@@ -219,6 +219,54 @@ Lists installed libraries (globally or for a project).
    - "Upload firmware to my ESP32"
    - "Search for WiFi libraries"
 
+## Usage with Claude Code
+
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is Anthropic's official CLI tool for Claude. It supports MCP servers for extending Claude's capabilities.
+
+### Configuration
+
+Add the server to your Claude Code settings file (`~/.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "platformio": {
+      "command": "node",
+      "args": ["/path/to/platformio-mcp/build/index.js"]
+    }
+  }
+}
+```
+
+For project-specific configuration, create `.claude/settings.json` in your project root.
+
+### Available Tools
+
+Once configured, Claude Code can use these MCP tools directly:
+
+- `mcp__platformio__list_boards` - Discover available boards
+- `mcp__platformio__get_board_info` - Get board specifications
+- `mcp__platformio__list_devices` - Find connected devices
+- `mcp__platformio__init_project` - Create new projects
+- `mcp__platformio__build_project` - Compile firmware
+- `mcp__platformio__clean_project` - Clean build artifacts
+- `mcp__platformio__upload_firmware` - Flash to device
+- `mcp__platformio__start_monitor` - Get monitor command
+- `mcp__platformio__search_libraries` - Search library registry
+- `mcp__platformio__install_library` - Install libraries
+- `mcp__platformio__list_installed_libraries` - List installed libraries
+
+### Example Workflow
+
+```
+You: Build my ESP32 project and upload it
+
+Claude Code: I'll build and upload your project.
+[Uses mcp__platformio__build_project]
+[Uses mcp__platformio__upload_firmware]
+Build successful! Firmware uploaded to /dev/cu.usbserial-0001
+```
+
 ## Development
 
 ```bash
@@ -300,6 +348,56 @@ await installLibrary("ArduinoJson", {
   version: "^6.21.0"
 });
 ```
+
+### ESP32 Development with Claude Code
+
+When using Claude Code with ESP32 projects, you can leverage natural language for common tasks:
+
+**Project Setup:**
+```
+You: Create a new ESP32-S2 project for the Adafruit Feather board with Arduino framework
+
+Claude Code: I'll set that up for you.
+[Uses mcp__platformio__init_project with board="featheresp32-s2", framework="arduino"]
+```
+
+**Finding the Right Board:**
+```
+You: What ESP32 boards support the ESP-IDF framework?
+
+Claude Code: Let me search for compatible boards.
+[Uses mcp__platformio__list_boards with filter="espressif32"]
+```
+
+**Library Management:**
+```
+You: I need a library for controlling stepper motors with acceleration
+
+Claude Code: I'll search the registry for stepper libraries.
+[Uses mcp__platformio__search_libraries with query="stepper acceleration"]
+Found: FastAccelStepper, AccelStepper, ESP-FlexyStepper...
+```
+
+**Build and Deploy Workflow:**
+```
+You: Build my project, upload it, and tell me how to monitor the output
+
+Claude Code:
+[Uses mcp__platformio__build_project]
+Build successful - 70% flash used
+[Uses mcp__platformio__upload_firmware]
+Uploaded to /dev/cu.usbserial-0001
+[Uses mcp__platformio__start_monitor]
+Run: pio device monitor -b 115200
+```
+
+**Common ESP32 Board IDs:**
+- `esp32dev` - Generic ESP32 DevKit
+- `featheresp32-s2` - Adafruit Feather ESP32-S2
+- `esp32-s3-devkitc-1` - ESP32-S3 DevKitC
+- `esp32-c3-devkitm-1` - ESP32-C3 DevKitM
+- `lolin_d32` - Wemos LOLIN D32
+- `esp32thing` - SparkFun ESP32 Thing
 
 ## Troubleshooting
 
