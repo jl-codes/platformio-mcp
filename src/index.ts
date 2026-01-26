@@ -20,6 +20,7 @@ import {
   BuildProjectParamsSchema,
   CleanProjectParamsSchema,
   UploadFirmwareParamsSchema,
+  UploadFilesystemParamsSchema,
   StartMonitorParamsSchema,
   SearchLibrariesParamsSchema,
   InstallLibraryParamsSchema,
@@ -31,7 +32,7 @@ import { listBoards, getBoardInfo } from './tools/boards.js';
 import { listDevices } from './tools/devices.js';
 import { initProject } from './tools/projects.js';
 import { buildProject, cleanProject } from './tools/build.js';
-import { uploadFirmware } from './tools/upload.js';
+import { uploadFirmware, uploadFilesystem } from './tools/upload.js';
 import { startMonitor } from './tools/monitor.js';
 import { searchLibraries, installLibrary, listInstalledLibraries } from './tools/libraries.js';
 import { checkPlatformIOInstalled } from './platformio.js';
@@ -150,6 +151,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'upload_firmware',
         description: 'Uploads compiled firmware to a connected device. Automatically builds if necessary. Supports automatic port detection.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            projectDir: {
+              type: 'string',
+              description: 'Path to the PlatformIO project directory',
+            },
+            port: {
+              type: 'string',
+              description: 'Optional upload port (auto-detected if not specified)',
+            },
+            environment: {
+              type: 'string',
+              description: 'Optional specific environment from platformio.ini',
+            },
+          },
+          required: ['projectDir'],
+        },
+      },
+      {
+        name: 'upload_filesystem',
+        description: 'Uploads filesystem image (SPIFFS/LittleFS) from the data/ directory to a connected device. Use this to deploy web assets, configuration files, or other static content stored in the project data folder.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -333,6 +356,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'upload_firmware': {
         const params = UploadFirmwareParamsSchema.parse(args);
         const result = await uploadFirmware(params.projectDir, params.port, params.environment);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'upload_filesystem': {
+        const params = UploadFilesystemParamsSchema.parse(args);
+        const result = await uploadFilesystem(params.projectDir, params.port, params.environment);
         return {
           content: [
             {
