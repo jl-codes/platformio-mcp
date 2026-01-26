@@ -289,6 +289,13 @@ export const UploadFirmwareParamsSchema = z.object({
   environment: z.string().optional().describe('Specific environment to upload (from platformio.ini)'),
 });
 
+// Upload filesystem parameters
+export const UploadFilesystemParamsSchema = z.object({
+  projectDir: z.string().min(1).describe('Path to the PlatformIO project directory'),
+  port: z.string().optional().describe('Upload port (auto-detected if not specified)'),
+  environment: z.string().optional().describe('Specific environment to upload (from platformio.ini)'),
+});
+
 // Start monitor parameters
 export const StartMonitorParamsSchema = z.object({
   port: z.string().optional().describe('Serial port to monitor (auto-detected if not specified)'),
