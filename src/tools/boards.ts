@@ -38,7 +38,7 @@ function normalizeBoardsOutput(
  */
 export async function listBoards(filter?: string): Promise<BoardInfo[]> {
   try {
-    const args: string[] = ['boards'];
+    const args: string[] = [];
     
     if (filter && filter.trim().length > 0) {
       args.push(filter.trim());
@@ -47,7 +47,7 @@ export async function listBoards(filter?: string): Promise<BoardInfo[]> {
     // Use shorter timeout for board listing
     const result = await platformioExecutor.executeWithJsonOutput(
       'boards',
-      [],
+      args,
       PioBoardsOutputSchema,
       { timeout: 30000 }
     );
