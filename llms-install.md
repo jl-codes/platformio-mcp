@@ -45,7 +45,7 @@ pio --version
 ### Step 1: Navigate to Server Directory
 
 ```bash
-cd /Users/tonyloehr/Desktop/Workspace/platformio-mcp
+cd /path/to/platformio-mcp
 ```
 
 ### Step 2: Install Dependencies
@@ -124,7 +124,7 @@ To use this server with Cline, add it to your MCP settings:
   "mcpServers": {
     "platformio": {
       "command": "node",
-      "args": ["/Users/tonyloehr/Desktop/Workspace/platformio-mcp/build/index.js"],
+      "args": ["/path/to/platformio-mcp/build/index.js"],
       "env": {}
     }
   }
@@ -138,12 +138,49 @@ To use this server with Cline, add it to your MCP settings:
     "platformio": {
       "command": "npm",
       "args": ["run", "dev"],
-      "cwd": "/Users/tonyloehr/Desktop/Workspace/platformio-mcp",
+      "cwd": "/path/to/platformio-mcp",
       "env": {}
     }
   }
 }
 ```
+
+## Configuration for Claude Code
+
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is Anthropic's official CLI for Claude with native MCP support.
+
+**Location:** `~/.claude/settings.json` (global) or `.claude/settings.json` (project-specific)
+
+**Configuration Example:**
+```json
+{
+  "mcpServers": {
+    "platformio": {
+      "command": "node",
+      "args": ["/path/to/platformio-mcp/build/index.js"]
+    }
+  }
+}
+```
+
+**Verify installation:**
+```bash
+# Start Claude Code - MCP tools load automatically
+claude
+
+# You can check available MCP tools with:
+/mcp
+```
+
+**Usage in Claude Code:**
+
+Once configured, interact naturally with your embedded projects:
+- "Build my PlatformIO project"
+- "What ESP32 boards are available?"
+- "Upload firmware to my connected device"
+- "Search for a JSON parsing library"
+
+Claude Code will automatically use the appropriate MCP tools (`mcp__platformio__build_project`, etc.).
 
 ## Troubleshooting
 
@@ -151,7 +188,7 @@ To use this server with Cline, add it to your MCP settings:
 
 **Solution:**
 ```bash
-cd /Users/tonyloehr/Desktop/Workspace/platformio-mcp
+cd /path/to/platformio-mcp
 rm -rf node_modules package-lock.json
 npm install
 ```
@@ -198,7 +235,7 @@ Run these commands to verify everything works:
 
 ```bash
 # 1. Check directory structure
-ls -la /Users/tonyloehr/Desktop/Workspace/platformio-mcp
+ls -la /path/to/platformio-mcp
 
 # 2. Verify dependencies
 npm list --depth=0
@@ -220,7 +257,7 @@ pio boards | head -5
 If something goes wrong, clean reinstall:
 
 ```bash
-cd /Users/tonyloehr/Desktop/Workspace/platformio-mcp
+cd /path/to/platformio-mcp
 rm -rf node_modules build package-lock.json
 npm install
 npm run build

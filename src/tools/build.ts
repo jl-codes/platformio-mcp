@@ -22,7 +22,7 @@ export async function buildProject(
   }
 
   try {
-    const args: string[] = ['run'];
+    const args: string[] = [];
 
     // Add environment if specified
     if (environment) {
@@ -109,13 +109,13 @@ export async function buildTarget(
   }
 
   try {
-    const args: string[] = ['run', '--target', target];
+    const args: string[] = ['--target', target];
 
     if (environment) {
       args.push('--environment', environment);
     }
 
-    const result = await platformioExecutor.execute('run', args.slice(1), {
+    const result = await platformioExecutor.execute('run', args, {
       cwd: validatedPath,
       timeout: 600000,
     });
@@ -150,13 +150,13 @@ export async function listTargets(projectDir: string, environment?: string): Pro
   const validatedPath = validateProjectPath(projectDir);
 
   try {
-    const args: string[] = ['run', '--list-targets'];
+    const args: string[] = ['--list-targets'];
 
     if (environment) {
       args.push('--environment', environment);
     }
 
-    const result = await platformioExecutor.execute('run', args.slice(1), {
+    const result = await platformioExecutor.execute('run', args, {
       cwd: validatedPath,
       timeout: 30000,
     });
