@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# PostToolUse hook: GPIO safety linter
+# Scans C/C++/Arduino files after write_to_file or replace_in_file for dangerous GPIO patterns.
+# Returns contextModification warnings so Cline can self-correct before the code hits hardware.
+
+set -euo pipefail
+
+# Read JSON input from stdin
+INPUT=$(cat)
+
+# Extract tool name and file path from the JSON
+TOOL=$(echo "$INPUT" | jq -r '.postToolUse.tool // empty')
+FILE_PATH=$(echo "$INPUT" | jq -r '.postToolUse.parameters.absolutePath // .postToolUse.parameters.path // empty')
+
+# Only run on file-writing tools
+if [[ "$TOOL" != "write_to_file" && "$TOOL" != "replace_in_file" ]]; then
+  echo '{"cancel": false}'
+  exit 0
+fi
+
+# Only lint C/C++/Arduino source files
+case "$FILE_PATH" in
+  *.cpp|*.c|*.h|*.hpp|*.ino) ;;
+  *)
+    echo '{"cancel": false}'
+    exit 0
+    ;;
+esac
+
+# Check if the file exists
+if [[ ! -f "$FILE_PATH" ]]; then
+  echo '{"cancel": false}'
+  exit 0
+fi
+
+WARNINGS=""
+
+# 1. Check for digitalWrite/analogWrite without a preceding pinMode in the same file
+if grep -qE '\bdigitalWrite\s*\(' "$FILE_PATH" || grep -qE '\banalogWrite\s*\(' "$FILE_PATH"; then
+  if ! grep -qE '\bpinMode\s*\(' "$FILE_PATH"; then
+    WARNINGS="${WARNINGS}⚠️ GPIO SAFETY: Found digitalWrite/analogWrite but NO pinMode() call in this file. Every pin must have its mode set before being driven. This can cause undefined behavior or hardware damage.\n"
+  fi
+fi
+
+# 2. Check for duplicate pin numbers in pinMode calls (potential conflict)
+if grep -qE '\bpinMode\s*\(' "$FILE_PATH"; then
+  DUPLICATE_PINS=$(grep -oE '\bpinMode\s*\(\s*[0-9]+' "$FILE_PATH" | grep -oE '[0-9]+' | sort | uniq -d)
+  if [[ -n "$DUPLICATE_PINS" ]]; then
+    WARNINGS="${WARNINGS}⚠️ GPIO SAFETY: Duplicate pinMode() calls for pin(s): ${DUPLICATE_PINS//$'\n'/, }. Multiple mode configurations on the same pin may indicate a conflict — verify these are intentional (e.g., mode change during runtime) and not two different functions fighting over the same pin.\n"
+  fi
+fi
+
+# 3. Check for common I2C/SPI pins being set as OUTPUT (ESP32 defaults)
+if grep -qE '\bpinMode\s*\(\s*(21|22|18|19|23|5)\s*,\s*OUTPUT\s*\)' "$FILE_PATH"; then
+  WARNINGS="${WARNINGS}⚠️ GPIO SAFETY: Setting a common I2C/SPI pin (21/22/18/19/23/5) as OUTPUT. If I2C or SPI is in use, this will cause bus conflicts and may damage connected peripherals. Verify these pins are not used for bus communication.\n"
+fi
+
+# 4. Check for direct register manipulation without comments (risky pattern)
+if grep -qE '\bGPIO_OUT_REG\b|\bREG_WRITE\b|\bREG_SET_BIT\b' "$FILE_PATH"; then
+  WARNINGS="${WARNINGS}⚠️ GPIO SAFETY: Direct register manipulation detected. This bypasses Arduino safety abstractions. Ensure you have verified the register addresses and bit masks against the MCU datasheet.\n"
+fi
+
+# 5. Check for magic numbers in pin operations
+if grep -qE '\bpinMode\s*\(\s*[0-9]+\s*,' "$FILE_PATH" || grep -qE '\bdigitalWrite\s*\(\s*[0-9]+\s*,' "$FILE_PATH"; then
+  WARNINGS="${WARNINGS}⚠️ PIN DISCIPLINE: Raw pin numbers detected in pinMode/digitalWrite calls. Use named constants (constexpr or #define) instead of magic numbers for maintainability and to prevent pin assignment errors.\n"
+fi
+
+# Return result
+if [[ -n "$WARNINGS" ]]; then
+  # Escape for JSON
+  WARNINGS_JSON=$(printf '%s' "$WARNINGS" | jq -Rs .)
+  echo "{\"cancel\": false, \"contextModification\": ${WARNINGS_JSON}}"
+else
+  echo '{"cancel": false}'
+fi

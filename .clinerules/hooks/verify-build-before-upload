@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# PreToolUse hook: Verify build exists before upload
+# Blocks firmware upload commands if no build artifacts exist, preventing flashing stale or missing firmware.
+
+set -euo pipefail
+
+# Read JSON input from stdin
+INPUT=$(cat)
+
+# Extract tool name and command from the JSON
+TOOL=$(echo "$INPUT" | jq -r '.preToolUse.tool // empty')
+COMMAND=$(echo "$INPUT" | jq -r '.preToolUse.parameters.command // empty')
+
+# Only intercept execute_command
+if [[ "$TOOL" != "execute_command" ]]; then
+  echo '{"cancel": false}'
+  exit 0
+fi
+
+# Only check upload commands
+if ! echo "$COMMAND" | grep -qE '(pio run\s+-t\s+upload|platformio run\s+-t\s+upload|pio run.*--target.*upload)'; then
+  echo '{"cancel": false}'
+  exit 0
+fi
+
+# Try to extract the project directory from the command (-d flag) or use workspace roots
+PROJECT_DIR=""
+if echo "$COMMAND" | grep -qE '\-d\s+\S+'; then
+  PROJECT_DIR=$(echo "$COMMAND" | grep -oE '\-d\s+\S+' | head -1 | sed 's/-d\s*//')
+fi
+
+# Fallback: check workspace roots from the hook input
+if [[ -z "$PROJECT_DIR" ]]; then
+  PROJECT_DIR=$(echo "$INPUT" | jq -r '.workspaceRoots[0] // empty')
+fi
+
+# If we still don't have a project dir, allow the upload (can't verify)
+if [[ -z "$PROJECT_DIR" || ! -d "$PROJECT_DIR" ]]; then
+  echo '{"cancel": false, "contextModification": "⚠️ Could not determine project directory to verify build artifacts. Proceeding with upload — ensure firmware was built recently."}'
+  exit 0
+fi
+
+# Check for build artifacts
+BUILD_DIR="$PROJECT_DIR/.pio/build"
+if [[ ! -d "$BUILD_DIR" ]]; then
+  echo '{"cancel": true, "errorMessage": "🛑 No build artifacts found at '"$BUILD_DIR"'. You must build the project (pio run) before uploading. Uploading without a build would flash stale or nonexistent firmware."}'
+  exit 0
+fi
+
+# Check if any .bin or .hex firmware files exist
+FIRMWARE_FILES=$(find "$BUILD_DIR" -maxdepth 3 \( -name "*.bin" -o -name "*.hex" -o -name "*.elf" \) -newer "$BUILD_DIR" 2>/dev/null | head -5)
+if [[ -z "$FIRMWARE_FILES" ]]; then
+  echo '{"cancel": true, "errorMessage": "🛑 Build directory exists but no firmware binaries (.bin/.hex/.elf) found in '"$BUILD_DIR"'. Run \"pio run\" to compile before uploading."}'
+  exit 0
+fi
+
+# Check if any source files are newer than the firmware (stale build)
+NEWEST_FIRMWARE=$(find "$BUILD_DIR" -maxdepth 3 \( -name "*.bin" -o -name "*.hex" -o -name "*.elf" \) -printf '%T@\n' 2>/dev/null | sort -rn | head -1)
+if [[ -z "$NEWEST_FIRMWARE" ]]; then
+  # -printf not available on macOS, use stat instead
+  NEWEST_FIRMWARE=$(find "$BUILD_DIR" -maxdepth 3 \( -name "*.bin" -o -name "*.hex" -o -name "*.elf" \) -exec stat -f '%m' {} \; 2>/dev/null | sort -rn | head -1)
+fi
+
+SRC_DIR="$PROJECT_DIR/src"
+if [[ -d "$SRC_DIR" && -n "$NEWEST_FIRMWARE" ]]; then
+  NEWEST_SOURCE=$(find "$SRC_DIR" \( -name "*.cpp" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" -o -name "*.ino" \) -exec stat -f '%m' {} \; 2>/dev/null | sort -rn | head -1)
+  if [[ -n "$NEWEST_SOURCE" ]] && (( NEWEST_SOURCE > NEWEST_FIRMWARE )); then
+    echo '{"cancel": false, "contextModification": "⚠️ STALE BUILD: Source files in src/ are newer than the latest firmware binary. The upload will proceed, but you may be flashing outdated firmware. Consider running \"pio run\" first to recompile."}'
+    exit 0
+  fi
+fi
+
+# All checks passed
+echo '{"cancel": false}'
