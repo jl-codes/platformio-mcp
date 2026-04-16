@@ -35,6 +35,7 @@ import {
   StopMonitorParamsSchema,
   QueryLogsParamsSchema,
   CheckTaskStatusParamsSchema,
+  GetDashboardUrlParamsSchema,
 } from "./types.js";
 
 // Import tool functions from feature modules
@@ -57,6 +58,7 @@ import { killAllTrackedProcesses } from "./utils/process-manager.js";
 import { LOCKS_DIR } from "./utils/paths.js";
 import fs from "node:fs";
 import path from "node:path";
+import { getDashboardStatus } from "./api/server.js";
 
 /**
  * Main PlatformIO MCP Server instance configuration.
@@ -412,6 +414,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: "get_dashboard_url",
+        description: "Retrieves the address and auth token for the MCP Web Dashboard. Automatically starts the web server on demand if offline.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            open: { type: "boolean", description: "If true, automatically opens the authenticated GUI link natively in the system's browser." },
+          },
+        },
+      },
     ],
   };
 });
@@ -731,6 +743,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      case "get_dashboard_url": {
+        const params = GetDashboardUrlParamsSchema.parse(args);
+        const result = await getDashboardStatus(params.open);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -763,6 +783,10 @@ async function main() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
+  if (process.argv.includes("--open-dashboard-on-start") || process.env.PIO_MCP_OPEN_DASH_ON_START === "true") {
+    getDashboardStatus(true).catch((e) => console.error(`[Dashboard] ${e.message}`));
+  }
 
   console.error("PlatformIO MCP Server running on stdio");
   console.error("Server supports 1000+ boards across 30+ platforms");

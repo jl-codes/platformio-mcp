@@ -541,3 +541,10 @@ export const CheckTaskStatusParamsSchema = z.object({
   projectDir: z.string().optional().describe("Optional project directory containing the workspace logs"),
 });
 
+/**
+ * Zod schema for get_dashboard_url tool parameters.
+ */
+export const GetDashboardUrlParamsSchema = z.object({
+  open: z.boolean().optional().describe("If true, automatically opens the local dashboard UI in the system's default browser."),
+});
+

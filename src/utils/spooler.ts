@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { platformioExecutor } from "../platformio.js";
 import { registerBuildPid, unregisterBuildPid, isBuildActive } from "./process-manager.js";
+import { portalEvents } from "../api/events.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOGS_DIR = "build_logs";
@@ -112,6 +113,28 @@ export async function executeWithSpooling(
     fs.linkSync(logFile, latestLog);
   } catch {}
 
+  // UI Portal File Tailing
+  let fileOffset = 0;
+  let watcher: fs.FSWatcher | null = null;
+  portalEvents.clearBuildLog(projectArea, logFile);
+
+  try {
+    watcher = fs.watch(logFile, (eventType) => {
+      if (eventType === 'change') {
+        try {
+          const stat = fs.statSync(logFile);
+          if (stat.size > fileOffset) {
+            const stream = fs.createReadStream(logFile, { start: fileOffset });
+            stream.on('data', (chunk) => {
+              portalEvents.emitBuildLog(projectArea, chunk.toString());
+            });
+            fileOffset = stat.size;
+          }
+        } catch {}
+      }
+    });
+  } catch {}
+
   // 4. Wait for termination
   const timeoutMs = options.timeout ?? 600000;
 
@@ -138,6 +161,7 @@ export async function executeWithSpooling(
     p.catch(e => console.error(`[Background Task Error]: ${e.message}`)).finally(() => {
       unregisterBuildPid(projectArea);
       try { fs.closeSync(outFd); } catch {}
+      if (watcher) { try { watcher.close(); } catch {} }
     });
 
     return { status: "running", message: "Task dispatched to background.", pid: proc.pid };
@@ -167,6 +191,9 @@ export async function executeWithSpooling(
   try {
     fs.closeSync(outFd);
   } catch {}
+  if (watcher) {
+    try { watcher.close(); } catch {}
+  }
 
   // 5. Yield contextual snapshot (preventing window bloat)
   let finalOutput = "";

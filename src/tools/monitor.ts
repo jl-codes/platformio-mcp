@@ -16,6 +16,7 @@ import { portSemaphoreManager } from "../utils/semaphore.js";
 import { getFirstDevice } from "./devices.js";
 import { registerPioMonitorPid, killPioMonitorByPort } from "../utils/process-manager.js";
 import { platformioExecutor } from "../platformio.js";
+import { portalEvents } from "../api/events.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOGS_DIR = "serial_logs";
@@ -45,10 +46,16 @@ type DaemonContext = {
   environment?: string; // Configured environment properties map
   hwid: string | null; // HWID to track the device across macOS descriptor re-enumerations
   logFile: string; // Active absolute path to the local primary written file
+  fileOffset?: number; // Internal tailing offset
+  watcher?: fs.FSWatcher; // Tailing pointer
 };
 
 // Global pool of hardware streams managed by the MCP server
 const activeDaemons: Record<string, DaemonContext> = {};
+
+export function getSpoolerStates() {
+  return activeDaemons;
+}
 
 /**
  * Clears outdated serial traces beyond the rotation limit to prevent disk bloat.
@@ -88,7 +95,12 @@ export async function stopMonitor(port: string, projectDir?: string) {
   
   if (activeDaemons[port]) {
     logDiag(`[Spooler Diagnostic] Deleting activeDaemons context.`, projectDir);
+    const daemon = activeDaemons[port];
+    if (daemon.watcher) {
+      try { daemon.watcher.close(); } catch {}
+    }
     delete activeDaemons[port];
+    portalEvents.emitSpoolerStates(getSpoolerStates());
     try {
       portSemaphoreManager.releasePort(port);
     } catch (e) {}
@@ -223,10 +235,33 @@ export async function startMonitor(
     environment,
     hwid: activeHwid,
     logFile,
+    fileOffset: 0,
   };
   activeDaemons[activePort] = daemon;
 
   await spawnPioMonitor(activePort, projectDir);
+
+  // Attach UI portal tailing
+  try {
+    daemon.watcher = fs.watch(logFile, (eventType) => {
+      if (eventType === 'change') {
+        try {
+          const stat = fs.statSync(logFile);
+          if (stat.size > (daemon.fileOffset || 0)) {
+            const stream = fs.createReadStream(logFile, { start: daemon.fileOffset });
+            stream.on('data', (chunk) => {
+              portalEvents.emitSerialLog(activePort!, chunk.toString());
+            });
+            daemon.fileOffset = stat.size;
+          }
+        } catch (e) {}
+      }
+    });
+  } catch (e) {
+    logDiag(`[Spooler] Failed to attach fs.watch to ${logFile}`, projectDir);
+  }
+
+  portalEvents.emitSpoolerStates(getSpoolerStates());
 
   return { success: true, port: activePort, logFile };
 }
