@@ -20,6 +20,16 @@ import {
 import { UploadError, PlatformIOError } from "../utils/errors.js";
 import { parseStderrErrors } from "../utils/errors.js";
 
+/**
+ * Uploads a SPIFFS/LittleFS filesystem image to a target device.
+ *
+ * @param projectDir - Validated project directory root.
+ * @param port - Target COM port or undefined to autodetect.
+ * @param environment - Optional specific environment target.
+ * @param verbose - If true, captures complete output without truncation.
+ * @param background - Executes asynchronously in the background.
+ * @returns Upload completion status.
+ */
 export async function uploadFilesystem(
   projectDir: string,
   port?: string,
@@ -96,6 +106,16 @@ export async function uploadFilesystem(
   }
 }
 
+/**
+ * Uploads a compiled firmware binary to a target device.
+ *
+ * @param projectDir - Validated project directory root.
+ * @param port - Target COM port or undefined to autodetect.
+ * @param environment - Optional specific environment target.
+ * @param verbose - If true, captures complete output without truncation.
+ * @param background - Executes asynchronously in the background.
+ * @returns Upload completion status.
+ */
 export async function uploadFirmware(
   projectDir: string,
   port?: string,
@@ -172,6 +192,16 @@ export async function uploadFirmware(
   }
 }
 
+/**
+ * Uploads firmware and sequentially initiates a monitor trace.
+ *
+ * @param projectDir - Validated project directory root.
+ * @param port - Target COM port or undefined to autodetect.
+ * @param environment - Optional specific environment target.
+ * @param verbose - If true, captures complete output without truncation.
+ * @param background - Executes asynchronously in the background.
+ * @returns Upload completion status.
+ */
 export async function uploadAndMonitor(
   projectDir: string,
   port?: string,
@@ -182,6 +212,16 @@ export async function uploadAndMonitor(
   return uploadFirmware(projectDir, port, environment, verbose, background);
 }
 
+/**
+ * Automates a complete compilation phase followed by a firmware upload.
+ *
+ * @param projectDir - Validated project directory root.
+ * @param port - Target COM port or undefined to autodetect.
+ * @param environment - Optional specific environment target.
+ * @param verbose - If true, captures complete output without truncation.
+ * @param background - Executes asynchronously in the background.
+ * @returns Build and Upload sequential status.
+ */
 export async function buildAndUpload(
   projectDir: string,
   port?: string,

@@ -148,6 +148,9 @@ export interface BuildResult {
   pid?: number;
 }
 
+/**
+ * Outcome of a project clean execution.
+ */
 export interface CleanResult {
   success?: boolean;
   message?: string;
@@ -159,6 +162,9 @@ export interface CleanResult {
 // Upload Types
 // ============================================================================
 
+/**
+ * Configuration options for firmware and filesystem uploads.
+ */
 export interface UploadConfig {
   projectDir: string;
   port?: string;
@@ -189,12 +195,18 @@ export interface UploadResult {
 // Library Types
 // ============================================================================
 
+/**
+ * Author metadata for a library in the PlatformIO registry.
+ */
 export interface LibraryAuthor {
   name: string;
   email?: string;
   maintainer?: boolean;
 }
 
+/**
+ * Repository location metadata for a library.
+ */
 export interface LibraryRepository {
   type: string;
   url: string;
@@ -258,6 +270,9 @@ export const LibrarySearchResponseSchema = z.object({
   items: z.array(LibraryInfoSchema),
 });
 
+/**
+ * Configuration parameters for searching libraries.
+ */
 export interface LibrarySearchConfig {
   query: string;
   limit?: number;
@@ -268,6 +283,9 @@ export const LibrarySearchConfigSchema = z.object({
   limit: z.number().positive().optional(),
 });
 
+/**
+ * Configuration parameters for installing a library.
+ */
 export interface LibraryInstallConfig {
   library: string;
   projectDir?: string;
@@ -280,6 +298,9 @@ export const LibraryInstallConfigSchema = z.object({
   version: z.string().optional(),
 });
 
+/**
+ * Outcome of a library installation.
+ */
 export interface LibraryInstallResult {
   success: boolean;
   library: string;
@@ -290,6 +311,9 @@ export interface LibraryInstallResult {
 // Platform Types
 // ============================================================================
 
+/**
+ * Information about a PlatformIO platform.
+ */
 export interface PlatformInfo {
   name: string;
   title: string;

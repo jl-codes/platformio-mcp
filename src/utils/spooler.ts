@@ -1,3 +1,12 @@
+/**
+ * Execution Spooling Utilities
+ * Crash-resilient process spawning that writes directly to disk.
+ *
+ * Provides:
+ * - rotateLogs: Generic log file rotater by prefix.
+ * - rotateBuildStreams: Specialized build log rotation.
+ * - executeWithSpooling: Spawns child processes mapped to disk limits.
+ */
 import fs from "node:fs";
 import path from "node:path";
 import { platformioExecutor } from "../platformio.js";
@@ -11,6 +20,13 @@ function getLogDir(projectDir?: string): string {
   return path.join(baseDir, WORKSPACE_DIR, LOGS_DIR);
 }
 
+/**
+ * Cleans out old log trace files adhering to an upper boundary limit.
+ *
+ * @param targetDir - Evaluated workspace folder storing logs.
+ * @param prefix - Filter signature indicating matching files.
+ * @param maxHistory - Absolute count of youngest logs to preserve.
+ */
 export function rotateLogs(targetDir: string, prefix: string, maxHistory = 30) {
   if (!fs.existsSync(targetDir)) return;
   const files = fs
@@ -33,6 +49,12 @@ export function rotateLogs(targetDir: string, prefix: string, maxHistory = 30) {
   }
 }
 
+/**
+ * Automatically prunes historical build payload output files from the local environment block.
+ *
+ * @param projectDir - Associated workspace to scope clearance into.
+ * @returns Absolute routing map to latest runtime traces.
+ */
 export function rotateBuildStreams(projectDir?: string) {
   const targetDir = getLogDir(projectDir);
   if (!fs.existsSync(targetDir)) {
@@ -48,6 +70,15 @@ export function rotateBuildStreams(projectDir?: string) {
   return { logFile, latestLog };
 }
 
+/**
+ * Wraps child process invocation forcing its runtime payload exclusively through 
+ * an active offline disk file context instead of active NodeJS stream memory.
+ *
+ * @param command - Core executing binary token.
+ * @param args - CLI arguments string array.
+ * @param options - Operational environment context overriding execution behavior.
+ * @returns Complete exit code metadata, trace locations, and completion summaries.
+ */
 export async function executeWithSpooling(
   command: string,
   args: string[],

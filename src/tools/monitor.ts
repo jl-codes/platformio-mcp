@@ -77,6 +77,12 @@ function rotateLogs(targetDir: string, maxHistory = 30) {
   }
 }
 
+/**
+ * Safely stops an active monitor daemon session and unlocks its port.
+ *
+ * @param port - The serial COM port to terminate polling on.
+ * @param projectDir - Optional project directory context.
+ */
 export async function stopMonitor(port: string, projectDir?: string) {
   logDiag(`[Spooler Diagnostic] stopMonitor called for port ${port}.`, projectDir);
   

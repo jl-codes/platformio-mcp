@@ -10,6 +10,9 @@
 import { randomUUID } from "node:crypto";
 import { PlatformIOError } from "./errors.js";
 
+/**
+ * Exception thrown when a process fails to acquire the global pipeline lock.
+ */
 export class QueueEnforcementError extends PlatformIOError {
   constructor(message: string, context?: Record<string, unknown>) {
     super(message, "QUEUE_ENFORCEMENT_FAILED", context);
@@ -17,6 +20,9 @@ export class QueueEnforcementError extends PlatformIOError {
   }
 }
 
+/**
+ * Internal representation of an actively held system hardware lock stream.
+ */
 export interface LockState {
   isLocked: boolean;
   sessionId?: string;
