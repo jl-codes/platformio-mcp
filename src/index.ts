@@ -31,6 +31,9 @@ import {
   ListInstalledLibrariesParamsSchema,
   AcquireLockParamsSchema,
   ReleaseLockParamsSchema,
+  StartMonitorParamsSchema,
+  StopMonitorParamsSchema,
+  QueryLogsParamsSchema,
 } from "./types.js";
 
 // Import tool functions from feature modules
@@ -39,6 +42,7 @@ import { listDevices } from "./tools/devices.js";
 import { initProject } from "./tools/projects.js";
 import { buildProject, cleanProject } from "./tools/build.js";
 import { uploadFirmware, uploadFilesystem } from "./tools/upload.js";
+import { startMonitor, stopMonitor, queryLogs } from "./tools/monitor.js";
 
 import {
   searchLibraries,
@@ -345,6 +349,44 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: "start_monitor",
+        description: "Manually start or restart the background serial-to-disk spooler for a specific device.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            port: { type: "string", description: "Optional COM path. Falls back to default." },
+            baudRate: { type: "number", description: "Optional baud rate. Defaults to 115200." },
+            projectDir: { type: "string", description: "Target project boundary to deposit raw hardware logs into instead of the global server cache." },
+            environment: { type: "string", description: "Optional PlatformIO environment context." },
+          },
+        },
+      },
+      {
+        name: "stop_monitor",
+        description: "Kills the active background serial listener and unlocks the UART.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            port: { type: "string", description: "COM port to stop listening on." },
+            projectDir: { type: "string", description: "Target project containing the workspace." },
+          },
+          required: ["port"],
+        },
+      },
+      {
+        name: "query_logs",
+        description: "Scans the latest active background serial trace spool, returning a filtered string block.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            lines: { type: "number", description: "Fetch this many tail lines from the end of the log (default: 100)" },
+            searchPattern: { type: "string", description: "Optional Regex pattern to filter the spool for specific keywords." },
+            projectDir: { type: "string", description: "Target project checkout to query local .log cache instead of global cache." },
+            port: { type: "string", description: "Specific COM port to query logs for." },
+          },
+        },
+      },
     ],
   };
 });
@@ -593,6 +635,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: JSON.stringify(libraries, null, 2),
             },
           ],
+        };
+      }
+
+      case "start_monitor": {
+        const params = StartMonitorParamsSchema.parse(args);
+        const executeTask = () =>
+          startMonitor(params.port, params.baudRate, params.projectDir, params.environment);
+        const result = await hardwareLockManager.withImplicitLock(executeTask);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "stop_monitor": {
+        const params = StopMonitorParamsSchema.parse(args);
+        const executeTask = async () => {
+          await stopMonitor(params.port, params.projectDir);
+          return { success: true, message: `Stopped monitor on ${params.port}` };
+        };
+        const result = await hardwareLockManager.withImplicitLock(executeTask);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "query_logs": {
+        const params = QueryLogsParamsSchema.parse(args);
+        const result = await queryLogs(params.lines, params.searchPattern, params.projectDir, params.port);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       }
 

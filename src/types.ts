@@ -469,3 +469,23 @@ export const ListInstalledLibrariesParamsSchema = z.object({
     .describe("Project directory (lists global libraries if not specified)"),
 });
 
+// Monitor parameters
+export const StartMonitorParamsSchema = z.object({
+  port: z.string().optional().describe("Optional serial port to monitor (auto-detected if not specified)"),
+  baudRate: z.number().optional().describe("Baud rate for serial connection (defaults to 115200)"),
+  projectDir: z.string().optional().describe("Optional project directory for workspace log storage"),
+  environment: z.string().optional().describe("Optional PlatformIO environment context"),
+});
+
+export const StopMonitorParamsSchema = z.object({
+  port: z.string().describe("Serial port to stop monitoring"),
+  projectDir: z.string().optional().describe("Optional project directory containing the workspace logs"),
+});
+
+export const QueryLogsParamsSchema = z.object({
+  lines: z.number().optional().describe("Number of tail lines to retrieve (default: 100)"),
+  searchPattern: z.string().optional().describe("Optional Regex pattern to filter logs"),
+  projectDir: z.string().optional().describe("Optional project directory containing the workspace logs"),
+  port: z.string().optional().describe("Specific port to query logs for"),
+});
+

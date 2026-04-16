@@ -308,6 +308,8 @@ export class PlatformIOExecutor {
       cwd?: string;
       env?: NodeJS.ProcessEnv;
       useFakeTty?: boolean;
+      detached?: boolean;
+      stdio?: any;
     } = {},
   ): ChildProcess {
     let pioBinary = "pio";
@@ -352,6 +354,8 @@ export class PlatformIOExecutor {
       cwd: options.cwd,
       env,
       shell: false,
+      detached: options.detached,
+      stdio: options.stdio,
     });
   }
 }
