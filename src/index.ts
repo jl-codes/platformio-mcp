@@ -29,6 +29,8 @@ import {
   SearchLibrariesParamsSchema,
   InstallLibraryParamsSchema,
   ListInstalledLibrariesParamsSchema,
+  AcquireLockParamsSchema,
+  ReleaseLockParamsSchema,
 } from "./types.js";
 
 // Import tool functions from feature modules
@@ -45,6 +47,7 @@ import {
 } from "./tools/libraries.js";
 import { checkPlatformIOInstalled } from "./platformio.js";
 import { formatPlatformIOError } from "./utils/errors.js";
+import { hardwareLockManager } from "./utils/lock-manager.js";
 
 /**
  * Main PlatformIO MCP Server instance configuration.
@@ -247,6 +250,42 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "acquire_lock",
+        description:
+          "Explicitly claim the hardware queue lock for multi-step tasks. Throws if already held.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            sessionId: {
+              type: "string",
+              description: "Your active Session ID",
+            },
+            reason: { type: "string", description: "Reason for locking" },
+          },
+          required: ["sessionId"],
+        },
+      },
+      {
+        name: "release_lock",
+        description:
+          "Release the explicit queue lock matching your session ID.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            sessionId: {
+              type: "string",
+              description: "Your active Session ID",
+            },
+          },
+          required: ["sessionId"],
+        },
+      },
+      {
+        name: "get_lock_status",
+        description: "Reveals who currently owns the hardware queue lock.",
+        inputSchema: { type: "object", properties: {} },
+      },
+      {
         name: "search_libraries",
         description:
           "Searches the PlatformIO library registry for available libraries by name, keywords, or description.",
@@ -374,11 +413,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "build_project": {
         const params = BuildProjectParamsSchema.parse(args);
 
-        const result = await buildProject(
-          params.projectDir,
-          params.environment,
-          params.verbose,
-        );
+        const executeTask = () =>
+          buildProject(params.projectDir, params.environment, params.verbose);
+        const result = params.sessionId
+          ? (hardwareLockManager.requireLock(params.sessionId),
+            await executeTask())
+          : await hardwareLockManager.withImplicitLock(executeTask);
 
         return {
           content: [
@@ -393,7 +433,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "clean_project": {
         const params = CleanProjectParamsSchema.parse(args);
 
-        const result = await cleanProject(params.projectDir);
+        const executeTask = () => cleanProject(params.projectDir);
+        const result = params.sessionId
+          ? (hardwareLockManager.requireLock(params.sessionId),
+            await executeTask())
+          : await hardwareLockManager.withImplicitLock(executeTask);
 
         return {
           content: [
@@ -408,12 +452,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "upload_filesystem": {
         const params = UploadFilesystemParamsSchema.parse(args);
 
-        const result = await uploadFilesystem(
-          params.projectDir,
-          params.port,
-          params.environment,
-          params.verbose,
-        );
+        const executeTask = () =>
+          uploadFilesystem(
+            params.projectDir,
+            params.port,
+            params.environment,
+            params.verbose,
+          );
+        const result = params.sessionId
+          ? (hardwareLockManager.requireLock(params.sessionId),
+            await executeTask())
+          : await hardwareLockManager.withImplicitLock(executeTask);
 
         return {
           content: [
@@ -428,18 +477,78 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "upload_firmware": {
         const params = UploadFirmwareParamsSchema.parse(args);
 
-        const result = await uploadFirmware(
-          params.projectDir,
-          params.port,
-          params.environment,
-          params.verbose,
-        );
+        const executeTask = () =>
+          uploadFirmware(
+            params.projectDir,
+            params.port,
+            params.environment,
+            params.verbose,
+          );
+        const result = params.sessionId
+          ? (hardwareLockManager.requireLock(params.sessionId),
+            await executeTask())
+          : await hardwareLockManager.withImplicitLock(executeTask);
 
         return {
           content: [
             {
               type: "text",
               text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "acquire_lock": {
+        const params = AcquireLockParamsSchema.parse(args);
+        hardwareLockManager.acquireLock(params.sessionId, params.reason);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: "Hardware lock acquired explicitly.",
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+
+      case "release_lock": {
+        const params = ReleaseLockParamsSchema.parse(args);
+        hardwareLockManager.releaseLock(params.sessionId);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: "Hardware lock released explicitly.",
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+
+      case "get_lock_status": {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                hardwareLockManager.getLockStatus(),
+                null,
+                2,
+              ),
             },
           ],
         };

@@ -305,6 +305,27 @@ export const ListBoardsParamsSchema = z.object({
     .describe("Optional filter by platform, framework, or MCU"),
 });
 
+// Hardware Lock parameters
+export const AcquireLockParamsSchema = z.object({
+  sessionId: z
+    .string()
+    .min(1)
+    .describe(
+      "Unique ID of the agent session acquiring the lock for a multi-step pipeline",
+    ),
+  reason: z
+    .string()
+    .optional()
+    .describe("Reason for acquiring the lock (e.g., Task Name)"),
+});
+
+export const ReleaseLockParamsSchema = z.object({
+  sessionId: z
+    .string()
+    .min(1)
+    .describe("Unique ID of the agent session releasing the lock"),
+});
+
 
 // Get board info parameters
 /**
