@@ -7,6 +7,10 @@
   "bin": {
     "platformio-mcp-server": "build/index.js"
   },
+  "files": [
+    "build",
+    "skills"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
