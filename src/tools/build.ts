@@ -10,6 +10,7 @@
  */
 
 import { platformioExecutor } from "../platformio.js";
+import { executeWithSpooling } from "../utils/spooler.js";
 import type { BuildResult, CleanResult } from "../types.js";
 import {
   validateProjectPath,
@@ -50,29 +51,30 @@ export async function buildProject(
 
 
     // Build can take a while, especially first time
-    const result = await platformioExecutor.execute("run", args, {
+    const result = await executeWithSpooling("run", args, {
       cwd: validatedPath,
+      projectDir: validatedPath,
       timeout: 600000, // 10 minutes
     });
 
     const success = result.exitCode === 0;
-    const errors = success ? undefined : parseStderrErrors(result.stderr);
+    const errors = success ? undefined : parseStderrErrors(result.finalOutput);
 
     let ramUsageBytes: number | undefined;
     let flashUsageBytes: number | undefined;
 
     if (success) {
-      const ramMatch = result.stdout.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
+      const ramMatch = result.finalOutput.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
       if (ramMatch) ramUsageBytes = parseInt(ramMatch[1], 10);
 
-      const flashMatch = result.stdout.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
+      const flashMatch = result.finalOutput.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
       if (flashMatch) flashUsageBytes = parseInt(flashMatch[1], 10);
     }
 
     return {
       success,
       environment: environment || "default",
-      output: success && !verbose ? undefined : result.stdout,
+      output: success && !verbose ? undefined : result.finalOutput,
       errors,
       ramUsageBytes,
       flashUsageBytes,
@@ -101,11 +103,12 @@ export async function cleanProject(projectDir: string): Promise<CleanResult> {
   const validatedPath = validateProjectPath(projectDir);
 
   try {
-    const result = await platformioExecutor.execute(
+    const result = await executeWithSpooling(
       "run",
       ["--target", "clean"],
       {
         cwd: validatedPath,
+        projectDir: validatedPath,
         timeout: 60000,
       },
     );
@@ -113,9 +116,9 @@ export async function cleanProject(projectDir: string): Promise<CleanResult> {
     const success = result.exitCode === 0;
 
     if (!success) {
-      throw new BuildError(`Clean failed: ${result.stderr}`, {
+      throw new BuildError(`Clean failed: ${result.finalOutput}`, {
         projectDir,
-        stderr: result.stderr,
+        stderr: result.finalOutput,
       });
     }
 
@@ -162,29 +165,30 @@ export async function buildTarget(
     }
 
 
-    const result = await platformioExecutor.execute("run", args, {
+    const result = await executeWithSpooling("run", args, {
       cwd: validatedPath,
+      projectDir: validatedPath,
       timeout: 600000,
     });
 
     const success = result.exitCode === 0;
-    const errors = success ? undefined : parseStderrErrors(result.stderr);
+    const errors = success ? undefined : parseStderrErrors(result.finalOutput);
 
     let ramUsageBytes: number | undefined;
     let flashUsageBytes: number | undefined;
 
     if (success) {
-      const ramMatch = result.stdout.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
+      const ramMatch = result.finalOutput.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
       if (ramMatch) ramUsageBytes = parseInt(ramMatch[1], 10);
 
-      const flashMatch = result.stdout.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
+      const flashMatch = result.finalOutput.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
       if (flashMatch) flashUsageBytes = parseInt(flashMatch[1], 10);
     }
 
     return {
       success,
       environment: environment || "default",
-      output: success && !verbose ? undefined : result.stdout,
+      output: success && !verbose ? undefined : result.finalOutput,
       errors,
       ramUsageBytes,
       flashUsageBytes,

@@ -8,7 +8,8 @@
  * - buildAndUpload: Compiles and dispatches binaries.
  */
 
-import { platformioExecutor } from "../platformio.js";
+
+import { executeWithSpooling } from "../utils/spooler.js";
 import type { UploadResult } from "../types.js";
 import {
   validateProjectPath,
@@ -53,11 +54,12 @@ export async function uploadFilesystem(
     const uploadArgs: string[] = ["run", "--target", "uploadfs"];
     if (environment) uploadArgs.push("--environment", environment);
 
-    const uploadResult = await platformioExecutor.execute(
+    const uploadResult = await executeWithSpooling(
       "run",
       uploadArgs.slice(1),
       {
         cwd: validatedPath,
+        projectDir: validatedPath,
         timeout: 600000,
       },
     );
@@ -67,10 +69,10 @@ export async function uploadFilesystem(
     return {
       success: uploadSuccess,
       port: activePort,
-      output: uploadSuccess && !verbose ? undefined : uploadResult.stdout,
+      output: uploadSuccess && !verbose ? undefined : uploadResult.finalOutput,
       errors: uploadSuccess
         ? undefined
-        : parseStderrErrors(uploadResult.stderr),
+        : parseStderrErrors(uploadResult.finalOutput),
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
@@ -122,11 +124,12 @@ export async function uploadFirmware(
     const uploadArgs: string[] = ["run", "--target", "upload"];
     if (environment) uploadArgs.push("--environment", environment);
 
-    const uploadResult = await platformioExecutor.execute(
+    const uploadResult = await executeWithSpooling(
       "run",
       uploadArgs.slice(1),
       {
         cwd: validatedPath,
+        projectDir: validatedPath,
         timeout: 600000,
       },
     );
@@ -136,10 +139,10 @@ export async function uploadFirmware(
     return {
       success: uploadSuccess,
       port: activePort,
-      output: uploadSuccess && !verbose ? undefined : uploadResult.stdout,
+      output: uploadSuccess && !verbose ? undefined : uploadResult.finalOutput,
       errors: uploadSuccess
         ? undefined
-        : parseStderrErrors(uploadResult.stderr),
+        : parseStderrErrors(uploadResult.finalOutput),
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {

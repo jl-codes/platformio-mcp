@@ -52,6 +52,10 @@ import {
 import { checkPlatformIOInstalled } from "./platformio.js";
 import { formatPlatformIOError } from "./utils/errors.js";
 import { hardwareLockManager } from "./utils/lock-manager.js";
+import { killAllTrackedProcesses } from "./utils/process-manager.js";
+import { LOCKS_DIR } from "./utils/paths.js";
+import fs from "node:fs";
+import path from "node:path";
 
 /**
  * Main PlatformIO MCP Server instance configuration.
@@ -387,6 +391,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: "reset_server_state",
+        description: "Forcefully cleans all server locks and terminates any tracked daemon or compilation PIDs globally or locally.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string", description: "Optional target directory for scoped cleanup." },
+          },
+        },
+      },
     ],
   };
 });
@@ -665,6 +679,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const result = await queryLogs(params.lines, params.searchPattern, params.projectDir, params.port);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "reset_server_state": {
+        const projectDir = args.projectDir as string | undefined;
+        await killAllTrackedProcesses(projectDir);
+
+        // Release MCP Explicit Lock
+        const status = hardwareLockManager.getLockStatus();
+        if (status.isLocked && status.sessionId) {
+          hardwareLockManager.releaseLock(status.sessionId);
+        }
+
+        // Release OS-level Semaphores
+        try {
+          if (fs.existsSync(LOCKS_DIR)) {
+            for (const file of fs.readdirSync(LOCKS_DIR)) {
+              if (file.endsWith(".lock")) {
+                fs.unlinkSync(path.join(LOCKS_DIR, file));
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`Failed to wipe semaphores: ${e}`);
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify({ success: true, message: "System state has been reset and all locks cleared." }, null, 2) }],
         };
       }
 
