@@ -1,0 +1,67 @@
+name: 🔍 PR Detective Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Cline CLI
+        run: npm install -g cline
+
+      - name: Authenticate Cline
+        env:
+          CLINE_API_KEY: ${{ secrets.CLINE_API_KEY }}
+        run: |
+          # Configure Cline with the API key
+          mkdir -p ~/.cline/data
+          echo '{"clineApiKey":"'"$CLINE_API_KEY"'"}' > ~/.cline/data/secrets.json
+          chmod 600 ~/.cline/data/secrets.json
+
+      - name: Clone PR Detective
+        run: |
+          git clone https://github.com/jl-codes/sdk-pr-detective.git /tmp/pr-detective
+          cd /tmp/pr-detective
+          npm install
+
+      - name: Run PR Detective
+        id: detective
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          cd /tmp/pr-detective
+          REVIEW=$(npx tsx src/index.ts --ci "$PR_URL" 2>/dev/null || echo "⚠️ PR Detective encountered an error analyzing this PR.")
+
+          # Write to file to handle multiline output
+          echo "$REVIEW" > /tmp/review.md
+
+      - name: Post PR Comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Build the comment with header
+          {
+            echo "## 🔍 PR Detective Review"
+            echo ""
+            echo "*Automated analysis powered by the [Cline SDK](https://docs.cline.bot/cline-sdk/overview)*"
+            echo ""
+            echo "---"
+            echo ""
+            cat /tmp/review.md
+          } > /tmp/comment.md
+
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --body-file /tmp/comment.md
