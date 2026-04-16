@@ -27,12 +27,13 @@ function getLogDir(projectDir?: string): string {
 }
 
 function logDiag(msg: string, projectDir?: string) {
-  const targetDir = getLogDir(projectDir);
-  const diagLog = path.join(targetDir, "mcp-internal.log");
+  const baseDir = projectDir || process.cwd();
+  const workspaceDir = path.join(baseDir, WORKSPACE_DIR);
+  const diagLog = path.join(workspaceDir, "mcp-internal.log");
   const timestamp = new Date().toISOString();
   const line = `[${timestamp}] ${msg}\n`;
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
+  if (!fs.existsSync(workspaceDir)) {
+    fs.mkdirSync(workspaceDir, { recursive: true });
   }
   fs.appendFileSync(diagLog, line);
   console.error(msg);
@@ -150,6 +151,7 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string) {
   
   const proc = platformioExecutor.spawn("device", ["monitor", ...monitorArgs], {
     detached: true,
+    useFakeTty: true,
     stdio: ['ignore', outFd, outFd]
   });
 

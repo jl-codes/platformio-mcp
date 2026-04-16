@@ -59,6 +59,7 @@ import { LOCKS_DIR } from "./utils/paths.js";
 import fs from "node:fs";
 import path from "node:path";
 import { getDashboardStatus } from "./api/server.js";
+import { portalEvents } from "./api/events.js";
 
 /**
  * Main PlatformIO MCP Server instance configuration.
@@ -436,8 +437,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name } = request.params;
   const args: any = request.params.arguments || {};
+  if (args.projectDir) {
+    portalEvents.emitWorkspaceState(args.projectDir);
+  }
+
   try {
-    switch (name) {
+    const response = await (async () => {
+      switch (name) {
       case "list_boards": {
         const params = ListBoardsParamsSchema.parse(args);
         const boards = await listBoards(params.filter);
@@ -753,8 +759,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       default:
         throw new Error(`Unknown tool: ${name}`);
-    }
+      }
+    })();
+    
+    portalEvents.emitActivity(name, args, true);
+    return response;
   } catch (error) {
+    portalEvents.emitActivity(name, args, false);
     const errorMessage = formatPlatformIOError(error);
     return {
       content: [

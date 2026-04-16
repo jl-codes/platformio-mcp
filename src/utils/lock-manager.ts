@@ -9,6 +9,7 @@
 
 import { randomUUID } from "node:crypto";
 import { PlatformIOError } from "./errors.js";
+import { portalEvents } from "../api/events.js";
 
 /**
  * Exception thrown when a process fails to acquire the global pipeline lock.
@@ -67,6 +68,7 @@ export class HardwareLockManager {
       reason: reason || "Explicit Pipeline Lock",
       lockedAt: Date.now(),
     };
+    try { portalEvents.emitLockState(this.state); } catch (e) {}
   }
 
   /**
@@ -75,6 +77,7 @@ export class HardwareLockManager {
   public releaseLock(sessionId: string): void {
     if (this.state.isLocked && this.state.sessionId === sessionId) {
       this.state = { isLocked: false };
+      try { portalEvents.emitLockState(this.state); } catch (e) {}
     }
   }
 
