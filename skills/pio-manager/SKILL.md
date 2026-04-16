@@ -11,11 +11,10 @@ This skill provides the mandatory 3-Tier Execution Architecture for interacting 
 
 ### 🟢 Tier 1 (Preferred): MCP Server Primitives
 The `platformio-mcp` server encapsulates atomic locking, compilation, and log spooling safely. **You must ALWAYS attempt to use these tools first:**
-1. `mcp_platformio_get_lock_status`
-2. `mcp_platformio_acquire_lock`
-3. `mcp_platformio_build_project`
-4. `mcp_platformio_upload_firmware`
-5. `mcp_platformio_query_logs`
+1. **Compilation/Deployment:** `mcp_platformio_build_project`, `mcp_platformio_clean_project`, `mcp_platformio_upload_firmware`, `mcp_platformio_upload_filesystem`
+2. **Hardware Locking:** `mcp_platformio_get_lock_status`, `mcp_platformio_acquire_lock`, `mcp_platformio_release_lock`, `mcp_platformio_reset_server_state`
+3. **Serial Monitor:** `mcp_platformio_start_monitor`, `mcp_platformio_stop_monitor`, `mcp_platformio_query_logs`
+4. **Environment/Libraries:** `mcp_platformio_list_boards`, `mcp_platformio_list_devices`, `mcp_platformio_init_project`, `mcp_platformio_search_libraries`, `mcp_platformio_install_library`
 
 **Targeting Rules:** You MUST explicitly map the `environment` parameter (e.g., `esp32dev` or `esp32s3nano`) harvested from `platformio.ini` unless the user requires a full multi-environment compatibility check.
 
@@ -23,13 +22,13 @@ The `platformio-mcp` server encapsulates atomic locking, compilation, and log sp
 If the native `mcp_platformio_*` tools are completely unavailable in your context:
 1. STOP. Do not immediately attempt bash commands.
 2. Formally ask the user: *"The MCP agent is unavailable. Would you like me to install/re-install it?"*
-3. If the user explicitly says YES, run `python .agents/skills/pio-manager/scripts/install_pio_mcp_server.py`. Once complete, instruct the user to reload the AI session to ingest `mcp.json`.
+3. If the user explicitly says YES, run `python skills/pio-manager/scripts/install_pio_mcp_server.py`. Once complete, instruct the user to reload the AI session to ingest `mcp.json`.
 4. If installation fails, ask the user again. **Only proceed to Tier 3 if the user explicitly says NO to further installation attempts.**
 
 ### 🔴 Tier 3 (Fallback): Dumb Assets
 If (and only if) the user refuses the MCP installation (Tier 2), you may proceed using raw shell wrappers.
 **WARNING:** Locks are completely bypassed in Tier 3. Inform the user that they are operating without mutex safety.
-Use the pre-built asset wrappers inside `.agents/skills/pio-manager/assets/` to save tokens. Do NOT write verbose `pio run` commands natively:
+Use the pre-built asset wrappers inside `skills/pio-manager/assets/` to save tokens. Do NOT write verbose `pio run` commands natively:
 - Build: `./assets/build.sh [env]`
 - Flash: `./assets/flash.sh [env]` (or use the advanced `safe-flash.sh` fallback auto-detect script)
 - Clean: `./assets/clean.sh [env]`
@@ -38,7 +37,7 @@ Use the pre-built asset wrappers inside `.agents/skills/pio-manager/assets/` to 
 ---
 
 ## Troubleshooting & Deadlocks
-If you execute `mcp_platformio_get_lock_status` and discover a stray session ID is permanently holding the hardware lock, query the stray `sessionId` and forcefully execute `mcp_platformio_release_lock` with that stray ID to prune the queue.
+If you discover a stray session ID is permanently holding the hardware lock, or you encounter runaway daemon compilation PIDs blocking execution, execute `mcp_platformio_reset_server_state` to forcefully clean all server locks and terminate any tracked PIDs. If port conflicts occur, use `mcp_platformio_stop_monitor` to kill the active background serial listener.
 
 ---
 
