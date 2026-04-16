@@ -95,14 +95,13 @@ jobs:
           PR_URL: ${{ steps.pr.outputs.url }}
         run: |
           cd /tmp/pr-detective
-          # Use tee so output streams to the log in real-time AND is saved to file.
-          # $() command substitution buffers output until exit — if the step times out
-          # the buffer is lost and nothing appears in the logs.
-          npx tsx src/index.ts --ci "$PR_URL" 2>&1 | tee /tmp/review.md
+          # Pipe stdout (the review markdown) to tee so it's both logged and saved.
+          # stderr (progress markers) goes to the GitHub Actions log separately — NOT into the review file.
+          npx tsx src/index.ts --ci "$PR_URL" 2>/dev/stderr | tee /tmp/review.md
           # If the script failed (non-zero exit), append a fallback message
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             echo "" >> /tmp/review.md
-            echo "⚠️ PR Detective encountered an error analyzing this PR." >> /tmp/review.md
+            echo "⚠️ PR Detective encountered an error (partial review above)." >> /tmp/review.md
           fi
 
       - name: Post PR Comment
