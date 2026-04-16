@@ -4,7 +4,7 @@
 
 # PlatformIO MCP Server
 
-A board-agnostic [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for [PlatformIO](https://platformio.org) embedded development. Enables AI agents like [Cline](https://github.com/cline/cline) and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to interact with PlatformIO's ecosystem of 1,000+ development boards across 30+ platforms.
+A board-agnostic [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for [PlatformIO](https://platformio.org) embedded development. This server enables AI agents like [Antigravity](https://github.com/google-deepmind/antigravity), [Cline](https://github.com/cline/cline), and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to interact with PlatformIO's comprehensive ecosystem of **1,000+ development boards** across **30+ platforms**.
 
 ## Features
 
@@ -13,6 +13,9 @@ A board-agnostic [Model Context Protocol](https://modelcontextprotocol.io) (MCP)
 - Library management: search, install, and list from the PlatformIO registry
 - Device discovery: detect connected boards automatically
 - Board-agnostic: no hardcoded configs, supports all PlatformIO platforms out of the box
+- **Workspace Spooling**: `stdout` streams and PIDs are stored cleanly in the `.pio-mcp-workspace/` directory inside the active project folder for easy offline debugging instead of bloating in-memory constraints.
+- **Async Polling**: LLM context limits and network timeouts are inherently negated. Dispatch long-running compilations using `background: true` and monitor them safely with `check_task_status`.
+- **Opt-in Web Dashboard**: Launch a secure telemetry UI by passing `--ui` or setting `PIO_MCP_UI=true` (produces a secure localhost token at boot).
 
 ## Supported Platforms
 
@@ -60,6 +63,24 @@ npm run build
 ```
 
 ## Configuration
+
+### Antigravity
+
+Add the server to your global definition (typically `~/.gemini/antigravity/mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "platformio": {
+      "command": "zsh",
+      "args": [
+        "-lic",
+        "node /absolute/path/to/platformio-mcp/build/index.js"
+      ]
+    }
+  }
+}
+```
 
 ### Cline
 
@@ -133,6 +154,14 @@ Initializes a new PlatformIO project.
 | `framework` | no | Framework (e.g. "arduino", "espidf", "mbed") |
 | `platformOptions` | no | Additional platform options |
 
+#### `check_task_status`
+
+Polls an active or historical background compilation/upload job safely.
+
+| Parameter | Required | Description |
+|---|---|---|
+| `taskId` | yes | The unique ID returned when a command was invoked with background: true |
+
 #### `build_project`
 
 Compiles the project and generates firmware binary.
@@ -141,6 +170,7 @@ Compiles the project and generates firmware binary.
 |---|---|---|
 | `projectDir` | yes | Path to project directory |
 | `environment` | no | Specific environment from platformio.ini |
+| `background` | no | Execute asynchronously to prevent timeouts. Returns a taskId. (default: false) |
 
 #### `clean_project`
 
@@ -159,6 +189,7 @@ Uploads compiled firmware to a connected device.
 | `projectDir` | yes | Path to project directory |
 | `port` | no | Upload port (auto-detected if omitted) |
 | `environment` | no | Specific environment from platformio.ini |
+| `background` | no | Execute asynchronously to prevent timeouts. Returns a taskId. (default: false) |
 
 #### `upload_filesystem`
 
@@ -169,6 +200,7 @@ Uploads a SPIFFS/LittleFS filesystem image from the project's `data/` directory 
 | `projectDir` | yes | Path to project directory |
 | `port` | no | Upload port (auto-detected if omitted) |
 | `environment` | no | Specific environment from platformio.ini |
+| `background` | no | Execute asynchronously to prevent timeouts. Returns a taskId. (default: false) |
 
 #### `start_monitor`
 
@@ -208,6 +240,36 @@ Lists installed libraries.
 | Parameter | Required | Description |
 |---|---|---|
 | `projectDir` | no | Project directory (global if omitted) |
+
+## Usage with AI Agents
+
+### Antigravity
+
+Antigravity will automatically use the MCP interface when running in the workspace. Simply execute `npm run dev` to bring the server online. By default, the Web Dashboard is securely opt-in. Pass `--ui` or set `PIO_MCP_UI=true` if you wish to launch the REST/WebSocket layer, which will produce a secure localhost token at boot. Let the agent manage the rest.
+
+### Cline
+
+Cline accesses the server seamlessly through its standard MCP integration. Instruct Cline to "Build my PlatformIO project" or "Flash the connected device," and it will correctly orchestrate the tasks through the exposed MCP tools.
+
+### Claude Code
+
+Claude Code detects the server once configured via the CLI or settings file. You can directly ask Claude Code to list available development boards, query the library registry, or compile the active workspace.
+
+## Antigravity Customization
+
+Antigravity natively utilizes Advanced Agentic constructs that integrate perfectly with PlatformIO development lifecycles via the repository's `.agents/` directory.
+
+### Invariant Rules
+
+Antigravity enforces strict repository invariants by automatically reading Markdown files located in `.agents/rules/` upon session start. Use these to securely mandate hardware lock acquisition before flashing, or define C++ formatting guidelines.
+
+### Workflows
+
+Antigravity Workflows are step-by-step Markdown guides placed in `.agents/workflows/`. You can invoke them via slash commands. For example, a custom `/flash-test` workflow can orchestrate building the binary, deploying the filesystem, and natively interfacing with the background serial monitor.
+
+### Skills
+
+Antigravity's `skills/` directory is properly framed as the absolute source of truth for empowering AI agents. For example, a dedicated `pio-manager` skill serves as the single source of truth for all embedded operations, securely managing complex edgecases like macOS USB re-enumeration races and concurrent serial lock contention.
 
 ## Cline Customization
 
@@ -344,6 +406,13 @@ Board IDs are case-sensitive. List available boards with `pio boards` or search 
 - Verify `platformio.ini` configuration
 - Clean and rebuild: `pio run -t clean`
 
+## Documentation & Guides
+
+For advanced configuration and detailed reference materials regarding hardware edge cases, consult the following guides:
+
+- [Setting Up ESP32 Devices for Native USB Stability](docs/SettingUpESP32Devices.md)
+- [macOS Port Conflicts Reference Document](docs/reference/ESP32PortConflictsOnMacOS.md)
+
 ## Contributing
 
 Contributions welcome. Open an issue or submit a pull request.
@@ -356,4 +425,12 @@ MIT. See [LICENSE](LICENSE).
 
 - [PlatformIO](https://platformio.org) | [Boards](https://docs.platformio.org/en/latest/boards/) | [Libraries](https://registry.platformio.org) | [Community](https://community.platformio.org)
 - [Model Context Protocol](https://modelcontextprotocol.io)
+- [Antigravity](https://github.com/google-deepmind/antigravity) | An autonomous AI coding assistant.
 - [Cline](https://github.com/cline/cline) | [Cline Docs](https://docs.cline.bot)
+
+## Support
+
+For issues and questions:
+- Open an issue on GitHub
+- Check PlatformIO documentation: https://docs.platformio.org
+- Join PlatformIO community: https://community.platformio.org

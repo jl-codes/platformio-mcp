@@ -1,6 +1,6 @@
 # PlatformIO MCP Server - AI Installation Guide
 
-This guide is designed for AI agents like Cline to successfully set up the PlatformIO MCP Server.
+This guide is designed for AI agents like Antigravity and Cline to successfully set up the PlatformIO MCP Server.
 
 ## Prerequisites Check
 
@@ -112,34 +112,100 @@ pio boards | head -10
 
 **Expected:** List of available boards.
 
+## Agentic Project Deployment Strategies
+
+If you are developing an embedded C/C++ repository and want to bundle `.agents/workflows` that rely on this MCP server, you have three primary deployment architectures to ensure the tools are available to any Developer or AI Agent checking out your codebase:
+
+### 1. The `npx` Auto-Execution Approach (Cleanest)
+If this package is published to NPM (or your private registry), you do not need to install anything locally. You can simply instruct users to drop this into their global `mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "platformio": {
+      "command": "npx",
+      "args": ["-y", "platformio-mcp-server"]
+    }
+  }
+}
+```
+*Note: The `-y` flag forces Node to automatically download, execute, and bridge the MCP background server transparently on-demand without any manual `npm install` steps.*
+
+### 2. The Native `tools/` Submodule (Embedded Standard)
+If you wish to contain the dependency exclusively within your project without relying on global registries:
+
+1. Add this repository as a submodule: `git submodule add <url> tools/platformio-mcp`
+2. Create an initialization workflow (`.agents/workflows/setup.md`) that instructs the Agent:
+   *"Navigate to `tools/platformio-mcp`, run `npm install`, and `npm run build`."*
+3. Update the `mcp_config.json` manually or via an installer script mapping the path absolutely:
+
+```json
+{
+  "mcpServers": {
+    "platformio": {
+      "command": "zsh",
+      "args": [
+        "-lic",
+        "node /absolute/path/to/your-repo/tools/platformio-mcp/build/index.js"
+      ]
+    }
+  }
+}
+```
+
+### 3. The `devDependencies` Integration
+If your embedded repository incorporates a `package.json` (e.g. for React captive portals):
+```bash
+npm install -D github:matthewmcneill/platformio-mcp
+```
+This isolates the utility within your `node_modules/.bin/`, allowing seamless execution securely boxed to the repository context.
+
+---
+
 ## Configuration for Cline
 
-To use this server with Cline, add it to your MCP settings:
+Cline requires you to explicitly add the MCP server configuration into its settings file. This is typically found via the VSCode Command Palette (`Cmd+Shift+P` -> `Cline: MCP Servers`).
 
-**Location:** Cline MCP Settings
+### Manual Configuration
+Ensure you map the absolute path correctly for your workspace:
 
-**Configuration Example:**
 ```json
 {
   "mcpServers": {
     "platformio": {
       "command": "node",
-      "args": ["/path/to/platformio-mcp/build/index.js"],
+      "args": [
+        "/absolute/path/to/platformio-mcp/build/index.js"
+      ],
       "env": {}
     }
   }
 }
 ```
 
-**Alternative using npm:**
+## Configuration for Antigravity & Global IDEs
+
+Antigravity requires you to explicitly add the MCP server configuration into its global settings file. This is typically found at `~/.gemini/antigravity/mcp_config.json` on macOS/Linux.
+
+### Automatic Installer Script
+We provide a helper Node.js script to safely map your local clone directly into Antigravity's global footprint. It will intelligently resolve your node binary path and format the JSON. (For the UI dashboard, export `PIO_MCP_UI=true` in your shell environment, or pass `--ui` if modifying the args array).
+```bash
+# From the root of the platformio-mcp repository:
+node scripts/install-antigravity.js
+```
+
+### Manual Configuration
+If manually adding, ensure you map the absolute path correctly:
+
 ```json
 {
   "mcpServers": {
     "platformio": {
-      "command": "npm",
-      "args": ["run", "dev"],
-      "cwd": "/path/to/platformio-mcp",
-      "env": {}
+      "command": "zsh",
+      "args": [
+        "-lic",
+        "node /absolute/path/to/platformio-mcp/build/index.js"
+      ]
     }
   }
 }
@@ -149,15 +215,24 @@ To use this server with Cline, add it to your MCP settings:
 
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) is Anthropic's official CLI for Claude with native MCP support.
 
-**Location:** `~/.claude/settings.json` (global) or `.claude/settings.json` (project-specific)
+### Automatic Configuration
+Claude Code supports adding MCP servers directly via its CLI. You can add the PlatformIO MCP server by running:
 
-**Configuration Example:**
+```bash
+claude mcp add platformio -- node /absolute/path/to/platformio-mcp/build/index.js
+```
+
+*Note: Ensure you replace `/absolute/path/to/...` with the exact path to your cloned repository, and restart Claude Code after adding the server.*
+
+### Manual Configuration
+Alternatively, add the server to `~/.claude/settings.json` (global) or `.claude/settings.json` (project-specific):
+
 ```json
 {
   "mcpServers": {
     "platformio": {
       "command": "node",
-      "args": ["/path/to/platformio-mcp/build/index.js"]
+      "args": ["/absolute/path/to/platformio-mcp/build/index.js"]
     }
   }
 }
@@ -286,7 +361,7 @@ The PlatformIO MCP Server provides 12 tools:
 
 The server works with **ANY** board supported by PlatformIO (1000+ boards). No hardcoded configurations needed. Users just specify the board ID (e.g., "esp32dev", "uno", "nucleo_f401re").
 
-### Example Usage Through Cline
+### Example Usage Through AI Agents (Antigravity / Cline)
 
 Once configured, users can interact naturally:
 
@@ -323,4 +398,4 @@ Installation is successful when:
 - ✅ `node build/index.js` starts the server
 - ✅ PlatformIO CLI responds to `pio --version`
 
-Once all criteria are met, the server is ready for use with Cline!
+Once all criteria are met, the server is ready for use with Antigravity, Cline, and other AI agents!
