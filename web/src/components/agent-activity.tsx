@@ -25,7 +25,7 @@ const AgentActivity: React.FC<Props> = ({ activities }) => {
         ) : (
           <ul className="activity-list">
             {activities.map((ev, i) => (
-              <li key={i} className={`activity-item ${ev.success ? 'success' : 'error'}`}>
+              <li key={i} className={`activity-item ${ev.status || (ev.success ? 'success' : 'error')}`}>
                 <div className="activity-time">
                   {new Date(ev.timestamp).toLocaleTimeString([], { hour12: false })}
                 </div>

@@ -20,14 +20,17 @@ class PortalEventEmitter extends EventEmitter {
    * Emit an agentic activity event.
    * @param toolName The name of the tool called
    * @param args The arguments passed to the tool
-   * @param success Whether the execution was successful
+   * @param status The execution status (running, success, error)
+   * @param activityId A unique identifier for this activity
    */
-  emitActivity(toolName: string, args: Record<string, any>, success: boolean) {
+  emitActivity(toolName: string, args: Record<string, any>, status: 'running' | 'success' | 'error', activityId: string) {
     const payload = {
       timestamp: Date.now(),
       toolName,
       args,
-      success,
+      success: status === 'success', // Kept for backwards compatibility
+      status,
+      activityId,
     };
     this.emit("agent_activity", payload);
 

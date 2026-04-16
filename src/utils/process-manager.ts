@@ -9,6 +9,7 @@
  */
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import treeKill from "tree-kill";
 import { logDiagnostic as logDiag } from "./logger.js";
@@ -22,7 +23,7 @@ const BUILD_PIDS_FILE = "build-pids.json";
  * Gets the absolute path to the PID tracking file.
  */
 function getPidsFilePath(projectDir?: string, file: string = SERIAL_PIDS_FILE): string {
-  const baseDir = projectDir || process.cwd();
+  const baseDir = projectDir || os.tmpdir();
   return path.join(baseDir, WORKSPACE_DIR, LOCKS_DIR, file);
 }
 

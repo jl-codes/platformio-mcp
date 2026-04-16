@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 
@@ -8,7 +9,7 @@ const WORKSPACE_DIR = ".pio-mcp-workspace";
  * whichever dynamically executed environment the MCP is targeting.
  */
 export function logDiagnostic(msg: string, projectDir?: string) {
-  const baseDir = projectDir || process.cwd();
+  const baseDir = projectDir || os.tmpdir();
   const workspaceDir = path.join(baseDir, WORKSPACE_DIR);
   const diagLog = path.join(workspaceDir, "mcp-internal.log");
   const timestamp = new Date().toISOString();

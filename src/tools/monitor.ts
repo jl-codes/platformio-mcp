@@ -9,6 +9,7 @@
  */
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { validateSerialPort, validateBaudRate } from "../utils/validation.js";
 import { PlatformIOError } from "../utils/errors.js";
@@ -23,7 +24,7 @@ const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOGS_DIR = "serial_logs";
 
 function getLogDir(projectDir?: string): string {
-  const baseDir = projectDir || process.cwd();
+  const baseDir = projectDir || os.tmpdir();
   return path.join(baseDir, WORKSPACE_DIR, LOGS_DIR);
 }
 

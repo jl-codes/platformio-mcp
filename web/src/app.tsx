@@ -23,7 +23,9 @@ export type AgentEvent = {
   timestamp: number; // High-resolution timestamp of the activity
   toolName: string; // Name of the MCP tool invoked
   args: Record<string, any>; // Input parameters provided by the agent
-  success: boolean; // Execution status
+  success: boolean; // Execution status (legacy)
+  status?: 'running' | 'success' | 'error'; // Modern execution status
+  activityId?: string; // Correlates running and completed states
 };
 
 /**
@@ -74,6 +76,14 @@ function App() {
 
     socket.on('agent_activity', (data: AgentEvent) => {
       setActivities(prev => {
+        if (data.activityId) {
+          const existingIndex = prev.findIndex(a => a.activityId === data.activityId);
+          if (existingIndex >= 0) {
+            const next = [...prev];
+            next[existingIndex] = data;
+            return next;
+          }
+        }
         const next = [data, ...prev];
         return next.slice(0, 100); // keep last 100 events
       });

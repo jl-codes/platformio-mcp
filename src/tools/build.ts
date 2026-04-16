@@ -20,6 +20,7 @@ import { BuildError, PlatformIOError } from "../utils/errors.js";
 import { parseStderrErrors } from "../utils/errors.js";
 import { isBuildActive } from "../utils/process-manager.js";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 
@@ -285,7 +286,7 @@ export async function listTargets(
  * Polling tool to check background task status and return recent logs.
  */
 export async function checkTaskStatus(projectDir?: string) {
-  const baseDir = projectDir || process.cwd();
+  const baseDir = projectDir || os.tmpdir();
   const WORKSPACE_DIR = ".pio-mcp-workspace";
   const LOGS_DIR = "build_logs";
   const logFile = path.join(baseDir, WORKSPACE_DIR, LOGS_DIR, "latest-build.log");

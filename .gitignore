@@ -42,6 +42,10 @@ pids/
 *.pid.lock
 tests/mock_project_spooler/
 
+# PlatformIO
+.pio/
+.pio-mcp-workspace/
+
 # Runtime data
 lib-cov/
 

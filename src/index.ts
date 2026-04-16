@@ -61,6 +61,7 @@ import path from "node:path";
 import { logDiagnostic as logDiag } from "./utils/logger.js";
 import { getDashboardStatus } from "./api/server.js";
 import { portalEvents } from "./api/events.js";
+import crypto from "node:crypto";
 
 /**
  * Main PlatformIO MCP Server instance configuration.
@@ -442,6 +443,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     portalEvents.emitWorkspaceState(args.projectDir);
   }
 
+  const activityId = crypto.randomUUID();
+  portalEvents.emitActivity(name, args, 'running', activityId);
+
   try {
     const response = await (async () => {
       switch (name) {
@@ -763,10 +767,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
     })();
     
-    portalEvents.emitActivity(name, args, true);
+    portalEvents.emitActivity(name, args, 'success', activityId);
     return response;
   } catch (error) {
-    portalEvents.emitActivity(name, args, false);
+    portalEvents.emitActivity(name, args, 'error', activityId);
     const errorMessage = formatPlatformIOError(error);
     return {
       content: [

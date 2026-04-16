@@ -8,6 +8,7 @@
  * - executeWithSpooling: Spawns child processes mapped to disk limits.
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { platformioExecutor } from "../platformio.js";
 import { registerBuildPid, unregisterBuildPid, isBuildActive } from "./process-manager.js";
@@ -17,7 +18,7 @@ const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOGS_DIR = "build_logs";
 
 function getLogDir(projectDir?: string): string {
-  const baseDir = projectDir || process.cwd();
+  const baseDir = projectDir || os.tmpdir();
   return path.join(baseDir, WORKSPACE_DIR, LOGS_DIR);
 }
 
