@@ -186,7 +186,24 @@ export function startPortalServer(defaultPort = 8080) {
 
     // Provide initial status state
     socket.emit("server_status", { timestamp: Date.now(), status: "online" });
-    socket.emit("spooler_states", getSpoolerStates());
+    const spoolers = getSpoolerStates();
+    socket.emit("spooler_states", spoolers);
+    
+    // Hydrate last 50 lines of active serial logs
+    for (const [port, daemon] of Object.entries(spoolers)) {
+      if (daemon.logFile && fs.existsSync(daemon.logFile)) {
+        try {
+          const content = fs.readFileSync(daemon.logFile, "utf8");
+          const lines = content.split("\n").slice(-50);
+          socket.emit("serial_log", {
+            timestamp: Date.now(),
+            port,
+            data: lines.join("\n")
+          });
+        } catch (e) {}
+      }
+    }
+
     socket.emit("lock_state", {
       timestamp: Date.now(),
       ...hardwareLockManager.getLockStatus(),
@@ -200,6 +217,20 @@ export function startPortalServer(defaultPort = 8080) {
         projectDir: activeWorkspace,
       });
 
+      // Hydrate last 100 agent activity logs
+      const activityLogPath = path.join(activeWorkspace, ".pio-mcp-workspace", "agent_activities.jsonl");
+      if (fs.existsSync(activityLogPath)) {
+        try {
+          const content = fs.readFileSync(activityLogPath, "utf8");
+          const lines = content.trim().split("\n").slice(-100);
+          for (const line of lines) {
+            if (line.trim()) {
+              socket.emit("agent_activity", JSON.parse(line));
+            }
+          }
+        } catch (e) {}
+      }
+
       // Provide initial build log state natively mapped to PR 4 structure
       const latestBuildLog = path.join(activeWorkspace, ".pio-mcp-workspace", "build_logs", "latest-build.log");
       if (fs.existsSync(latestBuildLog)) {
@@ -207,6 +238,21 @@ export function startPortalServer(defaultPort = 8080) {
           timestamp: Date.now(),
           logFile: latestBuildLog,
         });
+
+        // Hydrate last 50 lines of build log
+        try {
+          const content = fs.readFileSync(latestBuildLog, "utf8");
+          const lines = content.split("\n").slice(-50);
+          for (const line of lines) {
+            if (line.trim()) {
+              socket.emit("build_log", {
+                timestamp: Date.now(),
+                projectId: activeWorkspace,
+                logLine: line,
+              });
+            }
+          }
+        } catch (e) {}
       }
     }
   });

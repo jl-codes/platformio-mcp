@@ -12,7 +12,8 @@
     "skills"
   ],
   "scripts": {
-    "build": "tsc",
+    "build:ui": "cd web && npm install && npm run build",
+    "build": "npm run build:ui && tsc",
     "dev": "tsx src/index.ts",
     "watch": "tsc --watch",
     "test": "vitest run",

@@ -6,6 +6,8 @@
  * - portalEvents: Global singleton event emitter for portal communication.
  */
 import { EventEmitter } from "events";
+import fs from "node:fs";
+import path from "node:path";
 
 class PortalEventEmitter extends EventEmitter {
   constructor() {
@@ -21,12 +23,24 @@ class PortalEventEmitter extends EventEmitter {
    * @param success Whether the execution was successful
    */
   emitActivity(toolName: string, args: Record<string, any>, success: boolean) {
-    this.emit("agent_activity", {
+    const payload = {
       timestamp: Date.now(),
       toolName,
       args,
       success,
-    });
+    };
+    this.emit("agent_activity", payload);
+
+    if (this.lastKnownProjectDir) {
+      try {
+        const workspaceDir = path.join(this.lastKnownProjectDir, ".pio-mcp-workspace");
+        if (!fs.existsSync(workspaceDir)) {
+          fs.mkdirSync(workspaceDir, { recursive: true });
+        }
+        const logFile = path.join(workspaceDir, "agent_activities.jsonl");
+        fs.appendFileSync(logFile, JSON.stringify(payload) + "\n");
+      } catch (e) {}
+    }
   }
 
   private buildBuffers: Record<string, string> = {};
