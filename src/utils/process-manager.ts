@@ -11,6 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import treeKill from "tree-kill";
+import { logDiagnostic as logDiag } from "./logger.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOCKS_DIR = "locks";
@@ -77,12 +78,12 @@ export function killPioMonitorByPort(port: string, projectDir?: string): Promise
       const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
       const targetPid = pids[port];
       if (targetPid) {
-        console.error(`[ProcessManager Diagnostic] Found tracked PID ${targetPid} for port ${port}. Yielding to tree-kill...`);
+        logDiag(`[ProcessManager Diagnostic] Found tracked PID ${targetPid} for port ${port}. Yielding to tree-kill...`, projectDir);
         treeKill(targetPid, "SIGKILL", (err) => {
           if (err) {
-            console.error(`[ProcessManager Diagnostic] Failed to tree-kill PID ${targetPid}: ${err.message}`);
+            logDiag(`[ProcessManager Diagnostic] Failed to tree-kill PID ${targetPid}: ${err.message}`, projectDir);
           } else {
-            console.error(`[ProcessManager Diagnostic] Successfully tree-killed PID ${targetPid}.`);
+            logDiag(`[ProcessManager Diagnostic] Successfully tree-killed PID ${targetPid}.`, projectDir);
           }
           unregisterPioMonitorPid(port, projectDir);
           resolve();
@@ -166,7 +167,7 @@ export function killAllTrackedProcesses(projectDir?: string): Promise<void> {
           for (const key of Object.keys(pids)) {
             const targetPid = pids[key];
             if (targetPid) {
-              console.error(`[ProcessManager Diagnostic] Emergency killing tracked PID ${targetPid} via ${file}.`);
+              logDiag(`[ProcessManager Diagnostic] Emergency killing tracked PID ${targetPid} via ${file}.`, projectDir);
               const p = new Promise<void>((res) => {
                 treeKill(targetPid, "SIGKILL", () => res());
               });

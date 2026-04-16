@@ -1,0 +1,33 @@
+import fs from "node:fs";
+import path from "node:path";
+const WORKSPACE_DIR = ".pio-mcp-workspace";
+
+/**
+ * Persist centralized observability forensics across the server lifecycle.
+ * Writes to the `.pio-mcp-workspace/mcp-internal.log` bound natively into
+ * whichever dynamically executed environment the MCP is targeting.
+ */
+export function logDiagnostic(msg: string, projectDir?: string) {
+  const baseDir = projectDir || process.cwd();
+  const workspaceDir = path.join(baseDir, WORKSPACE_DIR);
+  const diagLog = path.join(workspaceDir, "mcp-internal.log");
+  const timestamp = new Date().toISOString();
+  const line = `[${timestamp}] ${msg}\n`;
+  
+  if (!fs.existsSync(workspaceDir)) {
+    try {
+      fs.mkdirSync(workspaceDir, { recursive: true });
+    } catch {
+      // Graceful fallback if we can't create the directory
+    }
+  }
+
+  try {
+    fs.appendFileSync(diagLog, line);
+  } catch {
+    // Fail silently in production if file permissions block tracing
+  }
+  
+  // Keep stdout free for JSON-RPC, emit to stderr natively.
+  console.error(msg);
+}

@@ -55,3 +55,4 @@ temp/
 
 # Agents
 .agents/
+.gemini/

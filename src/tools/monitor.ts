@@ -17,6 +17,7 @@ import { getFirstDevice } from "./devices.js";
 import { registerPioMonitorPid, killPioMonitorByPort } from "../utils/process-manager.js";
 import { platformioExecutor } from "../platformio.js";
 import { portalEvents } from "../api/events.js";
+import { logDiagnostic as logDiag } from "../utils/logger.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOGS_DIR = "serial_logs";
@@ -24,19 +25,6 @@ const LOGS_DIR = "serial_logs";
 function getLogDir(projectDir?: string): string {
   const baseDir = projectDir || process.cwd();
   return path.join(baseDir, WORKSPACE_DIR, LOGS_DIR);
-}
-
-function logDiag(msg: string, projectDir?: string) {
-  const baseDir = projectDir || process.cwd();
-  const workspaceDir = path.join(baseDir, WORKSPACE_DIR);
-  const diagLog = path.join(workspaceDir, "mcp-internal.log");
-  const timestamp = new Date().toISOString();
-  const line = `[${timestamp}] ${msg}\n`;
-  if (!fs.existsSync(workspaceDir)) {
-    fs.mkdirSync(workspaceDir, { recursive: true });
-  }
-  fs.appendFileSync(diagLog, line);
-  console.error(msg);
 }
 
 /**

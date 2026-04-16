@@ -58,6 +58,7 @@ import { killAllTrackedProcesses } from "./utils/process-manager.js";
 import { LOCKS_DIR } from "./utils/paths.js";
 import fs from "node:fs";
 import path from "node:path";
+import { logDiagnostic as logDiag } from "./utils/logger.js";
 import { getDashboardStatus } from "./api/server.js";
 import { portalEvents } from "./api/events.js";
 
@@ -733,7 +734,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
           }
         } catch (e) {
-          console.error(`Failed to wipe semaphores: ${e}`);
+          logDiag(`Failed to wipe semaphores: ${e}`, args.projectDir);
         }
 
         return {
@@ -784,11 +785,11 @@ async function main() {
   // Check if PlatformIO is installed
   const isInstalled = await checkPlatformIOInstalled();
   if (!isInstalled) {
-    console.error(
-      "Warning: PlatformIO CLI not found. Please install it from https://platformio.org/install/cli",
+    logDiag(
+      "Warning: PlatformIO CLI not found. Please install it from https://platformio.org/install/cli"
     );
-    console.error(
-      "The server will start but commands will fail until PlatformIO is installed.\n",
+    logDiag(
+      "The server will start but commands will fail until PlatformIO is installed.\n"
     );
   }
 
@@ -796,14 +797,14 @@ async function main() {
   await server.connect(transport);
 
   if (process.argv.includes("--open-dashboard-on-start") || process.env.PIO_MCP_OPEN_DASH_ON_START === "true") {
-    getDashboardStatus(true).catch((e) => console.error(`[Dashboard] ${e.message}`));
+    getDashboardStatus(true).catch((e) => logDiag(`[Dashboard] ${e.message}`));
   }
 
-  console.error("PlatformIO MCP Server running on stdio");
-  console.error("Server supports 1000+ boards across 30+ platforms");
+  logDiag("PlatformIO MCP Server running on stdio");
+  logDiag("Server supports 1000+ boards across 30+ platforms");
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error);
+  logDiag(`Fatal error: ${error}`);
   process.exit(1);
 });
