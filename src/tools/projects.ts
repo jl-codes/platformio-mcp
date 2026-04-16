@@ -1,21 +1,30 @@
 /**
- * Project initialization and management tools
+ * Project Scaffolding Tools
+ * Project initialization and management tools.
+ *
+ * Provides:
+ * - initProject: Scaffolds a standardized PlatformIO context.
+ * - isValidProject: Validates directory structural health.
+ * - getProjectConfig: Parses configuration syntax schema.
  */
 
-import { mkdir } from 'fs/promises';
-import path from 'path';
-import { platformioExecutor } from '../platformio.js';
-import type { ProjectInitResult } from '../types.js';
+import { mkdir } from "fs/promises";
+import path from "path";
+import { platformioExecutor } from "../platformio.js";
+import type { ProjectInitResult } from "../types.js";
 import {
   validateBoardId,
   validateFramework,
   validateProjectPath,
   checkDirectoryExists,
-} from '../utils/validation.js';
-import { ProjectInitError } from '../utils/errors.js';
+} from "../utils/validation.js";
+import { ProjectInitError } from "../utils/errors.js";
 
 /**
- * Initializes a new PlatformIO project
+ * Initializes a new PlatformIO project.
+ *
+ * @param config - The initialization scheme, requiring at least board and projectDir.
+ * @returns Status string denoting success and generated filesystem paths.
  */
 export async function initProject(config: {
   board: string;
@@ -25,18 +34,24 @@ export async function initProject(config: {
 }): Promise<ProjectInitResult> {
   // Validate inputs
   if (!validateBoardId(config.board)) {
-    throw new ProjectInitError(`Invalid board ID: ${config.board}`, { board: config.board });
+    throw new ProjectInitError(`Invalid board ID: ${config.board}`, {
+      board: config.board,
+    });
   }
 
   if (config.framework && !validateFramework(config.framework)) {
-    throw new ProjectInitError(`Invalid framework: ${config.framework}`, { framework: config.framework });
+    throw new ProjectInitError(`Invalid framework: ${config.framework}`, {
+      framework: config.framework,
+    });
   }
 
   let projectPath: string;
   try {
     projectPath = validateProjectPath(config.projectDir);
   } catch (error) {
-    throw new ProjectInitError(`Invalid project directory: ${error}`, { projectDir: config.projectDir });
+    throw new ProjectInitError(`Invalid project directory: ${error}`, {
+      projectDir: config.projectDir,
+    });
   }
 
   try {
@@ -47,22 +62,22 @@ export async function initProject(config: {
     }
 
     // Build command args
-    const args: string[] = ['project', 'init', '--board', config.board];
+    const args: string[] = ["project", "init", "--board", config.board];
 
     // Add optional framework
     if (config.framework) {
-      args.push('--project-option', `framework=${config.framework}`);
+      args.push("--project-option", `framework=${config.framework}`);
     }
 
     // Add additional platform options
     if (config.platformOptions) {
       for (const [key, value] of Object.entries(config.platformOptions)) {
-        args.push('--project-option', `${key}=${value}`);
+        args.push("--project-option", `${key}=${value}`);
       }
     }
 
     // Execute init command in the project directory
-    const result = await platformioExecutor.execute('project', args.slice(1), {
+    const result = await platformioExecutor.execute("project", args.slice(1), {
       cwd: projectPath,
       timeout: 120000,
     });
@@ -70,7 +85,11 @@ export async function initProject(config: {
     if (result.exitCode !== 0) {
       throw new ProjectInitError(
         `Failed to initialize project: ${result.stderr}`,
-        { board: config.board, stderr: result.stderr, exitCode: result.exitCode }
+        {
+          board: config.board,
+          stderr: result.stderr,
+          exitCode: result.exitCode,
+        },
       );
     }
 
@@ -83,20 +102,23 @@ export async function initProject(config: {
     if (error instanceof ProjectInitError) {
       throw error;
     }
-    throw new ProjectInitError(
-      `Failed to initialize project: ${error}`,
-      { board: config.board, projectDir: config.projectDir }
-    );
+    throw new ProjectInitError(`Failed to initialize project: ${error}`, {
+      board: config.board,
+      projectDir: config.projectDir,
+    });
   }
 }
 
 /**
- * Checks if a directory is a valid PlatformIO project
+ * Checks if a directory is a valid PlatformIO project.
+ *
+ * @param projectDir - Evaluated project workspace folder path.
+ * @returns Resolves true if a platformio.ini file is discovered.
  */
 export async function isValidProject(projectDir: string): Promise<boolean> {
   try {
     const validatedPath = validateProjectPath(projectDir);
-    const platformioIniPath = path.join(validatedPath, 'platformio.ini');
+    const platformioIniPath = path.join(validatedPath, "platformio.ini");
     return await checkDirectoryExists(platformioIniPath);
   } catch {
     return false;
@@ -104,13 +126,18 @@ export async function isValidProject(projectDir: string): Promise<boolean> {
 }
 
 /**
- * Gets project configuration from platformio.ini
+ * Gets project configuration from platformio.ini.
+ *
+ * @param projectDir - Validated platform path to retrieve configuration from.
+ * @returns Nested map tree of raw string config block keys and variables.
  */
-export async function getProjectConfig(projectDir: string): Promise<Record<string, unknown>> {
+export async function getProjectConfig(
+  projectDir: string,
+): Promise<Record<string, unknown>> {
   const validatedPath = validateProjectPath(projectDir);
 
   try {
-    const result = await platformioExecutor.execute('project', ['config'], {
+    const result = await platformioExecutor.execute("project", ["config"], {
       cwd: validatedPath,
       timeout: 30000,
     });
@@ -118,7 +145,7 @@ export async function getProjectConfig(projectDir: string): Promise<Record<strin
     if (result.exitCode !== 0) {
       throw new ProjectInitError(
         `Failed to get project config: ${result.stderr}`,
-        { projectDir, stderr: result.stderr }
+        { projectDir, stderr: result.stderr },
       );
     }
 
@@ -130,7 +157,7 @@ export async function getProjectConfig(projectDir: string): Promise<Record<strin
   } catch (error) {
     throw new ProjectInitError(
       `Failed to get project configuration: ${error}`,
-      { projectDir }
+      { projectDir },
     );
   }
 }
