@@ -137,17 +137,22 @@ export interface ProjectInitResult {
  * Outcome of a project build execution.
  */
 export interface BuildResult {
-  success: boolean; // Indicates if the build completed without errors
-  environment: string; // The environment identifier that was targeted
+  success?: boolean; // Indicates if the build completed without errors
+  environment?: string; // The environment identifier that was targeted
   output?: string; // Full stdout log from the compilation process
   errors?: string[]; // List of extracted error messages from stderr if build failed
   ramUsageBytes?: number; // Total RAM usage in bytes as reported by PIO
   flashUsageBytes?: number; // Total Flash usage in bytes as reported by PIO
+  status?: string; // e.g. "running" if background=true
+  message?: string;
+  pid?: number;
 }
 
 export interface CleanResult {
-  success: boolean;
-  message: string;
+  success?: boolean;
+  message?: string;
+  status?: string;
+  pid?: number;
 }
 
 // ============================================================================
@@ -170,10 +175,13 @@ export const UploadConfigSchema = z.object({
  * Outcome of a firmware or filesystem upload execution.
  */
 export interface UploadResult {
-  success: boolean; // Indicates if the upload completed without errors
+  success?: boolean; // Indicates if the upload completed without errors
   port?: string; // The serial port used for the upload
   output?: string; // Full stdout log from the upload process
   errors?: string[]; // List of extracted error messages from stderr if upload failed
+  status?: string;
+  message?: string;
+  pid?: number;
 }
 
 
@@ -371,6 +379,10 @@ export const BuildProjectParamsSchema = z.object({
     .describe(
       "If true, returns the complete verbose build log in the result instead of truncating it on success",
     ),
+  background: z
+    .boolean()
+    .optional()
+    .describe("If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."),
 });
 
 // Clean project parameters
@@ -383,6 +395,10 @@ export const CleanProjectParamsSchema = z.object({
     .string()
     .optional()
     .describe("Agent session ID for pipeline lock validation"),
+  background: z
+    .boolean()
+    .optional()
+    .describe("If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."),
 });
 
 // Upload firmware parameters
@@ -409,6 +425,10 @@ export const UploadFirmwareParamsSchema = z.object({
     .describe(
       "If true, returns the complete verbose upload log in the result instead of truncating it",
     ),
+  background: z
+    .boolean()
+    .optional()
+    .describe("If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."),
 });
 
 // Upload filesystem parameters
@@ -435,6 +455,10 @@ export const UploadFilesystemParamsSchema = z.object({
     .describe(
       "If true, returns the complete verbose upload log in the result instead of truncating it",
     ),
+  background: z
+    .boolean()
+    .optional()
+    .describe("If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."),
 });
 
 
@@ -487,5 +511,9 @@ export const QueryLogsParamsSchema = z.object({
   searchPattern: z.string().optional().describe("Optional Regex pattern to filter logs"),
   projectDir: z.string().optional().describe("Optional project directory containing the workspace logs"),
   port: z.string().optional().describe("Specific port to query logs for"),
+});
+
+export const CheckTaskStatusParamsSchema = z.object({
+  projectDir: z.string().optional().describe("Optional project directory containing the workspace logs"),
 });
 

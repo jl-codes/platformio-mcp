@@ -51,8 +51,8 @@ export function rotateBuildStreams(projectDir?: string) {
 export async function executeWithSpooling(
   command: string,
   args: string[],
-  options: { cwd: string; projectDir?: string; timeout?: number }
-): Promise<{ exitCode: number; finalOutput: string; fullLogPath: string }> {
+  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean }
+): Promise<any> {
   const projectArea = options.projectDir ?? options.cwd;
 
   // 1. Crash resilience tracking
@@ -83,6 +83,34 @@ export async function executeWithSpooling(
 
   // 4. Wait for termination
   const timeoutMs = options.timeout ?? 600000;
+
+  if (options.background) {
+    const p = new Promise<number>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (proc.pid) {
+          try { process.kill(proc.pid, 'SIGKILL'); } catch {}
+        }
+        reject(new Error(`Command timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      proc.on("error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+
+      proc.on("close", (code) => {
+        clearTimeout(timer);
+        resolve(code ?? 1);
+      });
+    });
+    
+    p.catch(e => console.error(`[Background Task Error]: ${e.message}`)).finally(() => {
+      unregisterBuildPid(projectArea);
+      try { fs.closeSync(outFd); } catch {}
+    });
+
+    return { status: "running", message: "Task dispatched to background.", pid: proc.pid };
+  }
   
   const exitCode = await new Promise<number>((resolve, reject) => {
     const timer = setTimeout(() => {

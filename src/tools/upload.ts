@@ -25,6 +25,7 @@ export async function uploadFilesystem(
   port?: string,
   environment?: string,
   verbose?: boolean,
+  background?: boolean,
 ): Promise<UploadResult> {
   const validatedPath = validateProjectPath(projectDir);
 
@@ -61,8 +62,13 @@ export async function uploadFilesystem(
         cwd: validatedPath,
         projectDir: validatedPath,
         timeout: 600000,
+        background
       },
     );
+
+    if (background) {
+      return uploadResult as UploadResult;
+    }
 
     const uploadSuccess = uploadResult.exitCode === 0;
 
@@ -95,6 +101,7 @@ export async function uploadFirmware(
   port?: string,
   environment?: string,
   verbose?: boolean,
+  background?: boolean,
 ): Promise<UploadResult> {
   const validatedPath = validateProjectPath(projectDir);
 
@@ -131,8 +138,13 @@ export async function uploadFirmware(
         cwd: validatedPath,
         projectDir: validatedPath,
         timeout: 600000,
+        background
       },
     );
+
+    if (background) {
+      return uploadResult as UploadResult;
+    }
 
     const uploadSuccess = uploadResult.exitCode === 0;
 
@@ -165,8 +177,9 @@ export async function uploadAndMonitor(
   port?: string,
   environment?: string,
   verbose?: boolean,
+  background?: boolean,
 ): Promise<UploadResult> {
-  return uploadFirmware(projectDir, port, environment, verbose);
+  return uploadFirmware(projectDir, port, environment, verbose, background);
 }
 
 export async function buildAndUpload(
@@ -174,6 +187,7 @@ export async function buildAndUpload(
   port?: string,
   environment?: string,
   verbose?: boolean,
+  background?: boolean,
 ): Promise<UploadResult> {
-  return uploadFirmware(projectDir, port, environment, verbose);
+  return uploadFirmware(projectDir, port, environment, verbose, background);
 }

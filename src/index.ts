@@ -34,13 +34,14 @@ import {
   StartMonitorParamsSchema,
   StopMonitorParamsSchema,
   QueryLogsParamsSchema,
+  CheckTaskStatusParamsSchema,
 } from "./types.js";
 
 // Import tool functions from feature modules
 import { listBoards, getBoardInfo } from "./tools/boards.js";
 import { listDevices } from "./tools/devices.js";
 import { initProject } from "./tools/projects.js";
-import { buildProject, cleanProject } from "./tools/build.js";
+import { buildProject, cleanProject, checkTaskStatus } from "./tools/build.js";
 import { uploadFirmware, uploadFilesystem } from "./tools/upload.js";
 import { startMonitor, stopMonitor, queryLogs } from "./tools/monitor.js";
 
@@ -401,6 +402,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: "check_task_status",
+        description: "Polls the status of an ongoing background build or upload task.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string", description: "Optional project directory to scope the check." },
+          },
+        },
+      },
     ],
   };
 });
@@ -470,7 +481,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const params = BuildProjectParamsSchema.parse(args);
 
         const executeTask = () =>
-          buildProject(params.projectDir, params.environment, params.verbose);
+          buildProject(params.projectDir, params.environment, params.verbose, params.background);
         const result = params.sessionId
           ? (hardwareLockManager.requireLock(params.sessionId),
             await executeTask())
@@ -489,7 +500,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "clean_project": {
         const params = CleanProjectParamsSchema.parse(args);
 
-        const executeTask = () => cleanProject(params.projectDir);
+        const executeTask = () => cleanProject(params.projectDir, params.background);
         const result = params.sessionId
           ? (hardwareLockManager.requireLock(params.sessionId),
             await executeTask())
@@ -514,6 +525,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             params.port,
             params.environment,
             params.verbose,
+            params.background
           );
         const result = params.sessionId
           ? (hardwareLockManager.requireLock(params.sessionId),
@@ -539,6 +551,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             params.port,
             params.environment,
             params.verbose,
+            params.background
           );
         const result = params.sessionId
           ? (hardwareLockManager.requireLock(params.sessionId),
@@ -707,6 +720,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         return {
           content: [{ type: "text", text: JSON.stringify({ success: true, message: "System state has been reset and all locks cleared." }, null, 2) }],
+        };
+      }
+
+      case "check_task_status": {
+        const params = CheckTaskStatusParamsSchema.parse(args);
+        const result = await checkTaskStatus(params.projectDir);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       }
 

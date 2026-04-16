@@ -18,6 +18,9 @@ import {
 } from "../utils/validation.js";
 import { BuildError, PlatformIOError } from "../utils/errors.js";
 import { parseStderrErrors } from "../utils/errors.js";
+import { isBuildActive } from "../utils/process-manager.js";
+import fs from "node:fs";
+import path from "node:path";
 
 
 /**
@@ -32,6 +35,7 @@ export async function buildProject(
   projectDir: string,
   environment?: string,
   verbose?: boolean,
+  background?: boolean,
 ): Promise<BuildResult> {
   const validatedPath = validateProjectPath(projectDir);
 
@@ -55,7 +59,12 @@ export async function buildProject(
       cwd: validatedPath,
       projectDir: validatedPath,
       timeout: 600000, // 10 minutes
+      background
     });
+
+    if (background) {
+      return result as BuildResult;
+    }
 
     const success = result.exitCode === 0;
     const errors = success ? undefined : parseStderrErrors(result.finalOutput);
@@ -99,7 +108,7 @@ export async function buildProject(
  * @param projectDir - Discard compilation output for this project workspace.
  * @returns Indicates successful cleanup execution metadata.
  */
-export async function cleanProject(projectDir: string): Promise<CleanResult> {
+export async function cleanProject(projectDir: string, background?: boolean): Promise<CleanResult> {
   const validatedPath = validateProjectPath(projectDir);
 
   try {
@@ -110,8 +119,13 @@ export async function cleanProject(projectDir: string): Promise<CleanResult> {
         cwd: validatedPath,
         projectDir: validatedPath,
         timeout: 60000,
+        background
       },
     );
+
+    if (background) {
+      return result;
+    }
 
     const success = result.exitCode === 0;
 
@@ -265,4 +279,46 @@ export async function listTargets(
       projectDir,
     });
   }
+}
+
+/**
+ * Polling tool to check background task status and return recent logs.
+ */
+export async function checkTaskStatus(projectDir?: string) {
+  const baseDir = projectDir || process.cwd();
+  const WORKSPACE_DIR = ".pio-mcp-workspace";
+  const LOGS_DIR = "build_logs";
+  const logFile = path.join(baseDir, WORKSPACE_DIR, LOGS_DIR, "latest-build.log");
+  
+  const active = isBuildActive(projectDir);
+
+  let finalOutput = "";
+  if (fs.existsSync(logFile)) {
+    try {
+      const content = fs.readFileSync(logFile, "utf-8");
+      const lines = content.split("\n");
+      if (active) {
+        finalOutput = lines.slice(-30).join("\n");
+      } else {
+        finalOutput = lines.slice(-150).join("\n");
+      }
+    } catch (e: any) {
+      finalOutput = `[Status Polling Error] Could not read log: ${e.message}`;
+    }
+  } else {
+    finalOutput = "No active build log found.";
+  }
+
+  let taskStatus = active ? "running" : "completed";
+  
+  if (!active && finalOutput.includes("FAILED")) {
+     taskStatus = "failed";
+  } else if (!active && finalOutput.includes("Error:")) {
+     taskStatus = "failed";
+  }
+
+  return {
+    status: taskStatus,
+    logTail: finalOutput
+  };
 }
