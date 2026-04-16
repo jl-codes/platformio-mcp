@@ -20,7 +20,9 @@ The `platformio-mcp` server encapsulates atomic locking, compilation, and log sp
 **Targeting Rules:** You MUST explicitly map the `environment` parameter (e.g., `esp32dev` or `esp32s3nano`) harvested from `platformio.ini` unless the user requires a full multi-environment compatibility check.
 
 **Handling Long-Running Tasks (Build & Flash):**
-Builds and firmware/filesystem uploads are often long-running asynchronous processes. When triggered, they may return immediately while the task operates completely in the background. If you anticipate a lengthy execution or observe a background task initiated, DO NOT assume failure or sit idle indefinitely. Instead, use the `mcp_platformio_check_task_status` tool to periodically poll the background process (e.g., check in every 1 to 3 minutes) until the task formally resolves.
+Builds and firmware/filesystem uploads are often long-running processes. You **MUST** use the `background: true` parameter when calling `mcp_platformio_build_project`, `mcp_platformio_clean_project`, `mcp_platformio_upload_firmware`, or `mcp_platformio_upload_filesystem` inside your tool invocation to prevent the server from timing out on large compilations.
+
+When triggered with the `background` flag, the tool will initiate the task offline and return control immediately. DO NOT assume failure, declare completion, or sit idle indefinitely. Instead, use the `mcp_platformio_check_task_status` tool to periodically poll the ongoing background process (check in every 1 to 3 minutes) until the task formally resolves.
 
 ### 🟡 Tier 2 (Self-Healing): Auto-Installer
 If the native `mcp_platformio_*` tools are completely unavailable in your context:
