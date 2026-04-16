@@ -174,6 +174,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "Agent session ID for pipeline lock validation",
             },
+            verbose: {
+              type: "boolean",
+              description:
+                "If true, returns the complete verbose build log in the result instead of truncating it on success",
+            },
+            background: {
+              type: "boolean",
+              description:
+                "If true, dispatches the compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
+            },
           },
           required: ["projectDir"],
         },
@@ -192,6 +202,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             sessionId: {
               type: "string",
               description: "Agent session ID for pipeline lock validation",
+            },
+            background: {
+              type: "boolean",
+              description:
+                "If true, dispatches the long-running execution to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
             },
           },
           required: ["projectDir"],
@@ -226,6 +241,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description:
                 "If true, returns the complete verbose upload log in the result instead of truncating it",
             },
+            background: {
+              type: "boolean",
+              description:
+                "If true, dispatches the compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
+            },
           },
           required: ["projectDir"],
         },
@@ -258,6 +278,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "boolean",
               description:
                 "If true, returns the complete verbose upload log in the result instead of truncating it",
+            },
+            background: {
+              type: "boolean",
+              description:
+                "If true, dispatches the compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
             },
           },
           required: ["projectDir"],
