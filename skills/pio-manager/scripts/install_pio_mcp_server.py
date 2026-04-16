@@ -77,6 +77,8 @@ def main():
         
     print("[+] Successfully installed and configured platformio-mcp!")
     print("[!] IMPORTANT: The AI agent or user must completely restart the agent process for the new MCP configuration to be picked up.")
+    print("\n[*] NOTE: AI agent skills are optionally available in the 'skills/pio-manager' directory.")
+    print("    Copy these guidelines into your agent's .agents/skills/ or equivalent rules directory to radically improve hardware autonomy.")
 
 if __name__ == "__main__":
     main()
