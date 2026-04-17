@@ -11,6 +11,7 @@
 
 import { executeWithSpooling } from "../utils/spooler.js";
 import type { UploadResult } from "../types.js";
+import { startMonitor } from "./monitor.js";
 import {
   validateProjectPath,
   validateEnvironmentName,
@@ -19,6 +20,8 @@ import {
 
 import { UploadError, PlatformIOError } from "../utils/errors.js";
 import { parseStderrErrors } from "../utils/errors.js";
+import { stopMonitor } from "./monitor.js";
+import { portSemaphoreManager } from "../utils/semaphore.js";
 
 /**
  * Uploads a SPIFFS/LittleFS filesystem image to a target device.
@@ -36,6 +39,7 @@ export async function uploadFilesystem(
   environment?: string,
   verbose?: boolean,
   background?: boolean,
+  startMonitorAfter?: boolean,
 ): Promise<UploadResult> {
   const validatedPath = validateProjectPath(projectDir);
 
@@ -65,6 +69,9 @@ export async function uploadFilesystem(
     const uploadArgs: string[] = ["run", "--target", "uploadfs"];
     if (environment) uploadArgs.push("--environment", environment);
 
+    await stopMonitor(activePort, projectDir);
+    portSemaphoreManager.claimPort(activePort, "Filesystem Upload");
+
     const uploadResult = await executeWithSpooling(
       "run",
       uploadArgs.slice(1),
@@ -72,7 +79,22 @@ export async function uploadFilesystem(
         cwd: validatedPath,
         projectDir: validatedPath,
         timeout: 600000,
-        background
+        background,
+        activePort,
+        onSuccess: startMonitorAfter ? async () => {
+          const { getFirstDevice } = await import("./devices.js");
+          let device = null;
+          for (let i = 0; i < 20; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            device = await getFirstDevice();
+            if (device) break;
+          }
+          if (device) {
+            await startMonitor(device.port, undefined, validatedPath, environment);
+          } else {
+            console.error(`[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`);
+          }
+        } : undefined
       },
     );
 
@@ -122,6 +144,7 @@ export async function uploadFirmware(
   environment?: string,
   verbose?: boolean,
   background?: boolean,
+  startMonitorAfter?: boolean,
 ): Promise<UploadResult> {
   const validatedPath = validateProjectPath(projectDir);
 
@@ -151,6 +174,9 @@ export async function uploadFirmware(
     const uploadArgs: string[] = ["run", "--target", "upload"];
     if (environment) uploadArgs.push("--environment", environment);
 
+    await stopMonitor(activePort, projectDir);
+    portSemaphoreManager.claimPort(activePort, "Firmware Upload");
+
     const uploadResult = await executeWithSpooling(
       "run",
       uploadArgs.slice(1),
@@ -158,7 +184,22 @@ export async function uploadFirmware(
         cwd: validatedPath,
         projectDir: validatedPath,
         timeout: 600000,
-        background
+        background,
+        activePort,
+        onSuccess: startMonitorAfter ? async () => {
+          const { getFirstDevice } = await import("./devices.js");
+          let device = null;
+          for (let i = 0; i < 20; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            device = await getFirstDevice();
+            if (device) break;
+          }
+          if (device) {
+            await startMonitor(device.port, undefined, validatedPath, environment);
+          } else {
+            console.error(`[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`);
+          }
+        } : undefined
       },
     );
 
@@ -208,8 +249,9 @@ export async function uploadAndMonitor(
   environment?: string,
   verbose?: boolean,
   background?: boolean,
+  startMonitorAfter?: boolean,
 ): Promise<UploadResult> {
-  return uploadFirmware(projectDir, port, environment, verbose, background);
+  return uploadFirmware(projectDir, port, environment, verbose, background, startMonitorAfter);
 }
 
 /**
@@ -228,6 +270,7 @@ export async function buildAndUpload(
   environment?: string,
   verbose?: boolean,
   background?: boolean,
+  startMonitorAfter?: boolean,
 ): Promise<UploadResult> {
-  return uploadFirmware(projectDir, port, environment, verbose, background);
+  return uploadFirmware(projectDir, port, environment, verbose, background, startMonitorAfter);
 }

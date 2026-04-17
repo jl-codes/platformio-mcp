@@ -24,6 +24,7 @@ import { listDevices } from "../tools/devices.js";
 import { exec } from "child_process";
 import fs from "node:fs";
 import { hardwareLockManager } from "../utils/lock-manager.js";
+import { isBuildActive } from "../utils/process-manager.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -127,12 +128,20 @@ export function startPortalServer(defaultPort = 8080) {
 
   app.post("/api/spooler/start", async (req, res) => {
     try {
-      if (hardwareLockManager.getLockStatus().isLocked) {
-        throw new Error(
-          "Hardware queue is currently locked by an active agent operation.",
-        );
-      }
       const { port, projectDir } = req.body;
+      const lockStatus = hardwareLockManager.getLockStatus();
+      
+      if (lockStatus.isLocked) {
+        if (!isBuildActive(projectDir)) {
+          // Orphaned explicit lock detected (agent forgot to release or crashed).
+          // Auto-evict the stale lock so the UI isn't permanently bricked.
+          hardwareLockManager.releaseLock(lockStatus.sessionId!);
+        } else {
+          throw new Error(
+            "Hardware queue is currently locked by an active agent operation.",
+          );
+        }
+      }
       const result = await startMonitor(
         port,
         115200,

@@ -246,6 +246,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description:
                 "If true, dispatches the compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
             },
+            start_monitor: {
+              type: "boolean",
+              description: "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."
+            },
           },
           required: ["projectDir"],
         },
@@ -283,6 +287,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "boolean",
               description:
                 "If true, dispatches the compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
+            },
+            start_monitor: {
+              type: "boolean",
+              description: "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."
             },
           },
           required: ["projectDir"],
@@ -573,7 +581,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             params.port,
             params.environment,
             params.verbose,
-            params.background
+            params.background,
+            args.start_monitor
           );
         const result = params.sessionId
           ? (hardwareLockManager.requireLock(params.sessionId),
@@ -599,7 +608,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             params.port,
             params.environment,
             params.verbose,
-            params.background
+            params.background,
+            args.start_monitor
           );
         const result = params.sessionId
           ? (hardwareLockManager.requireLock(params.sessionId),
@@ -715,9 +725,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "start_monitor": {
         const params = StartMonitorParamsSchema.parse(args);
-        const executeTask = () =>
-          startMonitor(params.port, params.baudRate, params.projectDir, params.environment);
-        const result = await hardwareLockManager.withImplicitLock(executeTask);
+        const result = await startMonitor(params.port, params.baudRate, params.projectDir, params.environment);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -725,11 +733,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "stop_monitor": {
         const params = StopMonitorParamsSchema.parse(args);
-        const executeTask = async () => {
-          await stopMonitor(params.port, params.projectDir);
-          return { success: true, message: `Stopped monitor on ${params.port}` };
-        };
-        const result = await hardwareLockManager.withImplicitLock(executeTask);
+        await stopMonitor(params.port, params.projectDir);
+        const result = { success: true, message: `Stopped monitor on ${params.port}` };
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };

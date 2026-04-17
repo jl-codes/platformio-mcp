@@ -16,6 +16,24 @@ The baseline architecture serves as a universal bridge wrapping the PlatformIO C
 
 ---
 
+## [Concurrency & Locking Architecture]
+
+To ensure atomic state stability across long-running autonomous processes and manual Web UI interactions, the system employs a strictly decoupled 2-Tier Locking mechanism. These queues must not be conflated.
+
+1. **Hardware Queue Lock (Build Pipeline Locks):**
+   * **Purpose:** Protects the *build process* codebase and compilation state. Ensures only one agent can mutate the project files, install dependencies, or trigger a compilation at a given time to guarantee deterministic build tests.
+   * **Scope:** Managed explicitly (`mcp_platformio_acquire_lock`) or implicitly applied across operations like builds, library installations, or platform inits.
+   * **Rule:** A monitor session or file read does NOT modify the build state and therefore MUST NEVER acquire or respect the Hardware Queue Lock.
+
+2. **Physical Port Semaphore (Serial Port Locks):**
+   * **Purpose:** Protects the runtime access to physical `/dev/cu.*` serial endpoints. Minimized to the shortest timeframe possible to prevent OS-level DriverKit (`Resource busy`) collisions between `miniterm` serial polling and the `esptool.py` flasher.
+   * **Scope:** Implicitly locked specifically when dropping firmware over the wire (flashing) or spawning a monitor daemon.
+   * **Preemption Rules:** 
+     * *Build/Upload Preemption:* A firmware upload operation **CAN** (and MUST) forcefully stop and clear any active monitor processes holding the physical port lock before it starts pushing bytes.
+     * *Monitor Preemption:* A monitor request **MUST NOT** kill an active pipeline building/flashing firmware. It should be outright rejected with a "Port Busy" exception until the flash completes.
+
+---
+
 ## [Types]
 
 TypeScript interfaces and Zod schemas define the rigorous structured I/O for the MCP operations.

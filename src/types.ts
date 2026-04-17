@@ -453,6 +453,10 @@ export const UploadFirmwareParamsSchema = z.object({
     .boolean()
     .optional()
     .describe("If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."),
+  startMonitorAfter: z
+    .boolean()
+    .optional()
+    .describe("If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."),
 });
 
 // Upload filesystem parameters
@@ -483,6 +487,10 @@ export const UploadFilesystemParamsSchema = z.object({
     .boolean()
     .optional()
     .describe("If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."),
+  startMonitorAfter: z
+    .boolean()
+    .optional()
+    .describe("If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."),
 });
 
 

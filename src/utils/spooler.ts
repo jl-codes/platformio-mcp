@@ -170,7 +170,11 @@ export async function executeWithSpooling(
       if (watcher) { try { watcher.close(); } catch {} }
 
       if (code === 0 && options.onSuccess) {
-        await options.onSuccess();
+        try {
+          await options.onSuccess();
+        } catch (e: any) {
+          console.error(`[Spooler Diagnostic] Background onSuccess hook failed: ${e.message}`);
+        }
       }
     });
 
