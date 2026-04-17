@@ -55,8 +55,10 @@ export async function uploadFilesystem(
 
   try {
     let activePort = port;
+    let hwid: string | undefined;
+    const { getFirstDevice, findDeviceByPort, waitForDeviceByHwid } = await import("./devices.js");
+
     if (!activePort) {
-      const { getFirstDevice } = await import("./devices.js");
       const device = await getFirstDevice();
       if (!device)
         throw new PlatformIOError(
@@ -64,6 +66,10 @@ export async function uploadFilesystem(
           "PORT_NOT_FOUND",
         );
       activePort = device.port;
+      hwid = device.hwid;
+    } else {
+      const device = await findDeviceByPort(activePort);
+      hwid = device?.hwid;
     }
 
     const uploadArgs: string[] = ["run", "--target", "uploadfs"];
@@ -82,7 +88,14 @@ export async function uploadFilesystem(
         background,
         activePort,
         onSuccess: startMonitorAfter ? async () => {
-          const { getFirstDevice } = await import("./devices.js");
+          if (hwid) {
+            const newPort = await waitForDeviceByHwid(hwid, 10000, (msg) => console.error(msg.trim()));
+            if (newPort) {
+              await startMonitor(newPort, undefined, validatedPath, environment);
+              return;
+            }
+          }
+          
           let device = null;
           for (let i = 0; i < 20; i++) {
             await new Promise((resolve) => setTimeout(resolve, 500));
@@ -160,8 +173,10 @@ export async function uploadFirmware(
 
   try {
     let activePort = port;
+    let hwid: string | undefined;
+    const { getFirstDevice, findDeviceByPort, waitForDeviceByHwid } = await import("./devices.js");
+
     if (!activePort) {
-      const { getFirstDevice } = await import("./devices.js");
       const device = await getFirstDevice();
       if (!device)
         throw new PlatformIOError(
@@ -169,6 +184,10 @@ export async function uploadFirmware(
           "PORT_NOT_FOUND",
         );
       activePort = device.port;
+      hwid = device.hwid;
+    } else {
+      const device = await findDeviceByPort(activePort);
+      hwid = device?.hwid;
     }
 
     const uploadArgs: string[] = ["run", "--target", "upload"];
@@ -187,7 +206,14 @@ export async function uploadFirmware(
         background,
         activePort,
         onSuccess: startMonitorAfter ? async () => {
-          const { getFirstDevice } = await import("./devices.js");
+          if (hwid) {
+            const newPort = await waitForDeviceByHwid(hwid, 10000, (msg) => console.error(msg.trim()));
+            if (newPort) {
+              await startMonitor(newPort, undefined, validatedPath, environment);
+              return;
+            }
+          }
+
           let device = null;
           for (let i = 0; i < 20; i++) {
             await new Promise((resolve) => setTimeout(resolve, 500));

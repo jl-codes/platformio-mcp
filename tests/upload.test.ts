@@ -32,6 +32,8 @@ describe('Upload Tools', () => {
     vi.spyOn(portSemaphoreManager, 'claimPort').mockImplementation(() => {});
     vi.spyOn(portSemaphoreManager, 'releasePort').mockImplementation(() => {});
     vi.spyOn(devices, 'getFirstDevice').mockResolvedValue({ port: 'COM1', description: 'Mock Device', hwid: '123' });
+    vi.spyOn(devices, 'findDeviceByPort').mockResolvedValue({ port: 'COM1', description: 'Mock Device', hwid: '123' });
+    vi.spyOn(devices, 'waitForDeviceByHwid').mockResolvedValue('COM1');
   });
 
   afterEach(() => {
@@ -75,7 +77,7 @@ describe('Upload Tools', () => {
     await vi.runAllTimersAsync();
     await promise;
 
-    expect(devices.getFirstDevice).toHaveBeenCalled();
+    expect(devices.waitForDeviceByHwid).toHaveBeenCalledWith('123', 10000, expect.any(Function));
     expect(monitor.startMonitor).toHaveBeenCalledWith('COM1', undefined, mockProjectDir, 'default');
     
     vi.useRealTimers();
