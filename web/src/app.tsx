@@ -117,6 +117,14 @@ function App() {
       });
     });
 
+    socket.on('serial_clear', (data: { port: string }) => {
+      setSerialLogs(prev => {
+        const next = { ...prev };
+        delete next[data.port];
+        return next;
+      });
+    });
+
     socket.on('spooler_states', (data: Record<string, SpoolerState>) => {
       setSpoolerStates(data);
     });
@@ -136,6 +144,7 @@ function App() {
       socket.off('build_clear');
       socket.off('build_state');
       socket.off('serial_log');
+      socket.off('serial_clear');
       socket.off('spooler_states');
       socket.off('workspace_state');
       socket.off('lock_state');

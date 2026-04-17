@@ -202,6 +202,9 @@ export function startPortalServer(defaultPort = 8080) {
     for (const [port, daemon] of Object.entries(spoolers)) {
       if (daemon.logFile && fs.existsSync(daemon.logFile)) {
         try {
+          // Clear existing local state on frontend to prevent duplicates across reconnects
+          socket.emit("serial_clear", { port });
+
           const content = fs.readFileSync(daemon.logFile, "utf8");
           const lines = content.split("\n").slice(-50);
           socket.emit("serial_log", {
@@ -247,6 +250,9 @@ export function startPortalServer(defaultPort = 8080) {
           timestamp: Date.now(),
           logFile: latestBuildLog,
         });
+
+        // Clear existing local state on frontend to prevent duplicates across reconnects
+        socket.emit("build_clear", { logFile: latestBuildLog });
 
         // Hydrate last 50 lines of build log
         try {
