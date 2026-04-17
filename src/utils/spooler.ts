@@ -13,6 +13,7 @@ import path from "node:path";
 import { platformioExecutor } from "../platformio.js";
 import { registerBuildPid, unregisterBuildPid, isBuildActive } from "./process-manager.js";
 import { portalEvents } from "../api/events.js";
+import { portSemaphoreManager } from "./semaphore.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOGS_DIR = "build_logs";
@@ -84,7 +85,7 @@ export function rotateBuildStreams(projectDir?: string) {
 export async function executeWithSpooling(
   command: string,
   args: string[],
-  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean }
+  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; onSuccess?: () => Promise<void> }
 ): Promise<any> {
   const projectArea = options.projectDir ?? options.cwd;
 
@@ -158,11 +159,19 @@ export async function executeWithSpooling(
         resolve(code ?? 1);
       });
     });
-    
-    p.catch(e => console.error(`[Background Task Error]: ${e.message}`)).finally(() => {
+
+    p.catch(e => {
+      console.error(`[Background Task Error]: ${e.message}`);
+      return 1;
+    }).then(async (code) => {
       unregisterBuildPid(projectArea);
+      if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
       try { fs.closeSync(outFd); } catch {}
       if (watcher) { try { watcher.close(); } catch {} }
+
+      if (code === 0 && options.onSuccess) {
+        await options.onSuccess();
+      }
     });
 
     return { status: "running", message: "Task dispatched to background.", pid: proc.pid };
@@ -189,11 +198,20 @@ export async function executeWithSpooling(
 
   // Cleanup
   unregisterBuildPid(projectArea);
+  if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
   try {
     fs.closeSync(outFd);
   } catch {}
   if (watcher) {
     try { watcher.close(); } catch {}
+  }
+
+  if (exitCode === 0 && options.onSuccess) {
+    try {
+      await options.onSuccess();
+    } catch (e: any) {
+      console.error(`[Spooler Diagnostic] onSuccess hook failed: ${e.message}`);
+    }
   }
 
   // 5. Yield contextual snapshot (preventing window bloat)
