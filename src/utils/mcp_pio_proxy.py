@@ -44,7 +44,8 @@ def main():
         stdin=slave_fd,
         stdout=slave_fd,
         stderr=slave_fd,
-        close_fds=True
+        close_fds=True,
+        start_new_session=True
     )
     
     # We close the slave in the parent so the master gets an EOF when the child exits

@@ -45,6 +45,7 @@ tests/mock_project_spooler/
 # PlatformIO
 .pio/
 .pio-mcp-workspace/
+.locks/
 
 # Runtime data
 lib-cov/
