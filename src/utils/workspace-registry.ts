@@ -7,9 +7,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { SERVER_STATE_DIR, ensureDir } from "./paths.js";
+import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
 
-const REGISTRY_FILE = path.join(SERVER_STATE_DIR, "workspaces.jsonl");
+const REGISTRY_FILE = path.join(SERVER_DATA_DIR, "workspaces.jsonl");
 
 export interface WorkspaceRecord {
   dir: string;
@@ -21,7 +21,7 @@ export interface WorkspaceRecord {
  * De-duplicates adjacent identical calls during rapid sequential operations.
  */
 export function addWorkspace(dir: string): void {
-  ensureDir(SERVER_STATE_DIR);
+  ensureGlobalDirs();
   
   if (fs.existsSync(REGISTRY_FILE)) {
     try {

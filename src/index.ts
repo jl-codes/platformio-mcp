@@ -55,7 +55,7 @@ import { checkPlatformIOInstalled } from "./platformio.js";
 import { formatPlatformIOError } from "./utils/errors.js";
 import { hardwareLockManager } from "./utils/lock-manager.js";
 import { killAllTrackedProcesses } from "./utils/process-manager.js";
-import { LOCKS_DIR } from "./utils/paths.js";
+import { GLOBAL_LOCKS_DIR } from "./utils/paths.js";
 import fs from "node:fs";
 import path from "node:path";
 import { logDiagnostic as logDiag } from "./utils/logger.js";
@@ -760,10 +760,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         // Release OS-level Semaphores
         try {
-          if (fs.existsSync(LOCKS_DIR)) {
-            for (const file of fs.readdirSync(LOCKS_DIR)) {
-              if (file.endsWith(".lock")) {
-                fs.unlinkSync(path.join(LOCKS_DIR, file));
+          if (fs.existsSync(GLOBAL_LOCKS_DIR)) {
+            for (const file of fs.readdirSync(GLOBAL_LOCKS_DIR)) {
+              if (file.endsWith(".json") || file.endsWith(".lock")) {
+                fs.unlinkSync(path.join(GLOBAL_LOCKS_DIR, file));
               }
             }
           }

@@ -32,7 +32,7 @@ export class SemaphoreManager {
 
   private getLockFilePath(port: string): string {
     const id = sanitizePortName(port);
-    return path.join(GLOBAL_LOCKS_DIR, `port_${id}.lock`);
+    return path.join(GLOBAL_LOCKS_DIR, `port_${id}.json`);
   }
 
   /**

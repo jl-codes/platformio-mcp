@@ -21,9 +21,6 @@ const __dirname = path.dirname(__filename);
 
 // Project root is two levels up from src/utils/
 export const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
-export const SERVER_STATE_DIR = path.join(PROJECT_ROOT, ".server-state");
-export const LOCKS_DIR = path.join(SERVER_STATE_DIR, "locks");
-export const LOGS_DIR = path.join(SERVER_STATE_DIR, "logs");
 
 export const SERVER_DATA_DIR = path.join(os.homedir(), ".platformio-mcp");
 export const GLOBAL_LOCKS_DIR = path.join(SERVER_DATA_DIR, "serial_ports");
@@ -38,11 +35,8 @@ export function ensureDir(dir: string): void {
 }
 
 /**
- * Ensures the locks directory exists.
+ * Ensures the global directories exist.
  */
-export function ensureLocksDir(): void {
-  ensureDir(LOCKS_DIR);
-}
 
 export function ensureGlobalDirs(): void {
   ensureDir(SERVER_DATA_DIR);
