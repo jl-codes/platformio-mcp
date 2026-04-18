@@ -12,6 +12,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import path from "path";
+import rateLimit from "express-rate-limit";
 import { fileURLToPath } from "url";
 import crypto from "node:crypto";
 import { portalEvents } from "./events.js";
@@ -114,6 +115,14 @@ export function startPortalServer(defaultPort = 8080) {
   });
 
   // REST Auth Middleware restricting access to /api endpoints
+  const apiLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 100,
+    message: { error: "Too many requests from this IP, please try again after 5 minutes" }
+  });
+
+  app.use("/api", apiLimiter);
+
   app.use("/api", (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || authHeader !== `Bearer ${PORTAL_AUTH_TOKEN}`) {

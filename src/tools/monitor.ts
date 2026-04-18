@@ -53,23 +53,36 @@ export function getSpoolerStates() {
  *
  * @param maxHistory - Maximum total bounded files to retain.
  */
-function rotateLogs(targetDir: string, maxHistory = 30) {
+async function rotateLogs(targetDir: string, maxHistory = 30) {
   if (!fs.existsSync(targetDir)) return;
-  const files = fs
+  const fileNames = fs
     .readdirSync(targetDir)
-    .filter((f) => f.startsWith("device-monitor-") && f.endsWith(".log"))
-    .map((f) => ({
-      name: f,
-      path: path.join(targetDir, f),
-      ctime: fs.statSync(path.join(targetDir, f)).ctime.getTime(),
-    }))
-    .sort((a, b) => b.ctime - a.ctime); // Newest first
+    .filter((f) => f.startsWith("device-monitor-") && f.endsWith(".log"));
 
-  if (files.length > maxHistory) {
-    const toDelete = files.slice(maxHistory);
+  const files = await Promise.all(
+    fileNames.map(async (name) => {
+      const filePath = path.join(targetDir, name);
+      try {
+        const stat = await fs.promises.stat(filePath);
+        return {
+          name,
+          path: filePath,
+          ctime: stat.ctime.getTime(),
+        };
+      } catch (e) {
+        return null;
+      }
+    })
+  );
+
+  const validFiles = files.filter((f): f is NonNullable<typeof f> => f !== null);
+  validFiles.sort((a, b) => b.ctime - a.ctime); // Newest first
+
+  if (validFiles.length > maxHistory) {
+    const toDelete = validFiles.slice(maxHistory);
     for (const f of toDelete) {
       try {
-        fs.unlinkSync(f.path);
+        await fs.promises.unlink(f.path);
       } catch (e) {}
     }
   }
@@ -105,10 +118,10 @@ export async function stopMonitor(port: string, projectDir?: string) {
 /**
  * Utility to generate a fresh log file path for a port.
  */
-function rotateSpoolerStreams(projectDir?: string) {
+async function rotateSpoolerStreams(projectDir?: string) {
   const targetDir = getLogDir(projectDir);
 
-  rotateLogs(targetDir, 30);
+  await rotateLogs(targetDir, 30);
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const logFile = path.join(targetDir, `device-monitor-${timestamp}.log`);
@@ -216,7 +229,7 @@ export async function startMonitor(
     fs.mkdirSync(targetDir, { recursive: true });
   }
 
-  const { logFile } = rotateSpoolerStreams(projectDir);
+  const { logFile } = await rotateSpoolerStreams(projectDir);
 
   portSemaphoreManager.claimPort(activePort, "Monitor Daemon");
 

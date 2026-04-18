@@ -41,6 +41,12 @@ class PortalEventEmitter extends EventEmitter {
           fs.mkdirSync(workspaceDir, { recursive: true });
         }
         const logFile = path.join(workspaceDir, "agent_activities.jsonl");
+        try {
+          const stat = await fs.promises.stat(logFile);
+          if (stat.size > 2 * 1024 * 1024) {
+            await fs.promises.rename(logFile, logFile + ".1");
+          }
+        } catch (e) {}
         await fs.promises.appendFile(logFile, JSON.stringify(payload) + "\n");
       } catch (e) {}
     }
