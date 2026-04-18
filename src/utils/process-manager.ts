@@ -11,6 +11,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import treeKill from "tree-kill";
 import { logDiagnostic as logDiag } from "./logger.js";
 
@@ -109,6 +110,20 @@ export function isBuildActive(projectDir?: string): boolean {
     const pid = pids["build"];
     if (pid) {
       process.kill(pid, 0); // Throws if process is dead
+      
+      // OS-level validation to prevent stale PID false positives
+      if (os.platform() !== "win32") {
+        try {
+          const stdout = execSync(`ps -p ${pid} -o command=`, { encoding: "utf8" }).toLowerCase();
+          if (!stdout.includes("platformio") && !stdout.includes("pio") && !stdout.includes("python")) {
+            return false;
+          }
+        } catch {
+          // If ps fails, assume process might be dead or permission denied
+          return false;
+        }
+      }
+      
       return true;
     }
   } catch {}

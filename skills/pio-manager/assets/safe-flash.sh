@@ -14,9 +14,18 @@ else
     echo "[*] No background monitor detected. Standalone flash mode."
 fi
 
-# Fallback/Safety: kill any remaining pio monitor processes directly
-pgrep -f "pio device monitor" | xargs kill -9 2>/dev/null || true
-pgrep -f "miniterm" | xargs kill -9 2>/dev/null || true
+# Fallback/Safety: attempt graceful SIGTERM first, then fallback to SIGKILL
+for pat in "pio device monitor" "miniterm"; do
+    PIDS=$(pgrep -f "$pat")
+    if [ -n "$PIDS" ]; then
+        echo "$PIDS" | xargs kill -TERM 2>/dev/null || true
+        sleep 1
+        PIDS_SURVIVOR=$(pgrep -f "$pat")
+        if [ -n "$PIDS_SURVIVOR" ]; then
+            echo "$PIDS_SURVIVOR" | xargs kill -9 2>/dev/null || true
+        fi
+    fi
+done
 
 if pio device list | grep -q "Arduino Nano ESP32\|2341:0070\|303A:1001"; then
     echo "Detected Arduino Nano ESP32 (esp32s3nano)"

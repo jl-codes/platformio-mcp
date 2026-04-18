@@ -144,7 +144,17 @@ export async function executeWithSpooling(
     const p = new Promise<number>((resolve, reject) => {
       const timer = setTimeout(() => {
         if (proc.pid) {
-          try { process.kill(proc.pid, 'SIGKILL'); } catch {}
+          try { 
+            process.kill(proc.pid, 'SIGTERM'); 
+            setTimeout(() => {
+              try {
+                if (proc.pid) {
+                  process.kill(proc.pid, 0);
+                  process.kill(proc.pid, 'SIGKILL');
+                }
+              } catch {}
+            }, 1000);
+          } catch {}
         }
         reject(new Error(`Command timed out after ${timeoutMs}ms`));
       }, timeoutMs);
@@ -184,7 +194,17 @@ export async function executeWithSpooling(
   const exitCode = await new Promise<number>((resolve, reject) => {
     const timer = setTimeout(() => {
       if (proc.pid) {
-        try { process.kill(proc.pid, 'SIGKILL'); } catch {}
+        try { 
+          process.kill(proc.pid, 'SIGTERM'); 
+          setTimeout(() => {
+            try {
+              if (proc.pid) {
+                process.kill(proc.pid, 0);
+                process.kill(proc.pid, 'SIGKILL');
+              }
+            } catch {}
+          }, 1000);
+        } catch {}
       }
       reject(new Error(`Command timed out after ${timeoutMs}ms`));
     }, timeoutMs);

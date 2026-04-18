@@ -31,9 +31,18 @@ export interface LockState {
   lockedAt?: number;
 }
 
+const MAX_LOCK_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
 export class HardwareLockManager {
   private static instance: HardwareLockManager;
   private state: LockState = { isLocked: false };
+
+  private checkExpiration(): void {
+    if (this.state.isLocked && this.state.lockedAt && Date.now() - this.state.lockedAt > MAX_LOCK_TTL_MS) {
+      this.state = { isLocked: false };
+      try { portalEvents.emitLockState(this.state); } catch (e) {}
+    }
+  }
 
   private constructor() {}
 
@@ -52,6 +61,13 @@ export class HardwareLockManager {
    * Throws if another session currently holds the lock.
    */
   public acquireLock(sessionId: string, reason?: string): void {
+    this.checkExpiration();
+    
+    if (this.state.isLocked && this.state.sessionId === sessionId) {
+      console.log(`Lock re-entry attempt by session ${sessionId}`);
+      return;
+    }
+
     if (this.state.isLocked && this.state.sessionId !== sessionId) {
       throw new QueueEnforcementError(
         `Hardware is currently tied up by ${this.state.sessionId || "another session"}. Please queue your task.`,
@@ -75,6 +91,7 @@ export class HardwareLockManager {
    * Release the explicit lock, if it matches the current session ID.
    */
   public releaseLock(sessionId: string): void {
+    this.checkExpiration();
     if (this.state.isLocked && this.state.sessionId === sessionId) {
       this.state = { isLocked: false };
       try { portalEvents.emitLockState(this.state); } catch (e) {}
@@ -85,6 +102,7 @@ export class HardwareLockManager {
    * Get the current global lock state.
    */
   public getLockStatus(): LockState {
+    this.checkExpiration();
     return { ...this.state };
   }
 
@@ -93,6 +111,7 @@ export class HardwareLockManager {
    * Operation can proceed if unlocked, or if the requester IS the locker.
    */
   public requireLock(sessionId?: string): void {
+    this.checkExpiration();
     if (this.state.isLocked && this.state.sessionId !== sessionId) {
       throw new QueueEnforcementError(
         `Hardware is currently tied up by session [${this.state.sessionId}]. Please queue your task.`,
