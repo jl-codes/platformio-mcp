@@ -88,3 +88,20 @@ export function getWorkspaces(): string[] {
     return [];
   }
 }
+
+/**
+ * Completely rewrites the JSONL registry, removing defunct entries.
+ * Given an array of ordered directory paths, it drops the current 
+ * transaction log and sequences them back in order.
+ */
+export function rewriteRegistry(directories: string[]): void {
+  try {
+    if (fs.existsSync(REGISTRY_FILE)) {
+      fs.unlinkSync(REGISTRY_FILE);
+    }
+  } catch {}
+
+  for (const dir of directories) {
+    addWorkspace(dir);
+  }
+}

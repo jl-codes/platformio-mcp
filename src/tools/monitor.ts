@@ -20,8 +20,8 @@ import { platformioExecutor } from "../platformio.js";
 import { portalEvents } from "../api/events.js";
 import { logDiagnostic as logDiag } from "../utils/logger.js";
 import { tailFileBounded } from "../utils/tail.js";
-import { getWorkspaces } from "../utils/workspace-registry.js";
-import { getActiveMonitorPids, isPidAlive } from "../utils/process-manager.js";
+import { getWorkspaces, rewriteRegistry } from "../utils/workspace-registry.js";
+import { getActiveMonitorPids, isPidAlive, isBuildActive } from "../utils/process-manager.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOGS_DIR = "serial_logs";
@@ -191,53 +191,70 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string) {
 export async function rehydrateMonitors(): Promise<void> {
   const workspaces = getWorkspaces();
   let rehydrationCount = 0;
+  const activeWorkspaces: string[] = [];
 
   for (const projectDir of workspaces) {
-    const pids = getActiveMonitorPids(projectDir);
-    for (const port in pids) {
-      const pid = pids[port];
-      if (isPidAlive(pid)) {
-        if (!activeDaemons[port]) {
-          const logFile = path.join(getLogDir(projectDir), "latest-monitor.log");
-          let currentSize = 0;
-          try {
-            if (fs.existsSync(logFile)) {
-              currentSize = fs.statSync(logFile).size;
-            }
-          } catch {}
+    let workspaceIsActive = false;
 
-          const daemon: DaemonContext = {
-            baudRate: 115200, // Placeholder
-            hwid: null,
-            logFile,
-            fileOffset: currentSize,
-          };
-          activeDaemons[port] = daemon;
+    if (fs.existsSync(projectDir)) {
+      if (isBuildActive(projectDir)) {
+        workspaceIsActive = true;
+      }
 
-          try {
-             daemon.watcher = fs.watch(logFile, (eventType) => {
-              if (eventType === 'change') {
-                try {
-                  const stat = fs.statSync(logFile);
-                  if (stat.size > (daemon.fileOffset || 0)) {
-                    const stream = fs.createReadStream(logFile, { start: daemon.fileOffset || 0, end: stat.size - 1 });
-                    stream.on('data', (chunk) => {
-                      portalEvents.emitSerialLog(port, chunk.toString());
-                    });
-                    daemon.fileOffset = stat.size;
-                  }
-                } catch (e) {}
+      const pids = getActiveMonitorPids(projectDir);
+      for (const port in pids) {
+        const pid = pids[port];
+        if (isPidAlive(pid)) {
+          workspaceIsActive = true;
+          if (!activeDaemons[port]) {
+            const logFile = path.join(getLogDir(projectDir), "latest-monitor.log");
+            let currentSize = 0;
+            try {
+              if (fs.existsSync(logFile)) {
+                currentSize = fs.statSync(logFile).size;
               }
-            });
-            rehydrationCount++;
-            logDiag(`[Monitor Recovery] Successfully rehydrated stream for ${port} (PID: ${pid}) in ${projectDir}`);
-          } catch (e: any) {
-             logDiag(`[Monitor Recovery] Failed to attach fs.watch to orphaned port ${port}: ${e.message}`, projectDir);
+            } catch {}
+
+            const daemon: DaemonContext = {
+              baudRate: 115200, // Placeholder
+              hwid: null,
+              logFile,
+              fileOffset: currentSize,
+            };
+            activeDaemons[port] = daemon;
+
+            try {
+               daemon.watcher = fs.watch(logFile, (eventType) => {
+                if (eventType === 'change') {
+                  try {
+                    const stat = fs.statSync(logFile);
+                    if (stat.size > (daemon.fileOffset || 0)) {
+                      const stream = fs.createReadStream(logFile, { start: daemon.fileOffset || 0, end: stat.size - 1 });
+                      stream.on('data', (chunk) => {
+                        portalEvents.emitSerialLog(port, chunk.toString());
+                      });
+                      daemon.fileOffset = stat.size;
+                    }
+                  } catch (e) {}
+                }
+              });
+              rehydrationCount++;
+              logDiag(`[Monitor Recovery] Successfully rehydrated stream for ${port} (PID: ${pid}) in ${projectDir}`);
+            } catch (e: any) {
+               logDiag(`[Monitor Recovery] Failed to attach fs.watch to orphaned port ${port}: ${e.message}`, projectDir);
+            }
           }
         }
       }
     }
+
+    if (workspaceIsActive) {
+      activeWorkspaces.push(projectDir);
+    }
   }
+
+  // Atomically recreate the workspaces log to drop zombie entries
+  rewriteRegistry(activeWorkspaces);
 
   if (rehydrationCount > 0) {
     portalEvents.emitSpoolerStates(activeDaemons);
