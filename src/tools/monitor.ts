@@ -19,6 +19,7 @@ import { registerPioMonitorPid, killPioMonitorByPort } from "../utils/process-ma
 import { platformioExecutor } from "../platformio.js";
 import { portalEvents } from "../api/events.js";
 import { logDiagnostic as logDiag } from "../utils/logger.js";
+import { tailFileBounded } from "../utils/tail.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOGS_DIR = "serial_logs";
@@ -135,10 +136,8 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string) {
   logDiag(`[Spooler] Spawning pio monitor (Env: ${daemon.environment || "None"}) via executor for ${targetPort}`, projectDir);
 
   // Instead of node managing the streams via stdout.on, we pass the file descriptor directly to the OS.
-  // This achieves direct-to-disk spooling and lets the daemon survive if the MCP server crashes.
   const outFd = fs.openSync(daemon.logFile, 'a');
-  
-  const proc = platformioExecutor.spawn("device", ["monitor", ...monitorArgs], {
+  const proc = await platformioExecutor.spawn("device", ["monitor", ...monitorArgs], {
     detached: true,
     useFakeTty: true,
     stdio: ['ignore', outFd, outFd]
@@ -281,8 +280,7 @@ export async function queryLogs(
     };
   }
 
-  const content = fs.readFileSync(targetFile, "utf8");
-  let outputLines = content.split("\n");
+  let outputLines = await tailFileBounded(targetFile);
 
   if (searchPattern) {
     try {

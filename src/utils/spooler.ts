@@ -14,6 +14,7 @@ import { platformioExecutor } from "../platformio.js";
 import { registerBuildPid, unregisterBuildPid, isBuildActive } from "./process-manager.js";
 import { portalEvents } from "../api/events.js";
 import { portSemaphoreManager } from "./semaphore.js";
+import { tailFileBounded } from "./tail.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOGS_DIR = "build_logs";
@@ -99,7 +100,7 @@ export async function executeWithSpooling(
   const outFd = fs.openSync(logFile, "a");
 
   // 3. Spawning
-  const proc = platformioExecutor.spawn(command, args, {
+  const proc = await platformioExecutor.spawn(command, args, {
     cwd: options.cwd,
     stdio: ["ignore", outFd, outFd],
     detached: false
@@ -241,8 +242,7 @@ export async function executeWithSpooling(
   // 5. Yield contextual snapshot (preventing window bloat)
   let finalOutput = "";
   try {
-    const content = fs.readFileSync(logFile, "utf-8");
-    const lines = content.split("\n");
+    const lines = await tailFileBounded(logFile, 512 * 1024);
     finalOutput = lines.slice(-150).join("\n");
   } catch (e: any) {
     finalOutput = `[Spooler Fetch Error] Could not parse log ending: ${e.message}`;

@@ -301,7 +301,7 @@ export class PlatformIOExecutor {
    * @param options - Execution options including working directory, environment overrides, and fake TTY bridging.
    * @returns The spawned ChildProcess instance.
    */
-  spawn(
+  async spawn(
     command: string,
     args: string[],
     options: {
@@ -311,7 +311,7 @@ export class PlatformIOExecutor {
       detached?: boolean;
       stdio?: any;
     } = {},
-  ): ChildProcess {
+  ): Promise<ChildProcess> {
     let pioBinary = "pio";
     let pioArgs = [command, ...args];
 
@@ -340,7 +340,7 @@ export class PlatformIOExecutor {
     try {
       const logDir = path.join(__dirname, "..", "logs");
       if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
-      fs.appendFileSync(
+      await fs.promises.appendFile(
         path.join(logDir, "mcp-internal.log"),
         `[${new Date().toISOString()}] [Spooler Executor] Spawning: ${fullCmd}\n`,
       );

@@ -8,7 +8,7 @@ const WORKSPACE_DIR = ".pio-mcp-workspace";
  * Writes to the `.pio-mcp-workspace/mcp-internal.log` bound natively into
  * whichever dynamically executed environment the MCP is targeting.
  */
-export function logDiagnostic(msg: string, projectDir?: string) {
+export async function logDiagnostic(msg: string, projectDir?: string) {
   const baseDir = projectDir || os.tmpdir();
   const workspaceDir = path.join(baseDir, WORKSPACE_DIR);
   const diagLog = path.join(workspaceDir, "mcp-internal.log");
@@ -24,7 +24,7 @@ export function logDiagnostic(msg: string, projectDir?: string) {
   }
 
   try {
-    fs.appendFileSync(diagLog, line);
+    await fs.promises.appendFile(diagLog, line);
   } catch {
     // Fail silently in production if file permissions block tracing
   }

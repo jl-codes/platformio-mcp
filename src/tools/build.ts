@@ -22,6 +22,7 @@ import { isBuildActive } from "../utils/process-manager.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { tailFileBounded } from "../utils/tail.js";
 
 
 /**
@@ -296,8 +297,7 @@ export async function checkTaskStatus(projectDir?: string) {
   let finalOutput = "";
   if (fs.existsSync(logFile)) {
     try {
-      const content = fs.readFileSync(logFile, "utf-8");
-      const lines = content.split("\n");
+      const lines = await tailFileBounded(logFile, 512 * 1024);
       if (active) {
         finalOutput = lines.slice(-30).join("\n");
       } else {
