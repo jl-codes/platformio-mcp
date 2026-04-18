@@ -197,7 +197,20 @@ export async function executeWithSpooling(
       await unregisterBuildPid(projectArea);
       if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
       try { fs.closeSync(outFd); } catch {}
-      if (watcher) { try { watcher.close(); } catch {} }
+      if (watcher) {
+        try {
+          const stat = fs.statSync(logFile);
+          if (stat.size > fileOffset) {
+            const buffer = Buffer.alloc(stat.size - fileOffset);
+            const fd = fs.openSync(logFile, "r");
+            fs.readSync(fd, buffer, 0, buffer.length, fileOffset);
+            fs.closeSync(fd);
+            portalEvents.emitBuildLog(projectArea, buffer.toString());
+            fileOffset = stat.size;
+          }
+        } catch {}
+        try { watcher.close(); } catch {}
+      }
 
       if (code === 0 && options.onSuccess) {
         try {
@@ -247,6 +260,17 @@ export async function executeWithSpooling(
     fs.closeSync(outFd);
   } catch {}
   if (watcher) {
+    try {
+      const stat = fs.statSync(logFile);
+      if (stat.size > fileOffset) {
+        const buffer = Buffer.alloc(stat.size - fileOffset);
+        const fd = fs.openSync(logFile, "r");
+        fs.readSync(fd, buffer, 0, buffer.length, fileOffset);
+        fs.closeSync(fd);
+        portalEvents.emitBuildLog(projectArea, buffer.toString());
+        fileOffset = stat.size;
+      }
+    } catch {}
     try { watcher.close(); } catch {}
   }
 

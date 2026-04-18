@@ -103,6 +103,16 @@ export async function stopMonitor(port: string, projectDir?: string) {
     logDiag(`[Spooler Diagnostic] Deleting activeDaemons context.`, projectDir);
     const daemon = activeDaemons[port];
     if (daemon.watcher) {
+      try {
+        const stat = fs.statSync(daemon.logFile);
+        if (stat.size > (daemon.fileOffset || 0)) {
+          const buffer = Buffer.alloc(stat.size - (daemon.fileOffset || 0));
+          const fd = fs.openSync(daemon.logFile, "r");
+          fs.readSync(fd, buffer, 0, buffer.length, (daemon.fileOffset || 0));
+          fs.closeSync(fd);
+          portalEvents.emitSerialLog(port, buffer.toString());
+        }
+      } catch {}
       try { daemon.watcher.close(); } catch {}
     }
     delete activeDaemons[port];
