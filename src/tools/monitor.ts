@@ -154,8 +154,8 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string) {
   try {
     if (fs.existsSync(latestLog)) fs.unlinkSync(latestLog);
     // On Unix, a symlink is best. On Windows it might require admin, so hardlink or just copying is safer.
-    // For simplicity globally we'll just hardlink to the logFile.
-    fs.linkSync(daemon.logFile, latestLog);
+    // Soft link is robust across different mounted volumes
+    fs.symlinkSync(daemon.logFile, latestLog);
   } catch (e) {
     logDiag(`[Spooler] Failed to link latest-monitor.log: ${e}`, projectDir);
   }

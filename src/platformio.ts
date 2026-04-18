@@ -14,6 +14,7 @@
 
 import { execFile, spawn, ChildProcess } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "url";
 import { z } from "zod";
@@ -370,11 +371,18 @@ export const platformioExecutor = new PlatformIOExecutor();
  * Required for tools like 'script' that don't perform PATH resolution.
  */
 function resolvePioPath(): string {
+  if (os.platform() === "win32") {
+    const winCandidate = path.join(os.homedir(), ".platformio", "penv", "Scripts", "pio.exe");
+    if (fs.existsSync(winCandidate)) return winCandidate;
+    return "pio"; // Fallback to PATH
+  }
+
   const candidates = [
     "/usr/local/bin/pio",
     "/opt/homebrew/bin/pio",
     "/usr/bin/pio",
     "/bin/pio",
+    path.join(os.homedir(), ".platformio", "penv", "bin", "pio"),
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;

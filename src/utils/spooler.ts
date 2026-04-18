@@ -113,7 +113,7 @@ export async function executeWithSpooling(
   try {
     if (fs.existsSync(latestLog)) fs.unlinkSync(latestLog);
     // Standard link is secure and visible to OS natively
-    fs.linkSync(logFile, latestLog);
+    fs.symlinkSync(logFile, latestLog);
   } catch {}
 
   // UI Portal File Tailing
