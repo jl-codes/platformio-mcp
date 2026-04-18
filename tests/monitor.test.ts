@@ -22,14 +22,14 @@ describe('Monitor API', () => {
   });
 
   it('registers and unregisters PIO monitor PID correctly in workspace', async () => {
-    registerPioMonitorPid('COM1', 12345, testProjectDir);
+    await registerPioMonitorPid('COM1', 12345, testProjectDir);
     const pidsFilePath = path.join(testProjectDir, '.pio-mcp-workspace', 'locks', 'serial-pids.json');
     
     expect(fs.existsSync(pidsFilePath)).toBe(true);
     const content = JSON.parse(fs.readFileSync(pidsFilePath, 'utf8'));
     expect(content['COM1']).toBe(12345);
 
-    unregisterPioMonitorPid('COM1', testProjectDir);
+    await unregisterPioMonitorPid('COM1', testProjectDir);
     const updatedContent = JSON.parse(fs.readFileSync(pidsFilePath, 'utf8'));
     expect(updatedContent['COM1']).toBeUndefined();
   });

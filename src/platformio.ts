@@ -370,11 +370,31 @@ export const platformioExecutor = new PlatformIOExecutor();
  * Resolves the absolute path to the PlatformIO binary.
  * Required for tools like 'script' that don't perform PATH resolution.
  */
+import { execSync } from "node:child_process";
+
+// ... Inside resolvePioPath
+
 function resolvePioPath(): string {
+  // Attempt to use system PATH natively first
+  try {
+    const whichCmd = os.platform() === "win32" ? "where pio" : "command -v pio";
+    const out = execSync(whichCmd, { stdio: "pipe" }).toString().trim();
+    if (out) {
+      // Windows 'where' can return multiple paths, take the first valid one
+      const paths = out.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+      for (const p of paths) {
+        if (fs.existsSync(p)) return p;
+      }
+    }
+  } catch (e) {
+    // Ignore error if command -v OR where fails (e.g. not in PATH)
+  }
+
+  // Native check failed, fallback to extensive hardcoded probes
   if (os.platform() === "win32") {
     const winCandidate = path.join(os.homedir(), ".platformio", "penv", "Scripts", "pio.exe");
     if (fs.existsSync(winCandidate)) return winCandidate;
-    return "pio"; // Fallback to PATH
+    return "pio"; // Fallback to PATH blindly
   }
 
   const candidates = [
@@ -387,5 +407,6 @@ function resolvePioPath(): string {
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
   }
-  return "pio"; // Fallback to PATH
+  
+  return "pio"; // Ultimate fallback
 }

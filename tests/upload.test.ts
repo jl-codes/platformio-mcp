@@ -21,7 +21,6 @@ describe('Upload Tools', () => {
     fs.writeFileSync(path.join(mockProjectDir, 'platformio.ini'), '[env:default]\nboard = esp32dev');
 
     vi.spyOn(spooler, 'executeWithSpooling').mockResolvedValue({
-      status: 'success',
       exitCode: 0,
       message: 'Mocked spooling success',
       logPath: 'mocked.log',
