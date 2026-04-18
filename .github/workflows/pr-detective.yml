@@ -1,0 +1,123 @@
+name: 🔍 PR Detective Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_url:
+        description: "GitHub PR URL to analyze"
+        required: true
+        type: string
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Cline CLI
+        run: npm install -g cline
+
+      - name: Authenticate Cline
+        env:
+          CLINE_API_KEY: ${{ secrets.CLINE_API_KEY }}
+        run: |
+          mkdir -p ~/.cline/data
+
+          # Write secrets — Cline API key
+          cat > ~/.cline/data/secrets.json <<EOF
+          {"clineApiKey":"$CLINE_API_KEY"}
+          EOF
+          chmod 600 ~/.cline/data/secrets.json
+
+          # Write global state — provider=cline, model=anthropic/claude-sonnet-4.6
+          cat > ~/.cline/data/globalState.json <<'EOF'
+          {
+            "actModeApiProvider": "cline",
+            "planModeApiProvider": "cline",
+            "actModeClineModelId": "anthropic/claude-sonnet-4.6",
+            "planModeClineModelId": "anthropic/claude-sonnet-4.6",
+            "actModeClineModelInfo": {
+              "maxTokens": 128000,
+              "contextWindow": 200000,
+              "supportsImages": true,
+              "supportsPromptCache": true,
+              "inputPrice": 3,
+              "outputPrice": 15,
+              "cacheWritesPrice": 3.75,
+              "cacheReadsPrice": 0.3
+            },
+            "planModeClineModelInfo": {
+              "maxTokens": 128000,
+              "contextWindow": 200000,
+              "supportsImages": true,
+              "supportsPromptCache": true,
+              "inputPrice": 3,
+              "outputPrice": 15,
+              "cacheWritesPrice": 3.75,
+              "cacheReadsPrice": 0.3
+            }
+          }
+          EOF
+
+      - name: Clone PR Detective
+        run: |
+          git clone https://github.com/jl-codes/sdk-pr-detective.git /tmp/pr-detective
+          cd /tmp/pr-detective
+          npm install
+
+      - name: Resolve PR URL
+        id: pr
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PR_URL="${{ github.event.inputs.pr_url }}"
+          else
+            PR_URL="${{ github.event.pull_request.html_url }}"
+          fi
+          PR_NUMBER=$(echo "$PR_URL" | grep -oP '\d+$')
+          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Run PR Detective
+        id: detective
+        continue-on-error: true
+        timeout-minutes: 15
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+        run: |
+          cd /tmp/pr-detective
+          # Pipe stdout (the review markdown) to tee so it's both logged and saved.
+          # stderr (progress markers) goes to the GitHub Actions log separately — NOT into the review file.
+          npx tsx src/index.ts --ci "$PR_URL" 2>/dev/stderr | tee /tmp/review.md
+          # If the script failed (non-zero exit), append a fallback message
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "" >> /tmp/review.md
+            echo "⚠️ PR Detective encountered an error (partial review above)." >> /tmp/review.md
+          fi
+
+      - name: Post PR Comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## 🔍 PR Detective Review"
+            echo ""
+            echo "*Automated analysis powered by the [Cline SDK](https://docs.cline.bot/cline-sdk/overview)*"
+            echo ""
+            echo "---"
+            echo ""
+            cat /tmp/review.md
+          } > /tmp/comment.md
+
+          gh pr comment "${{ steps.pr.outputs.number }}" \
+            --repo "${{ github.repository }}" \
+            --body-file /tmp/comment.md
