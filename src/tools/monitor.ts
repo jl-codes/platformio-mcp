@@ -146,7 +146,7 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string) {
 
   if (proc.pid) {
     // Record PID to workspace tracker
-    registerPioMonitorPid(targetPort, proc.pid, projectDir);
+    await registerPioMonitorPid(targetPort, proc.pid, projectDir);
   }
 
   // Symlink or copy to 'latest-monitor.log' for easy querying

@@ -106,7 +106,7 @@ export async function executeWithSpooling(
   });
 
   if (proc.pid) {
-    registerBuildPid(proc.pid, projectArea);
+    await registerBuildPid(proc.pid, projectArea);
   }
 
   try {
@@ -174,7 +174,7 @@ export async function executeWithSpooling(
       console.error(`[Background Task Error]: ${e.message}`);
       return 1;
     }).then(async (code) => {
-      unregisterBuildPid(projectArea);
+      await unregisterBuildPid(projectArea);
       if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
       try { fs.closeSync(outFd); } catch {}
       if (watcher) { try { watcher.close(); } catch {} }
@@ -221,7 +221,7 @@ export async function executeWithSpooling(
   });
 
   // Cleanup
-  unregisterBuildPid(projectArea);
+  await unregisterBuildPid(projectArea);
   if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
   try {
     fs.closeSync(outFd);

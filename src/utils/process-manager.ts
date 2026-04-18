@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import treeKill from "tree-kill";
+import lockfile from "proper-lockfile";
 import { logDiagnostic as logDiag } from "./logger.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
@@ -31,37 +32,49 @@ function getPidsFilePath(projectDir?: string, file: string = SERIAL_PIDS_FILE): 
 /**
  * Records a given process ID belonging to a started serial monitor.
  */
-export function registerPioMonitorPid(port: string, pid: number, projectDir?: string): void {
+export async function registerPioMonitorPid(port: string, pid: number, projectDir?: string): Promise<void> {
   const pidsFile = getPidsFilePath(projectDir);
   const dir = path.dirname(pidsFile);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(pidsFile)) fs.writeFileSync(pidsFile, "{}");
 
-  let pids: Record<string, number> = {};
-  if (fs.existsSync(pidsFile)) {
+  try {
+    const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
-      pids = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
-    } catch {}
+      let pids: Record<string, number> = {};
+      try {
+        pids = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+      } catch {}
+      pids[port] = pid;
+      fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    } finally {
+      await release();
+    }
+  } catch (e: any) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
   }
-  
-  pids[port] = pid;
-  fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
 }
 
 /**
  * Removes the recorded PID tracking for a specific port.
  */
-export function unregisterPioMonitorPid(port: string, projectDir?: string): void {
+export async function unregisterPioMonitorPid(port: string, projectDir?: string): Promise<void> {
   const pidsFile = getPidsFilePath(projectDir);
-  if (fs.existsSync(pidsFile)) {
+  if (!fs.existsSync(pidsFile)) return;
+
+  try {
+    const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
       if (pids[port]) {
         delete pids[port];
         fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
       }
-    } catch {}
+    } finally {
+      await release();
+    }
+  } catch (e: any) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
   }
 }
 
@@ -81,13 +94,13 @@ export function killPioMonitorByPort(port: string, projectDir?: string): Promise
       const targetPid = pids[port];
       if (targetPid) {
         logDiag(`[ProcessManager Diagnostic] Found tracked PID ${targetPid} for port ${port}. Yielding to tree-kill...`, projectDir);
-        treeKill(targetPid, "SIGKILL", (err) => {
+        treeKill(targetPid, "SIGKILL", async (err) => {
           if (err) {
             logDiag(`[ProcessManager Diagnostic] Failed to tree-kill PID ${targetPid}: ${err.message}`, projectDir);
           } else {
             logDiag(`[ProcessManager Diagnostic] Successfully tree-killed PID ${targetPid}.`, projectDir);
           }
-          unregisterPioMonitorPid(port, projectDir);
+          await unregisterPioMonitorPid(port, projectDir);
           resolve();
         });
       } else {
@@ -133,37 +146,49 @@ export function isBuildActive(projectDir?: string): boolean {
 /**
  * Records a process ID belonging to an executed build pipeline.
  */
-export function registerBuildPid(pid: number, projectDir?: string): void {
+export async function registerBuildPid(pid: number, projectDir?: string): Promise<void> {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
   const dir = path.dirname(pidsFile);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(pidsFile)) fs.writeFileSync(pidsFile, "{}");
 
-  let pids: Record<string, number> = {};
-  if (fs.existsSync(pidsFile)) {
+  try {
+    const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
-      pids = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
-    } catch {}
+      let pids: Record<string, number> = {};
+      try {
+        pids = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+      } catch {}
+      pids["build"] = pid;
+      fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    } finally {
+      await release();
+    }
+  } catch (e: any) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
   }
-  
-  pids["build"] = pid;
-  fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
 }
 
 /**
  * Removes the recorded PID tracking for a completed build stream.
  */
-export function unregisterBuildPid(projectDir?: string): void {
+export async function unregisterBuildPid(projectDir?: string): Promise<void> {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (fs.existsSync(pidsFile)) {
+  if (!fs.existsSync(pidsFile)) return;
+
+  try {
+    const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
       if (pids["build"]) {
         delete pids["build"];
         fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
       }
-    } catch {}
+    } finally {
+      await release();
+    }
+  } catch (e: any) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
   }
 }
 
