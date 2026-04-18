@@ -34,7 +34,7 @@ beforeEach(() => {
   if (fs.existsSync(locksDir)) {
     fs.rmSync(locksDir, { recursive: true, force: true });
   }
-  const logsDir = path.join(mockProjectDir, '.pio-mcp-workspace', 'build_logs');
+  const logsDir = path.join(mockProjectDir, '.pio-mcp-workspace', 'tasks', 'build_logs');
   if (fs.existsSync(logsDir)) {
     fs.rmSync(logsDir, { recursive: true, force: true });
   }
@@ -50,7 +50,7 @@ test('buildProject correctly spins up spooler and generates log file', async () 
   expect(result.ramUsageBytes).toBe(1234);
   expect(result.flashUsageBytes).toBe(5678);
 
-  const logsDir = path.join(mockProjectDir, '.pio-mcp-workspace', 'build_logs');
+  const logsDir = path.join(mockProjectDir, '.pio-mcp-workspace', 'tasks', 'build_logs');
   expect(fs.existsSync(logsDir)).toBe(true);
   
   const latestLog = path.join(logsDir, 'latest-build.log');

@@ -32,7 +32,7 @@ export class SemaphoreManager {
 
   private getLockFilePath(port: string): string {
     const id = sanitizePortName(port);
-    return path.join(GLOBAL_LOCKS_DIR, `port_${id}.json`);
+    return path.join(GLOBAL_LOCKS_DIR, `${id}.json`);
   }
 
   /**
@@ -42,11 +42,13 @@ export class SemaphoreManager {
   public claimPort(port: string, reason: string = "Flash Operation"): void {
     const filePath = this.getLockFilePath(port);
     const content = JSON.stringify({
-      port,
-      reason,
-      pid: process.pid,
-      workspace: process.cwd(),
-      timestamp: Date.now(),
+      status: "busy",
+      current_claim: {
+        type: reason.toLowerCase().includes("monitor") ? "monitor" : "upload",
+        owner_workspace: process.cwd(),
+        owner_pid: process.pid,
+        timestamp: Date.now()
+      }
     }, null, 2);
     
     fs.writeFileSync(filePath, content);

@@ -38,14 +38,14 @@ describe('Process Manager (Atomic Locking & Staleness)', () => {
 
   it('atomically registers and unregisters build PIDs', async () => {
     await registerBuildPid(9999, testProjectDir);
-    const pidsFilePath = path.join(testProjectDir, '.pio-mcp-workspace', 'locks', 'build-pids.json');
+    const pidsFilePath = path.join(testProjectDir, '.pio-mcp-workspace', 'tasks', 'active_tasks.json');
     expect(fs.existsSync(pidsFilePath)).toBe(true);
     let pids = JSON.parse(fs.readFileSync(pidsFilePath, 'utf8'));
-    expect(pids['build']).toBe(9999);
+    expect(pids['9999'].type).toBe('build');
 
     await unregisterBuildPid(testProjectDir);
     pids = JSON.parse(fs.readFileSync(pidsFilePath, 'utf8'));
-    expect(pids['build']).toBeUndefined();
+    expect(pids['9999']).toBeUndefined();
   });
 
   it('validates active build matching platformio process command', async () => {

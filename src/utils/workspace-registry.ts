@@ -1,15 +1,16 @@
 /**
  * Workspace Registry
  * Maintains a persistent log of workspaces targeted by the MCP server.
- * Uses a JSONL append-only structure to prevent read-modify-write data races 
+ * Uses proper-lockfile to prevent read-modify-write data races 
  * between parallel agents on the same host.
  */
 
 import fs from "node:fs";
 import path from "node:path";
+import lockfile from "proper-lockfile";
 import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
 
-const REGISTRY_FILE = path.join(SERVER_DATA_DIR, "workspaces.jsonl");
+const REGISTRY_FILE = path.join(SERVER_DATA_DIR, "workspaces.json");
 
 export interface WorkspaceRecord {
   dir: string;
@@ -17,91 +18,97 @@ export interface WorkspaceRecord {
 }
 
 /**
+ * Ensures the JSON array file exists.
+ */
+function ensureRegistryFile(): void {
+  ensureGlobalDirs();
+  if (!fs.existsSync(REGISTRY_FILE)) {
+    fs.writeFileSync(REGISTRY_FILE, "[]");
+  }
+}
+
+/**
  * Appends a workspace directory to the tracking log.
  * De-duplicates adjacent identical calls during rapid sequential operations.
  */
-export function addWorkspace(dir: string): void {
-  ensureGlobalDirs();
-  
-  if (fs.existsSync(REGISTRY_FILE)) {
+export async function addWorkspace(dir: string): Promise<void> {
+  ensureRegistryFile();
+
+  try {
+    const release = await lockfile.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
-      // Basic optimization: don't append if the exact same dir is already the very last line
-      const fd = fs.openSync(REGISTRY_FILE, "r");
-      const stat = fs.fstatSync(fd);
-      if (stat.size > 0) {
-        // Read tail chunk
-        const chunkSize = Math.min(stat.size, 1024);
-        const buffer = Buffer.alloc(chunkSize);
-        fs.readSync(fd, buffer, 0, chunkSize, stat.size - chunkSize);
-        
-        const content = buffer.toString("utf8");
-        const lines = content.trimEnd().split("\n");
-        const lastLine = lines[lines.length - 1];
-        
-        if (lastLine) {
-          const parsed = JSON.parse(lastLine) as WorkspaceRecord;
-          if (parsed.dir === dir) {
-            fs.closeSync(fd);
-            return; // Already the latest, skip append
-          }
+      let records: WorkspaceRecord[] = [];
+      try {
+        records = JSON.parse(fs.readFileSync(REGISTRY_FILE, "utf8"));
+      } catch {}
+
+      if (records.length > 0) {
+        const lastRecord = records[records.length - 1];
+        if (lastRecord.dir === dir) {
+          return; // Already the latest, skip
         }
       }
-      fs.closeSync(fd);
-    } catch {
-      // On any read race/error, safely default to appending
-    }
-  }
 
-  const record: WorkspaceRecord = { dir, timestamp: Date.now() };
-  fs.appendFileSync(REGISTRY_FILE, JSON.stringify(record) + "\n");
+      records.push({ dir, timestamp: Date.now() });
+      fs.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
+    } finally {
+      await release();
+    }
+  } catch {
+    // Fail silently on timeout so we don't crash the server
+  }
 }
 
 /**
  * Reads and deduplicates the registry, returning a chronologically ordered array
  * of unique absolute workspace paths (oldest to most recent).
  */
-export function getWorkspaces(): string[] {
-  if (!fs.existsSync(REGISTRY_FILE)) {
-    return [];
-  }
+export async function getWorkspaces(): Promise<string[]> {
+  ensureRegistryFile();
 
+  let records: WorkspaceRecord[] = [];
   try {
-    const lines = fs.readFileSync(REGISTRY_FILE, "utf8").split("\n").filter(l => l.trim().length > 0);
-    const seen = new Map<string, number>();
-
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line) as WorkspaceRecord;
-        if (parsed.dir) {
-          seen.set(parsed.dir, parsed.timestamp);
-        }
-      } catch {
-        continue;
-      }
+    const release = await lockfile.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      records = JSON.parse(fs.readFileSync(REGISTRY_FILE, "utf8"));
+    } finally {
+      await release();
     }
-
-    // Sort by timestamp ascending
-    return Array.from(seen.entries())
-      .sort((a, b) => a[1] - b[1])
-      .map(entry => entry[0]);
   } catch {
-    return [];
+    try {
+      records = JSON.parse(fs.readFileSync(REGISTRY_FILE, "utf8")); // Fallback read
+    } catch {
+      return [];
+    }
   }
+
+  const seen = new Map<string, number>();
+  for (const parsed of records) {
+    if (parsed.dir) {
+      seen.set(parsed.dir, parsed.timestamp);
+    }
+  }
+
+  return Array.from(seen.entries())
+    .sort((a, b) => a[1] - b[1])
+    .map(entry => entry[0]);
 }
 
 /**
- * Completely rewrites the JSONL registry, removing defunct entries.
+ * Completely rewrites the JSON registry, removing defunct entries.
  * Given an array of ordered directory paths, it drops the current 
  * transaction log and sequences them back in order.
  */
-export function rewriteRegistry(directories: string[]): void {
+export async function rewriteRegistry(directories: string[]): Promise<void> {
+  ensureRegistryFile();
+  
   try {
-    if (fs.existsSync(REGISTRY_FILE)) {
-      fs.unlinkSync(REGISTRY_FILE);
+    const release = await lockfile.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      const records = directories.map(dir => ({ dir, timestamp: Date.now() }));
+      fs.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
+    } finally {
+      await release();
     }
   } catch {}
-
-  for (const dir of directories) {
-    addWorkspace(dir);
-  }
 }

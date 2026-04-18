@@ -24,7 +24,7 @@ import { getWorkspaces, rewriteRegistry } from "../utils/workspace-registry.js";
 import { getActiveMonitorPids, isPidAlive, isBuildActive } from "../utils/process-manager.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
-const LOGS_DIR = "serial_logs";
+const LOGS_DIR = "serial_monitors/logs";
 
 function getLogDir(projectDir?: string): string {
   const baseDir = projectDir || os.tmpdir();
@@ -204,7 +204,7 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string) {
  * Re-attaches UI streaming for any active monitors orphaned by a server crash.
  */
 export async function rehydrateMonitors(): Promise<void> {
-  const workspaces = getWorkspaces();
+  const workspaces = await getWorkspaces();
   let rehydrationCount = 0;
   const activeWorkspaces: string[] = [];
 
@@ -269,7 +269,7 @@ export async function rehydrateMonitors(): Promise<void> {
   }
 
   // Atomically recreate the workspaces log to drop zombie entries
-  rewriteRegistry(activeWorkspaces);
+  await rewriteRegistry(activeWorkspaces);
 
   if (rehydrationCount > 0) {
     portalEvents.emitSpoolerStates(activeDaemons);

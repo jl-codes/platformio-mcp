@@ -17,13 +17,13 @@ import { portSemaphoreManager } from "./semaphore.js";
 import { tailFileBounded } from "./tail.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
-const LOGS_DIR = "build_logs";
+const LOGS_DIR = "tasks/build_logs";
 
 function getLogDir(projectDir?: string): string {
   const baseDir = projectDir || os.tmpdir();
   return path.join(baseDir, WORKSPACE_DIR, LOGS_DIR);
 }
-
+import { logDiagnostic as logDiag } from "./logger.js";
 /**
  * Cleans out old log trace files adhering to an upper boundary limit.
  *
@@ -126,6 +126,7 @@ export async function executeWithSpooling(
   });
 
   if (proc.pid) {
+    logDiag(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, projectArea);
     await registerBuildPid(proc.pid, projectArea);
   }
 

@@ -23,7 +23,7 @@ describe('Monitor API', () => {
 
   it('registers and unregisters PIO monitor PID correctly in workspace', async () => {
     await registerPioMonitorPid('COM1', 12345, testProjectDir);
-    const pidsFilePath = path.join(testProjectDir, '.pio-mcp-workspace', 'locks', 'serial-pids.json');
+    const pidsFilePath = path.join(testProjectDir, '.pio-mcp-workspace', 'serial_monitors', 'monitor-pids.json');
     
     expect(fs.existsSync(pidsFilePath)).toBe(true);
     const content = JSON.parse(fs.readFileSync(pidsFilePath, 'utf8'));

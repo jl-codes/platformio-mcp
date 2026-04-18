@@ -15,11 +15,11 @@ import { execSync } from "node:child_process";
 import treeKill from "tree-kill";
 import lockfile from "proper-lockfile";
 import { logDiagnostic as logDiag } from "./logger.js";
-import { SERVER_DATA_DIR } from "./paths.js";
+
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOCKS_DIR = "locks";
-const SERIAL_PIDS_FILE = "serial-pids.json";
+const SERIAL_PIDS_FILE = "monitor-pids.json";
 const BUILD_PIDS_FILE = "active_tasks.json";
 
 /**
@@ -27,7 +27,8 @@ const BUILD_PIDS_FILE = "active_tasks.json";
  */
 function getPidsFilePath(projectDir?: string, file: string = SERIAL_PIDS_FILE): string {
   if (file === SERIAL_PIDS_FILE) {
-    const dir = path.join(SERVER_DATA_DIR, "serial_monitors");
+    const baseDir = projectDir || os.tmpdir();
+    const dir = path.join(baseDir, WORKSPACE_DIR, "serial_monitors");
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     return path.join(dir, file);
   } else if (file === BUILD_PIDS_FILE) {

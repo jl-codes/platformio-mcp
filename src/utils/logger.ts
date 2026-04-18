@@ -1,28 +1,17 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-const WORKSPACE_DIR = ".pio-mcp-workspace";
+import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
 
 /**
  * Persist centralized observability forensics across the server lifecycle.
- * Writes to the `.pio-mcp-workspace/mcp-internal.log` bound natively into
- * whichever dynamically executed environment the MCP is targeting.
+ * Writes to the global server data directory `server.log`.
  */
-export async function logDiagnostic(msg: string, projectDir?: string) {
-  const baseDir = projectDir || os.tmpdir();
-  const workspaceDir = path.join(baseDir, WORKSPACE_DIR);
-  const diagLog = path.join(workspaceDir, "mcp-internal.log");
+export async function logDiagnostic(msg: string, _projectDir?: string) {
+  ensureGlobalDirs();
+  const diagLog = path.join(SERVER_DATA_DIR, "server.log");
   const timestamp = new Date().toISOString();
   const line = `[${timestamp}] ${msg}\n`;
   
-  if (!fs.existsSync(workspaceDir)) {
-    try {
-      fs.mkdirSync(workspaceDir, { recursive: true });
-    } catch {
-      // Graceful fallback if we can't create the directory
-    }
-  }
-
   try {
     await fs.promises.appendFile(diagLog, line);
   } catch {
