@@ -14,14 +14,19 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
+import os from "node:os";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Project root is two levels up from src/utils/
 export const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
-export const LOCKS_DIR = path.join(PROJECT_ROOT, ".locks");
-export const LOGS_DIR = path.join(PROJECT_ROOT, "logs");
+export const SERVER_STATE_DIR = path.join(PROJECT_ROOT, ".server-state");
+export const LOCKS_DIR = path.join(SERVER_STATE_DIR, "locks");
+export const LOGS_DIR = path.join(SERVER_STATE_DIR, "logs");
+
+export const SERVER_DATA_DIR = path.join(os.homedir(), ".platformio-mcp");
+export const GLOBAL_LOCKS_DIR = path.join(SERVER_DATA_DIR, "serial_ports");
 
 /**
  * Ensures a directory exists.
@@ -37,6 +42,11 @@ export function ensureDir(dir: string): void {
  */
 export function ensureLocksDir(): void {
   ensureDir(LOCKS_DIR);
+}
+
+export function ensureGlobalDirs(): void {
+  ensureDir(SERVER_DATA_DIR);
+  ensureDir(GLOBAL_LOCKS_DIR);
 }
 
 /**

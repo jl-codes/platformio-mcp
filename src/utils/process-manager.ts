@@ -15,16 +15,27 @@ import { execSync } from "node:child_process";
 import treeKill from "tree-kill";
 import lockfile from "proper-lockfile";
 import { logDiagnostic as logDiag } from "./logger.js";
+import { SERVER_DATA_DIR } from "./paths.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOCKS_DIR = "locks";
 const SERIAL_PIDS_FILE = "serial-pids.json";
-const BUILD_PIDS_FILE = "build-pids.json";
+const BUILD_PIDS_FILE = "active_tasks.json";
 
 /**
  * Gets the absolute path to the PID tracking file.
  */
 function getPidsFilePath(projectDir?: string, file: string = SERIAL_PIDS_FILE): string {
+  if (file === SERIAL_PIDS_FILE) {
+    const dir = path.join(SERVER_DATA_DIR, "serial_monitors");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return path.join(dir, file);
+  } else if (file === BUILD_PIDS_FILE) {
+    const baseDir = projectDir || os.tmpdir();
+    const dir = path.join(baseDir, WORKSPACE_DIR, "tasks");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return path.join(dir, file);
+  }
   const baseDir = projectDir || os.tmpdir();
   return path.join(baseDir, WORKSPACE_DIR, LOCKS_DIR, file);
 }
@@ -113,39 +124,59 @@ export function killPioMonitorByPort(port: string, projectDir?: string): Promise
 }
 
 /**
+ * OS-level check to verify if a PID is actively running PlatformIO/Python.
+ */
+export function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0); // Throws if process is dead
+    if (os.platform() !== "win32") {
+      try {
+        const stdout = execSync(`ps -p ${pid} -o command=`, { encoding: "utf8" }).toLowerCase();
+        if (!stdout.includes("platformio") && !stdout.includes("pio") && !stdout.includes("python")) {
+          return false;
+        }
+      } catch {
+        // ps fails -> process probably dead or inaccessible
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Reads the raw track-list of active monitor daemon PIDs for a specific workspace.
+ */
+export function getActiveMonitorPids(projectDir?: string): Record<string, number> {
+  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
+  if (!fs.existsSync(pidsFile)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Checks if a build is currently tracked and actively running.
  */
 export function isBuildActive(projectDir?: string): boolean {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
   if (!fs.existsSync(pidsFile)) return false;
   try {
-    const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
-    const pid = pids["build"];
-    if (pid) {
-      process.kill(pid, 0); // Throws if process is dead
-      
-      // OS-level validation to prevent stale PID false positives
-      if (os.platform() !== "win32") {
-        try {
-          const stdout = execSync(`ps -p ${pid} -o command=`, { encoding: "utf8" }).toLowerCase();
-          if (!stdout.includes("platformio") && !stdout.includes("pio") && !stdout.includes("python")) {
-            return false;
-          }
-        } catch {
-          // If ps fails, assume process might be dead or permission denied
-          return false;
-        }
+    const pids: Record<string, any> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+    for (const key of Object.keys(pids)) {
+      if (pids[key]?.type === "build" || key === "build") {
+        const targetPid = key === "build" ? pids[key] : Number(key);
+        if (isPidAlive(targetPid)) return true;
       }
-      
-      return true;
     }
   } catch {}
   return false;
 }
 
-/**
- * Records a process ID belonging to an executed build pipeline.
- */
 export async function registerBuildPid(pid: number, projectDir?: string): Promise<void> {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
   const dir = path.dirname(pidsFile);
@@ -155,11 +186,11 @@ export async function registerBuildPid(pid: number, projectDir?: string): Promis
   try {
     const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
-      let pids: Record<string, number> = {};
+      let pids: Record<string, any> = {};
       try {
         pids = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
       } catch {}
-      pids["build"] = pid;
+      pids[pid.toString()] = { type: "build", started: Date.now() };
       fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
     } finally {
       await release();
@@ -169,9 +200,6 @@ export async function registerBuildPid(pid: number, projectDir?: string): Promis
   }
 }
 
-/**
- * Removes the recorded PID tracking for a completed build stream.
- */
 export async function unregisterBuildPid(projectDir?: string): Promise<void> {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
   if (!fs.existsSync(pidsFile)) return;
@@ -179,9 +207,15 @@ export async function unregisterBuildPid(projectDir?: string): Promise<void> {
   try {
     const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
-      const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
-      if (pids["build"]) {
-        delete pids["build"];
+      const pids: Record<string, any> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+      let changed = false;
+      for (const key of Object.keys(pids)) {
+        if (pids[key]?.type === "build" || key === "build") {
+          delete pids[key];
+          changed = true;
+        }
+      }
+      if (changed) {
         fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
       }
     } finally {
@@ -204,13 +238,20 @@ export function killAllTrackedProcesses(projectDir?: string): Promise<void> {
       const pidsFile = getPidsFilePath(projectDir, file);
       if (fs.existsSync(pidsFile)) {
         try {
-          const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+          const pids: Record<string, any> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
           for (const key of Object.keys(pids)) {
-            const targetPid = pids[key];
+            let targetPid: number | undefined;
+            if (file === BUILD_PIDS_FILE) {
+              if (pids[key]?.type === "build" || key === "build") {
+                targetPid = key === "build" ? pids[key] : Number(key);
+              }
+            } else {
+              targetPid = pids[key];
+            }
             if (targetPid) {
               logDiag(`[ProcessManager Diagnostic] Emergency killing tracked PID ${targetPid} via ${file}.`, projectDir);
               const p = new Promise<void>((res) => {
-                treeKill(targetPid, "SIGKILL", () => res());
+                treeKill(targetPid!, "SIGKILL", () => res());
               });
               tasks.push(p);
             }

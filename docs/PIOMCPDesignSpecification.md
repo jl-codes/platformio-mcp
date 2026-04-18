@@ -34,6 +34,43 @@ To ensure atomic state stability across long-running autonomous processes and ma
 
 ---
 
+## [Object Hierarchy & Storage Strategy]
+
+The MCP server explicitly separates logical software contexts (Workspaces) from shared physical resources (Serial Ports). This division eliminates cross-workspace resource conflicts ("Access Denied" errors) and ensures predictable background process management.
+
+```text
+mcp-server (Global System: os.homedir() / %USERPROFILE% via ~/.platformio-mcp/)
+│
+├── workspaces.json               # Manifest of registered/active workspaces
+├── server.log                    # internal logs
+│
+└── serial_ports/                 # global physical resources
+    ├── dev_cu_usbserial.json     # lock record tracking physical status
+    │     - status: "busy"
+    │     - current_claim:
+    │         - type: "monitor" | "upload"
+    │         - owner_workspace: "/path/to/proj/"
+    │         - owner_pid: 1234   # Enables atomic O(1) process preemption
+    │         - timestamp
+    └── ...
+
+Workspaces (Project Local: [ProjectDir]/.pio-mcp-workspace/)
+│
+├── tasks/
+│   ├── active_tasks.json         # Active parallelizable processes (PIDs, task type, status)
+│   └── build_logs/               # Task spool traces (e.g. build-1234.log)
+│
+└── serial_monitors/
+    ├── monitor-pids.json         # Workspace's discrete view of its tracked monitors
+    └── logs/                     # Saved serial tracing outputs
+```
+
+### Global vs Workspace Scopes
+1. **Global Physical Resources (`~/.platformio-mcp/`)**: Because hardware (like a physical USB serial port) operates strictly as a system-wide singleton, its semaphore mechanisms must be hoisted completely out of the project repository. Including the OS locking `pid` locally within these structured global locks allows for `O(1)` atomic process replacement, resolving conflicts even when processes were fired from completely detached workspaces.
+2. **Project Local State (`.pio-mcp-workspace/`)**: Build queues, compiling, and specific serial logs are directly bound to the firmware code inside standard target repositories.
+
+---
+
 ## [Types]
 
 TypeScript interfaces and Zod schemas define the rigorous structured I/O for the MCP operations.

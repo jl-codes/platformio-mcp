@@ -9,7 +9,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { LOCKS_DIR, ensureLocksDir, sanitizePortName } from "./paths.js";
+import { GLOBAL_LOCKS_DIR, ensureGlobalDirs, sanitizePortName } from "./paths.js";
 
 /**
  * Port Semaphore Manager
@@ -20,7 +20,7 @@ export class SemaphoreManager {
   private static instance: SemaphoreManager;
 
   private constructor() {
-    ensureLocksDir();
+    ensureGlobalDirs();
   }
 
   public static getInstance(): SemaphoreManager {
@@ -32,7 +32,7 @@ export class SemaphoreManager {
 
   private getLockFilePath(port: string): string {
     const id = sanitizePortName(port);
-    return path.join(LOCKS_DIR, `port_${id}.lock`);
+    return path.join(GLOBAL_LOCKS_DIR, `port_${id}.lock`);
   }
 
   /**
@@ -45,6 +45,7 @@ export class SemaphoreManager {
       port,
       reason,
       pid: process.pid,
+      workspace: process.cwd(),
       timestamp: Date.now(),
     }, null, 2);
     

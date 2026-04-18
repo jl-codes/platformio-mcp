@@ -830,6 +830,22 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
+  // Attempt to recover detached processes and history
+  try {
+    const { rehydrateMonitors } = await import("./tools/monitor.js");
+    const { getWorkspaces } = await import("./utils/workspace-registry.js");
+    
+    await rehydrateMonitors();
+    
+    // Set UI target to the most recent workspace gracefully
+    const workspaces = getWorkspaces();
+    if (workspaces.length > 0 && !portalEvents.getLastKnownWorkspace()) {
+      portalEvents.emitWorkspaceState(workspaces[workspaces.length - 1]);
+    }
+  } catch (e) {
+    logDiag(`[Server Reboot] Boot rehydration encountered an error: ${e}`);
+  }
+
   if (process.argv.includes("--open-dashboard-on-start") || process.env.PIO_MCP_OPEN_DASH_ON_START === "true") {
     getDashboardStatus(true).catch((e) => logDiag(`[Dashboard] ${e.message}`));
   }

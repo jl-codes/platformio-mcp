@@ -146,7 +146,7 @@ export async function executeWithSpooling(
         try {
           const stat = fs.statSync(logFile);
           if (stat.size > fileOffset) {
-            const stream = fs.createReadStream(logFile, { start: fileOffset });
+            const stream = fs.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on('data', (chunk) => {
               portalEvents.emitBuildLog(projectArea, chunk.toString());
             });
