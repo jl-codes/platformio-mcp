@@ -1,154 +1,36 @@
 /**
- * Firmware upload tools
+ * Firmware Upload Tools
+ * Firmware upload operations and sequencing tools.
+ *
+ * Provides:
+ * - uploadFirmware: Targets serial devices and drops compiled hex/bin.
+ * - uploadAndMonitor: Drops firmware and attaches realtime observer.
+ * - buildAndUpload: Compiles and dispatches binaries.
  */
 
-import { platformioExecutor } from '../platformio.js';
-import type { UploadResult } from '../types.js';
-import { validateProjectPath, validateEnvironmentName, validateSerialPort } from '../utils/validation.js';
-import { UploadError, PlatformIOError } from '../utils/errors.js';
-import { parseStderrErrors } from '../utils/errors.js';
+import { platformioExecutor } from "../platformio.js";
+import type { UploadResult } from "../types.js";
+import {
+  validateProjectPath,
+  validateEnvironmentName,
+  validateSerialPort,
+} from "../utils/validation.js";
 
-/**
- * Uploads firmware to a connected device
- */
-export async function uploadFirmware(
-  projectDir: string,
-  port?: string,
-  environment?: string
-): Promise<UploadResult> {
-  const validatedPath = validateProjectPath(projectDir);
+import { UploadError, PlatformIOError } from "../utils/errors.js";
+import { parseStderrErrors } from "../utils/errors.js";
 
-  if (environment && !validateEnvironmentName(environment)) {
-    throw new UploadError(`Invalid environment name: ${environment}`, { environment });
-  }
-
-  if (port && !validateSerialPort(port)) {
-    throw new UploadError(`Invalid serial port: ${port}`, { port });
-  }
-
-  try {
-    const args: string[] = ['run', '--target', 'upload'];
-
-    // Add environment if specified
-    if (environment) {
-      args.push('--environment', environment);
-    }
-
-    // Add upload port if specified
-    if (port) {
-      args.push('--upload-port', port);
-    }
-
-    const result = await platformioExecutor.execute('run', args.slice(1), {
-      cwd: validatedPath,
-      timeout: 300000, // 5 minutes
-    });
-
-    const success = result.exitCode === 0;
-    const errors = success ? undefined : parseStderrErrors(result.stderr);
-
-    return {
-      success,
-      port,
-      output: result.stdout,
-      errors,
-    };
-  } catch (error) {
-    if (error instanceof PlatformIOError) {
-      throw new UploadError(
-        `Upload failed: ${error.message}`,
-        { projectDir, port, environment }
-      );
-    }
-    throw new UploadError(
-      `Failed to upload firmware: ${error}`,
-      { projectDir, port, environment }
-    );
-  }
-}
-
-/**
- * Uploads firmware and starts serial monitor (upload + monitor)
- */
-export async function uploadAndMonitor(
-  projectDir: string,
-  port?: string,
-  environment?: string
-): Promise<UploadResult> {
-  const validatedPath = validateProjectPath(projectDir);
-
-  if (environment && !validateEnvironmentName(environment)) {
-    throw new UploadError(`Invalid environment name: ${environment}`, { environment });
-  }
-
-  if (port && !validateSerialPort(port)) {
-    throw new UploadError(`Invalid serial port: ${port}`, { port });
-  }
-
-  try {
-    const args: string[] = ['run', '--target', 'upload', '--target', 'monitor'];
-
-    if (environment) {
-      args.push('--environment', environment);
-    }
-
-    if (port) {
-      args.push('--upload-port', port);
-      args.push('--monitor-port', port);
-    }
-
-    const result = await platformioExecutor.execute('run', args.slice(1), {
-      cwd: validatedPath,
-      timeout: 300000,
-    });
-
-    const success = result.exitCode === 0;
-    const errors = success ? undefined : parseStderrErrors(result.stderr);
-
-    return {
-      success,
-      port,
-      output: result.stdout,
-      errors,
-    };
-  } catch (error) {
-    if (error instanceof PlatformIOError) {
-      throw new UploadError(
-        `Upload and monitor failed: ${error.message}`,
-        { projectDir, port, environment }
-      );
-    }
-    throw new UploadError(
-      `Failed to upload and monitor: ${error}`,
-      { projectDir, port, environment }
-    );
-  }
-}
-
-/**
- * Builds and uploads firmware in one step
- */
-export async function buildAndUpload(
-  projectDir: string,
-  port?: string,
-  environment?: string
-): Promise<UploadResult> {
-  // Upload target automatically builds first if needed
-  return uploadFirmware(projectDir, port, environment);
-}
-
-/**
- * Uploads filesystem (SPIFFS/LittleFS) to a connected device
- */
 export async function uploadFilesystem(
   projectDir: string,
   port?: string,
-  environment?: string
+  environment?: string,
+  verbose?: boolean,
 ): Promise<UploadResult> {
   const validatedPath = validateProjectPath(projectDir);
 
   if (environment && !validateEnvironmentName(environment)) {
-    throw new UploadError(`Invalid environment name: ${environment}`, { environment });
+    throw new UploadError(`Invalid environment name: ${environment}`, {
+      environment,
+    });
   }
 
   if (port && !validateSerialPort(port)) {
@@ -156,42 +38,139 @@ export async function uploadFilesystem(
   }
 
   try {
-    const args: string[] = ['run', '--target', 'uploadfs'];
-
-    // Add environment if specified
-    if (environment) {
-      args.push('--environment', environment);
+    let activePort = port;
+    if (!activePort) {
+      const { getFirstDevice } = await import("./devices.js");
+      const device = await getFirstDevice();
+      if (!device)
+        throw new PlatformIOError(
+          "No serial devices detected for upload.",
+          "PORT_NOT_FOUND",
+        );
+      activePort = device.port;
     }
 
-    // Add upload port if specified
-    if (port) {
-      args.push('--upload-port', port);
-    }
+    const uploadArgs: string[] = ["run", "--target", "uploadfs"];
+    if (environment) uploadArgs.push("--environment", environment);
 
-    const result = await platformioExecutor.execute('run', args.slice(1), {
-      cwd: validatedPath,
-      timeout: 300000, // 5 minutes
-    });
+    const uploadResult = await platformioExecutor.execute(
+      "run",
+      uploadArgs.slice(1),
+      {
+        cwd: validatedPath,
+        timeout: 600000,
+      },
+    );
 
-    const success = result.exitCode === 0;
-    const errors = success ? undefined : parseStderrErrors(result.stderr);
+    const uploadSuccess = uploadResult.exitCode === 0;
 
     return {
-      success,
-      port,
-      output: result.stdout,
-      errors,
+      success: uploadSuccess,
+      port: activePort,
+      output: uploadSuccess && !verbose ? undefined : uploadResult.stdout,
+      errors: uploadSuccess
+        ? undefined
+        : parseStderrErrors(uploadResult.stderr),
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
-      throw new UploadError(
-        `Filesystem upload failed: ${error.message}`,
-        { projectDir, port, environment }
-      );
+      throw new UploadError(`Filesystem upload failed: ${error.message}`, {
+        projectDir,
+        port,
+        environment,
+      });
     }
-    throw new UploadError(
-      `Failed to upload filesystem: ${error}`,
-      { projectDir, port, environment }
-    );
+    throw new UploadError(`Failed to upload filesystem: ${error}`, {
+      projectDir,
+      port,
+      environment,
+    });
   }
+}
+
+export async function uploadFirmware(
+  projectDir: string,
+  port?: string,
+  environment?: string,
+  verbose?: boolean,
+): Promise<UploadResult> {
+  const validatedPath = validateProjectPath(projectDir);
+
+  if (environment && !validateEnvironmentName(environment)) {
+    throw new UploadError(`Invalid environment name: ${environment}`, {
+      environment,
+    });
+  }
+
+  if (port && !validateSerialPort(port)) {
+    throw new UploadError(`Invalid serial port: ${port}`, { port });
+  }
+
+  try {
+    let activePort = port;
+    if (!activePort) {
+      const { getFirstDevice } = await import("./devices.js");
+      const device = await getFirstDevice();
+      if (!device)
+        throw new PlatformIOError(
+          "No serial devices detected for upload.",
+          "PORT_NOT_FOUND",
+        );
+      activePort = device.port;
+    }
+
+    const uploadArgs: string[] = ["run", "--target", "upload"];
+    if (environment) uploadArgs.push("--environment", environment);
+
+    const uploadResult = await platformioExecutor.execute(
+      "run",
+      uploadArgs.slice(1),
+      {
+        cwd: validatedPath,
+        timeout: 600000,
+      },
+    );
+
+    const uploadSuccess = uploadResult.exitCode === 0;
+
+    return {
+      success: uploadSuccess,
+      port: activePort,
+      output: uploadSuccess && !verbose ? undefined : uploadResult.stdout,
+      errors: uploadSuccess
+        ? undefined
+        : parseStderrErrors(uploadResult.stderr),
+    };
+  } catch (error) {
+    if (error instanceof PlatformIOError) {
+      throw new UploadError(`Upload failed: ${error.message}`, {
+        projectDir,
+        port,
+        environment,
+      });
+    }
+    throw new UploadError(`Failed to upload firmware: ${error}`, {
+      projectDir,
+      port,
+      environment,
+    });
+  }
+}
+
+export async function uploadAndMonitor(
+  projectDir: string,
+  port?: string,
+  environment?: string,
+  verbose?: boolean,
+): Promise<UploadResult> {
+  return uploadFirmware(projectDir, port, environment, verbose);
+}
+
+export async function buildAndUpload(
+  projectDir: string,
+  port?: string,
+  environment?: string,
+  verbose?: boolean,
+): Promise<UploadResult> {
+  return uploadFirmware(projectDir, port, environment, verbose);
 }

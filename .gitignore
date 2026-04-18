@@ -54,3 +54,6 @@ temp/
 
 # MCP specific
 *.mcp.json
+
+# Agents
+.agents/
