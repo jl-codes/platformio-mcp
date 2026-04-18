@@ -91,15 +91,7 @@ export interface SpoolingForegroundResult {
   fullLogPath: string; // The absolute path referencing the complete log file
 }
 
-export type SpoolingResult = {
-  status?: string;
-  message?: string;
-  pid?: number;
-  exitCode?: any;
-  finalOutput?: any;
-  fullLogPath?: any;
-  success?: boolean;
-};
+export type SpoolingResult = SpoolingBackgroundResult | SpoolingForegroundResult;
 
 /**
  * Wraps child process invocation forcing its runtime payload exclusively through 

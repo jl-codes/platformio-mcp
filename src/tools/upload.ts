@@ -111,19 +111,19 @@ export async function uploadFilesystem(
       },
     );
 
-    if (background) {
-      return uploadResult as UploadResult;
+    if ('status' in uploadResult) {
+      return uploadResult as unknown as UploadResult;
     }
 
-    const uploadSuccess = (uploadResult as any).exitCode === 0;
+    const uploadSuccess = uploadResult.exitCode === 0;
 
     return {
       success: uploadSuccess,
       port: activePort,
-      output: uploadSuccess && !verbose ? undefined : (uploadResult as any).finalOutput,
+      output: uploadSuccess && !verbose ? undefined : uploadResult.finalOutput,
       errors: uploadSuccess
         ? undefined
-        : parseStderrErrors((uploadResult as any).finalOutput),
+        : parseStderrErrors(uploadResult.finalOutput),
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
@@ -229,19 +229,19 @@ export async function uploadFirmware(
       },
     );
 
-    if (background) {
-      return uploadResult as UploadResult;
+    if ('status' in uploadResult) {
+      return uploadResult as unknown as UploadResult;
     }
 
-    const uploadSuccess = (uploadResult as any).exitCode === 0;
+    const uploadSuccess = uploadResult.exitCode === 0;
 
     return {
       success: uploadSuccess,
       port: activePort,
-      output: uploadSuccess && !verbose ? undefined : (uploadResult as any).finalOutput,
+      output: uploadSuccess && !verbose ? undefined : uploadResult.finalOutput,
       errors: uploadSuccess
         ? undefined
-        : parseStderrErrors((uploadResult as any).finalOutput),
+        : parseStderrErrors(uploadResult.finalOutput),
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
