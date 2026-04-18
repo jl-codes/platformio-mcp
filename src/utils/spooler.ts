@@ -53,13 +53,18 @@ export function rotateLogs(targetDir: string, prefix: string, maxHistory = 30) {
   }
 }
 
+export interface BuildStreamRotation {
+  logFile: string; // The absolute path to the newly rotated log file
+  latestLog: string; // The absolute path to the symlink pointing to the newest log
+}
+
 /**
  * Automatically prunes historical build payload output files from the local environment block.
  *
  * @param projectDir - Associated workspace to scope clearance into.
- * @returns Absolute routing map to latest runtime traces.
+ * @returns The structured paths indicating where the new logs are actively spooling.
  */
-export function rotateBuildStreams(projectDir?: string) {
+export function rotateBuildStreams(projectDir?: string): BuildStreamRotation {
   const targetDir = getLogDir(projectDir);
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
@@ -74,6 +79,28 @@ export function rotateBuildStreams(projectDir?: string) {
   return { logFile, latestLog };
 }
 
+export interface SpoolingBackgroundResult {
+  status: string; // The operational status indicating background dispatch
+  message: string; // A descriptive message about the background task
+  pid?: number; // The process ID of the detached background process
+}
+
+export interface SpoolingForegroundResult {
+  exitCode: number; // The exit code returned by the synchronous process
+  finalOutput: string; // The sliced output tail retrieved from the log spool
+  fullLogPath: string; // The absolute path referencing the complete log file
+}
+
+export type SpoolingResult = {
+  status?: string;
+  message?: string;
+  pid?: number;
+  exitCode?: any;
+  finalOutput?: any;
+  fullLogPath?: any;
+  success?: boolean;
+};
+
 /**
  * Wraps child process invocation forcing its runtime payload exclusively through 
  * an active offline disk file context instead of active NodeJS stream memory.
@@ -81,13 +108,13 @@ export function rotateBuildStreams(projectDir?: string) {
  * @param command - Core executing binary token.
  * @param args - CLI arguments string array.
  * @param options - Operational environment context overriding execution behavior.
- * @returns Complete exit code metadata, trace locations, and completion summaries.
+ * @returns A structured result containing either background runtime metadata or foreground process completion details.
  */
 export async function executeWithSpooling(
   command: string,
   args: string[],
   options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; onSuccess?: () => Promise<void> }
-): Promise<any> {
+): Promise<SpoolingResult> {
   const projectArea = options.projectDir ?? options.cwd;
 
   // 1. Crash resilience tracking

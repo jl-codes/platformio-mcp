@@ -68,24 +68,24 @@ export async function buildProject(
       return result as BuildResult;
     }
 
-    const success = result.exitCode === 0;
-    const errors = success ? undefined : parseStderrErrors(result.finalOutput);
+    const success = (result as any).exitCode === 0;
+    const errors = success ? undefined : parseStderrErrors((result as any).finalOutput);
 
     let ramUsageBytes: number | undefined;
     let flashUsageBytes: number | undefined;
 
     if (success) {
-      const ramMatch = result.finalOutput.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
+      const ramMatch = (result as any).finalOutput.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
       if (ramMatch) ramUsageBytes = parseInt(ramMatch[1], 10);
 
-      const flashMatch = result.finalOutput.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
+      const flashMatch = (result as any).finalOutput.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
       if (flashMatch) flashUsageBytes = parseInt(flashMatch[1], 10);
     }
 
     return {
       success,
       environment: environment || "default",
-      output: success && !verbose ? undefined : result.finalOutput,
+      output: success && !verbose ? undefined : (result as any).finalOutput,
       errors,
       ramUsageBytes,
       flashUsageBytes,
@@ -126,15 +126,15 @@ export async function cleanProject(projectDir: string, background?: boolean): Pr
     );
 
     if (background) {
-      return result;
+      return result as any;
     }
 
-    const success = result.exitCode === 0;
+    const success = (result as any).exitCode === 0;
 
     if (!success) {
-      throw new BuildError(`Clean failed: ${result.finalOutput}`, {
+      throw new BuildError(`Clean failed: ${(result as any).finalOutput}`, {
         projectDir,
-        stderr: result.finalOutput,
+        stderr: (result as any).finalOutput,
       });
     }
 
@@ -187,24 +187,24 @@ export async function buildTarget(
       timeout: 600000,
     });
 
-    const success = result.exitCode === 0;
-    const errors = success ? undefined : parseStderrErrors(result.finalOutput);
+    const success = (result as any).exitCode === 0;
+    const errors = success ? undefined : parseStderrErrors((result as any).finalOutput);
 
     let ramUsageBytes: number | undefined;
     let flashUsageBytes: number | undefined;
 
     if (success) {
-      const ramMatch = result.finalOutput.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
+      const ramMatch = (result as any).finalOutput.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
       if (ramMatch) ramUsageBytes = parseInt(ramMatch[1], 10);
 
-      const flashMatch = result.finalOutput.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
+      const flashMatch = (result as any).finalOutput.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
       if (flashMatch) flashUsageBytes = parseInt(flashMatch[1], 10);
     }
 
     return {
       success,
       environment: environment || "default",
-      output: success && !verbose ? undefined : result.finalOutput,
+      output: success && !verbose ? undefined : (result as any).finalOutput,
       errors,
       ramUsageBytes,
       flashUsageBytes,
@@ -250,7 +250,7 @@ export async function listTargets(
       timeout: 30000,
     });
 
-    if (result.exitCode !== 0) {
+    if ((result as any).exitCode !== 0) {
       throw new BuildError("Failed to list targets", {
         projectDir,
         stderr: result.stderr,

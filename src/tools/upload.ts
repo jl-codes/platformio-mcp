@@ -31,7 +31,7 @@ import { portSemaphoreManager } from "../utils/semaphore.js";
  * @param environment - Optional specific environment target.
  * @param verbose - If true, captures complete output without truncation.
  * @param background - Executes asynchronously in the background.
- * @returns Upload completion status.
+ * @returns The structured UploadResult containing success flag, port, and standard output/errors.
  */
 export async function uploadFilesystem(
   projectDir: string,
@@ -115,15 +115,15 @@ export async function uploadFilesystem(
       return uploadResult as UploadResult;
     }
 
-    const uploadSuccess = uploadResult.exitCode === 0;
+    const uploadSuccess = (uploadResult as any).exitCode === 0;
 
     return {
       success: uploadSuccess,
       port: activePort,
-      output: uploadSuccess && !verbose ? undefined : uploadResult.finalOutput,
+      output: uploadSuccess && !verbose ? undefined : (uploadResult as any).finalOutput,
       errors: uploadSuccess
         ? undefined
-        : parseStderrErrors(uploadResult.finalOutput),
+        : parseStderrErrors((uploadResult as any).finalOutput),
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
@@ -149,7 +149,7 @@ export async function uploadFilesystem(
  * @param environment - Optional specific environment target.
  * @param verbose - If true, captures complete output without truncation.
  * @param background - Executes asynchronously in the background.
- * @returns Upload completion status.
+ * @returns The structured UploadResult containing success flag, port, and standard output/errors.
  */
 export async function uploadFirmware(
   projectDir: string,
@@ -233,15 +233,15 @@ export async function uploadFirmware(
       return uploadResult as UploadResult;
     }
 
-    const uploadSuccess = uploadResult.exitCode === 0;
+    const uploadSuccess = (uploadResult as any).exitCode === 0;
 
     return {
       success: uploadSuccess,
       port: activePort,
-      output: uploadSuccess && !verbose ? undefined : uploadResult.finalOutput,
+      output: uploadSuccess && !verbose ? undefined : (uploadResult as any).finalOutput,
       errors: uploadSuccess
         ? undefined
-        : parseStderrErrors(uploadResult.finalOutput),
+        : parseStderrErrors((uploadResult as any).finalOutput),
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
@@ -267,7 +267,7 @@ export async function uploadFirmware(
  * @param environment - Optional specific environment target.
  * @param verbose - If true, captures complete output without truncation.
  * @param background - Executes asynchronously in the background.
- * @returns Upload completion status.
+ * @returns The structured UploadResult containing success flag, port, and standard output/errors.
  */
 export async function uploadAndMonitor(
   projectDir: string,
@@ -288,7 +288,7 @@ export async function uploadAndMonitor(
  * @param environment - Optional specific environment target.
  * @param verbose - If true, captures complete output without truncation.
  * @param background - Executes asynchronously in the background.
- * @returns Build and Upload sequential status.
+ * @returns The structured UploadResult containing success flag, port, and standard output/errors.
  */
 export async function buildAndUpload(
   projectDir: string,

@@ -4,7 +4,7 @@
 
 # PlatformIO MCP Server
 
-A board-agnostic [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for [PlatformIO](https://platformio.org) embedded development. This server enables AI agents like [Antigravity](https://github.com/google-deepmind/antigravity), [Cline](https://github.com/cline/cline), and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to interact with PlatformIO's comprehensive ecosystem of **1,000+ development boards** across **30+ platforms**.
+A board-agnostic [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for [PlatformIO](https://platformio.org) embedded development. This server enables AI agents like [Antigravity](https://antigravity.google/), [Cline](https://github.com/cline/cline), and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to interact with PlatformIO's comprehensive ecosystem of **1,000+ development boards** across **30+ platforms**.
 
 ## Features
 
@@ -15,7 +15,7 @@ A board-agnostic [Model Context Protocol](https://modelcontextprotocol.io) (MCP)
 - Board-agnostic: no hardcoded configs, supports all PlatformIO platforms out of the box
 - **Workspace Spooling**: `stdout` streams and PIDs are stored cleanly in the `.pio-mcp-workspace/` directory inside the active project folder for easy offline debugging instead of bloating in-memory constraints.
 - **Async Polling**: LLM context limits and network timeouts are inherently negated. Dispatch long-running compilations using `background: true` and monitor them safely with `check_task_status`.
-- **Opt-in Web Dashboard**: Launch a secure telemetry UI by passing `--ui` or setting `PIO_MCP_UI=true` (produces a secure localhost token at boot).
+- **Opt-in Web Dashboard**: Launch a secure telemetry UI by passing `--ui` or setting `PIO_MCP_UI=true`. The Web Dashboard enforces strict process isolation through a `PORTAL_AUTH_TOKEN` generated at boot. This cryptographic token ensures that only the authorized LLM session can access the telemetry server, preventing cross-process API leakage or unauthorized local accesses.
 
 ## Supported Platforms
 
@@ -425,7 +425,7 @@ MIT. See [LICENSE](LICENSE).
 
 - [PlatformIO](https://platformio.org) | [Boards](https://docs.platformio.org/en/latest/boards/) | [Libraries](https://registry.platformio.org) | [Community](https://community.platformio.org)
 - [Model Context Protocol](https://modelcontextprotocol.io)
-- [Antigravity](https://github.com/google-deepmind/antigravity) | An autonomous AI coding assistant.
+- [Antigravity](https://antigravity.google/) | An autonomous AI coding assistant.
 - [Cline](https://github.com/cline/cline) | [Cline Docs](https://docs.cline.bot)
 
 ## Support
