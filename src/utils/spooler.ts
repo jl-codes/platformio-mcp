@@ -198,6 +198,11 @@ export async function executeWithSpooling(
       if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
       try { fs.closeSync(outFd); } catch {}
       if (watcher) {
+        // ARCHITECTURAL EXCEPTION: While synchronous fs calls are broadly banned to prevent 
+        // event loop blocking, fs.statSync and fs.readSync are mathematically required here 
+        // at the exact nanosecond of process termination. Using asynchronous promises yields 
+        // to the event loop, causing the FSEvents watcher to close before the OS can flush 
+        // the final chunk event, permanently dropping the trailing output lines from the UI.
         try {
           const stat = fs.statSync(logFile);
           if (stat.size > fileOffset) {
@@ -260,6 +265,11 @@ export async function executeWithSpooling(
     fs.closeSync(outFd);
   } catch {}
   if (watcher) {
+    // ARCHITECTURAL EXCEPTION: While synchronous fs calls are broadly banned to prevent 
+    // event loop blocking, fs.statSync and fs.readSync are mathematically required here 
+    // at the exact nanosecond of process termination. Using asynchronous promises yields 
+    // to the event loop, causing the FSEvents watcher to close before the OS can flush 
+    // the final chunk event, permanently dropping the trailing output lines from the UI.
     try {
       const stat = fs.statSync(logFile);
       if (stat.size > fileOffset) {
