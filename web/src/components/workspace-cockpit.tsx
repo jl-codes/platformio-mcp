@@ -3,6 +3,7 @@ import { AgentEvent, LogEvent, SpoolerState, LockState, TabRef } from '../App.js
 import CommandFeed from './command-feed.js';
 import IDEWorkspace from './ide-workspace.js';
 import HardwareRack from './hardware-rack.js';
+import WorkspaceConfig from './workspace-config.js';
 
 interface WorkspaceCockpitProps {
   status: 'online' | 'offline';
@@ -19,6 +20,8 @@ interface WorkspaceCockpitProps {
   setActiveTabRef: (tab: TabRef | null) => void;
   historicalLogBuffer: Record<string, string>;
   hardware?: any[];
+  apiBase: string;
+  token: string;
 }
 
 export default function WorkspaceCockpit({
@@ -35,7 +38,9 @@ export default function WorkspaceCockpit({
   activeTabRef,
   setActiveTabRef,
   historicalLogBuffer,
-  hardware = []
+  hardware = [],
+  apiBase,
+  token
 }: WorkspaceCockpitProps) {
   
   const handleOpenTab = (tab: TabRef) => {
@@ -90,6 +95,14 @@ export default function WorkspaceCockpit({
           activeWorkspace={activeWorkspace}
           lockState={lockState}
           historicalLogBuffer={historicalLogBuffer}
+        />
+        
+        {/* Module 3: Workspace Config & libraries */}
+        <WorkspaceConfig 
+          activeWorkspace={activeWorkspace}
+          lockState={lockState}
+          apiBase={apiBase}
+          token={token}
         />
         
       </main>

@@ -221,6 +221,8 @@ function App() {
       setActiveTabRef={setActiveTabRef}
       historicalLogBuffer={historicalLogBuffer}
       hardware={hardwareDevices}
+      apiBase={apiBase}
+      token={parsedToken}
     />
   );
 }
