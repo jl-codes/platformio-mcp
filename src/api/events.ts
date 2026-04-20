@@ -137,6 +137,16 @@ class PortalEventEmitter extends EventEmitter {
     this.emit("spooler_states", states);
   }
 
+  /**
+   * Emit an update signal when the command history registry changes
+   */
+  emitCommandHistoryUpdated(projectDir: string) {
+    this.emit("command_history_updated", {
+      timestamp: Date.now(),
+      projectDir,
+    });
+  }
+
   private lastKnownProjectDir?: string;
 
   /**

@@ -12,9 +12,10 @@ import os from "node:os";
 import path from "node:path";
 import { platformioExecutor } from "../platformio.js";
 import { registerBuildPid, unregisterBuildPid, isBuildActive } from "./process-manager.js";
-import { portalEvents } from "../api/events.js";
 import { portSemaphoreManager } from "./semaphore.js";
 import { tailFileBounded } from "./tail.js";
+import { registerCommand, updateCommandStatus } from "./command-registry.js";
+import crypto from "node:crypto";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOGS_DIR = "tasks/build_logs";
@@ -125,9 +126,19 @@ export async function executeWithSpooling(
     detached: false
   });
 
+  const commandId = crypto.randomUUID();
+
   if (proc.pid) {
     logDiag(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, projectArea);
     await registerBuildPid(proc.pid, projectArea);
+    await registerCommand({
+      id: commandId,
+      timestamp: Date.now(),
+      type: "build",
+      status: "running",
+      logFile: logFile,
+      pid: proc.pid
+    }, projectArea).catch(e => logDiag(`[Spooler] Registry fail: ${e.message}`, projectArea));
   }
 
   try {
@@ -193,8 +204,13 @@ export async function executeWithSpooling(
 
     p.catch(e => {
       console.error(`[Background Task Error]: ${e.message}`);
+      updateCommandStatus(commandId, { status: "error" }, projectArea).catch(() => {});
       return 1;
     }).then(async (code) => {
+      await updateCommandStatus(commandId, { 
+        status: code === 0 ? "success" : "error",
+        exitCode: code 
+      }, projectArea).catch(() => {});
       await unregisterBuildPid(projectArea);
       if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
       try { fs.closeSync(outFd); } catch {}
@@ -258,6 +274,11 @@ export async function executeWithSpooling(
       resolve(code ?? 1);
     });
   });
+
+  await updateCommandStatus(commandId, { 
+    status: exitCode === 0 ? "success" : "error",
+    exitCode 
+  }, projectArea).catch(() => {});
 
   // Cleanup
   await unregisterBuildPid(projectArea);

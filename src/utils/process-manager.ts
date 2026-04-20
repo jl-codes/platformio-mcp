@@ -15,7 +15,8 @@ import { execSync } from "node:child_process";
 import treeKill from "tree-kill";
 import lockfile from "proper-lockfile";
 import { logDiagnostic as logDiag } from "./logger.js";
-
+import { registerCommand, updateCommandStatus, getCommandHistory } from "./command-registry.js";
+import crypto from "node:crypto";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOCKS_DIR = "locks";
@@ -65,6 +66,20 @@ export async function registerPioMonitorPid(port: string, pid: number, projectDi
   } catch (e: any) {
     throw new Error(`Registry contention timeout: ${e.message}`);
   }
+
+  try {
+    const commandId = crypto.randomUUID();
+    await registerCommand({
+      id: commandId,
+      timestamp: Date.now(),
+      type: "monitor",
+      status: "running",
+      port: port,
+      pid: pid
+    }, projectDir);
+  } catch (e: any) {
+    logDiag(`[ProcessManager] Failed to register monitor command: ${e.message}`, projectDir);
+  }
 }
 
 /**
@@ -87,6 +102,16 @@ export async function unregisterPioMonitorPid(port: string, projectDir?: string)
     }
   } catch (e: any) {
     throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+
+  try {
+    const history = getCommandHistory(projectDir);
+    const activeMonitor = [...history].reverse().find((c: any) => c.type === "monitor" && c.status === "running" && c.port === port);
+    if (activeMonitor) {
+      await updateCommandStatus(activeMonitor.id, { status: "terminated" }, projectDir);
+    }
+  } catch (e: any) {
+    logDiag(`[ProcessManager] Failed to update monitor command status: ${e.message}`, projectDir);
   }
 }
 
