@@ -1,62 +1,69 @@
-/**
- * Build Terminal Component
- * Renders compiler diagnostics and build spool outputs.
- *
- * Provides:
- * - BuildTerminal: React Component
- */
 import React, { useEffect, useRef } from 'react';
-import { LogEvent } from '../app.js';
+import { LogEvent } from '../App.js';
 
-interface Props {
+interface BuildTerminalProps {
   logs: LogEvent[];
   logFile?: string;
+  activeCommandId: string | null;
+  historicalLogBuffer: string | null;
 }
 
-const BuildTerminal: React.FC<Props> = ({ logs, logFile }) => {
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const [isAutoScrollFastened, setIsAutoScrollFastened] = React.useState(true);
+export default function BuildTerminal({ logs, logFile, activeCommandId, historicalLogBuffer }: BuildTerminalProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isAutoScrollFastened && bottomRef.current) {
-      bottomRef.current.scrollIntoView();
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [logs, isAutoScrollFastened]);
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    const atBottom = scrollHeight - scrollTop - clientHeight < 150;
-    setIsAutoScrollFastened(atBottom);
-  };
+  }, [logs]);
 
   return (
-    <div className="panel terminal-panel">
-      <div className="panel-header dark">
-        <h2>Compiler Terminal</h2>
+    <section className="compiler-core">
+      <div className="compiler-header">
+        <div className="compiler-tab active">
+          {historicalLogBuffer ? `[ HISTORICAL ] CMD: #${activeCommandId?.slice(0,6)}` : `[ LIVE ] CMD: #${activeCommandId?.slice(0,6) || 'WAITING'}`}
+        </div>
+        <div className="compiler-tab inactive">{logFile ? logFile.split('/').pop() : 'NO_FILE_ATTACHED'}</div>
       </div>
-      <div className="panel-content terminal-content scrollable" onScroll={handleScroll}>
-        {logs.length === 0 ? (
-          <div className="empty-state">No build output yet...</div>
-        ) : (
-          <div className="terminal-lines">
-            {logs.map((log, i) => (
-              <div key={i} className="terminal-line">
-                <span className="log-prefix">[{new Date(log.timestamp).toLocaleTimeString([], { hour12: false })}]</span>
-                <span className="log-text">{log.logLine}</span>
-              </div>
-            ))}
-            <div ref={bottomRef} />
+      
+      <div className="compiler-log" ref={containerRef}>
+        <div className="crt-overlay" style={{ position: 'absolute', inset: 0, opacity: 0.1, pointerEvents: 'none' }}></div>
+        
+        {historicalLogBuffer !== null ? (
+          <div style={{ padding: '8px', width: '100%' }}>
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <button style={{
+                  background: 'transparent', border: '1px solid var(--outline_variant)', 
+                  color: 'var(--on_surface_variant)', padding: '6px 12px', fontSize: '11px',
+                  borderRadius: '4px', cursor: 'pointer', fontFamily: 'var(--font-mono)'
+              }}>
+                [ Load previous log blocks... ]
+              </button>
+            </div>
+            <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'var(--font-mono)', fontSize: '13px', lineHeight: 1.5 }}>
+              {historicalLogBuffer}
+            </pre>
           </div>
+        ) : (
+          logs.length === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontStyle: 'italic', opacity: 0.5 }}>
+              Awaiting background streaming event...
+            </div>
+          ) : (
+            logs.map((log, index) => {
+              const isError = log.logLine?.toLowerCase().includes('error') || log.logLine?.toLowerCase().includes('failed');
+              const isSuccess = log.logLine?.toLowerCase().includes('success');
+              const lineClass = isError ? 'error' : isSuccess ? 'highlight' : 'info';
+              
+              return (
+                <p key={index} className={lineClass} style={{ marginBottom: '4px' }}>
+                  {log.logLine}
+                </p>
+              );
+            })
+          )
         )}
       </div>
-      {logFile && (
-        <div className="serial-footer">
-          <span className="footer-label">Logging to:</span>
-          <span className="footer-value" title={logFile}>{logFile}</span>
-        </div>
-      )}
-    </div>
+    </section>
   );
-};
-
-export default BuildTerminal;
+}

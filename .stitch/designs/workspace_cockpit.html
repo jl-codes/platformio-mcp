@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>KINETIC_COMMAND // COCKPIT</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;family=Fira+Code:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed-dim": "#4edea3",
+                        "secondary": "#4edea3",
+                        "surface": "#0f131d",
+                        "on-surface-variant": "#c7c4d7",
+                        "inverse-surface": "#dfe2f1",
+                        "on-tertiary-container": "#5c0008",
+                        "on-tertiary-fixed": "#410004",
+                        "surface-variant": "#313540",
+                        "primary": "#c0c1ff",
+                        "surface-dim": "#0f131d",
+                        "tertiary-fixed-dim": "#ffb3ad",
+                        "surface-container-low": "#171b26",
+                        "on-primary-container": "#0d0096",
+                        "on-secondary": "#003824",
+                        "surface-container-highest": "#313540",
+                        "primary-fixed": "#e1e0ff",
+                        "on-secondary-fixed": "#002114",
+                        "error": "#ffb4ab",
+                        "tertiary": "#ffb3ad",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "on-tertiary-fixed-variant": "#930013",
+                        "on-surface": "#dfe2f1",
+                        "surface-tint": "#c0c1ff",
+                        "outline-variant": "#464554",
+                        "on-secondary-fixed-variant": "#005236",
+                        "tertiary-fixed": "#ffdad7",
+                        "on-background": "#dfe2f1",
+                        "outline": "#908fa0",
+                        "secondary-container": "#00b47d",
+                        "surface-container": "#1b1f2a",
+                        "tertiary-container": "#ff5451",
+                        "primary-container": "#8083ff",
+                        "error-container": "#93000a",
+                        "secondary-fixed": "#6ffbbe",
+                        "on-error": "#690005",
+                        "on-primary-fixed": "#07006c",
+                        "on-primary": "#1000a9",
+                        "surface-container-lowest": "#0a0e18",
+                        "surface-bright": "#353944",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "inverse-primary": "#494bd6",
+                        "on-error-container": "#ffdad6",
+                        "background": "#0f131d",
+                        "on-tertiary": "#68000a",
+                        "on-secondary-container": "#003e28",
+                        "inverse-on-surface": "#2c303b",
+                        "surface-container-high": "#262a35"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0rem",
+                        "lg": "0rem",
+                        "xl": "0rem",
+                        "full": "0rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["Fira Code"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .crt-overlay {
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0a0e18; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #313540; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #464554; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body overflow-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-slate-950/60 backdrop-blur-3xl bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl shadow-black/50 flex justify-between items-center h-14 px-6">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-indigo-100 font-headline">KINETIC_COMMAND</span>
+<div class="hidden md:flex items-center gap-6">
+<span class="text-indigo-400 font-bold border-b-2 border-indigo-400 font-headline tracking-tight py-4 cursor-pointer active:scale-95 duration-150">WORKSPACES</span>
+<span class="text-slate-400 font-medium hover:bg-slate-800/50 hover:text-white transition-colors font-headline tracking-tight py-4 cursor-pointer active:scale-95 duration-150">ANALYTICS</span>
+<span class="text-slate-400 font-medium hover:bg-slate-800/50 hover:text-white transition-colors font-headline tracking-tight py-4 cursor-pointer active:scale-95 duration-150">SENSORS</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex gap-3 mr-4">
+<span class="material-symbols-outlined text-indigo-300 hover:bg-slate-800/50 hover:text-white transition-colors p-1 cursor-pointer">memory</span>
+<span class="material-symbols-outlined text-indigo-300 hover:bg-slate-800/50 hover:text-white transition-colors p-1 cursor-pointer">sensors</span>
+<span class="material-symbols-outlined text-indigo-300 hover:bg-slate-800/50 hover:text-white transition-colors p-1 cursor-pointer">terminal</span>
+</div>
+<div class="bg-surface-container-highest px-3 py-1 text-indigo-300 font-mono text-xs tracking-tighter shadow-inner">
+                SYSTEM_UPTIME: 42:12:09
+            </div>
+</div>
+</header>
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-14 h-[calc(100vh-3.5rem)] z-40 bg-slate-900 dark:bg-slate-900 w-20 flex flex-col items-center py-6 bg-slate-950 transition-all duration-300 ease-in-out">
+<div class="flex flex-col items-center gap-8 w-full">
+<div class="group relative flex flex-col items-center text-emerald-400 bg-emerald-500/10 border-r-2 border-emerald-400 w-full py-3 cursor-pointer">
+<span class="material-symbols-outlined mb-1">grid_view</span>
+<span class="font-mono uppercase text-[8px] tracking-[0.2em]">WORKSPACES</span>
+</div>
+<div class="group relative flex flex-col items-center text-slate-500 hover:text-slate-200 hover:bg-slate-800/40 w-full py-3 cursor-pointer">
+<span class="material-symbols-outlined mb-1">precision_manufacturing</span>
+<span class="font-mono uppercase text-[8px] tracking-[0.2em]">COMPILER</span>
+</div>
+<div class="group relative flex flex-col items-center text-slate-500 hover:text-slate-200 hover:bg-slate-800/40 w-full py-3 cursor-pointer">
+<span class="material-symbols-outlined mb-1">developer_board</span>
+<span class="font-mono uppercase text-[8px] tracking-[0.2em]">HARDWARE</span>
+</div>
+<div class="group relative flex flex-col items-center text-slate-500 hover:text-slate-200 hover:bg-slate-800/40 w-full py-3 cursor-pointer">
+<span class="material-symbols-outlined mb-1">lan</span>
+<span class="font-mono uppercase text-[8px] tracking-[0.2em]">NETWORK</span>
+</div>
+<div class="group relative flex flex-col items-center text-slate-500 hover:text-slate-200 hover:bg-slate-800/40 w-full py-3 cursor-pointer">
+<span class="material-symbols-outlined mb-1">receipt_long</span>
+<span class="font-mono uppercase text-[8px] tracking-[0.2em]">LOGS</span>
+</div>
+</div>
+<div class="mt-auto flex flex-col items-center gap-6 w-full">
+<div class="w-10 h-10 bg-surface-container-high flex items-center justify-center border-l-2 border-indigo-400 mb-4">
+<span class="material-symbols-outlined text-indigo-400 text-sm">engineering</span>
+</div>
+<div class="group relative flex flex-col items-center text-slate-500 hover:text-slate-200 hover:bg-slate-800/40 w-full py-3 cursor-pointer">
+<span class="material-symbols-outlined">settings</span>
+</div>
+<div class="group relative flex flex-col items-center text-slate-500 hover:text-slate-200 hover:bg-slate-800/40 w-full py-3 cursor-pointer">
+<span class="material-symbols-outlined text-error">power_settings_new</span>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-20 mt-14 h-[calc(100vh-3.5rem)] flex bg-surface-container-lowest">
+<!-- Internal Sidebar: Command History -->
+<aside class="w-64 bg-surface-container-low flex flex-col p-4 overflow-hidden">
+<header class="mb-6">
+<h3 class="font-mono text-xs text-on-surface-variant tracking-[0.3em] uppercase">COMMAND_HISTORY</h3>
+</header>
+<div class="flex-1 space-y-4 overflow-y-auto custom-scrollbar">
+<div class="flex items-start gap-3 group">
+<div class="w-1.5 h-1.5 rounded-full bg-secondary mt-1.5 shadow-[0_0_8px_#4edea3]"></div>
+<div class="flex flex-col">
+<span class="font-mono text-[11px] text-on-surface">pio run --target upload</span>
+<span class="font-mono text-[9px] text-outline">SUCCESS // 0.4s</span>
+</div>
+</div>
+<div class="flex items-start gap-3 group">
+<div class="w-1.5 h-1.5 rounded-full bg-secondary mt-1.5 shadow-[0_0_8px_#4edea3]"></div>
+<div class="flex flex-col">
+<span class="font-mono text-[11px] text-on-surface">pio device monitor</span>
+<span class="font-mono text-[9px] text-outline">SUCCESS // ACTIVE</span>
+</div>
+</div>
+<div class="flex items-start gap-3 group">
+<div class="w-1.5 h-1.5 rounded-full bg-error mt-1.5 shadow-[0_0_8px_#ffb3ad]"></div>
+<div class="flex flex-col">
+<span class="font-mono text-[11px] text-on-surface">pio run</span>
+<span class="font-mono text-[9px] text-outline">FAILED // EXIT_CODE_1</span>
+</div>
+</div>
+<div class="flex items-start gap-3 group">
+<div class="w-1.5 h-1.5 rounded-full bg-secondary mt-1.5 shadow-[0_0_8px_#4edea3]"></div>
+<div class="flex flex-col">
+<span class="font-mono text-[11px] text-on-surface">pio lib install 123</span>
+<span class="font-mono text-[9px] text-outline">SUCCESS // 2.1s</span>
+</div>
+</div>
+<div class="flex items-start gap-3 group opacity-50">
+<div class="w-1.5 h-1.5 rounded-full bg-secondary mt-1.5 shadow-[0_0_8px_#4edea3]"></div>
+<div class="flex flex-col">
+<span class="font-mono text-[11px] text-on-surface">pio system info</span>
+<span class="font-mono text-[9px] text-outline">SUCCESS // 0.1s</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Central Terminal Area -->
+<section class="flex-1 flex flex-col bg-surface-container relative">
+<div class="flex bg-surface-container-high h-10 items-center">
+<div class="px-6 h-full flex items-center bg-surface-container text-secondary-fixed-dim border-b-2 border-secondary font-mono text-xs tracking-widest cursor-pointer">
+                    BUILD_OUTPUT
+                </div>
+<div class="px-6 h-full flex items-center text-outline font-mono text-xs tracking-widest hover:bg-surface-variant transition-colors cursor-pointer">
+                    SERIAL_MONITOR
+                </div>
+<div class="ml-auto px-4 flex gap-4">
+<span class="material-symbols-outlined text-outline text-lg cursor-pointer hover:text-on-surface">search</span>
+<span class="material-symbols-outlined text-outline text-lg cursor-pointer hover:text-on-surface">download</span>
+<span class="material-symbols-outlined text-outline text-lg cursor-pointer hover:text-on-surface">close</span>
+</div>
+</div>
+<div class="flex-1 p-6 font-mono text-xs leading-relaxed custom-scrollbar overflow-y-auto relative bg-surface-container-lowest">
+<div class="crt-overlay absolute inset-0 z-10 opacity-30"></div>
+<div class="space-y-1 relative z-0">
+<p class="text-outline">[INFO] Executing task: platformio run</p>
+<p class="text-on-surface">Processing esp32dev (platform: espressif32; board: esp32dev; framework: arduino)</p>
+<p class="text-outline">--------------------------------------------------------------------------------</p>
+<p class="text-on-surface">Verbose mode can be enabled via `-v, --verbose` option</p>
+<p class="text-on-surface">CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32dev.html</p>
+<p class="text-on-surface">PLATFORM: Espressif 32 (5.1.0) &gt; Espressif ESP32 Dev Module</p>
+<p class="text-on-surface">HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash</p>
+<p class="text-on-surface">DEBUG: Current (cmsis-dap) External (cmsis-dap, esp-prog, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, turing-link)</p>
+<p class="text-on-surface">PACKAGES:</p>
+<p class="text-on-surface"> - framework-arduinoespressif32 @ 3.20004.220825 (2.0.4)</p>
+<p class="text-on-surface"> - tool-esptoolpy @ 1.30300.0 (3.3.0)</p>
+<p class="text-on-surface"> - toolchain-xtensa-esp32 @ 8.4.0+2021r2-patch3</p>
+<p class="text-secondary-fixed-dim">Compiling .pio/build/esp32dev/src/main.cpp.o</p>
+<p class="text-secondary-fixed-dim">Compiling .pio/build/esp32dev/lib/WiFi/WiFi.cpp.o</p>
+<p class="text-secondary-fixed-dim">Compiling .pio/build/esp32dev/lib/HTTPClient/HTTPClient.cpp.o</p>
+<p class="text-on-surface">Archiving .pio/build/esp32dev/lib646/libWiFi.a</p>
+<p class="text-on-surface">Linking .pio/build/esp32dev/firmware.elf</p>
+<p class="text-secondary-fixed-dim font-bold">Retrieving maximum program size .pio/build/esp32dev/firmware.elf</p>
+<p class="text-on-surface">Checking size .pio/build/esp32dev/firmware.elf</p>
+<p class="text-secondary-fixed-dim">Advanced Memory Usage is available via "PlatformIO Home &gt; Project Inspect"</p>
+<p class="text-on-surface">RAM:   [==        ]  12.7% (used 41536 bytes from 327680 bytes)</p>
+<p class="text-on-surface">Flash: [==        ]  18.1% (used 237821 bytes from 1310720 bytes)</p>
+<p class="text-secondary-fixed-dim font-bold bg-secondary/10 px-1 inline-block">========================= [SUCCESS] Took 4.21 seconds =========================</p>
+<p class="text-outline mt-4">_</p>
+</div>
+</div>
+<!-- Footer Bar -->
+<div class="h-8 bg-surface-container-high border-t border-outline-variant/10 flex items-center px-4 justify-between font-mono text-[10px]">
+<div class="flex gap-4">
+<span class="text-secondary-fixed-dim flex items-center gap-1"><span class="material-symbols-outlined text-xs">check_circle</span> READY</span>
+<span class="text-outline">LF</span>
+<span class="text-outline">UTF-8</span>
+</div>
+<div class="flex gap-4">
+<span class="text-on-surface">Ln 42, Col 12</span>
+<span class="text-indigo-400">Master*</span>
+</div>
+</div>
+</section>
+<!-- Right Sidebar: Serial Telemetry -->
+<aside class="w-80 bg-surface-container-low flex flex-col overflow-hidden border-l border-outline-variant/5">
+<div class="p-4 border-b border-outline-variant/10 bg-surface-container-high">
+<h3 class="font-mono text-xs text-on-surface-variant tracking-[0.3em] uppercase">SERIAL_TELEMETRY</h3>
+</div>
+<!-- Real-time Stats Grid -->
+<div class="p-4 grid grid-cols-2 gap-4">
+<div class="bg-surface-container p-3 space-y-1">
+<p class="font-mono text-[9px] text-outline uppercase tracking-wider">Voltage</p>
+<p class="font-headline text-xl text-secondary-fixed-dim font-bold">3.302V</p>
+</div>
+<div class="bg-surface-container p-3 space-y-1">
+<p class="font-mono text-[9px] text-outline uppercase tracking-wider">Temperature</p>
+<p class="font-headline text-xl text-primary font-bold">42.8°C</p>
+</div>
+<div class="bg-surface-container p-3 space-y-1">
+<p class="font-mono text-[9px] text-outline uppercase tracking-wider">CPU Load</p>
+<div class="h-1 bg-surface-variant w-full mt-2 overflow-hidden">
+<div class="h-full bg-secondary-fixed-dim" style="width: 24%"></div>
+</div>
+<p class="font-mono text-[10px] text-on-surface mt-1">24.2%</p>
+</div>
+<div class="bg-surface-container p-3 space-y-1">
+<p class="font-mono text-[9px] text-outline uppercase tracking-wider">Uptime</p>
+<p class="font-mono text-xs text-on-surface pt-1">00:12:44</p>
+</div>
+</div>
+<!-- Visualization / Map Placeholder -->
+<div class="px-4 py-2 flex-1 flex flex-col gap-4 overflow-hidden">
+<div class="flex-1 bg-surface-container-lowest relative overflow-hidden group">
+<div class="absolute inset-0 opacity-40 mix-blend-screen grayscale">
+<img alt="Technological topography map" class="w-full h-full object-cover" data-alt="Technical digital topography map with glowing cyan grid lines and data points over a dark obsidian background aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdkYFxrDpxkZ-N0kbVXPNxxW4kzgkbI9Wj2hpzHMePJ8lhO0Gc60HJHi4Cy5G9C85f2W96tCcYNhWpTR1RM6i8qr9wjSn56pnS9S6LGBAntfK0XyOYqa-Avz1vDsMwW2XbxVauiJvvdvSRSrnoInsnKUQO8CGkv5zFkI0SR0hX7dvdJ7-vwx8XAilc_r7tIqZRqXiRV3w6LKn7WL0PEg5vragjH5Y5WhzOouJtFkSddiTB18MvROB3_janq1NWwRrSwF0yo-KuRoQ"/>
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent"></div>
+<div class="absolute top-2 left-2 flex flex-col gap-1">
+<div class="bg-slate-900/80 px-2 py-0.5 font-mono text-[8px] text-secondary-fixed-dim border-l border-secondary">NODE_DELTA_01</div>
+</div>
+</div>
+<!-- Live Data Stream -->
+<div class="h-40 bg-surface-container-lowest font-mono text-[10px] p-2 space-y-1 overflow-y-auto custom-scrollbar border border-outline-variant/10">
+<p class="text-secondary/60">RX: 0x42 0xFF 0x01 0x00</p>
+<p class="text-on-surface">MSG: SYNC_ACK [OK]</p>
+<p class="text-secondary/60">RX: 0x43 0xFE 0x00 0x12</p>
+<p class="text-on-surface">MSG: TEMP_UPDATE [42.8]</p>
+<p class="text-secondary/60">RX: 0x42 0xFF 0x01 0x00</p>
+<p class="text-on-surface">MSG: SYNC_ACK [OK]</p>
+<p class="text-secondary/60">RX: 0x44 0xAA 0x11 0x23</p>
+<p class="text-primary/70">MSG: PID_CALIBRATE [READY]</p>
+<p class="text-secondary/60">RX: 0x43 0xFE 0x00 0x13</p>
+<p class="text-on-surface">MSG: TEMP_UPDATE [42.9]</p>
+<p class="text-secondary/60">RX: 0x42 0xFF 0x01 0x00</p>
+<p class="text-on-surface">MSG: SYNC_ACK [OK]</p>
+</div>
+</div>
+<!-- CTA -->
+<div class="p-4 bg-surface-container-high">
+<button class="w-full bg-primary-container text-on-primary-container font-headline font-bold py-2 tracking-tighter hover:bg-primary transition-colors active:scale-95 duration-150">
+                    NEW_INSTANCE
+                </button>
+</div>
+</aside>
+</main>
+</body></html>
