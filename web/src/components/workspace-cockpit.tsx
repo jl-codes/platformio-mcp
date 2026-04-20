@@ -4,6 +4,7 @@ import CommandFeed from './command-feed.js';
 import IDEWorkspace from './ide-workspace.js';
 import HardwareRack from './hardware-rack.js';
 import WorkspaceConfig from './workspace-config.js';
+import CommandLauncher from './command-launcher.js';
 
 interface WorkspaceCockpitProps {
   status: 'online' | 'offline';
@@ -50,6 +51,8 @@ export default function WorkspaceCockpit({
     setActiveTabRef(tab);
   };
   
+  const [isLauncherOpen, setIsLauncherOpen] = React.useState(false);
+
   return (
     <div className="cockpit-container">
       {/* TopAppBar Global Context Switcher */}
@@ -60,6 +63,14 @@ export default function WorkspaceCockpit({
             <span className="dot"></span>
             AUTO-TRACKING ({activeWorkspace ? activeWorkspace.split('/').pop() : 'WAITING'})
           </div>
+          <button 
+            className="lib-btn" 
+            style={{ borderColor: 'var(--secondary)', color: 'var(--secondary)' }}
+            onClick={() => setIsLauncherOpen(true)}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>rocket_launch</span>
+            NEW RUN
+          </button>
         </div>
         <div className="flex items-center" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <span className="mono-label" style={{ color: status === 'online' ? 'var(--secondary)' : 'var(--outline)' }}>
@@ -78,7 +89,12 @@ export default function WorkspaceCockpit({
             activeTabRef={activeTabRef}
             onOpenTab={handleOpenTab} 
           />
-          <HardwareRack hardware={hardware} />
+          <HardwareRack 
+            hardware={hardware} 
+            activeWorkspace={activeWorkspace}
+            apiBase={apiBase}
+            token={token}
+          />
         </div>
 
         {/* Module 2: IDE Workspace Interface */}
@@ -106,6 +122,15 @@ export default function WorkspaceCockpit({
         />
         
       </main>
+
+      <CommandLauncher 
+        isOpen={isLauncherOpen}
+        onClose={() => setIsLauncherOpen(false)}
+        activeWorkspace={activeWorkspace}
+        hardware={hardware}
+        apiBase={apiBase}
+        token={token}
+      />
     </div>
   );
 }
