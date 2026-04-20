@@ -59,5 +59,8 @@ temp/
 *.mcp.json
 
 # Agents
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/pio-manager/
 .gemini/
