@@ -64,4 +64,4 @@ temp/
 .agents/skills/*
 !.agents/skills/pio-manager/
 .gemini/
-tmp/
+.stitch/
