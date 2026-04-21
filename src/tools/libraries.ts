@@ -222,8 +222,8 @@ export async function uninstallLibrary(
     }
 
     const result = await platformioExecutor.execute(
-      "lib",
-      ["uninstall", libraryName],
+      "pkg",
+      ["uninstall", "--library", libraryName],
       execOptions,
     );
 
@@ -288,6 +288,58 @@ export async function updateLibraries(
     throw new LibraryError(`Failed to update libraries: ${error}`, {
       projectDir,
     });
+  }
+}
+
+/**
+ * Updates a specific library (globally or for a specific project).
+ *
+ * @param libraryName - Identified registry name to update.
+ * @param projectDir - Optional directory workspace path specifying local target.
+ * @returns Success completion status string payload.
+ */
+export async function updateLibrary(
+  libraryName: string,
+  projectDir?: string,
+): Promise<{ success: boolean; message: string }> {
+  if (!validateLibraryName(libraryName)) {
+    throw new LibraryError(`Invalid library name: ${libraryName}`, {
+      libraryName,
+    });
+  }
+
+  try {
+    const execOptions: { cwd?: string; timeout?: number } = { timeout: 120000 };
+    if (projectDir) {
+      const validatedPath = validateProjectPath(projectDir);
+      execOptions.cwd = validatedPath;
+    }
+
+    const result = await platformioExecutor.execute(
+      "pkg",
+      ["update", "--library", libraryName],
+      execOptions,
+    );
+
+    if (result.exitCode !== 0) {
+      throw new LibraryError(
+        `Failed to update library '${libraryName}': ${result.stderr}`,
+        { library: libraryName, stderr: result.stderr },
+      );
+    }
+
+    return {
+      success: true,
+      message: `Successfully updated ${libraryName}${projectDir ? " in project" : " globally"}`,
+    };
+  } catch (error) {
+    if (error instanceof LibraryError) {
+      throw error;
+    }
+    throw new LibraryError(
+      `Failed to update library '${libraryName}': ${error}`,
+      { libraryName, projectDir },
+    );
   }
 }
 

@@ -36,13 +36,19 @@ import {
   QueryLogsParamsSchema,
   CheckTaskStatusParamsSchema,
   GetDashboardUrlParamsSchema,
+  GetProjectConfigParamsSchema,
+  SystemInfoParamsSchema,
+  CheckProjectParamsSchema,
+  RunTestsParamsSchema,
+  UninstallLibraryParamsSchema,
+  UpdateLibraryParamsSchema,
 } from "./types.js";
 
 // Import tool functions from feature modules
 import { listBoards, getBoardInfo } from "./tools/boards.js";
 import { listDevices } from "./tools/devices.js";
-import { initProject } from "./tools/projects.js";
-import { buildProject, cleanProject, checkTaskStatus } from "./tools/build.js";
+import { initProject, getProjectConfig, getSystemInfo } from "./tools/projects.js";
+import { buildProject, cleanProject, checkTaskStatus, checkProject, runTests } from "./tools/build.js";
 import { uploadFirmware, uploadFilesystem } from "./tools/upload.js";
 import { startMonitor, stopMonitor, queryLogs } from "./tools/monitor.js";
 
@@ -50,6 +56,8 @@ import {
   searchLibraries,
   installLibrary,
   listInstalledLibraries,
+  uninstallLibrary,
+  updateLibrary,
 } from "./tools/libraries.js";
 import { checkPlatformIOInstalled } from "./platformio.js";
 import { formatPlatformIOError } from "./utils/errors.js";
@@ -461,6 +469,75 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: "get_project_config",
+        description: "Dumps platformio.ini JSON.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory" },
+          },
+          required: ["projectDir"],
+        },
+      },
+      {
+        name: "system_info",
+        description: "Gets sys diagnostic path output.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
+        name: "check_project",
+        description: "Static analysis validation.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory" },
+            environment: { type: "string", description: "Specific environment to check" },
+            background: { type: "boolean", description: "Run slow analysis in background" },
+          },
+          required: ["projectDir"],
+        },
+      },
+      {
+        name: "run_tests",
+        description: "Validates unit tests locally/remote.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory" },
+            environment: { type: "string", description: "Specific environment to test" },
+            background: { type: "boolean", description: "Run testing in background" },
+          },
+          required: ["projectDir"],
+        },
+      },
+      {
+        name: "uninstall_library",
+        description: "Removes target library.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            library: { type: "string", description: "Library name or ID to uninstall" },
+            projectDir: { type: "string", description: "Project directory (uninstalls globally if not specified)" },
+          },
+          required: ["library"],
+        },
+      },
+      {
+        name: "update_library",
+        description: "Upgrades library versions.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            library: { type: "string", description: "Library name or ID to update" },
+            projectDir: { type: "string", description: "Project directory (updates globally if not specified)" },
+          },
+          required: ["library"],
+        },
+      },
     ],
   };
 });
@@ -790,6 +867,53 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "get_dashboard_url": {
         const params = GetDashboardUrlParamsSchema.parse(args);
         const result = await getDashboardStatus(params.open);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "get_project_config": {
+        const params = GetProjectConfigParamsSchema.parse(args);
+        const result = await getProjectConfig(params.projectDir);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "system_info": {
+        const result = await getSystemInfo();
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "check_project": {
+        const params = CheckProjectParamsSchema.parse(args);
+        const result = await checkProject(params.projectDir, params.environment, params.background);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "run_tests": {
+        const params = RunTestsParamsSchema.parse(args);
+        const result = await runTests(params.projectDir, params.environment, params.background);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "uninstall_library": {
+        const params = UninstallLibraryParamsSchema.parse(args);
+        const result = await uninstallLibrary(params.library, params.projectDir);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "update_library": {
+        const params = UpdateLibraryParamsSchema.parse(args);
+        const result = await updateLibrary(params.library, params.projectDir);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };

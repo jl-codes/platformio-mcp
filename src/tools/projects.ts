@@ -133,31 +133,41 @@ export async function isValidProject(projectDir: string): Promise<boolean> {
  */
 export async function getProjectConfig(
   projectDir: string,
-): Promise<Record<string, unknown>> {
+): Promise<any> {
   const validatedPath = validateProjectPath(projectDir);
 
   try {
-    const result = await platformioExecutor.execute("project", ["config"], {
-      cwd: validatedPath,
-      timeout: 30000,
-    });
-
-    if (result.exitCode !== 0) {
-      throw new ProjectInitError(
-        `Failed to get project config: ${result.stderr}`,
-        { projectDir, stderr: result.stderr },
-      );
-    }
-
-    // Parse the config output (it's in INI format)
-    // For now, return raw output
-    return {
-      rawConfig: result.stdout,
-    };
+    const result = await platformioExecutor.executeWithJsonOutput(
+      "project",
+      ["config", "--json-output"],
+      {
+        cwd: validatedPath,
+        timeout: 30000,
+      }
+    );
+    return result;
   } catch (error) {
     throw new ProjectInitError(
       `Failed to get project configuration: ${error}`,
       { projectDir },
     );
+  }
+}
+
+/**
+ * Gets system diagnostic path output.
+ *
+ * @returns JSON payload of system information.
+ */
+export async function getSystemInfo(): Promise<any> {
+  try {
+    const result = await platformioExecutor.executeWithJsonOutput(
+      "system",
+      ["info", "--json-output"],
+      { timeout: 30000 }
+    );
+    return result;
+  } catch (error) {
+    throw new Error(`Failed to get system info: ${error}`);
   }
 }

@@ -385,6 +385,17 @@ export const InitProjectParamsSchema = z.object({
     .describe("Additional platform-specific options"),
 });
 
+// Get project config parameters
+export const GetProjectConfigParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+});
+
+// System info parameters
+export const SystemInfoParamsSchema = z.object({});
+
 // Build project parameters
 export const BuildProjectParamsSchema = z.object({
   projectDir: z
@@ -425,6 +436,38 @@ export const CleanProjectParamsSchema = z.object({
     .boolean()
     .optional()
     .describe("If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."),
+});
+
+// Check project parameters
+export const CheckProjectParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+  environment: z
+    .string()
+    .optional()
+    .describe("Specific environment to check (from platformio.ini)"),
+  background: z
+    .boolean()
+    .optional()
+    .describe("If true, dispatches the static analysis to the background and returns immediately."),
+});
+
+// Run tests parameters
+export const RunTestsParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+  environment: z
+    .string()
+    .optional()
+    .describe("Specific environment to test (from platformio.ini)"),
+  background: z
+    .boolean()
+    .optional()
+    .describe("If true, dispatches the test execution to the background and returns immediately."),
 });
 
 // Upload firmware parameters
@@ -514,6 +557,24 @@ export const InstallLibraryParamsSchema = z.object({
     .optional()
     .describe("Project directory (installs globally if not specified)"),
   version: z.string().optional().describe("Specific version to install"),
+});
+
+// Uninstall library parameters
+export const UninstallLibraryParamsSchema = z.object({
+  library: z.string().min(1).describe("Library name or ID to uninstall"),
+  projectDir: z
+    .string()
+    .optional()
+    .describe("Project directory (uninstalls globally if not specified)"),
+});
+
+// Update library parameters
+export const UpdateLibraryParamsSchema = z.object({
+  library: z.string().min(1).describe("Library name or ID to update"),
+  projectDir: z
+    .string()
+    .optional()
+    .describe("Project directory (updates globally if not specified)"),
 });
 
 // List installed libraries parameters

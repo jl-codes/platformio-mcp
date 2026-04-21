@@ -105,7 +105,116 @@ export async function buildProject(
 }
 
 /**
+ * Runs static analysis on a PlatformIO project.
+ *
+ * @param projectDir - The target location of the PIO project.
+ * @param environment - Optional specific platformio.ini environment target.
+ * @param background - If true, dispatches the execution to the background.
+ * @returns Resulting status payload.
+ */
+export async function checkProject(
+  projectDir: string,
+  environment?: string,
+  background?: boolean,
+): Promise<BuildResult> {
+  const validatedPath = validateProjectPath(projectDir);
+
+  if (environment && !validateEnvironmentName(environment)) {
+    throw new BuildError(`Invalid environment name: ${environment}`, { environment });
+  }
+
+  try {
+    const args: string[] = [];
+    if (environment) {
+      args.push("--environment", environment);
+    }
+
+    const result = await executeWithSpooling("check", args, {
+      cwd: validatedPath,
+      projectDir: validatedPath,
+      timeout: 600000,
+      background,
+      artifactType: "check" as any, // "check" is handled cleanly by spooler
+    });
+
+    if ('status' in result) {
+      return result as unknown as BuildResult;
+    }
+
+    const success = result.exitCode === 0;
+    const errors = success ? undefined : parseStderrErrors(result.finalOutput);
+
+    return {
+      success,
+      environment: environment || "default",
+      output: result.finalOutput,
+      errors,
+    };
+  } catch (error) {
+    if (error instanceof PlatformIOError) {
+      throw new BuildError(`Check failed: ${error.message}`, { projectDir, environment });
+    }
+    throw new BuildError(`Failed to check project: ${error}`, { projectDir, environment });
+  }
+}
+
+/**
+ * Runs unit tests on a PlatformIO project.
+ *
+ * @param projectDir - The target location of the PIO project.
+ * @param environment - Optional specific platformio.ini environment target.
+ * @param background - If true, dispatches the execution to the background.
+ * @returns Resulting status payload.
+ */
+export async function runTests(
+  projectDir: string,
+  environment?: string,
+  background?: boolean,
+): Promise<BuildResult> {
+  const validatedPath = validateProjectPath(projectDir);
+
+  if (environment && !validateEnvironmentName(environment)) {
+    throw new BuildError(`Invalid environment name: ${environment}`, { environment });
+  }
+
+  try {
+    const args: string[] = [];
+    if (environment) {
+      args.push("--environment", environment);
+    }
+
+    const result = await executeWithSpooling("test", args, {
+      cwd: validatedPath,
+      projectDir: validatedPath,
+      timeout: 600000,
+      background,
+      artifactType: "test",
+    });
+
+    if ('status' in result) {
+      return result as unknown as BuildResult;
+    }
+
+    const success = result.exitCode === 0;
+    const errors = success ? undefined : parseStderrErrors(result.finalOutput);
+
+    return {
+      success,
+      environment: environment || "default",
+      output: result.finalOutput,
+      errors,
+    };
+  } catch (error) {
+    if (error instanceof PlatformIOError) {
+      throw new BuildError(`Tests failed: ${error.message}`, { projectDir, environment });
+    }
+    throw new BuildError(`Failed to run tests: ${error}`, { projectDir, environment });
+  }
+}
+
+/**
  * Cleans build artifacts from a project.
+
  *
  * @param projectDir - Discard compilation output for this project workspace.
  * @returns Indicates successful cleanup execution metadata.
