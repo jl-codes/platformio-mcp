@@ -11,6 +11,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import crypto from "node:crypto";
 import { validateSerialPort, validateBaudRate } from "../utils/validation.js";
 import { PlatformIOError } from "../utils/errors.js";
 import { portSemaphoreManager } from "../utils/semaphore.js";
@@ -36,6 +37,7 @@ type DaemonContext = {
   logFile: string; // Active absolute path to the local primary written file
   fileOffset?: number; // Internal tailing offset
   watcher?: fs.FSWatcher; // Tailing pointer
+  artifactId?: string; // UUID to isolate socket routing
 };
 
 // Global pool of hardware streams managed by the MCP server
@@ -77,7 +79,7 @@ export async function stopMonitor(port: string, projectDir?: string) {
           const fd = fs.openSync(daemon.logFile, "r");
           fs.readSync(fd, buffer, 0, buffer.length, (daemon.fileOffset || 0));
           fs.closeSync(fd);
-          portalEvents.emitSerialLog(port, buffer.toString());
+          portalEvents.emitSerialLog(port, buffer.toString(), daemon.artifactId);
         }
       } catch {}
       try { daemon.watcher.close(); } catch {}
@@ -195,7 +197,7 @@ export async function rehydrateMonitors(): Promise<void> {
                     if (stat.size > (daemon.fileOffset || 0)) {
                       const stream = fs.createReadStream(logFile, { start: daemon.fileOffset || 0, end: stat.size - 1 });
                       stream.on('data', (chunk) => {
-                        portalEvents.emitSerialLog(port, chunk.toString());
+                        portalEvents.emitSerialLog(port, chunk.toString(), daemon.artifactId);
                       });
                       daemon.fileOffset = stat.size;
                     }
@@ -276,12 +278,15 @@ export async function startMonitor(
 
   portSemaphoreManager.claimPort(activePort, "Monitor Daemon");
 
+  const monitorArtifactId = crypto.randomUUID();
+
   const daemon: DaemonContext = {
     baudRate: baud,
     environment,
     hwid: activeHwid,
     logFile,
     fileOffset: 0,
+    artifactId: monitorArtifactId,
   };
   activeDaemons[activePort] = daemon;
 
@@ -296,7 +301,7 @@ export async function startMonitor(
           if (stat.size > (daemon.fileOffset || 0)) {
             const stream = fs.createReadStream(logFile, { start: daemon.fileOffset || 0, end: stat.size - 1 });
             stream.on('data', (chunk) => {
-              portalEvents.emitSerialLog(activePort!, chunk.toString());
+              portalEvents.emitSerialLog(activePort!, chunk.toString(), daemon.artifactId);
             });
             daemon.fileOffset = stat.size;
           }

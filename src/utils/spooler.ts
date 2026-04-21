@@ -157,7 +157,7 @@ export async function executeWithSpooling(
   // UI Portal File Tailing
   let fileOffset = 0;
   let watcher: fs.FSWatcher | null = null;
-  portalEvents.clearBuildLog(projectArea, logFile);
+  portalEvents.clearArtifactLog(projectArea, artifactId, logFile);
 
   try {
     watcher = fs.watch(logFile, (eventType) => {
@@ -167,7 +167,7 @@ export async function executeWithSpooling(
           if (stat.size > fileOffset) {
             const stream = fs.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on('data', (chunk) => {
-              portalEvents.emitBuildLog(projectArea, chunk.toString());
+              portalEvents.emitArtifactLog(projectArea, artifactId, chunk.toString());
             });
             fileOffset = stat.size;
           }
@@ -234,7 +234,7 @@ export async function executeWithSpooling(
             const fd = fs.openSync(logFile, "r");
             fs.readSync(fd, buffer, 0, buffer.length, fileOffset);
             fs.closeSync(fd);
-            portalEvents.emitBuildLog(projectArea, buffer.toString());
+            portalEvents.emitArtifactLog(projectArea, artifactId, buffer.toString());
             fileOffset = stat.size;
           }
         } catch {}
@@ -306,7 +306,7 @@ export async function executeWithSpooling(
         const fd = fs.openSync(logFile, "r");
         fs.readSync(fd, buffer, 0, buffer.length, fileOffset);
         fs.closeSync(fd);
-        portalEvents.emitBuildLog(projectArea, buffer.toString());
+        portalEvents.emitArtifactLog(projectArea, artifactId, buffer.toString());
         fileOffset = stat.size;
       }
     } catch {}

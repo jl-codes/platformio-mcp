@@ -53,29 +53,31 @@ class PortalEventEmitter extends EventEmitter {
     }
   }
 
-  private buildBuffers: Record<string, string> = {};
+  private artifactBuffers: Record<string, string> = {};
 
   /**
    * Emit a build log stream, buffering partial chunks into clean lines
    */
-  emitBuildLog(projectId: string, chunk: string) {
-    if (!this.buildBuffers[projectId]) {
-      this.buildBuffers[projectId] = "";
+  emitArtifactLog(projectId: string, artifactId: string | undefined, chunk: string) {
+    const bufferKey = artifactId || projectId;
+    if (!this.artifactBuffers[bufferKey]) {
+      this.artifactBuffers[bufferKey] = "";
     }
-    this.buildBuffers[projectId] += chunk;
+    this.artifactBuffers[bufferKey] += chunk;
 
     let newlineIndex: number;
-    while ((newlineIndex = this.buildBuffers[projectId].indexOf("\n")) !== -1) {
-      const logLine = this.buildBuffers[projectId]
+    while ((newlineIndex = this.artifactBuffers[bufferKey].indexOf("\n")) !== -1) {
+      const logLine = this.artifactBuffers[bufferKey]
         .substring(0, newlineIndex)
         .trimEnd();
-      this.buildBuffers[projectId] = this.buildBuffers[projectId].substring(
+      this.artifactBuffers[bufferKey] = this.artifactBuffers[bufferKey].substring(
         newlineIndex + 1,
       );
 
       this.emit("build_log", {
         timestamp: Date.now(),
         projectId,
+        artifactId,
         logLine,
       });
     }
@@ -84,13 +86,15 @@ class PortalEventEmitter extends EventEmitter {
   /**
    * Emit a signal to clear the build terminal for a project
    */
-  clearBuildLog(projectId: string, logFile?: string) {
-    if (this.buildBuffers[projectId]) {
-      this.buildBuffers[projectId] = "";
+  clearArtifactLog(projectId: string, artifactId?: string, logFile?: string) {
+    const bufferKey = artifactId || projectId;
+    if (this.artifactBuffers[bufferKey]) {
+      this.artifactBuffers[bufferKey] = "";
     }
     this.emit("build_clear", {
       timestamp: Date.now(),
       projectId,
+      artifactId,
       logFile,
     });
   }
@@ -98,10 +102,11 @@ class PortalEventEmitter extends EventEmitter {
   /**
    * Emit a serial monitor read
    */
-  emitSerialLog(port: string, data: string) {
+  emitSerialLog(port: string, data: string, artifactId?: string) {
     this.emit("serial_log", {
       timestamp: Date.now(),
       port,
+      artifactId,
       data,
     });
   }
