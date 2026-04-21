@@ -20,16 +20,11 @@ import { platformioExecutor } from "../platformio.js";
 import { portalEvents } from "../api/events.js";
 import { logDiagnostic as logDiag } from "../utils/logger.js";
 import { tailFileBounded } from "../utils/tail.js";
+import { getLogDir, rotateSpoolerStreams } from "../utils/spooler.js";
 import { getWorkspaces, rewriteRegistry } from "../utils/workspace-registry.js";
 import { getActiveMonitorPids, isPidAlive, isBuildActive } from "../utils/process-manager.js";
 
-const WORKSPACE_DIR = ".pio-mcp-workspace";
-const LOGS_DIR = "serial_monitors/logs";
 
-function getLogDir(projectDir?: string): string {
-  const baseDir = projectDir || os.tmpdir();
-  return path.join(baseDir, WORKSPACE_DIR, LOGS_DIR);
-}
 
 /**
  * State and context mapping for an actively spooled hardware port.
@@ -55,40 +50,7 @@ export function getSpoolerStates() {
  *
  * @param maxHistory - Maximum total bounded files to retain.
  */
-async function rotateLogs(targetDir: string, maxHistory = 30) {
-  if (!fs.existsSync(targetDir)) return;
-  const fileNames = fs
-    .readdirSync(targetDir)
-    .filter((f) => f.startsWith("device-monitor-") && f.endsWith(".log"));
 
-  const files = await Promise.all(
-    fileNames.map(async (name) => {
-      const filePath = path.join(targetDir, name);
-      try {
-        const stat = await fs.promises.stat(filePath);
-        return {
-          name,
-          path: filePath,
-          ctime: stat.ctime.getTime(),
-        };
-      } catch (e) {
-        return null;
-      }
-    })
-  );
-
-  const validFiles = files.filter((f): f is NonNullable<typeof f> => f !== null);
-  validFiles.sort((a, b) => b.ctime - a.ctime); // Newest first
-
-  if (validFiles.length > maxHistory) {
-    const toDelete = validFiles.slice(maxHistory);
-    for (const f of toDelete) {
-      try {
-        await fs.promises.unlink(f.path);
-      } catch (e) {}
-    }
-  }
-}
 
 /**
  * Safely stops an active monitor daemon session and unlocks its port.
@@ -132,20 +94,7 @@ export async function stopMonitor(port: string, projectDir?: string) {
   logDiag(`[Spooler Diagnostic] killPioMonitorByPort completed.`, projectDir);
 }
 
-/**
- * Utility to generate a fresh log file path for a port.
- */
-async function rotateSpoolerStreams(projectDir?: string) {
-  const targetDir = getLogDir(projectDir);
 
-  await rotateLogs(targetDir, 30);
-
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const logFile = path.join(targetDir, `device-monitor-${timestamp}.log`);
-  const latestLog = path.join(targetDir, "latest-monitor.log");
-
-  return { logFile, latestLog };
-}
 
 async function spawnPioMonitor(targetPort: string, projectDir?: string, rootCommandId?: string) {
   const daemon = activeDaemons[targetPort];
@@ -179,7 +128,7 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string, rootComm
   }
 
   // Symlink or copy to 'latest-monitor.log' for easy querying
-  const targetDir = getLogDir(projectDir);
+  const targetDir = getLogDir("monitor", projectDir);
   const latestLog = path.join(targetDir, "latest-monitor.log");
   try {
     if (fs.existsSync(latestLog)) fs.unlinkSync(latestLog);
@@ -222,7 +171,7 @@ export async function rehydrateMonitors(): Promise<void> {
         if (isPidAlive(pid)) {
           workspaceIsActive = true;
           if (!activeDaemons[port]) {
-            const logFile = path.join(getLogDir(projectDir), "latest-monitor.log");
+            const logFile = path.join(getLogDir("monitor", projectDir), "latest-monitor.log");
             let currentSize = 0;
             try {
               if (fs.existsSync(logFile)) {
@@ -318,12 +267,12 @@ export async function startMonitor(
       "PORT_BUSY",
     );
 
-  const targetDir = getLogDir(projectDir);
+  const targetDir = getLogDir("monitor", projectDir);
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
 
-  const { logFile } = await rotateSpoolerStreams(projectDir);
+  const { logFile } = rotateSpoolerStreams("monitor", projectDir);
 
   portSemaphoreManager.claimPort(activePort, "Monitor Daemon");
 
@@ -372,7 +321,7 @@ export async function queryLogs(
   projectDir?: string,
   port?: string,
 ) {
-  const targetDir = getLogDir(projectDir);
+  const targetDir = getLogDir("monitor", projectDir);
   let targetFile = path.join(targetDir, "latest-monitor.log");
   
   // If a specific port is requested, try to find the active log file for it

@@ -4,7 +4,7 @@
  *
  * Provides:
  * - rotateLogs: Generic log file rotater by prefix.
- * - rotateBuildStreams: Specialized build log rotation.
+ * - rotateSpoolerStreams: Specialized spool log rotation.
  * - executeWithSpooling: Spawns child processes mapped to disk limits.
  */
 import fs from "node:fs";
@@ -18,11 +18,9 @@ import { registerCommand, updateArtifactStatus } from "./command-registry.js";
 import crypto from "node:crypto";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
-const LOGS_DIR = "tasks/build_logs";
-
-function getLogDir(projectDir?: string): string {
+export function getLogDir(verb: string, projectDir?: string): string {
   const baseDir = projectDir || os.tmpdir();
-  return path.join(baseDir, WORKSPACE_DIR, LOGS_DIR);
+  return path.join(baseDir, WORKSPACE_DIR, "logs", verb);
 }
 import { logDiagnostic as logDiag } from "./logger.js";
 /**
@@ -65,17 +63,18 @@ export interface BuildStreamRotation {
  * @param projectDir - Associated workspace to scope clearance into.
  * @returns The structured paths indicating where the new logs are actively spooling.
  */
-export function rotateBuildStreams(projectDir?: string): BuildStreamRotation {
-  const targetDir = getLogDir(projectDir);
+export function rotateSpoolerStreams(verb: string, projectDir?: string): BuildStreamRotation {
+  const targetDir = getLogDir(verb, projectDir);
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
 
-  rotateLogs(targetDir, "build-", 30);
+  rotateLogs(targetDir, `${verb}-`, 30);
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const logFile = path.join(targetDir, `build-${timestamp}.log`);
-  const latestLog = path.join(targetDir, "latest-build.log");
+  const shortHash = crypto.randomBytes(4).toString("hex");
+  const logFile = path.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
+  const latestLog = path.join(targetDir, `latest-${verb}.log`);
 
   return { logFile, latestLog };
 }
@@ -106,7 +105,7 @@ export type SpoolingResult = SpoolingBackgroundResult | SpoolingForegroundResult
 export async function executeWithSpooling(
   command: string,
   args: string[],
-  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; onSuccess?: () => Promise<void>; rootCommandId?: string; artifactType?: "build" | "upload" }
+  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; onSuccess?: () => Promise<void>; rootCommandId?: string; artifactType?: "build" | "upload" | "monitor" | "test" | "debug" }
 ): Promise<SpoolingResult> {
   const projectArea = options.projectDir ?? options.cwd;
 
@@ -116,7 +115,8 @@ export async function executeWithSpooling(
   }
 
   // 2. Setup spooling streams
-  const { logFile, latestLog } = rotateBuildStreams(projectArea);
+  const verb = options.artifactType || "build";
+  const { logFile, latestLog } = rotateSpoolerStreams(verb, projectArea);
   const outFd = fs.openSync(logFile, "a");
 
   // 3. Spawning

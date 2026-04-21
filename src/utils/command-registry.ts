@@ -30,7 +30,7 @@ function getRegistryFilePath(projectDir?: string): string {
  */
 export interface ArtifactRecord {
   id: string; // Internal trace ID
-  type: "build" | "monitor" | "upload";
+  type: "build" | "monitor" | "upload" | "test" | "debug";
   status: "inactive" | "running" | "success" | "error" | "terminated";
   logFile?: string;
   port?: string;
