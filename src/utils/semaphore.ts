@@ -71,6 +71,24 @@ export class SemaphoreManager {
     const filePath = this.getLockFilePath(port);
     return fs.existsSync(filePath);
   }
+
+  /**
+   * Retrieves the current claim payload for a port, if it exists.
+   */
+  public getClaim(port: string): any | null {
+    const filePath = this.getLockFilePath(port);
+    if (fs.existsSync(filePath)) {
+      try {
+        const content = fs.readFileSync(filePath, "utf-8");
+        const parsed = JSON.parse(content);
+        return parsed.current_claim || parsed;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
 }
+
 
 export const portSemaphoreManager = SemaphoreManager.getInstance();

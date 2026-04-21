@@ -28,19 +28,26 @@ function getRegistryFilePath(projectDir?: string): string {
 /**
  * Historical record of an executed command spanning builds or serial monitors.
  */
+export interface ArtifactRecord {
+  id: string; // Internal trace ID
+  type: "build" | "monitor" | "upload";
+  status: "inactive" | "running" | "success" | "error" | "terminated";
+  logFile?: string;
+  port?: string;
+  pid?: number;
+  exitCode?: number;
+}
+
 export interface CommandRecord {
-  id: string; // Unique identifier for the command
-  timestamp: number; // Start time epoch
-  type: "build" | "monitor"; // Classification of the command
-  status: "running" | "success" | "error" | "terminated"; // Current process status
-  logFile?: string; // Optional pointer to disk-spooled output log
-  port?: string; // Optional context for monitor commands
-  pid?: number; // Optional system PID
-  exitCode?: number; // OS exit signal result
+  id: string; // The root invocation ID
+  commandDesc: string; // E.g., 'pio run -t upload'
+  timestamp: number;
+  status: "running" | "success" | "error" | "terminated"; // Overall process status
+  artifacts: ArtifactRecord[];
 }
 
 /**
- * Appends a new command record into the workspace command history.
+ * Appends a new command record into the workspace command history, or appends an artifact if the command exists.
  * @param record Initial status details of the command being spun up
  * @param projectDir Optional specific workspace
  */
@@ -56,10 +63,21 @@ export async function registerCommand(record: CommandRecord, projectDir?: string
         history = JSON.parse(fs.readFileSync(file, "utf8"));
       } catch {}
 
-      history.push(record);
-      // Keep only up to 30 items
-      if (history.length > MAX_HISTORY_ITEMS) {
-        history = history.slice(-MAX_HISTORY_ITEMS);
+      const existingIndex = history.findIndex(cmd => cmd.id === record.id);
+      if (existingIndex !== -1) {
+        // Just merge artifacts if appending to an existing command chain
+        const existingCmd = history[existingIndex];
+        record.artifacts.forEach(newArt => {
+          if (!existingCmd.artifacts.find(a => a.id === newArt.id)) {
+            existingCmd.artifacts.push(newArt);
+          }
+        });
+        existingCmd.status = record.status;
+      } else {
+        history.push(record);
+        if (history.length > MAX_HISTORY_ITEMS) {
+          history = history.slice(-MAX_HISTORY_ITEMS);
+        }
       }
 
       fs.writeFileSync(file, JSON.stringify(history, null, 2));
@@ -95,6 +113,50 @@ export async function updateCommandStatus(id: string, updates: Partial<CommandRe
         history[index] = { ...history[index], ...updates };
         fs.writeFileSync(file, JSON.stringify(history, null, 2));
         portalEvents.emitCommandHistoryUpdated(projectDir || os.tmpdir());
+      }
+    } finally {
+      await release();
+    }
+  } catch (e: any) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+}
+
+/**
+ * Updates a specific nested artifact's status.
+ */
+export async function updateArtifactStatus(commandId: string, artifactId: string, updates: Partial<ArtifactRecord>, projectDir?: string): Promise<void> {
+  const file = getRegistryFilePath(projectDir);
+  if (!fs.existsSync(file)) return;
+
+  try {
+    const release = await lockfile.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let history: CommandRecord[] = [];
+      try {
+        history = JSON.parse(fs.readFileSync(file, "utf8"));
+      } catch {}
+
+      const cmdIndex = history.findIndex((cmd) => cmd.id === commandId);
+      if (cmdIndex !== -1) {
+        const cmd = history[cmdIndex];
+        const artIndex = cmd.artifacts?.findIndex((art) => art.id === artifactId) ?? -1;
+        if (artIndex !== -1) {
+          cmd.artifacts[artIndex] = { ...cmd.artifacts[artIndex], ...updates };
+
+          // Automatically roll up statuses (if all artifacts are success, parent is success)
+          const allSuccess = cmd.artifacts.every(a => a.status === 'success');
+          const anyError = cmd.artifacts.some(a => a.status === 'error');
+          const anyRunning = cmd.artifacts.some(a => a.status === 'running');
+          
+          if (anyError) cmd.status = 'error';
+          else if (anyRunning) cmd.status = 'running';
+          else if (allSuccess) cmd.status = 'success';
+          else cmd.status = 'terminated';
+
+          fs.writeFileSync(file, JSON.stringify(history, null, 2));
+          portalEvents.emitCommandHistoryUpdated(projectDir || os.tmpdir());
+        }
       }
     } finally {
       await release();

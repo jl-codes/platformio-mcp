@@ -147,6 +147,16 @@ class PortalEventEmitter extends EventEmitter {
     });
   }
 
+  /**
+   * Emit a signal containing the latest rich hardware port state
+   */
+  emitHardwareStateUpdated(devices: any[]) {
+    this.emit("hardware_state_updated", {
+        timestamp: Date.now(),
+        devices
+    });
+  }
+
   private lastKnownProjectDir?: string;
 
   /**

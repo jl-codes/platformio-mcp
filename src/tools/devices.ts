@@ -17,6 +17,7 @@ import type { SerialDevice } from "../types.js";
 import { DevicesArraySchema } from "../types.js";
 import { PlatformIOError } from "../utils/errors.js";
 import { mapVidPidToBoard } from "../utils/hardware-maps.js";
+import { portSemaphoreManager } from "../utils/semaphore.js";
 
 /**
  * Lists all connected serial devices.
@@ -35,10 +36,15 @@ export async function listDevices(): Promise<SerialDevice[]> {
     // Enhance discovered devices with mapped board information
     return result.map((device) => {
       const detectedBoard = mapVidPidToBoard(device.hwid, device.description);
+      const enrichedDevice: SerialDevice = { ...device };
       if (detectedBoard) {
-        return { ...device, detectedBoard };
+        enrichedDevice.detectedBoard = detectedBoard;
       }
-      return device;
+      const claim = portSemaphoreManager.getClaim(device.port);
+      if (claim) {
+        enrichedDevice.claim = claim;
+      }
+      return enrichedDevice;
     });
   } catch (error) {
     // If no devices are found, PlatformIO may return an error or empty array

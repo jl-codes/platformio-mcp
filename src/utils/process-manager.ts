@@ -15,7 +15,7 @@ import { execSync } from "node:child_process";
 import treeKill from "tree-kill";
 import lockfile from "proper-lockfile";
 import { logDiagnostic as logDiag } from "./logger.js";
-import { registerCommand, updateCommandStatus, getCommandHistory } from "./command-registry.js";
+import { registerCommand, updateArtifactStatus, getCommandHistory } from "./command-registry.js";
 import crypto from "node:crypto";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
@@ -45,7 +45,7 @@ function getPidsFilePath(projectDir?: string, file: string = SERIAL_PIDS_FILE): 
 /**
  * Records a given process ID belonging to a started serial monitor.
  */
-export async function registerPioMonitorPid(port: string, pid: number, projectDir?: string): Promise<void> {
+export async function registerPioMonitorPid(port: string, pid: number, projectDir?: string, rootCommandId?: string): Promise<void> {
   const pidsFile = getPidsFilePath(projectDir);
   const dir = path.dirname(pidsFile);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -68,14 +68,22 @@ export async function registerPioMonitorPid(port: string, pid: number, projectDi
   }
 
   try {
-    const commandId = crypto.randomUUID();
+    const commandId = rootCommandId || crypto.randomUUID();
+    const artifactId = crypto.randomUUID();
+    
     await registerCommand({
       id: commandId,
+      commandDesc: `PIO Serial Monitor: ${port}`,
       timestamp: Date.now(),
-      type: "monitor",
       status: "running",
-      port: port,
-      pid: pid
+      artifacts: [{
+        id: artifactId,
+        type: "monitor",
+        status: "running",
+        port: port,
+        pid: pid,
+        logFile: path.join(path.dirname(pidsFile), `${port.replace(/\//g, '_')}.log`)
+      }]
     }, projectDir);
   } catch (e: any) {
     logDiag(`[ProcessManager] Failed to register monitor command: ${e.message}`, projectDir);
@@ -106,9 +114,15 @@ export async function unregisterPioMonitorPid(port: string, projectDir?: string)
 
   try {
     const history = getCommandHistory(projectDir);
-    const activeMonitor = [...history].reverse().find((c: any) => c.type === "monitor" && c.status === "running" && c.port === port);
-    if (activeMonitor) {
-      await updateCommandStatus(activeMonitor.id, { status: "terminated" }, projectDir);
+    // Find the command that contains an actively running monitor artifact for this port
+    const activeCommand = [...history].reverse().find(cmd => 
+      cmd.artifacts?.some(a => a.type === "monitor" && a.status === "running" && a.port === port)
+    );
+    if (activeCommand) {
+      const activeArtifact = activeCommand.artifacts.find(a => a.type === "monitor" && a.status === "running" && a.port === port);
+      if (activeArtifact) {
+        await updateArtifactStatus(activeCommand.id, activeArtifact.id, { status: "terminated" }, projectDir);
+      }
     }
   } catch (e: any) {
     logDiag(`[ProcessManager] Failed to update monitor command status: ${e.message}`, projectDir);

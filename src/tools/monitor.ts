@@ -147,7 +147,7 @@ async function rotateSpoolerStreams(projectDir?: string) {
   return { logFile, latestLog };
 }
 
-async function spawnPioMonitor(targetPort: string, projectDir?: string) {
+async function spawnPioMonitor(targetPort: string, projectDir?: string, rootCommandId?: string) {
   const daemon = activeDaemons[targetPort];
   if (!daemon) return;
 
@@ -175,7 +175,7 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string) {
 
   if (proc.pid) {
     // Record PID to workspace tracker
-    await registerPioMonitorPid(targetPort, proc.pid, projectDir);
+    await registerPioMonitorPid(targetPort, proc.pid, projectDir, rootCommandId);
   }
 
   // Symlink or copy to 'latest-monitor.log' for easy querying
@@ -281,6 +281,7 @@ export async function startMonitor(
   baud: number = 115200,
   projectDir?: string,
   environment?: string,
+  rootCommandId?: string,
 ) {
   let activePort = port;
   let activeHwid: string | null = null;
@@ -335,7 +336,7 @@ export async function startMonitor(
   };
   activeDaemons[activePort] = daemon;
 
-  await spawnPioMonitor(activePort, projectDir);
+  await spawnPioMonitor(activePort, projectDir, rootCommandId);
 
   // Attach UI portal tailing
   try {

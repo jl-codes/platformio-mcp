@@ -14,7 +14,7 @@ import { platformioExecutor } from "../platformio.js";
 import { registerBuildPid, unregisterBuildPid, isBuildActive } from "./process-manager.js";
 import { portSemaphoreManager } from "./semaphore.js";
 import { tailFileBounded } from "./tail.js";
-import { registerCommand, updateCommandStatus } from "./command-registry.js";
+import { registerCommand, updateArtifactStatus } from "./command-registry.js";
 import crypto from "node:crypto";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
@@ -106,7 +106,7 @@ export type SpoolingResult = SpoolingBackgroundResult | SpoolingForegroundResult
 export async function executeWithSpooling(
   command: string,
   args: string[],
-  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; onSuccess?: () => Promise<void> }
+  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; onSuccess?: () => Promise<void>; rootCommandId?: string; artifactType?: "build" | "upload" }
 ): Promise<SpoolingResult> {
   const projectArea = options.projectDir ?? options.cwd;
 
@@ -126,18 +126,25 @@ export async function executeWithSpooling(
     detached: false
   });
 
-  const commandId = crypto.randomUUID();
+  const commandId = options.rootCommandId || crypto.randomUUID();
+  const artifactId = crypto.randomUUID();
+  const artType = options.artifactType || "build";
 
   if (proc.pid) {
     logDiag(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, projectArea);
     await registerBuildPid(proc.pid, projectArea);
     await registerCommand({
       id: commandId,
+      commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
       timestamp: Date.now(),
-      type: "build",
       status: "running",
-      logFile: logFile,
-      pid: proc.pid
+      artifacts: [{
+        id: artifactId,
+        type: artType,
+        status: "running",
+        logFile: logFile,
+        pid: proc.pid
+      }]
     }, projectArea).catch(e => logDiag(`[Spooler] Registry fail: ${e.message}`, projectArea));
   }
 
@@ -204,10 +211,10 @@ export async function executeWithSpooling(
 
     p.catch(e => {
       console.error(`[Background Task Error]: ${e.message}`);
-      updateCommandStatus(commandId, { status: "error" }, projectArea).catch(() => {});
+      updateArtifactStatus(commandId, artifactId, { status: "error" }, projectArea).catch(() => {});
       return 1;
     }).then(async (code) => {
-      await updateCommandStatus(commandId, { 
+      await updateArtifactStatus(commandId, artifactId, { 
         status: code === 0 ? "success" : "error",
         exitCode: code 
       }, projectArea).catch(() => {});
@@ -275,7 +282,7 @@ export async function executeWithSpooling(
     });
   });
 
-  await updateCommandStatus(commandId, { 
+  await updateArtifactStatus(commandId, artifactId, { 
     status: exitCode === 0 ? "success" : "error",
     exitCode 
   }, projectArea).catch(() => {});

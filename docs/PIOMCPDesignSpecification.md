@@ -56,18 +56,22 @@ mcp-server (Global System: os.homedir() / %USERPROFILE% via ~/.platformio-mcp/)
 
 Workspaces (Project Local: [ProjectDir]/.pio-mcp-workspace/)
 │
+├── registry/
+│   └── command_history.json      # Bounded chronological feed of unified commands (build/monitor)
+│
 ├── tasks/
-│   ├── active_tasks.json         # Active parallelizable processes (PIDs, task type, status)
+│   ├── active_tasks.json         # Active parallelizable processes (PIDs)
 │   └── build_logs/               # Task spool traces (e.g. build-1234.log)
 │
 └── serial_monitors/
-    ├── monitor-pids.json         # Workspace's discrete view of its tracked monitors
+    ├── monitor-pids.json         # Tracked monitor background PIDs
     └── logs/                     # Saved serial tracing outputs
 ```
 
 ### Global vs Workspace Scopes
 1. **Global Physical Resources (`~/.platformio-mcp/`)**: Because hardware (like a physical USB serial port) operates strictly as a system-wide singleton, its semaphore mechanisms must be hoisted completely out of the project repository. Including the OS locking `pid` locally within these structured global locks allows for `O(1)` atomic process replacement, resolving conflicts even when processes were fired from completely detached workspaces.
-2. **Project Local State (`.pio-mcp-workspace/`)**: Build queues, compiling, and specific serial logs are directly bound to the firmware code inside standard target repositories.
+2. **Project Local State (`.pio-mcp-workspace/`)**: Build queues, compiling, and specific serial logs are directly bound to the firmware code inside standard target repositories. 
+   - **Command Registry**: The core chronological feed (`registry/command_history.json`) merges all async build and monitor events into a single appended timeline, serving as the primary structured data source for the connected Web Portal UI rather than discrete task tracking files.
 
 ---
 

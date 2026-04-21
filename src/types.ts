@@ -85,6 +85,7 @@ export interface SerialDevice {
   description: string; // Human-readable description of the device
   hwid: string; // Hardware ID string for port identification
   detectedBoard?: string; // Optional detected board identifier if PlatformIO recognized it
+  claim?: any; // Optional port claim state
 }
 
 /**
@@ -95,6 +96,7 @@ export const SerialDeviceSchema = z.object({
   description: z.string(),
   hwid: z.string(),
   detectedBoard: z.string().optional(),
+  claim: z.any().optional(),
 });
 
 /**

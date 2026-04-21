@@ -27,6 +27,11 @@ import fs from "node:fs";
 import { hardwareLockManager } from "../utils/lock-manager.js";
 import { isBuildActive } from "../utils/process-manager.js";
 import { tailFileBounded } from "../utils/tail.js";
+import { getCommandHistory } from "../utils/command-registry.js";
+import { getProjectConfig } from "../tools/projects.js";
+import { searchLibraries, listInstalledLibraries, installLibrary, uninstallLibrary } from "../tools/libraries.js";
+import { buildProject, cleanProject } from "../tools/build.js";
+import { uploadFirmware, uploadFilesystem } from "../tools/upload.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -136,6 +141,213 @@ export function startPortalServer(defaultPort = 8080) {
     try {
       const devices = await listDevices();
       res.json(devices);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/hardware", async (_req, res) => {
+    try {
+      const hardware = await listDevices();
+      res.json(hardware);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/commands", (req, res) => {
+    try {
+      const projectDir = req.query.projectDir as string | undefined;
+      const history = getCommandHistory(projectDir);
+      res.json(history);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/logs", async (req, res) => {
+    try {
+      const { commandId, artifactId, projectDir } = req.query;
+      if (!commandId || !artifactId) {
+        res.status(400).json({ error: "Missing commandId or artifactId parameter" });
+        return;
+      }
+      
+      const history = getCommandHistory(projectDir as string | undefined);
+      const command = history.find(c => c.id === commandId);
+      
+      if (!command) {
+        res.status(404).json({ error: "Command not found in registry" });
+        return;
+      }
+
+      const artifact = command.artifacts?.find(a => a.id === artifactId);
+      if (!artifact) {
+        res.status(404).json({ error: "Artifact not found in command" });
+        return;
+      }
+      if (!artifact.logFile) {
+        res.status(404).json({ error: "No logFile mapped for this artifact" });
+        return;
+      }
+      
+      if (!fs.existsSync(artifact.logFile)) {
+        res.status(404).json({ error: "Log file missing from disk" });
+        return;
+      }
+      
+      // Serve file completely
+      const fileStream = fs.createReadStream(artifact.logFile);
+      res.setHeader('Content-Type', 'text/plain');
+      fileStream.pipe(res);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/projects/config", async (req, res) => {
+    try {
+      const { projectDir } = req.query;
+      if (!projectDir) {
+        res.status(400).json({ error: "Missing projectDir parameter" });
+        return;
+      }
+      const config = await getProjectConfig(projectDir as string);
+      res.json(config);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/libraries/search", async (req, res) => {
+    try {
+      const { query } = req.query;
+      if (!query) {
+        res.json([]);
+        return;
+      }
+      const libs = await searchLibraries(query as string, 25);
+      res.json(libs);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/libraries/installed", async (req, res) => {
+    try {
+      const { projectDir } = req.query;
+      const libs = await listInstalledLibraries(projectDir as string | undefined);
+      res.json(libs);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/libraries/install", async (req, res) => {
+    let lockerSession;
+    try {
+      const { library, projectDir } = req.body;
+      
+      const lockStatus = hardwareLockManager.getLockStatus();
+      if (lockStatus.isLocked) {
+        if (!isBuildActive(projectDir)) {
+          hardwareLockManager.releaseLock(lockStatus.sessionId!);
+        } else {
+          throw new Error("Hardware queue is currently locked by an active agent operation. Please wait for the build to finish.");
+        }
+      }
+
+      lockerSession = hardwareLockManager.acquireLock("Installing Library: " + library);
+      if (!lockerSession.success) {
+        throw new Error("Failed to acquire hardware lock");
+      }
+      portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+
+      const result = await installLibrary(library, { projectDir });
+      
+      hardwareLockManager.releaseLock(lockerSession.sessionId);
+      portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+
+      res.json(result);
+    } catch (e: any) {
+      if (lockerSession && lockerSession.success) {
+        hardwareLockManager.releaseLock(lockerSession.sessionId);
+        portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+      }
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/libraries/uninstall", async (req, res) => {
+    let lockerSession;
+    try {
+      const { library, projectDir } = req.body;
+
+      const lockStatus = hardwareLockManager.getLockStatus();
+      if (lockStatus.isLocked) {
+        if (!isBuildActive(projectDir)) {
+          hardwareLockManager.releaseLock(lockStatus.sessionId!);
+        } else {
+          throw new Error("Hardware queue is currently locked by an active agent operation. Please wait for the build to finish.");
+        }
+      }
+
+      lockerSession = hardwareLockManager.acquireLock("Uninstalling Library: " + library);
+      if (!lockerSession.success) {
+        throw new Error("Failed to acquire hardware lock");
+      }
+      portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+
+      const result = await uninstallLibrary(library, projectDir);
+      
+      hardwareLockManager.releaseLock(lockerSession.sessionId);
+      portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+
+      res.json(result);
+    } catch (e: any) {
+      if (lockerSession && lockerSession.success) {
+        hardwareLockManager.releaseLock(lockerSession.sessionId);
+        portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+      }
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/commands/build", async (req, res) => {
+    try {
+      const { projectDir, environment } = req.body;
+      const result = await buildProject(projectDir, environment, false, true);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/commands/clean", async (req, res) => {
+    try {
+      const { projectDir } = req.body;
+      const result = await cleanProject(projectDir, true);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/commands/upload", async (req, res) => {
+    try {
+      const { projectDir, port, environment } = req.body;
+      const result = await uploadFirmware(projectDir, port, environment, false, true, true);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/commands/uploadfs", async (req, res) => {
+    try {
+      const { projectDir, port, environment } = req.body;
+      const result = await uploadFilesystem(projectDir, port, environment, false, true, true);
+      res.json(result);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -293,6 +505,8 @@ export function startPortalServer(defaultPort = 8080) {
   portalEvents.on("serial_log", (data) => io.emit("serial_log", data));
   portalEvents.on("server_status", (data) => io.emit("server_status", data));
   portalEvents.on("spooler_states", (data) => io.emit("spooler_states", data));
+  portalEvents.on("command_history_updated", (data) => io.emit("command_history_updated", data));
+  portalEvents.on("hardware_state_updated", (data) => io.emit("hardware_state_updated", data));
   portalEvents.on("workspace_state", (data) =>
     io.emit("workspace_state", data),
   );
@@ -350,6 +564,14 @@ export function startPortalServer(defaultPort = 8080) {
   });
 
   startListening();
+
+  // Background loop to poll hardware state
+  setInterval(async () => {
+    try {
+      const devices = await listDevices();
+      portalEvents.emitHardwareStateUpdated(devices);
+    } catch (e) {}
+  }, 5000);
 
   // Ensure port 8080 is relinquished cleanly if the parent IDE terminates the MCP server
   const cleanup = () => {
