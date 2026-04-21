@@ -85,7 +85,7 @@ export interface SerialDevice {
   description: string; // Human-readable description of the device
   hwid: string; // Hardware ID string for port identification
   detectedBoard?: string; // Optional detected board identifier if PlatformIO recognized it
-  claim?: any; // Optional port claim state
+  claim?: unknown; // Optional port claim state
 }
 
 /**
@@ -126,9 +126,9 @@ export const ProjectConfigSchema = z.object({
 });
 
 export interface ProjectInitResult {
-  success: boolean;
-  path: string;
-  message: string;
+  success: boolean; // Indicates if the initialization was successful
+  path: string; // Path to the initialized project
+  message: string; // Human-readable status message
 }
 
 // ============================================================================
@@ -146,18 +146,18 @@ export interface BuildResult {
   ramUsageBytes?: number; // Total RAM usage in bytes as reported by PIO
   flashUsageBytes?: number; // Total Flash usage in bytes as reported by PIO
   status?: string; // e.g. "running" if background=true
-  message?: string;
-  pid?: number;
+  message?: string; // Descriptive feedback message
+  pid?: number; // Process identifier for background streams
 }
 
 /**
  * Outcome of a project clean execution.
  */
 export interface CleanResult {
-  success?: boolean;
-  message?: string;
-  status?: string;
-  pid?: number;
+  success?: boolean; // Indicates if clean was successful
+  message?: string; // Descriptive feedback message
+  status?: string; // Status token string
+  pid?: number; // System process ID
 }
 
 // ============================================================================
@@ -187,9 +187,9 @@ export interface UploadResult {
   port?: string; // The serial port used for the upload
   output?: string; // Full stdout log from the upload process
   errors?: string[]; // List of extracted error messages from stderr if upload failed
-  status?: string;
-  message?: string;
-  pid?: number;
+  status?: string; // Overall state token like "running"
+  message?: string; // Descriptive feedback message
+  pid?: number; // System process ID
 }
 
 
@@ -201,17 +201,17 @@ export interface UploadResult {
  * Author metadata for a library in the PlatformIO registry.
  */
 export interface LibraryAuthor {
-  name: string;
-  email?: string;
-  maintainer?: boolean;
+  name: string; // Name of the author or maintainer
+  email?: string; // Contact email optionally provided
+  maintainer?: boolean; // Defines if the author acts as active maintainer
 }
 
 /**
  * Repository location metadata for a library.
  */
 export interface LibraryRepository {
-  type: string;
-  url: string;
+  type: string; // Version control type (e.g. 'git')
+  url: string; // External repository web URL
 }
 
 /**
@@ -225,8 +225,8 @@ export interface LibraryInfo {
   authors?: LibraryAuthor[]; // List of authors and maintainers
   repository?: LibraryRepository; // Source code repository location
   version?: string; // Latest available version string
-  frameworks?: any[]; // List of compatible frameworks
-  platforms?: any[]; // List of compatible platforms
+  frameworks?: unknown[]; // List of compatible frameworks
+  platforms?: unknown[]; // List of compatible platforms
   homepage?: string; // Offical project URL
 }
 
@@ -251,8 +251,8 @@ export const LibraryInfoSchema = z.object({
     })
     .optional(),
   version: z.string().optional(),
-  frameworks: z.array(z.any()).optional(),
-  platforms: z.array(z.any()).optional(),
+  frameworks: z.array(z.unknown()).optional(),
+  platforms: z.array(z.unknown()).optional(),
   homepage: z.string().optional(),
 });
 
@@ -276,8 +276,8 @@ export const LibrarySearchResponseSchema = z.object({
  * Configuration parameters for searching libraries.
  */
 export interface LibrarySearchConfig {
-  query: string;
-  limit?: number;
+  query: string; // Keyword filter
+  limit?: number; // Max list length
 }
 
 export const LibrarySearchConfigSchema = z.object({
@@ -289,9 +289,9 @@ export const LibrarySearchConfigSchema = z.object({
  * Configuration parameters for installing a library.
  */
 export interface LibraryInstallConfig {
-  library: string;
-  projectDir?: string;
-  version?: string;
+  library: string; // Target registry ID
+  projectDir?: string; // Optional workspace bounded path
+  version?: string; // Strict library string target
 }
 
 export const LibraryInstallConfigSchema = z.object({
@@ -304,9 +304,9 @@ export const LibraryInstallConfigSchema = z.object({
  * Outcome of a library installation.
  */
 export interface LibraryInstallResult {
-  success: boolean;
-  library: string;
-  message: string;
+  success: boolean; // Indicates if installation succeeded
+  library: string; // The registered library targeted
+  message: string; // Operational feedback message
 }
 
 // ============================================================================
@@ -317,14 +317,14 @@ export interface LibraryInstallResult {
  * Information about a PlatformIO platform.
  */
 export interface PlatformInfo {
-  name: string;
-  title: string;
-  version?: string;
-  description?: string;
-  homepage?: string;
-  repository?: string;
-  frameworks?: string[];
-  packages?: string[];
+  name: string; // Internal registry identifier
+  title: string; // Capitalized descriptive title
+  version?: string; // Current loaded version
+  description?: string; // Platform outline
+  homepage?: string; // External web link
+  repository?: string; // Source control locator
+  frameworks?: string[]; // Valid framework identifiers
+  packages?: string[]; // Downloaded dependency bundles
 }
 
 // ============================================================================

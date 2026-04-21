@@ -30,20 +30,20 @@ function getRegistryFilePath(projectDir?: string): string {
  */
 export interface ArtifactRecord {
   id: string; // Internal trace ID
-  type: "build" | "monitor" | "upload" | "test" | "debug";
-  status: "inactive" | "running" | "success" | "error" | "terminated";
-  logFile?: string;
-  port?: string;
-  pid?: number;
-  exitCode?: number;
+  type: "build" | "monitor" | "upload" | "test" | "debug"; // Classification of the executing process
+  status: "inactive" | "running" | "success" | "error" | "terminated"; // Real-time execution phase
+  logFile?: string; // Optional path for redirected logs
+  port?: string; // Target hardware interface mapping
+  pid?: number; // Monitored system daemon integer
+  exitCode?: number; // CLI resulting integer status code
 }
 
 export interface CommandRecord {
   id: string; // The root invocation ID
   commandDesc: string; // E.g., 'pio run -t upload'
-  timestamp: number;
+  timestamp: number; // Unix epoch of initiation
   status: "running" | "success" | "error" | "terminated"; // Overall process status
-  artifacts: ArtifactRecord[];
+  artifacts: ArtifactRecord[]; // Log outputs and child executions
 }
 
 /**
