@@ -368,15 +368,13 @@ The MCP server acts as an intelligent orchestration layer prioritizing semantic 
 | `uninstall_library`| `pio pkg uninstall` | **[NEW]** Removes target library. | `library` (req), `projectDir` (opt) | No |
 | `update_library` | `pio pkg update` | **[NEW]** Upgrades library versions. | `library` (req), `projectDir` (opt) | No |
 | `system_prune` | `pio system prune` | **[NEW]** Cleans global tools cache. | `force` (bool, opt) | No |
-| `update_core` | `pio update` | **[NEW]** Updates platformio-cli core. | None | **Yes** (Slow D/L) |
-| `install_platform` | `pio platform install`| **[NEW]** Enforces platform toolchain pull. | `platform` (req) | **Yes** (Slow D/L) |
-| `list_platforms` | `pio platform list` | **[NEW]** Lists local env toolchains. | None | No |
 
-### Deliberately Ignored PIO Commands
+### Deliberately Ignored / Deprecated PIO Commands
 
-To keep the MCP strict, safe, and scoped to the embedded feedback loop, several `pio` core namespaces were strategically excluded:
+To keep the MCP strict, safe, and scoped to the embedded feedback loop, several `pio` core namespaces were strategically excluded. Additionally, PIO v6 deprecates multiple legacy namespaces:
 
-1. **Cloud & Organization Tools (`pio access`, `pio account`, `pio org`, `pio team`)**: These tools govern PlatformIO registry authentication and cloud resource sharing. This is traditionally a human-centric setup action, entirely out of scope for a local development agent.
+1. **Deprecated Commands (PlatformIO v6)**: `pio lib`, `pio platform`, and `pio update` commands are officially deprecated in favor of the unified `pio pkg *` CLI interface. Using them is strongly discouraged.
+2. **Cloud & Organization Tools (`pio access`, `pio account`, `pio org`, `pio team`)**: These tools govern PlatformIO registry authentication and cloud resource sharing. This is traditionally a human-centric setup action, entirely out of scope for a local development agent.
 2. **CI Emulation (`pio ci`)**: While test suites are vital (hence `pio test`), `pio ci` simulates CI pipelines locally. Since the AI agent relies on direct source compilation (`pio run`), running simulated CI workflows is redundant overhead.
 3. **Interactive Debugger (`pio debug`)**: Initiating GDB/OpenOCD targets over the wire via MCP is structurally incompatible with the current asynchronous command registry. Bridging native debugger breakpoints via a JSON-RPC textual interface is too complex for this phase of the server.
 4. **Remote Orchestration (`pio remote`)**: Managing remote execution nodes is outside the domain of the local hardware orchestration we are solving for. 

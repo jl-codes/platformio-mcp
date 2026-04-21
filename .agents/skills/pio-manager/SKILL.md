@@ -53,3 +53,15 @@ If the user asks you to audit or review a `platformio.ini` file for ESP32 device
 - View the bundled knowledge reference located at `references/esp32-macos-tuning.md` (relative to this skill's root directory).
 
 This reference contains highly specific configurations (DTR/RTS overrides, Native USB CDC flags) and deterministic port resolution strategies required to stabilize the ESP32 macOS flashing pipeline.
+
+---
+
+## PIO v6 Advanced Diagnostics
+If you are debugging corrupted hardware memory, need to clear flash partitions, or are trying to invoke low-level toolchain binaries like `esptool.py` directly, IMMEDIATELY read the sandboxing pattern reference:
+- View `references/v6-pkg-exec-sandboxing.md` (relative to this skill's root directory).
+
+## Hardware-less Emulation & Testing
+If you need to run unit-tests or validate C++ logic but **no physical board is plugged in**, or the user asks to setup a simulator, IMMEDIATELY read the emulation pattern reference:
+- View `references/v6-hardware-less-emulation.md` (relative to this skill's root directory).
+
+
