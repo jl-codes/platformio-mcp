@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import LibraryExplorer from './library-explorer.js';
+import DependenciesViewer from './dependencies-viewer.js';
 import type { LockState } from '../App.js';
 
 interface WorkspaceConfigProps {
@@ -68,7 +68,7 @@ export default function WorkspaceConfig({
         </div>
       </div>
       
-      <LibraryExplorer 
+      <DependenciesViewer 
         apiBase={apiBase}
         token={token}
         activeWorkspace={activeWorkspace}
