@@ -154,4 +154,42 @@ describe("Portal API Security & Telemetry Tailing", () => {
       expect(payload.secureLink).toContain(`?token=${authToken}`);
     });
   });
+
+  describe("V2 Wrapper Endpoints & Queue Enforcement", () => {
+    const mockProjectDir = path.join(os.tmpdir(), "pio-mcp-test-wrapper");
+
+    beforeAll(() => {
+      if (!fs.existsSync(mockProjectDir)) {
+        fs.mkdirSync(mockProjectDir, { recursive: true });
+      }
+    });
+
+    afterAll(() => {
+      if (fs.existsSync(mockProjectDir)) {
+        fs.rmSync(mockProjectDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should execute check_project and ensure hardware lock is false exactly upon resolution", async () => {
+      const { checkProject } = await import("../src/tools/build.js");
+      const { hardwareLockManager } = await import("../src/utils/lock-manager.js");
+      
+      const promise = checkProject(mockProjectDir, "default", false);
+      const result = await promise;
+      
+      expect(result.success).toBeDefined();
+      expect(hardwareLockManager.getLockStatus().isLocked).toBe(false);
+    });
+
+    it("should execute run_tests and ensure hardware lock is false exactly upon resolution", async () => {
+      const { runTests } = await import("../src/tools/build.js");
+      const { hardwareLockManager } = await import("../src/utils/lock-manager.js");
+      
+      const promise = runTests(mockProjectDir, "default", false);
+      const result = await promise;
+      
+      expect(result.success).toBeDefined();
+      expect(hardwareLockManager.getLockStatus().isLocked).toBe(false);
+    });
+  });
 });

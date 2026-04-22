@@ -288,4 +288,75 @@ describe("PlatformIO MCP Server E2E Integration", () => {
     expect(parsed.message).toContain("state has been reset");
   });
 
+  it("should successfully route check_project tool", async () => {
+    const result = await harness.client.callTool({
+      name: "check_project",
+      arguments: { projectDir: tempProjectDir },
+    }) as { content: Array<{ type: string, text: string }> };
+
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.success).toBeDefined();
+  }, 30000);
+
+  it("should successfully route run_tests tool", async () => {
+    const result = await harness.client.callTool({
+      name: "run_tests",
+      arguments: { projectDir: tempProjectDir },
+    }) as { content: Array<{ type: string, text: string }> };
+
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.success).toBeDefined();
+  }, 30000);
+
+  it("should successfully route system_info tool", async () => {
+    const result = await harness.client.callTool({
+      name: "system_info",
+      arguments: {},
+    }) as { content: Array<{ type: string, text: string }> };
+
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed).toBeDefined();
+  }, 10000);
+
+  it("should trigger build followed instantly by test without QueueEnforcementError", async () => {
+    const p1 = harness.client.callTool({
+      name: "build_project",
+      arguments: { projectDir: tempProjectDir },
+    });
+    const p2 = harness.client.callTool({
+      name: "run_tests",
+      arguments: { projectDir: tempProjectDir },
+    });
+
+    const [res1, res2] = await Promise.all([p1, p2]) as any[];
+    
+    // Neither should have thrown an unhandled exception or queue enforcement error string.
+    if (res1.isError) {
+      expect(res1.content[0].text).not.toContain("QueueEnforcementError");
+    }
+    if (res2.isError) {
+      expect(res2.content[0].text).not.toContain("QueueEnforcementError");
+    }
+  }, 60000);
+
+  it.fails("should reject start_monitor with queue error when upload_firmware is running (BUG TO FIX)", async () => {
+    const p1 = harness.client.callTool({
+      name: "upload_firmware",
+      arguments: { projectDir: tempProjectDir, port: "/dev/ttyNONEXISTENT" },
+    });
+    // Slight delay to ensure upload claims the lock
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    const p2 = harness.client.callTool({
+      name: "start_monitor",
+      arguments: { port: "/dev/ttyNONEXISTENT", projectDir: tempProjectDir },
+    });
+
+    const [res1, res2] = await Promise.all([p1, p2]) as any[];
+    
+    // Expect start_monitor to be rejected by the lock manager
+    expect(res2.isError).toBe(true);
+    expect(res2.content[0].text).toMatch(/queue is currently locked|QueueEnforcementError/i);
+  }, 60000);
+
 });
