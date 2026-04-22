@@ -67,6 +67,12 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
       } else if (action === 'monitor') {
          endpoint = '/api/spooler/start';
          if (port) payload.port = port;
+      } else if (action === 'check') {
+         endpoint = '/api/check';
+         if (env) payload.environment = env;
+      } else if (action === 'test') {
+         endpoint = '/api/test';
+         if (env) payload.environment = env;
       }
 
       await fetch(`${apiBase}${endpoint}`, {
@@ -89,6 +95,8 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
     if (action === 'build') return 'var(--secondary)'; // cyan/neon green
     if (action === 'upload' || action === 'uploadfs') return '#ff0055'; // magenta/red
     if (action === 'monitor') return '#00e5ff'; // bright cyan
+    if (action === 'check') return '#ff9900'; // orange
+    if (action === 'test') return '#b000ff'; // purple
     if (action === 'clean') return 'var(--outline)';
     return 'var(--primary)';
   }
@@ -126,6 +134,8 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
               onChange={e => setAction(e.target.value)}
             >
               <option value="build">BUILD PROJECT</option>
+              <option value="check">CHECK PROJECT (LINTING)</option>
+              <option value="test">RUN UNIT TESTS</option>
               <option value="upload">UPLOAD FIRMWARE</option>
               <option value="uploadfs">UPLOAD FILESYSTEM</option>
               <option value="monitor">START SERIAL MONITOR</option>

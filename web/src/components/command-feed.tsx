@@ -4,7 +4,7 @@ import { TabRef } from '../App.js';
 
 export interface ArtifactRecord {
   id: string; // Internal trace ID
-  type: "build" | "monitor" | "upload";
+  type: "build" | "monitor" | "upload" | "check" | "test";
   status: "inactive" | "running" | "success" | "error" | "terminated";
   logFile?: string;
   port?: string;
@@ -64,6 +64,9 @@ export default function CommandFeed({ commands, onOpenTab, activeTabRef }: Comma
                     <div style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {cmd.artifacts?.map(art => {
                         const isActive = activeTabRef?.artifactId === art.id;
+                        let typeColor = 'var(--secondary)';
+                        if (art.type === 'test') typeColor = '#b000ff';
+                        if (art.type === 'check') typeColor = '#ff9900';
                         return (
                           <div 
                             key={art.id}
@@ -73,7 +76,9 @@ export default function CommandFeed({ commands, onOpenTab, activeTabRef }: Comma
                           >
                             <div className={`command-dot ${art.status}`}></div>
                             <div className="command-info">
-                              <span className="command-name" style={{ color: 'var(--secondary)', fontSize: '11px' }}>
+                              <span className="command-name" style={{ color: typeColor, fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {art.type === 'test' && <span className="material-symbols-outlined" style={{fontSize: '12px'}}>science</span>}
+                                {art.type === 'check' && <span className="material-symbols-outlined" style={{fontSize: '12px'}}>fact_check</span>}
                                 [ {art.type === 'monitor' ? `Serial: ${art.port?.split('/').pop()}` : art.type.toUpperCase()} ]
                               </span>
                             </div>
@@ -103,6 +108,10 @@ export default function CommandFeed({ commands, onOpenTab, activeTabRef }: Comma
                     <div style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                        {cmd.artifacts?.map(art => {
                         const isActive = activeTabRef?.artifactId === art.id;
+                        let defaultColor = isActive ? 'var(--primary)' : 'var(--outline)';
+                        let typeColor = defaultColor;
+                        if (art.type === 'test') typeColor = isActive ? '#d580ff' : '#9000d1';
+                        if (art.type === 'check') typeColor = isActive ? '#ffbf66' : '#cc7a00';
                         return (
                           <div 
                             key={art.id}
@@ -119,7 +128,9 @@ export default function CommandFeed({ commands, onOpenTab, activeTabRef }: Comma
                           >
                             <div className={`command-dot ${art.status}`}></div>
                             <div className="command-info">
-                              <span className="command-name" style={{ color: isActive ? 'var(--primary)' : 'var(--outline)', fontSize: '11px' }}>
+                              <span className="command-name" style={{ color: typeColor, fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {art.type === 'test' && <span className="material-symbols-outlined" style={{fontSize: '12px'}}>science</span>}
+                                {art.type === 'check' && <span className="material-symbols-outlined" style={{fontSize: '12px'}}>fact_check</span>}
                                 [ {art.type === 'monitor' ? `Serial: ${art.port?.split('/').pop()}` : art.type.toUpperCase()} ]
                               </span>
                             </div>
