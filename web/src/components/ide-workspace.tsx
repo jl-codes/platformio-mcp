@@ -11,7 +11,7 @@ interface IDEWorkspaceProps {
   setActiveTabRef: (tab: TabRef | null) => void;
   
   commands: any[];
-  buildLogs: LogEvent[];
+  buildLogs: Record<string, LogEvent[]>;
   buildLogFile: string | undefined;
   serialLogs: Record<string, LogEvent[]>;
   spoolerStates: Record<string, SpoolerState>;
@@ -132,10 +132,11 @@ export default function IDEWorkspace({
                  <SerialLogRaw 
                     port={activeArtInfo.port!} 
                     serialLogs={serialLogs} 
+                    artifactId={activeTabRef.artifactId}
                  />
                ) : (
                  <BuildTerminalRaw 
-                    buildLogs={buildLogs} 
+                    buildLogs={buildLogs[activeTabRef.artifactId] || []} 
                  />
                )
             )}
@@ -147,8 +148,8 @@ export default function IDEWorkspace({
 }
 
 // Inline pure renderers for the live buffers to avoid refactoring the entire old components heavily right now.
-function SerialLogRaw({ port, serialLogs }: { port: string, serialLogs: Record<string, LogEvent[]> }) {
-  const logs = serialLogs[port] || [];
+function SerialLogRaw({ port, serialLogs, artifactId }: { port: string, serialLogs: Record<string, LogEvent[]>, artifactId: string }) {
+  const logs = serialLogs[artifactId] || [];
   return (
     <>
       <div style={{ opacity: 0.5, marginBottom: '16px' }}>[ CONNECTED LIVE STREAM: {port} ]</div>

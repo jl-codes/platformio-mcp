@@ -23,6 +23,7 @@ export type LogEvent = {
   port?: string;
   logLine?: string;
   data?: string;
+  artifactId?: string;
 };
 
 export type SpoolerState = {
@@ -47,7 +48,7 @@ export type TabRef = {
 function App() {
   const [status, setStatus] = useState<'online' | 'offline'>('offline');
   const [commands, setCommands] = useState<any[]>([]);
-  const [buildLogs, setBuildLogs] = useState<LogEvent[]>([]);
+  const [buildLogs, setBuildLogs] = useState<Record<string, LogEvent[]>>({});
   const [buildLogFile, setBuildLogFile] = useState<string | null>(null);
   const [serialLogs, setSerialLogs] = useState<Record<string, LogEvent[]>>({});
   const [spoolerStates, setSpoolerStates] = useState<Record<string, SpoolerState>>({});
@@ -139,14 +140,27 @@ function App() {
     });
 
     socket.on('build_log', (data: LogEvent) => {
+      if (!data.artifactId) return;
       setBuildLogs(prev => {
-        const next = [...prev, data];
-        return next.slice(-500);
+        const id = data.artifactId!;
+        const next = [...(prev[id] || []), data];
+        return {
+          ...prev,
+          [id]: next.slice(-500)
+        };
       });
     });
 
-    socket.on('build_clear', (data: { logFile?: string }) => {
-      setBuildLogs([]);
+    socket.on('build_clear', (data: { logFile?: string, artifactId?: string }) => {
+      if (data.artifactId) {
+        setBuildLogs(prev => {
+          const next = { ...prev };
+          delete next[data.artifactId!];
+          return next;
+        });
+      } else {
+        setBuildLogs({});
+      }
       setBuildLogFile(data.logFile || null);
     });
 
@@ -155,23 +169,28 @@ function App() {
     });
 
     socket.on('serial_log', (data: LogEvent) => {
-      if (!data.port) return;
+      if (!data.artifactId) return;
       setSerialLogs(prev => {
-        const portLogs = prev[data.port!] || [];
+        const id = data.artifactId!;
+        const portLogs = prev[id] || [];
         const next = [...portLogs, data];
         return {
           ...prev,
-          [data.port!]: next.slice(-1000)
+          [id]: next.slice(-1000)
         };
       });
     });
 
-    socket.on('serial_clear', (data: { port: string }) => {
-      setSerialLogs(prev => {
-        const next = { ...prev };
-        delete next[data.port];
-        return next;
-      });
+    socket.on('serial_clear', (data: { port: string, artifactId?: string }) => {
+      if (data.artifactId) {
+        setSerialLogs(prev => {
+          const next = { ...prev };
+          delete next[data.artifactId!];
+          return next;
+        });
+      } else {
+        // Fallback or ignore if no artifactId
+      }
     });
 
     socket.on('spooler_states', (data: Record<string, SpoolerState>) => {
