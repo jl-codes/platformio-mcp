@@ -1,8 +1,18 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
+import { mockFetch } from './mocks/apiHandlers';
 
-// Blank global fetch mock
-global.fetch = vi.fn();
+// Mock socket.io-client
+vi.mock('socket.io-client', async () => {
+  const { io } = await import('./mocks/socketMock');
+  return {
+    default: io,
+    io: io
+  };
+});
+
+// Mock global fetch
+global.fetch = mockFetch as unknown as typeof fetch;
 
 // Blank window.matchMedia mock
 Object.defineProperty(window, 'matchMedia', {
