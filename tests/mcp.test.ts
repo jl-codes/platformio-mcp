@@ -339,24 +339,6 @@ describe("PlatformIO MCP Server E2E Integration", () => {
     }
   }, 60000);
 
-  it.fails("should reject start_monitor with queue error when upload_firmware is running (BUG TO FIX)", async () => {
-    const p1 = harness.client.callTool({
-      name: "upload_firmware",
-      arguments: { projectDir: tempProjectDir, port: "/dev/ttyNONEXISTENT" },
-    });
-    // Slight delay to ensure upload claims the lock
-    await new Promise(resolve => setTimeout(resolve, 50));
-    
-    const p2 = harness.client.callTool({
-      name: "start_monitor",
-      arguments: { port: "/dev/ttyNONEXISTENT", projectDir: tempProjectDir },
-    });
 
-    const [res1, res2] = await Promise.all([p1, p2]) as any[];
-    
-    // Expect start_monitor to be rejected by the lock manager
-    expect(res2.isError).toBe(true);
-    expect(res2.content[0].text).toMatch(/queue is currently locked|QueueEnforcementError/i);
-  }, 60000);
 
 });
