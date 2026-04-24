@@ -4,6 +4,16 @@
 
 ---
 
+## Table of Contents
+
+1. [Design System & Atmosphere](#1-design-system--atmosphere)
+2. [Layout Architecture (Workspace Cockpit)](#2-layout-architecture-workspace-cockpit)
+3. [Focal Interactive State: "Add Monitor" Launcher](#3-focal-interactive-state-add-monitor-launcher)
+4. [Stitch UX Design Process](#4-stitch-ux-design-process)
+5. [Historical Architectural Decision Records](#5-historical-architectural-decision-records)
+
+---
+
 ## 1. Design System & Atmosphere
 
 **Vibe & Mood**
@@ -25,33 +35,39 @@
 
 ---
 
-## 2. Layout Architecture
+## 2. Layout Architecture (Workspace Cockpit)
 
-The dashboard acts as a "flight recorder" and control console, segmented into four primary zones:
+The dashboard acts as a "flight recorder" and control console, restructured around the React + Vite + Socket.io V2 Architecture. It is segmented into four primary zones:
 
 ### A. The Header (Global Status)
 *   **Left:** App Title / Branding ("⚡️ PIO MCP Server").
-*   **Right:** Global Hardware Queue Status indicator (e.g., `[🔒 Hardware: Free ]` or `[🔒 Hardware: Locked by Agent ]`).
+*   **Right:** Global Hardware Queue Status indicator, communicating real-time Hardware Rack locking view (e.g., `[🔒 Hardware: Free ]` or `[🔒 Hardware: Locked by Agent ]`).
 
-### B. Left Sidebar ("Daemon Manager")
-*   **Purpose:** Exposes headless background tracking locks so the developer retains complete control.
+### B. Left Sidebar ("Command Action Feed" / CommandRegistry)
+*   **Purpose:** A chronological Command Action Feed driven by the `CommandRegistry`. It natively maps websocket logs to proper UUID `artifactId` streams.
 *   **Components:**
-    *   **Daemons List:** A vertical list of active OS processes (Builds, Monitors).
-    *   **Process Items:** Each row displays the process type (icon), PID (monospace), and a prominent "Stop / 🗡️ Kill" button emitting the red destructive color on hover.
-    *   **Bottom Anchor:** A dramatic, full-width "Reset Server State" emergency button (solid destructive background or heavy glowing border).
+    *   **Action Feed:** A unified vertical list of dispatched async build and monitor events instead of just OS processes.
+    *   **Process Items:** Each row displays the task execution state, PID (monospace), and a prominent "Stop / 🗡️ Kill" button emitting the red destructive color on hover.
+    *   **Bottom Anchor:** A dramatic, full-width "Reset Server State" emergency button.
 
-### C. Top Main Area ("Workspace Toolbar")
-*   **Purpose:** A horizontal command palette mapping to core MCP execution verbs.
+### C. Top Main Area ("Command Launcher" Toolbar)
+*   **Purpose:** A Kinetic Monolith-themed horizontal command palette mapping to core MCP execution verbs (`build`, `upload_firmware`, `check_project`, `run_tests`).
 *   **Components:**
     *   Current project path indicator.
-    *   Action Button Group:  `[🛠️ Build]`, `[🚀 Flash Firmware]`, `[📁 Flash FS]`, `[🧹 Clean]`.
+    *   Action Button Group:  `[🛠️ Build]`, `[🚀 Flash Firmware]`, `[📁 Flash FS]`, `[✔️ Check]`, `[🧪 Test]`.
     *   **Styling:** Medium elevation, standard primary buttons.
 
-### D. Bottom Main Area ("Console & Terminal")
-*   **Purpose:** A tabbed interface displaying active system logs and allowing the creation of new hardware monitor sessions.
+### D. Right Sidebar ("Dependencies Viewer")
+*   **Purpose:** A strict read-only parser of the project environment displaying `platformio.ini` configurations.
+*   **Components:**
+    *   Interactive library tools.
+    *   `pio home` deep link to delegate complex system exploration (Hybrid UI PIO Home delegation).
+
+### E. Bottom Main Area ("Console & Terminal")
+*   **Purpose:** A tabbed interface displaying active system logs hydrated dynamically via the Universal Spooler topology.
 *   **Components:**
     *   **Tab Bar:** `[ Build Logs ]`, `[ 🔌 usbmodem14101 ]`, `[ ➕ Add Monitor ]`.
-    *   **Active Tab Content:** Scrolls a live monospace text feed of the build or serial logs.
+    *   **Active Tab Content:** Scrolls a live monospace text feed of the build or serial logs, uniquely identified via UUID tracing.
 
 ---
 
@@ -65,14 +81,18 @@ When the user clicks the **`[ ➕ Add Monitor ]`** tab, the standard terminal te
     *   **Iconography:** A USB or plug icon.
     *   **Port Name:** The physical path (e.g., `/dev/cu.usbmodem14101`).
     *   **Configuration:** A sleek, inline dropdown menu for selecting the Baud Rate (default `115200`).
-    *   **Action:** A vibrant, glowing `[ ▶ Start Monitoring ]` button at the bottom of the card.
+    *   **Action:** A vibrant, glowing `[ ▶ Start Monitoring ]` button at the bottom of the card, acting as an ergonomic inline global play/stop wrapper on the Hardware Rack for instant monitor toggles.
 *   **Interaction:** Clicking "Start" initiates the background daemon connection, organically dismisses the launcher grid, and transitions the view directly into the live log stream for that newly created tab.
 
 ---
 
-## 4. Stitch Prompt Generator (Copy/Paste Ready)
+## 4. Stitch UX Design Process
 
-*To pass this specification to the Stitch MCP server or the Google Labs interface, use the following enhanced prompt:*
+The current UI React component topology was entirely orchestrated through the `@stitch-design` skill in tandem with `@react:components`. 
+*   **Design Prompts:** Use the prompt generator (like the one below) to bootstrap updates via the Stitch MCP.
+*   **Architecture Mapping:** Hand-off Stitch layout JSON payloads directly to `react:components` to translate into functional React artifacts bound to `socket.io` contexts.
+
+### Stitch Prompt Generator (Copy/Paste Ready)
 
 ```markdown
 Design a premium, dark-mode Web Dashboard for an AI-augmented Developer IDE that manages low-level hardware builds and serial ports.
@@ -85,8 +105,17 @@ Design a premium, dark-mode Web Dashboard for an AI-augmented Developer IDE that
 
 **PAGE STRUCTURE:**
 1. **Header:** "PIO MCP" brand logo on the left, and a "Hardware Queue: Free" status badge on the right.
-2. **Left Sidebar:** Title it "Daemon Manager." List 2 active background OS processes showing a monospace PID and a red "Kill" button. Put a large "Reset Server State" red button at the absolute bottom.
-3. **Workspace Toolbar (Top Main):** A sleek horizontal bar showing a directory path and 4 action buttons: [Build], [Flash Firmware], [Flash FS], [Clean].
-4. **Console Area (Bottom Main):** A tabbed interface. Show tabs for "Build Logs" and "➕ Add Monitor". The "Add Monitor" tab is currently active.
-5. **Main Content (Focus):** Because the "Add Monitor" tab is active, instead of showing text logs, the main body displays a "Device Selection Launcher". Show a 3-column grid of beautiful Cards representing detected USB ports. Each card has a USB icon, the port path (`/dev/cu.usb123`), a dropdown for Baud Rate (115200), and a neon green "Start Monitoring" button.
+2. **Left Sidebar:** Title it "Command Action Feed". List active background tasks from the CommandRegistry showing a monospace PID, task state, and a red "Kill" button. Put a large "Reset Server State" red button at the absolute bottom.
+3. **Workspace Toolbar (Top Main):** A sleek horizontal bar showing a directory path and 5 action buttons: [Build], [Flash Firmware], [Flash FS], [Check], [Test].
+4. **Right Sidebar:** Title it "Dependencies Viewer". Read-only list of installed dependencies and a link to open "PIO Home".
+5. **Console Area (Bottom Main):** A tabbed interface. Show tabs for "Build Logs" and "➕ Add Monitor". The "Add Monitor" tab is currently active.
+6. **Main Content (Focus):** Because the "Add Monitor" tab is active, instead of showing text logs, the main body displays a "Device Selection Launcher". Show a 3-column grid of beautiful Cards representing detected USB ports. Each card has a USB icon, the port path (`/dev/cu.usb123`), a dropdown for Baud Rate (115200), and a neon green "Start Monitoring" button.
 ```
+
+---
+
+## 5. Historical Architectural Decision Records
+
+The following documents track early architectural evaluations and are preserved here as Historical Architectural Decision Records (ADRs):
+
+- [Design Evaluation Archive](archive/design_evaluation.md)

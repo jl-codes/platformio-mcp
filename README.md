@@ -137,9 +137,9 @@ await installLibrary("ArduinoJson", {
 - [macOS Port Conflicts Reference Document](docs/reference/ESP32PortConflictsOnMacOS.md)
 - [Setting Up ESP32 Devices for Native USB Stability](docs/SettingUpESP32Devices.md)
 
-### Specifications & Commands (Pending WO2/WO3)
-- [PIO MCP Design Specification (Placeholder)](#)
-- [Web UX Design Specification (Placeholder)](#)
+### Specifications & Commands
+- [PIO MCP Design Specification](docs/PIOMCPDesignSpecification.md)
+- [Web UX Design Specification](docs/WebUXDesignSpecification.md)
 - [MCP Server Command Reference (Placeholder)](#)
 
 ## Contributing & Support
