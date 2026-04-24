@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Cline-PlatformIO-MCP-Server-Logo.png" alt="PlatformIO MCP Server Logo" width="200"/>
+  <img src="docs/assets/Cline-PlatformIO-MCP-Server-Logo.png" alt="PlatformIO MCP Server Logo" width="200"/>
 </p>
 
 # PlatformIO MCP Server
@@ -87,7 +87,7 @@ Add the server to your agent's MCP configuration:
 }
 ```
 
-> **Note**: For instructions specific to configuring Antigravity, Claude, or Cline, please see our [LLM Installation Guide](docs/llms-install.md).
+> **Note**: For instructions specific to configuring Antigravity, Claude, or Cline, please see our [LLM Installation Guide](docs/LLMInstallationGuide.md).
 
 ## AI Agent Usage Examples
 
@@ -128,19 +128,19 @@ await installLibrary("ArduinoJson", {
 ## Documentation Index
 
 ### Getting Started
-- [LLM Installation Guide](docs/llms-install.md)
+- [LLM Installation Guide](docs/LLMInstallationGuide.md)
 
 ### Guides & References
-- [Agent Customization Guide](docs/reference/agent-customization.md)
-- [Development Guide](docs/reference/development-guide.md)
-- [Troubleshooting & Remediation](docs/reference/troubleshooting.md)
+- [Agent Customization Guide](docs/reference/AgentCustomizationGuide.md)
+- [Development Guide](docs/reference/DevelopmentGuide.md)
+- [Troubleshooting & Remediation](docs/reference/TroubleshootingGuide.md)
 - [macOS Port Conflicts Reference Document](docs/reference/ESP32PortConflictsOnMacOS.md)
 - [Setting Up ESP32 Devices for Native USB Stability](docs/SettingUpESP32Devices.md)
 
 ### Specifications & Commands
 - [PIO MCP Design Specification](docs/PIOMCPDesignSpecification.md)
 - [Web UX Design Specification](docs/WebUXDesignSpecification.md)
-- [MCP Server Command Reference (Placeholder)](#)
+- [MCP Server Command Reference](docs/MCPServerCommandReference.md)
 
 ## Contributing & Support
 

@@ -118,4 +118,4 @@ Design a premium, dark-mode Web Dashboard for an AI-augmented Developer IDE that
 
 The following documents track early architectural evaluations and are preserved here as Historical Architectural Decision Records (ADRs):
 
-- [Design Evaluation Archive](archive/design_evaluation.md)
+- [Design Evaluation Archive](archive/DesignEvaluation.md)

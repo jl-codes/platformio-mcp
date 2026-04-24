@@ -208,7 +208,7 @@ Create a modular TypeScript project structure with clear separation of concerns,
 18. **`src/utils/command-registry.ts`** - Manages the CommandFeed via dynamic UUID logic.
 19. **`src/utils/spooler.ts`** - Handles universal artifact spooling to file streams.
 20. **`README.md`** - Comprehensive documentation, usage examples, board-agnostic guide.
-21. **`llms-install.md`** - AI-friendly installation guide for Antigravity, Cline, and other Agents.
+21. **`LLMInstallationGuide.md`** - AI-friendly installation guide for Antigravity, Cline, and other Agents.
 
 ---
 
