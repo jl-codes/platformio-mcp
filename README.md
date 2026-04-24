@@ -4,7 +4,46 @@
 
 # PlatformIO MCP Server
 
-A board-agnostic [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for [PlatformIO](https://platformio.org) embedded development. This server enables AI agents like [Antigravity](https://antigravity.google/), [Cline](https://github.com/cline/cline), and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to interact with PlatformIO's comprehensive ecosystem of **1,000+ development boards** across **30+ platforms**.
+## Introduction
+The PlatformIO MCP Server acts as a board-agnostic [Model Context Protocol](https://modelcontextprotocol.io) bridge, seamlessly connecting AI agents (like [Antigravity](https://antigravity.google/), [Cline](https://github.com/cline/cline), and [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) to [PlatformIO's](https://platformio.org) comprehensive ecosystem. 
+
+This server solves several critical challenges in embedded AI development:
+1. **Bridging the Hardware Gap:** Enables autonomous AI agents to discover, compile, and flash code to over 1,000+ embedded boards across 30+ platforms.
+2. **Preventing Context Pollution:** Keeps massive compilation logs and noisy serial traces out of the LLM context window.
+3. **Improving Token Efficiency:** Offloads synchronous execution and polling to the server, preserving token budgets.
+4. **Providing Human Visibility:** Exposes an opt-in web dashboard, giving human developers a managed build history and transparent view into what the agent is actively compiling or monitoring.
+5. **Agentic Empowerment:** Includes pre-packaged `.agents/skills` (such as `@pio-manager` and `@embedded-systems`) to provide the LLM with deep domain expertise in handling port conflicts, device semaphores, and RTOS fundamentals.
+
+## Core Capabilities
+
+### Features
+- Universal board support: works with any PlatformIO-supported board (ESP32, Arduino, STM32, nRF52, RP2040, etc.)
+- Complete development workflow: init, build, upload, and monitor
+- Library management: search, install, and list from the PlatformIO registry
+- Device discovery: detect connected boards automatically
+- Board-agnostic: no hardcoded configs, supports all PlatformIO platforms out of the box
+- **Workspace Spooling**: `stdout` streams and PIDs are stored cleanly in the `.pio-mcp-workspace/` directory inside the active project folder for easy offline debugging instead of bloating in-memory constraints.
+- **Async Polling**: LLM context limits and network timeouts are inherently negated. Dispatch long-running compilations using `background: true` and monitor them safely with `check_task_status`.
+- **Opt-in Web Dashboard**: Launch a secure telemetry UI by passing `--ui` or setting `PIO_MCP_UI=true`. The Web Dashboard enforces strict process isolation through a `PORTAL_AUTH_TOKEN` generated at boot. This cryptographic token ensures that only the authorized LLM session can access the telemetry server, preventing cross-process API leakage or unauthorized local accesses.
+
+### Supported Platforms
+PlatformIO supports 30+ embedded platforms including:
+
+| Vendor | Platforms |
+|---|---|
+| Espressif | ESP32, ESP8266 |
+| Arduino | Uno, Mega, Nano, Due |
+| STMicroelectronics | STM32, STM8 |
+| Nordic | nRF51, nRF52 |
+| Raspberry Pi | RP2040 (Pico) |
+| Teensy | All Teensy boards |
+| Atmel | AVR, SAM, megaAVR |
+| NXP | i.MX RT, LPC |
+| Microchip | PIC32 |
+| TI | MSP430, TIVA |
+| RISC-V | SiFive, GAP |
+
+See the full list at [PlatformIO Boards](https://docs.platformio.org/en/latest/boards/).
 
 ## Quickstart
 
@@ -48,10 +87,57 @@ Add the server to your agent's MCP configuration:
 }
 ```
 
+> **Note**: For instructions specific to configuring Antigravity, Claude, or Cline, please see our [LLM Installation Guide](docs/llms-install.md).
+
+## AI Agent Usage Examples
+
+### Create and upload an ESP32 project
+
+```typescript
+// List ESP32 boards
+await listBoards("esp32");
+
+// Initialize project
+await initProject({
+  board: "esp32dev",
+  framework: "arduino",
+  projectDir: "/path/to/esp32-blink"
+});
+
+// Build
+await buildProject("/path/to/esp32-blink");
+
+// Upload firmware
+await uploadFirmware("/path/to/esp32-blink");
+
+// Monitor
+await startMonitor();
+```
+
+### Search and install libraries
+
+```typescript
+const libraries = await searchLibraries("ArduinoJson", 10);
+
+await installLibrary("ArduinoJson", {
+  projectDir: "/path/to/my-project",
+  version: "^6.21.0"
+});
+```
+
 ## Documentation Index
 
+### Getting Started
 - [LLM Installation Guide](docs/llms-install.md)
+
+### Guides & References
+- [Agent Customization Guide](docs/reference/agent-customization.md)
+- [Development Guide](docs/reference/development-guide.md)
+- [Troubleshooting & Remediation](docs/reference/troubleshooting.md)
+- [macOS Port Conflicts Reference Document](docs/reference/ESP32PortConflictsOnMacOS.md)
 - [Setting Up ESP32 Devices for Native USB Stability](docs/SettingUpESP32Devices.md)
+
+### Specifications & Commands (Pending WO2/WO3)
 - [PIO MCP Design Specification (Placeholder)](#)
 - [Web UX Design Specification (Placeholder)](#)
 - [MCP Server Command Reference (Placeholder)](#)

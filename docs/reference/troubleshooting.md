@@ -1,3 +1,7 @@
+# Troubleshooting & Remediation
+
+[← Back to README](../../README.md)
+
 ## Troubleshooting
 
 ### PlatformIO not found
