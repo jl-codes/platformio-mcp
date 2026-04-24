@@ -1,0 +1,22 @@
+## Troubleshooting
+
+### PlatformIO not found
+1. Install: `pip install platformio`
+2. Verify: `pio --version`
+3. Ensure `pio` or `platformio` is in your PATH
+
+### Board not found
+Board IDs are case-sensitive. List available boards with `pio boards` or search at [PlatformIO Boards](https://docs.platformio.org/en/latest/boards/).
+
+### Upload failures
+- Check that the device is connected and powered
+- Try a different USB cable
+- Verify the port with `list_devices`
+- Reset the device
+- Close other programs using the serial port
+
+### Build errors
+- Check source code for syntax errors
+- Ensure required libraries are installed
+- Verify `platformio.ini` configuration
+- Clean and rebuild: `pio run -t clean`
