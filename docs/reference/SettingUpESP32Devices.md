@@ -2,7 +2,7 @@
 
 When configuring ESP32 and ESP32-S3 devices running on macOS inside PlatformIO, developers often encounter kernel-level port exceptions such as `[Errno 6] Device not configured` or `[Errno 2] No such file or directory`. 
 
-This guide consolidates the best practices and configurations required to safely flash, boot, and monitor modern ESP32 variants over Native USB. For a deeper, architectural dive on why macOS drops the USB bus upon DTR assertion, see the [macOS Port Conflicts Reference Document](reference/ESP32PortConflictsOnMacOS.md).
+This guide consolidates the best practices and configurations required to safely flash, boot, and monitor modern ESP32 variants over Native USB. For a deeper, architectural dive on why macOS drops the USB bus upon DTR assertion, see the [macOS Port Conflicts Reference Document](ESP32PortConflictsOnMacOS.md).
 
 ## Recommended `platformio.ini` Configuration
 

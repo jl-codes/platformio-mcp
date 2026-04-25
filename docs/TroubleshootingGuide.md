@@ -1,6 +1,6 @@
 # Troubleshooting & Remediation
 
-[← Back to README](../../README.md)
+[← Back to README](../README.md)
 
 ## Troubleshooting
 
@@ -24,3 +24,9 @@ Board IDs are case-sensitive. List available boards with `pio boards` or search 
 - Ensure required libraries are installed
 - Verify `platformio.ini` configuration
 - Clean and rebuild: `pio run -t clean`
+
+## Deep Dive Reference Guides
+
+For specific, complex hardware and OS-level issues, refer to our detailed troubleshooting documents:
+- [macOS Port Conflicts Reference Document](reference/ESP32PortConflictsOnMacOS.md)
+- [Setting Up ESP32 Devices for Native USB Stability](reference/SettingUpESP32Devices.md)

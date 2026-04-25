@@ -93,36 +93,90 @@ Add the server to your agent's MCP configuration:
 
 ### Create and upload an ESP32 project
 
-```typescript
-// List ESP32 boards
-await listBoards("esp32");
+**Prompt your agent:**
+> "Initialize a new Arduino project for an ESP32 Dev Board in `/path/to/esp32-blink`. Build the firmware, and upload it while monitoring the serial output."
 
-// Initialize project
-await initProject({
-  board: "esp32dev",
-  framework: "arduino",
-  projectDir: "/path/to/esp32-blink"
-});
+When you execute a prompt like this, your agent will typically translate it into the following sequence of MCP calls to the server:
 
-// Build
-await buildProject("/path/to/esp32-blink");
+```json
+// 1. Find the right board ID
+{
+  "name": "list_boards",
+  "arguments": {
+    "filter": "esp32"
+  }
+}
 
-// Upload firmware
-await uploadFirmware("/path/to/esp32-blink");
+// 2. Initialize project
+{
+  "name": "init_project",
+  "arguments": {
+    "board": "esp32dev",
+    "framework": "arduino",
+    "projectDir": "/path/to/esp32-blink"
+  }
+}
 
-// Monitor
-await startMonitor();
+// 3. Build firmware
+{
+  "name": "build_project",
+  "arguments": {
+    "projectDir": "/path/to/esp32-blink"
+  }
+}
+
+// 4. Upload and start serial monitor
+{
+  "name": "upload_firmware",
+  "arguments": {
+    "projectDir": "/path/to/esp32-blink",
+    "start_monitor": true
+  }
+}
 ```
 
 ### Search and install libraries
 
-```typescript
-const libraries = await searchLibraries("ArduinoJson", 10);
+**Prompt your agent:**
+> "Find the ArduinoJson library and install the latest 6.x version into my project at `/path/to/esp32-blink`."
 
-await installLibrary("ArduinoJson", {
-  projectDir: "/path/to/my-project",
-  version: "^6.21.0"
-});
+When you execute a prompt like this, your agent will typically make the following MCP calls:
+
+```json
+// 1. Search for a library
+{
+  "name": "search_libraries",
+  "arguments": {
+    "query": "ArduinoJson",
+    "limit": 5
+  }
+}
+
+// 2. Install library to project
+{
+  "name": "install_library",
+  "arguments": {
+    "library": "ArduinoJson",
+    "projectDir": "/path/to/esp32-blink",
+    "version": "^6.21.0"
+  }
+}
+```
+
+### Launch the Web Dashboard
+
+**Prompt your agent:**
+> "Open the PlatformIO MCP web dashboard so I can see the compilation telemetry."
+
+When you execute a prompt like this, your agent will typically make the following MCP call to launch the local UI:
+
+```json
+{
+  "name": "get_dashboard_url",
+  "arguments": {
+    "open": true
+  }
+}
 ```
 
 ## Documentation Index
@@ -132,15 +186,13 @@ await installLibrary("ArduinoJson", {
 
 ### Guides & References
 - [Agent Customization Guide](docs/reference/AgentCustomizationGuide.md)
-- [Development Guide](docs/reference/DevelopmentGuide.md)
-- [Troubleshooting & Remediation](docs/reference/TroubleshootingGuide.md)
-- [macOS Port Conflicts Reference Document](docs/reference/ESP32PortConflictsOnMacOS.md)
-- [Setting Up ESP32 Devices for Native USB Stability](docs/SettingUpESP32Devices.md)
+- [MCP Server Command Reference](docs/MCPServerCommandReference.md)
+- [Troubleshooting & Remediation](docs/TroubleshootingGuide.md)
 
-### Specifications & Commands
+### Developer Guides and Specifications
+- [Development Guide](docs/reference/DevelopmentGuide.md)
 - [PIO MCP Design Specification](docs/PIOMCPDesignSpecification.md)
 - [Web UX Design Specification](docs/WebUXDesignSpecification.md)
-- [MCP Server Command Reference](docs/MCPServerCommandReference.md)
 
 ## Contributing & Support
 
