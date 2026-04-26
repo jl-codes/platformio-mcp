@@ -257,22 +257,21 @@ export function startPortalServer(defaultPort = 8080) {
         }
       }
 
-      lockerSession = hardwareLockManager.acquireLock("Installing Library: " + library);
-      if (!lockerSession.success) {
-        throw new Error("Failed to acquire hardware lock");
-      }
-      portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+      const reqSessionId = crypto.randomUUID();
+      hardwareLockManager.acquireLock(reqSessionId, "Installing Library: " + library);
+      lockerSession = { success: true, sessionId: reqSessionId };
+      portalEvents.emitLockState(hardwareLockManager.getLockStatus());
 
       const result = await installLibrary(library, { projectDir });
       
       hardwareLockManager.releaseLock(lockerSession.sessionId);
-      portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+      portalEvents.emitLockState(hardwareLockManager.getLockStatus());
 
       res.json(result);
     } catch (e: any) {
       if (lockerSession && lockerSession.success) {
         hardwareLockManager.releaseLock(lockerSession.sessionId);
-        portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+        portalEvents.emitLockState(hardwareLockManager.getLockStatus());
       }
       res.status(500).json({ error: e.message });
     }
@@ -292,22 +291,21 @@ export function startPortalServer(defaultPort = 8080) {
         }
       }
 
-      lockerSession = hardwareLockManager.acquireLock("Uninstalling Library: " + library);
-      if (!lockerSession.success) {
-        throw new Error("Failed to acquire hardware lock");
-      }
-      portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+      const reqSessionId = crypto.randomUUID();
+      hardwareLockManager.acquireLock(reqSessionId, "Uninstalling Library: " + library);
+      lockerSession = { success: true, sessionId: reqSessionId };
+      portalEvents.emitLockState(hardwareLockManager.getLockStatus());
 
       const result = await uninstallLibrary(library, projectDir);
       
       hardwareLockManager.releaseLock(lockerSession.sessionId);
-      portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+      portalEvents.emitLockState(hardwareLockManager.getLockStatus());
 
       res.json(result);
     } catch (e: any) {
       if (lockerSession && lockerSession.success) {
         hardwareLockManager.releaseLock(lockerSession.sessionId);
-        portalEvents.emitLockState({ timestamp: Date.now(), ...hardwareLockManager.getLockStatus() });
+        portalEvents.emitLockState(hardwareLockManager.getLockStatus());
       }
       res.status(500).json({ error: e.message });
     }

@@ -37,7 +37,6 @@ import {
   CheckTaskStatusParamsSchema,
   GetDashboardUrlParamsSchema,
   GetProjectConfigParamsSchema,
-  SystemInfoParamsSchema,
   CheckProjectParamsSchema,
   RunTestsParamsSchema,
   UninstallLibraryParamsSchema,

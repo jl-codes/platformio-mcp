@@ -10,6 +10,7 @@
 
 import { mkdir } from "fs/promises";
 import path from "path";
+import { z } from "zod";
 import { platformioExecutor } from "../platformio.js";
 import type { ProjectInitResult } from "../types.js";
 import {
@@ -140,6 +141,7 @@ export async function getProjectConfig(
     const result = await platformioExecutor.executeWithJsonOutput(
       "project",
       ["config", "--json-output"],
+      z.any(),
       {
         cwd: validatedPath,
         timeout: 30000,
@@ -164,6 +166,7 @@ export async function getSystemInfo(): Promise<any> {
     const result = await platformioExecutor.executeWithJsonOutput(
       "system",
       ["info", "--json-output"],
+      z.any(),
       { timeout: 30000 }
     );
     return result;

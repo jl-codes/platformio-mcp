@@ -23,6 +23,7 @@ export function getLogDir(verb: string, projectDir?: string): string {
   return path.join(baseDir, WORKSPACE_DIR, "logs", verb);
 }
 import { logDiagnostic as logDiag } from "./logger.js";
+import { portalEvents } from "../api/events.js";
 /**
  * Cleans out old log trace files adhering to an upper boundary limit.
  *
