@@ -821,7 +821,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "query_logs": {
         const params = QueryLogsParamsSchema.parse(args);
-        const result = await queryLogs(params.lines, params.searchPattern, params.projectDir, params.port);
+        const result = await queryLogs(params.lines, params.searchPattern, params.taskId, params.logPath, params.projectDir, params.port);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -857,7 +857,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "check_task_status": {
         const params = CheckTaskStatusParamsSchema.parse(args);
-        const result = await checkTaskStatus(params.projectDir);
+        const result = await checkTaskStatus(params.taskId, params.logPath, params.projectDir);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -896,7 +896,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "run_tests": {
         const params = RunTestsParamsSchema.parse(args);
-        const result = await runTests(params.projectDir, params.environment, params.background);
+        const executeTask = () => runTests(params.projectDir, params.environment, params.background);
+        const result = params.sessionId
+          ? (hardwareLockManager.requireLock(params.sessionId),
+            await executeTask())
+          : await hardwareLockManager.withImplicitLock(executeTask);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };

@@ -84,6 +84,8 @@ export interface SpoolingBackgroundResult {
   status: string; // The operational status indicating background dispatch
   message: string; // A descriptive message about the background task
   pid?: number; // The process ID of the detached background process
+  taskId?: string; // Generated command ID
+  logPaths?: string[]; // Arrays of logs mapping
 }
 
 export interface SpoolingForegroundResult {
@@ -251,7 +253,7 @@ export async function executeWithSpooling(
       }
     });
 
-    return { status: "running", message: "Task dispatched to background.", pid: proc.pid };
+    return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
   }
   
   const exitCode = await new Promise<number>((resolve, reject) => {

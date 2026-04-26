@@ -396,43 +396,78 @@ export async function listTargets(
   }
 }
 
+import { getCommandHistory } from "../utils/command-registry.js";
+
 /**
  * Polling tool to check background task status and return recent logs.
  */
-export async function checkTaskStatus(projectDir?: string) {
+export async function checkTaskStatus(taskId?: string, logPath?: string, projectDir?: string) {
   const baseDir = projectDir || os.tmpdir();
-  const WORKSPACE_DIR = ".pio-mcp-workspace";
-  const LOGS_DIR = "build_logs";
-  const logFile = path.join(baseDir, WORKSPACE_DIR, LOGS_DIR, "latest-build.log");
   
-  const active = isBuildActive(projectDir);
+  let status = "completed";
+  let output = "No output available.";
+  let logPaths: string[] = [];
 
-  let finalOutput = "";
-  if (fs.existsSync(logFile)) {
-    try {
-      const lines = await tailFileBounded(logFile, 512 * 1024);
-      if (active) {
-        finalOutput = lines.slice(-30).join("\n");
-      } else {
-        finalOutput = lines.slice(-150).join("\n");
+  const history = getCommandHistory(baseDir);
+
+  if (taskId) {
+    const cmd = history.find(c => c.id === taskId);
+    if (cmd) {
+      status = cmd.status;
+      logPaths = cmd.artifacts
+        .map(a => a.logFile)
+        .filter((f): f is string => Boolean(f));
+      
+      const latestLog = logPaths[logPaths.length - 1];
+      if (latestLog && fs.existsSync(latestLog)) {
+         try {
+           const lines = await tailFileBounded(latestLog, 512 * 1024);
+           output = lines.slice(status === "running" ? -30 : -150).join("\n");
+         } catch(e: any) {
+           output = `[Status Polling Error] Could not read log: ${e.message}`;
+         }
       }
-    } catch (e: any) {
-      finalOutput = `[Status Polling Error] Could not read log: ${e.message}`;
+    } else {
+       status = "failed";
+       output = `Task ID not found: ${taskId}`;
     }
+  } else if (logPath) {
+     logPaths = [logPath];
+     if (fs.existsSync(logPath)) {
+        try {
+           const lines = await tailFileBounded(logPath, 512 * 1024);
+           output = lines.slice(-150).join("\n");
+        } catch(e: any) {
+           output = `[Status Polling Error] Could not read log: ${e.message}`;
+        }
+     } else {
+        output = `Log file not found: ${logPath}`;
+     }
   } else {
-    finalOutput = "No active build log found.";
-  }
+    // Legacy fallback
+    const logFile = path.join(baseDir, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
+    const active = isBuildActive(projectDir);
+    status = active ? "running" : "completed";
+    if (fs.existsSync(logFile)) {
+      logPaths = [logFile];
+      try {
+        const lines = await tailFileBounded(logFile, 512 * 1024);
+        output = lines.slice(active ? -30 : -150).join("\n");
+      } catch (e: any) {
+        output = `[Status Polling Error] Could not read log: ${e.message}`;
+      }
+    } else {
+      output = "No active build log found.";
+    }
 
-  let taskStatus = active ? "running" : "completed";
-  
-  if (!active && finalOutput.includes("FAILED")) {
-     taskStatus = "failed";
-  } else if (!active && finalOutput.includes("Error:")) {
-     taskStatus = "failed";
+    if (!active && output.includes("FAILED")) status = "failed";
+    else if (!active && output.includes("Error:")) status = "failed";
   }
 
   return {
-    status: taskStatus,
-    logTail: finalOutput
+    status,
+    taskId,
+    logPaths,
+    output
   };
 }

@@ -148,6 +148,8 @@ export interface BuildResult {
   status?: string; // e.g. "running" if background=true
   message?: string; // Descriptive feedback message
   pid?: number; // Process identifier for background streams
+  taskId?: string; // UUID mapping to the background invocation
+  logPaths?: string[]; // Array of associated trailing paths
 }
 
 /**
@@ -158,6 +160,8 @@ export interface CleanResult {
   message?: string; // Descriptive feedback message
   status?: string; // Status token string
   pid?: number; // System process ID
+  taskId?: string; // UUID mapping to the background invocation
+  logPaths?: string[]; // Array of associated trailing paths
 }
 
 // ============================================================================
@@ -190,6 +194,8 @@ export interface UploadResult {
   status?: string; // Overall state token like "running"
   message?: string; // Descriptive feedback message
   pid?: number; // System process ID
+  taskId?: string; // UUID mapping to the background invocation
+  logPaths?: string[]; // Array of associated trailing paths
 }
 
 
@@ -460,6 +466,10 @@ export const RunTestsParamsSchema = z.object({
     .string()
     .min(1)
     .describe("Path to the PlatformIO project directory"),
+  sessionId: z
+    .string()
+    .optional()
+    .describe("Agent session ID for pipeline lock validation"),
   environment: z
     .string()
     .optional()
@@ -602,14 +612,18 @@ export const StopMonitorParamsSchema = z.object({
 });
 
 export const QueryLogsParamsSchema = z.object({
-  lines: z.number().optional().describe("Number of tail lines to retrieve (default: 100)"),
-  searchPattern: z.string().optional().describe("Optional Regex pattern to filter logs"),
-  projectDir: z.string().optional().describe("Optional project directory containing the workspace logs"),
-  port: z.string().optional().describe("Specific port to query logs for"),
+  lines: z.number().optional().describe("Fetch this many tail lines from the end of the log (default: 100)"),
+  searchPattern: z.string().optional().describe("Optional Regex pattern to filter the spool for specific keywords."),
+  taskId: z.string().optional().describe("Target standard task ID to retrieve logs for."),
+  logPath: z.string().optional().describe("Optional relative path to a log to query directly."),
+  port: z.string().optional().describe("Specific COM port to query logs for."),
+  projectDir: z.string().optional().describe("Target project checkout to query local .log cache instead of global cache."),
 });
 
 export const CheckTaskStatusParamsSchema = z.object({
-  projectDir: z.string().optional().describe("Optional project directory containing the workspace logs"),
+  taskId: z.string().optional().describe("Optional task ID to check status."),
+  logPath: z.string().optional().describe("Optional relative log path to check."),
+  projectDir: z.string().optional().describe("Optional project directory to scope the check."),
 });
 
 /**

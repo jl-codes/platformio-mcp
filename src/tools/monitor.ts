@@ -316,36 +316,59 @@ export async function startMonitor(
   return { success: true, port: activePort, logFile };
 }
 
+import { getCommandHistory } from "../utils/command-registry.js";
+
 /**
  * Tool for agents to scan historical offline device payloads.
  */
 export async function queryLogs(
   lines: number = 100,
   searchPattern?: string,
+  taskId?: string,
+  logPath?: string,
   projectDir?: string,
   port?: string,
 ) {
-  const targetDir = getLogDir("monitor", projectDir);
-  let targetFile = path.join(targetDir, "latest-monitor.log");
-  
-  // If a specific port is requested, try to find the active log file for it
-  if (port && activeDaemons[port]) {
-    targetFile = activeDaemons[port].logFile;
+  let targetPaths: string[] = [];
+
+  if (taskId) {
+    const history = getCommandHistory(projectDir);
+    const cmd = history.find(c => c.id === taskId);
+    if (cmd) {
+      targetPaths = cmd.artifacts
+        .map(a => a.logFile)
+        .filter((f): f is string => Boolean(f && fs.existsSync(f)));
+    }
+  } else if (logPath) {
+    if (fs.existsSync(logPath)) {
+      targetPaths = [logPath];
+    }
+  } else if (port && activeDaemons[port]) {
+    targetPaths = [activeDaemons[port].logFile];
+  } else {
+    const targetDir = getLogDir("monitor", projectDir);
+    const targetFile = path.join(targetDir, "latest-monitor.log");
+    if (fs.existsSync(targetFile)) {
+      targetPaths = [targetFile];
+    }
   }
 
-  if (!fs.existsSync(targetFile)) {
+  if (targetPaths.length === 0) {
     return {
       success: false,
-      content: `No active or recent logs found for ${port || "general session"} in ${targetDir}.`,
+      content: `No active or recent logs found for query context (taskId: ${taskId || "none"}, port: ${port || "none"}, logPath: ${logPath || "none"}).`,
     };
   }
 
-  let outputLines = await tailFileBounded(targetFile);
+  let stitchedLines: string[] = [];
+  for (const p of targetPaths) {
+    stitchedLines = stitchedLines.concat(await tailFileBounded(p));
+  }
 
   if (searchPattern) {
     try {
       const regex = new RegExp(searchPattern, "i");
-      outputLines = outputLines.filter((line) => regex.test(line));
+      stitchedLines = stitchedLines.filter((line) => regex.test(line));
     } catch (e) {
       return {
         success: false,
@@ -354,9 +377,9 @@ export async function queryLogs(
     }
   }
 
-  if (outputLines.length > lines) {
-    outputLines = outputLines.slice(-lines);
+  if (stitchedLines.length > lines) {
+    stitchedLines = stitchedLines.slice(-lines);
   }
 
-  return { success: true, content: outputLines.join("\n") };
+  return { success: true, content: stitchedLines.join("\n") };
 }

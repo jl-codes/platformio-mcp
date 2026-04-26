@@ -11,18 +11,20 @@ This skill provides the mandatory 3-Tier Execution Architecture for interacting 
 
 ### 🟢 Tier 1 (Preferred): MCP Server Primitives
 The `platformio-mcp` server encapsulates atomic locking, compilation, and log spooling safely. **You must ALWAYS attempt to use these tools first:**
-1. **Compilation/Deployment:** `mcp_platformio_build_project`, `mcp_platformio_clean_project`, `mcp_platformio_upload_firmware`, `mcp_platformio_upload_filesystem`
+1. **Compilation/Deployment/Analysis:** `mcp_platformio_build_project`, `mcp_platformio_clean_project`, `mcp_platformio_upload_firmware`, `mcp_platformio_upload_filesystem`, `mcp_platformio_check_project`, `mcp_platformio_run_tests`
 2. **Asynchronous Polling:** `mcp_platformio_check_task_status`
 3. **Hardware Locking:** `mcp_platformio_get_lock_status`, `mcp_platformio_acquire_lock`, `mcp_platformio_release_lock`, `mcp_platformio_reset_server_state`
 4. **Serial Monitor:** `mcp_platformio_start_monitor`, `mcp_platformio_stop_monitor`, `mcp_platformio_query_logs`
-5. **Environment/Libraries:** `mcp_platformio_list_boards`, `mcp_platformio_list_devices`, `mcp_platformio_init_project`, `mcp_platformio_search_libraries`, `mcp_platformio_install_library`
+5. **Environment/Libraries:** `mcp_platformio_list_boards`, `mcp_platformio_list_devices`, `mcp_platformio_init_project`, `mcp_platformio_search_libraries`, `mcp_platformio_install_library`, `mcp_platformio_uninstall_library`, `mcp_platformio_update_library`, `mcp_platformio_list_installed_libraries`
+6. **Diagnostics/Dashboard:** `mcp_platformio_get_dashboard_url`, `mcp_platformio_get_project_config`, `mcp_platformio_system_info`
 
-**Targeting Rules:** You MUST explicitly map the `environment` parameter (e.g., `esp32dev` or `esp32s3nano`) harvested from `platformio.ini` unless the user requires a full multi-environment compatibility check.
+**Targeting Rules & Hazard Advisory:** You MUST explicitly map the `environment` parameter (e.g., `esp32dev` or `esp32s3nano`) harvested from `platformio.ini` when executing commands like `upload_firmware` or `upload_filesystem`. **HAZARD:** If `environment` is omitted, PlatformIO will aggressively aggregate and attempt to upload ALL active configured environments found in `default_envs` (or literally every environment in the file) sequentially over the port, which causes overlapping flashes and bricked hardware on multi-target repos. You are only permitted to omit `environment` if the repository strictly contains a single environment block, or if the user explicitly demands a multi-environment parallel build/flash.
 
 **Handling Long-Running Tasks (Build & Flash):**
 Builds and firmware/filesystem uploads are often long-running processes. You **MUST** use the `background: true` parameter when calling `mcp_platformio_build_project`, `mcp_platformio_clean_project`, `mcp_platformio_upload_firmware`, or `mcp_platformio_upload_filesystem` inside your tool invocation to prevent the server from timing out on large compilations.
 
-When triggered with the `background` flag, the tool will initiate the task offline and return control immediately. DO NOT assume failure, declare completion, or sit idle indefinitely. Instead, use the `mcp_platformio_check_task_status` tool to periodically poll the ongoing background process (check in every 1 to 3 minutes) until the task formally resolves.
+When triggered with the `background` flag, the tool will initiate the task offline and return a `{ status: "running", taskId: "..." }` signature (along with an optional array of `logPaths`). DO NOT assume failure, declare completion, or sit idle indefinitely. Instead, use the `mcp_platformio_check_task_status` tool (passing `taskId`) to periodically poll the ongoing background process.
+**ADVISORY:** While background tasks may transparently return a `logPaths` string array enabling you to execute native host file-tailing, you are strongly encouraged to use the `mcp_platformio_query_logs` tool passing strictly the abstract `taskId` to seamlessly fetch hardware telemetry and compilation logs.
 **CRITICAL:** Once the background task is fully complete (status is "completed" or "failed"), you MUST explicitly call `mcp_platformio_release_lock` (using the same session ID) to free the hardware queue. Failing to release the lock will brick the user's GUI Dashboard.
 
 ### 🟡 Tier 2 (Self-Healing): Auto-Installer
