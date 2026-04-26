@@ -1,6 +1,6 @@
 ---
 name: pio-manager
-description: The absolute Single Source of Truth for executing PlatformIO operations (compiling, flashing, log-reading, and queue locking). Agents must strictly route all hardware checks and commands through this skill. Use this skill when auditing or reviewing platformio.ini, resolving port conflicts, build port errors, port not found, device not configured, or resource busy errors.
+description: The absolute Single Source of Truth for executing PlatformIO operations via the MCP Server (compiling, flashing, log-reading, uploading filesystems, managing libraries, testing, and queue locking). Agents MUST route all hardware executions through this skill. Use this to actively solve 'Resource busy' errors, macOS ESP32 port drift/anomalies, invoke esptool.py to clear corrupted flash memory, or configure hardware-less target simulators. Do NOT trigger this skill for general code editing, simply writing text into a platformio.ini file, or querying general macOS/Docker host analytics.
 ---
 
 # PIO Manager (Mega-Skill)
@@ -24,8 +24,10 @@ The `platformio-mcp` server encapsulates atomic locking, compilation, and log sp
 Builds and firmware/filesystem uploads are often long-running processes. You **MUST** use the `background: true` parameter when calling `mcp_platformio_build_project`, `mcp_platformio_clean_project`, `mcp_platformio_upload_firmware`, or `mcp_platformio_upload_filesystem` inside your tool invocation to prevent the server from timing out on large compilations.
 
 When triggered with the `background` flag, the tool will initiate the task offline and return a `{ status: "running", taskId: "..." }` signature (along with an optional array of `logPaths`). DO NOT assume failure, declare completion, or sit idle indefinitely. Instead, use the `mcp_platformio_check_task_status` tool (passing `taskId`) to periodically poll the ongoing background process.
-**ADVISORY:** While background tasks may transparently return a `logPaths` string array enabling you to execute native host file-tailing, you are strongly encouraged to use the `mcp_platformio_query_logs` tool passing strictly the abstract `taskId` to seamlessly fetch hardware telemetry and compilation logs.
-**CRITICAL:** Once the background task is fully complete (status is "completed" or "failed"), you MUST explicitly call `mcp_platformio_release_lock` (using the same session ID) to free the hardware queue. Failing to release the lock will brick the user's GUI Dashboard.
+
+**ADVISORY - TASK ID PRIORITY:** For any active background operations (`build_project`, `clean_project`, `upload_firmware`, `upload_filesystem`, `run_tests`), you MUST ALWAYS prioritize using the generated `taskId` with BOTH `mcp_platformio_check_task_status` (for polling state) AND `mcp_platformio_query_logs` (for efficiently reading the compilation/flash output). While background tasks may transparently return a `logPaths` string array enabling you to execute native host file-tailing, you must prefer this tokenized task correlation over native `.log` file reading or broad port-based querying whenever a `taskId` is available. When using `query_logs`, always utilize the `searchPattern` parameter (Regex) to filter the spool for specific keywords or anomalies instead of brute-force reading thousands of lines.
+
+**CRITICAL:** Once any explicit background task is fully complete (status is "completed" or "failed") and you have acquired a manual lock, you MUST explicitly call `mcp_platformio_release_lock` (using the same session ID) to free the hardware queue. Failing to release the lock will brick the user's GUI Dashboard.
 
 ### 🟡 Tier 2 (Self-Healing): Auto-Installer
 If the native `mcp_platformio_*` tools are completely unavailable in your context:
