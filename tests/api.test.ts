@@ -13,7 +13,11 @@ vi.mock("../src/platformio.js", () => ({
   platformioExecutor: {
     spawn: vi.fn(() => ({
       pid: 12345,
-      on: vi.fn(),
+      on: vi.fn((event, callback) => {
+        if (event === "close") {
+          setTimeout(() => callback(0), 10);
+        }
+      }),
       unref: vi.fn(),
     })),
     executeWithJsonOutput: vi.fn(() => Promise.resolve([])),

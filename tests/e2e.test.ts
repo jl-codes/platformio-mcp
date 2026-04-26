@@ -88,7 +88,7 @@ describe("Work Order 4: Hybrid E2E Integration Test", () => {
     const buildLogPath = path.join(tempProjectDir, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
     expect(fs.existsSync(buildLogPath)).toBe(true);
     const buildLogContent = fs.readFileSync(buildLogPath, "utf-8");
-    expect(buildLogContent).toContain("Environment"); // Standard PlatformIO build output
+    expect(buildLogContent).toContain("Processing uno"); // Standard PlatformIO build output
 
     // 3. upload_fs (Mocked Hardware)
     const uploadResult = await hardwareLockManager.withImplicitLock(() => uploadFilesystem(tempProjectDir, "/dev/cu.usbserial-mock", undefined, false, false, false));

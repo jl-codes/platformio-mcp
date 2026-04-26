@@ -77,7 +77,7 @@ describe('Upload Tools', () => {
     await promise;
 
     expect(devices.waitForDeviceByHwid).toHaveBeenCalledWith('123', 10000, expect.any(Function));
-    expect(monitor.startMonitor).toHaveBeenCalledWith('COM1', undefined, mockProjectDir, 'default');
+    expect(monitor.startMonitor).toHaveBeenCalledWith('COM1', undefined, mockProjectDir, 'default', expect.any(String));
     
     vi.useRealTimers();
   });
@@ -98,7 +98,7 @@ describe('Upload Tools', () => {
     await vi.runAllTimersAsync();
     await promise;
 
-    expect(monitor.startMonitor).toHaveBeenCalledWith('COM1', undefined, mockProjectDir, 'default');
+    expect(monitor.startMonitor).toHaveBeenCalledWith('COM1', undefined, mockProjectDir, 'default', expect.any(String));
     
     vi.useRealTimers();
   });

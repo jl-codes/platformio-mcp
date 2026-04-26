@@ -100,13 +100,13 @@ describe("PlatformIO MCP Server E2E Integration", () => {
     const buildResult = JSON.parse(textContent);
     
     expect(buildResult.status).toBe("running");
-    expect(buildResult.pid).toBeDefined();
+    expect(buildResult.taskId).toBeDefined();
 
     // Poll the status immediately
     const pollResult = await harness.client.callTool({
       name: "check_task_status",
       arguments: {
-        projectDir: tempProjectDir,
+        taskId: buildResult.taskId,
       },
     }) as { content: Array<{ type: string, text: string }> };
 
@@ -114,7 +114,7 @@ describe("PlatformIO MCP Server E2E Integration", () => {
     const pollParsed = JSON.parse(pollText);
 
     expect(pollParsed.status).toBeDefined();
-    expect(pollParsed.logTail).toBeDefined();
+    expect(pollParsed.logPaths).toBeDefined();
     
     // Wait for the background build to actually finish so we don't leak processes
     await new Promise(resolve => setTimeout(resolve, 5000));

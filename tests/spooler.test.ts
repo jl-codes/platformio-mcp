@@ -45,8 +45,8 @@ describe('Native E2E Spooler Execution', () => {
   it('should compile and capture native execution stdout via spooling', async () => {
     // We run the native environment in background so we don't hang on the infinite heartbeat loop
     const result = await executeWithSpooling(
-      'pio',
-      ['run', '-e', 'native', '-t', 'exec'],
+      'run',
+      ['-e', 'native', '-t', 'exec'],
       {
         cwd: nativeRigDir,
         projectDir: nativeRigDir,
