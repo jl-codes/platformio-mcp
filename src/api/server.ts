@@ -30,8 +30,7 @@ import { tailFileBounded } from "../utils/tail.js";
 import { getCommandHistory } from "../utils/command-registry.js";
 import { getProjectConfig } from "../tools/projects.js";
 import { searchLibraries, listInstalledLibraries, installLibrary, uninstallLibrary } from "../tools/libraries.js";
-import { buildProject, cleanProject } from "../tools/build.js";
-import { uploadFirmware, uploadFilesystem } from "../tools/upload.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
