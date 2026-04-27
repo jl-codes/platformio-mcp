@@ -30,6 +30,8 @@ import { tailFileBounded } from "../utils/tail.js";
 import { getCommandHistory } from "../utils/command-registry.js";
 import { getProjectConfig } from "../tools/projects.js";
 import { searchLibraries, listInstalledLibraries, installLibrary, uninstallLibrary } from "../tools/libraries.js";
+import { buildProject, cleanProject } from "../tools/build.js";
+import { uploadFirmware, uploadFilesystem } from "../tools/upload.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -164,39 +166,48 @@ export function startPortalServer(defaultPort = 8080) {
     }
   });
 
+  app.post("/api/commands/build", async (req, res) => {
+    try {
+      const { projectDir, environment, verbose } = req.body;
+      if (!projectDir) {
+        res.status(400).json({ error: "Missing projectDir parameter" });
+        return;
+      }
+      // Dispatch build to background so we can return the TaskId immediately
+      const result = await buildProject(projectDir, environment, verbose, true);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.get("/api/logs", async (req, res) => {
     try {
-      const { commandId, artifactId, projectDir } = req.query;
-      if (!commandId || !artifactId) {
-        res.status(400).json({ error: "Missing commandId or artifactId parameter" });
+      const { taskId, projectDir } = req.query;
+      if (!taskId) {
+        res.status(400).json({ error: "Missing taskId parameter" });
         return;
       }
       
       const history = getCommandHistory(projectDir as string | undefined);
-      const command = history.find(c => c.id === commandId);
+      const task = history.flatMap(c => c.tasks || []).find(t => t.taskId === taskId);
       
-      if (!command) {
-        res.status(404).json({ error: "Command not found in registry" });
+      if (!task) {
+        res.status(404).json({ error: "Task not found in registry" });
         return;
       }
-
-      const artifact = command.artifacts?.find(a => a.id === artifactId);
-      if (!artifact) {
-        res.status(404).json({ error: "Artifact not found in command" });
-        return;
-      }
-      if (!artifact.logFile) {
-        res.status(404).json({ error: "No logFile mapped for this artifact" });
+      if (!task.logPaths || task.logPaths.length === 0) {
+        res.status(404).json({ error: "No log paths mapped for this task" });
         return;
       }
       
-      if (!fs.existsSync(artifact.logFile)) {
+      if (!fs.existsSync(task.logPaths[0])) {
         res.status(404).json({ error: "Log file missing from disk" });
         return;
       }
       
       // Serve file completely
-      const fileStream = fs.createReadStream(artifact.logFile);
+      const fileStream = fs.createReadStream(task.logPaths[0]);
       res.setHeader('Content-Type', 'text/plain');
       fileStream.pipe(res);
     } catch (e: any) {

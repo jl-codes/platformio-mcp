@@ -15,7 +15,7 @@ import { execSync } from "node:child_process";
 import treeKill from "tree-kill";
 import lockfile from "proper-lockfile";
 import { logDiagnostic as logDiag } from "./logger.js";
-import { registerCommand, updateArtifactStatus, getCommandHistory } from "./command-registry.js";
+import { registerCommand, updateTaskStatus, getCommandHistory } from "./command-registry.js";
 import crypto from "node:crypto";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
@@ -69,20 +69,20 @@ export async function registerPioMonitorPid(port: string, pid: number, projectDi
 
   try {
     const commandId = rootCommandId || crypto.randomUUID();
-    const artifactId = crypto.randomUUID();
+    const taskId = crypto.randomUUID();
     
     await registerCommand({
       id: commandId,
       commandDesc: `PIO Serial Monitor: ${port}`,
       timestamp: Date.now(),
       status: "running",
-      artifacts: [{
-        id: artifactId,
+      tasks: [{
+        taskId: taskId,
         type: "monitor",
         status: "running",
         port: port,
         pid: pid,
-        logFile: path.join(path.dirname(pidsFile), `${port.replace(/\//g, '_')}.log`)
+        logPaths: [path.join(path.dirname(pidsFile), `${port.replace(/\//g, '_')}.log`)]
       }]
     }, projectDir);
   } catch (e: any) {
@@ -114,14 +114,14 @@ export async function unregisterPioMonitorPid(port: string, projectDir?: string)
 
   try {
     const history = getCommandHistory(projectDir);
-    // Find the command that contains an actively running monitor artifact for this port
+    // Find the command that contains an actively running monitor task for this port
     const activeCommand = [...history].reverse().find(cmd => 
-      cmd.artifacts?.some(a => a.type === "monitor" && a.status === "running" && a.port === port)
+      cmd.tasks?.some(a => a.type === "monitor" && a.status === "running" && a.port === port)
     );
     if (activeCommand) {
-      const activeArtifact = activeCommand.artifacts.find(a => a.type === "monitor" && a.status === "running" && a.port === port);
-      if (activeArtifact) {
-        await updateArtifactStatus(activeCommand.id, activeArtifact.id, { status: "terminated" }, projectDir);
+      const activeTask = activeCommand.tasks.find(a => a.type === "monitor" && a.status === "running" && a.port === port);
+      if (activeTask) {
+        await updateTaskStatus(activeCommand.id, activeTask.taskId, { status: "terminated" }, projectDir);
       }
     }
   } catch (e: any) {

@@ -36,7 +36,7 @@ type DaemonContext = {
   logFile: string; // Active absolute path to the local primary written file
   fileOffset?: number; // Internal tailing offset
   watcher?: fs.FSWatcher; // Tailing pointer
-  artifactId?: string; // UUID to isolate socket routing
+  taskId?: string; // UUID to isolate socket routing
 };
 
 // Global pool of hardware streams managed by the MCP server
@@ -78,7 +78,7 @@ export async function stopMonitor(port: string, projectDir?: string) {
           const fd = fs.openSync(daemon.logFile, "r");
           fs.readSync(fd, buffer, 0, buffer.length, (daemon.fileOffset || 0));
           fs.closeSync(fd);
-          portalEvents.emitSerialLog(port, buffer.toString(), daemon.artifactId);
+          portalEvents.emitSerialLog(port, buffer.toString(), daemon.taskId);
         }
       } catch {}
       try { daemon.watcher.close(); } catch {}
@@ -196,7 +196,7 @@ export async function rehydrateMonitors(): Promise<void> {
                     if (stat.size > (daemon.fileOffset || 0)) {
                       const stream = fs.createReadStream(logFile, { start: daemon.fileOffset || 0, end: stat.size - 1 });
                       stream.on('data', (chunk) => {
-                        portalEvents.emitSerialLog(port, chunk.toString(), daemon.artifactId);
+                        portalEvents.emitSerialLog(port, chunk.toString(), daemon.taskId);
                       });
                       daemon.fileOffset = stat.size;
                     }
@@ -277,7 +277,7 @@ export async function startMonitor(
 
   portSemaphoreManager.claimPort(activePort, "Monitor Daemon");
 
-  const monitorArtifactId = crypto.randomUUID();
+  const monitorTaskId = crypto.randomUUID();
 
   const daemon: DaemonContext = {
     baudRate: baud,
@@ -285,7 +285,7 @@ export async function startMonitor(
     hwid: activeHwid,
     logFile,
     fileOffset: 0,
-    artifactId: monitorArtifactId,
+    taskId: monitorTaskId,
   };
   activeDaemons[activePort] = daemon;
 
@@ -300,7 +300,7 @@ export async function startMonitor(
           if (stat.size > (daemon.fileOffset || 0)) {
             const stream = fs.createReadStream(logFile, { start: daemon.fileOffset || 0, end: stat.size - 1 });
             stream.on('data', (chunk) => {
-              portalEvents.emitSerialLog(activePort!, chunk.toString(), daemon.artifactId);
+              portalEvents.emitSerialLog(activePort!, chunk.toString(), daemon.taskId);
             });
             daemon.fileOffset = stat.size;
           }
@@ -335,8 +335,8 @@ export async function queryLogs(
     const history = getCommandHistory(projectDir);
     const cmd = history.find(c => c.id === taskId);
     if (cmd) {
-      targetPaths = cmd.artifacts
-        .map(a => a.logFile)
+      targetPaths = cmd.tasks
+        .flatMap(a => a.logPaths || [])
         .filter((f): f is string => Boolean(f && fs.existsSync(f)));
     }
   } else if (logPath) {

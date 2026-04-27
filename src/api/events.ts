@@ -58,8 +58,8 @@ class PortalEventEmitter extends EventEmitter {
   /**
    * Emit a build log stream, buffering partial chunks into clean lines
    */
-  emitArtifactLog(projectId: string, artifactId: string | undefined, chunk: string) {
-    const bufferKey = artifactId || projectId;
+  emitTaskLog(projectId: string, taskId: string | undefined, chunk: string) {
+    const bufferKey = taskId || projectId;
     if (!this.artifactBuffers[bufferKey]) {
       this.artifactBuffers[bufferKey] = "";
     }
@@ -77,7 +77,7 @@ class PortalEventEmitter extends EventEmitter {
       this.emit("build_log", {
         timestamp: Date.now(),
         projectId,
-        artifactId,
+        taskId,
         logLine,
       });
     }
@@ -86,27 +86,27 @@ class PortalEventEmitter extends EventEmitter {
   /**
    * Emit a signal to clear the build terminal for a project
    */
-  clearArtifactLog(projectId: string, artifactId?: string, logFile?: string) {
-    const bufferKey = artifactId || projectId;
+  clearTaskLog(projectId: string, taskId?: string, logPaths?: string[]) {
+    const bufferKey = taskId || projectId;
     if (this.artifactBuffers[bufferKey]) {
       this.artifactBuffers[bufferKey] = "";
     }
     this.emit("build_clear", {
       timestamp: Date.now(),
       projectId,
-      artifactId,
-      logFile,
+      taskId,
+      logPaths,
     });
   }
 
   /**
    * Emit a serial monitor read
    */
-  emitSerialLog(port: string, data: string, artifactId?: string) {
+  emitSerialLog(port: string, data: string, taskId?: string) {
     this.emit("serial_log", {
       timestamp: Date.now(),
       port,
-      artifactId,
+      taskId,
       data,
     });
   }

@@ -14,7 +14,7 @@ import { platformioExecutor } from "../platformio.js";
 import { registerBuildPid, unregisterBuildPid, isBuildActive } from "./process-manager.js";
 import { portSemaphoreManager } from "./semaphore.js";
 import { tailFileBounded } from "./tail.js";
-import { registerCommand, updateArtifactStatus } from "./command-registry.js";
+import { registerCommand, updateTaskStatus } from "./command-registry.js";
 import crypto from "node:crypto";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
@@ -130,7 +130,7 @@ export async function executeWithSpooling(
   });
 
   const commandId = options.rootCommandId || crypto.randomUUID();
-  const artifactId = crypto.randomUUID();
+  const taskId = crypto.randomUUID();
   const artType = options.artifactType || "build";
 
   if (proc.pid) {
@@ -141,11 +141,11 @@ export async function executeWithSpooling(
       commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
       timestamp: Date.now(),
       status: "running",
-      artifacts: [{
-        id: artifactId,
+      tasks: [{
+        taskId: taskId,
         type: artType,
         status: "running",
-        logFile: logFile,
+        logPaths: [logFile],
         pid: proc.pid
       }]
     }, projectArea).catch(e => logDiag(`[Spooler] Registry fail: ${e.message}`, projectArea));
@@ -160,7 +160,7 @@ export async function executeWithSpooling(
   // UI Portal File Tailing
   let fileOffset = 0;
   let watcher: fs.FSWatcher | null = null;
-  portalEvents.clearArtifactLog(projectArea, artifactId, logFile);
+  portalEvents.clearTaskLog(projectArea, taskId, [logFile]);
 
   try {
     watcher = fs.watch(logFile, (eventType) => {
@@ -170,7 +170,7 @@ export async function executeWithSpooling(
           if (stat.size > fileOffset) {
             const stream = fs.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on('data', (chunk) => {
-              portalEvents.emitArtifactLog(projectArea, artifactId, chunk.toString());
+              portalEvents.emitTaskLog(projectArea, taskId, chunk.toString());
             });
             fileOffset = stat.size;
           }
@@ -214,10 +214,10 @@ export async function executeWithSpooling(
 
     p.catch(e => {
       console.error(`[Background Task Error]: ${e.message}`);
-      updateArtifactStatus(commandId, artifactId, { status: "error" }, projectArea).catch(() => {});
+      updateTaskStatus(commandId, taskId, { status: "error" }, projectArea).catch(() => {});
       return 1;
     }).then(async (code) => {
-      await updateArtifactStatus(commandId, artifactId, { 
+      await updateTaskStatus(commandId, taskId, { 
         status: code === 0 ? "success" : "error",
         exitCode: code 
       }, projectArea).catch(() => {});
@@ -237,7 +237,7 @@ export async function executeWithSpooling(
             const fd = fs.openSync(logFile, "r");
             fs.readSync(fd, buffer, 0, buffer.length, fileOffset);
             fs.closeSync(fd);
-            portalEvents.emitArtifactLog(projectArea, artifactId, buffer.toString());
+            portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
             fileOffset = stat.size;
           }
         } catch {}
@@ -285,7 +285,7 @@ export async function executeWithSpooling(
     });
   });
 
-  await updateArtifactStatus(commandId, artifactId, { 
+  await updateTaskStatus(commandId, taskId, { 
     status: exitCode === 0 ? "success" : "error",
     exitCode 
   }, projectArea).catch(() => {});
@@ -309,7 +309,7 @@ export async function executeWithSpooling(
         const fd = fs.openSync(logFile, "r");
         fs.readSync(fd, buffer, 0, buffer.length, fileOffset);
         fs.closeSync(fd);
-        portalEvents.emitArtifactLog(projectArea, artifactId, buffer.toString());
+        portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
         fileOffset = stat.size;
       }
     } catch {}

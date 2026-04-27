@@ -28,11 +28,11 @@ function getRegistryFilePath(projectDir?: string): string {
 /**
  * Historical record of an executed command spanning builds or serial monitors.
  */
-export interface ArtifactRecord {
-  id: string; // Internal trace ID
+export interface TaskRecord {
+  taskId: string; // Internal trace ID
   type: "build" | "monitor" | "upload" | "test" | "debug"; // Classification of the executing process
   status: "inactive" | "running" | "success" | "error" | "terminated"; // Real-time execution phase
-  logFile?: string; // Optional path for redirected logs
+  logPaths?: string[]; // Optional array of mapped log file paths
   port?: string; // Target hardware interface mapping
   pid?: number; // Monitored system daemon integer
   exitCode?: number; // CLI resulting integer status code
@@ -43,7 +43,7 @@ export interface CommandRecord {
   commandDesc: string; // E.g., 'pio run -t upload'
   timestamp: number; // Unix epoch of initiation
   status: "running" | "success" | "error" | "terminated"; // Overall process status
-  artifacts: ArtifactRecord[]; // Log outputs and child executions
+  tasks: TaskRecord[]; // Log outputs and child executions
 }
 
 /**
@@ -67,9 +67,9 @@ export async function registerCommand(record: CommandRecord, projectDir?: string
       if (existingIndex !== -1) {
         // Just merge artifacts if appending to an existing command chain
         const existingCmd = history[existingIndex];
-        record.artifacts.forEach(newArt => {
-          if (!existingCmd.artifacts.find(a => a.id === newArt.id)) {
-            existingCmd.artifacts.push(newArt);
+        record.tasks.forEach(newArt => {
+          if (!existingCmd.tasks.find(a => a.taskId === newArt.taskId)) {
+            existingCmd.tasks.push(newArt);
           }
         });
         existingCmd.status = record.status;
@@ -123,9 +123,9 @@ export async function updateCommandStatus(id: string, updates: Partial<CommandRe
 }
 
 /**
- * Updates a specific nested artifact's status.
+ * Updates a specific nested task's status.
  */
-export async function updateArtifactStatus(commandId: string, artifactId: string, updates: Partial<ArtifactRecord>, projectDir?: string): Promise<void> {
+export async function updateTaskStatus(commandId: string, taskId: string, updates: Partial<TaskRecord>, projectDir?: string): Promise<void> {
   const file = getRegistryFilePath(projectDir);
   if (!fs.existsSync(file)) return;
 
@@ -140,14 +140,14 @@ export async function updateArtifactStatus(commandId: string, artifactId: string
       const cmdIndex = history.findIndex((cmd) => cmd.id === commandId);
       if (cmdIndex !== -1) {
         const cmd = history[cmdIndex];
-        const artIndex = cmd.artifacts?.findIndex((art) => art.id === artifactId) ?? -1;
+        const artIndex = cmd.tasks?.findIndex((art) => art.taskId === taskId) ?? -1;
         if (artIndex !== -1) {
-          cmd.artifacts[artIndex] = { ...cmd.artifacts[artIndex], ...updates };
+          cmd.tasks[artIndex] = { ...cmd.tasks[artIndex], ...updates };
 
-          // Automatically roll up statuses (if all artifacts are success, parent is success)
-          const allSuccess = cmd.artifacts.every(a => a.status === 'success');
-          const anyError = cmd.artifacts.some(a => a.status === 'error');
-          const anyRunning = cmd.artifacts.some(a => a.status === 'running');
+          // Automatically roll up statuses (if all tasks are success, parent is success)
+          const allSuccess = cmd.tasks.every(a => a.status === 'success');
+          const anyError = cmd.tasks.some(a => a.status === 'error');
+          const anyRunning = cmd.tasks.some(a => a.status === 'running');
           
           if (anyError) cmd.status = 'error';
           else if (anyRunning) cmd.status = 'running';

@@ -414,8 +414,8 @@ export async function checkTaskStatus(taskId?: string, logPath?: string, project
     const cmd = history.find(c => c.id === taskId);
     if (cmd) {
       status = cmd.status;
-      logPaths = cmd.artifacts
-        .map(a => a.logFile)
+      logPaths = cmd.tasks
+        .flatMap(a => a.logPaths || [])
         .filter((f): f is string => Boolean(f));
       
       const latestLog = logPaths[logPaths.length - 1];
