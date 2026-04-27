@@ -9,17 +9,19 @@
  */
 
 import fs from "node:fs";
-import os from "node:os";
+
 import path from "node:path";
 import lockfile from "proper-lockfile";
 import { portalEvents } from "../api/events.js";
+import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const REGISTRY_FILE = "command_history.json";
 const MAX_HISTORY_ITEMS = 30;
 
 function getRegistryFilePath(projectDir?: string): string {
-  const baseDir = projectDir || os.tmpdir();
+  const baseDir = projectDir || SERVER_DATA_DIR;
+  if (!projectDir) ensureGlobalDirs();
   const dir = path.join(baseDir, WORKSPACE_DIR, "registry");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return path.join(dir, REGISTRY_FILE);
@@ -81,7 +83,7 @@ export async function registerCommand(record: CommandRecord, projectDir?: string
       }
 
       fs.writeFileSync(file, JSON.stringify(history, null, 2));
-      portalEvents.emitCommandHistoryUpdated(projectDir || os.tmpdir());
+      portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
     } finally {
       await release();
     }
@@ -112,7 +114,7 @@ export async function updateCommandStatus(id: string, updates: Partial<CommandRe
       if (index !== -1) {
         history[index] = { ...history[index], ...updates };
         fs.writeFileSync(file, JSON.stringify(history, null, 2));
-        portalEvents.emitCommandHistoryUpdated(projectDir || os.tmpdir());
+        portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
       }
     } finally {
       await release();
@@ -155,7 +157,7 @@ export async function updateTaskStatus(commandId: string, taskId: string, update
           else cmd.status = 'terminated';
 
           fs.writeFileSync(file, JSON.stringify(history, null, 2));
-          portalEvents.emitCommandHistoryUpdated(projectDir || os.tmpdir());
+          portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
         }
       }
     } finally {

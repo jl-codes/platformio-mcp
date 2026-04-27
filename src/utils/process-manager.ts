@@ -17,6 +17,7 @@ import lockfile from "proper-lockfile";
 import { logDiagnostic as logDiag } from "./logger.js";
 import { registerCommand, updateTaskStatus, getCommandHistory } from "./command-registry.js";
 import crypto from "node:crypto";
+import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOCKS_DIR = "locks";
@@ -28,24 +29,29 @@ const BUILD_PIDS_FILE = "active_tasks.json";
  */
 function getPidsFilePath(projectDir?: string, file: string = SERIAL_PIDS_FILE): string {
   if (file === SERIAL_PIDS_FILE) {
-    const baseDir = projectDir || os.tmpdir();
-    const dir = path.join(baseDir, WORKSPACE_DIR, "serial_monitors");
+    // Serial ports are global OS-level hardware resources.
+    // Tracking them globally prevents Project B from attempting to open a port held by Project A.
+    ensureGlobalDirs();
+    const dir = path.join(SERVER_DATA_DIR, "serial_monitors");
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     return path.join(dir, file);
   } else if (file === BUILD_PIDS_FILE) {
-    const baseDir = projectDir || os.tmpdir();
+    // Build tasks are strictly scoped to the project environment
+    const baseDir = projectDir || SERVER_DATA_DIR;
+    if (!projectDir) ensureGlobalDirs();
     const dir = path.join(baseDir, WORKSPACE_DIR, "tasks");
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     return path.join(dir, file);
   }
-  const baseDir = projectDir || os.tmpdir();
+  const baseDir = projectDir || SERVER_DATA_DIR;
+  if (!projectDir) ensureGlobalDirs();
   return path.join(baseDir, WORKSPACE_DIR, LOCKS_DIR, file);
 }
 
 /**
  * Records a given process ID belonging to a started serial monitor.
  */
-export async function registerPioMonitorPid(port: string, pid: number, projectDir?: string, rootCommandId?: string): Promise<void> {
+export async function registerPioMonitorPid(port: string, pid: number, projectDir?: string, rootCommandId?: string, logFile?: string): Promise<void> {
   const pidsFile = getPidsFilePath(projectDir);
   const dir = path.dirname(pidsFile);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -82,7 +88,7 @@ export async function registerPioMonitorPid(port: string, pid: number, projectDi
         status: "running",
         port: port,
         pid: pid,
-        logPaths: [path.join(path.dirname(pidsFile), `${port.replace(/\//g, '_')}.log`)]
+        logPaths: logFile ? [logFile] : []
       }]
     }, projectDir);
   } catch (e: any) {

@@ -20,9 +20,10 @@ import { BuildError, PlatformIOError } from "../utils/errors.js";
 import { parseStderrErrors } from "../utils/errors.js";
 import { isBuildActive } from "../utils/process-manager.js";
 import fs from "node:fs";
-import os from "node:os";
+
 import path from "node:path";
 import { tailFileBounded } from "../utils/tail.js";
+import { SERVER_DATA_DIR, ensureGlobalDirs } from "../utils/paths.js";
 
 
 /**
@@ -402,7 +403,8 @@ import { getCommandHistory } from "../utils/command-registry.js";
  * Polling tool to check background task status and return recent logs.
  */
 export async function checkTaskStatus(taskId?: string, logPath?: string, projectDir?: string) {
-  const baseDir = projectDir || os.tmpdir();
+  const baseDir = projectDir || SERVER_DATA_DIR;
+  if (!projectDir) ensureGlobalDirs();
   
   let status = "completed";
   let output = "No output available.";

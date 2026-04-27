@@ -8,7 +8,7 @@
  * - executeWithSpooling: Spawns child processes mapped to disk limits.
  */
 import fs from "node:fs";
-import os from "node:os";
+
 import path from "node:path";
 import { platformioExecutor } from "../platformio.js";
 import { registerBuildPid, unregisterBuildPid, isBuildActive } from "./process-manager.js";
@@ -17,9 +17,12 @@ import { tailFileBounded } from "./tail.js";
 import { registerCommand, updateTaskStatus } from "./command-registry.js";
 import crypto from "node:crypto";
 
+import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
+
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 export function getLogDir(verb: string, projectDir?: string): string {
-  const baseDir = projectDir || os.tmpdir();
+  const baseDir = projectDir || SERVER_DATA_DIR;
+  if (!projectDir) ensureGlobalDirs();
   return path.join(baseDir, WORKSPACE_DIR, "logs", verb);
 }
 import { logDiagnostic as logDiag } from "./logger.js";
