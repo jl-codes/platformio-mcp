@@ -21,6 +21,8 @@ import { parseStderrErrors } from "./errors.js";
 
 import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
 
+import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
+
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 export function getLogDir(verb: string, projectDir?: string): string {
   const baseDir = projectDir || SERVER_DATA_DIR;

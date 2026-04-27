@@ -684,7 +684,6 @@ export function startPortalServer(defaultPort = 8080) {
 
 
 
-
   app.post("/api/spooler/start", async (req, res) => {
     const { port, projectDir } = req.body;
     const commandId = crypto.randomUUID();
