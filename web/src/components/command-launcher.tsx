@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Modal, Form, Select, Switch, Button, message } from 'antd';
+import { CodeOutlined } from '@ant-design/icons';
 
 interface CommandLauncherProps {
   isOpen: boolean;
@@ -10,14 +12,16 @@ interface CommandLauncherProps {
 }
 
 export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hardware, apiBase, token }: CommandLauncherProps) {
-  const [action, setAction] = useState('build');
-  const [env, setEnv] = useState('');
-  const [port, setPort] = useState('');
+  const [form] = Form.useForm();
+  const [action, setAction] = useState('build_project');
   const [loading, setLoading] = useState(false);
   const [environments, setEnvironments] = useState<string[]>([]);
 
   useEffect(() => {
     if (isOpen && activeWorkspace) {
+      form.resetFields();
+      form.setFieldsValue({ action: 'build_project' });
+      setAction('build_project');
       const fetchConfig = async () => {
         try {
           const res = await fetch(`${apiBase}/api/projects/config?projectDir=${encodeURIComponent(activeWorkspace)}`, {
@@ -25,11 +29,18 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
           });
           if (res.ok) {
             const payload = await res.json();
-            if (payload && payload.rawConfig) {
+            if (Array.isArray(payload)) {
+              // Parse PIO config JSON format: [["env:esp32dev", [...]], ["platformio", [...]]]
+              const envs = payload
+                .filter((section: any) => Array.isArray(section) && section.length > 0 && typeof section[0] === 'string' && section[0].startsWith('env:'))
+                .map((section: any) => section[0].replace('env:', ''));
+              
+              setEnvironments(envs);
+            } else if (payload && payload.rawConfig) {
+              // Fallback for legacy rawConfig
               const matches = Array.from(payload.rawConfig.matchAll(/\[env:([^\]]+)\]/g));
               const envs = matches.map((m: any) => m[1]);
               setEnvironments(envs);
-              if (envs.length > 0 && !env) setEnv(envs[0]);
             }
           }
         } catch (e) {
@@ -38,44 +49,24 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
       };
       fetchConfig();
     }
-  }, [isOpen, activeWorkspace, apiBase, token, env]);
-
-  useEffect(() => {
-    if (isOpen && hardware.length > 0 && !port) {
-      setPort(hardware[0].port);
-    }
-  }, [isOpen, hardware, port]);
-
-  if (!isOpen) return null;
+  }, [isOpen, activeWorkspace, apiBase, token, form]);
 
   const handleExecute = async () => {
     if (!activeWorkspace) return;
-    setLoading(true);
     try {
-      let endpoint = '';
-      let payload: any = { projectDir: activeWorkspace };
+      const values = await form.validateFields();
+      setLoading(true);
+      
+      const actionPath = values.action === 'build_project' ? 'build' : values.action;
+      const endpoint = `/api/commands/${actionPath}`;
+      const payload: any = { projectDir: activeWorkspace };
 
-      if (action === 'build') {
-         endpoint = '/api/commands/build';
-         if (env) payload.environment = env;
-      } else if (action === 'clean') {
-         endpoint = '/api/commands/clean';
-      } else if (action === 'upload' || action === 'uploadfs') {
-         endpoint = `/api/commands/${action}`;
-         if (env) payload.environment = env;
-         if (port) payload.port = port;
-      } else if (action === 'monitor') {
-         endpoint = '/api/spooler/start';
-         if (port) payload.port = port;
-      } else if (action === 'check') {
-         endpoint = '/api/check';
-         if (env) payload.environment = env;
-      } else if (action === 'test') {
-         endpoint = '/api/test';
-         if (env) payload.environment = env;
-      }
+      if (values.environment) payload.environment = values.environment;
+      if (values.port) payload.port = values.port;
+      if (values.verbose !== undefined) payload.verbose = values.verbose;
+      if (values.start_monitor !== undefined) payload.start_monitor = values.start_monitor;
 
-      await fetch(`${apiBase}${endpoint}`, {
+      const res = await fetch(`${apiBase}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,115 +74,77 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
         },
         body: JSON.stringify(payload)
       });
+      
+      if (!res.ok) {
+         const data = await res.json();
+         message.error(`Failed: ${data.error}`);
+      }
       onClose();
-    } catch(e) {
-      console.error(e);
+    } catch(e: any) {
+      if (e.errorFields) return; // Validation failed
+      message.error(e.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const getBorderColor = () => {
-    if (action === 'build') return 'var(--secondary)'; // cyan/neon green
-    if (action === 'upload' || action === 'uploadfs') return '#ff0055'; // magenta/red
-    if (action === 'monitor') return '#00e5ff'; // bright cyan
-    if (action === 'check') return '#ff9900'; // orange
-    if (action === 'test') return '#b000ff'; // purple
-    if (action === 'clean') return 'var(--outline)';
-    return 'var(--primary)';
-  }
+  const hasEnv = ['build_project', 'upload_firmware', 'upload_filesystem', 'run_tests', 'check_project'].includes(action);
+  const hasPort = ['upload_firmware', 'upload_filesystem'].includes(action);
+  const hasVerbose = ['build_project', 'upload_firmware'].includes(action);
+  const hasStartMonitor = ['upload_firmware'].includes(action);
 
   return (
-    <div className="modal-overlay" style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(10, 14, 24, 0.85)', backdropFilter: 'blur(8px)',
-      display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-    }}>
-      <div className="modal-content" style={{
-        backgroundColor: 'var(--surface-container)',
-        border: `1px solid ${getBorderColor()}`,
-        borderRadius: '8px',
-        width: '450px',
-        maxWidth: '90vw',
-        display: 'flex', flexDirection: 'column',
-        boxShadow: `0 0 40px ${getBorderColor()}33`
-      }}>
-        
-        <div style={{ padding: '20px', borderBottom: '1px solid rgba(70, 69, 84, 0.4)' }}>
-          <h2 className="section-title" style={{ margin: 0, color: getBorderColor(), display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="material-symbols-outlined">terminal</span>
-            LAUNCH_COMMAND
-          </h2>
-        </div>
+    <Modal
+      title={<><CodeOutlined /> LAUNCH NEW COMMAND</>}
+      open={isOpen}
+      onCancel={onClose}
+      onOk={handleExecute}
+      confirmLoading={loading}
+      okText="EXECUTE"
+      cancelText="CANCEL"
+      destroyOnClose
+    >
+      <Form form={form} layout="vertical" initialValues={{ action: 'build_project' }}>
+        <Form.Item name="action" label="ACTION VERB" rules={[{ required: true }]}>
+          <Select onChange={(val) => setAction(val)}>
+            <Select.Option value="build_project">BUILD PROJECT</Select.Option>
+            <Select.Option value="upload_firmware">UPLOAD FIRMWARE</Select.Option>
+            <Select.Option value="upload_filesystem">UPLOAD FILESYSTEM</Select.Option>
+            <Select.Option value="run_tests">RUN UNIT TESTS</Select.Option>
+            <Select.Option value="check_project">CHECK PROJECT (STATIC ANALYSIS)</Select.Option>
+            <Select.Option value="clean">CLEAN ARTIFACTS</Select.Option>
+          </Select>
+        </Form.Item>
 
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label className="mono-label">ACTION VERB</label>
-            <select 
-              className="lib-search-input" 
-              value={action} 
-              onChange={e => setAction(e.target.value)}
-            >
-              <option value="build">BUILD PROJECT</option>
-              <option value="check">CHECK PROJECT (LINTING)</option>
-              <option value="test">RUN UNIT TESTS</option>
-              <option value="upload">UPLOAD FIRMWARE</option>
-              <option value="uploadfs">UPLOAD FILESYSTEM</option>
-              <option value="monitor">START SERIAL MONITOR</option>
-              <option value="clean">CLEAN ARTIFACTS</option>
-            </select>
-          </div>
+        {hasEnv && (
+          <Form.Item name="environment" label="TARGET ENVIRONMENT">
+            <Select allowClear placeholder="Auto-Detect / Default">
+              {environments.length === 0 && <Select.Option value="">Auto-Detect / Default</Select.Option>}
+              {environments.map(e => <Select.Option key={e} value={e}>{e}</Select.Option>)}
+            </Select>
+          </Form.Item>
+        )}
 
-          {action !== 'clean' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label className="mono-label">TARGET ENVIRONMENT</label>
-              <select 
-                className="lib-search-input" 
-                value={env} 
-                onChange={e => setEnv(e.target.value)}
-              >
-                {environments.length === 0 && <option value="">Auto-Detect / Default</option>}
-                {environments.map(e => <option key={e} value={e}>{e}</option>)}
-              </select>
-            </div>
-          )}
+        {hasPort && (
+          <Form.Item name="port" label="HARDWARE PORT">
+            <Select allowClear placeholder="Auto-Detect Port">
+              {hardware.map(h => <Select.Option key={h.port} value={h.port}>{h.port} - {h.hwid}</Select.Option>)}
+            </Select>
+          </Form.Item>
+        )}
 
-          {(action === 'upload' || action === 'uploadfs' || action === 'monitor') && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label className="mono-label">HARDWARE PORT</label>
-              <select 
-                className="lib-search-input" 
-                value={port} 
-                onChange={e => setPort(e.target.value)}
-              >
-                {hardware.length === 0 && <option value="">Auto-Detect Port</option>}
-                <option value="">Auto-Detect Port</option>
-                {hardware.map(h => <option key={h.port} value={h.port}>{h.port} - {h.hwid}</option>)}
-              </select>
-            </div>
-          )}
+        {hasVerbose && (
+          <Form.Item name="verbose" label="Verbose Output" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+        )}
 
-        </div>
-
-        <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(70, 69, 84, 0.4)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-          <button 
-            className="lib-btn" 
-            onClick={onClose}
-          >
-            CANCEL
-          </button>
-          <button 
-            className="lib-btn" 
-            style={{ borderColor: getBorderColor(), color: getBorderColor() }}
-            onClick={handleExecute}
-            disabled={loading || !activeWorkspace}
-          >
-            {loading ? 'ENQUEUING...' : 'EXECUTE'}
-          </button>
-        </div>
-
-      </div>
-    </div>
+        {hasStartMonitor && (
+          <Form.Item name="start_monitor" label="Start Monitor after Upload" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+        )}
+      </Form>
+    </Modal>
   );
 }

@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import type { LockState } from '../App.js';
+import { Card, Button, Typography, Spin, Empty, List, Tag, Space, theme } from 'antd';
+import { CodeSandboxOutlined, ExportOutlined } from '@ant-design/icons';
+import type { LockState } from '../app.js';
+
+const { Text, Paragraph } = Typography;
 
 interface DependenciesViewerProps {
   apiBase: string;
@@ -17,6 +21,7 @@ export default function DependenciesViewer({
   const [installedLibs, setInstalledLibs] = useState<any[]>([]);
   const [isFetchingInstalled, setIsFetchingInstalled] = useState(false);
   const [loadingPioHome, setLoadingPioHome] = useState(false);
+  const { token: antdToken } = theme.useToken();
 
   const fetchInstalledInfo = async () => {
     if (!activeWorkspace) return;
@@ -44,73 +49,73 @@ export default function DependenciesViewer({
     if (!activeWorkspace) return;
     setLoadingPioHome(true);
     try {
-      // Assuming /api/spooler/start can wrap generic pio commands or we can use it to launch home
-      // Will send a generic task just in case it triggers the existing routing 
-      await fetch(`${apiBase}/api/spooler/start`, {
+      await fetch(`${apiBase}/api/commands/pio_home`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ command: 'pio home', projectDir: activeWorkspace })
+        body: JSON.stringify({ projectDir: activeWorkspace })
       });
+      setTimeout(() => {
+        window.open('http://127.0.0.1:8008/', '_blank');
+      }, 1000);
     } catch(e) {
       console.error("Failed to launch PIO Home", e);
     } finally {
-      setTimeout(() => setLoadingPioHome(false), 1500); // UI breathing room
+      setTimeout(() => setLoadingPioHome(false), 1500); 
     }
   };
 
   return (
-    <div className="library-explorer">
-      <div className="lib-search" style={{ borderBottom: 'none', paddingBottom: '0' }}>
-        <h3 className="section-title" style={{ fontSize: '13px', marginBottom: '12px' }}>DEPENDENCIES VIEWER</h3>
-        <p className="mono-label" style={{ fontSize: '10px', opacity: 0.7, lineHeight: 1.4, marginBottom: '16px' }}>
-          Library mutations are disabled in this read-only view. Please manage your workspace dependencies using the Native PlatformIO dashboard.
-        </p>
-        
-        {activeWorkspace && (
-           <button 
-             className="lib-btn" 
-             style={{ width: '100%', borderColor: 'var(--secondary)', color: 'var(--secondary)', padding: '8px' }}
-             onClick={handleLaunchPioHome}
-             disabled={loadingPioHome || lockState.isLocked}
-           >
-             <span className="material-symbols-outlined" style={{ fontSize: '14px', marginRight: '6px', verticalAlign: 'middle' }}>open_in_new</span>
-             {loadingPioHome ? 'LAUNCHING...' : 'MANAGE IN PIO HOME'}
-           </button>
-        )}
-      </div>
+    <Card 
+      title={<Space><CodeSandboxOutlined /> <Text strong>DEPENDENCIES VIEWER</Text></Space>}
+      size="small"
+      extra={
+        activeWorkspace && (
+          <Button 
+            type="default" 
+            size="small" 
+            icon={<ExportOutlined />}
+            loading={loadingPioHome}
+            disabled={lockState.isLocked}
+            onClick={handleLaunchPioHome}
+          >
+            MANAGE IN PIO HOME
+          </Button>
+        )
+      }
+      styles={{ header: { backgroundColor: antdToken.colorBgElevated } }}
+    >
+      <Paragraph type="secondary" style={{ fontSize: '12px' }}>
+        Library mutations are disabled in this read-only view. Please manage your workspace dependencies using the Native PlatformIO dashboard.
+      </Paragraph>
       
-      <div className="lib-list" style={{ borderTop: '1px solid rgba(70, 69, 84, 0.4)', marginTop: '16px', paddingTop: '8px' }}>
-        {!activeWorkspace && (
-           <div className="mono-label" style={{ textAlign: 'center', opacity: 0.5, marginTop: '20px' }}>
-             AWAITING WORKSPACE CONTEXT
-           </div>
-        )}
-        
-        {activeWorkspace && installedLibs.length === 0 && !isFetchingInstalled && (
-          <div className="mono-label" style={{ textAlign: 'center', opacity: 0.5, marginTop: '20px' }}>
-             NO INSTALLED LIBRARIES
-          </div>
-        )}
-
-        {isFetchingInstalled && (
-          <div className="mono-label" style={{ textAlign: 'center', opacity: 0.5, marginTop: '20px' }}>
-             SYNCING TELEMETRY...
-          </div>
-        )}
-
-        {activeWorkspace && installedLibs.map(lib => (
-          <div key={lib.id || lib.name} className="lib-item readonly" style={{ opacity: 0.85, border: '1px solid transparent' }}>
-            <div className="lib-header">
-              <span className="lib-name" title={lib.name} style={{ color: 'var(--on-surface)' }}>{lib.name}</span>
-              {lib.version && <span className="lib-version">v{lib.version}</span>}
-            </div>
-            <div className="lib-desc" title={lib.description}>{lib.description || 'No description available'}</div>
-          </div>
-        ))}
-      </div>
-    </div>
+      {!activeWorkspace ? (
+         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<Text type="secondary">AWAITING WORKSPACE CONTEXT</Text>} />
+      ) : isFetchingInstalled ? (
+         <div style={{ textAlign: 'center', padding: '20px' }}><Spin tip="Syncing Telemetry..." /></div>
+      ) : installedLibs.length === 0 ? (
+         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<Text type="secondary">NO INSTALLED LIBRARIES</Text>} />
+      ) : (
+        <List
+          itemLayout="horizontal"
+          dataSource={installedLibs}
+          renderItem={(lib) => (
+            <List.Item>
+              <List.Item.Meta
+                title={
+                  <Space>
+                    <Text strong>{lib.name}</Text>
+                    {lib.version && <Tag color="green">v{lib.version}</Tag>}
+                  </Space>
+                }
+                description={lib.description || 'No description available'}
+              />
+            </List.Item>
+          )}
+        />
+      )}
+    </Card>
   );
 }

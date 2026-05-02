@@ -1,4 +1,16 @@
 import React, { useState } from 'react';
+import { Card, Button, Badge, Tooltip, Typography, Tag, Space, Divider, message, theme } from 'antd';
+import { 
+  UsbOutlined, 
+  PlayCircleOutlined, 
+  StopOutlined,
+  DashboardOutlined,
+  LinkOutlined,
+  ApiOutlined,
+  CodeOutlined
+} from '@ant-design/icons';
+
+const { Text } = Typography;
 
 interface PortClaim {
   type: string;
@@ -20,10 +32,12 @@ interface HardwareRackProps {
   activeWorkspace: string | null;
   apiBase: string;
   token: string;
+  onOpenTab?: (port: string) => void;
 }
 
-export default function HardwareRack({ hardware, activeWorkspace, apiBase, token }: HardwareRackProps) {
+export default function HardwareRack({ hardware, activeWorkspace, apiBase, token, onOpenTab }: HardwareRackProps) {
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
+  const { token: antdToken } = theme.useToken();
 
   const toggleMonitor = async (device: HardwareDevice) => {
     const isMonitoring = device.claim?.type === 'monitor';
@@ -32,7 +46,7 @@ export default function HardwareRack({ hardware, activeWorkspace, apiBase, token
     
     setLoadingMap(prev => ({ ...prev, [port]: true }));
     try {
-      await fetch(`${apiBase}${endpoint}`, {
+      const res = await fetch(`${apiBase}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -40,75 +54,150 @@ export default function HardwareRack({ hardware, activeWorkspace, apiBase, token
         },
         body: JSON.stringify({ port, projectDir: activeWorkspace })
       });
-    } catch (e) {
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        message.error(`Failed: ${errorData.error || res.statusText}`);
+      }
+    } catch (e: any) {
       console.error(e);
+      message.error(`Network Error: ${e.message}`);
     } finally {
       setLoadingMap(prev => ({ ...prev, [port]: false }));
     }
   };
 
-  const renderStatusPip = (claim?: PortClaim) => {
-    if (!claim) return <div className="hardware-pip idle" title="Idle" />;
-    if (claim.type === 'monitor') {
-      return (
-        <div 
-          className="hardware-pip monitor" 
-          title={`Monitor Claimed (PID: ${claim.owner_pid}) - Workspace: ${claim.owner_workspace.split('/').pop()}`} 
-        />
-      );
+  const getBadgeProps = (device: HardwareDevice) => {
+    const { claim, detectedBoard } = device;
+    if (!claim) {
+      if (detectedBoard || (device.hwid && device.hwid !== 'n/a')) {
+        return { color: 'blue', text: 'Connected' };
+      }
+      return { status: 'default' as const, text: 'Disconnected' };
     }
-    return (
-      <div 
-        className="hardware-pip upload" 
-        title={`Upload Claimed (PID: ${claim.owner_pid}) - Workspace: ${claim.owner_workspace.split('/').pop()}`} 
-      />
-    );
+    if (claim.type === 'monitor') {
+      return { status: 'processing' as const, color: 'green', text: 'Monitoring' };
+    }
+    if (claim.type === 'upload') {
+      return { status: 'processing' as const, color: 'gold', text: 'Uploading' };
+    }
+    return { status: 'error' as const, text: 'Locked' };
   };
 
+  if (!hardware || hardware.length === 0) {
+    return (
+      <div style={{ padding: 32, textAlign: 'center' }}>
+        <Text type="secondary">No Hardware Devices Detected</Text>
+      </div>
+    );
+  }
+
   return (
-    <div className="hardware-rack">
-      <div className="global-divider">
-        <div className="divider-line"></div>
-        <span className="divider-text">SYSTEM GLOBAL LAYER</span>
-        <div className="divider-line"></div>
-      </div>
-      <header style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-        <h3 className="mono-label">HARDWARE_RACK</h3>
-        <span className="global-badge">SYS</span>
-      </header>
-      
-      <div className="hardware-list">
-        {hardware.length === 0 ? (
-          <div className="mono-label" style={{ textAlign: 'center', margin: '20px 0' }}>No Devices Detected</div>
-        ) : (
-          hardware.map((device, idx) => (
-            <div key={device.port + idx} className="hardware-item hover-container" style={{ position: 'relative' }}>
-              {renderStatusPip(device.claim)}
-              <div className="hardware-info">
-                <span className="hardware-port">{device.port.split('/').pop() || device.port}</span>
-                <span className="hardware-desc" title={`${device.description} (${device.hwid})`}>
-                  {device.detectedBoard ? `board:${device.detectedBoard}` : device.description}
-                </span>
+    <div style={{ 
+      display: 'flex', 
+      gap: 16, 
+      padding: 16, 
+      overflowX: 'auto',
+      height: '100%',
+      alignItems: 'flex-start'
+    }}>
+      {hardware.map(device => {
+        const badge = getBadgeProps(device);
+        const isMonitoring = device.claim?.type === 'monitor';
+        const isLocked = device.claim && device.claim.type !== 'monitor';
+        const isLoading = loadingMap[device.port];
+        const portName = device.port.split('/').pop() || device.port;
+
+        const isDisconnected = badge.text === 'Disconnected';
+        const isConnected = badge.text === 'Connected';
+
+        return (
+          <Card 
+            key={device.port}
+            size="small"
+            style={{ 
+              width: 320, 
+              flexShrink: 0,
+              backgroundColor: antdToken.colorBgContainer,
+              borderColor: antdToken.colorBorderSecondary,
+              boxShadow: '0 6px 16px -8px rgba(0,0,0,0.4), 0 9px 28px 0 rgba(0,0,0,0.3)',
+              borderRadius: 8
+            }}
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Space>
+                  <UsbOutlined style={{ color: badge.color === 'blue' ? '#1677ff' : badge.color === 'green' ? '#52c41a' : badge.color === 'gold' ? '#faad14' : badge.status === 'error' ? '#ff4d4f' : '#8c8c8c' }} />
+                  <Text strong ellipsis style={{ maxWidth: 150 }}>{portName}</Text>
+                </Space>
+                <Badge status={badge.status} color={badge.color} text={<span style={{ fontSize: 12 }}>{badge.text}</span>} />
               </div>
+            }
+            actions={[
+              <Tooltip key="toggle" title={isMonitoring ? 'Stop Serial Monitor' : (isLocked ? 'Port Locked by Another Process' : (isDisconnected ? 'Device Disconnected' : 'Start Serial Monitor'))}>
+                <Button 
+                  type={isMonitoring ? 'primary' : 'default'}
+                  danger={isMonitoring}
+                  icon={isMonitoring ? <StopOutlined /> : <PlayCircleOutlined />}
+                  onClick={() => toggleMonitor(device)}
+                  loading={isLoading}
+                  disabled={!!isLocked || isDisconnected}
+                  block
+                  style={{ 
+                    border: 'none', 
+                    background: 'transparent', 
+                    boxShadow: 'none', 
+                    color: isMonitoring ? undefined : (isConnected ? antdToken.colorPrimary : undefined) 
+                  }}
+                >
+                  {isMonitoring ? 'Stop Monitor' : 'Start Monitor'}
+                </Button>
+              </Tooltip>,
+              <Tooltip key="view" title={device.claim ? "View Logs" : "No Active Logs"}>
+                <Button 
+                  type="default"
+                  icon={<CodeOutlined />}
+                  onClick={() => onOpenTab && onOpenTab(device.port)}
+                  block
+                  disabled={!device.claim}
+                  style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}
+                >
+                  Logs
+                </Button>
+              </Tooltip>
+            ]}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: 130 }}>
               
-              <button 
-                onClick={() => toggleMonitor(device)}
-                disabled={loadingMap[device.port] || (device.claim && device.claim.type !== 'monitor')}
-                className="rack-btn"
-                style={{
-                  background: 'transparent', border: 'none', color: device.claim?.type === 'monitor' ? 'var(--error)' : 'var(--secondary)', 
-                  cursor: 'pointer', padding: '4px', opacity: (loadingMap[device.port] || device.claim?.type === 'monitor') ? 1 : 0.4,
-                }}
-                title={device.claim?.type === 'monitor' ? 'Kill Monitor' : 'Start Monitor'}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-                  {device.claim?.type === 'monitor' ? 'stop_circle' : 'play_circle'}
-                </span>
-              </button>
+              <div style={{ flex: 1 }}>
+                <Text type="secondary" style={{ fontSize: 10, letterSpacing: 1 }}>DEVICE INFO</Text>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
+                  {device.detectedBoard ? (
+                    <ApiOutlined style={{ marginTop: 4, color: '#52c41a' }} />
+                  ) : (
+                    <LinkOutlined style={{ marginTop: 4, color: '#8c8c8c' }} />
+                  )}
+                  <Text style={{ fontSize: 13, lineHeight: 1.4, color: (device.detectedBoard || (device.hwid && device.hwid !== 'n/a')) ? '#1677ff' : undefined }}>
+                    {device.detectedBoard ? `Board: ${device.detectedBoard}` : device.description}
+                  </Text>
+                </div>
+              </div>
+
+              <Divider style={{ margin: '4px 0' }} />
+              <div>
+                <Text type="secondary" style={{ fontSize: 10, letterSpacing: 1 }}>PROCESS ATTACHED</Text>
+                <div style={{ marginTop: 4 }}>
+                  {device.claim ? (
+                    <Tag icon={<DashboardOutlined />} color="blue" style={{ border: 'none' }}>
+                      PID: {device.claim.owner_pid}
+                    </Tag>
+                  ) : (
+                    <Text type="secondary" style={{ fontSize: 12 }}>None</Text>
+                  )}
+                </div>
+              </div>
             </div>
-          ))
-        )}
-      </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }
