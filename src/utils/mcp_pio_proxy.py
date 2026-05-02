@@ -79,6 +79,10 @@ def main():
             if not data:
                 break
             
+            # PTY often translates \n to \r\n, or miniterm might output \r\n.
+            # Normalize \r\n to \n to prevent double spacing in our log files.
+            data = data.replace(b'\r\n', b'\n')
+            
             # Write raw bytes out to our actual standard output
             sys.stdout.buffer.write(data)
             sys.stdout.buffer.flush()

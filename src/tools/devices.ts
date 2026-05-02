@@ -97,7 +97,7 @@ export async function getFirstDevice(): Promise<SerialDevice | null> {
     );
   });
 
-  return validDevices.length > 0 ? validDevices[0] : devices[0];
+  return validDevices.length > 0 ? validDevices[0] : null;
 }
 
 /**

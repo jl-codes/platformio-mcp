@@ -16,6 +16,8 @@ import { portSemaphoreManager } from "./semaphore.js";
 import { tailFileBounded } from "./tail.js";
 import { registerCommand, updateTaskStatus } from "./command-registry.js";
 import crypto from "node:crypto";
+import { mcpContext } from "./mcp-context.js";
+import { parseStderrErrors } from "./errors.js";
 
 import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
 
@@ -132,13 +134,15 @@ export async function executeWithSpooling(
     detached: false
   });
 
-  const commandId = options.rootCommandId || crypto.randomUUID();
+  const ctx = mcpContext.getStore();
+  const commandId = options.rootCommandId || ctx?.activityId || crypto.randomUUID();
   const taskId = crypto.randomUUID();
   const artType = options.artifactType || "build";
+  const targetProjectArea = projectArea || ctx?.targetProjectDir;
 
   if (proc.pid) {
-    logDiag(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, projectArea);
-    await registerBuildPid(proc.pid, projectArea);
+    logDiag(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, targetProjectArea);
+    await registerBuildPid(proc.pid, targetProjectArea);
     await registerCommand({
       id: commandId,
       commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
@@ -149,9 +153,10 @@ export async function executeWithSpooling(
         type: artType,
         status: "running",
         logPaths: [logFile],
-        pid: proc.pid
+        pid: proc.pid,
+        commandDesc: `pio ${command} ${args.join(" ")}`
       }]
-    }, projectArea).catch(e => logDiag(`[Spooler] Registry fail: ${e.message}`, projectArea));
+    }, targetProjectArea).catch(e => logDiag(`[Spooler] Registry fail: ${e.message}`, targetProjectArea));
   }
 
   try {
@@ -163,7 +168,7 @@ export async function executeWithSpooling(
   // UI Portal File Tailing
   let fileOffset = 0;
   let watcher: fs.FSWatcher | null = null;
-  portalEvents.clearTaskLog(projectArea, taskId, [logFile]);
+  portalEvents.clearTaskLog(targetProjectArea || "global", taskId, [logFile]);
 
   try {
     watcher = fs.watch(logFile, (eventType) => {
@@ -173,7 +178,7 @@ export async function executeWithSpooling(
           if (stat.size > fileOffset) {
             const stream = fs.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on('data', (chunk) => {
-              portalEvents.emitTaskLog(projectArea, taskId, chunk.toString());
+              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, chunk.toString());
             });
             fileOffset = stat.size;
           }
@@ -217,14 +222,24 @@ export async function executeWithSpooling(
 
     p.catch(e => {
       console.error(`[Background Task Error]: ${e.message}`);
-      updateTaskStatus(commandId, taskId, { status: "error" }, projectArea).catch(() => {});
+      updateTaskStatus(commandId, taskId, { status: "error", error: e.message }, targetProjectArea).catch(() => {});
       return 1;
     }).then(async (code) => {
+      let errorMessage = undefined;
+      if (code !== 0) {
+        try {
+          const lines = await tailFileBounded(logFile, 512 * 1024);
+          const errors = parseStderrErrors(lines.join("\n"));
+          if (errors && errors.length > 0) errorMessage = errors[0];
+        } catch {}
+      }
+      
       await updateTaskStatus(commandId, taskId, { 
         status: code === 0 ? "success" : "error",
-        exitCode: code 
-      }, projectArea).catch(() => {});
-      await unregisterBuildPid(projectArea);
+        exitCode: code,
+        ...(errorMessage ? { error: errorMessage } : {})
+      }, targetProjectArea).catch(() => {});
+      await unregisterBuildPid(targetProjectArea);
       if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
       try { fs.closeSync(outFd); } catch {}
       if (watcher) {
@@ -288,9 +303,19 @@ export async function executeWithSpooling(
     });
   });
 
+  let errorMessage = undefined;
+  if (exitCode !== 0) {
+    try {
+      const lines = await tailFileBounded(logFile, 512 * 1024);
+      const errors = parseStderrErrors(lines.join("\n"));
+      if (errors && errors.length > 0) errorMessage = errors[0];
+    } catch {}
+  }
+
   await updateTaskStatus(commandId, taskId, { 
     status: exitCode === 0 ? "success" : "error",
-    exitCode 
+    exitCode,
+    ...(errorMessage ? { error: errorMessage } : {})
   }, projectArea).catch(() => {});
 
   // Cleanup
@@ -337,4 +362,50 @@ export async function executeWithSpooling(
   }
 
   return { exitCode, finalOutput, fullLogPath: logFile };
+}
+
+/**
+ * Spools a large JSON dataset to disk if it exceeds a specified string length.
+ * Prevents MCP context window blowouts.
+ * 
+ * @param toolName - The name of the tool generating the data (used for the cache file name).
+ * @param data - The raw JSON object/array payload.
+ * @param targetDir - The target workspace directory to save the cache file.
+ * @param threshold - The character count threshold above which the data should be spooled (default: 2000).
+ * @returns Either the original data or a string message pointing to the file path.
+ */
+export function spoolLargeDataset(toolName: string, data: any, targetDir?: string, threshold = 2000): string | any {
+  const stringified = JSON.stringify(data, null, 2);
+  
+  if (stringified.length > threshold) {
+    // Determine the cache directory using standard getLogDir with toolName as verb
+    const cacheDir = getLogDir(toolName, targetDir);
+    
+    // Ensure the directory exists
+    if (!fs.existsSync(cacheDir)) {
+      fs.mkdirSync(cacheDir, { recursive: true });
+    }
+    
+    // Rotate logs to prevent infinite spools accumulating
+    rotateLogs(cacheDir, `${toolName}-`, 30);
+    
+    // Define the cache file path
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const shortHash = crypto.randomBytes(4).toString("hex");
+    const cacheFile = path.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
+    const latestFile = path.join(cacheDir, `latest-${toolName}.json`);
+    
+    // Write the raw JSON data to disk
+    fs.writeFileSync(cacheFile, stringified, "utf-8");
+    
+    // Update the latest symlink
+    try {
+      if (fs.existsSync(latestFile)) fs.unlinkSync(latestFile);
+      fs.symlinkSync(cacheFile, latestFile);
+    } catch {}
+    
+    return `Payload too large for context window. Full dataset successfully spooled to disk at ${cacheFile}. Please use your grep_search or view_file tools to query this file.`;
+  }
+  
+  return data;
 }

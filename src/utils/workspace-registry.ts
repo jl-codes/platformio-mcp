@@ -32,6 +32,11 @@ function ensureRegistryFile(): void {
  * De-duplicates adjacent identical calls during rapid sequential operations.
  */
 export async function addWorkspace(dir: string): Promise<void> {
+  const normalizedDir = path.resolve(dir);
+  if (!fs.existsSync(path.join(normalizedDir, 'platformio.ini'))) {
+    throw new Error("Directory is not a valid PlatformIO project (missing platformio.ini).");
+  }
+
   ensureRegistryFile();
 
   try {
@@ -44,12 +49,12 @@ export async function addWorkspace(dir: string): Promise<void> {
 
       if (records.length > 0) {
         const lastRecord = records[records.length - 1];
-        if (lastRecord.dir === dir) {
+        if (lastRecord.dir === normalizedDir) {
           return; // Already the latest, skip
         }
       }
 
-      records.push({ dir, timestamp: Date.now() });
+      records.push({ dir: normalizedDir, timestamp: Date.now() });
       fs.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
     } finally {
       await release();

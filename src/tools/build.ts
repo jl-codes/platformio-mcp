@@ -56,6 +56,10 @@ export async function buildProject(
       args.push("--environment", environment);
     }
 
+    // Add verbose flag if requested
+    if (verbose) {
+      args.push("--verbose");
+    }
 
     // Build can take a while, especially first time
     const result = await executeWithSpooling("run", args, {
@@ -290,6 +294,9 @@ export async function buildTarget(
       args.push("--environment", environment);
     }
 
+    if (verbose) {
+      args.push("--verbose");
+    }
 
     const result = await executeWithSpooling("run", args, {
       cwd: validatedPath,
@@ -406,21 +413,45 @@ export async function checkTaskStatus(taskId?: string, logPath?: string, project
   const baseDir = projectDir || SERVER_DATA_DIR;
   if (!projectDir) ensureGlobalDirs();
   
+  const history = getCommandHistory(baseDir);
+  let resolvedTaskId = taskId;
+
+  // 1. Reverse Lookup by logPath
+  if (!resolvedTaskId && logPath) {
+    for (const cmd of history) {
+      const match = cmd.tasks?.find(t => t.logPaths?.includes(logPath));
+      if (match) {
+        resolvedTaskId = cmd.id; // Command ID acts as the primary task reference
+        break;
+      }
+    }
+  }
+
+  // 2. Smart Fallback if still no taskId
+  if (!resolvedTaskId) {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const cmd = history[i];
+      if (cmd.tasks && cmd.tasks.length > 0) {
+        resolvedTaskId = cmd.id;
+        break;
+      }
+    }
+  }
+
   let status = "completed";
   let output = "No output available.";
   let logPaths: string[] = [];
 
-  const history = getCommandHistory(baseDir);
-
-  if (taskId) {
-    const cmd = history.find(c => c.id === taskId);
+  // 3. Unified Execution
+  if (resolvedTaskId) {
+    const cmd = history.find(c => c.id === resolvedTaskId);
     if (cmd) {
       status = cmd.status;
       logPaths = cmd.tasks
         .flatMap(a => a.logPaths || [])
         .filter((f): f is string => Boolean(f));
       
-      const latestLog = logPaths[logPaths.length - 1];
+      const latestLog = logPath || logPaths[logPaths.length - 1];
       if (latestLog && fs.existsSync(latestLog)) {
          try {
            const lines = await tailFileBounded(latestLog, 512 * 1024);
@@ -428,25 +459,15 @@ export async function checkTaskStatus(taskId?: string, logPath?: string, project
          } catch(e: any) {
            output = `[Status Polling Error] Could not read log: ${e.message}`;
          }
+      } else if (latestLog) {
+         output = `Log file not found: ${latestLog}`;
       }
     } else {
        status = "failed";
-       output = `Task ID not found: ${taskId}`;
+       output = `Task ID not found: ${resolvedTaskId}`;
     }
-  } else if (logPath) {
-     logPaths = [logPath];
-     if (fs.existsSync(logPath)) {
-        try {
-           const lines = await tailFileBounded(logPath, 512 * 1024);
-           output = lines.slice(-150).join("\n");
-        } catch(e: any) {
-           output = `[Status Polling Error] Could not read log: ${e.message}`;
-        }
-     } else {
-        output = `Log file not found: ${logPath}`;
-     }
   } else {
-    // Legacy fallback
+    // Absolute legacy fallback
     const logFile = path.join(baseDir, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
     const active = isBuildActive(projectDir);
     status = active ? "running" : "completed";
@@ -459,7 +480,7 @@ export async function checkTaskStatus(taskId?: string, logPath?: string, project
         output = `[Status Polling Error] Could not read log: ${e.message}`;
       }
     } else {
-      output = "No active build log found.";
+      output = "No active task or build log found.";
     }
 
     if (!active && output.includes("FAILED")) status = "failed";
@@ -468,7 +489,7 @@ export async function checkTaskStatus(taskId?: string, logPath?: string, project
 
   return {
     status,
-    taskId,
+    taskId: resolvedTaskId,
     logPaths,
     output
   };

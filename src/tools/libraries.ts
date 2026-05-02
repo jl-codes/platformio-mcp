@@ -110,7 +110,7 @@ export async function installLibrary(
 
     const result = await platformioExecutor.execute(
       "lib",
-      ["install", librarySpec],
+      options?.projectDir ? ["install", librarySpec] : ["--global", "install", librarySpec],
       execOptions,
     );
 
@@ -155,7 +155,7 @@ export async function listInstalledLibraries(
 
     const result = await platformioExecutor.executeWithJsonOutput(
       "lib",
-      ["list"],
+      projectDir ? ["list"] : ["--global", "list"],
       z.union([LibrariesArraySchema, LibrariesObjectSchema]),
       execOptions,
     );
@@ -223,7 +223,7 @@ export async function uninstallLibrary(
 
     const result = await platformioExecutor.execute(
       "pkg",
-      ["uninstall", "--library", libraryName],
+      ["uninstall", ...(projectDir ? [] : ["--global"]), "--library", libraryName],
       execOptions,
     );
 
@@ -267,7 +267,7 @@ export async function updateLibraries(
 
     const result = await platformioExecutor.execute(
       "lib",
-      ["update"],
+      projectDir ? ["update"] : ["--global", "update"],
       execOptions,
     );
 
@@ -317,7 +317,7 @@ export async function updateLibrary(
 
     const result = await platformioExecutor.execute(
       "pkg",
-      ["update", "--library", libraryName],
+      ["update", ...(projectDir ? [] : ["--global"]), "--library", libraryName],
       execOptions,
     );
 

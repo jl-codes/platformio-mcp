@@ -18,6 +18,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "url";
 import { z } from "zod";
+import crypto from "node:crypto";
+import { registerCommand, updateTaskStatus } from "./utils/command-registry.js";
+import { mcpContext } from "./utils/mcp-context.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -234,7 +237,53 @@ export class PlatformIOExecutor {
     },
   ): Promise<CommandResult> {
     const fullArgs = [command, ...args];
-    return execPioCommand(fullArgs, options);
+    
+    // Attempt telemetry tracking for observability of inline executions
+    const ctx = mcpContext.getStore();
+    const commandId = ctx?.activityId;
+    const targetProjectDir = ctx?.targetProjectDir || options?.cwd;
+    let taskId: string | undefined = undefined;
+    
+    if (commandId) {
+      taskId = crypto.randomUUID();
+      try {
+        await registerCommand({
+          id: commandId,
+          commandDesc: `PIO Task: pio ${fullArgs.join(" ")}`,
+          timestamp: Date.now(),
+          status: "running",
+          tasks: [{
+            taskId,
+            type: command as any,
+            status: "running",
+            commandDesc: `pio ${fullArgs.join(" ")}`
+          }]
+        }, targetProjectDir);
+      } catch (e: any) {
+        console.error(`[PlatformIO] Inline telemetry failure: ${e.message}`);
+      }
+    }
+
+    try {
+      const result = await execPioCommand(fullArgs, options);
+      
+      if (commandId && taskId) {
+        await updateTaskStatus(commandId, taskId, {
+          status: result.exitCode === 0 ? "success" : "error",
+          exitCode: result.exitCode
+        }, targetProjectDir).catch(() => {});
+      }
+      
+      return result;
+    } catch (error: any) {
+      if (commandId && taskId) {
+        await updateTaskStatus(commandId, taskId, {
+          status: "error",
+          exitCode: error.code || 1
+        }, targetProjectDir).catch(() => {});
+      }
+      throw error;
+    }
   }
 
   /**
