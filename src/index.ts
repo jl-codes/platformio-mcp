@@ -537,7 +537,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name } = request.params;
   const args: any = request.params.arguments || {};
   if (args.projectDir) {
-    portalEvents.emitWorkspaceState(args.projectDir);
+    try {
+      portalEvents.emitWorkspaceState(args.projectDir);
+    } catch (e: any) {
+      logDiag(`[Middleware] Workspace validation deferred: ${e.message}`, args.projectDir);
+    }
   }
 
   const activityId = crypto.randomUUID();

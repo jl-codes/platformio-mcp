@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { startMonitor, stopMonitor, queryLogs } from '../src/tools/monitor.js';
-import { registerPioMonitorPid, killPioMonitorByPort, unregisterPioMonitorPid } from '../src/utils/process-manager.js';
+import { registerPioMonitorPid, killPioMonitorByPort, unregisterPioMonitorPid, getActiveMonitorPids } from '../src/utils/process-manager.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -23,14 +23,12 @@ describe('Monitor API', () => {
 
   it('registers and unregisters PIO monitor PID correctly in workspace', async () => {
     await registerPioMonitorPid('COM1', 12345, testProjectDir);
-    const pidsFilePath = path.join(testProjectDir, '.pio-mcp-workspace', 'serial_monitors', 'monitor-pids.json');
     
-    expect(fs.existsSync(pidsFilePath)).toBe(true);
-    const content = JSON.parse(fs.readFileSync(pidsFilePath, 'utf8'));
+    const content = getActiveMonitorPids(testProjectDir);
     expect(content['COM1']).toBe(12345);
 
     await unregisterPioMonitorPid('COM1', testProjectDir);
-    const updatedContent = JSON.parse(fs.readFileSync(pidsFilePath, 'utf8'));
+    const updatedContent = getActiveMonitorPids(testProjectDir);
     expect(updatedContent['COM1']).toBeUndefined();
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { registerCommand, updateArtifactStatus, getCommandHistory, CommandRecord } from '../src/utils/command-registry.js';
+import { registerCommand, updateTaskStatus, getCommandHistory, CommandRecord } from '../src/utils/command-registry.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -25,9 +25,10 @@ describe('Command Registry', () => {
       commandDesc: 'pio run',
       timestamp: Date.now(),
       status: 'running',
-      artifacts: [
+      source: 'agent',
+      tasks: [
         {
-          id: 'art-1',
+          taskId: 'art-1',
           type: 'build',
           status: 'running'
         }
@@ -39,9 +40,10 @@ describe('Command Registry', () => {
     const history = getCommandHistory(testProjectDir);
     expect(history.length).toBe(1);
     expect(history[0].id).toBe('cmd-1');
-    expect(history[0].artifacts.length).toBe(1);
-    expect(history[0].artifacts[0].id).toBe('art-1');
-    expect(history[0].artifacts[0].type).toBe('build');
+    expect(history[0].source).toBe('agent');
+    expect(history[0].tasks.length).toBe(1);
+    expect(history[0].tasks[0].taskId).toBe('art-1');
+    expect(history[0].tasks[0].type).toBe('build');
   });
 
   it('should recursively override deep keys inside the artifacts array via updateArtifactStatus', async () => {
@@ -50,9 +52,10 @@ describe('Command Registry', () => {
       commandDesc: 'pio test',
       timestamp: Date.now(),
       status: 'running',
-      artifacts: [
+      source: 'dashboard',
+      tasks: [
         {
-          id: 'art-2',
+          taskId: 'art-2',
           type: 'test',
           status: 'running'
         }
@@ -61,17 +64,18 @@ describe('Command Registry', () => {
 
     await registerCommand(record, testProjectDir);
     
-    // Update artifact status to success and add exitCode
-    await updateArtifactStatus('cmd-2', 'art-2', { status: 'success', exitCode: 0 }, testProjectDir);
+    // Update task status to success and add exitCode
+    await updateTaskStatus('cmd-2', 'art-2', { status: 'success', exitCode: 0 }, testProjectDir);
 
     const history = getCommandHistory(testProjectDir);
     const cmd = history.find(c => c.id === 'cmd-2');
     expect(cmd).toBeDefined();
     
     // Validate deep keys were recursively overridden
-    expect(cmd!.artifacts[0].status).toBe('success');
-    expect(cmd!.artifacts[0].exitCode).toBe(0);
-    expect(cmd!.artifacts[0].type).toBe('test'); // Retains original data
+    expect(cmd!.source).toBe('dashboard');
+    expect(cmd!.tasks[0].status).toBe('success');
+    expect(cmd!.tasks[0].exitCode).toBe(0);
+    expect(cmd!.tasks[0].type).toBe('test'); // Retains original data
 
     // Since all artifacts are success, parent status should be automatically rolled up to success
     expect(cmd!.status).toBe('success');
