@@ -171,9 +171,7 @@ class PortalEventEmitter extends EventEmitter {
     this.lastKnownProjectDir = projectDir;
     
     // Dynamically persist to the server-level tracking registry
-    addWorkspace(projectDir).catch(() => {
-        // Silently swallow in case it's a test or init_project before ini is created
-    });
+    addWorkspace(projectDir);
 
     this.emit("workspace_state", {
       timestamp: Date.now(),
@@ -183,6 +181,16 @@ class PortalEventEmitter extends EventEmitter {
 
   getLastKnownWorkspace() {
     return this.lastKnownProjectDir;
+  }
+
+  /**
+   * Emit an update signal when the overall workspaces registry changes.
+   */
+  emitWorkspacesUpdated(workspaces: string[]) {
+    this.emit("workspaces_updated", {
+      timestamp: Date.now(),
+      workspaces,
+    });
   }
 }
 

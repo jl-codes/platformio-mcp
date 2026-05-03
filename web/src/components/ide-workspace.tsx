@@ -72,7 +72,11 @@ export default function IDEWorkspace({
   if (openTabs.length === 0) {
     return (
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Empty description={<Text type="secondary" style={{ fontFamily: 'Fira Code' }}>NO TABS OPEN. SELECT A TRACE FROM THE COMMAND FEED.</Text>} />
+        <Empty 
+          image="/pio_mcp_220x220.png"
+          imageStyle={{ height: 180, marginBottom: 24, opacity: 0.85 }}
+          description={<Text type="secondary" style={{ fontFamily: 'Fira Code', fontSize: '14px', letterSpacing: '1px' }}>NO TABS OPEN. SELECT A TRACE FROM THE COMMAND FEED.</Text>} 
+        />
       </div>
     );
   }

@@ -208,6 +208,10 @@ function App() {
       fetchWorkspaces();
     });
 
+    socket.on('workspaces_updated', (data: { workspaces: string[] }) => {
+      setKnownWorkspaces(data.workspaces);
+    });
+
     socket.on('build_log', (data: LogEvent & { taskId?: string }) => {
       const id = data.artifactId || data.taskId;
       if (!id) return;

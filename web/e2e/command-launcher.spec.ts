@@ -31,6 +31,20 @@ test.describe('Command Launcher & Target Environment', () => {
 
     // Verify the modal has loaded by checking for the execute button
     await expect(page.locator('button:has-text("EXECUTE")')).toBeVisible();
+
+    // Ensure the Target Environment Select has finished loading the config
+    await expect(page.locator('.ant-select-loading')).toHaveCount(0);
+
+    // Open Target Environment dropdown
+    await page.locator('#environment').click({ force: true });
+    
+    // Wait for the deterministic portal class to appear
+    const dropdown = page.locator('.target-environment-dropdown');
+    await expect(dropdown).toBeVisible();
+    
+    // Verify the hydrated options exist inside the portal
+    await expect(dropdown.locator('.ant-select-item-option-content', { hasText: 'esp32dev' })).toBeVisible();
+    await expect(dropdown.locator('.ant-select-item-option-content', { hasText: 'uno' })).toBeVisible();
   });
 
   test('should stream logs and show correct visual status when dispatching a task', async ({ page }) => {

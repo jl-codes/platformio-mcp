@@ -122,7 +122,7 @@ export default function WorkspaceCockpit({
           <Dropdown
             menu={{
               items: [
-                ...knownWorkspaces.map(ws => ({ key: ws, label: <span className="mono-label" style={{ fontSize: '12px' }}>{ws.split('/').pop()}</span> })),
+                ...knownWorkspaces.map(ws => ({ key: ws, label: <span className="mono-label" style={{ fontSize: '12px' }}>{ws.split('/').filter(Boolean).pop()}</span> })),
                 { type: 'divider', key: 'div1' },
                 { key: 'open-project', icon: <FolderOpenOutlined />, label: 'Open Project' }
               ],
@@ -138,7 +138,7 @@ export default function WorkspaceCockpit({
           >
             <Button style={{ fontFamily: 'Fira Code', width: '280px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {activeWorkspace ? activeWorkspace.split('/').pop() : 'No Project Selected'}
+                {activeWorkspace ? activeWorkspace.split('/').filter(Boolean).pop() : 'No Project Selected'}
               </span>
               <DownOutlined style={{ fontSize: '10px', color: '#8c8c8c' }} />
             </Button>

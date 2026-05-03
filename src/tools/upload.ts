@@ -22,7 +22,6 @@ import { UploadError, PlatformIOError } from "../utils/errors.js";
 import { parseStderrErrors } from "../utils/errors.js";
 import { stopMonitor } from "./monitor.js";
 import { portSemaphoreManager } from "../utils/semaphore.js";
-import { mcpContext } from "../utils/mcp-context.js";
 
 /**
  * Uploads a SPIFFS/LittleFS filesystem image to a target device.
@@ -75,13 +74,11 @@ export async function uploadFilesystem(
 
     const uploadArgs: string[] = ["run", "--target", "uploadfs"];
     if (environment) uploadArgs.push("--environment", environment);
-    if (verbose) uploadArgs.push("--verbose");
 
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Filesystem Upload");
 
-    const ctx = mcpContext.getStore();
-    const rootCommandId = ctx?.activityId || crypto.randomUUID();
+    const rootCommandId = crypto.randomUUID();
 
     const uploadResult = await executeWithSpooling(
       "run",
@@ -199,13 +196,11 @@ export async function uploadFirmware(
 
     const uploadArgs: string[] = ["run", "--target", "upload"];
     if (environment) uploadArgs.push("--environment", environment);
-    if (verbose) uploadArgs.push("--verbose");
 
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Firmware Upload");
 
-    const ctx = mcpContext.getStore();
-    const rootCommandId = ctx?.activityId || crypto.randomUUID();
+    const rootCommandId = crypto.randomUUID();
 
     const uploadResult = await executeWithSpooling(
       "run",

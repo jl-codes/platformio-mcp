@@ -16,7 +16,7 @@
     "build": "npm run build:ui && tsc",
     "dev": "tsx src/index.ts",
     "watch": "tsc --watch",
-    "test": "vitest run",
+    "test": "vitest run tests",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/**/*.ts",

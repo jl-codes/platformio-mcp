@@ -15,6 +15,7 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
   const [form] = Form.useForm();
   const [action, setAction] = useState('build_project');
   const [loading, setLoading] = useState(false);
+  const [isFetchingConfig, setIsFetchingConfig] = useState(false);
   const [environments, setEnvironments] = useState<string[]>([]);
 
   useEffect(() => {
@@ -45,8 +46,11 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
           }
         } catch (e) {
           console.error(e);
+        } finally {
+          setIsFetchingConfig(false);
         }
       };
+      setIsFetchingConfig(true);
       fetchConfig();
     }
   }, [isOpen, activeWorkspace, apiBase, token, form]);
@@ -118,7 +122,12 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
 
         {hasEnv && (
           <Form.Item name="environment" label="TARGET ENVIRONMENT">
-            <Select allowClear placeholder="Auto-Detect / Default">
+            <Select 
+              allowClear 
+              placeholder="Auto-Detect / Default"
+              loading={isFetchingConfig}
+              popupClassName="target-environment-dropdown"
+            >
               {environments.length === 0 && <Select.Option value="">Auto-Detect / Default</Select.Option>}
               {environments.map(e => <Select.Option key={e} value={e}>{e}</Select.Option>)}
             </Select>

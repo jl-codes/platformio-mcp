@@ -32,11 +32,6 @@ function ensureRegistryFile(): void {
  * De-duplicates adjacent identical calls during rapid sequential operations.
  */
 export async function addWorkspace(dir: string): Promise<void> {
-  const normalizedDir = path.resolve(dir);
-  if (!fs.existsSync(path.join(normalizedDir, 'platformio.ini'))) {
-    throw new Error("Directory is not a valid PlatformIO project (missing platformio.ini).");
-  }
-
   ensureRegistryFile();
 
   try {
@@ -49,12 +44,12 @@ export async function addWorkspace(dir: string): Promise<void> {
 
       if (records.length > 0) {
         const lastRecord = records[records.length - 1];
-        if (lastRecord.dir === normalizedDir) {
+        if (lastRecord.dir === dir) {
           return; // Already the latest, skip
         }
       }
 
-      records.push({ dir: normalizedDir, timestamp: Date.now() });
+      records.push({ dir, timestamp: Date.now() });
       fs.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
     } finally {
       await release();
@@ -94,9 +89,11 @@ export async function getWorkspaces(): Promise<string[]> {
     }
   }
 
+  // Return newest workspaces first, filtering out directories missing platformio.ini
   return Array.from(seen.entries())
-    .sort((a, b) => a[1] - b[1])
-    .map(entry => entry[0]);
+    .sort((a, b) => b[1] - a[1])
+    .map(entry => entry[0])
+    .filter(dir => fs.existsSync(path.join(dir, "platformio.ini")));
 }
 
 /**

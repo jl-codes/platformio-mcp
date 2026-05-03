@@ -38,8 +38,6 @@ export interface TaskRecord {
   port?: string; // Target hardware interface mapping
   pid?: number; // Monitored system daemon integer
   exitCode?: number; // CLI resulting integer status code
-  commandDesc?: string; // The exact CLI command passed to the terminal for this task
-  error?: string; // Descriptive error message if the task failed
 }
 
 export interface CommandRecord {
@@ -48,11 +46,6 @@ export interface CommandRecord {
   timestamp: number; // Unix epoch of initiation
   status: "running" | "success" | "error" | "terminated"; // Overall process status
   tasks: TaskRecord[]; // Log outputs and child executions
-  mcpRequest?: any; // The exact parameters sent to the MCP tool
-  mcpResponse?: any; // The exact response payload returned to the agent
-  mcpToolName?: string; // The specific tool verb invoked (e.g. 'build_project')
-  source?: "agent" | "dashboard"; // Originating entity for the execution
-  error?: string; // Descriptive error message if the command failed
 }
 
 /**
@@ -158,13 +151,7 @@ export async function updateTaskStatus(commandId: string, taskId: string, update
           const anyError = cmd.tasks.some(a => a.status === 'error');
           const anyRunning = cmd.tasks.some(a => a.status === 'running');
           
-          if (anyError) {
-            cmd.status = 'error';
-            const failedTask = cmd.tasks.find(a => a.status === 'error' && a.error);
-            if (failedTask?.error) {
-              cmd.error = failedTask.error;
-            }
-          }
+          if (anyError) cmd.status = 'error';
           else if (anyRunning) cmd.status = 'running';
           else if (allSuccess) cmd.status = 'success';
           else cmd.status = 'terminated';

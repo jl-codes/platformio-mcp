@@ -23,7 +23,6 @@ import { tailFileBounded } from "../utils/tail.js";
 import { getLogDir, rotateSpoolerStreams } from "../utils/spooler.js";
 import { getWorkspaces, rewriteRegistry } from "../utils/workspace-registry.js";
 import { getActiveMonitorPids, isPidAlive, isBuildActive } from "../utils/process-manager.js";
-import { mcpContext } from "../utils/mcp-context.js";
 
 
 
@@ -126,8 +125,7 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string, rootComm
 
   if (proc.pid) {
     // Record PID to workspace tracker
-    const cliDesc = `pio device monitor ${monitorArgs.join(" ")}`;
-    await registerPioMonitorPid(targetPort, proc.pid, projectDir, rootCommandId, daemon.logFile, daemon.taskId, cliDesc);
+    await registerPioMonitorPid(targetPort, proc.pid, projectDir, rootCommandId, daemon.logFile);
   }
 
   // Symlink or copy to 'latest-monitor.log' for easy querying
@@ -158,81 +156,65 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string, rootComm
 export async function rehydrateMonitors(): Promise<void> {
   const workspaces = await getWorkspaces();
   let rehydrationCount = 0;
-  const keptWorkspaces: { dir: string, active: boolean }[] = [];
+  const activeWorkspaces: string[] = [];
 
   for (const projectDir of workspaces) {
-    let workspaceIsActive = false;
+    if (fs.existsSync(projectDir)) {
+      activeWorkspaces.push(projectDir);
 
-    // Prune immediately if the project dir or platformio.ini is missing
-    if (!fs.existsSync(projectDir) || !fs.existsSync(path.join(projectDir, "platformio.ini"))) {
-      continue;
-    }
+      if (isBuildActive(projectDir)) {
+        // Build is active
+      }
 
-    if (isBuildActive(projectDir)) {
-      workspaceIsActive = true;
-    }
-
-    const pids = getActiveMonitorPids(projectDir);
-    for (const port in pids) {
-      const pid = pids[port];
-      if (isPidAlive(pid)) {
-        workspaceIsActive = true;
-        if (!activeDaemons[port]) {
-          const logFile = path.join(getLogDir("monitor", projectDir), "latest-monitor.log");
-          let currentSize = 0;
-          try {
-            if (fs.existsSync(logFile)) {
-              currentSize = fs.statSync(logFile).size;
-            }
-          } catch {}
-
-          const daemon: DaemonContext = {
-            baudRate: 115200, // Placeholder
-            hwid: null,
-            logFile,
-            fileOffset: currentSize,
-          };
-          activeDaemons[port] = daemon;
-
-          try {
-             daemon.watcher = fs.watch(logFile, (eventType) => {
-              if (eventType === 'change') {
-                try {
-                  const stat = fs.statSync(logFile);
-                  if (stat.size > (daemon.fileOffset || 0)) {
-                    const stream = fs.createReadStream(logFile, { start: daemon.fileOffset || 0, end: stat.size - 1 });
-                    stream.on('data', (chunk) => {
-                      portalEvents.emitSerialLog(port, chunk.toString(), daemon.taskId);
-                    });
-                    daemon.fileOffset = stat.size;
-                  }
-                } catch (e) {}
+      const pids = getActiveMonitorPids(projectDir);
+      for (const port in pids) {
+        const pid = pids[port];
+        if (isPidAlive(pid)) {
+          if (!activeDaemons[port]) {
+            const logFile = path.join(getLogDir("monitor", projectDir), "latest-monitor.log");
+            let currentSize = 0;
+            try {
+              if (fs.existsSync(logFile)) {
+                currentSize = fs.statSync(logFile).size;
               }
-            });
-            rehydrationCount++;
-            logDiag(`[Monitor Recovery] Successfully rehydrated stream for ${port} (PID: ${pid}) in ${projectDir}`);
-          } catch (e: any) {
-             logDiag(`[Monitor Recovery] Failed to attach fs.watch to orphaned port ${port}: ${e.message}`, projectDir);
+            } catch {}
+
+            const daemon: DaemonContext = {
+              baudRate: 115200, // Placeholder
+              hwid: null,
+              logFile,
+              fileOffset: currentSize,
+            };
+            activeDaemons[port] = daemon;
+
+            try {
+               daemon.watcher = fs.watch(logFile, (eventType) => {
+                if (eventType === 'change') {
+                  try {
+                    const stat = fs.statSync(logFile);
+                    if (stat.size > (daemon.fileOffset || 0)) {
+                      const stream = fs.createReadStream(logFile, { start: daemon.fileOffset || 0, end: stat.size - 1 });
+                      stream.on('data', (chunk) => {
+                        portalEvents.emitSerialLog(port, chunk.toString(), daemon.taskId);
+                      });
+                      daemon.fileOffset = stat.size;
+                    }
+                  } catch (e) {}
+                }
+              });
+              rehydrationCount++;
+              logDiag(`[Monitor Recovery] Successfully rehydrated stream for ${port} (PID: ${pid}) in ${projectDir}`);
+            } catch (e: any) {
+               logDiag(`[Monitor Recovery] Failed to attach fs.watch to orphaned port ${port}: ${e.message}`, projectDir);
+            }
           }
         }
       }
     }
-
-    keptWorkspaces.push({ dir: projectDir, active: workspaceIsActive });
-  }
-
-  // Prune inactive workspaces if we have more than 10 total
-  while (keptWorkspaces.length > 10) {
-    const oldestInactiveIndex = keptWorkspaces.findIndex(w => !w.active);
-    if (oldestInactiveIndex !== -1) {
-      keptWorkspaces.splice(oldestInactiveIndex, 1);
-    } else {
-      break; // All remaining are active, we must keep them
-    }
   }
 
   // Atomically recreate the workspaces log to drop zombie entries
-  await rewriteRegistry(keptWorkspaces.map(w => w.dir));
+  await rewriteRegistry(activeWorkspaces);
 
   if (rehydrationCount > 0) {
     portalEvents.emitSpoolerStates(activeDaemons);
@@ -246,8 +228,6 @@ export async function startMonitor(
   environment?: string,
   rootCommandId?: string,
 ) {
-  const ctx = mcpContext.getStore();
-  const effectiveCommandId = rootCommandId || ctx?.activityId;
   let activePort = port;
   let activeHwid: string | null = null;
   
@@ -304,7 +284,7 @@ export async function startMonitor(
   };
   activeDaemons[activePort] = daemon;
 
-  await spawnPioMonitor(activePort, projectDir, effectiveCommandId);
+  await spawnPioMonitor(activePort, projectDir, rootCommandId);
 
   // Attach UI portal tailing
   try {

@@ -65,3 +65,9 @@ temp/
 !.agents/skills/pio-manager/
 .gemini/
 .stitch/
+
+# Playwright Test Artifacts
+playwright-report/
+web/playwright-report/
+test-results/
+web/test-results/
