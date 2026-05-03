@@ -1,0 +1,339 @@
+
+> platformio-mcp-web@1.0.0 test
+> vitest --run
+
+
+ RUN  v1.6.1 /Users/mcneillm/Documents/Projects/platformio-mcp/web
+
+ ❯ src/tests/components/dependencies-viewer.test.tsx  (0 test)
+ ❯ src/tests/components/command-feed.test.tsx  (0 test)
+ ❯ src/tests/integration/hybrid-e2e.test.tsx  (0 test)
+ ❯ src/tests/components/command-launcher.test.tsx  (0 test)
+stderr | src/__tests__/command-feed.test.tsx > CommandFeed Component > renders MCP Layer correctly
+Warning: [antd: Modal] `destroyOnClose` is deprecated. Please use `destroyOnHidden` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [rc-collapse] `children` will be removed in next major version. Please use `items` instead.
+Warning: [antd: Divider] `orientation` is used for direction, please use `titlePlacement` replace this
+Warning: [antd: Divider] `orientation` is used for direction, please use `titlePlacement` replace this
+
+stderr | src/__tests__/command-feed.test.tsx > CommandFeed Component > renders OS/Hardware Layer correctly underneath MCP layer
+Warning: [antd: Modal] `destroyOnClose` is deprecated. Please use `destroyOnHidden` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [rc-collapse] `children` will be removed in next major version. Please use `items` instead.
+Warning: [antd: Divider] `orientation` is used for direction, please use `titlePlacement` replace this
+Warning: [antd: Divider] `orientation` is used for direction, please use `titlePlacement` replace this
+
+stderr | src/__tests__/command-feed.test.tsx > CommandFeed Component > gracefully falls back to commandDesc when mcpToolName is missing
+Warning: [antd: Modal] `destroyOnClose` is deprecated. Please use `destroyOnHidden` instead.
+Warning: [antd: Collapse] `expandIconPosition` is deprecated. Please use `expandIconPlacement` instead.
+Warning: [rc-collapse] `children` will be removed in next major version. Please use `items` instead.
+
+ ✓ src/__tests__/command-feed.test.tsx  (3 tests) 397ms
+ ❯ src/__tests__/status-indicators.test.tsx  (5 tests | 5 failed) 512ms
+   ❯ src/__tests__/status-indicators.test.tsx > Status Indicators > displays a pulsing green dot when active/running
+     → ResizeObserver is not defined
+   ❯ src/__tests__/status-indicators.test.tsx > Status Indicators > displays a pulsing gold dot when uploading
+     → ResizeObserver is not defined
+   ❯ src/__tests__/status-indicators.test.tsx > Status Indicators > displays a static blue dot when idle or connected
+     → ResizeObserver is not defined
+   ❯ src/__tests__/status-indicators.test.tsx > Status Indicators > displays a static red dot when in error state or locked by something else
+     → ResizeObserver is not defined
+   ❯ src/__tests__/status-indicators.test.tsx > Status Indicators > displays a static grey dot when disconnected
+     → ResizeObserver is not defined
+stderr | src/__tests__/status-indicators.test.tsx > Status Indicators > displays a pulsing green dot when active/running
+Error: Uncaught [ReferenceError: ResizeObserver is not defined]
+    at reportException (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
+    at innerInvokeEventListeners (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:353:9)
+    at invokeEventListeners (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:286:3)
+    at HTMLUnknownElementImpl._dispatch (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:233:9)
+    at HTMLUnknownElementImpl.dispatchEvent (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:104:17)
+    at HTMLUnknownElement.dispatchEvent (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js:241:34)
+    at Object.invokeGuardedCallbackDev (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:4213:16)
+    at invokeGuardedCallback (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:4277:31)
+    at reportUncaughtErrorInDEV (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:22877:5)
+    at captureCommitPhaseError (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27165:5) ReferenceError: ResizeObserver is not defined
+    at ensureResizeObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:24:5)
+    at observe (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:37:5)
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/useResizeObserver.js:76:33
+    at commitHookEffectListMount (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24905:3)
+    at flushPassiveEffectsImpl (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27078:3)
+    at flushPassiveEffects (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27023:14)
+The above error occurred in the <SingleObserver> component:
+
+    at SingleObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/SingleObserver/index.js:17:5)
+    at ResizeObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/index.js:33:5)
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/typography/Base/index.js:62:16
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/typography/Text.js:17:5
+    at div
+    at Item (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/space/Item.js:15:5)
+    at div
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/space/index.js:38:39
+    at div
+    at div
+    at div
+    at div
+    at div
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/card/Card.js:46:16
+    at div
+    at HardwareRack (/Users/mcneillm/Documents/Projects/platformio-mcp/web/src/components/hardware-rack.tsx:10:25)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+
+stderr | src/__tests__/status-indicators.test.tsx > Status Indicators > displays a pulsing gold dot when uploading
+Error: Uncaught [ReferenceError: ResizeObserver is not defined]
+    at reportException (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
+    at innerInvokeEventListeners (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:353:9)
+    at invokeEventListeners (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:286:3)
+    at HTMLUnknownElementImpl._dispatch (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:233:9)
+    at HTMLUnknownElementImpl.dispatchEvent (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:104:17)
+    at HTMLUnknownElement.dispatchEvent (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js:241:34)
+    at Object.invokeGuardedCallbackDev (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:4213:16)
+    at invokeGuardedCallback (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:4277:31)
+    at reportUncaughtErrorInDEV (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:22877:5)
+    at captureCommitPhaseError (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27165:5) ReferenceError: ResizeObserver is not defined
+    at ensureResizeObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:24:5)
+    at observe (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:37:5)
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/useResizeObserver.js:76:33
+    at commitHookEffectListMount (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24905:3)
+    at flushPassiveEffectsImpl (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27078:3)
+    at flushPassiveEffects (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27023:14)
+The above error occurred in the <SingleObserver> component:
+
+    at SingleObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/SingleObserver/index.js:17:5)
+    at ResizeObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/index.js:33:5)
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/typography/Base/index.js:62:16
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/typography/Text.js:17:5
+    at div
+    at Item (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/space/Item.js:15:5)
+    at div
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/space/index.js:38:39
+    at div
+    at div
+    at div
+    at div
+    at div
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/card/Card.js:46:16
+    at div
+    at HardwareRack (/Users/mcneillm/Documents/Projects/platformio-mcp/web/src/components/hardware-rack.tsx:10:25)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+
+stderr | src/__tests__/status-indicators.test.tsx > Status Indicators > displays a static blue dot when idle or connected
+Error: Uncaught [ReferenceError: ResizeObserver is not defined]
+    at reportException (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
+    at innerInvokeEventListeners (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:353:9)
+    at invokeEventListeners (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:286:3)
+    at HTMLUnknownElementImpl._dispatch (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:233:9)
+    at HTMLUnknownElementImpl.dispatchEvent (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:104:17)
+    at HTMLUnknownElement.dispatchEvent (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js:241:34)
+    at Object.invokeGuardedCallbackDev (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:4213:16)
+    at invokeGuardedCallback (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:4277:31)
+    at reportUncaughtErrorInDEV (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:22877:5)
+    at captureCommitPhaseError (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27165:5) ReferenceError: ResizeObserver is not defined
+    at ensureResizeObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:24:5)
+    at observe (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:37:5)
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/useResizeObserver.js:76:33
+    at commitHookEffectListMount (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24905:3)
+    at flushPassiveEffectsImpl (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27078:3)
+    at flushPassiveEffects (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27023:14)
+The above error occurred in the <SingleObserver> component:
+
+    at SingleObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/SingleObserver/index.js:17:5)
+    at ResizeObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/index.js:33:5)
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/typography/Base/index.js:62:16
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/typography/Text.js:17:5
+    at div
+    at Item (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/space/Item.js:15:5)
+    at div
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/space/index.js:38:39
+    at div
+    at div
+    at div
+    at div
+    at div
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/card/Card.js:46:16
+    at div
+    at HardwareRack (/Users/mcneillm/Documents/Projects/platformio-mcp/web/src/components/hardware-rack.tsx:10:25)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+
+stderr | src/__tests__/status-indicators.test.tsx > Status Indicators > displays a static red dot when in error state or locked by something else
+Error: Uncaught [ReferenceError: ResizeObserver is not defined]
+    at reportException (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
+    at innerInvokeEventListeners (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:353:9)
+    at invokeEventListeners (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:286:3)
+    at HTMLUnknownElementImpl._dispatch (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:233:9)
+    at HTMLUnknownElementImpl.dispatchEvent (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:104:17)
+    at HTMLUnknownElement.dispatchEvent (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js:241:34)
+    at Object.invokeGuardedCallbackDev (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:4213:16)
+    at invokeGuardedCallback (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:4277:31)
+    at reportUncaughtErrorInDEV (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:22877:5)
+    at captureCommitPhaseError (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27165:5) ReferenceError: ResizeObserver is not defined
+    at ensureResizeObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:24:5)
+    at observe (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:37:5)
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/useResizeObserver.js:76:33
+    at commitHookEffectListMount (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24905:3)
+    at flushPassiveEffectsImpl (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27078:3)
+    at flushPassiveEffects (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27023:14)
+The above error occurred in the <SingleObserver> component:
+
+    at SingleObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/SingleObserver/index.js:17:5)
+    at ResizeObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/index.js:33:5)
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/typography/Base/index.js:62:16
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/typography/Text.js:17:5
+    at div
+    at Item (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/space/Item.js:15:5)
+    at div
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/space/index.js:38:39
+    at div
+    at div
+    at div
+    at div
+    at div
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/card/Card.js:46:16
+    at div
+    at HardwareRack (/Users/mcneillm/Documents/Projects/platformio-mcp/web/src/components/hardware-rack.tsx:10:25)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+
+stderr | src/__tests__/status-indicators.test.tsx > Status Indicators > displays a static grey dot when disconnected
+Error: Uncaught [ReferenceError: ResizeObserver is not defined]
+    at reportException (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
+    at innerInvokeEventListeners (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:353:9)
+    at invokeEventListeners (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:286:3)
+    at HTMLUnknownElementImpl._dispatch (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:233:9)
+    at HTMLUnknownElementImpl.dispatchEvent (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:104:17)
+    at HTMLUnknownElement.dispatchEvent (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js:241:34)
+    at Object.invokeGuardedCallbackDev (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:4213:16)
+    at invokeGuardedCallback (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:4277:31)
+    at reportUncaughtErrorInDEV (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:22877:5)
+    at captureCommitPhaseError (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27165:5) ReferenceError: ResizeObserver is not defined
+    at ensureResizeObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:24:5)
+    at observe (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:37:5)
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/useResizeObserver.js:76:33
+    at commitHookEffectListMount (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:24905:3)
+    at flushPassiveEffectsImpl (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27078:3)
+    at flushPassiveEffects (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/react-dom/cjs/react-dom.development.js:27023:14)
+The above error occurred in the <SingleObserver> component:
+
+    at SingleObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/SingleObserver/index.js:17:5)
+    at ResizeObserver (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/@rc-component/resize-observer/lib/index.js:33:5)
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/typography/Base/index.js:62:16
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/typography/Text.js:17:5
+    at div
+    at Item (/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/space/Item.js:15:5)
+    at div
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/space/index.js:38:39
+    at div
+    at div
+    at div
+    at div
+    at div
+    at /Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/antd/lib/card/Card.js:46:16
+    at div
+    at HardwareRack (/Users/mcneillm/Documents/Projects/platformio-mcp/web/src/components/hardware-rack.tsx:10:25)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/components/command-feed.test.tsx [ src/tests/components/command-feed.test.tsx ]
+Error: Failed to resolve import "../../../app" from "src/tests/components/command-feed.test.tsx". Does the file exist?
+ ❯ TransformPluginContext._formatError node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41
+ ❯ TransformPluginContext.error node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16
+ ❯ normalizeUrl node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23
+ ❯ async file:/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+ ❯ TransformPluginContext.transform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7
+ ❯ PluginContainer.transform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18
+ ❯ loadAndTransform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  src/tests/components/command-launcher.test.tsx [ src/tests/components/command-launcher.test.tsx ]
+Error: Failed to resolve import "../../../components/command-launcher" from "src/tests/components/command-launcher.test.tsx". Does the file exist?
+ ❯ TransformPluginContext._formatError node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41
+ ❯ TransformPluginContext.error node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16
+ ❯ normalizeUrl node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23
+ ❯ async file:/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+ ❯ TransformPluginContext.transform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7
+ ❯ PluginContainer.transform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18
+ ❯ loadAndTransform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  src/tests/components/dependencies-viewer.test.tsx [ src/tests/components/dependencies-viewer.test.tsx ]
+Error: Failed to resolve import "../../../components/dependencies-viewer" from "src/tests/components/dependencies-viewer.test.tsx". Does the file exist?
+ ❯ TransformPluginContext._formatError node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41
+ ❯ TransformPluginContext.error node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16
+ ❯ normalizeUrl node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23
+ ❯ async file:/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+ ❯ TransformPluginContext.transform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7
+ ❯ PluginContainer.transform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18
+ ❯ loadAndTransform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  src/tests/integration/hybrid-e2e.test.tsx [ src/tests/integration/hybrid-e2e.test.tsx ]
+Error: Failed to resolve import "../../../app" from "src/tests/integration/hybrid-e2e.test.tsx". Does the file exist?
+ ❯ TransformPluginContext._formatError node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41
+ ❯ TransformPluginContext.error node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16
+ ❯ normalizeUrl node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23
+ ❯ async file:/Users/mcneillm/Documents/Projects/platformio-mcp/web/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+ ❯ TransformPluginContext.transform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7
+ ❯ PluginContainer.transform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18
+ ❯ loadAndTransform node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/status-indicators.test.tsx > Status Indicators > displays a pulsing green dot when active/running
+ FAIL  src/__tests__/status-indicators.test.tsx > Status Indicators > displays a pulsing gold dot when uploading
+ FAIL  src/__tests__/status-indicators.test.tsx > Status Indicators > displays a static blue dot when idle or connected
+ FAIL  src/__tests__/status-indicators.test.tsx > Status Indicators > displays a static red dot when in error state or locked by something else
+ FAIL  src/__tests__/status-indicators.test.tsx > Status Indicators > displays a static grey dot when disconnected
+ReferenceError: ResizeObserver is not defined
+ ❯ ensureResizeObserver node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:24:5
+ ❯ observe node_modules/@rc-component/resize-observer/lib/utils/observerUtil.js:37:5
+ ❯ node_modules/@rc-component/resize-observer/lib/useResizeObserver.js:76:33
+ ❯ commitHookEffectListMount node_modules/react-dom/cjs/react-dom.development.js:23189:26
+ ❯ commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom.development.js:24970:11
+ ❯ commitPassiveMountEffects_complete node_modules/react-dom/cjs/react-dom.development.js:24930:9
+ ❯ commitPassiveMountEffects_begin node_modules/react-dom/cjs/react-dom.development.js:24917:7
+ ❯ commitPassiveMountEffects node_modules/react-dom/cjs/react-dom.development.js:24905:3
+ ❯ flushPassiveEffectsImpl node_modules/react-dom/cjs/react-dom.development.js:27078:3
+ ❯ flushPassiveEffects node_modules/react-dom/cjs/react-dom.development.js:27023:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ Test Files  5 failed | 1 passed (6)
+      Tests  5 failed | 3 passed (8)
+   Start at  10:22:16
+   Duration  7.84s (transform 2.57s, setup 1.20s, collect 11.49s, tests 909ms, environment 5.14s, prepare 1.33s)
+

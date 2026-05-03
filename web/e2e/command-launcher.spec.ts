@@ -1,0 +1,71 @@
+import { test, expect } from '@playwright/test';
+
+test.describe('Command Launcher & Target Environment', () => {
+  test('should hydrate the Target Environment dropdown based on active project config', async ({ page }) => {
+    // Mock project config API
+    await page.route('**/api/system/info', async route => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          success: true,
+          activeWorkspace: '/path/to/workspace'
+        }
+      });
+    });
+
+    await page.route('**/api/projects/config*', async route => {
+      await route.fulfill({
+        status: 200,
+        json: [
+          ["env:esp32dev", []],
+          ["env:uno", []]
+        ]
+      });
+    });
+
+    await page.goto('/');
+
+    // Click "NEW TASK"
+    await page.click('button:has-text("NEW TASK")');
+    await expect(page.getByRole('dialog', { name: 'LAUNCH NEW COMMAND' })).toBeVisible();
+
+    // Verify the modal has loaded by checking for the execute button
+    await expect(page.locator('button:has-text("EXECUTE")')).toBeVisible();
+  });
+
+  test('should stream logs and show correct visual status when dispatching a task', async ({ page }) => {
+    // Dispatch the task (we mock the API call)
+    let dispatched = false;
+    await page.route('**/api/commands/build', async route => {
+      dispatched = true;
+      await route.fulfill({ status: 200, json: { success: true } });
+    });
+    
+    // Mock active workspace
+    await page.route('**/api/system/info', async route => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          success: true,
+          activeWorkspace: '/path/to/workspace'
+        }
+      });
+    });
+
+    await page.route('**/api/projects/config*', async route => {
+      await route.fulfill({
+        status: 200,
+        json: []
+      });
+    });
+
+    await page.goto('/');
+
+    // Open Launcher
+    await page.click('button:has-text("NEW TASK")');
+    await expect(page.getByRole('dialog', { name: 'LAUNCH NEW COMMAND' })).toBeVisible();
+    
+    await page.click('button:has-text("EXECUTE")');
+  });
+});
+

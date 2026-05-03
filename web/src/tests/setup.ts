@@ -1,6 +1,13 @@
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 import { mockFetch } from './mocks/apiHandlers';
+
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+global.ResizeObserver = ResizeObserverMock as any;
 
 // Mock socket.io-client
 vi.mock('socket.io-client', async () => {
