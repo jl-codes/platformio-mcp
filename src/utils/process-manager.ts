@@ -51,7 +51,15 @@ function getPidsFilePath(projectDir?: string, file: string = SERIAL_PIDS_FILE): 
 /**
  * Records a given process ID belonging to a started serial monitor.
  */
-export async function registerPioMonitorPid(port: string, pid: number, projectDir?: string, rootCommandId?: string, logFile?: string): Promise<void> {
+export async function registerPioMonitorPid(
+  port: string, 
+  pid: number, 
+  projectDir?: string, 
+  rootCommandId?: string, 
+  logFile?: string,
+  taskId?: string,
+  commandDesc?: string
+): Promise<void> {
   const pidsFile = getPidsFilePath(projectDir);
   const dir = path.dirname(pidsFile);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -75,7 +83,7 @@ export async function registerPioMonitorPid(port: string, pid: number, projectDi
 
   try {
     const commandId = rootCommandId || crypto.randomUUID();
-    const taskId = crypto.randomUUID();
+    const effectiveTaskId = taskId || crypto.randomUUID();
     
     await registerCommand({
       id: commandId,
@@ -83,11 +91,12 @@ export async function registerPioMonitorPid(port: string, pid: number, projectDi
       timestamp: Date.now(),
       status: "running",
       tasks: [{
-        taskId: taskId,
+        taskId: effectiveTaskId,
         type: "monitor",
         status: "running",
         port: port,
         pid: pid,
+        commandDesc: commandDesc,
         logPaths: logFile ? [logFile] : []
       }]
     }, projectDir);
@@ -100,22 +109,23 @@ export async function registerPioMonitorPid(port: string, pid: number, projectDi
  * Removes the recorded PID tracking for a specific port.
  */
 export async function unregisterPioMonitorPid(port: string, projectDir?: string): Promise<void> {
-  const pidsFile = getPidsFilePath(projectDir);
-  if (!fs.existsSync(pidsFile)) return;
-
-  try {
-    const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
+  
+  if (fs.existsSync(pidsFile)) {
     try {
-      const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
-      if (pids[port]) {
-        delete pids[port];
-        fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+      const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+      try {
+        const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+        if (pids[port]) {
+          delete pids[port];
+          fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+        }
+      } finally {
+        await release();
       }
-    } finally {
-      await release();
+    } catch (e: any) {
+      throw new Error(`Registry contention timeout: ${e.message}`);
     }
-  } catch (e: any) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
   }
 
   try {
@@ -140,31 +150,47 @@ export async function unregisterPioMonitorPid(port: string, projectDir?: string)
  */
 export function killPioMonitorByPort(port: string, projectDir?: string): Promise<void> {
   return new Promise((resolve) => {
+    let targetPid: number | undefined;
+    
     const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-    if (!fs.existsSync(pidsFile)) {
-      resolve();
-      return;
+    if (fs.existsSync(pidsFile)) {
+      try {
+        const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+        targetPid = pids[port];
+      } catch {}
     }
 
-    try {
-      const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
-      const targetPid = pids[port];
-      if (targetPid) {
-        logDiag(`[ProcessManager Diagnostic] Found tracked PID ${targetPid} for port ${port}. Yielding to tree-kill...`, projectDir);
-        treeKill(targetPid, "SIGKILL", async (err) => {
-          if (err) {
-            logDiag(`[ProcessManager Diagnostic] Failed to tree-kill PID ${targetPid}: ${err.message}`, projectDir);
-          } else {
-            logDiag(`[ProcessManager Diagnostic] Successfully tree-killed PID ${targetPid}.`, projectDir);
+    if (!targetPid) {
+      try {
+        const history = getCommandHistory(projectDir);
+        for (const cmd of history) {
+          if (cmd.status === "running" && cmd.tasks) {
+            for (const task of cmd.tasks) {
+              if (task.type === "monitor" && task.status === "running" && task.port === port && task.pid) {
+                targetPid = task.pid;
+                break;
+              }
+            }
           }
-          await unregisterPioMonitorPid(port, projectDir);
-          resolve();
-        });
-      } else {
+          if (targetPid) break;
+        }
+      } catch {}
+    }
+
+    if (targetPid) {
+      logDiag(`[ProcessManager Diagnostic] Found tracked PID ${targetPid} for port ${port}. Yielding to tree-kill...`, projectDir);
+      treeKill(targetPid, "SIGKILL", async (err) => {
+        if (err) {
+          logDiag(`[ProcessManager Diagnostic] Failed to tree-kill PID ${targetPid}: ${err.message}`, projectDir);
+        } else {
+          logDiag(`[ProcessManager Diagnostic] Successfully tree-killed PID ${targetPid}.`, projectDir);
+        }
+        await unregisterPioMonitorPid(port, projectDir);
         resolve();
-      }
-    } catch {
-      resolve();
+      });
+    } else {
+      // Always ensure we unregister and update command status even if the PID was missing or already died
+      unregisterPioMonitorPid(port, projectDir).finally(resolve);
     }
   });
 }
@@ -181,6 +207,12 @@ export function isPidAlive(pid: number): boolean {
         if (!stdout.includes("platformio") && !stdout.includes("pio") && !stdout.includes("python")) {
           return false;
         }
+        try {
+          const stat = execSync(`ps -p ${pid} -o stat=`, { encoding: "utf8" }).trim().toUpperCase();
+          if (stat.startsWith("Z")) {
+            return false;
+          }
+        } catch {}
       } catch {
         // ps fails -> process probably dead or inaccessible
         return false;

@@ -9,6 +9,8 @@
  */
 
 
+import crypto from "node:crypto";
+import { mcpContext } from "../utils/mcp-context.js";
 import { executeWithSpooling } from "../utils/spooler.js";
 import type { UploadResult } from "../types.js";
 import { startMonitor } from "./monitor.js";
@@ -41,6 +43,7 @@ export async function uploadFilesystem(
   background?: boolean,
   startMonitorAfter?: boolean,
 ): Promise<UploadResult> {
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
 
   if (environment && !validateEnvironmentName(environment)) {
@@ -78,15 +81,13 @@ export async function uploadFilesystem(
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Filesystem Upload");
 
-    const rootCommandId = crypto.randomUUID();
-
     const uploadResult = await executeWithSpooling(
       "run",
       uploadArgs.slice(1),
       {
         cwd: validatedPath,
         projectDir: validatedPath,
-        timeout: 600000,
+        timeout: background ? 3600000 : 600000,
         background,
         activePort,
         rootCommandId,
@@ -163,6 +164,7 @@ export async function uploadFirmware(
   background?: boolean,
   startMonitorAfter?: boolean,
 ): Promise<UploadResult> {
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
 
   if (environment && !validateEnvironmentName(environment)) {
@@ -200,15 +202,13 @@ export async function uploadFirmware(
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Firmware Upload");
 
-    const rootCommandId = crypto.randomUUID();
-
     const uploadResult = await executeWithSpooling(
       "run",
       uploadArgs.slice(1),
       {
         cwd: validatedPath,
         projectDir: validatedPath,
-        timeout: 600000,
+        timeout: background ? 3600000 : 600000,
         background,
         activePort,
         rootCommandId,

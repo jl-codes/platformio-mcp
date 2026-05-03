@@ -56,7 +56,12 @@ export default function BuildTerminal({ logs, logFile, activeCommandId, historic
               const lineClass = isError ? 'error' : isSuccess ? 'highlight' : 'info';
               
               return (
-                <p key={index} className={lineClass} style={{ marginBottom: '4px' }}>
+                <p key={index} className={lineClass} style={{ 
+                  marginBottom: '4px', 
+                  whiteSpace: 'pre-wrap', 
+                  fontFamily: "'Fira Code', monospace",
+                  tabSize: 4 
+                }}>
                   {log.logLine}
                 </p>
               );
