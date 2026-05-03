@@ -14,6 +14,17 @@ This server solves several critical challenges in embedded AI development:
 4. **Providing Human Visibility:** Exposes an opt-in web dashboard, giving human developers a managed build history and transparent view into what the agent is actively compiling or monitoring.
 5. **Agentic Empowerment:** Includes pre-packaged `.agents/skills` (such as `@pio-manager` and `@embedded-systems`) to provide the LLM with deep domain expertise in handling port conflicts, device semaphores, and RTOS fundamentals.
 
+<p align="center">
+  <a href="docs/assets/pio_mcp_01.png"><img src="docs/assets/pio_mcp_01.png" width="32%" alt="PlatformIO MCP Dashboard" /></a>&nbsp;
+  <a href="docs/assets/pio_mcp_02.png"><img src="docs/assets/pio_mcp_02.png" width="32%" alt="Device Telemetry" /></a>&nbsp;
+  <a href="docs/assets/pio_mcp_03.png"><img src="docs/assets/pio_mcp_03.png" width="32%" alt="Project Workspace" /></a>
+  <br>
+  <br>
+  <a href="docs/assets/pio_mcp_04.png"><img src="docs/assets/pio_mcp_04.png" width="32%" alt="Build Output" /></a>&nbsp;
+  <a href="docs/assets/pio_mcp_05.png"><img src="docs/assets/pio_mcp_05.png" width="32%" alt="Serial Monitor" /></a>&nbsp;
+  <a href="docs/assets/pio_mcp_06.png"><img src="docs/assets/pio_mcp_06.png" width="32%" alt="Command Launcher" /></a>
+</p>
+
 ## Core Capabilities
 
 ### Features
