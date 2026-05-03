@@ -191,7 +191,7 @@ Ensure you map the absolute path correctly for your workspace:
 Antigravity requires you to explicitly add the MCP server configuration into its global settings file. This is typically found at `~/.gemini/antigravity/mcp_config.json` on macOS/Linux.
 
 ### Automatic Installer Script
-We provide a helper Node.js script to safely map your local clone directly into Antigravity's global footprint. It will intelligently resolve your node binary path and format the JSON. (For the UI dashboard, export `PIO_MCP_UI=true` in your shell environment, or pass `--ui` if modifying the args array).
+We provide a helper Node.js script to safely map your local clone directly into Antigravity's global footprint. It will intelligently resolve your node binary path and format the JSON. (For the UI dashboard, export `PIO_MCP_OPEN_DASH_ON_START=true` in your shell environment, or pass `--open-dashboard-on-start` if modifying the args array).
 ```bash
 # From the root of the platformio-mcp repository:
 node scripts/install-antigravity.js

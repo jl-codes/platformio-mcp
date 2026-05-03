@@ -493,7 +493,7 @@ When you execute a prompt like this, your agent will typically make the followin
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `taskId` | string | no | Optional task ID to check status. |
-- **Returns:** JSON object containing the current status (`running`, `completed`, `failed`), output log tail, and a `logPaths` string array.
+- **Returns:** JSON object containing `status` (success of the polling operation), `targetStatus` (the current state of the background task: `running`, `completed`, `failed`), output log tail, and a `logPaths` string array.
 
 - **Usage Example:**
 
@@ -516,7 +516,8 @@ When you execute a prompt like this, your agent will typically make the followin
 
 ```json
 {
-  "status": "running",
+  "status": "success",
+  "targetStatus": "running",
   "output": "Compiling .pio/build/esp32dev/src/main.cpp.o...",
   "taskId": "task-1234-abcd",
   "logPaths": [

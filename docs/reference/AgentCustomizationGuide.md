@@ -5,7 +5,7 @@
 ## Usage with AI Agents
 
 ### Antigravity
-Antigravity will automatically use the MCP interface when running in the workspace. Simply execute `npm run dev` to bring the server online. By default, the Web Dashboard is securely opt-in. Pass `--ui` or set `PIO_MCP_UI=true` if you wish to launch the REST/WebSocket layer, which will produce a secure localhost token at boot. Let the agent manage the rest.
+Antigravity will automatically use the MCP interface when running in the workspace. Simply execute `npm run dev` to bring the server online. By default, the Web Dashboard is securely opt-in. Pass `--open-dashboard-on-start` or set `PIO_MCP_OPEN_DASH_ON_START=true` if you wish to launch the REST/WebSocket layer, which will produce a secure localhost token at boot. Let the agent manage the rest.
 
 ### Cline
 Cline accesses the server seamlessly through its standard MCP integration. Instruct Cline to "Build my PlatformIO project" or "Flash the connected device," and it will correctly orchestrate the tasks through the exposed MCP tools.

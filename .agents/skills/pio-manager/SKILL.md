@@ -18,12 +18,16 @@ The `platformio-mcp` server encapsulates atomic locking, compilation, and log sp
 5. **Environment/Libraries:** `mcp_platformio_list_boards`, `mcp_platformio_get_board_info`, `mcp_platformio_list_devices`, `mcp_platformio_init_project`, `mcp_platformio_search_libraries`, `mcp_platformio_install_library`, `mcp_platformio_uninstall_library`, `mcp_platformio_update_library`, `mcp_platformio_list_installed_libraries`
 6. **Diagnostics/Dashboard:** `mcp_platformio_get_dashboard_url`, `mcp_platformio_get_project_config`, `mcp_platformio_system_info`
 
+**Reference:** For exact tool parameters and best practices, load and read `references/mcp-agent-reference.md`.
+
 **Discovery Best Practices:**
 - ALWAYS use `mcp_platformio_list_boards` to dynamically find a board before trying to query specs with `mcp_platformio_get_board_info`.
 - ALWAYS use `mcp_platformio_list_devices` before uploading or monitoring to discover the correct `port` dynamically if multiple serial devices are attached.
 - ALWAYS use explicit versions when using `mcp_platformio_install_library` to ensure reproducible builds.
 
-**Targeting Rules & Hazard Advisory:** You MUST explicitly map the `environment` parameter (e.g., `esp32dev` or `esp32s3nano`) harvested from `platformio.ini` when executing commands like `upload_firmware` or `upload_filesystem`. **HAZARD:** If `environment` is omitted, PlatformIO will aggressively aggregate and attempt to upload ALL active configured environments found in `default_envs` (or literally every environment in the file) sequentially over the port, which causes overlapping flashes and bricked hardware on multi-target repos. You are only permitted to omit `environment` if the repository strictly contains a single environment block, or if the user explicitly demands a multi-environment parallel build/flash.
+**Targeting Rules & Hazard Advisory:** 
+- **Workspace Isolation:** You MUST ALWAYS explicitly provide the `projectDir` parameter to ensure operations execute in the correct workspace, unless explicitly instructed otherwise.
+- **Environment Safety:** You MUST explicitly map the `environment` parameter (e.g., `esp32dev` or `esp32s3nano`) harvested from `platformio.ini` when executing commands like `upload_firmware` or `upload_filesystem`. **HAZARD:** If `environment` is omitted, PlatformIO will aggressively aggregate and attempt to upload ALL active configured environments found in `default_envs` (or literally every environment in the file) sequentially over the port, which causes overlapping flashes and bricked hardware on multi-target repos. You are only permitted to omit `environment` if the repository strictly contains a single environment block, or if the user explicitly demands a multi-environment parallel build/flash.
 
 **Handling Long-Running Tasks (Build, Flash, & Testing):**
 Builds, tests, and uploads are often long-running processes. You **MUST** use the `background: true` parameter when calling `mcp_platformio_build_project`, `mcp_platformio_clean_project`, `mcp_platformio_upload_firmware`, `mcp_platformio_upload_filesystem`, `mcp_platformio_check_project`, or `mcp_platformio_run_tests` to prevent the server from timing out on large executions.

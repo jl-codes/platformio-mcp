@@ -24,7 +24,7 @@ This server solves several critical challenges in embedded AI development:
 - Board-agnostic: no hardcoded configs, supports all PlatformIO platforms out of the box
 - **Workspace Spooling**: `stdout` streams and PIDs are stored cleanly in the `.pio-mcp-workspace/` directory inside the active project folder for easy offline debugging instead of bloating in-memory constraints.
 - **Async Polling**: LLM context limits and network timeouts are inherently negated. Dispatch long-running compilations using `background: true` and monitor them safely with `check_task_status`.
-- **Opt-in Web Dashboard**: A functional-led PIO Home UI featuring a Command Launcher and Workspace Sidebar. Launch the secure telemetry UI by passing `--ui` or setting `PIO_MCP_UI=true`. The Web Dashboard enforces strict process isolation through a `PORTAL_AUTH_TOKEN` generated at boot. This cryptographic token ensures that only the authorized LLM session can access the telemetry server, preventing cross-process API leakage or unauthorized local accesses.
+- **Opt-in Web Dashboard**: A functional-led PIO Home UI featuring a Command Launcher and Workspace Sidebar. Launch the secure telemetry UI by passing `--open-dashboard-on-start` or setting `PIO_MCP_OPEN_DASH_ON_START=true`. The Web Dashboard enforces strict process isolation through a `PORTAL_AUTH_TOKEN` generated at boot. This cryptographic token ensures that only the authorized LLM session can access the telemetry server, preventing cross-process API leakage or unauthorized local accesses.
 
 ### Supported Platforms
 PlatformIO supports 30+ embedded platforms including:
