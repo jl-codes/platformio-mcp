@@ -3,6 +3,12 @@
  * Maintains a persistent log of workspaces targeted by the MCP server.
  * Uses proper-lockfile to prevent read-modify-write data races 
  * between parallel agents on the same host.
+ *
+ * Provides:
+ * - addWorkspace: Appends a workspace directory to the tracking log.
+ * - getWorkspaces: Reads and deduplicates the registry, returning a chronologically ordered array.
+ * - rewriteRegistry: Completely rewrites the JSON registry, removing defunct entries.
+ * - WorkspaceRecord: Interface for a single workspace registry record.
  */
 
 import fs from "node:fs";
@@ -12,9 +18,12 @@ import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
 
 const REGISTRY_FILE = path.join(SERVER_DATA_DIR, "workspaces.json");
 
+/**
+ * Represents a single logged workspace in the registry.
+ */
 export interface WorkspaceRecord {
-  dir: string;
-  timestamp: number;
+  dir: string; // Absolute path to the workspace directory
+  timestamp: number; // Epoch timestamp of when the workspace was last accessed
 }
 
 /**

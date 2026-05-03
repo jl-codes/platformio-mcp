@@ -114,7 +114,9 @@ pio boards | head -10
 
 ## Agentic Project Deployment Strategies
 
-If you are developing an embedded C/C++ repository and want to bundle `.agents/workflows` that rely on this MCP server, you have three primary deployment architectures to ensure the tools are available to any Developer or AI Agent checking out your codebase:
+If you are developing an embedded C/C++ repository and want to bundle `.agents/workflows` that rely on this MCP server, you have three primary deployment architectures to ensure the tools are available to any Developer or AI Agent checking out your codebase.
+
+> **Note on `--open-dashboard-on-start`**: In the examples below, you will see the `--open-dashboard-on-start` parameter. When passed, this parameter automatically opens the PlatformIO MCP Web Dashboard in your default browser whenever the server starts. This is highly recommended to give developers immediate, visual telemetry of the AI agent's background build and monitor tasks.
 
 ### 1. The `npx` Auto-Execution Approach (Cleanest)
 If this package is published to NPM (or your private registry), you do not need to install anything locally. You can simply instruct users to drop this into their global `mcp_config.json`:
@@ -124,7 +126,7 @@ If this package is published to NPM (or your private registry), you do not need 
   "mcpServers": {
     "platformio": {
       "command": "npx",
-      "args": ["-y", "platformio-mcp-server"]
+      "args": ["-y", "platformio-mcp-server", "--open-dashboard-on-start"]
     }
   }
 }
@@ -146,7 +148,7 @@ If you wish to contain the dependency exclusively within your project without re
       "command": "zsh",
       "args": [
         "-lic",
-        "node /absolute/path/to/your-repo/tools/platformio-mcp/build/index.js"
+        "node /absolute/path/to/your-repo/tools/platformio-mcp/build/index.js --open-dashboard-on-start"
       ]
     }
   }
@@ -175,7 +177,8 @@ Ensure you map the absolute path correctly for your workspace:
     "platformio": {
       "command": "node",
       "args": [
-        "/absolute/path/to/platformio-mcp/build/index.js"
+        "/absolute/path/to/platformio-mcp/build/index.js",
+        "--open-dashboard-on-start"
       ],
       "env": {}
     }
@@ -204,7 +207,7 @@ If manually adding, ensure you map the absolute path correctly:
       "command": "zsh",
       "args": [
         "-lic",
-        "node /absolute/path/to/platformio-mcp/build/index.js"
+        "node /absolute/path/to/platformio-mcp/build/index.js --open-dashboard-on-start"
       ]
     }
   }
@@ -219,7 +222,7 @@ If manually adding, ensure you map the absolute path correctly:
 Claude Code supports adding MCP servers directly via its CLI. You can add the PlatformIO MCP server by running:
 
 ```bash
-claude mcp add platformio -- node /absolute/path/to/platformio-mcp/build/index.js
+claude mcp add platformio -- node /absolute/path/to/platformio-mcp/build/index.js --open-dashboard-on-start
 ```
 
 *Note: Ensure you replace `/absolute/path/to/...` with the exact path to your cloned repository, and restart Claude Code after adding the server.*
@@ -232,7 +235,10 @@ Alternatively, add the server to `~/.claude/settings.json` (global) or `.claude/
   "mcpServers": {
     "platformio": {
       "command": "node",
-      "args": ["/absolute/path/to/platformio-mcp/build/index.js"]
+      "args": [
+        "/absolute/path/to/platformio-mcp/build/index.js",
+        "--open-dashboard-on-start"
+      ]
     }
   }
 }

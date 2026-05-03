@@ -35,8 +35,8 @@ This document serves as the definitive reference for all tools exposed by the Pl
 | [`query_logs`](#query_logs) | Scans the latest active background serial trace spool, returning a filtered string block. |
 | **Library Management** | |
 | [`search_libraries`](#search_libraries) | Searches the PlatformIO library registry for available libraries by name, keywords, or description. |
-| [`install_library`](#install_library) | Installs a library from the PlatformIO registry either globally or to a specific project. |
-| [`list_installed_libraries`](#list_installed_libraries) | Lists all installed libraries either globally or for a specific project. |
+| [`install_library`](#install_library) | Installs a library from the PlatformIO registry to a specific project boundary. |
+| [`list_installed_libraries`](#list_installed_libraries) | Lists all installed libraries for a specific project boundary. |
 | [`uninstall_library`](#uninstall_library) | Removes target library. |
 | [`update_library`](#update_library) | Upgrades library versions. |
 | **Diagnostics/Dashboard** | |
@@ -956,7 +956,7 @@ When you execute a prompt like this, your agent will typically make the followin
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `library` | string | yes | Library name or ID to install |
-| `projectDir` | string | no | Optional project directory (installs globally if not specified) |
+| `projectDir` | string | yes | Project directory (required to enforce workspace boundary compliance) |
 | `version` | string | no | Optional specific version (e.g., "1.0.0", "^2.1.0") |
 - **Returns:** JSON object confirming installation success.
 
@@ -998,7 +998,7 @@ When you execute a prompt like this, your agent will typically make the followin
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `projectDir` | string | no | Optional project directory (lists global libraries if not specified) |
+| `projectDir` | string | yes | Project directory (required to enforce workspace boundary compliance) |
 - **Returns:** JSON array of installed libraries.
 
 - **Usage Example:**
@@ -1040,7 +1040,7 @@ When you execute a prompt like this, your agent will typically make the followin
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `library` | string | yes | Library name or ID to uninstall |
-| `projectDir` | string | no | Project directory (uninstalls globally if not specified) |
+| `projectDir` | string | yes | Project directory (required to enforce workspace boundary compliance) |
 - **Returns:** JSON object confirming removal.
 
 - **Usage Example:**
@@ -1082,7 +1082,7 @@ When you execute a prompt like this, your agent will typically make the followin
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `library` | string | yes | Library name or ID to update |
-| `projectDir` | string | no | Project directory (updates globally if not specified) |
+| `projectDir` | string | yes | Project directory (required to enforce workspace boundary compliance) |
 - **Returns:** JSON object confirming upgrade.
 
 - **Usage Example:**

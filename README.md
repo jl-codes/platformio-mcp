@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/Cline-PlatformIO-MCP-Server-Logo.png" alt="PlatformIO MCP Server Logo" width="200"/>
+  <img src="docs/assets/pio_mcp_220x220.png" alt="PlatformIO MCP Server Logo" width="220"/>
 </p>
 
 # PlatformIO MCP Server
@@ -24,7 +24,7 @@ This server solves several critical challenges in embedded AI development:
 - Board-agnostic: no hardcoded configs, supports all PlatformIO platforms out of the box
 - **Workspace Spooling**: `stdout` streams and PIDs are stored cleanly in the `.pio-mcp-workspace/` directory inside the active project folder for easy offline debugging instead of bloating in-memory constraints.
 - **Async Polling**: LLM context limits and network timeouts are inherently negated. Dispatch long-running compilations using `background: true` and monitor them safely with `check_task_status`.
-- **Opt-in Web Dashboard**: Launch a secure telemetry UI by passing `--ui` or setting `PIO_MCP_UI=true`. The Web Dashboard enforces strict process isolation through a `PORTAL_AUTH_TOKEN` generated at boot. This cryptographic token ensures that only the authorized LLM session can access the telemetry server, preventing cross-process API leakage or unauthorized local accesses.
+- **Opt-in Web Dashboard**: A functional-led PIO Home UI featuring a Command Launcher and Workspace Sidebar. Launch the secure telemetry UI by passing `--ui` or setting `PIO_MCP_UI=true`. The Web Dashboard enforces strict process isolation through a `PORTAL_AUTH_TOKEN` generated at boot. This cryptographic token ensures that only the authorized LLM session can access the telemetry server, preventing cross-process API leakage or unauthorized local accesses.
 
 ### Supported Platforms
 PlatformIO supports 30+ embedded platforms including:
@@ -81,13 +81,19 @@ Add the server to your agent's MCP configuration:
   "mcpServers": {
     "platformio": {
       "command": "node",
-      "args": ["/absolute/path/to/platformio-mcp/build/index.js"]
+      "args": [
+        "/absolute/path/to/platformio-mcp/build/index.js",
+        "--open-dashboard-on-start"
+      ]
     }
   }
 }
 ```
 
 > **Note**: For instructions specific to configuring Antigravity, Claude, or Cline, please see our [LLM Installation Guide](docs/LLMInstallationGuide.md).
+
+**What is `--open-dashboard-on-start`?**
+This parameter automatically launches the PlatformIO MCP Web Dashboard in your default browser whenever the MCP server is initialized by your AI agent. This provides immediate, real-time visibility into the agent's build processes, background operations, and hardware interactions without requiring a manual UI launch command.
 
 ## AI Agent Usage Examples
 

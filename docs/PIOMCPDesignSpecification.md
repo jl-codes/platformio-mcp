@@ -29,7 +29,7 @@ The baseline architecture serves as a universal bridge wrapping the PlatformIO C
 5. **Universal Artifact Spooling:** Moving away from in-memory constraints to persistent file-based spooling. `stdout` streams and PIDs are stored cleanly in the `.pio-mcp-workspace/logs/` directory inside the active project folder, permitting robust offline debugging and flat directory mappings for any execution format.
 6. **Telemetry Routing via UUIDs & CommandFeed:** Logging both build and monitor tasks into a single chronological feed using dynamic UUID `artifactId` mappings native across the `CommandRegistry` layer. Server Event streaming isolates identical logs via UUIDs so they do not multiplex via simple Project IDs anymore.
 7. **Async Job Polling:** Bypassing strict LLM context timeouts using `background: true` on major operations, enabling agents to safely track execution state via the `check_task_status` resource.
-8. **Secure Web Telemetry (React + Vite + Socket.io):** A fully opt-in, tokenized web dashboard (activated via the `--ui` manifest token or `PIO_MCP_UI=true` variable) to view real-time diagnostics securely. The UI enforces strict process isolation through a `PORTAL_AUTH_TOKEN` generated at boot, preventing unauthorized access.
+8. **Secure Web Telemetry (React + Vite + Socket.io):** A fully opt-in, tokenized web dashboard featuring a functional-led Command Launcher, Workspace Sidebar, and real-time CommandFeed. Activated via the `--ui` manifest token or `PIO_MCP_UI=true` variable to view real-time diagnostics securely. The UI enforces strict process isolation through a `PORTAL_AUTH_TOKEN` generated at boot, preventing unauthorized access.
 
 ---
 

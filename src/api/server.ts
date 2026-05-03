@@ -60,6 +60,7 @@ export const activePortalStatus = {
  * and intercepts hard-blocks configured via environment flags.
  * 
  * @param autoOpen If true, seamlessly dispatches a subshell command to route the host's default web browser to the secure link.
+ * @param projectDir Optional project directory to register upon startup.
  * @returns A dictionary dictating the physical port, localhost domain string, and active session cryptographic token.
  */
 export async function getDashboardStatus(autoOpen: boolean = false, projectDir?: string) {

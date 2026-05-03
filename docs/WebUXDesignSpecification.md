@@ -43,15 +43,15 @@ The dashboard acts as a "flight recorder" and control console, restructured arou
 *   **Left:** App Title / Branding ("⚡️ PIO MCP Server").
 *   **Right:** Global Hardware Queue Status indicator, communicating real-time Hardware Rack locking view (e.g., `[🔒 Hardware: Free ]` or `[🔒 Hardware: Locked by Agent ]`).
 
-### B. Left Sidebar ("Command Action Feed" / CommandRegistry)
-*   **Purpose:** A chronological Command Action Feed driven by the `CommandRegistry`. It natively maps websocket logs to proper UUID `artifactId` streams.
+### B. Left-Hand Workspace Sidebar ("Command Action Feed" / CommandRegistry)
+*   **Purpose:** A chronological Command Action Feed and workspace navigator driven by the `CommandRegistry`. It natively maps websocket logs to proper UUID `artifactId` streams.
 *   **Components:**
     *   **Action Feed:** A unified vertical list of dispatched async build and monitor events instead of just OS processes.
     *   **Process Items:** Each row displays the task execution state, PID (monospace), and a prominent "Stop / 🗡️ Kill" button emitting the red destructive color on hover.
     *   **Bottom Anchor:** A dramatic, full-width "Reset Server State" emergency button.
 
 ### C. Top Main Area ("Command Launcher" Toolbar)
-*   **Purpose:** A Kinetic Monolith-themed horizontal command palette mapping to core MCP execution verbs (`build`, `upload_firmware`, `check_project`, `run_tests`).
+*   **Purpose:** A functional-led horizontal command launcher mapping to core MCP execution verbs (`build`, `upload_firmware`, `check_project`, `run_tests`).
 *   **Components:**
     *   Current project path indicator.
     *   Action Button Group:  `[🛠️ Build]`, `[🚀 Flash Firmware]`, `[📁 Flash FS]`, `[✔️ Check]`, `[🧪 Test]`.
@@ -68,6 +68,11 @@ The dashboard acts as a "flight recorder" and control console, restructured arou
 *   **Components:**
     *   **Tab Bar:** `[ Build Logs ]`, `[ 🔌 usbmodem14101 ]`, `[ ➕ Add Monitor ]`.
     *   **Active Tab Content:** Scrolls a live monospace text feed of the build or serial logs, uniquely identified via UUID tracing.
+
+### F. Global Footer
+*   **Purpose:** Provides persistent state indicators, diagnostic UUIDs, and quick actions across the entire application interface.
+*   **Components:**
+    *   Result status, CLI command snippet, and MCP telemetry links.
 
 ---
 
