@@ -160,9 +160,19 @@ function TerminalView({ status, type, historicalLog, port, serialLogs, buildLogs
       style={{ padding: '16px', overflowY: 'auto', height: '100%', fontFamily: 'Fira Code', fontSize: '13px', position: 'relative' }}
     >
       {status !== 'running' ? (
-        <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
-          {historicalLog || "Loading historic payload..."}
-        </pre>
+        historicalLog === undefined ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.5 }}>
+            [ Loading historic payload... ]
+          </div>
+        ) : historicalLog === '' ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.5 }}>
+            [ Log file is empty ]
+          </div>
+        ) : (
+          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
+            {historicalLog}
+          </pre>
+        )
       ) : (
         type === 'monitor' ? (
           <SerialLogRaw port={port} serialLogs={serialLogs} artifactId={taskId} />
