@@ -308,39 +308,40 @@ export async function unregisterBuildPid(projectDir?: string): Promise<void> {
  * Wipes out all stray tracked processes across serial instances and builds.
  * Specifically used by emergency reset routines to return the system to a clean state.
  */
-export function killAllTrackedProcesses(projectDir?: string): Promise<void> {
-  return new Promise((resolve) => {
-    let tasks: Promise<void>[] = [];
-    
-    for (const file of [SERIAL_PIDS_FILE, BUILD_PIDS_FILE]) {
-      const pidsFile = getPidsFilePath(projectDir, file);
-      if (fs.existsSync(pidsFile)) {
-        try {
-          const pids: Record<string, any> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
-          for (const key of Object.keys(pids)) {
-            let targetPid: number | undefined;
-            if (file === BUILD_PIDS_FILE) {
-              if (pids[key]?.type === "build" || key === "build") {
-                targetPid = key === "build" ? pids[key] : Number(key);
-              }
-            } else {
-              targetPid = pids[key];
+export async function killAllTrackedProcesses(projectDir?: string): Promise<void> {
+  const tasks: Promise<void>[] = [];
+  
+  for (const file of [SERIAL_PIDS_FILE, BUILD_PIDS_FILE]) {
+    const pidsFile = getPidsFilePath(projectDir, file);
+    if (fs.existsSync(pidsFile)) {
+      try {
+        const pids: Record<string, any> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+        for (const key of Object.keys(pids)) {
+          let targetPid: number | undefined;
+          if (file === BUILD_PIDS_FILE) {
+            if (pids[key]?.type === "build" || key === "build") {
+              targetPid = key === "build" ? pids[key] : Number(key);
             }
-            if (targetPid) {
-              logDiag(`[ProcessManager Diagnostic] Emergency killing tracked PID ${targetPid} via ${file}.`, projectDir);
-              const p = new Promise<void>((res) => {
-                treeKill(targetPid!, "SIGKILL", () => res());
-              });
-              tasks.push(p);
-            }
+          } else {
+            targetPid = pids[key];
           }
-          fs.unlinkSync(pidsFile);
-        } catch {}
-      }
+          if (targetPid) {
+            logDiag(`[ProcessManager Diagnostic] Emergency killing tracked PID ${targetPid} via ${file}.`, projectDir);
+            const p = new Promise<void>((res) => {
+              treeKill(targetPid!, "SIGKILL", () => res());
+            });
+            tasks.push(p);
+          }
+        }
+        fs.unlinkSync(pidsFile);
+      } catch {}
     }
-    
-    Promise.all(tasks).then(() => resolve());
-  });
+  }
+  
+  await Promise.all(tasks);
+  
+  // Ensure the command registry is immediately synchronized with reality
+  await sweepGhostTasks(projectDir);
 }
 
 /**
@@ -353,22 +354,20 @@ export async function sweepGhostTasks(projectDir?: string): Promise<void> {
     let changed = false;
 
     for (const cmd of history) {
-      if (cmd.status === "running") {
-        if (cmd.tasks) {
-          for (const task of cmd.tasks) {
-            if (task.status === "running") {
-              const pid = task.pid;
-              let isAlive = false;
-              if (pid && isPidAlive(pid)) {
-                isAlive = true;
-              }
+      if (cmd.tasks) {
+        for (const task of cmd.tasks) {
+          if (task.status === "running") {
+            const pid = task.pid;
+            let isAlive = false;
+            if (pid && isPidAlive(pid)) {
+              isAlive = true;
+            }
 
-              if (!isAlive) {
-                // Task is dead! Force transition to terminated
-                await updateTaskStatus(cmd.id, task.taskId, { status: "terminated" }, projectDir);
-                logDiag(`[Ghost Sweeper] Cleaned up orphaned ghost task ${task.taskId} (PID: ${pid || 'Unknown'})`, projectDir);
-                changed = true;
-              }
+            if (!isAlive) {
+              // Task is dead! Force transition to terminated
+              await updateTaskStatus(cmd.id, task.taskId, { status: "terminated" }, projectDir);
+              logDiag(`[Ghost Sweeper] Cleaned up orphaned ghost task ${task.taskId} (PID: ${pid || 'Unknown'})`, projectDir);
+              changed = true;
             }
           }
         }

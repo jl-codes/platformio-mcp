@@ -357,7 +357,7 @@ export default function CommandFeed({
   };
 
   const displayedCommands = commands.slice().reverse().filter(cmd => {
-    if (showActiveOnly && cmd.status !== 'running') return false;
+    if (showActiveOnly && cmd.status !== 'running' && !cmd.tasks?.some(t => t.status === 'running')) return false;
     
     const cmdSource = cmd.source || 'agent';
     if (sourceFilter === 'Agent' && cmdSource !== 'agent') return false;
