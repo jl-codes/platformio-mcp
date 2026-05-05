@@ -42,6 +42,7 @@ npx platformio-mcp install --cline       # Cline (VS Code extension or CLI)
 npx platformio-mcp install --claude      # Claude Desktop
 npx platformio-mcp install --vscode      # VS Code native MCP support
 npx platformio-mcp install --antigravity # Google Antigravity
+npx platformio-mcp install --codex       # OpenAI Codex CLI
 ```
 
 The web dashboard auto-opens in your browser the first time the agent boots

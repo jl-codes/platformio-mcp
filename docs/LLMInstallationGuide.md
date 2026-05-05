@@ -214,6 +214,40 @@ If manually adding, ensure you map the absolute path correctly:
 }
 ```
 
+## Configuration for OpenAI Codex CLI
+
+[OpenAI Codex CLI](https://developers.openai.com/codex) reads MCP server definitions from a TOML file at `~/.codex/config.toml` (Windows: `%USERPROFILE%\.codex\config.toml`).
+
+### Automatic Installer Script
+Run the bundled installer to add or update the `[mcp_servers.platformio]` block in-place — every other section of your `config.toml` is preserved verbatim:
+
+```bash
+npx platformio-mcp install --codex
+# or the shorter alias:
+npx pio-mcp install --codex
+```
+
+After it completes, restart `codex` and run `/mcp` to confirm the `platformio` server is listed.
+
+### Manual Configuration
+If you prefer to edit the file by hand, append (or merge) this block into `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.platformio]
+command = "npx"
+args = ["-y", "platformio-mcp", "--open-dashboard-on-start"]
+```
+
+> On Windows, use `command = "npx.cmd"` so Codex resolves the npm shim correctly.
+
+If you've cloned and built the repo locally and want Codex to use that build instead of `npx`:
+
+```toml
+[mcp_servers.platformio]
+command = "node"
+args = ["/absolute/path/to/platformio-mcp/build/index.js", "--open-dashboard-on-start"]
+```
+
 ## Configuration for Claude Code
 
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) is Anthropic's official CLI for Claude with native MCP support.

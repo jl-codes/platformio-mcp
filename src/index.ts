@@ -997,6 +997,7 @@ USAGE:
   platformio-mcp install --claude      Install into Claude Desktop
   platformio-mcp install --vscode      Install into VS Code native MCP support
   platformio-mcp install --antigravity Install into Google Antigravity
+  platformio-mcp install --codex       Install into OpenAI Codex CLI
 
 FLAGS (when starting MCP server):
   --open-dashboard-on-start            Auto-open dashboard when agent connects
@@ -1054,7 +1055,7 @@ async function main() {
     const target = cliArgs.find((a) => a.startsWith("--"))?.replace(/^--/, "");
     if (!target) {
       console.error(
-        "Usage: platformio-mcp install --<cline|claude|vscode|antigravity>",
+        "Usage: platformio-mcp install --<cline|claude|vscode|antigravity|codex>",
       );
       process.exit(1);
     }
