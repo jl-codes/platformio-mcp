@@ -48,8 +48,8 @@ export default function SerialLog({ logs, spoolerStates, lockState }: SerialLogP
         ) : (
           allLogs.map((log, index) => (
             <p key={index} className="rx-line" style={{ marginBottom: '4px' }}>
-              <span style={{ opacity: 0.5, marginRight: '8px' }}>[{log.port?.split('/').pop()}]</span>
-              <span style={{ color: 'var(--on-surface)', whiteSpace: 'pre-wrap' }}>{log.data}</span>
+              <span style={{ opacity: 0.5, marginRight: '8px', fontFamily: "'Fira Code', monospace" }}>[{log.port?.split('/').pop()}]</span>
+              <span style={{ color: 'var(--on-surface)', whiteSpace: 'pre-wrap', fontFamily: "'Fira Code', monospace", tabSize: 4 }}>{log.data}</span>
             </p>
           ))
         )}

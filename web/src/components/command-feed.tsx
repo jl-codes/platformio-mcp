@@ -42,37 +42,57 @@ import CommandLauncher from './command-launcher.js';
 const { Text } = Typography;
 const { Panel } = Collapse;
 
+/**
+ * Command Feed Component
+ * Displays the real-time telemetry and execution history of tasks initiated 
+ * by agents and users via the MCP.
+ *
+ * Provides:
+ * - CommandFeed: React component rendering the activity ledger.
+ * - TaskRecord: Type representing a single spawned system task.
+ * - CommandRecord: Type representing a parent MCP command execution.
+ */
+
+/**
+ * Represents a discrete task spawned by the command executor.
+ */
 export interface TaskRecord {
-  taskId: string;
-  type: "build" | "monitor" | "upload" | "check" | "test" | "debug";
-  status: "inactive" | "running" | "success" | "error" | "terminated";
-  logPaths?: string[];
-  port?: string;
-  pid?: number;
-  exitCode?: number;
+  taskId: string; // Unique identifier for the task
+  type: "build" | "monitor" | "upload" | "check" | "test" | "debug"; // Classification of the task
+  status: "inactive" | "running" | "success" | "error" | "terminated"; // Current execution status
+  logPaths?: string[]; // Array of associated log file paths on disk
+  port?: string; // Optional target hardware port for upload/monitor
+  pid?: number; // OS process ID of the running task
+  exitCode?: number; // Final exit code if terminated
 }
 
+/**
+ * Represents an overarching MCP execution command and its child tasks.
+ */
 export interface CommandRecord {
-  id: string;
-  commandDesc: string;
-  timestamp: number;
-  status: "running" | "success" | "error" | "terminated";
-  tasks: TaskRecord[];
-  mcpRequest?: any;
-  mcpResponse?: any;
-  mcpToolName?: string;
-  source?: "agent" | "dashboard";
+  id: string; // Unique UUID for the execution
+  commandDesc: string; // Plain-text description
+  timestamp: number; // Epoch timestamp of initiation
+  status: "running" | "success" | "error" | "terminated"; // Master status reflecting its children
+  tasks: TaskRecord[]; // Array of spawned sub-tasks
+  mcpRequest?: any; // Raw JSON payload sent to the MCP Server
+  mcpResponse?: any; // Raw JSON payload returned by the MCP Server
+  mcpToolName?: string; // Name of the MCP Tool invoked
+  source?: "agent" | "dashboard"; // Originator of the request
 }
 
-interface CommandFeedProps {
-  commands: CommandRecord[];
-  onOpenTab: (tab: TabRef) => void;
-  activeTabRef: TabRef | null;
-  activeWorkspace?: string | null;
-  hardware?: any[];
-  spoolerStates?: Record<string, any>;
-  apiBase?: string;
-  token?: string;
+/**
+ * Props for the CommandFeed component.
+ */
+export interface CommandFeedProps {
+  commands: CommandRecord[]; // Chronological array of execution records
+  onOpenTab: (tab: TabRef) => void; // Callback to open log tabs
+  activeTabRef: TabRef | null; // Currently viewed tab
+  activeWorkspace?: string | null; // Project directory currently in context
+  hardware?: any[]; // Hardware states mapping
+  spoolerStates?: Record<string, any>; // Active serial monitor daemons
+  apiBase?: string; // Dashboard Backend API URL
+  token?: string; // Security token
 }
 
 const parseLeniently = (str: string): any => {
@@ -244,6 +264,11 @@ const renderDataTree = (data: any, depth = 0): React.ReactNode => {
   );
 };
 
+/**
+ * Renders an accordion list of agent- or user-initiated MCP executions.
+ * @param props The CommandFeedProps
+ * @returns The rendered React component
+ */
 export default function CommandFeed({ 
   commands, onOpenTab, activeTabRef, activeWorkspace, hardware, spoolerStates, apiBase, token 
 }: CommandFeedProps) {
@@ -332,7 +357,7 @@ export default function CommandFeed({
   };
 
   const displayedCommands = commands.slice().reverse().filter(cmd => {
-    if (showActiveOnly && cmd.status !== 'running') return false;
+    if (showActiveOnly && cmd.status !== 'running' && !cmd.tasks?.some(t => t.status === 'running')) return false;
     
     const cmdSource = cmd.source || 'agent';
     if (sourceFilter === 'Agent' && cmdSource !== 'agent') return false;

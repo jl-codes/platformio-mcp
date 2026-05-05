@@ -23,6 +23,7 @@ import { tailFileBounded } from "../utils/tail.js";
 import { getLogDir, rotateSpoolerStreams } from "../utils/spooler.js";
 import { getWorkspaces, rewriteRegistry } from "../utils/workspace-registry.js";
 import { getActiveMonitorPids, isPidAlive, isBuildActive } from "../utils/process-manager.js";
+import { mcpContext } from "../utils/mcp-context.js";
 
 
 
@@ -125,7 +126,8 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string, rootComm
 
   if (proc.pid) {
     // Record PID to workspace tracker
-    await registerPioMonitorPid(targetPort, proc.pid, projectDir, rootCommandId, daemon.logFile);
+    const cliDesc = `pio device monitor ${monitorArgs.join(" ")}`;
+    await registerPioMonitorPid(targetPort, proc.pid, projectDir, rootCommandId, daemon.logFile, daemon.taskId, cliDesc);
   }
 
   // Symlink or copy to 'latest-monitor.log' for easy querying
@@ -228,6 +230,8 @@ export async function startMonitor(
   environment?: string,
   rootCommandId?: string,
 ) {
+  const ctx = mcpContext.getStore();
+  const effectiveCommandId = rootCommandId || ctx?.activityId;
   let activePort = port;
   let activeHwid: string | null = null;
   
@@ -284,7 +288,7 @@ export async function startMonitor(
   };
   activeDaemons[activePort] = daemon;
 
-  await spawnPioMonitor(activePort, projectDir, rootCommandId);
+  await spawnPioMonitor(activePort, projectDir, effectiveCommandId);
 
   // Attach UI portal tailing
   try {

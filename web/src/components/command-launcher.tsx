@@ -2,15 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Switch, Button, message } from 'antd';
 import { CodeOutlined } from '@ant-design/icons';
 
-interface CommandLauncherProps {
-  isOpen: boolean;
-  onClose: () => void;
-  activeWorkspace: string | null;
-  hardware: any[];
-  apiBase: string;
-  token: string;
+/**
+ * Command Launcher Component
+ * Provides a UI modal for agents or users to manually dispatch PlatformIO tasks.
+ *
+ * Provides:
+ * - CommandLauncher: React component for the task dispatch modal.
+ * - CommandLauncherProps: Props interface for the CommandLauncher component.
+ */
+
+/**
+ * Props for the CommandLauncher component.
+ */
+export interface CommandLauncherProps {
+  isOpen: boolean; // Controls modal visibility
+  onClose: () => void; // Callback to close the modal
+  activeWorkspace: string | null; // The currently targeted project directory
+  hardware: any[]; // List of available hardware ports
+  apiBase: string; // Base URL for the MCP API
+  token: string; // Authentication token for the API
 }
 
+/**
+ * Renders a modal interface to execute PlatformIO commands against the active workspace.
+ * @param props The CommandLauncherProps
+ * @returns The rendered React modal component
+ */
 export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hardware, apiBase, token }: CommandLauncherProps) {
   const [form] = Form.useForm();
   const [action, setAction] = useState('build_project');

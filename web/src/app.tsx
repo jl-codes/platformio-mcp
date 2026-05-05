@@ -48,6 +48,7 @@ export type TabRef = {
 
 function App() {
   const [status, setStatus] = useState<'online' | 'offline'>('offline');
+  const [authStatus, setAuthStatus] = useState<'checking' | 'valid' | 'invalid'>(parsedToken ? 'checking' : 'invalid');
   const [commands, setCommands] = useState<any[]>([]);
   const [buildLogs, setBuildLogs] = useState<Record<string, LogEvent[]>>({});
   const [buildLogFile, setBuildLogFile] = useState<string | null>(null);
@@ -79,18 +80,28 @@ function App() {
   // Fetch initial hardware
   const fetchHardware = async () => {
     try {
-      const res = await fetch(`${apiBase}/api/hardware`, { headers: { 'Authorization': `Bearer ${parsedToken}` } });
+      const res = await fetch(`${apiBase}/api/hardware`, { 
+        headers: { 'Authorization': `Bearer ${parsedToken}` },
+        cache: 'no-store'
+      });
       if (res.ok) {
         setHardwareDevices(await res.json());
+      } else if (res.status === 401) {
+        setAuthStatus('invalid');
       }
     } catch {}
   };
 
   const fetchWorkspaces = async () => {
     try {
-      const res = await fetch(`${apiBase}/api/workspaces`, { headers: { 'Authorization': `Bearer ${parsedToken}` } });
+      const res = await fetch(`${apiBase}/api/workspaces`, { 
+        headers: { 'Authorization': `Bearer ${parsedToken}` },
+        cache: 'no-store'
+      });
       if (res.ok) {
         setKnownWorkspaces(await res.json());
+      } else if (res.status === 401) {
+        setAuthStatus('invalid');
       }
     } catch {}
   };
@@ -113,7 +124,7 @@ function App() {
     const activeHistoricalLog = activeTabRef ? historicalLogBuffer[activeTabRef.taskId] : undefined;
 
     // Check if we already have it buffered
-    if (activeHistoricalLog) return;
+    if (activeHistoricalLog !== undefined) return;
 
     let artifact: any = null;
     let actualCommandId = activeTabRef.commandId;
@@ -142,7 +153,10 @@ function App() {
       try {
         let url = `${apiBase}/api/logs?commandId=${encodeURIComponent(actualCommandId)}&taskId=${encodeURIComponent(activeTabRef.taskId)}`;
         if (activeWorkspace) url += `&projectDir=${encodeURIComponent(activeWorkspace)}`;
-        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${parsedToken}` } });
+        const res = await fetch(url, { 
+          headers: { 'Authorization': `Bearer ${parsedToken}` },
+          cache: 'no-store'
+        });
         if (res.ok) {
            const logContent = await res.text();
            setHistoricalLogBuffer(prev => ({ ...prev, [activeTabRef.taskId]: logContent }));
@@ -163,11 +177,14 @@ function App() {
       if (projectDir) url += `?projectDir=${encodeURIComponent(projectDir)}`;
       
       const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${parsedToken}` }
+        headers: { 'Authorization': `Bearer ${parsedToken}` },
+        cache: 'no-store'
       });
       if (response.ok) {
         const data = await response.json();
         setCommands(data);
+      } else if (response.status === 401) {
+        setAuthStatus('invalid');
       }
     } catch (e) {
       console.error('Failed to fetch command history', e);
@@ -183,6 +200,20 @@ function App() {
   }, [activeWorkspace]);
 
   useEffect(() => {
+    if (socket.connected) {
+      setAuthStatus('valid');
+    }
+
+    socket.on('connect_error', (err) => {
+      if (err.message === 'Unauthorized') {
+        setAuthStatus('invalid');
+      }
+    });
+
+    socket.on('connect', () => {
+      setAuthStatus('valid');
+    });
+
     socket.on('server_status', (data) => {
       setStatus(data.status);
     });
@@ -286,6 +317,8 @@ function App() {
     fetchWorkspaces();
 
     return () => {
+      socket.off('connect_error');
+      socket.off('connect');
       socket.off('server_status');
       socket.off('command_history_updated');
       socket.off('build_log');
@@ -301,6 +334,36 @@ function App() {
   }, []);
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+
+  if (authStatus === 'invalid') {
+    return (
+      <ConfigProvider theme={{ algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
+        <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#1E1E1E' : '#ffffff', flexDirection: 'column', gap: 24 }}>
+          <img src="/pio_mcp_220x220.png" alt="PIO MCP" style={{ height: '80px', width: '80px', objectFit: 'contain' }} />
+          <div style={{ color: isDarkMode ? '#989898' : '#333333', fontSize: '18px', fontFamily: 'Fira Code, monospace', textAlign: 'center' }}>
+            Access Denied: The dashboard token is invalid or has expired.
+          </div>
+        </div>
+      </ConfigProvider>
+    );
+  }
+
+  if (authStatus === 'checking') {
+    return (
+      <ConfigProvider theme={{ algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
+        <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#1E1E1E' : '#ffffff' }}>
+          <img src="/pio_mcp_220x220.png" alt="PIO MCP" style={{ height: '60px', width: '60px', objectFit: 'contain', opacity: 0.3, animation: 'pulse 1.5s infinite' }} />
+          <style>{`
+            @keyframes pulse {
+              0% { opacity: 0.3; transform: scale(1); }
+              50% { opacity: 0.8; transform: scale(1.05); }
+              100% { opacity: 0.3; transform: scale(1); }
+            }
+          `}</style>
+        </div>
+      </ConfigProvider>
+    );
+  }
 
   return (
     <ConfigProvider

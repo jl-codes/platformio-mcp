@@ -42,6 +42,9 @@ import {
   UninstallLibraryParamsSchema,
   UpdateLibraryParamsSchema,
 } from "./types.js";
+import { registerCommand, updateCommandStatus } from "./utils/command-registry.js";
+import { mcpContext } from "./utils/mcp-context.js";
+import { addWorkspace } from "./utils/workspace-registry.js";
 
 // Import tool functions from feature modules
 import { listBoards, getBoardInfo } from "./tools/boards.js";
@@ -50,6 +53,7 @@ import { initProject, getProjectConfig, getSystemInfo } from "./tools/projects.j
 import { buildProject, cleanProject, checkTaskStatus, checkProject, runTests } from "./tools/build.js";
 import { uploadFirmware, uploadFilesystem } from "./tools/upload.js";
 import { startMonitor, stopMonitor, queryLogs } from "./tools/monitor.js";
+import { spoolLargeDataset } from "./utils/spooler.js";
 
 import {
   searchLibraries,
@@ -150,10 +154,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description:
                 'Optional framework (e.g., "arduino", "espidf", "mbed")',
             },
-            projectDir: {
-              type: "string",
-              description: "Directory path where the project should be created",
-            },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
             platformOptions: {
               type: "object",
               description: "Optional platform-specific configuration options",
@@ -169,10 +170,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            projectDir: {
-              type: "string",
-              description: "Path to the PlatformIO project directory",
-            },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
             environment: {
               type: "string",
               description:
@@ -203,10 +201,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            projectDir: {
-              type: "string",
-              description: "Path to the PlatformIO project directory",
-            },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
             sessionId: {
               type: "string",
               description: "Agent session ID for pipeline lock validation",
@@ -227,10 +222,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            projectDir: {
-              type: "string",
-              description: "Path to the PlatformIO project directory",
-            },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
             port: {
               type: "string",
               description:
@@ -269,10 +261,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            projectDir: {
-              type: "string",
-              description: "Path to the PlatformIO project directory",
-            },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
             port: {
               type: "string",
               description:
@@ -371,16 +360,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "Library name or ID to install",
             },
-            projectDir: {
-              type: "string",
-              description:
-                "Optional project directory (installs globally if not specified)",
-            },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
             version: {
               type: "string",
               description:
                 'Optional specific version (e.g., "1.0.0", "^2.1.0")',
             },
+            global: { type: "boolean", description: "If true, performs the operation globally. Defaults to false." },
           },
           required: ["library"],
         },
@@ -392,11 +378,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            projectDir: {
-              type: "string",
-              description:
-                "Optional project directory (lists global libraries if not specified)",
-            },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
+            global: { type: "boolean", description: "If true, performs the operation globally. Defaults to false." },
           },
         },
       },
@@ -408,7 +391,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             port: { type: "string", description: "Optional COM path. Falls back to default." },
             baudRate: { type: "number", description: "Optional baud rate. Defaults to 115200." },
-            projectDir: { type: "string", description: "Target project boundary to deposit raw hardware logs into instead of the global server cache." },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
             environment: { type: "string", description: "Optional PlatformIO environment context." },
           },
         },
@@ -420,7 +403,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {
             port: { type: "string", description: "COM port to stop listening on." },
-            projectDir: { type: "string", description: "Target project containing the workspace." },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
           },
           required: ["port"],
         },
@@ -433,7 +416,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             lines: { type: "number", description: "Fetch this many tail lines from the end of the log (default: 100)" },
             searchPattern: { type: "string", description: "Optional Regex pattern to filter the spool for specific keywords." },
-            projectDir: { type: "string", description: "Target project checkout to query local .log cache instead of global cache." },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
             port: { type: "string", description: "Specific COM port to query logs for." },
           },
         },
@@ -444,17 +427,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            projectDir: { type: "string", description: "Optional target directory for scoped cleanup." },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
           },
         },
       },
       {
         name: "check_task_status",
-        description: "Polls the status of an ongoing background build or upload task.",
+        description: "Polls the status of an ongoing background task. Returns a JSON object where `status` indicates the success of the polling operation itself, and `targetStatus` (running, failed, completed) indicates the state of the actual background task.",
         inputSchema: {
           type: "object",
           properties: {
-            projectDir: { type: "string", description: "Optional project directory to scope the check." },
+            taskId: { type: "string", description: "Optional task ID to check status." },
+            logPath: { type: "string", description: "Optional relative log path to check." },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
           },
         },
       },
@@ -474,7 +459,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            projectDir: { type: "string", description: "Path to the PlatformIO project directory" },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
           },
           required: ["projectDir"],
         },
@@ -493,7 +478,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            projectDir: { type: "string", description: "Path to the PlatformIO project directory" },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
             environment: { type: "string", description: "Specific environment to check" },
             background: { type: "boolean", description: "Run slow analysis in background" },
           },
@@ -506,7 +491,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            projectDir: { type: "string", description: "Path to the PlatformIO project directory" },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
             environment: { type: "string", description: "Specific environment to test" },
             background: { type: "boolean", description: "Run testing in background" },
           },
@@ -520,7 +505,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {
             library: { type: "string", description: "Library name or ID to uninstall" },
-            projectDir: { type: "string", description: "Project directory (uninstalls globally if not specified)" },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
+            global: { type: "boolean", description: "If true, performs the operation globally. Defaults to false." },
           },
           required: ["library"],
         },
@@ -532,7 +518,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {
             library: { type: "string", description: "Library name or ID to update" },
-            projectDir: { type: "string", description: "Project directory (updates globally if not specified)" },
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
+            global: { type: "boolean", description: "If true, performs the operation globally. Defaults to false." },
           },
           required: ["library"],
         },
@@ -556,19 +543,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const activityId = crypto.randomUUID();
   portalEvents.emitActivity(name, args, 'running', activityId);
 
-  logDiag(`[Command Execution] Tool invoked: '${name}' with arguments: ${JSON.stringify(args)}`, args.projectDir);
+  // Group global commands into the currently active workspace UI if missing
+  const targetProjectDir = args.projectDir || portalEvents.getLastKnownWorkspace();
+
+  // Expose the MCP tool initiation to the Web UI ledger
+  await registerCommand({
+    id: activityId,
+    commandDesc: `MCP Tool: ${name}`,
+    timestamp: Date.now(),
+    status: "running",
+    tasks: [],
+    mcpRequest: args,
+    mcpToolName: name
+  }, targetProjectDir);
+
+  logDiag(`[Command Execution] Tool invoked: '${name}' with arguments: ${JSON.stringify(args)}`, targetProjectDir);
 
   try {
-    const response = await (async () => {
+    const response = await mcpContext.run({ activityId, targetProjectDir }, async () => {
       switch (name) {
       case "list_boards": {
         const params = ListBoardsParamsSchema.parse(args);
         const boards = await listBoards(params.filter);
+        const spooled = spoolLargeDataset("list_boards", boards, targetProjectDir || process.cwd());
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(boards, null, 2),
+              text: typeof spooled === "string" ? spooled : JSON.stringify(spooled, null, 2),
             },
           ],
         };
@@ -763,11 +765,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "search_libraries": {
         const params = SearchLibrariesParamsSchema.parse(args);
         const libraries = await searchLibraries(params.query, params.limit);
+        const spooled = spoolLargeDataset("search_libraries", libraries, targetProjectDir || process.cwd());
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(libraries, null, 2),
+              text: typeof spooled === "string" ? spooled : JSON.stringify(spooled, null, 2),
             },
           ],
         };
@@ -776,7 +779,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "install_library": {
         const params = InstallLibraryParamsSchema.parse(args);
         const result = await installLibrary(params.library, {
-          projectDir: params.projectDir,
+          projectDir: params.global ? undefined : targetProjectDir,
           version: params.version,
         });
         return {
@@ -791,12 +794,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "list_installed_libraries": {
         const params = ListInstalledLibrariesParamsSchema.parse(args);
-        const libraries = await listInstalledLibraries(params.projectDir);
+        const libraries = await listInstalledLibraries(params.global ? undefined : targetProjectDir);
+        const spooled = spoolLargeDataset("list_installed_libraries", libraries, targetProjectDir || process.cwd());
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(libraries, null, 2),
+              text: typeof spooled === "string" ? spooled : JSON.stringify(spooled, null, 2),
             },
           ],
         };
@@ -865,7 +869,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "get_dashboard_url": {
         const params = GetDashboardUrlParamsSchema.parse(args);
-        const result = await getDashboardStatus(params.open);
+        const result = await getDashboardStatus(params.open, params.projectDir);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -908,7 +912,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "uninstall_library": {
         const params = UninstallLibraryParamsSchema.parse(args);
-        const result = await uninstallLibrary(params.library, params.projectDir);
+        const result = await uninstallLibrary(params.library, params.global ? undefined : targetProjectDir);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -916,7 +920,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "update_library": {
         const params = UpdateLibraryParamsSchema.parse(args);
-        const result = await updateLibrary(params.library, params.projectDir);
+        const result = await updateLibrary(params.library, params.global ? undefined : targetProjectDir);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -925,12 +929,48 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       default:
         throw new Error(`Unknown tool: ${name}`);
       }
-    })();
-    
+    });
+
+    let storedResponse = response;
+    try {
+      const responseString = JSON.stringify(response);
+      if (responseString.length > 1000) {
+        storedResponse = { 
+          truncated: true, 
+          message: "Response truncated to save ledger space",
+          preview: responseString.substring(0, 1000) + "... [TRUNCATED]"
+        } as any;
+      }
+    } catch {}
+
+    let isBackground = false;
+    try {
+      if (response?.content?.[0]?.text) {
+        const parsed = JSON.parse(response.content[0].text);
+        if (parsed.status === "running" && parsed.message === "Task dispatched to background.") isBackground = true;
+      }
+    } catch {}
+
+    await updateCommandStatus(activityId, {
+      status: isBackground ? "running" : "success",
+      mcpResponse: storedResponse
+    }, targetProjectDir);
+
     portalEvents.emitActivity(name, args, 'success', activityId);
+    
+    if (args.projectDir) {
+      await addWorkspace(args.projectDir).catch(() => {});
+    }
+
     return response;
-  } catch (error) {
+  } catch (error: any) {
+    await updateCommandStatus(activityId, {
+      status: "error",
+      mcpResponse: { error: error.message }
+    }, targetProjectDir);
+
     portalEvents.emitActivity(name, args, 'error', activityId);
+    
     const errorMessage = formatPlatformIOError(error);
     return {
       content: [

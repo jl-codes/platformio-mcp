@@ -6,6 +6,14 @@
  * - startPortalServer: Initializes Express and Socket.io endpoints and hooks into the event bus
  * - getDashboardStatus: Conditionally bootstraps server and returns secure URL payload
  * - activePortalStatus: Global registry for UI runtime variables
+ *
+ * REST API Routes:
+ * - /api/devices & /hardware: Query connected serial devices
+ * - /api/workspaces & /projects: Manage active project contexts
+ * - /api/commands/*: Trigger PIO toolchain actions (build, upload, clean, check)
+ * - /api/libraries/*: Search, install, and uninstall library dependencies
+ * - /api/spooler/*: Manage background serial telemetry listeners
+ * - /api/logs: Retrieve full background task log streams
  */
 import express from "express";
 import { createServer } from "http";
@@ -27,7 +35,8 @@ import fs from "node:fs";
 import { hardwareLockManager } from "../utils/lock-manager.js";
 import { isBuildActive } from "../utils/process-manager.js";
 import { tailFileBounded } from "../utils/tail.js";
-import { getCommandHistory } from "../utils/command-registry.js";
+import { getCommandHistory, registerCommand, updateCommandStatus } from "../utils/command-registry.js";
+import { mcpContext } from "../utils/mcp-context.js";
 import { getWorkspaces } from "../utils/workspace-registry.js";
 import { getProjectConfig, isValidProject } from "../tools/projects.js";
 import { searchLibraries, listInstalledLibraries, installLibrary, uninstallLibrary } from "../tools/libraries.js";
@@ -60,6 +69,7 @@ export const activePortalStatus = {
  * and intercepts hard-blocks configured via environment flags.
  * 
  * @param autoOpen If true, seamlessly dispatches a subshell command to route the host's default web browser to the secure link.
+ * @param projectDir Optional project directory to register upon startup.
  * @returns A dictionary dictating the physical port, localhost domain string, and active session cryptographic token.
  */
 export async function getDashboardStatus(autoOpen: boolean = false, projectDir?: string) {
@@ -80,7 +90,7 @@ export async function getDashboardStatus(autoOpen: boolean = false, projectDir?:
         if (activePortalStatus.running) {
           clearInterval(check);
           resolve();
-        } else if (attempts++ > 10) {
+        } else if (attempts++ > 60) {
           clearInterval(check);
           reject(new Error("Timeout waiting for Web Dashboard to boot"));
         }
@@ -149,6 +159,13 @@ export function startPortalServer(defaultPort = 8080) {
     next();
   });
 
+  /**
+   * Retrieves a list of all connected serial devices (e.g., development boards).
+   * 
+   * Route: GET /api/devices
+   * 
+   * @returns JSON array of connected hardware devices
+   */
   app.get("/api/devices", async (_req, res) => {
     try {
       const devices = await listDevices();
@@ -158,6 +175,13 @@ export function startPortalServer(defaultPort = 8080) {
     }
   });
 
+  /**
+   * Alias for /api/devices. Retrieves a list of connected serial devices.
+   * 
+   * Route: GET /api/hardware
+   * 
+   * @returns JSON array of connected hardware devices
+   */
   app.get("/api/hardware", async (_req, res) => {
     try {
       const hardware = await listDevices();
@@ -167,6 +191,15 @@ export function startPortalServer(defaultPort = 8080) {
     }
   });
 
+  /**
+   * Retrieves the historical and active command registry for the workspace.
+   * Clears out any ghost tasks before returning the history.
+   * 
+   * Route: GET /api/commands
+   * 
+   * @param {string} [req.query.projectDir] - Optional project directory to scope the command history
+   * @returns JSON array representing the chronological command history
+   */
   app.get("/api/commands", async (req, res) => {
     try {
       const projectDir = req.query.projectDir as string | undefined;
@@ -178,6 +211,13 @@ export function startPortalServer(defaultPort = 8080) {
     }
   });
 
+  /**
+   * Retrieves a list of all recognized PlatformIO workspace projects from the registry.
+   * 
+   * Route: GET /api/workspaces
+   * 
+   * @returns JSON array of registered workspaces
+   */
   app.get("/api/workspaces", async (_req, res) => {
     try {
       const workspaces = await getWorkspaces();
@@ -187,23 +227,94 @@ export function startPortalServer(defaultPort = 8080) {
     }
   });
 
-  app.post("/api/commands/build", async (req, res) => {
+  /**
+   * Wrapper function for executing an MCP tool command triggered via the Web Dashboard.
+   * Handles registering the command in the telemetry ledger, executing it safely 
+   * within the MCP context, tracking the response, and standardizing error handling.
+   * 
+   * @param toolName - The identifier of the MCP tool being executed
+   * @param projectDir - The target PlatformIO workspace directory
+   * @param requestPayload - The raw JSON body of the API request
+   * @param action - The specific async execution logic for the command
+   * @param res - The Express response object used to reply to the client
+   */
+  async function executeDashboardCommand(
+    toolName: string,
+    projectDir: string,
+    requestPayload: any,
+    action: () => Promise<any>,
+    res: any
+  ) {
+  if (!projectDir) {
+    res.status(400).json({ error: "Missing projectDir parameter" });
+    return;
+  }
+  
+  const activityId = crypto.randomUUID();
+  try {
+    await registerCommand({
+      id: activityId,
+      commandDesc: `Dashboard Action`,
+      timestamp: Date.now(),
+      status: "running",
+      tasks: [],
+      mcpRequest: requestPayload,
+      mcpToolName: toolName,
+      source: "dashboard"
+    }, projectDir);
+
+    const result = await mcpContext.run({ activityId, targetProjectDir: projectDir }, action);
+
+    let storedResponse = result;
     try {
-      const { projectDir, environment, verbose } = req.body;
-      if (!projectDir) {
-        res.status(400).json({ error: "Missing projectDir parameter" });
-        return;
+      const responseString = JSON.stringify(result);
+      if (responseString.length > 1000) {
+        storedResponse = { truncated: true, message: "Response truncated to save ledger space" };
       }
-      // Dispatch build to background so we can return the TaskId immediately
-      const result = await buildProject(projectDir, environment, verbose, true);
-      res.json(result);
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
+    } catch {}
+
+    await updateCommandStatus(activityId, {
+      status: (result?.status === "running" && result?.message === "Task dispatched to background.") ? "running" : "success",
+      mcpResponse: storedResponse
+    }, projectDir);
+
+    res.json(result);
+  } catch (e: any) {
+    await updateCommandStatus(activityId, {
+      status: "error",
+      mcpResponse: { error: e.message }
+    }, projectDir);
+    res.status(500).json({ error: e.message });
+  }
+}
+
+  /**
+   * Compiles the project source code and generates firmware binary.
+   * 
+   * Route: POST /api/commands/build
+   * 
+   * @param {string} req.body.projectDir - Path to the PlatformIO project directory
+   * @param {string} [req.body.environment] - Optional specific environment to build
+   * @param {boolean} [req.body.verbose] - If true, returns the complete verbose build log
+   * @returns JSON object containing the command execution result and task status
+   */
+  app.post("/api/commands/build", async (req, res) => {
+    executeDashboardCommand("build_project", req.body.projectDir, req.body, async () => {
+      const { projectDir, environment, verbose } = req.body;
+      return await buildProject(projectDir, environment, verbose, true);
+    }, res);
   });
 
+  /**
+   * Forcefully cleans all server locks and terminates tracked compilation PIDs.
+   * 
+   * Route: POST /api/server/reset
+   * 
+   * @param {string} [req.body.projectDir] - Optional project directory to scope the reset
+   * @returns JSON object confirming the reset operation
+   */
   app.post("/api/server/reset", async (req, res) => {
-    try {
+    executeDashboardCommand("reset_server_state", req.body.projectDir, req.body, async () => {
       const projectDir = req.body.projectDir as string | undefined;
       await killAllTrackedProcesses(projectDir);
 
@@ -224,12 +335,17 @@ export function startPortalServer(defaultPort = 8080) {
         }
       } catch (e) {}
       
-      res.json({ success: true, message: "System state has been reset and all locks cleared." });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
+      return { success: true, message: "System state has been reset and all locks cleared." };
+    }, res);
   });
 
+  /**
+   * Opens a native OS dialog to select and register a new PlatformIO workspace.
+   * 
+   * Route: POST /api/workspaces/browse
+   * 
+   * @returns JSON object with the registered path, or an error if invalid
+   */
   app.post("/api/workspaces/browse", async (_req, res) => {
     try {
       let result = execSync("osascript -e 'POSIX path of (choose folder)'").toString().trim();
@@ -257,46 +373,98 @@ export function startPortalServer(defaultPort = 8080) {
     }
   });
 
+  /**
+   * Removes build artifacts and compiled files from the project.
+   * 
+   * Route: POST /api/commands/clean
+   * 
+   * @param {string} req.body.projectDir - Path to the PlatformIO project directory
+   * @returns JSON object containing the command execution result
+   */
   app.post("/api/commands/clean", async (req, res) => {
-    try {
+    executeDashboardCommand("clean_project", req.body.projectDir, req.body, async () => {
       const { projectDir } = req.body;
-      const result = await cleanProject(projectDir, true);
-      res.json(result);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+      return await cleanProject(projectDir, true);
+    }, res);
   });
 
+  /**
+   * Uploads compiled firmware to a connected device. Automatically builds if necessary.
+   * 
+   * Route: POST /api/commands/upload_firmware
+   * 
+   * @param {string} req.body.projectDir - Path to the PlatformIO project directory
+   * @param {string} [req.body.environment] - Optional specific environment from platformio.ini
+   * @param {string} [req.body.port] - Optional upload port (auto-detected if not specified)
+   * @param {boolean} [req.body.start_monitor] - If true, starts serial monitor after upload
+   * @param {boolean} [req.body.verbose] - If true, returns verbose upload log
+   * @returns JSON object containing the command execution result
+   */
   app.post("/api/commands/upload_firmware", async (req, res) => {
-    try {
+    executeDashboardCommand("upload_firmware", req.body.projectDir, req.body, async () => {
       const { projectDir, environment, port, start_monitor, verbose } = req.body;
-      const result = await uploadFirmware(projectDir, port, environment, verbose, true, start_monitor);
-      res.json(result);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+      return await uploadFirmware(projectDir, port, environment, verbose, true, start_monitor);
+    }, res);
   });
 
+  /**
+   * Builds and uploads a SPIFFS/LittleFS filesystem image to the connected device.
+   * 
+   * Route: POST /api/commands/upload_filesystem
+   * 
+   * @param {string} req.body.projectDir - Path to the PlatformIO project directory
+   * @param {string} [req.body.environment] - Optional specific environment from platformio.ini
+   * @param {string} [req.body.port] - Optional upload port
+   * @returns JSON object containing the command execution result
+   */
   app.post("/api/commands/upload_filesystem", async (req, res) => {
-    try {
+    executeDashboardCommand("upload_filesystem", req.body.projectDir, req.body, async () => {
       const { projectDir, environment, port } = req.body;
-      const result = await uploadFilesystem(projectDir, port, environment, false, true, false);
-      res.json(result);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+      return await uploadFilesystem(projectDir, port, environment, false, true, false);
+    }, res);
   });
 
+  /**
+   * Validates unit tests locally or on hardware.
+   * 
+   * Route: POST /api/commands/run_tests
+   * 
+   * @param {string} req.body.projectDir - Path to the PlatformIO project directory
+   * @param {string} [req.body.environment] - Optional specific environment to test
+   * @returns JSON object containing the command execution result
+   */
   app.post("/api/commands/run_tests", async (req, res) => {
-    try {
+    executeDashboardCommand("run_tests", req.body.projectDir, req.body, async () => {
       const { projectDir, environment } = req.body;
-      const result = await runTests(projectDir, environment, true);
-      res.json(result);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+      return await runTests(projectDir, environment, true);
+    }, res);
   });
 
+  /**
+   * Runs static analysis validation on the project source code.
+   * 
+   * Route: POST /api/commands/check_project
+   * 
+   * @param {string} req.body.projectDir - Path to the PlatformIO project directory
+   * @param {string} [req.body.environment] - Optional specific environment to check
+   * @returns JSON object containing the command execution result
+   */
   app.post("/api/commands/check_project", async (req, res) => {
-    try {
+    executeDashboardCommand("check_project", req.body.projectDir, req.body, async () => {
       const { projectDir, environment } = req.body;
-      const result = await checkProject(projectDir, environment, true);
-      res.json(result);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+      return await checkProject(projectDir, environment, true);
+    }, res);
   });
 
+  /**
+   * Retrieves and serves a complete log file from a specific background task.
+   * 
+   * Route: GET /api/logs
+   * 
+   * @param {string} req.query.taskId - The UUID of the task to retrieve logs for
+   * @param {string} [req.query.projectDir] - The project directory associated with the task
+   * @returns Raw text stream of the log file contents
+   */
   app.get("/api/logs", async (req, res) => {
     try {
       const { taskId, projectDir } = req.query;
@@ -331,6 +499,13 @@ export function startPortalServer(defaultPort = 8080) {
     }
   });
 
+  /**
+   * Retrieves system diagnostic path output and PIO environment information.
+   * 
+   * Route: GET /api/system/info
+   * 
+   * @returns JSON object with system diagnostics
+   */
   app.get("/api/system/info", async (_req, res) => {
     try {
       const { getSystemInfo } = await import("../tools/projects.js");
@@ -341,6 +516,14 @@ export function startPortalServer(defaultPort = 8080) {
     }
   });
 
+  /**
+   * Dumps the parsed platformio.ini JSON configuration for a workspace.
+   * 
+   * Route: GET /api/projects/config
+   * 
+   * @param {string} req.query.projectDir - Path to the PlatformIO project directory
+   * @returns JSON object of the parsed platformio.ini configuration
+   */
   app.get("/api/projects/config", async (req, res) => {
     try {
       const { projectDir } = req.query;
@@ -355,6 +538,14 @@ export function startPortalServer(defaultPort = 8080) {
     }
   });
 
+  /**
+   * Searches the PlatformIO library registry for available libraries.
+   * 
+   * Route: GET /api/libraries/search
+   * 
+   * @param {string} req.query.query - Search query string
+   * @returns JSON array of search results
+   */
   app.get("/api/libraries/search", async (req, res) => {
     try {
       const { query } = req.query;
@@ -369,6 +560,14 @@ export function startPortalServer(defaultPort = 8080) {
     }
   });
 
+  /**
+   * Lists all installed libraries either globally or for a specific project.
+   * 
+   * Route: GET /api/libraries/installed
+   * 
+   * @param {string} [req.query.projectDir] - Path to the PlatformIO project directory
+   * @returns JSON array of installed libraries
+   */
   app.get("/api/libraries/installed", async (req, res) => {
     try {
       const { projectDir } = req.query;
@@ -379,9 +578,18 @@ export function startPortalServer(defaultPort = 8080) {
     }
   });
 
+  /**
+   * Installs a library from the PlatformIO registry to a specific project.
+   * Acquires the hardware queue lock during operation.
+   * 
+   * Route: POST /api/libraries/install
+   * 
+   * @param {string} req.body.library - Library name or ID to install
+   * @param {string} req.body.projectDir - Path to the PlatformIO project directory
+   * @returns JSON object containing the command execution result
+   */
   app.post("/api/libraries/install", async (req, res) => {
-    let lockerSession;
-    try {
+    executeDashboardCommand("install_library", req.body.projectDir, req.body, async () => {
       const { library, projectDir } = req.body;
       
       const lockStatus = hardwareLockManager.getLockStatus();
@@ -395,27 +603,29 @@ export function startPortalServer(defaultPort = 8080) {
 
       const reqSessionId = crypto.randomUUID();
       hardwareLockManager.acquireLock(reqSessionId, "Installing Library: " + library);
-      lockerSession = { success: true, sessionId: reqSessionId };
       portalEvents.emitLockState(hardwareLockManager.getLockStatus());
 
-      const result = await installLibrary(library, { projectDir });
-      
-      hardwareLockManager.releaseLock(lockerSession.sessionId);
-      portalEvents.emitLockState(hardwareLockManager.getLockStatus());
-
-      res.json(result);
-    } catch (e: any) {
-      if (lockerSession && lockerSession.success) {
-        hardwareLockManager.releaseLock(lockerSession.sessionId);
+      try {
+        return await installLibrary(library, { projectDir });
+      } finally {
+        hardwareLockManager.releaseLock(reqSessionId);
         portalEvents.emitLockState(hardwareLockManager.getLockStatus());
       }
-      res.status(500).json({ error: e.message });
-    }
+    }, res);
   });
 
+  /**
+   * Removes a library from a specific project.
+   * Acquires the hardware queue lock during operation.
+   * 
+   * Route: POST /api/libraries/uninstall
+   * 
+   * @param {string} req.body.library - Library name or ID to uninstall
+   * @param {string} req.body.projectDir - Path to the PlatformIO project directory
+   * @returns JSON object containing the command execution result
+   */
   app.post("/api/libraries/uninstall", async (req, res) => {
-    let lockerSession;
-    try {
+    executeDashboardCommand("uninstall_library", req.body.projectDir, req.body, async () => {
       const { library, projectDir } = req.body;
 
       const lockStatus = hardwareLockManager.getLockStatus();
@@ -429,28 +639,30 @@ export function startPortalServer(defaultPort = 8080) {
 
       const reqSessionId = crypto.randomUUID();
       hardwareLockManager.acquireLock(reqSessionId, "Uninstalling Library: " + library);
-      lockerSession = { success: true, sessionId: reqSessionId };
       portalEvents.emitLockState(hardwareLockManager.getLockStatus());
 
-      const result = await uninstallLibrary(library, projectDir);
-      
-      hardwareLockManager.releaseLock(lockerSession.sessionId);
-      portalEvents.emitLockState(hardwareLockManager.getLockStatus());
-
-      res.json(result);
-    } catch (e: any) {
-      if (lockerSession && lockerSession.success) {
-        hardwareLockManager.releaseLock(lockerSession.sessionId);
+      try {
+        return await uninstallLibrary(library, projectDir);
+      } finally {
+        hardwareLockManager.releaseLock(reqSessionId);
         portalEvents.emitLockState(hardwareLockManager.getLockStatus());
       }
-      res.status(500).json({ error: e.message });
-    }
+    }, res);
   });
 
 
 
+  /**
+   * Manually starts or restarts the background serial-to-disk spooler for a specific device.
+   * 
+   * Route: POST /api/spooler/start
+   * 
+   * @param {string} [req.body.port] - Optional COM path
+   * @param {string} req.body.projectDir - Path to the PlatformIO project directory
+   * @returns JSON object containing the command execution result
+   */
   app.post("/api/spooler/start", async (req, res) => {
-    try {
+    executeDashboardCommand("start_monitor", req.body.projectDir, req.body, async () => {
       const { port, projectDir } = req.body;
       const lockStatus = hardwareLockManager.getLockStatus();
       
@@ -465,29 +677,52 @@ export function startPortalServer(defaultPort = 8080) {
           );
         }
       }
-      const result = await startMonitor(
+      return await startMonitor(
         port,
         115200,
         projectDir,
       );
-      res.json(result);
-    } catch (e: any) {
-      res.status(500).json({ success: false, error: e.message });
-    }
+    }, res);
   });
 
+  /**
+   * Kills the active background serial listener and unlocks the UART.
+   * 
+   * Route: POST /api/spooler/stop
+   * 
+   * @param {string} [req.body.port] - Optional COM port to stop listening on. If omitted, stops all.
+   * @returns JSON object containing the command execution result
+   */
   app.post("/api/spooler/stop", async (req, res) => {
-    const { port } = req.body;
-    if (port) {
-      await stopMonitor(port);
-    } else {
-      // Fallback: stop all if no port specified (though UI should always specify)
-      const states = getSpoolerStates();
-      for (const p of Object.keys(states)) {
-        await stopMonitor(p);
+    executeDashboardCommand("stop_monitor", req.body.projectDir, req.body, async () => {
+      const { port } = req.body;
+      if (port) {
+        await stopMonitor(port);
+      } else {
+        // Fallback: stop all if no port specified (though UI should always specify)
+        const states = getSpoolerStates();
+        for (const p of Object.keys(states)) {
+          await stopMonitor(p);
+        }
       }
-    }
-    res.json({ success: true });
+      return { success: true };
+    }, res);
+  });
+
+  /**
+   * Launches the native PIO Home server in the background.
+   * 
+   * Route: POST /api/commands/pio_home
+   * 
+   * @param {string} [req.body.projectDir] - Optional project directory
+   * @returns JSON object confirming launch
+   */
+  app.post("/api/commands/pio_home", async (req, res) => {
+    executeDashboardCommand("start_pio_home", req.body.projectDir, req.body, async () => {
+      // Execute the PIO Home server in the background
+      exec("pio home --port 8008");
+      return { success: true, message: "PIO Home launched" };
+    }, res);
   });
 
   const io = new Server(httpServer, {

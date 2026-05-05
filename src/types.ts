@@ -567,6 +567,7 @@ export const InstallLibraryParamsSchema = z.object({
     .optional()
     .describe("Project directory (installs globally if not specified)"),
   version: z.string().optional().describe("Specific version to install"),
+  global: z.boolean().optional().describe("If true, installs the library globally"),
 });
 
 // Uninstall library parameters
@@ -576,6 +577,7 @@ export const UninstallLibraryParamsSchema = z.object({
     .string()
     .optional()
     .describe("Project directory (uninstalls globally if not specified)"),
+  global: z.boolean().optional().describe("If true, uninstalls from global storage"),
 });
 
 // Update library parameters
@@ -585,6 +587,7 @@ export const UpdateLibraryParamsSchema = z.object({
     .string()
     .optional()
     .describe("Project directory (updates globally if not specified)"),
+  global: z.boolean().optional().describe("If true, updates from global storage"),
 });
 
 // List installed libraries parameters
@@ -596,6 +599,7 @@ export const ListInstalledLibrariesParamsSchema = z.object({
     .string()
     .optional()
     .describe("Project directory (lists global libraries if not specified)"),
+  global: z.boolean().optional().describe("If true, lists global libraries"),
 });
 
 // Monitor parameters
@@ -631,5 +635,6 @@ export const CheckTaskStatusParamsSchema = z.object({
  */
 export const GetDashboardUrlParamsSchema = z.object({
   open: z.boolean().optional().describe("If true, automatically opens the local dashboard UI in the system's default browser."),
+  projectDir: z.string().optional().describe("Optional project directory to initialize the dashboard with."),
 });
 

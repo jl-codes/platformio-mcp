@@ -4,6 +4,7 @@
  *
  * Provides:
  * - portalEvents: Global singleton event emitter for portal communication.
+ * - PortalEventEmitter: Class defining the portal event bus behavior.
  */
 import { EventEmitter } from "events";
 import fs from "node:fs";
@@ -57,6 +58,9 @@ class PortalEventEmitter extends EventEmitter {
 
   /**
    * Emit a build log stream, buffering partial chunks into clean lines
+   * @param projectId The target project identifier
+   * @param taskId The task ID generating the log
+   * @param chunk Raw string chunk of the log
    */
   emitTaskLog(projectId: string, taskId: string | undefined, chunk: string) {
     const bufferKey = taskId || projectId;
@@ -85,6 +89,9 @@ class PortalEventEmitter extends EventEmitter {
 
   /**
    * Emit a signal to clear the build terminal for a project
+   * @param projectId The target project identifier
+   * @param taskId Optional specific task ID
+   * @param logPaths Optional list of associated log files
    */
   clearTaskLog(projectId: string, taskId?: string, logPaths?: string[]) {
     const bufferKey = taskId || projectId;
@@ -101,6 +108,9 @@ class PortalEventEmitter extends EventEmitter {
 
   /**
    * Emit a serial monitor read
+   * @param port Serial port emitting the log
+   * @param data Log payload data
+   * @param taskId Optional task ID
    */
   emitSerialLog(port: string, data: string, taskId?: string) {
     this.emit("serial_log", {
@@ -113,6 +123,7 @@ class PortalEventEmitter extends EventEmitter {
 
   /**
    * Emit general server status
+   * @param status String enum of "online" or "offline"
    */
   emitServerStatus(status: "online" | "offline") {
     this.emit("server_status", {
@@ -123,6 +134,7 @@ class PortalEventEmitter extends EventEmitter {
 
   /**
    * Emit hardware queue lock status
+   * @param state The lock state object
    */
   emitLockState(state: {
     isLocked: boolean;
@@ -137,6 +149,7 @@ class PortalEventEmitter extends EventEmitter {
 
   /**
    * Emit a map of all spooler connection and config properties
+   * @param states Record mapping ports to spooler states
    */
   emitSpoolerStates(states: Record<string, any>) {
     this.emit("spooler_states", states);
@@ -144,6 +157,7 @@ class PortalEventEmitter extends EventEmitter {
 
   /**
    * Emit an update signal when the command history registry changes
+   * @param projectDir Target project context
    */
   emitCommandHistoryUpdated(projectDir: string) {
     this.emit("command_history_updated", {
@@ -154,6 +168,7 @@ class PortalEventEmitter extends EventEmitter {
 
   /**
    * Emit a signal containing the latest rich hardware port state
+   * @param devices List of device objects
    */
   emitHardwareStateUpdated(devices: unknown[]) {
     this.emit("hardware_state_updated", {
@@ -166,6 +181,7 @@ class PortalEventEmitter extends EventEmitter {
 
   /**
    * Caches and emits the last known dynamically targeted workspace directory.
+   * @param projectDir Target project directory path
    */
   emitWorkspaceState(projectDir: string) {
     this.lastKnownProjectDir = projectDir;
@@ -179,12 +195,17 @@ class PortalEventEmitter extends EventEmitter {
     });
   }
 
+  /**
+   * Retrieves the last known workspace path
+   * @returns The last targeted workspace directory
+   */
   getLastKnownWorkspace() {
     return this.lastKnownProjectDir;
   }
 
   /**
    * Emit an update signal when the overall workspaces registry changes.
+   * @param workspaces List of available workspace directories
    */
   emitWorkspacesUpdated(workspaces: string[]) {
     this.emit("workspaces_updated", {
