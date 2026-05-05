@@ -31,6 +31,7 @@ import {
 } from "../tools/monitor.js";
 import { listDevices } from "../tools/devices.js";
 import { exec } from "child_process";
+import open from "open";
 import fs from "node:fs";
 import { hardwareLockManager } from "../utils/lock-manager.js";
 import { isBuildActive } from "../utils/process-manager.js";
@@ -105,7 +106,7 @@ export async function getDashboardStatus(autoOpen: boolean = false, projectDir?:
   }
   
   if (autoOpen) {
-    exec(`open "${secureLink}"`, () => {});
+    open(secureLink).catch(() => { /* swallow — dashboard URL is logged anyway */ });
   }
 
   return { url, token: activePortalStatus.token, secureLink, status: "online" };

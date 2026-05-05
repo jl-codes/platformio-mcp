@@ -25,7 +25,48 @@ This server solves several critical challenges in embedded AI development:
   <a href="docs/assets/pio_mcp_06.png"><img src="docs/assets/pio_mcp_06.png" width="32%" alt="Command Launcher" /></a>
 </p>
 
+## Quick Start
+
+### Just open the dashboard right now
+
+```bash
+npx platformio-mcp dashboard
+# or the shorter alias:
+npx pio-mcp dashboard
+```
+
+### Wire it into your AI agent
+
+```bash
+npx platformio-mcp install --cline       # Cline (VS Code extension or CLI)
+npx platformio-mcp install --claude      # Claude Desktop
+npx platformio-mcp install --vscode      # VS Code native MCP support
+npx platformio-mcp install --antigravity # Google Antigravity
+```
+
+The web dashboard auto-opens in your browser the first time the agent boots
+the MCP server.
+
+### Manual install (any other MCP-compatible host)
+
+Add this block to your MCP server config:
+
+```json
+{
+  "mcpServers": {
+    "platformio": {
+      "command": "npx",
+      "args": ["-y", "platformio-mcp", "--open-dashboard-on-start"]
+    }
+  }
+}
+```
+
+> On Windows, replace `"command": "npx"` with `"command": "npx.cmd"` if your
+> host doesn't auto-resolve npm shims.
+
 ## Core Capabilities
+
 
 ### Features
 - Universal board support: works with any PlatformIO-supported board (ESP32, Arduino, STM32, nRF52, RP2040, etc.)

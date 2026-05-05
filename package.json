@@ -1,15 +1,18 @@
 {
-  "name": "platformio-mcp-server",
-  "version": "1.0.0",
-  "description": "A board-agnostic MCP server for PlatformIO embedded development - supports 1000+ boards across 30+ platforms",
+  "name": "platformio-mcp",
+  "version": "2.0.0",
+  "description": "PlatformIO MCP server + web dashboard for AI agents (Cline, Claude Desktop, VS Code, Antigravity). Supports 1000+ boards across 30+ platforms.",
   "type": "module",
   "main": "build/index.js",
   "bin": {
-    "platformio-mcp-server": "build/index.js"
+    "platformio-mcp": "build/index.js"
   },
   "files": [
     "build",
-    "skills"
+    "web/dist",
+    "scripts/installers",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build:ui": "cd web && npm ci && npm run build",
@@ -22,7 +25,8 @@
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "prepare": "npm run build"
+    "smoke-test": "node -e \"require('fs').accessSync('build/index.js'); require('fs').accessSync('web/dist/index.html'); require('fs').accessSync('scripts/installers/index.js')\"",
+    "prepublishOnly": "npm run build && npm run smoke-test"
   },
   "keywords": [
     "mcp",
@@ -36,7 +40,10 @@
     "firmware",
     "embedded-systems",
     "cline",
-    "ai"
+    "claude",
+    "antigravity",
+    "ai",
+    "dashboard"
   ],
   "author": "PlatformIO MCP Server Contributors",
   "license": "MIT",
@@ -48,6 +55,7 @@
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "express-rate-limit": "^8.3.2",
+    "open": "^10.2.0",
     "proper-lockfile": "^4.1.2",
     "socket.io": "^4.8.0",
     "tree-kill": "^1.2.2",

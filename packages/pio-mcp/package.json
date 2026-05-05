@@ -1,0 +1,39 @@
+{
+  "name": "pio-mcp",
+  "version": "2.0.0",
+  "description": "Short alias for platformio-mcp — PlatformIO MCP server + web dashboard for AI agents.",
+  "type": "module",
+  "bin": {
+    "pio-mcp": "bin.js"
+  },
+  "files": [
+    "bin.js",
+    "README.md"
+  ],
+  "dependencies": {
+    "platformio-mcp": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "platformio",
+    "embedded",
+    "arduino",
+    "esp32",
+    "stm32",
+    "alias"
+  ],
+  "author": "PlatformIO MCP Server Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jl-codes/platformio-mcp.git",
+    "directory": "packages/pio-mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/jl-codes/platformio-mcp/issues"
+  },
+  "homepage": "https://github.com/jl-codes/platformio-mcp#readme"
+}

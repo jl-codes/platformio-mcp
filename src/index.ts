@@ -984,10 +984,113 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
+/**
+ * Print CLI help text for the platformio-mcp binary.
+ */
+function printCliHelp() {
+  console.log(`platformio-mcp — PlatformIO MCP server with web dashboard
+
+USAGE:
+  platformio-mcp                       Start MCP stdio server (default — for AI agents)
+  platformio-mcp dashboard             Open the web dashboard in your browser
+  platformio-mcp install --cline       Install into Cline (VS Code extension or CLI)
+  platformio-mcp install --claude      Install into Claude Desktop
+  platformio-mcp install --vscode      Install into VS Code native MCP support
+  platformio-mcp install --antigravity Install into Google Antigravity
+
+FLAGS (when starting MCP server):
+  --open-dashboard-on-start            Auto-open dashboard when agent connects
+  --disable-dashboard                  Disable web dashboard entirely
+  --help                               Show this help
+  --version                            Print version
+
+ENV VARS:
+  PORTAL_PORT                          Override dashboard port (default: 8080)
+  PIO_MCP_OPEN_DASH_ON_START           Same as --open-dashboard-on-start
+  PIO_MCP_DISABLE_DASHBOARD            Same as --disable-dashboard
+`);
+}
+
 // Start server
 async function main() {
+  // ---------------------------------------------------------------------------
+  // CLI Subcommand Router
+
+  // Dispatches BEFORE the MCP server boots. The default behavior (no subcommand)
+  // is preserved: start the MCP stdio server for AI agents.
+  // ---------------------------------------------------------------------------
+  const cliArgs = process.argv.slice(2);
+  const subcommand = cliArgs.find((a) => !a.startsWith("--"));
+
+  if (cliArgs.includes("--help") || subcommand === "help") {
+    printCliHelp();
+    process.exit(0);
+  }
+
+  if (cliArgs.includes("--version") || subcommand === "version") {
+    let version = "unknown";
+    try {
+      const currentDir = path.dirname(new URL(import.meta.url).pathname);
+      const pkg = JSON.parse(
+        fs.readFileSync(path.join(currentDir, "..", "package.json"), "utf8"),
+      );
+      version = pkg.version;
+    } catch {}
+    console.log(version);
+    process.exit(0);
+  }
+
+  if (subcommand === "dashboard") {
+    // Boot HTTP server, open browser, hold the event loop open via httpServer.
+    const result = await getDashboardStatus(true);
+    console.log(`PlatformIO MCP Dashboard: ${result.secureLink}`);
+    console.log(`Press Ctrl+C to stop.`);
+    // Express http server keeps the event loop alive; SIGINT cleanup is wired
+    // inside startPortalServer().
+    return;
+  }
+
+  if (subcommand === "install") {
+    const target = cliArgs.find((a) => a.startsWith("--"))?.replace(/^--/, "");
+    if (!target) {
+      console.error(
+        "Usage: platformio-mcp install --<cline|claude|vscode|antigravity>",
+      );
+      process.exit(1);
+    }
+    try {
+      // Resolve relative to the published package layout:
+      //   <pkg-root>/build/index.js  ->  <pkg-root>/scripts/installers/index.js
+      const currentDir = path.dirname(new URL(import.meta.url).pathname);
+      const installerEntry = path.join(
+        currentDir,
+        "..",
+        "scripts",
+        "installers",
+        "index.js",
+      );
+      const installerUrl = new URL(`file://${installerEntry}`).href;
+      const { runInstaller } = await import(installerUrl);
+      await runInstaller(target);
+    } catch (e: any) {
+      console.error(`Installer failed: ${e.message}`);
+      process.exit(1);
+    }
+    process.exit(0);
+  }
+
+  if (subcommand && subcommand !== "help") {
+    console.error(`Unknown subcommand: ${subcommand}`);
+    printCliHelp();
+    process.exit(1);
+  }
+
+  // Fall through to default MCP stdio server boot
+  // ---------------------------------------------------------------------------
+
   // Check if PlatformIO is installed
   const isInstalled = await checkPlatformIOInstalled();
+
   if (!isInstalled) {
     logDiag(
       "Warning: PlatformIO CLI not found. Please install it from https://platformio.org/install/cli"
