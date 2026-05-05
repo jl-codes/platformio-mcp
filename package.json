@@ -72,10 +72,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/platformio-mcp-server.git"
+    "url": "https://github.com/jl-codes/platformio-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/platformio-mcp-server/issues"
+    "url": "https://github.com/jl-codes/platformio-mcp/issues"
   },
-  "homepage": "https://github.com/yourusername/platformio-mcp-server#readme"
+  "homepage": "https://github.com/jl-codes/platformio-mcp#readme"
 }
