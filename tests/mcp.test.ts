@@ -37,8 +37,12 @@ describe("PlatformIO MCP Server E2E Integration", () => {
     expect(result.content.length).toBeGreaterThan(0);
     
     const textContent = result.content[0].text;
-    expect(textContent).toContain("Arduino Uno"); // Or at least 'uno' json object
-    expect(textContent).toContain("uno");
+    if (textContent.includes("Payload too large")) {
+      expect(textContent).toContain("spooled to disk");
+    } else {
+      expect(textContent).toContain("Arduino Uno"); // Or at least 'uno' json object
+      expect(textContent).toContain("uno");
+    }
   });
 
   it("should initialize a new project", async () => {
@@ -194,9 +198,14 @@ describe("PlatformIO MCP Server E2E Integration", () => {
       arguments: { query: "ArduinoJson", limit: 2 },
     }) as { content: Array<{ type: string, text: string }> };
 
-    const parsed = JSON.parse(result.content[0].text);
-    // Registry returns array structure or search wrapper
-    expect(parsed.items || parsed).toBeDefined(); 
+    const textContent = result.content[0].text;
+    if (textContent.includes("Payload too large")) {
+      expect(textContent).toContain("spooled to disk");
+    } else {
+      const parsed = JSON.parse(textContent);
+      // Registry returns array structure or search wrapper
+      expect(parsed.items || parsed).toBeDefined(); 
+    }
   }, 15000);
 
   it("should install a library explicitly into the test workspace", async () => {

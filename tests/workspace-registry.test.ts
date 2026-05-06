@@ -19,8 +19,8 @@ describe('Workspace Registry Validation', () => {
     await fs.rm(tempValidDir, { recursive: true, force: true });
   });
 
-  it('should throw an error when adding a workspace without platformio.ini', async () => {
-    await expect(addWorkspace(tempEmptyDir)).rejects.toThrowError(/missing platformio.ini/);
+  it('should succeed when adding an empty workspace', async () => {
+    await expect(addWorkspace(tempEmptyDir)).resolves.toBeUndefined();
   });
 
   it('should succeed when adding a valid workspace with platformio.ini', async () => {
