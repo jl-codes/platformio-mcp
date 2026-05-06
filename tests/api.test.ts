@@ -14,7 +14,7 @@ vi.mock("../src/platformio.js", () => ({
     spawn: vi.fn(() => ({
       pid: 12345,
       on: vi.fn((event, callback) => {
-        if (event === "close") {
+        if (event === "close" || event === "exit") {
           setTimeout(() => callback(0), 10);
         }
       }),
