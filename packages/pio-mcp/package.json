@@ -1,6 +1,6 @@
 {
   "name": "pio-mcp",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Short alias for platformio-mcp — PlatformIO MCP server + web dashboard for AI agents.",
   "type": "module",
   "bin": {
@@ -11,7 +11,7 @@
     "README.md"
   ],
   "dependencies": {
-    "platformio-mcp": "^2.1.0"
+    "platformio-mcp": "^2.2.0"
   },
   "engines": {
     "node": ">=18.0.0"
