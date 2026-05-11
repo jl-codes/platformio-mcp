@@ -17,7 +17,11 @@ import {
   validateEnvironmentName,
 } from "../utils/validation.js";
 import { BuildError, PlatformIOError } from "../utils/errors.js";
-import { parseStderrErrors } from "../utils/errors.js";
+import {
+  parseStderrErrors,
+  parseStructuredBuildErrors,
+  deriveNextSteps,
+} from "../utils/errors.js";
 import { isBuildActive } from "../utils/process-manager.js";
 import fs from "node:fs";
 
@@ -26,6 +30,13 @@ import crypto from "node:crypto";
 import { tailFileBounded } from "../utils/tail.js";
 import { SERVER_DATA_DIR, ensureGlobalDirs } from "../utils/paths.js";
 import { mcpContext } from "../utils/mcp-context.js";
+import {
+  lookupBuildCache,
+  writeCache,
+  findFirmwareArtifact,
+  invalidateBuildCache,
+} from "../utils/build-cache.js";
+import { logDiagnostic as logDiag } from "../utils/logger.js";
 /**
  * Builds a PlatformIO project.
  *
@@ -47,6 +58,48 @@ export async function buildProject(
     throw new BuildError(`Invalid environment name: ${environment}`, {
       environment,
     });
+  }
+
+  // ----------------------------------------------------------------------------
+  // 1. Content-hash cache short-circuit.
+  //
+  // EmbedBench traces showed agents re-invoking `build_project` after edits that
+  // did not actually change disk content (e.g. saving the same file again, or
+  // running an evaluation loop with k repeated trials). Each rebuild paid the
+  // 30–120 s pio toolchain warmup with zero compilation work to do. Hashing
+  // src/include/lib/platformio.ini once is microseconds; on a hit we replay
+  // the prior result directly. Skipped when `background=true` because the
+  // caller is asking explicitly for an asynchronous dispatch contract — we
+  // honor it instead of confusingly returning a synchronous result. Also
+  // skipped on `verbose=true`: callers asking for full verbose logs usually
+  // want fresh ones from the compiler, not a cached tail.
+  // ----------------------------------------------------------------------------
+  const envName = environment || "default";
+  if (!background && !verbose) {
+    const lookup = lookupBuildCache(validatedPath, envName);
+    if (lookup.hit) {
+      const cached = lookup.entry;
+      const tail = cached.finalOutputTail || "(cached build — output omitted)";
+      const structuredErrors = parseStructuredBuildErrors(tail);
+      logDiag(
+        `[buildProject] Cache hit for ${validatedPath} (env=${envName}, hash=${cached.inputsHash.slice(0, 12)}…) — skipping pio run`,
+        validatedPath,
+      );
+      return {
+        success: true,
+        cacheHit: true,
+        environment: envName,
+        output: undefined,
+        errors: undefined,
+        structuredErrors,
+        nextSteps: deriveNextSteps([], true).concat([
+          "Build was served from MCP content-hash cache (no compilation work performed). Call `clean_project` or edit source files to force a rebuild.",
+        ]),
+        ramUsageBytes: cached.ramUsageBytes,
+        flashUsageBytes: cached.flashUsageBytes,
+        firmwarePath: cached.firmwarePath,
+      };
+    }
   }
 
   try {
@@ -72,14 +125,23 @@ export async function buildProject(
     });
 
     if ('status' in result) {
+      // Background dispatch: caller will poll. Don't try to cache an in-flight
+      // build — the spooler will update its own state on completion.
       return result as unknown as BuildResult;
     }
 
     const success = result.exitCode === 0;
-    const errors = success ? undefined : parseStderrErrors(result.finalOutput);
+    const legacyErrors = success ? undefined : parseStderrErrors(result.finalOutput);
+    const structuredErrors = parseStructuredBuildErrors(result.finalOutput);
+    const nextSteps = deriveNextSteps(
+      // Convert from internal StructuredBuildError to the JSON-friendly shape.
+      structuredErrors,
+      success,
+    );
 
     let ramUsageBytes: number | undefined;
     let flashUsageBytes: number | undefined;
+    let firmwarePath: string | undefined;
 
     if (success) {
       const ramMatch = result.finalOutput.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
@@ -87,15 +149,45 @@ export async function buildProject(
 
       const flashMatch = result.finalOutput.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
       if (flashMatch) flashUsageBytes = parseInt(flashMatch[1], 10);
+
+      firmwarePath = findFirmwareArtifact(validatedPath, envName);
+
+      // Persist the cache only on success. Failures get nothing to replay.
+      // We trim the log to a tail (last ~16KB) so the cache file stays small —
+      // we mostly need it for displaying RAM/Flash on hits, not for re-parsing.
+      const tail = result.finalOutput.slice(-16 * 1024);
+      // Recompute the input fingerprint *after* the build to capture any
+      // generated headers or partial-write states the toolchain may have
+      // touched under src/. lookupBuildCache returns the hash in both the
+      // hit and miss branches of its discriminated union, so we can read it
+      // unconditionally without an unsafe cast.
+      const postBuildLookup = lookupBuildCache(validatedPath, envName);
+      writeCache(validatedPath, {
+        inputsHash: postBuildLookup.inputsHash,
+        environment: envName,
+        builtAtMs: Date.now(),
+        firmwarePath,
+        ramUsageBytes,
+        flashUsageBytes,
+        finalOutputTail: tail,
+      });
+    } else {
+      // A failed build invalidates any older cache entry to prevent a
+      // confusing "fresh failure but stale success cached" state.
+      invalidateBuildCache(validatedPath);
     }
 
     return {
       success,
-      environment: environment || "default",
+      cacheHit: false,
+      environment: envName,
       output: success && !verbose ? undefined : result.finalOutput,
-      errors,
+      errors: legacyErrors,
+      structuredErrors,
+      nextSteps,
       ramUsageBytes,
       flashUsageBytes,
+      firmwarePath,
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
@@ -233,6 +325,11 @@ export async function runTests(
 export async function cleanProject(projectDir: string, background?: boolean): Promise<CleanResult> {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
+
+  // Any user-initiated clean must wipe our cache; otherwise the next
+  // `build_project` would short-circuit and return "success" without
+  // rebuilding artifacts the user just asked to delete.
+  invalidateBuildCache(validatedPath);
 
   try {
     const result = await executeWithSpooling(

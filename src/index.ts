@@ -37,6 +37,7 @@ import {
   CheckTaskStatusParamsSchema,
   GetDashboardUrlParamsSchema,
   GetProjectConfigParamsSchema,
+  GetProjectContextParamsSchema,
   CheckProjectParamsSchema,
   RunTestsParamsSchema,
   UninstallLibraryParamsSchema,
@@ -49,7 +50,7 @@ import { addWorkspace } from "./utils/workspace-registry.js";
 // Import tool functions from feature modules
 import { listBoards, getBoardInfo } from "./tools/boards.js";
 import { listDevices } from "./tools/devices.js";
-import { initProject, getProjectConfig, getSystemInfo } from "./tools/projects.js";
+import { initProject, getProjectConfig, getSystemInfo, getProjectContext } from "./tools/projects.js";
 import { buildProject, cleanProject, checkTaskStatus, checkProject, runTests } from "./tools/build.js";
 import { uploadFirmware, uploadFilesystem } from "./tools/upload.js";
 import { startMonitor, stopMonitor, queryLogs } from "./tools/monitor.js";
@@ -166,7 +167,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "build_project",
         description:
-          "Compiles the project source code and generates firmware binary. Automatically downloads required toolchains and libraries on first build.",
+          "Compiles the project and generates the firmware binary via PlatformIO. PREFERRED over running `pio run` directly in a shell — this tool integrates with the hardware lock, the content-hash build cache (skips toolchain work when src/ is unchanged), and a structured-error parser that returns `structuredErrors` + `nextSteps` alongside the raw log. Returns immediately on a cache hit (no compilation). Set `verbose=true` only when you need the full log; otherwise the response stays compact. Use `background=true` for very long first-time builds to avoid MCP timeouts and poll with `check_task_status`.",
         inputSchema: {
           type: "object",
           properties: {
@@ -218,7 +219,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "upload_filesystem",
         description:
-          "Builds and uploads a SPIFFS/LittleFS filesystem image to the connected device. Automatically builds if necessary. Supports automatic port detection.",
+          "Builds and uploads a SPIFFS/LittleFS filesystem image to the connected device. PREFERRED over `pio run --target uploadfs` in a shell — same hardware-lock and port-auto-detect benefits as `upload_firmware`. Supports `start_monitor=true` to re-attach serial after upload.",
         inputSchema: {
           type: "object",
           properties: {
@@ -257,7 +258,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "upload_firmware",
         description:
-          "Uploads compiled firmware to a connected device. Automatically builds if necessary. Supports automatic port detection.",
+          "Uploads compiled firmware to a connected device. PREFERRED over `pio run --target upload` in a shell — this tool routes through the hardware lock to serialize port access, auto-detects the port, and (with `start_monitor=true`) re-attaches the serial monitor after the device re-enumerates. Automatically rebuilds via `build_project` semantics if the cache is cold.",
         inputSchema: {
           type: "object",
           properties: {
@@ -451,6 +452,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             open: { type: "boolean", description: "If true, automatically opens the authenticated GUI link natively in the system's browser." },
           },
+        },
+      },
+      {
+        name: "get_project_context",
+        description:
+          "Returns a compact pre-flight snapshot of a PlatformIO project: declared environments, source files under src/, `lib_deps`, build-cache state, firmware artifact path, connected serial devices, and a `nextSteps` checklist. Call this FIRST when starting work on a project instead of issuing several read_file/list_devices/cat-log calls — it collapses that ritual into a single deterministic response. Pure I/O, no toolchain invocation; safe to call repeatedly.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
+            includeBuildHistory: {
+              type: "boolean",
+              description:
+                "If true, include the most recent build/upload status summary from the workspace log directory.",
+            },
+          },
+          required: ["projectDir"],
         },
       },
       {
@@ -878,6 +896,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "get_project_config": {
         const params = GetProjectConfigParamsSchema.parse(args);
         const result = await getProjectConfig(params.projectDir);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "get_project_context": {
+        const params = GetProjectContextParamsSchema.parse(args);
+        const result = await getProjectContext(
+          params.projectDir,
+          params.includeBuildHistory,
+        );
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };

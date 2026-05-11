@@ -136,15 +136,34 @@ export interface ProjectInitResult {
 // ============================================================================
 
 /**
- * Outcome of a project build execution.
+ * Single structured build error surfaced to MCP clients. See
+ * `parseStructuredBuildErrors` in `utils/errors.ts` for the parser.
+ */
+export interface StructuredBuildErrorJSON {
+  category: string;
+  message: string;
+  file?: string;
+  line?: number;
+  raw: string;
+}
+
+/**
+ * Outcome of a project build execution. Field order in serialized JSON is
+ * not guaranteed by JS, but downstream tooling should treat `success`,
+ * `cacheHit`, `structuredErrors`, and `nextSteps` as the first-pass
+ * summary fields the agent should consult before scrolling the raw log.
  */
 export interface BuildResult {
   success?: boolean; // Indicates if the build completed without errors
+  cacheHit?: boolean; // True when this result was served from the build cache without invoking pio
   environment?: string; // The environment identifier that was targeted
   output?: string; // Full stdout log from the compilation process
-  errors?: string[]; // List of extracted error messages from stderr if build failed
+  errors?: string[]; // Legacy flat list of extracted error messages (kept for backwards-compat)
+  structuredErrors?: StructuredBuildErrorJSON[]; // Categorized errors with file/line where extractable
+  nextSteps?: string[]; // Actionable instructions for the agent based on success/failure
   ramUsageBytes?: number; // Total RAM usage in bytes as reported by PIO
   flashUsageBytes?: number; // Total Flash usage in bytes as reported by PIO
+  firmwarePath?: string; // Absolute path to the most recently built firmware artifact, when located
   status?: string; // e.g. "running" if background=true
   message?: string; // Descriptive feedback message
   pid?: number; // Process identifier for background streams
@@ -637,4 +656,53 @@ export const GetDashboardUrlParamsSchema = z.object({
   open: z.boolean().optional().describe("If true, automatically opens the local dashboard UI in the system's default browser."),
   projectDir: z.string().optional().describe("Optional project directory to initialize the dashboard with."),
 });
+
+/**
+ * Zod schema for get_project_context tool parameters. The "project context"
+ * is a compact pre-flight bundle that EmbedBench traces showed agents
+ * synthesizing manually (via 3–5 `read_file` + `cat` calls) before every
+ * iteration. Returning it from a single MCP call cuts cold-start latency
+ * and gives the agent a deterministic, structured starting point.
+ */
+export const GetProjectContextParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+  includeBuildHistory: z
+    .boolean()
+    .optional()
+    .describe("If true, include the most recent build/upload status summary from the workspace log directory."),
+});
+
+/**
+ * Shape returned by `get_project_context`. All fields are optional so the
+ * tool can degrade gracefully on uninitialized projects (missing
+ * platformio.ini) — the agent still gets back a structured object instead
+ * of an error.
+ */
+export interface ProjectContext {
+  /** Absolute resolved project directory. */
+  projectDir: string;
+  /** True if `platformio.ini` exists at the root. */
+  hasPlatformioIni: boolean;
+  /** Environments declared in platformio.ini (parsed names only). */
+  environments?: string[];
+  /** Default environment, inferred as the first declared one. */
+  defaultEnvironment?: string;
+  /** Source files present in `src/` (relative paths, capped at 50 entries). */
+  sourceFiles?: string[];
+  /** Declared `lib_deps` entries, when parseable. */
+  libDeps?: string[];
+  /** True if a recent successful build cache entry is present. */
+  cacheReady?: boolean;
+  /** Absolute path to the most recent firmware artifact, if available. */
+  firmwarePath?: string;
+  /** Auto-detected connected serial devices (port + description). */
+  connectedDevices?: Array<{ port: string; description: string; detectedBoard?: string }>;
+  /** Brief summary of the most recent build, when `includeBuildHistory` is true. */
+  lastBuild?: { status: string; logPath?: string };
+  /** Actionable hints for the agent (e.g. "run init_project first"). */
+  nextSteps: string[];
+}
 
