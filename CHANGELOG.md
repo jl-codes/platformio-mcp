@@ -5,6 +5,36 @@ All notable changes to **platformio-mcp** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] — 2026-05-14
+
+### Fixed
+
+- **Repeated browser tabs from `getDashboardStatus`** — Every invocation of
+  `getDashboardStatus(autoOpen=true)` unconditionally called `open(secureLink)`,
+  with no record of whether the tab had already been spawned. The result, in
+  hosts running multiple MCP clients (e.g. several Cline profiles) or any
+  workflow that re-invokes the `get_dashboard_url` tool, was a continuous
+  flood of new browser windows pointed at `http://localhost:<port>?token=…`.
+  The port itself crept upward (8080 → 8081 → 8082 → …) as concurrent MCP
+  instances each fell forward through the `EADDRINUSE` retry loop, making the
+  symptom worse over time.
+
+  The fix is idempotent-by-construction: `activePortalStatus` now carries a
+  `browserOpened` latch that is set on the first successful `open()` call and
+  blocks every subsequent attempt for the remainder of the process lifetime.
+  Auto-open is now also explicitly skippable via either the
+  `PIO_MCP_NO_BROWSER=true` environment variable or the `--no-browser` CLI
+  flag, which take precedence over `--open-dashboard-on-start`. Coverage is
+  locked in by `tests/dashboard-open.test.ts`, which asserts that five
+  back-to-back `getDashboardStatus(true)` calls produce exactly one `open()`
+  invocation and that both opt-out paths suppress it entirely.
+
+### Internal
+
+- `package-lock.json` corrected to reflect the published package identity
+  (`platformio-mcp` / matching version) instead of stale pre-rename
+  `platformio-mcp-server` / `1.0.0` metadata. No dependency graph changes.
+
 ## [2.2.0] — 2026-05-11
 
 This release is driven by analysis of **EmbedBench** agent traces. Three

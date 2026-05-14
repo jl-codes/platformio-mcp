@@ -61,7 +61,12 @@ const PORTAL_AUTH_TOKEN = crypto.randomUUID();
 export const activePortalStatus = {
   running: false,
   port: 0,
-  token: PORTAL_AUTH_TOKEN
+  token: PORTAL_AUTH_TOKEN,
+  // Tracks whether we have already spawned an OS browser tab for this process
+  // lifetime. Prevents the "million windows" failure mode where repeated
+  // invocations of getDashboardStatus(true) (rehydration, tool calls, multiple
+  // Cline profiles, etc.) each fire a fresh open(secureLink).
+  browserOpened: false
 };
 
 /**
@@ -106,7 +111,13 @@ export async function getDashboardStatus(autoOpen: boolean = false, projectDir?:
   }
   
   if (autoOpen) {
-    open(secureLink).catch(() => { /* swallow — dashboard URL is logged anyway */ });
+    // Guarded — see browserOpened + PIO_MCP_NO_BROWSER below
+    if (process.env.PIO_MCP_NO_BROWSER === "true" || process.argv.includes("--no-browser")) {
+      // user opted out of auto-opening — leave secureLink in the return payload only
+    } else if (!activePortalStatus.browserOpened) {
+      activePortalStatus.browserOpened = true;
+      open(secureLink).catch(() => { /* swallow — dashboard URL is logged anyway */ });
+    }
   }
 
   return { url, token: activePortalStatus.token, secureLink, status: "online" };
