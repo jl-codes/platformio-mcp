@@ -247,6 +247,7 @@ When you execute a prompt like this, your agent will typically make the followin
 - [Agent Customization Guide](docs/reference/AgentCustomizationGuide.md)
 - [MCP Server Command Reference](docs/MCPServerCommandReference.md)
 - [Troubleshooting & Remediation](docs/TroubleshootingGuide.md)
+- [Agent Skills Directory](.skills/README.md)
 
 ### Developer Guides and Specifications
 - [Development Guide](docs/reference/DevelopmentGuide.md)
@@ -261,6 +262,23 @@ For issues and questions:
 - Open an issue on GitHub
 - Check PlatformIO documentation: https://docs.platformio.org
 - Join PlatformIO community: https://community.platformio.org
+
+## Agent Skills
+
+This repo includes agent-readable skills in `.skills/`.
+
+These skills help Codex, Cline, Claude Code, and other agents use PlatformIO MCP safely for embedded development.
+
+The first skills cover:
+
+- firmware bringup
+- PlatformIO debugging
+- serial diagnostics
+- ESP32 flash and monitor workflows
+- hardware-in-the-loop testing
+- SBC deployment
+
+MCP is one adapter. PlatformIO is the first backend. The larger goal is to provide a safe embedded agent runtime for building, flashing, monitoring, testing, and debugging physical devices.
 
 ## License
 
