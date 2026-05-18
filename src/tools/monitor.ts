@@ -24,6 +24,7 @@ import { getLogDir, rotateSpoolerStreams } from "../utils/spooler.js";
 import { getWorkspaces, rewriteRegistry } from "../utils/workspace-registry.js";
 import { getActiveMonitorPids, isPidAlive, isBuildActive } from "../utils/process-manager.js";
 import { mcpContext } from "../utils/mcp-context.js";
+import { redactSecretsInText } from "../core/policy/redact.js";
 
 
 
@@ -139,7 +140,11 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string, rootComm
     // Soft link is robust across different mounted volumes
     fs.symlinkSync(daemon.logFile, latestLog);
   } catch (e) {
-    logDiag(`[Spooler] Failed to link latest-monitor.log: ${e}`, projectDir);
+    try {
+      fs.linkSync(daemon.logFile, latestLog);
+    } catch {
+      logDiag(`[Spooler] Failed to link latest-monitor.log: ${e}`, projectDir);
+    }
   }
 
   // Unref ensures the MCP server process can exit independently without waiting for the monitor daemon
@@ -203,6 +208,9 @@ export async function rehydrateMonitors(): Promise<void> {
                     }
                   } catch (e) {}
                 }
+              });
+              daemon.watcher.on("error", () => {
+                // Ignore watcher errors on constrained environments.
               });
               rehydrationCount++;
               logDiag(`[Monitor Recovery] Successfully rehydrated stream for ${port} (PID: ${pid}) in ${projectDir}`);
@@ -306,6 +314,9 @@ export async function startMonitor(
         } catch (e) {}
       }
     });
+    daemon.watcher.on("error", () => {
+      // Ignore watcher errors on constrained environments.
+    });
   } catch (e) {
     logDiag(`[Spooler] Failed to attach fs.watch to ${logFile}`, projectDir);
   }
@@ -380,5 +391,5 @@ export async function queryLogs(
     stitchedLines = stitchedLines.slice(-lines);
   }
 
-  return { success: true, content: stitchedLines.join("\n") };
+  return { success: true, content: redactSecretsInText(stitchedLines.join("\n")) };
 }

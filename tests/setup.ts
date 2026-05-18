@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const SERVER_PATH = path.resolve(__dirname, "../build/index.js");
+export const SERVER_PATH = path.resolve(__dirname, "../src/index.ts");
 
 export class MCPTestHarness {
   public client: Client;
@@ -13,7 +13,7 @@ export class MCPTestHarness {
   constructor() {
     this.transport = new StdioClientTransport({
       command: process.execPath, // Path to node binary
-      args: [SERVER_PATH],
+      args: ["--import", "tsx", SERVER_PATH],
       env: {
         ...process.env,
         PATH: `${process.env.PATH}:${process.env.HOME}/.platformio/penv/bin`,

@@ -101,6 +101,73 @@ export interface SpoolingForegroundResult {
 
 export type SpoolingResult = SpoolingBackgroundResult | SpoolingForegroundResult;
 
+function tryTerminateProcess(pid?: number) {
+  if (!pid) return;
+  try {
+    process.kill(pid, "SIGTERM");
+    setTimeout(() => {
+      try {
+        process.kill(pid, 0);
+        process.kill(pid, "SIGKILL");
+      } catch {}
+    }, 1000);
+  } catch {}
+}
+
+function waitForProcessEnd(proc: any, timeoutMs: number): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    let settled = false;
+
+    const onDone = (code?: number | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(code ?? 1);
+    };
+
+    const onError = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    };
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      tryTerminateProcess(proc?.pid);
+      settled = true;
+      reject(new Error(`Command timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    proc.on("error", onError);
+    proc.on("exit", onDone);
+    proc.on("close", onDone);
+  });
+}
+
+function ensureLatestLogPointer(logFile: string, latestLog: string): { mirrorLatest: boolean } {
+  try {
+    if (fs.existsSync(latestLog)) fs.unlinkSync(latestLog);
+  } catch {}
+
+  try {
+    fs.symlinkSync(logFile, latestLog);
+    return { mirrorLatest: false };
+  } catch {}
+
+  try {
+    fs.linkSync(logFile, latestLog);
+    return { mirrorLatest: false };
+  } catch {}
+
+  try {
+    fs.writeFileSync(latestLog, "");
+    return { mirrorLatest: true };
+  } catch {}
+
+  return { mirrorLatest: false };
+}
+
 /**
  * Wraps child process invocation forcing its runtime payload exclusively through 
  * an active offline disk file context instead of active NodeJS stream memory.
@@ -159,11 +226,7 @@ export async function executeWithSpooling(
     }, targetProjectArea).catch(e => logDiag(`[Spooler] Registry fail: ${e.message}`, targetProjectArea));
   }
 
-  try {
-    if (fs.existsSync(latestLog)) fs.unlinkSync(latestLog);
-    // Standard link is secure and visible to OS natively
-    fs.symlinkSync(logFile, latestLog);
-  } catch {}
+  const latestPointer = ensureLatestLogPointer(logFile, latestLog);
 
   // UI Portal File Tailing
   let fileOffset = 0;
@@ -178,12 +241,21 @@ export async function executeWithSpooling(
           if (stat.size > fileOffset) {
             const stream = fs.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on('data', (chunk) => {
-              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, chunk.toString());
+              const text = chunk.toString();
+              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text);
+              if (latestPointer.mirrorLatest) {
+                try {
+                  fs.appendFileSync(latestLog, text);
+                } catch {}
+              }
             });
             fileOffset = stat.size;
           }
         } catch {}
       }
+    });
+    watcher.on("error", () => {
+      // Swallow watcher errors (common on CI/Windows) so they don't crash test runtime.
     });
   } catch {}
 
@@ -191,34 +263,7 @@ export async function executeWithSpooling(
   const timeoutMs = options.timeout ?? (options.background ? 3600000 : 600000);
 
   if (options.background) {
-    const p = new Promise<number>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        if (proc.pid) {
-          try { 
-            process.kill(proc.pid, 'SIGTERM'); 
-            setTimeout(() => {
-              try {
-                if (proc.pid) {
-                  process.kill(proc.pid, 0);
-                  process.kill(proc.pid, 'SIGKILL');
-                }
-              } catch {}
-            }, 1000);
-          } catch {}
-        }
-        reject(new Error(`Command timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-
-      proc.on("error", (err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-
-      proc.on("exit", (code) => {
-        clearTimeout(timer);
-        resolve(code ?? 1);
-      });
-    });
+    const p = waitForProcessEnd(proc, timeoutMs);
 
     p.catch(e => {
       console.error(`[Background Task Error]: ${e.message}`);
@@ -274,34 +319,7 @@ export async function executeWithSpooling(
     return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
   }
   
-  const exitCode = await new Promise<number>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      if (proc.pid) {
-        try { 
-          process.kill(proc.pid, 'SIGTERM'); 
-          setTimeout(() => {
-            try {
-              if (proc.pid) {
-                process.kill(proc.pid, 0);
-                process.kill(proc.pid, 'SIGKILL');
-              }
-            } catch {}
-          }, 1000);
-        } catch {}
-      }
-      reject(new Error(`Command timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    proc.on("error", (err) => {
-      clearTimeout(timer);
-      reject(err);
-    });
-
-    proc.on("exit", (code) => {
-      clearTimeout(timer);
-      resolve(code ?? 1);
-    });
-  });
+  const exitCode = await waitForProcessEnd(proc, timeoutMs);
 
   let errorMessage = undefined;
   if (exitCode !== 0) {

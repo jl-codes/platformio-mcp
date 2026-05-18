@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Typography, Spin, Space, Tag, Empty, theme, Row, Col, Descriptions } from 'antd';
 import { AppstoreOutlined, SettingOutlined, DesktopOutlined, ProjectOutlined } from '@ant-design/icons';
 import DependenciesViewer from './dependencies-viewer.js';
+import SafetyPolicyOverview from './safety-policy-overview.js';
 import type { LockState } from '../app.js';
 
 const { Text } = Typography;
@@ -24,6 +25,9 @@ export default function WorkspaceConfig({
   
   const [systemInfo, setSystemInfo] = useState<any>(null);
   const [isFetchingSys, setIsFetchingSys] = useState(false);
+  const [safetyOverview, setSafetyOverview] = useState<any>(null);
+  const [isFetchingSafety, setIsFetchingSafety] = useState(false);
+  const [safetyRefreshKey, setSafetyRefreshKey] = useState(0);
 
   const { token: antdToken } = theme.useToken();
 
@@ -88,6 +92,31 @@ export default function WorkspaceConfig({
     };
     fetchConfig();
   }, [activeWorkspace, apiBase, token]);
+
+  useEffect(() => {
+    const fetchSafety = async () => {
+      setIsFetchingSafety(true);
+      try {
+        let url = `${apiBase}/api/safety/overview`;
+        if (activeWorkspace) {
+          url += `?projectDir=${encodeURIComponent(activeWorkspace)}`;
+        }
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const payload = await res.json();
+          setSafetyOverview(payload);
+        }
+      } catch (e) {
+        console.error("Failed to fetch safety overview", e);
+      } finally {
+        setIsFetchingSafety(false);
+      }
+    };
+
+    fetchSafety();
+  }, [activeWorkspace, apiBase, token, safetyRefreshKey]);
 
   return (
     <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -154,6 +183,17 @@ export default function WorkspaceConfig({
             token={token}
             activeWorkspace={activeWorkspace}
             lockState={lockState}
+          />
+        </Col>
+
+        {/* Safety / Diagnostics Panel */}
+        <Col span={24}>
+          <SafetyPolicyOverview
+            payload={safetyOverview}
+            loading={isFetchingSafety}
+            apiBase={apiBase}
+            token={token}
+            onActionComplete={() => setSafetyRefreshKey((prev) => prev + 1)}
           />
         </Col>
       </Row>

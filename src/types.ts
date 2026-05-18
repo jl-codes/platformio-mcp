@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import type { DiagnosticResult } from "./core/diagnostics/types.js";
 
 // ============================================================================
 // Command Result Types
@@ -169,6 +170,8 @@ export interface BuildResult {
   pid?: number; // Process identifier for background streams
   taskId?: string; // UUID mapping to the background invocation
   logPaths?: string[]; // Array of associated trailing paths
+  rawLogPath?: string; // Full path to the captured raw log when available
+  diagnostic?: DiagnosticResult; // Structured diagnostic summary for agent-safe recovery flows
 }
 
 /**
@@ -215,6 +218,8 @@ export interface UploadResult {
   pid?: number; // System process ID
   taskId?: string; // UUID mapping to the background invocation
   logPaths?: string[]; // Array of associated trailing paths
+  rawLogPath?: string; // Full path to the captured raw log when available
+  diagnostic?: DiagnosticResult; // Structured diagnostic summary for agent-safe recovery flows
 }
 
 

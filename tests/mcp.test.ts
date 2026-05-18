@@ -4,7 +4,31 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 
-describe("PlatformIO MCP Server E2E Integration", () => {
+const describeMcp =
+  process.env.RUN_MCP_E2E === "1" ? describe : describe.skip;
+
+async function parseToolPayloadFromText(text: string): Promise<unknown> {
+  const spooledPrefix = "Payload too large for context window.";
+  if (!text.startsWith(spooledPrefix)) {
+    return JSON.parse(text);
+  }
+
+  const marker = "spooled to disk at ";
+  const markerIdx = text.indexOf(marker);
+  if (markerIdx === -1) {
+    throw new Error(`Could not resolve spooled payload path from message: ${text}`);
+  }
+  const pathStart = markerIdx + marker.length;
+  const pathEnd = text.indexOf(". Please use your grep_search", pathStart);
+  if (pathEnd === -1) {
+    throw new Error(`Could not resolve spooled payload terminator from message: ${text}`);
+  }
+  const payloadPath = text.slice(pathStart, pathEnd).trim();
+  const fileContent = await fs.readFile(payloadPath, "utf-8");
+  return JSON.parse(fileContent);
+}
+
+describeMcp("PlatformIO MCP Server E2E Integration", () => {
   let harness: MCPTestHarness;
   let tempProjectDir: string;
 
@@ -36,9 +60,12 @@ describe("PlatformIO MCP Server E2E Integration", () => {
     expect(result.content).toBeDefined();
     expect(result.content.length).toBeGreaterThan(0);
     
-    const textContent = result.content[0].text;
-    expect(textContent).toContain("Arduino Uno"); // Or at least 'uno' json object
-    expect(textContent).toContain("uno");
+    const parsed = await parseToolPayloadFromText(result.content[0].text) as Array<{ id: string; name: string }>;
+    expect(Array.isArray(parsed)).toBe(true);
+    const hasUnoName = parsed.some((board) => board.name.includes("Arduino Uno"));
+    const hasUnoId = parsed.some((board) => board.id === "uno");
+    expect(hasUnoName).toBe(true);
+    expect(hasUnoId).toBe(true);
   });
 
   it("should initialize a new project", async () => {
@@ -122,7 +149,7 @@ describe("PlatformIO MCP Server E2E Integration", () => {
     // Cleanup any lingering state
     await harness.client.callTool({
       name: "reset_server_state",
-      arguments: { projectDir: tempProjectDir }
+      arguments: { projectDir: tempProjectDir, approved: true }
     });
   }, 30000);
 
@@ -132,7 +159,7 @@ describe("PlatformIO MCP Server E2E Integration", () => {
       arguments: { boardId: "uno" },
     }) as { content: Array<{ type: string, text: string }> };
 
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = await parseToolPayloadFromText(result.content[0].text) as any;
     expect(parsed.id).toBe("uno");
     expect(parsed.mcu.toLowerCase()).toContain("atmega328");
   });
@@ -280,7 +307,7 @@ describe("PlatformIO MCP Server E2E Integration", () => {
   it("should reset server state explicitly", async () => {
     const result = await harness.client.callTool({
       name: "reset_server_state",
-      arguments: { projectDir: tempProjectDir },
+      arguments: { projectDir: tempProjectDir, approved: true },
     }) as { content: Array<{ type: string, text: string }> };
 
     const parsed = JSON.parse(result.content[0].text);

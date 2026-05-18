@@ -22,7 +22,43 @@ const __dirname = path.dirname(__filename);
 // Project root is two levels up from src/utils/
 export const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 
-export const SERVER_DATA_DIR = path.join(os.homedir(), ".platformio-mcp");
+function canUseDir(dir: string): boolean {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const probe = path.join(dir, `.write-probe-${process.pid}-${Date.now()}`);
+    fs.writeFileSync(probe, "ok", "utf8");
+    fs.unlinkSync(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveServerDataDir(): string {
+  const override = process.env.PIO_MCP_DATA_DIR?.trim();
+  if (override && canUseDir(override)) {
+    return path.resolve(override);
+  }
+
+  const homeScoped = path.join(os.homedir(), ".platformio-mcp");
+  if (canUseDir(homeScoped)) {
+    return homeScoped;
+  }
+
+  const cwdScoped = path.join(process.cwd(), ".platformio-mcp");
+  if (canUseDir(cwdScoped)) {
+    return cwdScoped;
+  }
+
+  const tmpScoped = path.join(os.tmpdir(), ".platformio-mcp");
+  if (canUseDir(tmpScoped)) {
+    return tmpScoped;
+  }
+
+  return cwdScoped;
+}
+
+export const SERVER_DATA_DIR = resolveServerDataDir();
 export const GLOBAL_LOCKS_DIR = path.join(SERVER_DATA_DIR, "serial_ports");
 
 /**

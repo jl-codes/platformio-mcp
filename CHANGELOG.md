@@ -5,6 +5,80 @@ All notable changes to **platformio-mcp** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2026-05-18
+
+### Added
+
+- **Diagnostics Engine v1 scaffolding and classifiers** under
+  `src/core/diagnostics/`:
+  - `types.ts` (`DiagnosticStage`, `DiagnosticErrorType`, `DiagnosticResult`)
+  - `matchers.ts` (build/upload/serial regex matcher sets)
+  - `diagnose.ts` (shared classifier pipeline)
+  - stage-specific wrappers (`build-diagnostics.ts`,
+    `upload-diagnostics.ts`, `serial-diagnostics.ts`)
+- **Safety & Policy Engine v1** under `src/core/policy/`:
+  - typed policy/approval/audit models
+  - default risk map + policy defaults
+  - policy loader (global + workspace overrides)
+  - policy evaluator (`allow` / `deny` / `requires_approval`)
+  - approval registry, audit JSONL appender, and secret redaction
+- **Dashboard safety visibility**:
+  - `GET /api/safety/overview` route aggregating pending approvals,
+    recent audit events, device lock state, recent diagnostics, and raw log links
+  - new UI panel `web/src/components/safety-policy-overview.tsx`
+    rendered in project info view.
+
+### Changed
+
+- **CLI adapter (`pio-agent` / `platformio-mcp`) now enforces policy decisions**
+  before command execution, including:
+  - interactive approval prompt for risky actions
+  - `--approve` override for explicit non-interactive confirmation
+  - structured policy errors in JSON mode.
+- **Approval lifecycle management is now first-class in CLI + dashboard UI**:
+  - CLI commands: `approvals`, `approve <approval-id>`, `deny <approval-id>`
+  - Dashboard API routes:
+    `GET /api/safety/approvals`,
+    `POST /api/safety/approvals/:id/approve`,
+    `POST /api/safety/approvals/:id/deny`
+  - Safety panel controls to approve/deny pending requests in-place.
+- **MCP tool dispatch now performs pre-execution policy evaluation** and returns
+  structured `policyDecision` payloads when actions are denied or require approval.
+- **Build/upload/monitor outputs now include safer diagnostics context**:
+  - redacted output paths for returned logs
+  - structured `diagnostic` objects on build/upload/task-status responses
+  - preserved raw log references for forensic review.
+- **Server data path handling hardened**:
+  - `SERVER_DATA_DIR` now resolves via writable fallback chain
+    (`PIO_MCP_DATA_DIR` -> home -> cwd -> temp) to avoid host-permission
+    failures in constrained environments.
+
+### Fixed
+
+- Resolved multiple environment-permission regressions caused by hard
+  writes to `~/.platformio-mcp` by routing policy/audit/approval stores
+  through the unified writable server data directory.
+
+### Tests
+
+- Added diagnostics/policy focused tests:
+  - `tests/diagnostics-engine.test.ts`
+  - `tests/policy-engine.test.ts`
+- Updated existing suites for policy/approval-aware behavior and constrained-host
+  execution semantics.
+- Validation completed:
+  - `npx tsc --noEmit`
+  - `npm run build`
+  - `npm run test`
+  - `web: npm run test -- --run`
+  - `npm run smoke-test`
+
+### Notes
+
+- Full MCP stdio E2E (`tests/mcp.test.ts`) remains gated behind
+  `RUN_MCP_E2E=1` due to host/runtime transport dependence; non-E2E suites
+  and build/smoke checks are green.
+
 ## [2.2.1] — 2026-05-14
 
 ### Fixed

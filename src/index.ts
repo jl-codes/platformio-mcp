@@ -48,13 +48,20 @@ import { mcpContext } from "./utils/mcp-context.js";
 import { addWorkspace } from "./utils/workspace-registry.js";
 
 // Import tool functions from feature modules
-import { listBoards, getBoardInfo } from "./tools/boards.js";
-import { listDevices } from "./tools/devices.js";
-import { initProject, getProjectConfig, getSystemInfo, getProjectContext } from "./tools/projects.js";
-import { buildProject, cleanProject, checkTaskStatus, checkProject, runTests } from "./tools/build.js";
-import { uploadFirmware, uploadFilesystem } from "./tools/upload.js";
-import { startMonitor, stopMonitor, queryLogs } from "./tools/monitor.js";
+import { getBoardInfo } from "./tools/boards.js";
+import { getProjectConfig, getSystemInfo, getProjectContext } from "./tools/projects.js";
+import { cleanProject, checkProject, runTests } from "./tools/build.js";
+import { uploadFilesystem } from "./tools/upload.js";
+import { stopMonitor, queryLogs } from "./tools/monitor.js";
 import { spoolLargeDataset } from "./utils/spooler.js";
+import { listBoardsCore } from "./core/boards.js";
+import { listDevicesCore } from "./core/devices.js";
+import { initProjectCore } from "./core/project.js";
+import { buildProjectCore } from "./core/build.js";
+import { uploadFirmwareCore } from "./core/flash.js";
+import { startMonitorCore } from "./core/monitor.js";
+import { checkTaskStatusCore } from "./core/tasks.js";
+import { getDashboardStatusCore } from "./core/dashboard.js";
 
 import {
   searchLibraries,
@@ -72,9 +79,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { logDiagnostic as logDiag } from "./utils/logger.js";
-import { getDashboardStatus } from "./api/server.js";
 import { portalEvents } from "./api/events.js";
 import crypto from "node:crypto";
+import { evaluatePolicy } from "./core/policy/evaluate-policy.js";
+
+function toolToPolicyAction(toolName: string): string {
+  switch (toolName) {
+    case "check_task_status":
+      return "query_logs";
+    case "get_dashboard_url":
+      return "query_logs";
+    default:
+      return toolName;
+  }
+}
 
 /**
  * Main PlatformIO MCP Server instance configuration.
@@ -578,17 +596,50 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   logDiag(`[Command Execution] Tool invoked: '${name}' with arguments: ${JSON.stringify(args)}`, targetProjectDir);
 
   try {
+    const policyDecision = await evaluatePolicy(
+      toolToPolicyAction(name),
+      args,
+      {
+        workspaceDir: targetProjectDir,
+        devicePort: typeof args.port === "string" ? args.port : undefined,
+        taskId: activityId,
+        actor: "agent",
+      },
+    );
+
+    if (policyDecision.status !== "allow") {
+      const policyResponse = {
+        success: false,
+        policyDecision,
+      };
+      const response = {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(policyResponse, null, 2),
+          },
+        ],
+      };
+
+      await updateCommandStatus(activityId, {
+        status: "success",
+        mcpResponse: policyResponse as any,
+      }, targetProjectDir);
+
+      portalEvents.emitActivity(name, args, "success", activityId);
+      return response;
+    }
+
     const response = await mcpContext.run({ activityId, targetProjectDir }, async () => {
       switch (name) {
       case "list_boards": {
         const params = ListBoardsParamsSchema.parse(args);
-        const boards = await listBoards(params.filter);
-        const spooled = spoolLargeDataset("list_boards", boards, targetProjectDir || process.cwd());
+        const boards = await listBoardsCore(params.filter);
         return {
           content: [
             {
               type: "text",
-              text: typeof spooled === "string" ? spooled : JSON.stringify(spooled, null, 2),
+              text: JSON.stringify(boards, null, 2),
             },
           ],
         };
@@ -608,7 +659,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "list_devices": {
-        const devices = await listDevices();
+        const devices = await listDevicesCore();
         return {
           content: [
             {
@@ -621,7 +672,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "init_project": {
         const params = InitProjectParamsSchema.parse(args);
-        const result = await initProject(params);
+        const result = await initProjectCore(params);
         return {
           content: [
             {
@@ -634,13 +685,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "build_project": {
         const params = BuildProjectParamsSchema.parse(args);
-
-        const executeTask = () =>
-          buildProject(params.projectDir, params.environment, params.verbose, params.background);
-        const result = params.sessionId
-          ? (hardwareLockManager.requireLock(params.sessionId),
-            await executeTask())
-          : await hardwareLockManager.withImplicitLock(executeTask);
+        const result = await buildProjectCore({
+          projectDir: params.projectDir,
+          environment: params.environment,
+          verbose: params.verbose,
+          background: params.background,
+          sessionId: params.sessionId,
+        });
 
         return {
           content: [
@@ -700,20 +751,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "upload_firmware": {
         const params = UploadFirmwareParamsSchema.parse(args);
-
-        const executeTask = () =>
-          uploadFirmware(
-            params.projectDir,
-            params.port,
-            params.environment,
-            params.verbose,
-            params.background,
-            args.start_monitor
-          );
-        const result = params.sessionId
-          ? (hardwareLockManager.requireLock(params.sessionId),
-            await executeTask())
-          : await hardwareLockManager.withImplicitLock(executeTask);
+        const result = await uploadFirmwareCore({
+          projectDir: params.projectDir,
+          port: params.port,
+          environment: params.environment,
+          verbose: params.verbose,
+          background: params.background,
+          startMonitorAfter: args.start_monitor,
+          sessionId: params.sessionId,
+        });
 
         return {
           content: [
@@ -783,12 +829,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "search_libraries": {
         const params = SearchLibrariesParamsSchema.parse(args);
         const libraries = await searchLibraries(params.query, params.limit);
-        const spooled = spoolLargeDataset("search_libraries", libraries, targetProjectDir || process.cwd());
         return {
           content: [
             {
               type: "text",
-              text: typeof spooled === "string" ? spooled : JSON.stringify(spooled, null, 2),
+              text: JSON.stringify(libraries, null, 2),
             },
           ],
         };
@@ -826,7 +871,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "start_monitor": {
         const params = StartMonitorParamsSchema.parse(args);
-        const result = await startMonitor(params.port, params.baudRate, params.projectDir, params.environment);
+        const result = await startMonitorCore({
+          port: params.port,
+          baudRate: params.baudRate,
+          projectDir: params.projectDir,
+          environment: params.environment,
+        });
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -879,7 +929,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "check_task_status": {
         const params = CheckTaskStatusParamsSchema.parse(args);
-        const result = await checkTaskStatus(params.taskId, params.logPath, params.projectDir);
+        const result = await checkTaskStatusCore({
+          taskId: params.taskId,
+          logPath: params.logPath,
+          projectDir: params.projectDir,
+        });
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -887,7 +941,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "get_dashboard_url": {
         const params = GetDashboardUrlParamsSchema.parse(args);
-        const result = await getDashboardStatus(params.open, params.projectDir);
+        const result = await getDashboardStatusCore({
+          open: params.open,
+          projectDir: params.projectDir,
+        });
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -1072,7 +1129,7 @@ async function main() {
 
   if (subcommand === "dashboard") {
     // Boot HTTP server, open browser, hold the event loop open via httpServer.
-    const result = await getDashboardStatus(true);
+    const result = await getDashboardStatusCore({ open: true });
     console.log(`PlatformIO MCP Dashboard: ${result.secureLink}`);
     console.log(`Press Ctrl+C to stop.`);
     // Express http server keeps the event loop alive; SIGINT cleanup is wired
@@ -1150,7 +1207,7 @@ async function main() {
   }
 
   if (process.argv.includes("--open-dashboard-on-start") || process.env.PIO_MCP_OPEN_DASH_ON_START === "true") {
-    getDashboardStatus(true).catch((e) => logDiag(`[Dashboard] ${e.message}`));
+    getDashboardStatusCore({ open: true }).catch((e) => logDiag(`[Dashboard] ${e.message}`));
   }
 
   let gitHash = "unknown";

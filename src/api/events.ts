@@ -10,6 +10,7 @@ import { EventEmitter } from "events";
 import fs from "node:fs";
 import path from "node:path";
 import { addWorkspace } from "../utils/workspace-registry.js";
+import { redactSecretsInText } from "../core/policy/redact.js";
 
 class PortalEventEmitter extends EventEmitter {
   constructor() {
@@ -63,11 +64,12 @@ class PortalEventEmitter extends EventEmitter {
    * @param chunk Raw string chunk of the log
    */
   emitTaskLog(projectId: string, taskId: string | undefined, chunk: string) {
+    const safeChunk = redactSecretsInText(chunk);
     const bufferKey = taskId || projectId;
     if (!this.artifactBuffers[bufferKey]) {
       this.artifactBuffers[bufferKey] = "";
     }
-    this.artifactBuffers[bufferKey] += chunk;
+    this.artifactBuffers[bufferKey] += safeChunk;
 
     let newlineIndex: number;
     while ((newlineIndex = this.artifactBuffers[bufferKey].indexOf("\n")) !== -1) {
@@ -117,7 +119,7 @@ class PortalEventEmitter extends EventEmitter {
       timestamp: Date.now(),
       port,
       taskId,
-      data,
+      data: redactSecretsInText(data),
     });
   }
 
@@ -187,7 +189,9 @@ class PortalEventEmitter extends EventEmitter {
     this.lastKnownProjectDir = projectDir;
     
     // Dynamically persist to the server-level tracking registry
-    addWorkspace(projectDir);
+    addWorkspace(projectDir).catch(() => {
+      // Ignore non-PlatformIO paths in telemetry-only workspace updates.
+    });
 
     this.emit("workspace_state", {
       timestamp: Date.now(),

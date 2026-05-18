@@ -1,11 +1,12 @@
 {
   "name": "platformio-mcp",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "PlatformIO MCP server + web dashboard for AI agents (Cline, Claude Desktop, VS Code, Antigravity). Supports 1000+ boards across 30+ platforms.",
   "type": "module",
   "main": "build/index.js",
   "bin": {
-    "platformio-mcp": "build/index.js"
+    "platformio-mcp": "build/cli.js",
+    "pio-agent": "build/cli.js"
   },
   "files": [
     "build",
@@ -25,7 +26,7 @@
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "smoke-test": "node -e \"require('fs').accessSync('build/index.js'); require('fs').accessSync('web/dist/index.html'); require('fs').accessSync('scripts/installers/index.js')\"",
+    "smoke-test": "node -e \"require('fs').accessSync('build/index.js'); require('fs').accessSync('build/cli.js'); require('fs').accessSync('web/dist/index.html'); require('fs').accessSync('scripts/installers/index.js')\"",
     "prepublishOnly": "npm run build && npm run smoke-test"
   },
   "keywords": [

@@ -37,6 +37,11 @@ import {
   invalidateBuildCache,
 } from "../utils/build-cache.js";
 import { logDiagnostic as logDiag } from "../utils/logger.js";
+import { redactSecretsInText } from "../core/policy/redact.js";
+import { diagnoseBuildLog } from "../core/diagnostics/build-diagnostics.js";
+import { diagnoseUploadLog } from "../core/diagnostics/upload-diagnostics.js";
+import { diagnoseSerialLog } from "../core/diagnostics/serial-diagnostics.js";
+import type { DiagnosticResult } from "../core/diagnostics/types.js";
 /**
  * Builds a PlatformIO project.
  *
@@ -98,6 +103,9 @@ export async function buildProject(
         ramUsageBytes: cached.ramUsageBytes,
         flashUsageBytes: cached.flashUsageBytes,
         firmwarePath: cached.firmwarePath,
+        diagnostic: diagnoseBuildLog(tail, {
+          success: true,
+        }),
       };
     }
   }
@@ -131,23 +139,28 @@ export async function buildProject(
     }
 
     const success = result.exitCode === 0;
-    const legacyErrors = success ? undefined : parseStderrErrors(result.finalOutput);
-    const structuredErrors = parseStructuredBuildErrors(result.finalOutput);
+    const safeOutput = redactSecretsInText(result.finalOutput);
+    const legacyErrors = success ? undefined : parseStderrErrors(safeOutput);
+    const structuredErrors = parseStructuredBuildErrors(safeOutput);
     const nextSteps = deriveNextSteps(
       // Convert from internal StructuredBuildError to the JSON-friendly shape.
       structuredErrors,
       success,
     );
+    const diagnostic = diagnoseBuildLog(safeOutput, {
+      rawLogPath: result.fullLogPath,
+      success: success,
+    });
 
     let ramUsageBytes: number | undefined;
     let flashUsageBytes: number | undefined;
     let firmwarePath: string | undefined;
 
     if (success) {
-      const ramMatch = result.finalOutput.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
+      const ramMatch = safeOutput.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
       if (ramMatch) ramUsageBytes = parseInt(ramMatch[1], 10);
 
-      const flashMatch = result.finalOutput.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
+      const flashMatch = safeOutput.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
       if (flashMatch) flashUsageBytes = parseInt(flashMatch[1], 10);
 
       firmwarePath = findFirmwareArtifact(validatedPath, envName);
@@ -155,7 +168,7 @@ export async function buildProject(
       // Persist the cache only on success. Failures get nothing to replay.
       // We trim the log to a tail (last ~16KB) so the cache file stays small —
       // we mostly need it for displaying RAM/Flash on hits, not for re-parsing.
-      const tail = result.finalOutput.slice(-16 * 1024);
+      const tail = safeOutput.slice(-16 * 1024);
       // Recompute the input fingerprint *after* the build to capture any
       // generated headers or partial-write states the toolchain may have
       // touched under src/. lookupBuildCache returns the hash in both the
@@ -181,13 +194,15 @@ export async function buildProject(
       success,
       cacheHit: false,
       environment: envName,
-      output: success && !verbose ? undefined : result.finalOutput,
+      output: success && !verbose ? undefined : safeOutput,
       errors: legacyErrors,
       structuredErrors,
       nextSteps,
       ramUsageBytes,
       flashUsageBytes,
       firmwarePath,
+      rawLogPath: result.fullLogPath,
+      diagnostic,
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
@@ -546,6 +561,7 @@ export async function checkTaskStatus(taskId?: string, logPath?: string, project
   let status = "completed";
   let output = "No output available.";
   let logPaths: string[] = [];
+  let diagnostic: DiagnosticResult | undefined;
 
   // 3. Unified Execution
   if (resolvedTaskId) {
@@ -592,11 +608,43 @@ export async function checkTaskStatus(taskId?: string, logPath?: string, project
     else if (!active && output.includes("Error:")) status = "failed";
   }
 
+  const safeOutput = redactSecretsInText(output);
+  const effectiveLogPath = logPath || logPaths[logPaths.length - 1];
+  const normalizedStatus = status.toLowerCase();
+  const command = resolvedTaskId ? history.find((c) => c.id === resolvedTaskId) : undefined;
+  const taskType = command?.tasks?.[0]?.type ?? "build";
+  const successByStatus = normalizedStatus === "success" || normalizedStatus === "completed";
+  const failedByStatus =
+    normalizedStatus === "error" ||
+    normalizedStatus === "failed" ||
+    normalizedStatus === "terminated";
+
+  if (taskType === "upload") {
+    diagnostic = diagnoseUploadLog(safeOutput, {
+      taskId: resolvedTaskId,
+      rawLogPath: effectiveLogPath,
+      success: successByStatus && !failedByStatus,
+    });
+  } else if (taskType === "monitor") {
+    diagnostic = diagnoseSerialLog(safeOutput, {
+      taskId: resolvedTaskId,
+      rawLogPath: effectiveLogPath,
+      success: successByStatus && !failedByStatus,
+    });
+  } else {
+    diagnostic = diagnoseBuildLog(safeOutput, {
+      taskId: resolvedTaskId,
+      rawLogPath: effectiveLogPath,
+      success: successByStatus && !failedByStatus,
+    });
+  }
+
   return {
     status: "success",
     targetStatus: status,
     taskId: resolvedTaskId,
     logPaths,
-    output
+    output: safeOutput,
+    diagnostic,
   };
 }

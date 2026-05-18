@@ -42,6 +42,10 @@ function ensureRegistryFile(): void {
  */
 export async function addWorkspace(dir: string): Promise<void> {
   ensureRegistryFile();
+  const platformioIni = path.join(dir, "platformio.ini");
+  if (!fs.existsSync(platformioIni)) {
+    throw new Error(`missing platformio.ini in workspace: ${dir}`);
+  }
 
   try {
     const release = await lockfile.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });

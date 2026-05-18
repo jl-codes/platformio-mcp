@@ -159,6 +159,48 @@ describe("Portal API Security & Telemetry Tailing", () => {
     });
   });
 
+  describe("Safety Approval APIs", () => {
+    it("lists approvals and supports approve/deny actions", async () => {
+      const { createApprovalRequest } = await import("../src/core/policy/approvals.js");
+
+      const approvalA = createApprovalRequest({
+        action: "upload_firmware",
+        riskLevel: "high",
+        reason: "Test approval A",
+        requestedBy: "agent",
+      });
+      const approvalB = createApprovalRequest({
+        action: "upload_firmware",
+        riskLevel: "high",
+        reason: "Test approval B",
+        requestedBy: "agent",
+      });
+
+      const listRes = await request(server)
+        .get("/api/safety/approvals")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(listRes.status).toBe(200);
+      expect(Array.isArray(listRes.body)).toBe(true);
+      expect(listRes.body.some((item: any) => item.id === approvalA.id)).toBe(true);
+      expect(listRes.body.some((item: any) => item.id === approvalB.id)).toBe(true);
+
+      const approveRes = await request(server)
+        .post(`/api/safety/approvals/${encodeURIComponent(approvalA.id)}/approve`)
+        .set("Authorization", `Bearer ${authToken}`);
+      expect(approveRes.status).toBe(200);
+      expect(approveRes.body.success).toBe(true);
+      expect(approveRes.body.approval.status).toBe("approved");
+
+      const denyRes = await request(server)
+        .post(`/api/safety/approvals/${encodeURIComponent(approvalB.id)}/deny`)
+        .set("Authorization", `Bearer ${authToken}`);
+      expect(denyRes.status).toBe(200);
+      expect(denyRes.body.success).toBe(true);
+      expect(denyRes.body.approval.status).toBe("denied");
+    });
+  });
+
   describe("V2 Wrapper Endpoints & Queue Enforcement", () => {
     const mockProjectDir = path.join(os.tmpdir(), "pio-mcp-test-wrapper");
 

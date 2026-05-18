@@ -38,13 +38,17 @@ beforeEach(() => {
   if (fs.existsSync(logsDir)) {
     fs.rmSync(logsDir, { recursive: true, force: true });
   }
+  const cacheFile = path.join(mockProjectDir, '.pio', '.mcp-build-cache.json');
+  if (fs.existsSync(cacheFile)) {
+    fs.rmSync(cacheFile, { force: true });
+  }
   if (!fs.existsSync(mockProjectDir)) {
     fs.mkdirSync(mockProjectDir, { recursive: true });
   }
 });
 
 test('buildProject correctly spins up spooler and generates log file', async () => {
-  const result = await buildProject(mockProjectDir, 'default', false);
+  const result = await buildProject(mockProjectDir, 'default', true);
   
   expect(result.success).toBe(true);
   expect(result.ramUsageBytes).toBe(1234);

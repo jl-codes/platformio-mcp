@@ -47,6 +47,17 @@ import { GLOBAL_LOCKS_DIR } from "../utils/paths.js";
 import { addWorkspace } from "../utils/workspace-registry.js";
 import { killAllTrackedProcesses, sweepGhostTasks } from "../utils/process-manager.js";
 import { execSync } from "node:child_process";
+import {
+  approveRequest,
+  denyRequest,
+  getApproval,
+  listApprovalRequests,
+} from "../core/policy/approvals.js";
+import { readRecentAuditEvents } from "../core/policy/audit-log.js";
+import { diagnoseBuildLog } from "../core/diagnostics/build-diagnostics.js";
+import { diagnoseUploadLog } from "../core/diagnostics/upload-diagnostics.js";
+import { diagnoseSerialLog } from "../core/diagnostics/serial-diagnostics.js";
+import type { DiagnosticResult } from "../core/diagnostics/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -68,6 +79,60 @@ export const activePortalStatus = {
   // Cline profiles, etc.) each fire a fresh open(secureLink).
   browserOpened: false
 };
+
+function parseDeviceLocks() {
+  const locks: Array<{
+    lockFile: string;
+    port: string;
+    claimType?: string;
+    ownerWorkspace?: string;
+    ownerPid?: number;
+    timestamp?: number;
+  }> = [];
+
+  if (!fs.existsSync(GLOBAL_LOCKS_DIR)) {
+    return locks;
+  }
+
+  for (const file of fs.readdirSync(GLOBAL_LOCKS_DIR)) {
+    if (!file.endsWith(".json")) continue;
+    const lockFile = path.join(GLOBAL_LOCKS_DIR, file);
+    try {
+      const payload = JSON.parse(fs.readFileSync(lockFile, "utf8"));
+      const claim = payload?.current_claim ?? payload;
+      locks.push({
+        lockFile,
+        port: file.replace(/\.json$/i, ""),
+        claimType: claim?.type,
+        ownerWorkspace: claim?.owner_workspace,
+        ownerPid: claim?.owner_pid,
+        timestamp: claim?.timestamp,
+      });
+    } catch {
+      locks.push({
+        lockFile,
+        port: file.replace(/\.json$/i, ""),
+      });
+    }
+  }
+
+  return locks;
+}
+
+function diagnoseByTaskType(
+  type: string | undefined,
+  logText: string,
+  rawLogPath?: string,
+  success?: boolean,
+): DiagnosticResult {
+  if (type === "upload") {
+    return diagnoseUploadLog(logText, { rawLogPath, success });
+  }
+  if (type === "monitor") {
+    return diagnoseSerialLog(logText, { rawLogPath, success });
+  }
+  return diagnoseBuildLog(logText, { rawLogPath, success });
+}
 
 /**
  * Retrieves the operational footprint of the user-facing Web Dashboard.
@@ -218,6 +283,198 @@ export function startPortalServer(defaultPort = 8080) {
       await sweepGhostTasks(projectDir);
       const history = getCommandHistory(projectDir);
       res.json(history);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * Retrieves the current safety and diagnostics overview for dashboard rendering.
+   *
+   * Route: GET /api/safety/overview
+   *
+   * @param {string} [req.query.projectDir] - Optional project directory to scope audit and command history.
+   * @returns Aggregated safety/policy and diagnostics payload.
+   */
+  app.get("/api/safety/overview", async (req, res) => {
+    try {
+      const projectDir = req.query.projectDir as string | undefined;
+      const pendingApprovals = listApprovalRequests({
+        status: "pending",
+        limit: 25,
+      });
+      const recentAuditEvents = readRecentAuditEvents({
+        workspaceDir: projectDir,
+        limit: 100,
+      });
+      const deviceLocks = parseDeviceLocks();
+      const commandHistory = getCommandHistory(projectDir);
+      const recentCommands = commandHistory.slice(-40).reverse();
+
+      const recentDiagnostics: Array<{
+        commandId?: string;
+        taskId?: string;
+        toolName?: string;
+        status?: string;
+        diagnostic: DiagnosticResult;
+      }> = [];
+      const rawLogLinks: Array<{
+        commandId?: string;
+        taskId?: string;
+        type?: string;
+        logPath: string;
+        exists: boolean;
+      }> = [];
+
+      const extractResponseDiagnostic = (response: any): DiagnosticResult | undefined => {
+        if (!response) return undefined;
+        if (response.diagnostic) return response.diagnostic as DiagnosticResult;
+        if (Array.isArray(response?.content) && response.content[0]?.text) {
+          try {
+            const parsed = JSON.parse(response.content[0].text);
+            if (parsed?.diagnostic) return parsed.diagnostic as DiagnosticResult;
+          } catch {
+            // Ignore parse failures.
+          }
+        }
+        return undefined;
+      };
+
+      for (const cmd of recentCommands) {
+        const commandLevelDiagnostic = extractResponseDiagnostic(cmd.mcpResponse);
+        if (commandLevelDiagnostic) {
+          recentDiagnostics.push({
+            commandId: cmd.id,
+            toolName: cmd.mcpToolName,
+            status: cmd.status,
+            diagnostic: commandLevelDiagnostic,
+          });
+        }
+
+        const tasks = cmd.tasks || [];
+        for (const task of tasks) {
+          const firstLogPath = task.logPaths?.[0];
+          if (firstLogPath) {
+            rawLogLinks.push({
+              commandId: cmd.id,
+              taskId: task.taskId,
+              type: task.type,
+              logPath: firstLogPath,
+              exists: fs.existsSync(firstLogPath),
+            });
+          }
+
+          if (!firstLogPath || !fs.existsSync(firstLogPath)) {
+            continue;
+          }
+
+          try {
+            const lines = await tailFileBounded(firstLogPath, 128 * 1024);
+            const logText = lines.join("\n");
+            const success =
+              task.status === "success" ||
+              task.status === "terminated" ||
+              (task.exitCode !== undefined && task.exitCode === 0);
+
+            const diagnostic = diagnoseByTaskType(
+              task.type,
+              logText,
+              firstLogPath,
+              success,
+            );
+            recentDiagnostics.push({
+              commandId: cmd.id,
+              taskId: task.taskId,
+              toolName: cmd.mcpToolName,
+              status: task.status,
+              diagnostic,
+            });
+          } catch {
+            // Best-effort diagnostics only.
+          }
+        }
+      }
+
+      // Keep payload bounded for dashboard responsiveness.
+      const dedupedDiagnostics = recentDiagnostics
+        .filter((item, idx, arr) => {
+          const key = `${item.commandId ?? "none"}::${item.taskId ?? "none"}::${item.diagnostic.timestamp}`;
+          return arr.findIndex((x) => `${x.commandId ?? "none"}::${x.taskId ?? "none"}::${x.diagnostic.timestamp}` === key) === idx;
+        })
+        .slice(0, 50);
+
+      res.json({
+        pendingApprovals,
+        recentAuditEvents: recentAuditEvents.slice(0, 100),
+        deviceLocks,
+        recentDiagnostics: dedupedDiagnostics,
+        rawLogLinks: rawLogLinks.slice(0, 100),
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * Lists approval requests with optional status filtering.
+   *
+   * Route: GET /api/safety/approvals
+   *
+   * @param {string} [req.query.status] - Optional approval status filter.
+   * @param {number} [req.query.limit] - Optional max records to return.
+   * @returns Approval request list.
+   */
+  app.get("/api/safety/approvals", async (req, res) => {
+    try {
+      const status = req.query.status as
+        | "pending"
+        | "approved"
+        | "denied"
+        | "expired"
+        | undefined;
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      const approvals = listApprovalRequests({ status, limit });
+      res.json(approvals);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * Approves an approval request.
+   *
+   * Route: POST /api/safety/approvals/:id/approve
+   */
+  app.post("/api/safety/approvals/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const existing = getApproval(id);
+      if (!existing) {
+        res.status(404).json({ error: `Approval not found: ${id}` });
+        return;
+      }
+      const approved = approveRequest(id);
+      res.json({ success: true, approval: approved });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * Denies an approval request.
+   *
+   * Route: POST /api/safety/approvals/:id/deny
+   */
+  app.post("/api/safety/approvals/:id/deny", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const existing = getApproval(id);
+      if (!existing) {
+        res.status(404).json({ error: `Approval not found: ${id}` });
+        return;
+      }
+      const denied = denyRequest(id);
+      res.json({ success: true, approval: denied });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }

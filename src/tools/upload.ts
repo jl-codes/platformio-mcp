@@ -24,6 +24,8 @@ import { UploadError, PlatformIOError } from "../utils/errors.js";
 import { parseStderrErrors } from "../utils/errors.js";
 import { stopMonitor } from "./monitor.js";
 import { portSemaphoreManager } from "../utils/semaphore.js";
+import { redactSecretsInText } from "../core/policy/redact.js";
+import { diagnoseUploadLog } from "../core/diagnostics/upload-diagnostics.js";
 
 /**
  * Uploads a SPIFFS/LittleFS filesystem image to a target device.
@@ -121,14 +123,21 @@ export async function uploadFilesystem(
     }
 
     const uploadSuccess = uploadResult.exitCode === 0;
+    const safeOutput = redactSecretsInText(uploadResult.finalOutput);
+    const diagnostic = diagnoseUploadLog(safeOutput, {
+      rawLogPath: uploadResult.fullLogPath,
+      success: uploadSuccess,
+    });
 
     return {
       success: uploadSuccess,
       port: activePort,
-      output: uploadSuccess && !verbose ? undefined : uploadResult.finalOutput,
+      output: uploadSuccess && !verbose ? undefined : safeOutput,
       errors: uploadSuccess
         ? undefined
-        : parseStderrErrors(uploadResult.finalOutput),
+        : parseStderrErrors(safeOutput),
+      rawLogPath: uploadResult.fullLogPath,
+      diagnostic,
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
@@ -242,14 +251,21 @@ export async function uploadFirmware(
     }
 
     const uploadSuccess = uploadResult.exitCode === 0;
+    const safeOutput = redactSecretsInText(uploadResult.finalOutput);
+    const diagnostic = diagnoseUploadLog(safeOutput, {
+      rawLogPath: uploadResult.fullLogPath,
+      success: uploadSuccess,
+    });
 
     return {
       success: uploadSuccess,
       port: activePort,
-      output: uploadSuccess && !verbose ? undefined : uploadResult.finalOutput,
+      output: uploadSuccess && !verbose ? undefined : safeOutput,
       errors: uploadSuccess
         ? undefined
-        : parseStderrErrors(uploadResult.finalOutput),
+        : parseStderrErrors(safeOutput),
+      rawLogPath: uploadResult.fullLogPath,
+      diagnostic,
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
