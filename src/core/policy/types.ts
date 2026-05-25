@@ -21,6 +21,17 @@ export interface PolicyConfig {
   audit_all_agent_actions: boolean;
 }
 
+export type PolicyProfileName =
+  | "read_only"
+  | "build_only"
+  | "flash_requires_approval"
+  | "lab_admin";
+
+export interface PolicyProfileConfig {
+  profile: PolicyProfileName;
+  overrides?: Partial<PolicyConfig>;
+}
+
 export interface ApprovalRequest {
   id: string;
   action: string;
@@ -58,4 +69,3 @@ export interface PolicyEvaluationContext {
   taskId?: string;
   actor?: "agent" | "user" | "system";
 }
-

@@ -6,8 +6,18 @@ import { redactSecretsInText } from "../src/core/policy/redact.js";
 import { SERVER_DATA_DIR } from "../src/utils/paths.js";
 
 function removeIfExists(target: string) {
-  if (fs.existsSync(target)) {
-    fs.rmSync(target, { recursive: true, force: true });
+  if (!fs.existsSync(target)) return;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      fs.rmSync(target, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (fs.existsSync(target) && lastError) {
+    throw lastError;
   }
 }
 
@@ -85,4 +95,3 @@ describe("Policy Engine", () => {
     expect(redacted).toContain("[REDACTED_SECRET]");
   });
 });
-

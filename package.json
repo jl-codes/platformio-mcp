@@ -21,6 +21,8 @@
     "dev": "tsx src/index.ts",
     "watch": "tsc --watch",
     "test": "vitest run tests",
+    "test:ci:unit": "vitest run tests --exclude tests/mcp.test.ts --exclude tests/mcp-agent-smoke.test.ts",
+    "test:e2e:ci": "vitest run tests/agent-workflows.test.ts tests/cli-agent-smoke.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/**/*.ts",

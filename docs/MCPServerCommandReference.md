@@ -15,6 +15,13 @@ This document serves as the definitive reference for all tools exposed by the Pl
 | [`init_project`](#init_project) | Initializes a new PlatformIO project with the specified board and optional framework. |
 | [`get_project_config`](#get_project_config) | Dumps `platformio.ini` JSON. |
 | [`system_info`](#system_info) | Gets sys diagnostic path output. |
+| **Agent Workflows** | |
+| [`agent_validate_project`](#agent_validate_project) | Agent pre-flight project readiness validation. |
+| [`agent_build_diagnose`](#agent_build_diagnose) | Build + rich diagnostic classification in one step. |
+| [`agent_safe_pin_audit`](#agent_safe_pin_audit) | Board-aware heuristic GPIO risk audit. |
+| [`agent_flash_monitor_verify`](#agent_flash_monitor_verify) | Flash + monitor + runtime assertion verification workflow. |
+| [`agent_get_last_report`](#agent_get_last_report) | Retrieve persisted `.pio-mcp-workspace/lastAgentReport.json`. |
+| [`agent_generate_board_report`](#agent_generate_board_report) | Generate and cache board intelligence report. |
 | **Build and Upload** | |
 | [`build_project`](#build_project) | Compiles the project source code and generates firmware binary. |
 | [`clean_project`](#clean_project) | Removes build artifacts and compiled files from the project. |
@@ -39,6 +46,8 @@ This document serves as the definitive reference for all tools exposed by the Pl
 | [`list_installed_libraries`](#list_installed_libraries) | Lists all installed libraries for a specific project boundary. |
 | [`uninstall_library`](#uninstall_library) | Removes target library. |
 | [`update_library`](#update_library) | Upgrades library versions. |
+| **Policy** | |
+| [`get_policy_status`](#get_policy_status) | Returns active policy profile and allowed operations. |
 | **Diagnostics/Dashboard** | |
 | [`get_dashboard_url`](#get_dashboard_url) | Retrieves the address and auth token for the MCP Web Dashboard. |
 
@@ -1157,3 +1166,89 @@ When you execute a prompt like this, your agent will typically make the followin
 
 
 - **Best Practices / Edge Cases:** Use this to surface the observability UI to the human user automatically.
+
+## Agent Workflows
+
+### `agent_validate_project`
+- **Description:** Validates project readiness for agent-driven workflows.
+- **Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | yes | Path to the PlatformIO project directory |
+
+- **Returns:** Structured report including `hasPlatformioIni`, environments, board IDs, source-file presence, missing entries, connected devices, and `nextSteps`.
+
+### `agent_build_diagnose`
+- **Description:** Runs `build_project` and returns structured diagnostics with taxonomy classification.
+- **Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | yes | Path to the PlatformIO project directory |
+| `environment` | string | no | Specific environment |
+| `verbose` | boolean | no | Preserve verbose build output |
+| `background` | boolean | no | Dispatch build asynchronously |
+
+- **Returns:** `diagnostic` (`errorType`, `evidence`, `recommendedAction`, `severity`, `safeToAutoRetry`) plus RAM/Flash usage on success.
+
+### `agent_safe_pin_audit`
+- **Description:** Heuristic static scan of `src/` pin usage with board-aware risk checks.
+- **Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | yes | Path to the PlatformIO project directory |
+| `boardId` | string | yes | Target board ID (for profile matching) |
+
+- **Returns:** Array of pin findings `{ pin, severity, reason, recommendation, saferAlternatives? }`.
+
+### `agent_flash_monitor_verify`
+- **Description:** Optionally builds, flashes firmware with monitor restart, captures serial output, and verifies expectations/rejections.
+- **Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | yes | Path to the PlatformIO project directory |
+| `environment` | string | no | Specific environment |
+| `port` | string | no | Specific upload port |
+| `expect_all` | string[] | no | Expected serial markers |
+| `reject_patterns` | string[] | no | Forbidden serial patterns |
+| `timeoutSeconds` | number | no | Verification timeout (default 45) |
+| `stabilityWindowSeconds` | number | no | Required quiet window (default 10) |
+| `autoBuild` | boolean | no | Build first if firmware artifact is missing |
+
+- **Returns:** Structured verification payload: flash/monitor success, status, matched/unmatched expectations, rejected patterns, runtime failures, and one recommended next action.
+
+### `agent_get_last_report`
+- **Description:** Reads `.pio-mcp-workspace/lastAgentReport.json`.
+- **Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | yes | Path to the PlatformIO project directory |
+
+- **Returns:** Latest persisted report payload or a `success: false` missing-report message.
+
+### `agent_generate_board_report`
+- **Description:** Generates compact board intelligence metadata and caches it at `.pio-mcp-workspace/boardReport.json`.
+- **Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | yes | Path to the PlatformIO project directory |
+| `boardId` | string | yes | Target board ID |
+
+- **Returns:** `{ boardId, platform, frameworks, mcu, flashBytes, ramBytes, dangerousPins, inputOnlyPins, flashSpiPins, recommendedMonitorBaudRate, generatedAt }`.
+
+## Policy
+
+### `get_policy_status`
+- **Description:** Returns the active policy profile and operation gates.
+- **Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | no | Optional directory used to resolve `.pio-mcp-policy.json` |
+
+- **Returns:** Profile metadata plus allowed, approval-required, and denied operations.

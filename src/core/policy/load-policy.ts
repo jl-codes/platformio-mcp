@@ -1,7 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { PolicyConfig } from "./types.js";
-import { defaultPolicy } from "./default-policy.js";
+import type {
+  PolicyConfig,
+  PolicyProfileConfig,
+  PolicyProfileName,
+} from "./types.js";
+import { resolvePolicyProfile } from "./profiles.js";
 import { SERVER_DATA_DIR, ensureDir } from "../../utils/paths.js";
 
 function parseBoolean(value: string): boolean {
@@ -89,18 +93,90 @@ function loadPolicyFile(policyPath: string): Partial<PolicyConfig> {
   }
 }
 
-export function loadEffectivePolicy(workspaceDir?: string): PolicyConfig {
+function isPolicyProfileName(value: string): value is PolicyProfileName {
+  return (
+    value === "read_only" ||
+    value === "build_only" ||
+    value === "flash_requires_approval" ||
+    value === "lab_admin"
+  );
+}
+
+function loadProfileConfig(
+  workspaceDir?: string,
+): { profile: PolicyProfileName; source: string; overrides?: Partial<PolicyConfig> } {
+  const fallbackProfile: PolicyProfileName = "flash_requires_approval";
+  if (!workspaceDir) {
+    return {
+      profile: fallbackProfile,
+      source: "built-in:flash_requires_approval",
+    };
+  }
+
+  const profilePath = path.join(workspaceDir, ".pio-mcp-policy.json");
+  if (!fs.existsSync(profilePath)) {
+    return {
+      profile: fallbackProfile,
+      source: "built-in:flash_requires_approval",
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(profilePath, "utf8"),
+    ) as PolicyProfileConfig;
+
+    if (!parsed || typeof parsed.profile !== "string" || !isPolicyProfileName(parsed.profile)) {
+      return {
+        profile: fallbackProfile,
+        source: `invalid-profile:${profilePath}`,
+      };
+    }
+
+    return {
+      profile: parsed.profile,
+      source: profilePath,
+      overrides: parsed.overrides,
+    };
+  } catch {
+    return {
+      profile: fallbackProfile,
+      source: `invalid-profile:${profilePath}`,
+    };
+  }
+}
+
+export interface EffectivePolicyState {
+  profile: PolicyProfileName;
+  source: string;
+  policy: PolicyConfig;
+}
+
+export function loadEffectivePolicyState(workspaceDir?: string): EffectivePolicyState {
   ensureDir(SERVER_DATA_DIR);
   const globalPath = path.join(SERVER_DATA_DIR, "policy.yaml");
   const localPath = workspaceDir
     ? path.join(workspaceDir, ".pio-mcp-workspace", "policy.yaml")
     : undefined;
 
+  const profileConfig = loadProfileConfig(workspaceDir);
+  const basePolicy = resolvePolicyProfile({
+    profile: profileConfig.profile,
+    overrides: profileConfig.overrides,
+  });
   const globalOverride = loadPolicyFile(globalPath);
   const localOverride = localPath ? loadPolicyFile(localPath) : {};
 
-  return mergePolicy(
-    mergePolicy(defaultPolicy, globalOverride),
-    localOverride,
-  );
+  const withGlobal = mergePolicy(basePolicy, globalOverride);
+  const policy = mergePolicy(withGlobal, localOverride);
+
+  return {
+    profile: profileConfig.profile,
+    source: profileConfig.source,
+    policy,
+  };
+}
+
+export function loadEffectivePolicy(workspaceDir?: string): PolicyConfig {
+  return loadEffectivePolicyState(workspaceDir).policy;
 }

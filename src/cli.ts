@@ -7,8 +7,15 @@ import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "node:readline/promises";
 import { PlatformIOError } from "./utils/errors.js";
 import {
+  AgentBuildDiagnoseParamsSchema,
+  AgentFlashMonitorVerifyParamsSchema,
+  AgentGenerateBoardReportParamsSchema,
+  AgentGetLastReportParamsSchema,
+  AgentSafePinAuditParamsSchema,
+  AgentValidateProjectParamsSchema,
   BuildProjectParamsSchema,
   CheckTaskStatusParamsSchema,
+  GetPolicyStatusParamsSchema,
   GetDashboardUrlParamsSchema,
   InitProjectParamsSchema,
   ListBoardsParamsSchema,
@@ -28,12 +35,21 @@ import { checkTaskStatusSummaryCore } from "./core/tasks.js";
 import { getDashboardStatusCore } from "./core/dashboard.js";
 import { toCliStructuredError } from "./core/cli-diagnostics.js";
 import { evaluatePolicy } from "./core/policy/evaluate-policy.js";
+import { getPolicyStatus } from "./core/policy/status.js";
 import {
   approveRequest,
   denyRequest,
   getApproval,
   listApprovalRequests,
 } from "./core/policy/approvals.js";
+import {
+  agentBuildDiagnose,
+  agentFlashMonitorVerify,
+  agentGenerateBoardReport,
+  agentGetLastReport,
+  agentSafePinAudit,
+  agentValidateProject,
+} from "./tools/agent.js";
 
 type OptionValue = string | boolean;
 type ParsedArgs = {
@@ -56,6 +72,13 @@ COMMANDS:
   flash --project-dir <dir> [--port <port|auto>] [--environment <env>] [--background] [--start-monitor]
   monitor [--project-dir <dir>] [--port <port|auto>] [--environment <env>] [--timeout <seconds>] [--expect <text>] [--background]
   task-status <task-id>
+  agent-validate --project-dir <dir>
+  agent-build-diagnose --project-dir <dir> [--environment <env>] [--verbose]
+  agent-safe-pin-audit --project-dir <dir> --board <id>
+  agent-flash-monitor-verify --project-dir <dir> [--environment <env>] [--port <port|auto>] [--expect-all <csv>] [--reject-patterns <csv>] [--timeout <seconds>] [--stability-window <seconds>] [--auto-build <true|false>]
+  agent-last-report --project-dir <dir>
+  agent-board-report --project-dir <dir> --board <id>
+  policy-status [--project-dir <dir>]
   approvals [--status <pending|approved|denied|expired>] [--limit <n>]
   approve <approval-id>
   deny <approval-id>
@@ -128,6 +151,15 @@ function asNumber(value: OptionValue | undefined): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function asCsv(value: OptionValue | undefined): string[] | undefined {
+  if (typeof value !== "string") return undefined;
+  const items = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  return items.length > 0 ? items : undefined;
+}
+
 function normalizePortOption(value: string | undefined): string | undefined {
   if (!value) return undefined;
   if (value.toLowerCase() === "auto") return undefined;
@@ -176,6 +208,20 @@ function actionForCommand(command: string): string {
       return "start_monitor";
     case "task-status":
       return "check_task_status";
+    case "agent-validate":
+      return "agent_validate_project";
+    case "agent-build-diagnose":
+      return "agent_build_diagnose";
+    case "agent-safe-pin-audit":
+      return "agent_safe_pin_audit";
+    case "agent-flash-monitor-verify":
+      return "upload_firmware";
+    case "agent-last-report":
+      return "agent_get_last_report";
+    case "agent-board-report":
+      return "agent_generate_board_report";
+    case "policy-status":
+      return "get_policy_status";
     case "dashboard":
       return "get_dashboard_url";
     case "install":
@@ -440,6 +486,98 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         return;
       }
 
+      case "agent-validate": {
+        const params = AgentValidateProjectParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+        });
+        const result = await agentValidateProject(params.projectDir);
+        printOutput(result, jsonMode);
+        return;
+      }
+
+      case "agent-build-diagnose": {
+        const params = AgentBuildDiagnoseParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+          environment: asString(options.environment),
+          verbose: asBoolean(options.verbose),
+          background: asBoolean(options.background),
+        });
+        const result = await agentBuildDiagnose(
+          params.projectDir,
+          params.environment,
+          params.verbose,
+          params.background,
+        );
+        printOutput(result, jsonMode);
+        return;
+      }
+
+      case "agent-safe-pin-audit": {
+        const params = AgentSafePinAuditParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+          boardId: asString(options.board),
+        });
+        const result = await agentSafePinAudit(params.projectDir, params.boardId);
+        printOutput(result, jsonMode);
+        return;
+      }
+
+      case "agent-flash-monitor-verify": {
+        const params = AgentFlashMonitorVerifyParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+          environment: asString(options.environment),
+          port: normalizePortOption(asString(options.port)),
+          expect_all: asCsv(options["expect-all"]),
+          reject_patterns: asCsv(options["reject-patterns"]),
+          timeoutSeconds: asNumber(options.timeout),
+          stabilityWindowSeconds: asNumber(options["stability-window"]),
+          autoBuild: asBoolean(options["auto-build"]),
+        });
+        const result = await agentFlashMonitorVerify({
+          projectDir: params.projectDir,
+          environment: params.environment,
+          port: params.port,
+          expectAll: params.expect_all,
+          rejectPatterns: params.reject_patterns,
+          timeoutSeconds: params.timeoutSeconds,
+          stabilityWindowSeconds: params.stabilityWindowSeconds,
+          autoBuild: params.autoBuild,
+        });
+        printOutput(result, jsonMode);
+        return;
+      }
+
+      case "agent-last-report": {
+        const params = AgentGetLastReportParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+        });
+        const result = await agentGetLastReport(params.projectDir);
+        printOutput(result, jsonMode);
+        return;
+      }
+
+      case "agent-board-report": {
+        const params = AgentGenerateBoardReportParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+          boardId: asString(options.board),
+        });
+        const result = await agentGenerateBoardReport(
+          params.projectDir,
+          params.boardId,
+        );
+        printOutput(result, jsonMode);
+        return;
+      }
+
+      case "policy-status": {
+        const params = GetPolicyStatusParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+        });
+        const result = getPolicyStatus(params.projectDir);
+        printOutput(result, jsonMode);
+        return;
+      }
+
       case "dashboard": {
         const params = GetDashboardUrlParamsSchema.parse({
           open: true,
@@ -513,6 +651,13 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       flash: "upload",
       monitor: "monitor",
       "task-status": "tasks",
+      "agent-validate": "agent",
+      "agent-build-diagnose": "build",
+      "agent-safe-pin-audit": "agent",
+      "agent-flash-monitor-verify": "upload",
+      "agent-last-report": "agent",
+      "agent-board-report": "agent",
+      "policy-status": "policy",
       approvals: "policy",
       approve: "policy",
       deny: "policy",
@@ -544,6 +689,13 @@ async function main() {
     "flash",
     "monitor",
     "task-status",
+    "agent-validate",
+    "agent-build-diagnose",
+    "agent-safe-pin-audit",
+    "agent-flash-monitor-verify",
+    "agent-last-report",
+    "agent-board-report",
+    "policy-status",
     "approvals",
     "approve",
     "deny",

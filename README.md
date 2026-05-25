@@ -4,7 +4,7 @@
 
 # PlatformIO MCP
 
-PlatformIO MCP is a safe embedded development runtime for AI coding agents.
+PlatformIO MCP is the open-source, agent-first hardware execution layer for embedded development.
 
 It exposes PlatformIO workflows for board discovery, project setup, build, flash, monitor, diagnostics, and task orchestration through:
 - an MCP server adapter
@@ -12,6 +12,18 @@ It exposes PlatformIO workflows for board discovery, project setup, build, flash
 - an optional local dashboard for visibility and control
 
 MCP is one adapter. PlatformIO is the first backend.
+
+## Agent-First Capabilities
+
+- Project readiness validation (`agent_validate_project`)
+- Rich build diagnostics with structured error taxonomy (`agent_build_diagnose`)
+- Board-aware GPIO safety audits (`agent_safe_pin_audit`)
+- Flash + monitor + runtime assertions (`agent_flash_monitor_verify`)
+- Persistent workflow artifacts in `.pio-mcp-workspace/` (`lastAgentReport.json`, `boardReport.json`)
+- Board intelligence reports (`agent_generate_board_report`)
+- Policy profile introspection (`get_policy_status`)
+
+All risky operations still honor policy and approval rules.
 
 ## Quick Start
 
@@ -30,6 +42,12 @@ npx platformio-mcp init --board esp32dev --framework arduino --project-dir ./fir
 npx platformio-mcp build --project-dir ./firmware
 npx platformio-mcp flash --project-dir ./firmware --port auto
 npx platformio-mcp monitor --project-dir ./firmware --port auto --expect BOOT_OK --timeout 30
+npx platformio-mcp agent-validate --project-dir ./firmware
+npx platformio-mcp agent-build-diagnose --project-dir ./firmware
+npx platformio-mcp agent-safe-pin-audit --project-dir ./firmware --board esp32dev
+npx platformio-mcp agent-flash-monitor-verify --project-dir ./firmware --expect-all BOOT_OK --reject-patterns "Guru Meditation,Brownout detector,WDT reset" --timeout 45
+npx platformio-mcp agent-last-report --project-dir ./firmware
+npx platformio-mcp policy-status --project-dir ./firmware
 npx platformio-mcp task-status <task-id>
 ```
 
@@ -82,6 +100,20 @@ PlatformIO MCP enforces policy decisions across CLI and MCP flows.
 - All actions can be audited
 - Secrets are redacted in exposed log streams
 
+Policy profiles can be selected per-project via `.pio-mcp-policy.json`:
+
+```json
+{
+  "profile": "flash_requires_approval"
+}
+```
+
+Supported profiles:
+- `read_only`
+- `build_only`
+- `flash_requires_approval`
+- `lab_admin`
+
 CLI approval workflows:
 
 ```bash
@@ -106,6 +138,9 @@ Guides and references:
 - [Agent Customization Guide](docs/reference/AgentCustomizationGuide.md)
 - [MCP Server Command Reference](docs/MCPServerCommandReference.md)
 - [Troubleshooting Guide](docs/TroubleshootingGuide.md)
+- [Agent-First Embedded Workflow](docs/AGENT_FIRST_EMBEDDED.md)
+- [Competitive Positioning](docs/COMPETITIVE_POSITIONING.md)
+- [MCP-U Integration Template](docs/MCP_U_INTEGRATION.md)
 - [Agent Skills Directory](.skills/README.md)
 
 Specifications:
@@ -129,6 +164,13 @@ npm run build
 npm run test
 npm run smoke-test
 ```
+
+CI/CD test tiers:
+
+- `npm run test:ci:unit` runs unit/component coverage used in cross-platform CI.
+- `npm run test:e2e:ci` runs CI-safe end-to-end tests for agent workflows and CLI wiring.
+- `.github/workflows/ci.yml` runs typecheck, tests, and package smoke checks on pull requests/pushes.
+- `.github/workflows/hardware-e2e.yml` is a manual self-hosted runner workflow for real hardware MCP E2E (`RUN_MCP_E2E=1`).
 
 ## Contributing
 

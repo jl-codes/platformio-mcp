@@ -56,11 +56,11 @@ export function diagnoseFromLog(
       success: false,
       stage,
       errorType: matcher.errorType,
-      severity: matcher.severity ?? "error",
+      severity: matcher.severity,
       summary: `${stage} failed with ${matcher.errorType}.`,
       evidence: trimEvidence(normalized, matcher.pattern),
       recommendedAction: matcher.recommendedAction,
-      safeToAutoRetry: matcher.safeToAutoRetry ?? false,
+      safeToAutoRetry: matcher.safeToAutoRetry,
       rawLogPath: opts?.rawLogPath,
       taskId: opts?.taskId,
       timestamp,
@@ -85,4 +85,3 @@ export function diagnoseFromLog(
     timestamp,
   };
 }
-

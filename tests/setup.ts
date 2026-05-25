@@ -11,12 +11,21 @@ export class MCPTestHarness {
   private transport: StdioClientTransport;
 
   constructor() {
+    const homeDir =
+      process.env.HOME ||
+      process.env.USERPROFILE ||
+      path.dirname(process.execPath);
+    const platformioBin = path.join(homeDir, ".platformio", "penv", "bin");
+    const mergedPath = [process.env.PATH || "", platformioBin]
+      .filter((entry) => entry.length > 0)
+      .join(path.delimiter);
+
     this.transport = new StdioClientTransport({
       command: process.execPath, // Path to node binary
       args: ["--import", "tsx", SERVER_PATH],
       env: {
         ...process.env,
-        PATH: `${process.env.PATH}:${process.env.HOME}/.platformio/penv/bin`,
+        PATH: mergedPath,
       },
     });
 

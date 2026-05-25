@@ -1,0 +1,37 @@
+name: Hardware E2E (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: Optional run annotation
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  hardware_mcp_e2e:
+    name: MCP Hardware E2E
+    runs-on:
+      - self-hosted
+      - platformio-hardware
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run MCP hardware e2e suite
+        env:
+          RUN_MCP_E2E: "1"
+        run: npm run test -- tests/mcp.test.ts

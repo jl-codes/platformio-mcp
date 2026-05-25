@@ -711,3 +711,256 @@ export interface ProjectContext {
   nextSteps: string[];
 }
 
+/**
+ * Pin audit severity levels.
+ */
+export type PinAuditSeverity = "info" | "medium" | "high";
+
+/**
+ * Per-pin safety finding emitted by `agent_safe_pin_audit`.
+ */
+export interface AgentPinAuditResult {
+  pin: number | string; // Physical GPIO index or unresolved symbolic token
+  severity: PinAuditSeverity; // Severity of the detected pin risk
+  reason: string; // Why this pin usage is risky for the selected board profile
+  recommendation: string; // Recommended mitigation for the identified risk
+  saferAlternatives?: number[]; // Optional list of safer substitute GPIOs
+}
+
+/**
+ * Structured result from `agent_validate_project`.
+ */
+export interface AgentValidateProjectResult {
+  success: boolean; // True when project meets baseline agent workflow prerequisites
+  projectDir: string; // Absolute project directory path
+  hasPlatformioIni: boolean; // True when platformio.ini is present
+  environments: string[]; // Declared platformio environments
+  defaultEnvironment?: string; // Resolved default environment
+  boardIds: string[]; // Board IDs declared across environments
+  sourceFiles: string[]; // Source files discovered under src/
+  missingConfigEntries: string[]; // Missing or suspicious config entries
+  connectedDevices: Array<{ port: string; description: string; detectedBoard?: string }>; // Connected serial devices
+  nextSteps: string[]; // Recommended next actions for the agent
+}
+
+/**
+ * Structured result from `agent_build_diagnose`.
+ */
+export interface AgentBuildDiagnoseResult {
+  success: boolean; // Build success status
+  projectDir: string; // Absolute project directory path
+  environment: string; // Targeted environment
+  cacheHit?: boolean; // True when build came from cache
+  diagnostic: DiagnosticResult; // Classified build diagnostic payload
+  nextSteps: string[]; // Recommended next actions
+  ramUsageBytes?: number; // Parsed RAM usage in bytes
+  flashUsageBytes?: number; // Parsed flash usage in bytes
+  firmwarePath?: string; // Resolved firmware artifact path
+  rawLogPath?: string; // Optional path to full raw log
+}
+
+/**
+ * Verification result states from `agent_flash_monitor_verify`.
+ */
+export type AgentVerificationStatus =
+  | "passed"
+  | "failed"
+  | "inconclusive"
+  | "flash_failed";
+
+/**
+ * Structured result from `agent_flash_monitor_verify`.
+ */
+export interface AgentFlashMonitorVerifyResult {
+  success: boolean; // Overall workflow success flag
+  projectDir: string; // Absolute project directory path
+  environment: string; // Targeted environment
+  flashSuccess: boolean; // Firmware upload success status
+  monitorSuccess: boolean; // Serial monitoring success status
+  verificationStatus: AgentVerificationStatus; // Runtime verification classification
+  matchedExpectations: string[]; // Expected runtime markers observed
+  unmatchedExpectations: string[]; // Expected runtime markers not observed
+  rejectedPatterns: string[]; // Rejected runtime patterns that appeared
+  detectedRuntimeErrors: string[]; // Built-in runtime failures detected
+  diagnostic?: DiagnosticResult; // Upload-stage diagnostic payload when relevant
+  recommendedNextAction: string; // Single recommended next step
+  rawMonitorLogPath?: string; // Path to monitor log consumed for verification
+  monitorSnippet?: string; // Tail snippet used as runtime evidence
+}
+
+/**
+ * Board profile payload emitted by `agent_generate_board_report`.
+ */
+export interface AgentBoardReport {
+  boardId: string; // PlatformIO board identifier
+  platform: string; // PlatformIO platform identifier
+  frameworks: string[]; // Supported frameworks
+  mcu: string; // MCU model name
+  flashBytes?: number; // Flash capacity in bytes when available
+  ramBytes?: number; // RAM capacity in bytes when available
+  dangerousPins: number[]; // High-risk pins from board profile
+  inputOnlyPins: number[]; // Input-only pins from board profile
+  flashSpiPins: number[]; // Flash/SPI-reserved pins from board profile
+  recommendedMonitorBaudRate: number; // Suggested monitor baud rate
+  generatedAt: string; // Report generation timestamp
+}
+
+/**
+ * Persisted summary of the latest agent workflow execution.
+ */
+export interface LastAgentReport {
+  tool: string; // Tool that produced the report
+  timestamp: string; // Report timestamp
+  projectDir: string; // Project directory associated with the report
+  success: boolean; // Outcome of the workflow
+  summary: string; // Human-readable summary
+  payload:
+    | AgentValidateProjectResult
+    | AgentBuildDiagnoseResult
+    | AgentFlashMonitorVerifyResult
+    | AgentBoardReport
+    | AgentPinAuditResult[]; // Structured workflow payload
+}
+
+/**
+ * Structured result from `agent_get_last_report`.
+ */
+export interface AgentGetLastReportResult {
+  success: boolean; // True when a prior report exists
+  report?: LastAgentReport; // Persisted report payload when available
+  message?: string; // Human-readable status message when no report is found
+}
+
+/**
+ * Effective policy status payload returned by `get_policy_status`.
+ */
+export interface PolicyStatusResult {
+  profile: string; // Active policy profile
+  source: string; // Policy source path or descriptor
+  allowedOperations: string[]; // Actions explicitly allowed
+  approvalRequiredOperations: string[]; // Actions requiring approval
+  deniedOperations: string[]; // Actions explicitly denied
+  requireWorkspaceBoundary: boolean; // Workspace boundary safety gate
+  requireDeviceLockForUpload: boolean; // Upload lock requirement
+  redactSecretsFromLogs: boolean; // Secret redaction status
+  auditAllAgentActions: boolean; // Audit logging status
+}
+
+/**
+ * Zod schema for `agent_validate_project` tool parameters.
+ */
+export const AgentValidateProjectParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+});
+
+/**
+ * Zod schema for `agent_build_diagnose` tool parameters.
+ */
+export const AgentBuildDiagnoseParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+  environment: z
+    .string()
+    .optional()
+    .describe("Optional specific environment from platformio.ini"),
+  verbose: z
+    .boolean()
+    .optional()
+    .describe("If true, preserve verbose build output."),
+  background: z
+    .boolean()
+    .optional()
+    .describe("If true, dispatches build asynchronously."),
+});
+
+/**
+ * Zod schema for `agent_safe_pin_audit` tool parameters.
+ */
+export const AgentSafePinAuditParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+  boardId: z.string().min(1).describe("Target PlatformIO board ID"),
+});
+
+/**
+ * Zod schema for `agent_flash_monitor_verify` tool parameters.
+ */
+export const AgentFlashMonitorVerifyParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+  environment: z
+    .string()
+    .optional()
+    .describe("Optional specific environment from platformio.ini"),
+  port: z
+    .string()
+    .optional()
+    .describe("Optional serial upload port"),
+  expect_all: z
+    .array(z.string())
+    .optional()
+    .describe("All expected runtime markers that should appear in serial output."),
+  reject_patterns: z
+    .array(z.string())
+    .optional()
+    .describe("Runtime patterns that must not appear in serial output."),
+  timeoutSeconds: z
+    .number()
+    .int()
+    .positive()
+    .max(300)
+    .optional()
+    .describe("Total verification timeout window in seconds."),
+  stabilityWindowSeconds: z
+    .number()
+    .int()
+    .positive()
+    .max(120)
+    .optional()
+    .describe("Required quiet serial window at the tail of capture."),
+  autoBuild: z
+    .boolean()
+    .optional()
+    .describe("If true, build before flashing when no firmware artifact is detected."),
+});
+
+/**
+ * Zod schema for `agent_get_last_report` tool parameters.
+ */
+export const AgentGetLastReportParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+});
+
+/**
+ * Zod schema for `agent_generate_board_report` tool parameters.
+ */
+export const AgentGenerateBoardReportParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+  boardId: z.string().min(1).describe("Target PlatformIO board ID"),
+});
+
+/**
+ * Zod schema for `get_policy_status` tool parameters.
+ */
+export const GetPolicyStatusParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .optional()
+    .describe("Optional project directory to resolve local policy profile context."),
+});
+

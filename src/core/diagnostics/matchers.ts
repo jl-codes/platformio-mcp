@@ -9,6 +9,15 @@ export const buildMatchers: DiagnosticMatcher[] = [
     safeToAutoRetry: false,
   },
   {
+    errorType: "MissingLibrary",
+    pattern:
+      /library .* not found|library manager:.*not found|librarynotfound/i,
+    recommendedAction:
+      "Install the missing library dependency or correct the `lib_deps` entry.",
+    severity: "error",
+    safeToAutoRetry: false,
+  },
+  {
     errorType: "SyntaxError",
     pattern: /error: expected|error: stray|error: .* was not declared/i,
     recommendedAction:
@@ -32,14 +41,7 @@ export const buildMatchers: DiagnosticMatcher[] = [
     safeToAutoRetry: false,
   },
   {
-    errorType: "MissingLibrary",
-    pattern: /library .* not found|library manager:.*not found/i,
-    recommendedAction: "Install or correct the missing library dependency.",
-    severity: "error",
-    safeToAutoRetry: false,
-  },
-  {
-    errorType: "WrongBoard",
+    errorType: "UnknownBoard",
     pattern: /unknown board|invalid board|board .* not found/i,
     recommendedAction:
       "Check the PlatformIO board ID and update platformio.ini accordingly.",
@@ -47,10 +49,26 @@ export const buildMatchers: DiagnosticMatcher[] = [
     safeToAutoRetry: false,
   },
   {
-    errorType: "WrongFramework",
-    pattern: /framework .* is not compatible|unknown framework/i,
+    errorType: "WrongBoard",
+    pattern: /board .* is not compatible|board .* does not support/i,
+    recommendedAction:
+      "Use a board and platform combination that supports the selected framework and upload target.",
+    severity: "error",
+    safeToAutoRetry: false,
+  },
+  {
+    errorType: "UnknownFramework",
+    pattern: /unknown framework|framework .* not found/i,
     recommendedAction:
       "Select a framework supported by the selected board and retry build.",
+    severity: "error",
+    safeToAutoRetry: false,
+  },
+  {
+    errorType: "WrongFramework",
+    pattern: /framework .* not compatible with board|frameworks?: .*required/i,
+    recommendedAction:
+      "Adjust the environment framework to one supported by the target board.",
     severity: "error",
     safeToAutoRetry: false,
   },
@@ -67,7 +85,7 @@ export const uploadMatchers: DiagnosticMatcher[] = [
   },
   {
     errorType: "PermissionDenied",
-    pattern: /Permission denied|Operation not permitted/i,
+    pattern: /Permission denied|Operation not permitted|Access is denied/i,
     recommendedAction:
       "Check serial device permissions or run the required permission setup.",
     severity: "error",
@@ -75,7 +93,8 @@ export const uploadMatchers: DiagnosticMatcher[] = [
   },
   {
     errorType: "UploadSyncFailed",
-    pattern: /Failed to connect|Timed out waiting for packet|Invalid head of packet/i,
+    pattern:
+      /Failed to connect|Timed out waiting for packet|Invalid head of packet|A fatal error occurred: Failed to connect/i,
     recommendedAction:
       "Put the board into bootloader mode, check cable, or retry upload.",
     severity: "error",
@@ -83,24 +102,41 @@ export const uploadMatchers: DiagnosticMatcher[] = [
   },
   {
     errorType: "DeviceDisconnected",
-    pattern: /No such file or directory|device not found|could not open port/i,
+    pattern:
+      /No such file or directory|device not found|could not open port|serial port not found|device has been disconnected/i,
     recommendedAction: "Reconnect the device and re-run device discovery.",
     severity: "error",
     safeToAutoRetry: true,
+  },
+  {
+    errorType: "Esp32StrappingPinRisk",
+    pattern: /ESP32 strapping pin risk|ESP32_STRAPPING_PIN_RISK/i,
+    recommendedAction:
+      "Move application I/O off ESP32 strapping pins (for example GPIO25/26/27) and retry upload.",
+    severity: "critical",
+    safeToAutoRetry: false,
   },
 ];
 
 export const serialMatchers: DiagnosticMatcher[] = [
   {
     errorType: "Brownout",
-    pattern: /brownout/i,
+    pattern: /brownout|brownout detector/i,
     recommendedAction: "Check power supply, USB cable, and peak current draw.",
     severity: "critical",
     safeToAutoRetry: false,
   },
   {
+    errorType: "BootLoop",
+    pattern: /rst:[^\n]*\n[\s\S]*rst:/i,
+    recommendedAction:
+      "Device appears to be repeatedly rebooting. Inspect startup code and power stability.",
+    severity: "critical",
+    safeToAutoRetry: false,
+  },
+  {
     errorType: "WatchdogReset",
-    pattern: /watchdog|wdt/i,
+    pattern: /watchdog|wdt|WDT reset|task watchdog/i,
     recommendedAction:
       "Inspect blocking loops, task starvation, and interrupt behavior.",
     severity: "error",
@@ -115,14 +151,6 @@ export const serialMatchers: DiagnosticMatcher[] = [
     safeToAutoRetry: false,
   },
   {
-    errorType: "BootLoop",
-    pattern: /(rst:|boot:)[\s\S]*(rst:|boot:)/i,
-    recommendedAction:
-      "Device appears to be repeatedly rebooting. Inspect startup code and power stability.",
-    severity: "critical",
-    safeToAutoRetry: false,
-  },
-  {
     errorType: "NoSerialOutput",
     pattern: /^\s*$/i,
     recommendedAction:
@@ -131,4 +159,3 @@ export const serialMatchers: DiagnosticMatcher[] = [
     safeToAutoRetry: true,
   },
 ];
-

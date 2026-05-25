@@ -42,6 +42,13 @@ import {
   RunTestsParamsSchema,
   UninstallLibraryParamsSchema,
   UpdateLibraryParamsSchema,
+  AgentValidateProjectParamsSchema,
+  AgentBuildDiagnoseParamsSchema,
+  AgentSafePinAuditParamsSchema,
+  AgentFlashMonitorVerifyParamsSchema,
+  AgentGetLastReportParamsSchema,
+  AgentGenerateBoardReportParamsSchema,
+  GetPolicyStatusParamsSchema,
 } from "./types.js";
 import { registerCommand, updateCommandStatus } from "./utils/command-registry.js";
 import { mcpContext } from "./utils/mcp-context.js";
@@ -70,6 +77,14 @@ import {
   uninstallLibrary,
   updateLibrary,
 } from "./tools/libraries.js";
+import {
+  agentBuildDiagnose,
+  agentFlashMonitorVerify,
+  agentGenerateBoardReport,
+  agentGetLastReport,
+  agentSafePinAudit,
+  agentValidateProject,
+} from "./tools/agent.js";
 import { checkPlatformIOInstalled } from "./platformio.js";
 import { formatPlatformIOError } from "./utils/errors.js";
 import { hardwareLockManager } from "./utils/lock-manager.js";
@@ -82,6 +97,7 @@ import { logDiagnostic as logDiag } from "./utils/logger.js";
 import { portalEvents } from "./api/events.js";
 import crypto from "node:crypto";
 import { evaluatePolicy } from "./core/policy/evaluate-policy.js";
+import { getPolicyStatus } from "./core/policy/status.js";
 
 function toolToPolicyAction(toolName: string): string {
   switch (toolName) {
@@ -89,6 +105,10 @@ function toolToPolicyAction(toolName: string): string {
       return "query_logs";
     case "get_dashboard_url":
       return "query_logs";
+    case "agent_build_diagnose":
+      return "build_project";
+    case "agent_flash_monitor_verify":
+      return "upload_firmware";
     default:
       return toolName;
   }
@@ -498,6 +518,167 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             projectDir: { type: "string", description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise." },
           },
           required: ["projectDir"],
+        },
+      },
+      {
+        name: "agent_validate_project",
+        description:
+          "Agent-oriented pre-flight validation for a PlatformIO project. Reports environments, board IDs, source-file presence, config gaps, connected devices, and recommended next actions.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: {
+              type: "string",
+              description:
+                "Path to the PlatformIO project directory.",
+            },
+          },
+          required: ["projectDir"],
+        },
+      },
+      {
+        name: "agent_build_diagnose",
+        description:
+          "Runs build_project and returns rich structured diagnostics with error taxonomy, evidence, severity, retry-safety, and resource usage (RAM/Flash).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: {
+              type: "string",
+              description:
+                "Path to the PlatformIO project directory.",
+            },
+            environment: {
+              type: "string",
+              description: "Optional specific environment from platformio.ini.",
+            },
+            verbose: {
+              type: "boolean",
+              description: "If true, preserves verbose build output.",
+            },
+            background: {
+              type: "boolean",
+              description:
+                "If true, dispatches build to background and returns a pending diagnostic status.",
+            },
+          },
+          required: ["projectDir"],
+        },
+      },
+      {
+        name: "agent_safe_pin_audit",
+        description:
+          "Heuristic static pin audit for board-specific GPIO risks (ESP32 strapping/input-only/flash pins).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: {
+              type: "string",
+              description:
+                "Path to the PlatformIO project directory.",
+            },
+            boardId: {
+              type: "string",
+              description: "Target PlatformIO board ID.",
+            },
+          },
+          required: ["projectDir", "boardId"],
+        },
+      },
+      {
+        name: "agent_flash_monitor_verify",
+        description:
+          "Builds (optionally), flashes firmware with monitor restart, then verifies runtime serial output against expected/rejected patterns and stability criteria.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: {
+              type: "string",
+              description:
+                "Path to the PlatformIO project directory.",
+            },
+            environment: {
+              type: "string",
+              description: "Optional specific environment from platformio.ini.",
+            },
+            port: {
+              type: "string",
+              description: "Optional upload port.",
+            },
+            expect_all: {
+              type: "array",
+              items: { type: "string" },
+              description: "Serial markers expected to appear.",
+            },
+            reject_patterns: {
+              type: "array",
+              items: { type: "string" },
+              description: "Serial patterns that must not appear.",
+            },
+            timeoutSeconds: {
+              type: "number",
+              description: "Verification window in seconds (default 45).",
+            },
+            stabilityWindowSeconds: {
+              type: "number",
+              description: "Required quiet window in seconds (default 10).",
+            },
+            autoBuild: {
+              type: "boolean",
+              description:
+                "If true, builds before flashing when firmware artifact is missing.",
+            },
+          },
+          required: ["projectDir"],
+        },
+      },
+      {
+        name: "agent_get_last_report",
+        description:
+          "Returns the last persisted agent report from .pio-mcp-workspace/lastAgentReport.json.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: {
+              type: "string",
+              description: "Path to the PlatformIO project directory.",
+            },
+          },
+          required: ["projectDir"],
+        },
+      },
+      {
+        name: "agent_generate_board_report",
+        description:
+          "Generates a compact board intelligence report and caches it in .pio-mcp-workspace/boardReport.json.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: {
+              type: "string",
+              description: "Path to the PlatformIO project directory.",
+            },
+            boardId: {
+              type: "string",
+              description: "Target PlatformIO board ID.",
+            },
+          },
+          required: ["projectDir", "boardId"],
+        },
+      },
+      {
+        name: "get_policy_status",
+        description:
+          "Returns the active policy profile and allowed/approval-required/denied operations.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: {
+              type: "string",
+              description:
+                "Optional project directory to resolve local policy profile context.",
+            },
+          },
         },
       },
       {
@@ -964,6 +1145,79 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           params.projectDir,
           params.includeBuildHistory,
         );
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "agent_validate_project": {
+        const params = AgentValidateProjectParamsSchema.parse(args);
+        const result = await agentValidateProject(params.projectDir);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "agent_build_diagnose": {
+        const params = AgentBuildDiagnoseParamsSchema.parse(args);
+        const result = await agentBuildDiagnose(
+          params.projectDir,
+          params.environment,
+          params.verbose,
+          params.background,
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "agent_safe_pin_audit": {
+        const params = AgentSafePinAuditParamsSchema.parse(args);
+        const result = await agentSafePinAudit(params.projectDir, params.boardId);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "agent_flash_monitor_verify": {
+        const params = AgentFlashMonitorVerifyParamsSchema.parse(args);
+        const result = await agentFlashMonitorVerify({
+          projectDir: params.projectDir,
+          environment: params.environment,
+          port: params.port,
+          expectAll: params.expect_all,
+          rejectPatterns: params.reject_patterns,
+          timeoutSeconds: params.timeoutSeconds,
+          stabilityWindowSeconds: params.stabilityWindowSeconds,
+          autoBuild: params.autoBuild,
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "agent_get_last_report": {
+        const params = AgentGetLastReportParamsSchema.parse(args);
+        const result = await agentGetLastReport(params.projectDir);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "agent_generate_board_report": {
+        const params = AgentGenerateBoardReportParamsSchema.parse(args);
+        const result = await agentGenerateBoardReport(
+          params.projectDir,
+          params.boardId,
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "get_policy_status": {
+        const params = GetPolicyStatusParamsSchema.parse(args);
+        const result = getPolicyStatus(params.projectDir);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
