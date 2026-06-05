@@ -326,7 +326,7 @@ export async function startMonitor(
   return { success: true, port: activePort, logFile };
 }
 
-import { getCommandHistory } from "../utils/command-registry.js";
+import { getCommandHistory, findCommandAcrossWorkspaces } from "../utils/command-registry.js";
 
 /**
  * Tool for agents to scan historical offline device payloads.
@@ -342,8 +342,18 @@ export async function queryLogs(
   let targetPaths: string[] = [];
 
   if (taskId) {
-    const history = getCommandHistory(projectDir);
-    const cmd = history.find(c => c.id === taskId);
+    let history = getCommandHistory(projectDir);
+    let cmd = history.find(c => c.id === taskId);
+
+    // Cross-workspace fallback: if the caller omitted projectDir, the task
+    // may live in a project-specific registry rather than the global one.
+    if (!cmd && !projectDir) {
+      const crossResult = await findCommandAcrossWorkspaces(taskId);
+      if (crossResult) {
+        cmd = crossResult.command;
+      }
+    }
+
     if (cmd) {
       targetPaths = cmd.tasks
         .flatMap(a => a.logPaths || [])

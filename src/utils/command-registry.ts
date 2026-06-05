@@ -195,3 +195,33 @@ export function getCommandHistory(projectDir?: string): CommandRecord[] {
     return [];
   }
 }
+
+/**
+ * Searches for a command record by ID across all known workspace registries.
+ * Checks the global registry first, then iterates project-specific workspaces.
+ *
+ * This solves the case where a task was registered under a project-specific
+ * workspace but the caller only has a taskId (no projectDir).
+ *
+ * @param taskId - The command ID to search for.
+ * @returns The matching command, full history for its registry, and the resolved projectDir, or undefined if not found.
+ */
+export async function findCommandAcrossWorkspaces(
+  taskId: string,
+): Promise<{ command: CommandRecord; history: CommandRecord[]; projectDir?: string } | undefined> {
+  // 1. Check the global (SERVER_DATA_DIR) registry first
+  const globalHistory = getCommandHistory();
+  const globalMatch = globalHistory.find(c => c.id === taskId);
+  if (globalMatch) return { command: globalMatch, history: globalHistory };
+
+  // 2. Search all known project workspaces
+  const { getWorkspaces } = await import("./workspace-registry.js");
+  const workspaces = await getWorkspaces();
+  for (const ws of workspaces) {
+    const wsHistory = getCommandHistory(ws);
+    const found = wsHistory.find(c => c.id === taskId);
+    if (found) return { command: found, history: wsHistory, projectDir: ws };
+  }
+
+  return undefined;
+}
