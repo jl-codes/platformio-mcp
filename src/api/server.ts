@@ -1025,17 +1025,18 @@ export function startPortalServer(defaultPort = 8080) {
     const spoolers = getSpoolerStates();
     socket.emit("spooler_states", spoolers);
     
-    // Hydrate last 50 lines of active serial logs
+    // Hydrate last 1000 lines of active serial logs
     for (const [port, daemon] of Object.entries(spoolers)) {
       if (daemon.logFile && fs.existsSync(daemon.logFile)) {
         try {
-          socket.emit("serial_clear", { port });
+          socket.emit("serial_clear", { port, taskId: daemon.taskId });
 
           const lines = await tailFileBounded(daemon.logFile);
-          const tailLines = lines.slice(-50);
+          const tailLines = lines.slice(-1000);
           socket.emit("serial_log", {
             timestamp: Date.now(),
             port,
+            taskId: daemon.taskId,
             data: tailLines.join("\n")
           });
         } catch (e) {}
