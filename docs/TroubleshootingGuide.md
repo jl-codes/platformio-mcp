@@ -30,3 +30,48 @@ Board IDs are case-sensitive. List available boards with `pio boards` or search 
 For specific, complex hardware and OS-level issues, refer to our detailed troubleshooting documents:
 - [macOS Port Conflicts Reference Document](reference/ESP32PortConflictsOnMacOS.md)
 - [Setting Up ESP32 Devices for Native USB Stability](reference/SettingUpESP32Devices.md)
+- [Windows Setup & Compatibility Guide](WindowsSetupGuide.md)
+
+## Windows-Specific Issues
+
+### Serial monitor not streaming in dashboard UI
+**Symptom**: Dashboard shows stale serial data. Log file grows but UI doesn't update.
+**Cause**: `fs.watch()` on Windows uses `ReadDirectoryChangesW` which is unreliable for files written by external processes (like `pio device monitor`).
+**Fix**: Apply the polling fallback patch in `src/tools/monitor.ts`. See [Windows Setup Guide](WindowsSetupGuide.md#bug-1-fs.watch-unreliable-on-windows).
+
+### "Maximum call stack size exceeded" when starting serial monitor
+**Symptom**: `POST /api/spooler/start` returns 500 with "Maximum call stack size exceeded".
+**Cause**: `getSpoolerStates()` exposes non-serializable `Timeout` and `FSWatcher` objects with circular references. Socket.IO serialization causes infinite recursion.
+**Fix**: Strip non-serializable fields in `getSpoolerStates()`. See [Windows Setup Guide](WindowsSetupGuide.md#bug-2-getspoolerstates-serialization-crash).
+
+### Browse folder button crashes on Windows
+**Symptom**: Clicking "browse for folder" in dashboard UI returns 500 error.
+**Cause**: The browse route uses `osascript` (macOS AppleScript) with no platform detection.
+**Fix**: Add platform detection for Windows (PowerShell) and Linux (zenity). See [Windows Setup Guide](WindowsSetupGuide.md#bug-3-browse-route-macos-only).
+
+### Dashboard shows 400 on all commands
+**Symptom**: Every command returns "Missing projectDir parameter".
+**Cause**: No workspace registered. `workspaces.json` is empty.
+**Fix**: Register workspace via file edit or API. See [Windows Setup Guide](WindowsSetupGuide.md#workspace-registration).
+
+### Stale serial port lock
+**Symptom**: "Port is currently locked: COM14" error.
+**Cause**: Lock file persists after server crash or killed monitor process.
+**Fix**:
+```bash
+del "%USERPROFILE%\.platformio-mcp\serial_ports\COM14.json"
+taskkill /F /IM pio.exe
+```
+
+### ESP32-S3 serial output not visible
+**Symptom**: Serial monitor connects but shows no data.
+**Cause**: Missing `-DARDUINO_USB_CDC_ON_BOOT=1` build flag. Without it, `Serial.println()` goes to internal UART, not USB CDC.
+**Fix**: Add to `platformio.ini`:
+```ini
+build_flags = -DARDUINO_USB_CDC_ON_BOOT=1
+```
+
+### hallRead() not available on ESP32-S3
+**Symptom**: `'hallRead' was not declared in this scope` compilation error.
+**Cause**: The hall sensor API is only available on the original ESP32, not the S3 variant. The Arduino core explicitly skips it (`.skip.esp32s3` in examples).
+**Fix**: Use `touchRead(pin)` (GPIO 1-14) or `temperatureRead()` instead.
