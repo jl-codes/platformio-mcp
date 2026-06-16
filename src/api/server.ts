@@ -615,11 +615,55 @@ export function startPortalServer(defaultPort = 8080) {
    * 
    * @returns JSON object with the registered path, or an error if invalid
    */
+  /**
+   * Registers a new workspace directory by path (cross-platform).
+   *
+   * Route: POST /api/workspaces
+   *
+   * @param {string} req.body.dir - Absolute path to the PlatformIO project directory
+   * @returns JSON object with the registered path
+   */
+  app.post("/api/workspaces", async (req, res) => {
+    try {
+      const { dir } = req.body;
+      if (!dir) {
+        res.status(400).json({ error: "Missing dir parameter" });
+        return;
+      }
+      const resolved = path.resolve(dir);
+      if (!(await isValidProject(resolved))) {
+        res.status(400).json({ error: "This folder is not a PlatformIO project. Please initialize it using the AI Agent or terminal first, then try opening it again." });
+        return;
+      }
+      await addWorkspace(resolved);
+      const workspaces = await getWorkspaces();
+      portalEvents.emitWorkspacesUpdated(workspaces);
+      res.json({ path: resolved });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.post("/api/workspaces/browse", async (_req, res) => {
     try {
-      let result = execSync("osascript -e 'POSIX path of (choose folder)'").toString().trim();
+      let result: string | null = null;
+
+      if (process.platform === "darwin") {
+        result = execSync("osascript -e 'POSIX path of (choose folder)'").toString().trim();
+      } else if (process.platform === "win32") {
+        const ps = `[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Select PlatformIO Project'; $f.ShowNewFolderButton = $false; if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath } else { '' }`;
+        result = execSync(`powershell -NoProfile -Command "${ps}"`, { timeout: 60000 }).toString().trim();
+      } else {
+        // Linux: try zenity, then fall back to manual input
+        try {
+          result = execSync("zenity --file-selection --directory --title='Select PlatformIO Project'", { timeout: 60000 }).toString().trim();
+        } catch {
+          res.status(400).json({ error: "Native folder picker is not available on this system. Please use the text input to enter the project path directly." });
+          return;
+        }
+      }
+
       if (result) {
-        // macOS choose folder always returns a trailing slash. We normalize it.
         result = path.resolve(result);
 
         if (!(await isValidProject(result))) {
