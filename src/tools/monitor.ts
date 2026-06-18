@@ -186,11 +186,28 @@ export async function rehydrateMonitors(): Promise<void> {
               }
             } catch {}
 
+            // Restore taskId from the command registry so hydration events carry the correct key.
+            // The original startMonitor() stored it via registerPioMonitorPid → registerCommand.
+            let restoredTaskId: string | undefined;
+            try {
+              const history = getCommandHistory();
+              const cmd = [...history].reverse().find(c =>
+                c.tasks?.some(t => t.type === "monitor" && t.status === "running" && t.port === port)
+              );
+              restoredTaskId = cmd?.tasks.find(
+                t => t.type === "monitor" && t.status === "running" && t.port === port
+              )?.taskId;
+            } catch {}
+            if (!restoredTaskId) {
+              restoredTaskId = crypto.randomUUID();
+            }
+
             const daemon: DaemonContext = {
               baudRate: 115200, // Placeholder
               hwid: null,
               logFile,
               fileOffset: currentSize,
+              taskId: restoredTaskId,
             };
             activeDaemons[port] = daemon;
 
