@@ -37,17 +37,17 @@ For specific, complex hardware and OS-level issues, refer to our detailed troubl
 ### Serial monitor not streaming in dashboard UI
 **Symptom**: Dashboard shows stale serial data. Log file grows but UI doesn't update.
 **Cause**: `fs.watch()` on Windows uses `ReadDirectoryChangesW` which is unreliable for files written by external processes (like `pio device monitor`).
-**Fix**: Apply the polling fallback patch in `src/tools/monitor.ts`. See [Windows Setup Guide](WindowsSetupGuide.md#bug-1-fs.watch-unreliable-on-windows).
+**Fix**: Use a version with the Windows polling fallback for serial monitor logs. See [Windows Setup Guide](WindowsSetupGuide.md#serial-monitor-streaming).
 
 ### "Maximum call stack size exceeded" when starting serial monitor
 **Symptom**: `POST /api/spooler/start` returns 500 with "Maximum call stack size exceeded".
 **Cause**: `getSpoolerStates()` exposes non-serializable `Timeout` and `FSWatcher` objects with circular references. Socket.IO serialization causes infinite recursion.
-**Fix**: Strip non-serializable fields in `getSpoolerStates()`. See [Windows Setup Guide](WindowsSetupGuide.md#bug-2-getspoolerstates-serialization-crash).
+**Fix**: Use a version that emits serializable spooler state. See [Windows Setup Guide](WindowsSetupGuide.md#spooler-state-serialization).
 
 ### Browse folder button crashes on Windows
 **Symptom**: Clicking "browse for folder" in dashboard UI returns 500 error.
 **Cause**: The browse route uses `osascript` (macOS AppleScript) with no platform detection.
-**Fix**: Add platform detection for Windows (PowerShell) and Linux (zenity). See [Windows Setup Guide](WindowsSetupGuide.md#bug-3-browse-route-macos-only).
+**Fix**: Use a version with OS-specific folder picker support or register the workspace path directly. See [Windows Setup Guide](WindowsSetupGuide.md#workspace-folder-browsing).
 
 ### Dashboard shows 400 on all commands
 **Symptom**: Every command returns "Missing projectDir parameter".

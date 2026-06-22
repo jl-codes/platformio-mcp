@@ -70,91 +70,33 @@ build_flags = -DARDUINO_USB_CDC_ON_BOOT=1
 
 Without this flag, `Serial.println()` output goes to the internal UART (GPIO 43/44) instead of the USB CDC port. The serial monitor will connect but show no data.
 
-## Known Bugs and Fixes
+## Known Windows Compatibility Fixes
 
-### Bug 1: fs.watch Unreliable on Windows
+### Serial monitor streaming
 
 **File**: `src/tools/monitor.ts`
 
-**Problem**: `fs.watch()` on Windows uses `ReadDirectoryChangesW` which is unreliable for files being written by external processes (like `pio device monitor`). The watcher fires inconsistently or not at all, causing the dashboard serial monitor to show stale data.
+**Problem**: `fs.watch()` on Windows uses `ReadDirectoryChangesW`, which can miss changes for log files written by external processes like `pio device monitor`. The dashboard can show stale serial data even while the log file grows.
 
-**Fix**: Add a 500ms polling fallback that reads new bytes from the log file:
+**Fix**: PlatformIO MCP keeps the normal file watcher and adds a Windows-only polling fallback that reads newly appended log bytes every 500ms. The fallback shares the same file offset as the watcher, so duplicate serial events are avoided, and the polling interval is cleared when the monitor stops.
 
-```typescript
-// Add to DaemonContext type:
-poller?: ReturnType<typeof setInterval>;
+The same fallback is applied when active monitors are rehydrated after a server restart.
 
-// Add after fs.watch setup in startMonitor():
-daemon.poller = setInterval(() => {
-  try {
-    const stat = fs.statSync(logFile);
-    if (stat.size > (daemon.fileOffset || 0)) {
-      const buffer = Buffer.alloc(stat.size - (daemon.fileOffset || 0));
-      const fd = fs.openSync(logFile, "r");
-      fs.readSync(fd, buffer, 0, buffer.length, (daemon.fileOffset || 0));
-      fs.closeSync(fd);
-      const text = buffer.toString();
-      if (text.length > 0) {
-        portalEvents.emitSerialLog(activePort!, text, daemon.taskId);
-      }
-      daemon.fileOffset = stat.size;
-    }
-  } catch {}
-}, 500);
-
-// Add to stopMonitor():
-if (daemon.poller) {
-  clearInterval(daemon.poller);
-  daemon.poller = undefined;
-}
-```
-
-Apply the same polling pattern to `rehydrateMonitors()`.
-
-### Bug 2: getSpoolerStates Serialization Crash
+### Spooler state serialization
 
 **File**: `src/tools/monitor.ts`
 
 **Problem**: `getSpoolerStates()` returns the raw `activeDaemons` object which contains `watcher` (FSWatcher) and `poller` (Timeout) fields with circular references. When Socket.IO tries to serialize this for WebSocket emission via `portalEvents.emitSpoolerStates()`, the circular references cause "Maximum call stack size exceeded".
 
-**Fix**: Strip non-serializable fields before returning:
+**Fix**: PlatformIO MCP returns a serializable daemon-state snapshot and strips internal `watcher` and `poller` handles before emitting spooler state to the dashboard.
 
-```typescript
-export function getSpoolerStates() {
-  const clean: Record<string, Omit<DaemonContext, 'watcher' | 'poller'>> = {};
-  for (const [port, daemon] of Object.entries(activeDaemons)) {
-    const { watcher, poller, ...rest } = daemon;
-    clean[port] = rest;
-  }
-  return clean;
-}
-```
-
-### Bug 3: Browse Route macOS-Only
+### Workspace folder browsing
 
 **File**: `src/api/server.ts`
 
 **Problem**: `POST /api/workspaces/browse` uses `osascript` (macOS AppleScript) for the native folder picker dialog, with no platform detection. Crashes on Windows and Linux.
 
-**Fix**: Add platform detection:
-
-```typescript
-if (process.platform === "darwin") {
-  result = execSync("osascript -e 'POSIX path of (choose folder)'").toString().trim();
-} else if (process.platform === "win32") {
-  const ps = `[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Select PlatformIO Project'; $f.ShowNewFolderButton = $false; if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath } else { '' }`;
-  result = execSync(`powershell -NoProfile -Command "${ps}"`, { timeout: 60000 }).toString().trim();
-} else {
-  try {
-    result = execSync("zenity --file-selection --directory --title='Select PlatformIO Project'", { timeout: 60000 }).toString().trim();
-  } catch {
-    res.status(400).json({ error: "Native folder picker not available. Use text input." });
-    return;
-  }
-}
-```
-
-Also add a `POST /api/workspaces` route for direct path registration (text input fallback).
+**Fix**: The browse route now chooses an OS-specific folder picker: AppleScript on macOS, PowerShell `FolderBrowserDialog` on Windows, and `zenity` on Linux when available. A direct `POST /api/workspaces` route is also available for registering a project path from text input when a native picker is unavailable.
 
 ## File Locations on Windows
 
