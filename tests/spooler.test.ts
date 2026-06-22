@@ -82,6 +82,7 @@ describe('Native E2E Spooler Execution', () => {
       logContent.includes('[SYSTEM] Boot complete') &&
       logContent.includes('[HEARTBEAT] Tick: 0');
     const containsToolchainFailure =
+      logContent.includes("spawn pio ENOENT") ||
       logContent.includes("'g++' is not recognized") ||
       logContent.includes("[FAILED]") ||
       logContent.includes("Error 1");
