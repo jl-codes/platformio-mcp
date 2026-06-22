@@ -1,0 +1,3 @@
+Uploading .pio/build/esp32dev/firmware.bin
+Serial port /dev/ttyUSB0
+Error: device or resource busy: '/dev/ttyUSB0'

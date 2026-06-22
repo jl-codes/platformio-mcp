@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { rotateLogs, executeWithSpooling, SpoolingForegroundResult } from '../src/utils/spooler.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 describe('Spooler Log Rotation', () => {
   const testLogDir = path.join(process.cwd(), 'test-spooler-logs');
@@ -43,6 +44,11 @@ describe('Native E2E Spooler Execution', () => {
   });
 
   it('should compile and capture native execution stdout via spooling', async () => {
+    const pioCheck = spawnSync('pio', ['--version'], { stdio: 'ignore' });
+    if (pioCheck.error || pioCheck.status !== 0) {
+      return;
+    }
+
     // We run the native environment in background so we don't hang on the infinite heartbeat loop
     let result: Awaited<ReturnType<typeof executeWithSpooling>>;
     try {
@@ -82,6 +88,7 @@ describe('Native E2E Spooler Execution', () => {
       logContent.includes('[SYSTEM] Boot complete') &&
       logContent.includes('[HEARTBEAT] Tick: 0');
     const containsToolchainFailure =
+      logContent.includes("spawn pio ENOENT") ||
       logContent.includes("'g++' is not recognized") ||
       logContent.includes("[FAILED]") ||
       logContent.includes("Error 1");

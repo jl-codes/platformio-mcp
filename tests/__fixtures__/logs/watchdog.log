@@ -1,0 +1,3 @@
+E (12345) task_wdt: Task watchdog got triggered.
+E (12345) task_wdt: CPU 0: loopTask
+WDT reset

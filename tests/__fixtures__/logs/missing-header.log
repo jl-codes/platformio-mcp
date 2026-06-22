@@ -1,0 +1,4 @@
+src/main.cpp:1:10: fatal error: MissingLibrary.h: No such file or directory
+ #include <MissingLibrary.h>
+          ^~~~~~~~~~~~~~~~~~
+compilation terminated.

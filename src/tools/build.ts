@@ -524,7 +524,7 @@ export async function listTargets(
   }
 }
 
-import { getCommandHistory } from "../utils/command-registry.js";
+import { getCommandHistory, findCommandAcrossWorkspaces } from "../utils/command-registry.js";
 
 /**
  * Polling tool to check background task status and return recent logs.
@@ -533,7 +533,7 @@ export async function checkTaskStatus(taskId?: string, logPath?: string, project
   const baseDir = projectDir || SERVER_DATA_DIR;
   if (!projectDir) ensureGlobalDirs();
   
-  const history = getCommandHistory(baseDir);
+  let history = getCommandHistory(baseDir);
   let resolvedTaskId = taskId;
 
   // 1. Reverse Lookup by logPath
@@ -554,6 +554,19 @@ export async function checkTaskStatus(taskId?: string, logPath?: string, project
       if (cmd.tasks && cmd.tasks.length > 0) {
         resolvedTaskId = cmd.id;
         break;
+      }
+    }
+  }
+
+  // 2b. Cross-workspace search: if the caller provided a taskId but no
+  //     projectDir, the task may live in a project-specific registry rather
+  //     than the global one. Scan all known workspaces before giving up.
+  if (resolvedTaskId && !projectDir) {
+    const cmd = history.find(c => c.id === resolvedTaskId);
+    if (!cmd) {
+      const crossResult = await findCommandAcrossWorkspaces(resolvedTaskId);
+      if (crossResult) {
+        history = crossResult.history;
       }
     }
   }
