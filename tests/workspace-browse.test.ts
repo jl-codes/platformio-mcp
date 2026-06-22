@@ -10,7 +10,7 @@ vi.mock("child_process", async (importOriginal) => {
   return {
     ...actual,
     execSync: vi.fn((cmd: string) => {
-      if (cmd.includes("choose folder")) {
+      if (cmd.includes("choose folder") || cmd.includes("zenity")) {
         return "/tmp/invalid-pio-project-test";
       }
       return actual.execSync(cmd);

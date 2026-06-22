@@ -46,13 +46,43 @@ type DaemonContext = {
 const activeDaemons: Record<string, DaemonContext> = {};
 
 export function getSpoolerStates() {
-  // Strip non-serializable fields (watcher, poller) before returning to callers like Socket.IO
-  const clean: Record<string, Omit<DaemonContext, 'watcher' | 'poller'>> = {};
+  const clean: Record<string, Omit<DaemonContext, "watcher" | "poller">> = {};
   for (const [port, daemon] of Object.entries(activeDaemons)) {
     const { watcher, poller, ...rest } = daemon;
     clean[port] = rest;
   }
   return clean;
+}
+
+function emitNewLogBytes(port: string, daemon: DaemonContext): void {
+  let fd: number | undefined;
+  try {
+    const stat = fs.statSync(daemon.logFile);
+    if (stat.size <= (daemon.fileOffset || 0)) return;
+
+    const start = daemon.fileOffset || 0;
+    const buffer = Buffer.alloc(stat.size - start);
+    fd = fs.openSync(daemon.logFile, "r");
+    fs.readSync(fd, buffer, 0, buffer.length, start);
+    const text = buffer.toString();
+    if (text.length > 0) {
+      portalEvents.emitSerialLog(port, text, daemon.taskId);
+    }
+    daemon.fileOffset = stat.size;
+  } catch {
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch {}
+    }
+  }
+}
+
+function startWindowsPollingFallback(port: string, daemon: DaemonContext): void {
+  if (process.platform !== "win32" || daemon.poller) return;
+
+  daemon.poller = setInterval(() => {
+    emitNewLogBytes(port, daemon);
+  }, 500);
 }
 
 /**
@@ -223,23 +253,7 @@ export async function rehydrateMonitors(): Promise<void> {
               daemon.watcher.on("error", () => {
                 // Ignore watcher errors on constrained environments.
               });
-              // Polling fallback for Windows
-              daemon.poller = setInterval(() => {
-                try {
-                  const stat = fs.statSync(logFile);
-                  if (stat.size > (daemon.fileOffset || 0)) {
-                    const buffer = Buffer.alloc(stat.size - (daemon.fileOffset || 0));
-                    const fd = fs.openSync(logFile, "r");
-                    fs.readSync(fd, buffer, 0, buffer.length, (daemon.fileOffset || 0));
-                    fs.closeSync(fd);
-                    const text = buffer.toString();
-                    if (text.length > 0) {
-                      portalEvents.emitSerialLog(port, text, daemon.taskId);
-                    }
-                    daemon.fileOffset = stat.size;
-                  }
-                } catch {}
-              }, 500);
+              startWindowsPollingFallback(port, daemon);
               rehydrationCount++;
               logDiag(`[Monitor Recovery] Successfully rehydrated stream for ${port} (PID: ${pid}) in ${projectDir}`);
             } catch (e: any) {
@@ -349,23 +363,7 @@ export async function startMonitor(
     logDiag(`[Spooler] Failed to attach fs.watch to ${logFile}`, projectDir);
   }
 
-  // Polling fallback for Windows where fs.watch is unreliable for external file writes
-  daemon.poller = setInterval(() => {
-    try {
-      const stat = fs.statSync(logFile);
-      if (stat.size > (daemon.fileOffset || 0)) {
-        const buffer = Buffer.alloc(stat.size - (daemon.fileOffset || 0));
-        const fd = fs.openSync(logFile, "r");
-        fs.readSync(fd, buffer, 0, buffer.length, (daemon.fileOffset || 0));
-        fs.closeSync(fd);
-        const text = buffer.toString();
-        if (text.length > 0) {
-          portalEvents.emitSerialLog(activePort!, text, daemon.taskId);
-        }
-        daemon.fileOffset = stat.size;
-      }
-    } catch {}
-  }, 500);
+  startWindowsPollingFallback(activePort, daemon);
 
   portalEvents.emitSpoolerStates(getSpoolerStates());
 
