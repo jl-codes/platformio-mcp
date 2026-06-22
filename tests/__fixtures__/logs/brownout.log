@@ -1,0 +1,3 @@
+ets Jun  8 2016 00:22:57
+Brownout detector was triggered
+rst:0xc (SW_CPU_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)

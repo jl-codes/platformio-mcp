@@ -1,0 +1,2 @@
+Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled.
+Backtrace: 0x400d1234:0x3ffb1f20 0x400d5678:0x3ffb1f40

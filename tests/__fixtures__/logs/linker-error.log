@@ -1,0 +1,3 @@
+/usr/bin/ld: .pio/build/native/src/main.o: in function `main':
+main.cpp:(.text+0x15): undefined reference to `missing_symbol()'
+collect2: error: ld returned 1 exit status
