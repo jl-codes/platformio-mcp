@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "tools": {
+    "list_boards": ["pio-manager", "firmware-bringup"],
+    "get_board_info": ["pio-manager", "firmware-bringup"],
+    "list_devices": ["pio-manager", "firmware-bringup"],
+    "init_project": ["pio-manager", "firmware-bringup"],
+    "build_project": ["pio-manager", "platformio-debug"],
+    "clean_project": ["pio-manager", "platformio-debug"],
+    "upload_filesystem": ["pio-manager", "esp32-flash-monitor"],
+    "upload_firmware": [
+      "pio-manager",
+      "firmware-bringup",
+      "esp32-flash-monitor"
+    ],
+    "acquire_lock": ["pio-manager"],
+    "release_lock": ["pio-manager"],
+    "get_lock_status": ["pio-manager", "platformio-dashboard"],
+    "search_libraries": ["pio-manager", "platformio-debug"],
+    "install_library": ["pio-manager", "platformio-debug"],
+    "list_installed_libraries": ["pio-manager", "platformio-debug"],
+    "start_monitor": ["pio-manager", "serial-diagnostics"],
+    "stop_monitor": ["pio-manager", "serial-diagnostics"],
+    "query_logs": ["pio-manager", "serial-diagnostics"],
+    "reset_server_state": ["pio-manager"],
+    "check_task_status": ["pio-manager", "platformio-monitoring-automation"],
+    "get_dashboard_url": ["platformio-dashboard"],
+    "get_project_context": [
+      "pio-manager",
+      "firmware-bringup",
+      "platformio-debug"
+    ],
+    "get_project_config": [
+      "pio-manager",
+      "firmware-bringup",
+      "platformio-debug"
+    ],
+    "agent_validate_project": ["pio-manager", "firmware-bringup"],
+    "agent_build_diagnose": ["pio-manager", "platformio-debug"],
+    "agent_safe_pin_audit": ["pio-manager", "firmware-bringup"],
+    "agent_flash_monitor_verify": [
+      "pio-manager",
+      "esp32-flash-monitor",
+      "hardware-in-the-loop-test"
+    ],
+    "agent_get_last_report": ["pio-manager", "hardware-in-the-loop-test"],
+    "agent_generate_board_report": ["pio-manager", "hardware-in-the-loop-test"],
+    "get_policy_status": ["pio-manager", "platformio-monitoring-automation"],
+    "system_info": ["pio-manager", "platformio-debug"],
+    "check_project": ["pio-manager", "platformio-debug"],
+    "run_tests": ["pio-manager", "hardware-in-the-loop-test"],
+    "uninstall_library": ["pio-manager", "platformio-debug"],
+    "update_library": ["pio-manager", "platformio-debug"]
+  }
+}

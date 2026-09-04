@@ -45,6 +45,7 @@ tests/mock_project_spooler/
 # PlatformIO
 .pio/
 .pio-mcp-workspace/
+.platformio-mcp/
 .locks/
 
 # Runtime data
@@ -57,12 +58,15 @@ temp/
 
 # MCP specific
 *.mcp.json
+!plugins/platformio-mcp/.mcp.json
 
 # Agents
 .agents/*
 !.agents/skills/
 .agents/skills/*
 !.agents/skills/pio-manager/
+!.agents/plugins/
+!.agents/plugins/marketplace.json
 .gemini/
 .stitch/
 

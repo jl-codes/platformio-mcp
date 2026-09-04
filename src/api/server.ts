@@ -5,6 +5,7 @@
  * Provides:
  * - startPortalServer: Initializes Express and Socket.io endpoints and hooks into the event bus
  * - getDashboardStatus: Conditionally bootstraps server and returns secure URL payload
+ * - resolveDashboardWebRoot: Locates dashboard assets in source and bundled runtimes
  * - activePortalStatus: Global registry for UI runtime variables
  *
  * REST API Routes:
@@ -61,6 +62,22 @@ import type { DiagnosticResult } from "../core/diagnostics/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * Resolves dashboard assets for both repository builds and installed plugins.
+ * @param environment Process environment containing an optional bundled UI override.
+ * @param moduleDirectory Directory containing the compiled API server module.
+ * @returns Absolute path to the dashboard's production assets.
+ */
+export function resolveDashboardWebRoot(
+  environment: NodeJS.ProcessEnv = process.env,
+  moduleDirectory: string = __dirname,
+): string {
+  const configuredPath = environment.PIO_MCP_WEB_DIST?.trim();
+  return configuredPath
+    ? path.resolve(configuredPath)
+    : path.join(moduleDirectory, "..", "..", "web", "dist");
+}
 
 // Secure randomized access token for local API authentication
 const PORTAL_AUTH_TOKEN = crypto.randomUUID();
@@ -1056,7 +1073,7 @@ export function startPortalServer(defaultPort = 8080) {
   });
 
   // Serve static UI if built
-  const webDistPath = path.join(__dirname, "..", "..", "web", "dist");
+  const webDistPath = resolveDashboardWebRoot();
   app.use(express.static(webDistPath));
 
   io.on("connection", async (socket) => {

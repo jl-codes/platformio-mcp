@@ -1,0 +1,20 @@
+{
+  "name": "platformio-mcp",
+  "interface": {
+    "displayName": "PlatformIO MCP"
+  },
+  "plugins": [
+    {
+      "name": "platformio-mcp",
+      "source": {
+        "source": "local",
+        "path": "./plugins/platformio-mcp"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

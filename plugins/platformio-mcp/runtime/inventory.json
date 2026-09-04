@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "platformio-mcp.mjs",
+      "bytes": 2694702,
+      "sha256": "e23d44c65d94f02e59e935ab578652efcbe486ae234ced54aaf711113492614e"
+    },
+    {
+      "path": "web/assets/index-C9cLzdi4.js",
+      "bytes": 928593,
+      "sha256": "93bdcef757709dda3a9dc4c170f1a86a57be34637de1fd821cb9e89e38906bbf"
+    },
+    {
+      "path": "web/assets/index-CeNlI08O.css",
+      "bytes": 1906,
+      "sha256": "bed2046ba66e661dc1a8defd3cbadc933f7ffd85d0c8eadddb06e6f71de35031"
+    },
+    {
+      "path": "web/index.html",
+      "bytes": 472,
+      "sha256": "4d7edd579dfe7832891f2b46ddf8c9b06e5d64a3901a93bc08c34a23f5941d44"
+    },
+    {
+      "path": "web/pio_mcp_128x128.ico",
+      "bytes": 81118,
+      "sha256": "9ced423e1f40370d1d05c4561cee9f02c8eeeb6cacc63364d1cc24a9eba5c4ce"
+    },
+    {
+      "path": "web/pio_mcp_220x220.png",
+      "bytes": 70018,
+      "sha256": "5ff7a448d82ba6025e3e3688398737a8055d899b4b06cb53f625ea25cc261a37"
+    }
+  ]
+}

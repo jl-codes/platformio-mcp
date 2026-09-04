@@ -1430,7 +1430,13 @@ async function main() {
   // ---------------------------------------------------------------------------
 
   // Check if PlatformIO is installed
-  const isInstalled = await checkPlatformIOInstalled();
+  let isInstalled = false;
+  try {
+    isInstalled = await checkPlatformIOInstalled();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await logDiag(`Warning: PlatformIO availability check failed: ${message}`);
+  }
 
   if (!isInstalled) {
     logDiag(
@@ -1483,7 +1489,7 @@ async function main() {
   logDiag("=======================================================\n");
 }
 
-main().catch((error) => {
-  logDiag(`Fatal error: ${error}`);
-  process.exit(1);
+main().catch(async (error) => {
+  await logDiag(`Fatal error: ${error}`);
+  process.exitCode = 1;
 });

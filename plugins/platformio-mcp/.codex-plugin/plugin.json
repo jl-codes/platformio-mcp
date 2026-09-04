@@ -1,0 +1,39 @@
+{
+  "name": "platformio-mcp",
+  "version": "2.2.2",
+  "description": "Build, flash, test, and monitor PlatformIO firmware safely from Codex.",
+  "author": {
+    "name": "PlatformIO MCP Server Contributors",
+    "url": "https://github.com/jl-codes"
+  },
+  "homepage": "https://github.com/jl-codes/platformio-mcp#readme",
+  "repository": "https://github.com/jl-codes/platformio-mcp",
+  "license": "MIT",
+  "keywords": [
+    "platformio",
+    "embedded",
+    "firmware",
+    "microcontroller",
+    "serial-monitor",
+    "hardware-in-the-loop"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "PlatformIO MCP",
+    "shortDescription": "Build, flash, and monitor embedded projects.",
+    "longDescription": "A complete local PlatformIO workflow for Codex: discover boards, inspect projects, diagnose builds, flash with policy-backed approvals, monitor serial output, run hardware tests, and open the live dashboard.",
+    "developerName": "PlatformIO MCP Server Contributors",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Write"],
+    "websiteURL": "https://github.com/jl-codes/platformio-mcp",
+    "brandColor": "#2F80ED",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/logo.png",
+    "defaultPrompt": [
+      "Inspect and validate this PlatformIO project.",
+      "Build, flash with approval, and verify the device output.",
+      "Open the PlatformIO dashboard and monitor this device."
+    ]
+  }
+}
