@@ -1,8 +1,12 @@
 import path from "node:path";
 import { actionRiskLevels, defaultPolicy, deniedActionPatterns } from "./default-policy.js";
-import { createApprovalRequest, getApproval } from "./approvals.js";
+import {
+  approveRequest,
+  createApprovalRequest,
+  getApproval,
+} from "./approvals.js";
 import { appendAuditEvent } from "./audit-log.js";
-import { loadEffectivePolicy } from "./load-policy.js";
+import { loadEffectivePolicyState } from "./load-policy.js";
 import type {
   PolicyDecision,
   PolicyEvaluationContext,
@@ -31,6 +35,45 @@ function isPathBoundaryUnsafe(projectDir: string): boolean {
   return resolved === root;
 }
 
+function approvalMatchesScope(
+  action: string,
+  args: Record<string, unknown>,
+  request: NonNullable<ReturnType<typeof getApproval>>,
+): boolean {
+  if (normalizeActionName(request.action) !== action) return false;
+  const metadata = request.metadata ?? {};
+  const approvedArgs =
+    typeof metadata.args === "object" && metadata.args !== null
+      ? (metadata.args as Record<string, unknown>)
+      : {};
+
+  for (const key of ["projectDir", "environment", "port"] as const) {
+    const approved = approvedArgs[key];
+    if (typeof approved !== "string") continue;
+    const current = args[key];
+    if (typeof current !== "string") return false;
+    const matches =
+      key === "projectDir"
+        ? path.resolve(approved) === path.resolve(current)
+        : approved === current;
+    if (!matches) return false;
+  }
+
+  const approvedBinding = approvedArgs.targetBinding;
+  if (typeof approvedBinding === "object" && approvedBinding !== null) {
+    const currentBinding = args.targetBinding;
+    if (
+      typeof currentBinding !== "object" ||
+      currentBinding === null ||
+      (approvedBinding as Record<string, unknown>).digest !==
+        (currentBinding as Record<string, unknown>).digest
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function decision(
   status: PolicyDecision["status"],
   reason: string,
@@ -55,7 +98,19 @@ export async function evaluatePolicy(
 ): Promise<PolicyDecision> {
   const action = normalizeActionName(actionName);
   const riskLevel = riskForAction(action);
-  const policy = loadEffectivePolicy(context.workspaceDir);
+  const effectivePolicy = loadEffectivePolicyState(context.workspaceDir);
+  const policy = effectivePolicy.policy;
+  const auditContext = {
+    workspaceDir: context.workspaceDir,
+    devicePort: context.devicePort,
+    taskId: context.taskId,
+    automationKey: context.automationKey,
+    targetBindingDigest: context.targetBindingDigest,
+    policyProfile: effectivePolicy.profile,
+    actorClass:
+      context.actorClass ??
+      (context.actor === "system" ? "system" : "interactive"),
+  } as const;
 
   // Hard deny known dangerous command aliases/patterns.
   if (policy.deny.includes(action) || deniedActionPatterns.some((p) => p.test(action))) {
@@ -71,9 +126,7 @@ export async function evaluatePolicy(
         status: "denied",
         reason: denied.reason,
         riskLevel,
-        workspaceDir: context.workspaceDir,
-        devicePort: context.devicePort,
-        taskId: context.taskId,
+        ...auditContext,
       });
     }
     return denied;
@@ -96,9 +149,7 @@ export async function evaluatePolicy(
         status: "denied",
         reason: denied.reason,
         riskLevel,
-        workspaceDir: context.workspaceDir,
-        devicePort: context.devicePort,
-        taskId: context.taskId,
+        ...auditContext,
       });
     }
     return denied;
@@ -119,9 +170,7 @@ export async function evaluatePolicy(
           status: "denied",
           reason: denied.reason,
           riskLevel,
-          workspaceDir: context.workspaceDir,
-          devicePort: context.devicePort,
-          taskId: context.taskId,
+          ...auditContext,
         });
       }
       return denied;
@@ -131,11 +180,17 @@ export async function evaluatePolicy(
   if (policy.approval_required.includes(action)) {
     const explicitApprovalId =
       typeof args.approvalId === "string" ? args.approvalId : undefined;
-    const explicitApproved = args.approved === true || args.__approved === true;
+    const explicitApproved =
+      context.actor === "user" &&
+      (args.approved === true || args.__approved === true);
 
     if (explicitApprovalId) {
       const request = getApproval(explicitApprovalId);
-      if (request && request.status === "approved") {
+      if (
+        request &&
+        request.status === "approved" &&
+        approvalMatchesScope(action, args, request)
+      ) {
         const allowed = decision(
           "allow",
           `Action '${action}' is allowed via approved request ${explicitApprovalId}.`,
@@ -149,9 +204,7 @@ export async function evaluatePolicy(
             status: "approved",
             reason: allowed.reason,
             riskLevel,
-            workspaceDir: context.workspaceDir,
-            devicePort: context.devicePort,
-            taskId: context.taskId,
+            ...auditContext,
             approvalId: explicitApprovalId,
           });
         }
@@ -167,6 +220,7 @@ export async function evaluatePolicy(
         requestedBy: context.actor ?? "user",
         metadata: { source: "inline-approved-flag" },
       });
+      approveRequest(approved.id);
       const allowed = decision(
         "allow",
         `Action '${action}' allowed by explicit caller approval.`,
@@ -180,9 +234,7 @@ export async function evaluatePolicy(
           status: "approved",
           reason: allowed.reason,
           riskLevel,
-          workspaceDir: context.workspaceDir,
-          devicePort: context.devicePort,
-          taskId: context.taskId,
+          ...auditContext,
           approvalId: approved.id,
         });
       }
@@ -210,9 +262,7 @@ export async function evaluatePolicy(
         status: "requires_approval",
         reason: needsApproval.reason,
         riskLevel,
-        workspaceDir: context.workspaceDir,
-        devicePort: context.devicePort,
-        taskId: context.taskId,
+        ...auditContext,
         approvalId: approval.id,
       });
     }
@@ -241,9 +291,7 @@ export async function evaluatePolicy(
       status: result.status === "allow" ? "allowed" : "denied",
       reason: result.reason,
       riskLevel,
-      workspaceDir: context.workspaceDir,
-      devicePort: context.devicePort,
-      taskId: context.taskId,
+      ...auditContext,
       approvalId: result.approvalId,
     });
   }

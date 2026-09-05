@@ -106,16 +106,16 @@ export default function WorkspaceCockpit({
   };
 
   return (
-    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
+    <Layout className="cockpit-shell" style={{ overflow: 'hidden' }}>
       {/* Top Global Header */}
-      <Header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px 0 0', borderBottom: '1px solid rgba(144, 143, 160, 0.2)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', height: '100%', gap: '24px' }}>
+      <Header className="cockpit-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px 0 0', borderBottom: '1px solid rgba(144, 143, 160, 0.2)' }}>
+        <div className="cockpit-header-main" style={{ display: 'flex', alignItems: 'center', height: '100%', gap: '24px' }}>
           {/* Logo container: 64px width exactly matches the Sider width below */}
-          <div style={{ width: '64px', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div className="cockpit-logo-cell" style={{ width: '64px', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <img src="/pio_mcp_220x220.png" alt="PIO MCP" style={{ height: '40px', width: '40px', objectFit: 'contain' }} />
           </div>
           
-          <span className="mono-label" style={{ color: '#4080D0', fontSize: '22px', fontWeight: 'bold' }}>
+          <span className="mono-label cockpit-title" style={{ color: '#4080D0', fontSize: '22px', fontWeight: 'bold' }}>
             PLATFORMIO MCP
           </span>
 
@@ -136,7 +136,7 @@ export default function WorkspaceCockpit({
             }}
             trigger={['click']}
           >
-            <Button style={{ fontFamily: 'Fira Code', width: '280px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Button className="cockpit-project-select" aria-label="Select PlatformIO project" style={{ fontFamily: 'Fira Code', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {activeWorkspace ? activeWorkspace.split('/').filter(Boolean).pop() : 'No Project Selected'}
               </span>
@@ -146,19 +146,20 @@ export default function WorkspaceCockpit({
           
           <Space align="center">
             <Switch checked={autoTrack} onChange={setAutoTrack} size="small" />
-            <Text type="secondary" style={{ fontSize: 11, letterSpacing: 0.5, margin: 0 }}>AUTO-TRACK</Text>
+            <Text className="cockpit-auto-track-label" type="secondary" style={{ fontSize: 11, letterSpacing: 0.5, margin: 0 }}>AUTO-TRACK</Text>
           </Space>
         </div>
         
-        <Space align="center">
-          <Badge status={status === 'online' ? 'success' : 'error'} text={<span className="mono-label" style={{ color: 'inherit' }}>SERVER: {status.toUpperCase()}</span>} />
+        <Space className="cockpit-header-actions" align="center">
+          <Badge className="cockpit-session-badge" color="#4080D0" text={<span className="mono-label">CODEX SESSION</span>} />
+          <Badge status={status === 'online' ? 'success' : 'error'} text={<span className="mono-label cockpit-server-label" style={{ color: 'inherit' }}>SERVER: {status.toUpperCase()}</span>} />
           <ThemeSelector isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
         </Space>
       </Header>
 
       <Layout>
         {/* The 64px Thin Activity Bar */}
-        <Sider width={64} collapsed={true} collapsedWidth={64} theme={isDarkMode ? 'dark' : 'light'} style={{ borderRight: '1px solid rgba(144, 143, 160, 0.2)' }}>
+        <Sider className="cockpit-activity-bar" width={64} collapsed={true} collapsedWidth={64} theme={isDarkMode ? 'dark' : 'light'} style={{ borderRight: '1px solid rgba(144, 143, 160, 0.2)' }}>
           <Menu 
             theme={isDarkMode ? 'dark' : 'light'} 
             mode="vertical" 
@@ -212,11 +213,11 @@ export default function WorkspaceCockpit({
         </Sider>
 
         {/* Dynamic Main Viewport */}
-        <Content style={{ display: 'flex', overflow: 'hidden' }}>
+        <Content className="cockpit-main-content" style={{ display: 'flex', overflow: 'hidden' }}>
           {activeMenu === 'agent-stream' ? (
             <>
               {/* Agent Task Stream Master */}
-              <div style={{ width: 320, borderRight: '1px solid rgba(144, 143, 160, 0.2)', overflowY: 'auto' }}>
+              <div className="cockpit-command-feed" style={{ width: 320, borderRight: '1px solid rgba(144, 143, 160, 0.2)', overflowY: 'auto' }}>
                 <CommandFeed 
                   commands={commands} 
                   activeTabRef={activeTabRef}
@@ -230,7 +231,7 @@ export default function WorkspaceCockpit({
               </div>
               
               {/* Agent Task Stream Detail */}
-              <div style={{ flex: 1, overflow: 'hidden' }}>
+              <div className="cockpit-task-detail" style={{ flex: 1, overflow: 'hidden' }}>
                 <IDEWorkspace 
                   openTabs={openTabs}
                   setOpenTabs={setOpenTabs}
@@ -278,6 +279,15 @@ export default function WorkspaceCockpit({
         return (
         <div 
           onClick={() => setIsHardwareRackOpen(true)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              setIsHardwareRackOpen(true);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label="Open hardware rack"
           style={{ height: '32px', backgroundColor: antdToken.colorBgElevated, borderTop: '1px solid rgba(144, 143, 160, 0.2)', display: 'flex', alignItems: 'center', padding: '0 16px', gap: '16px', overflowX: 'auto', flexShrink: 0, cursor: 'pointer' }}
         >
           <Button 

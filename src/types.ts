@@ -536,6 +536,10 @@ export const UploadFirmwareParamsSchema = z.object({
     .boolean()
     .optional()
     .describe("If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."),
+  targetBinding: z
+    .lazy(() => TargetBindingSchema)
+    .optional()
+    .describe("Optional short-lived binding returned by agent_resolve_target."),
 });
 
 // Upload filesystem parameters
@@ -570,6 +574,10 @@ export const UploadFilesystemParamsSchema = z.object({
     .boolean()
     .optional()
     .describe("If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."),
+  targetBinding: z
+    .lazy(() => TargetBindingSchema)
+    .optional()
+    .describe("Optional short-lived binding returned by agent_resolve_target."),
 });
 
 
@@ -640,8 +648,8 @@ export const StopMonitorParamsSchema = z.object({
 });
 
 export const QueryLogsParamsSchema = z.object({
-  lines: z.number().optional().describe("Fetch this many tail lines from the end of the log (default: 100)"),
-  searchPattern: z.string().optional().describe("Optional Regex pattern to filter the spool for specific keywords."),
+  lines: z.number().int().min(1).max(1000).optional().describe("Fetch this many tail lines from the end of the log (default: 100, maximum: 1000)"),
+  searchPattern: z.string().max(128).optional().describe("Optional bounded pattern to filter the spool for specific keywords."),
   taskId: z.string().optional().describe("Target standard task ID to retrieve logs for."),
   logPath: z.string().optional().describe("Optional relative path to a log to query directly."),
   port: z.string().optional().describe("Specific COM port to query logs for."),
@@ -652,6 +660,83 @@ export const CheckTaskStatusParamsSchema = z.object({
   taskId: z.string().optional().describe("Optional task ID to check status."),
   logPath: z.string().optional().describe("Optional relative log path to check."),
   projectDir: z.string().optional().describe("Optional project directory to scope the check."),
+});
+
+/** Short-lived physical target binding accepted by write workflows. */
+export const TargetBindingSchema = z.object({
+  digest: z.string().length(64),
+  projectDir: z.string().min(1).max(4096),
+  environment: z.string().min(1).max(80),
+  board: z.string().min(1).max(100),
+  port: z.string().min(1).max(512),
+  deviceFingerprint: z.string().length(64),
+  createdAt: z.string().datetime(),
+  expiresAt: z.string().datetime(),
+});
+
+/** Zod schema for deterministic project/environment/device resolution. */
+export const AgentResolveTargetParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096),
+  environment: z.string().min(1).max(80).optional(),
+  port: z.string().min(1).max(512).optional(),
+  bindingTtlSeconds: z.number().int().min(30).max(900).optional(),
+});
+
+/** Zod schema for active serial monitor status inspection. */
+export const GetMonitorStatusParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096).optional(),
+  port: z.string().min(1).max(512).optional(),
+});
+
+/** Zod schema for one bounded serial capture lease. */
+export const CaptureSerialWindowParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096),
+  port: z.string().min(1).max(512).optional(),
+  environment: z.string().min(1).max(80).optional(),
+  baudRate: z.number().int().min(1).max(2_000_000).optional(),
+  durationSeconds: z.number().int().min(1).max(60).optional(),
+  maxBytes: z.number().int().min(256).max(65_536).optional(),
+  cursor: z.string().min(1).max(512).optional(),
+});
+
+/** Zod schema for change-aware serial health evaluation. */
+export const AgentMonitorHealthParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096),
+  port: z.string().min(1).max(512).optional(),
+  environment: z.string().min(1).max(80).optional(),
+  baudRate: z.number().int().min(1).max(2_000_000).optional(),
+  captureDurationSeconds: z.number().int().min(1).max(60).optional(),
+  maxBytes: z.number().int().min(256).max(65_536).optional(),
+  expectedMarkers: z.array(z.string().min(1).max(128)).max(20).optional(),
+  rejectedPatterns: z.array(z.string().min(1).max(128)).max(20).optional(),
+  automationKey: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional(),
+  cursor: z.string().min(1).max(512).optional(),
+  failureThreshold: z.number().int().min(1).max(10).optional(),
+});
+
+/** Zod schema for idempotent cancellation of one tracked background task. */
+export const CancelTaskParamsSchema = z.object({
+  taskId: z.string().min(1).max(128),
+  projectDir: z.string().min(1).max(4096).optional(),
+});
+
+/** Zod schema for compact project-scoped task history. */
+export const ListTaskHistoryParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096),
+  limit: z.number().int().min(1).max(100).optional(),
+  status: z.enum(["inactive", "running", "success", "error", "terminated"]).optional(),
+});
+
+/** Zod schema for reading one approval request without mutating it. */
+export const GetApprovalRequestParamsSchema = z.object({
+  approvalId: z.string().min(1).max(128),
+  projectDir: z.string().min(1).max(4096).optional(),
+});
+
+/** Zod schema for project-scoped pending approval inspection. */
+export const ListPendingApprovalsParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096).optional(),
+  limit: z.number().int().min(1).max(100).optional(),
 });
 
 /**
@@ -786,6 +871,7 @@ export interface AgentFlashMonitorVerifyResult {
   recommendedNextAction: string; // Single recommended next step
   rawMonitorLogPath?: string; // Path to monitor log consumed for verification
   monitorSnippet?: string; // Tail snippet used as runtime evidence
+  targetBindingDigest?: string; // Short-lived binding used for the write operation
 }
 
 /**

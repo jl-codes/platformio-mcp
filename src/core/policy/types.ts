@@ -24,7 +24,9 @@ export interface PolicyConfig {
 export type PolicyProfileName =
   | "read_only"
   | "build_only"
+  | "monitor_only"
   | "flash_requires_approval"
+  | "lab_runner"
   | "lab_admin";
 
 export interface PolicyProfileConfig {
@@ -60,6 +62,10 @@ export interface AuditEvent {
   devicePort?: string;
   taskId?: string;
   approvalId?: string;
+  automationKey?: string;
+  targetBindingDigest?: string;
+  policyProfile?: string;
+  actorClass?: "interactive" | "scheduled" | "system";
   timestamp: string;
 }
 
@@ -68,4 +74,7 @@ export interface PolicyEvaluationContext {
   devicePort?: string;
   taskId?: string;
   actor?: "agent" | "user" | "system";
+  automationKey?: string;
+  targetBindingDigest?: string;
+  actorClass?: "interactive" | "scheduled" | "system";
 }

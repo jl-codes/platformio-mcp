@@ -95,7 +95,14 @@ describe("agent workflow integration", () => {
       }
       return [];
     });
-    mockedListDevicesCore.mockResolvedValue([]);
+    mockedListDevicesCore.mockResolvedValue([
+      {
+        port: "COM7",
+        description: "USB Serial",
+        hwid: "USB VID:PID=303A:1001 SER=TEST-BOARD",
+        detectedBoard: "esp32dev",
+      },
+    ]);
     mockedFindFirmwareArtifact.mockReturnValue(undefined);
   });
 

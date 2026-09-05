@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
+import { approveRequest } from "../src/core/policy/approvals.js";
+import { readRecentAuditEvents } from "../src/core/policy/audit-log.js";
 import { evaluatePolicy } from "../src/core/policy/evaluate-policy.js";
 import { redactSecretsInText } from "../src/core/policy/redact.js";
 import { SERVER_DATA_DIR } from "../src/utils/paths.js";
@@ -50,6 +52,50 @@ describe("Policy Engine", () => {
     expect(decision.approvalId).toBeDefined();
   });
 
+  it("does not allow an agent to self-approve with an inline flag", async () => {
+    const decision = await evaluatePolicy(
+      "upload_firmware",
+      { projectDir: process.cwd(), __approved: true },
+      { workspaceDir: process.cwd(), actor: "agent" },
+    );
+
+    expect(decision.status).toBe("requires_approval");
+    expect(decision.approvalId).toBeDefined();
+  });
+
+  it("does not replay an approval for another project or action", async () => {
+    const requested = await evaluatePolicy(
+      "upload_firmware",
+      { projectDir: process.cwd(), environment: "esp32dev", port: "COM7" },
+      { workspaceDir: process.cwd(), actor: "agent" },
+    );
+    approveRequest(requested.approvalId!);
+
+    const wrongProject = await evaluatePolicy(
+      "upload_firmware",
+      {
+        projectDir: path.join(process.cwd(), "another-project"),
+        environment: "esp32dev",
+        port: "COM7",
+        approvalId: requested.approvalId,
+      },
+      { workspaceDir: process.cwd(), actor: "agent" },
+    );
+    const wrongAction = await evaluatePolicy(
+      "upload_filesystem",
+      {
+        projectDir: process.cwd(),
+        environment: "esp32dev",
+        port: "COM7",
+        approvalId: requested.approvalId,
+      },
+      { workspaceDir: process.cwd(), actor: "agent" },
+    );
+
+    expect(wrongProject.status).toBe("requires_approval");
+    expect(wrongAction.status).toBe("requires_approval");
+  });
+
   it("denies known dangerous actions", async () => {
     const decision = await evaluatePolicy(
       "curl_pipe_to_shell",
@@ -83,6 +129,10 @@ describe("Policy Engine", () => {
       .split(/\r?\n/)
       .filter(Boolean);
     expect(lines.length).toBeGreaterThan(0);
+    expect(readRecentAuditEvents({ limit: 1 })[0]).toMatchObject({
+      policyProfile: "flash_requires_approval",
+      actorClass: "interactive",
+    });
   });
 
   it("redacts common secret patterns", () => {

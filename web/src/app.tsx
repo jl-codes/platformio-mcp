@@ -6,8 +6,13 @@ import { ConfigProvider, theme } from 'antd';
 const parsedToken = new URLSearchParams(window.location.search).get('token') || '';
 const parsedProjectDir = new URLSearchParams(window.location.search).get('projectDir') || null;
 // Detect API base implicitly during local development
-const apiBase = window.location.origin.includes('localhost:5173') ? 'http://localhost:8080' : '';
-const socket: Socket = io(apiBase || '/', { auth: { token: parsedToken } });
+const apiBase = /^(http:\/\/localhost|http:\/\/127\.0\.0\.1):5173$/.test(window.location.origin)
+  ? 'http://127.0.0.1:8080'
+  : '';
+const socket: Socket = io(apiBase || '/', {
+  auth: { token: parsedToken },
+  withCredentials: true,
+});
 
 export type AgentEvent = {
   timestamp: number;
@@ -48,7 +53,7 @@ export type TabRef = {
 
 function App() {
   const [status, setStatus] = useState<'online' | 'offline'>('offline');
-  const [authStatus, setAuthStatus] = useState<'checking' | 'valid' | 'invalid'>(parsedToken ? 'checking' : 'invalid');
+  const [authStatus, setAuthStatus] = useState<'checking' | 'valid' | 'invalid'>('checking');
   const [commands, setCommands] = useState<any[]>([]);
   const [buildLogs, setBuildLogs] = useState<Record<string, LogEvent[]>>({});
   const [buildLogFile, setBuildLogFile] = useState<string | null>(null);
@@ -341,7 +346,7 @@ function App() {
         <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#1E1E1E' : '#ffffff', flexDirection: 'column', gap: 24 }}>
           <img src="/pio_mcp_220x220.png" alt="PIO MCP" style={{ height: '80px', width: '80px', objectFit: 'contain' }} />
           <div style={{ color: isDarkMode ? '#989898' : '#333333', fontSize: '18px', fontFamily: 'Fira Code, monospace', textAlign: 'center' }}>
-            Access Denied: The dashboard token is invalid or has expired.
+            Access Denied: The dashboard session is invalid or has expired.
           </div>
         </div>
       </ConfigProvider>

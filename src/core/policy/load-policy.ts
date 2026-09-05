@@ -97,7 +97,9 @@ function isPolicyProfileName(value: string): value is PolicyProfileName {
   return (
     value === "read_only" ||
     value === "build_only" ||
+    value === "monitor_only" ||
     value === "flash_requires_approval" ||
+    value === "lab_runner" ||
     value === "lab_admin"
   );
 }

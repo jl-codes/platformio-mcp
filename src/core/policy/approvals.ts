@@ -110,3 +110,94 @@ export function getApproval(id: string): ApprovalRequest | undefined {
   }
   return approval;
 }
+
+/** Agent-readable approval summary that excludes raw tool arguments. */
+export interface ApprovalRequestSummary {
+  id: string;
+  action: string;
+  riskLevel: PolicyRiskLevel;
+  reason: string;
+  requestedBy: ApprovalRequest["requestedBy"];
+  status: ApprovalRequest["status"];
+  createdAt: string;
+  expiresAt?: string;
+  projectDir?: string;
+  environment?: string;
+  port?: string;
+}
+
+/**
+ * Extracts only allowlisted, non-secret scope fields from approval metadata.
+ *
+ * @param request - Stored approval request.
+ * @returns Safe agent-readable approval summary.
+ */
+function summarizeApproval(request: ApprovalRequest): ApprovalRequestSummary {
+  const metadata = request.metadata ?? {};
+  const args =
+    typeof metadata.args === "object" && metadata.args !== null
+      ? (metadata.args as Record<string, unknown>)
+      : metadata;
+  return {
+    id: request.id,
+    action: request.action,
+    riskLevel: request.riskLevel,
+    reason: request.reason,
+    requestedBy: request.requestedBy,
+    status: request.status,
+    createdAt: request.createdAt,
+    expiresAt: request.expiresAt,
+    projectDir: typeof args.projectDir === "string" ? args.projectDir : undefined,
+    environment:
+      typeof args.environment === "string" ? args.environment : undefined,
+    port: typeof args.port === "string" ? args.port : undefined,
+  };
+}
+
+/**
+ * Reads one approval without exposing an approval mutation.
+ *
+ * @param id - Approval request identifier.
+ * @param projectDir - Optional project boundary assertion.
+ * @returns Safe summary or undefined when missing/out of scope.
+ */
+export function getApprovalRequestSummary(
+  id: string,
+  projectDir?: string,
+): ApprovalRequestSummary | undefined {
+  const request = getApproval(id);
+  if (!request) return undefined;
+  const summary = summarizeApproval(request);
+  if (
+    projectDir &&
+    (!summary.projectDir ||
+      path.resolve(summary.projectDir) !== path.resolve(projectDir))
+  ) {
+    return undefined;
+  }
+  return summary;
+}
+
+/**
+ * Lists pending approvals, optionally constrained to one project.
+ *
+ * @param options - Project scope and result limit.
+ * @returns Newest-first safe approval summaries.
+ */
+export function listPendingApprovalSummaries(options?: {
+  projectDir?: string;
+  limit?: number;
+}): ApprovalRequestSummary[] {
+  return listApprovalRequests({ status: "pending", limit: options?.limit ?? 50 })
+    .map((request) => getApproval(request.id))
+    .filter((request): request is ApprovalRequest => Boolean(request))
+    .filter((request) => request.status === "pending")
+    .map(summarizeApproval)
+    .filter(
+      (request) =>
+        !options?.projectDir ||
+        (Boolean(request.projectDir) &&
+          path.resolve(request.projectDir!) === path.resolve(options.projectDir)),
+    )
+    .slice(0, Math.min(100, Math.max(1, options?.limit ?? 20)));
+}

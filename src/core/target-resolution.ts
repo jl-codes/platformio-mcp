@@ -57,6 +57,14 @@ export interface TargetResolutionResult {
   nextSteps: string[];
 }
 
+/** Exact target fields safe to pass to a hardware-changing operation. */
+export interface VerifiedWriteTarget {
+  environment: string;
+  port: string;
+  binding: TargetBinding;
+  portChanged: boolean;
+}
+
 /**
  * Parses the environment fields required for safe target selection.
  *
@@ -139,6 +147,7 @@ function createBindingDigest(fields: Omit<TargetBinding, "digest">): string {
         fields.projectDir,
         fields.environment,
         fields.board,
+        fields.port,
         fields.deviceFingerprint,
         fields.createdAt,
         fields.expiresAt,
@@ -388,5 +397,64 @@ export async function verifyTargetBinding(
     valid: true,
     port: matching[0].port,
     portChanged: matching[0].port !== binding.port,
+  };
+}
+
+/**
+ * Resolves or revalidates a single physical target immediately before a write.
+ * A write never falls back to PlatformIO's implicit device or environment
+ * selection, so ambiguous, missing, expired, or substituted targets fail
+ * before a hardware lock is acquired.
+ *
+ * @param input - Write scope and optional prior binding.
+ * @returns Verified environment, current port, and binding.
+ */
+export async function resolveWriteTarget(input: {
+  projectDir: string;
+  environment?: string;
+  port?: string;
+  targetBinding?: TargetBinding;
+}): Promise<VerifiedWriteTarget> {
+  if (input.targetBinding) {
+    const environment = input.environment ?? input.targetBinding.environment;
+    const verified = await verifyTargetBinding(input.targetBinding, {
+      projectDir: input.projectDir,
+      environment,
+    });
+    return {
+      environment,
+      port: verified.port,
+      binding: input.targetBinding,
+      portChanged: verified.portChanged,
+    };
+  }
+
+  const resolved = await resolveTarget({
+    projectDir: input.projectDir,
+    environment: input.environment,
+    port: input.port,
+  });
+  if (
+    !resolved.success ||
+    !resolved.environment ||
+    !resolved.port ||
+    !resolved.binding
+  ) {
+    const errorCode =
+      resolved.status === "ambiguous"
+        ? "AMBIGUOUS_TARGET"
+        : resolved.status === "unavailable"
+          ? "TARGET_UNAVAILABLE"
+          : "INVALID_TARGET_CONFIG";
+    throw new PlatformIOError(resolved.summary, errorCode, {
+      candidates: resolved.candidates,
+      nextSteps: resolved.nextSteps,
+    });
+  }
+  return {
+    environment: resolved.environment,
+    port: resolved.port,
+    binding: resolved.binding,
+    portChanged: false,
   };
 }

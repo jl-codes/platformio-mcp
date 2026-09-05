@@ -27,6 +27,11 @@ const READ_ONLY_ALLOW = [
   "agent_get_last_report",
   "agent_generate_board_report",
   "get_policy_status",
+  "get_monitor_status",
+  "list_task_history",
+  "get_approval_request",
+  "list_pending_approvals",
+  "agent_resolve_target",
 ];
 
 const BUILD_ONLY_ALLOW = [
@@ -35,6 +40,16 @@ const BUILD_ONLY_ALLOW = [
   "check_project",
   "run_tests",
   "agent_build_diagnose",
+];
+
+const MONITOR_ONLY_ALLOW = [
+  ...READ_ONLY_ALLOW,
+  "query_logs",
+  "start_monitor",
+  "stop_monitor",
+  "capture_serial_window",
+  "agent_monitor_health",
+  "cancel_task",
 ];
 
 /**
@@ -70,6 +85,25 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
         "upload_firmware",
         "upload_filesystem",
         "reset_server_state",
+        "agent_flash_monitor_verify",
+      ]),
+    ),
+  },
+  monitor_only: {
+    ...defaultPolicy,
+    allow: MONITOR_ONLY_ALLOW,
+    approval_required: [],
+    deny: Array.from(
+      new Set([
+        ...defaultPolicy.deny,
+        "build_project",
+        "check_project",
+        "run_tests",
+        "upload_firmware",
+        "upload_filesystem",
+        "clean_project",
+        "reset_server_state",
+        "agent_build_diagnose",
         "agent_flash_monitor_verify",
       ]),
     ),
@@ -118,6 +152,21 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
     ),
     approval_required: [],
     deny: defaultPolicy.deny,
+  },
+  lab_runner: {
+    ...defaultPolicy,
+    allow: Array.from(
+      new Set([
+        ...BUILD_ONLY_ALLOW,
+        ...MONITOR_ONLY_ALLOW,
+        "upload_firmware",
+        "agent_flash_monitor_verify",
+      ]),
+    ),
+    approval_required: ["upload_filesystem", "reset_server_state"],
+    deny: Array.from(
+      new Set([...defaultPolicy.deny, "erase_flash", "run_shell_command"]),
+    ),
   },
 };
 

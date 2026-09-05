@@ -81,6 +81,17 @@ export function resolveDashboardWebRoot(
 
 // Secure randomized access token for local API authentication
 const PORTAL_AUTH_TOKEN = crypto.randomUUID();
+const DASHBOARD_SESSION_COOKIE = "pio_mcp_session";
+const LAUNCH_TICKET_TTL_MS = 60_000;
+const DASHBOARD_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+
+type LaunchTicket = {
+  expiresAt: number;
+  projectDir?: string;
+};
+
+const launchTickets = new Map<string, LaunchTicket>();
+const dashboardSessions = new Map<string, number>();
 
 /**
  * Global singleton tracking the health, bound port, and session payload
@@ -89,6 +100,7 @@ const PORTAL_AUTH_TOKEN = crypto.randomUUID();
 export const activePortalStatus = {
   running: false,
   port: 0,
+  host: "127.0.0.1",
   token: PORTAL_AUTH_TOKEN,
   // Tracks whether we have already spawned an OS browser tab for this process
   // lifetime. Prevents the "million windows" failure mode where repeated
@@ -96,6 +108,90 @@ export const activePortalStatus = {
   // Cline profiles, etc.) each fire a fresh open(secureLink).
   browserOpened: false
 };
+
+/**
+ * Resolves and validates the dashboard listener host.
+ *
+ * @returns Explicit loopback host, or an intentionally enabled non-loopback host.
+ */
+function resolvePortalHost(): string {
+  const host = process.env.PIO_MCP_BIND_HOST?.trim() || "127.0.0.1";
+  const loopback = host === "127.0.0.1" || host === "localhost" || host === "::1";
+  if (!loopback && process.env.PIO_MCP_ALLOW_NON_LOOPBACK !== "true") {
+    throw new Error(
+      "Non-loopback dashboard binding requires PIO_MCP_ALLOW_NON_LOOPBACK=true.",
+    );
+  }
+  if (!loopback) {
+    console.error(
+      `[WARN] Dashboard is intentionally binding to non-loopback host '${host}'.`,
+    );
+  }
+  return host;
+}
+
+/**
+ * Formats a listener host for use in an HTTP URL.
+ *
+ * @param host - IPv4, IPv6, or hostname listener.
+ * @returns URL-safe host segment.
+ */
+function formatUrlHost(host: string): string {
+  return host.includes(":") ? `[${host}]` : host;
+}
+
+/**
+ * Parses a request Cookie header without accepting duplicate values.
+ *
+ * @param header - Raw Cookie header.
+ * @returns Cookie name/value mapping.
+ */
+function parseCookies(header?: string): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  for (const part of header?.split(";") ?? []) {
+    const separator = part.indexOf("=");
+    if (separator <= 0) continue;
+    const name = part.slice(0, separator).trim();
+    if (Object.hasOwn(cookies, name)) continue;
+    cookies[name] = decodeURIComponent(part.slice(separator + 1).trim());
+  }
+  return cookies;
+}
+
+/**
+ * Checks a dashboard session and prunes expired entries.
+ *
+ * @param cookieHeader - Request Cookie header.
+ * @returns True when a non-expired session cookie is present.
+ */
+function hasValidDashboardSession(cookieHeader?: string): boolean {
+  const now = Date.now();
+  for (const [sessionId, expiresAt] of dashboardSessions) {
+    if (expiresAt <= now) dashboardSessions.delete(sessionId);
+  }
+  const sessionId = parseCookies(cookieHeader)[DASHBOARD_SESSION_COOKIE];
+  return Boolean(sessionId && (dashboardSessions.get(sessionId) ?? 0) > now);
+}
+
+/**
+ * Creates one short-lived, single-use browser launch ticket.
+ *
+ * @param projectDir - Optional project selected after authentication.
+ * @returns Raw ticket and expiry for immediate browser launch.
+ */
+function issueLaunchTicket(projectDir?: string): {
+  ticket: string;
+  expiresAt: string;
+} {
+  const now = Date.now();
+  for (const [ticket, value] of launchTickets) {
+    if (value.expiresAt <= now) launchTickets.delete(ticket);
+  }
+  const ticket = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = now + LAUNCH_TICKET_TTL_MS;
+  launchTickets.set(ticket, { expiresAt, projectDir });
+  return { ticket, expiresAt: new Date(expiresAt).toISOString() };
+}
 
 function parseDeviceLocks() {
   const locks: Array<{
@@ -186,23 +282,31 @@ export async function getDashboardStatus(autoOpen: boolean = false, projectDir?:
     });
   }
 
-  const url = `http://localhost:${activePortalStatus.port}`;
-  let secureLink = `${url}?token=${activePortalStatus.token}`;
-  if (projectDir) {
-    secureLink += `&projectDir=${encodeURIComponent(projectDir)}`;
-  }
+  const baseUrl = `http://${formatUrlHost(activePortalStatus.host)}:${activePortalStatus.port}`;
+  const launch = issueLaunchTicket(projectDir);
+  const launchUrl = `${baseUrl}/auth/launch?ticket=${encodeURIComponent(launch.ticket)}`;
   
   if (autoOpen) {
     // Guarded — see browserOpened + PIO_MCP_NO_BROWSER below
     if (process.env.PIO_MCP_NO_BROWSER === "true" || process.argv.includes("--no-browser")) {
-      // user opted out of auto-opening — leave secureLink in the return payload only
+      // User opted out of auto-opening; return the launch URL only.
     } else if (!activePortalStatus.browserOpened) {
       activePortalStatus.browserOpened = true;
-      open(secureLink).catch(() => { /* swallow — dashboard URL is logged anyway */ });
+      open(launchUrl).catch(() => { /* The launch URL remains available to the caller. */ });
     }
   }
 
-  return { url, token: activePortalStatus.token, secureLink, status: "online" };
+  return {
+    baseUrl,
+    launchUrl,
+    expiresAt: launch.expiresAt,
+    projectDir,
+    status: "online",
+    url: baseUrl,
+    secureLink: launchUrl,
+    token: "[REDACTED_DEPRECATED]",
+    deprecatedAuthenticationFields: ["url", "secureLink", "token"],
+  };
 }
 
 /**
@@ -213,9 +317,27 @@ export async function getDashboardStatus(autoOpen: boolean = false, projectDir?:
 export function startPortalServer(defaultPort = 8080) {
   const app = express();
   const httpServer = createServer(app);
+  const portalHost = resolvePortalHost();
+  activePortalStatus.host = portalHost;
+
+  app.disable("x-powered-by");
+  app.use((_req, res, next) => {
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://127.0.0.1:* ws://localhost:* ws://[::1]:*",
+    );
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
 
   // Configure strict CORS for local UI dev mode
-  const allowedOrigins = [/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/];
+  const allowedOrigins = [
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+    /^http:\/\/\[::1\](:\d+)?$/,
+  ];
   const corsOptions = {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // Allow requests with no origin (like curl) or explicitly matched localhost origins
@@ -224,15 +346,43 @@ export function startPortalServer(defaultPort = 8080) {
       } else {
         callback(new Error('Not allowed by CORS'));
       }
-    }
+    },
+    credentials: true,
   };
 
   app.use(cors(corsOptions));
-  app.use(express.json());
+  app.use(express.json({ limit: "256kb", strict: true }));
 
   // Unauthenticated health ping for deployment orchestrators
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "alive" });
+  });
+
+  // Exchanges a single-use launch ticket for an HttpOnly dashboard session.
+  app.get("/auth/launch", (req, res) => {
+    const ticket = typeof req.query.ticket === "string" ? req.query.ticket : "";
+    const launch = launchTickets.get(ticket);
+    launchTickets.delete(ticket);
+    if (!launch || launch.expiresAt <= Date.now()) {
+      res.status(401).send("Dashboard launch ticket is invalid or expired.");
+      return;
+    }
+    const sessionId = crypto.randomBytes(32).toString("base64url");
+    dashboardSessions.set(sessionId, Date.now() + DASHBOARD_SESSION_TTL_MS);
+    res.cookie(DASHBOARD_SESSION_COOKIE, sessionId, {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: false,
+      path: "/",
+      maxAge: DASHBOARD_SESSION_TTL_MS,
+    });
+    if (launch.projectDir) {
+      portalEvents.emitWorkspaceState(launch.projectDir);
+    }
+    const redirect = launch.projectDir
+      ? `/?projectDir=${encodeURIComponent(launch.projectDir)}`
+      : "/";
+    res.redirect(303, redirect);
   });
 
   // REST Auth Middleware restricting access to /api endpoints
@@ -246,7 +396,9 @@ export function startPortalServer(defaultPort = 8080) {
 
   app.use("/api", (req, res, next) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader || authHeader !== `Bearer ${PORTAL_AUTH_TOKEN}`) {
+    const validBearer = authHeader === `Bearer ${PORTAL_AUTH_TOKEN}`;
+    const validSession = hasValidDashboardSession(req.headers.cookie);
+    if (!validBearer && !validSession) {
       res.status(401).json({ error: "Unauthorized: Invalid or missing token" });
       return;
     }
@@ -1065,7 +1217,10 @@ export function startPortalServer(defaultPort = 8080) {
   // Socket.io Auth Middleware
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
-    if (token === PORTAL_AUTH_TOKEN) {
+    if (
+      token === PORTAL_AUTH_TOKEN ||
+      hasValidDashboardSession(socket.handshake.headers.cookie)
+    ) {
       next();
     } else {
       next(new Error("Unauthorized"));
@@ -1182,16 +1337,13 @@ export function startPortalServer(defaultPort = 8080) {
   const maxRetries = 10;
 
   const startListening = () => {
-    httpServer.listen(port, () => {
+    httpServer.listen(port, portalHost, () => {
       activePortalStatus.running = true;
       activePortalStatus.port = (httpServer.address() as any)?.port || port;
 
       console.error(`\n======================================================`);
       console.error(
-        `🚀 MCP Server Web Portal running at: http://localhost:${activePortalStatus.port}`,
-      );
-      console.error(
-        `🔑 Authentication Token: ${PORTAL_AUTH_TOKEN}`,
+        `MCP Server Web Portal listening on http://${formatUrlHost(portalHost)}:${activePortalStatus.port}`,
       );
       console.error(`======================================================\n`);
 
@@ -1228,21 +1380,40 @@ export function startPortalServer(defaultPort = 8080) {
   startListening();
 
   // Background loop to poll hardware state
-  setInterval(async () => {
+  const hardwarePollTimer = setInterval(async () => {
     try {
       const devices = await listDevices();
       portalEvents.emitHardwareStateUpdated(devices);
     } catch (e) {}
   }, 5000);
+  hardwarePollTimer.unref();
 
   // Ensure port 8080 is relinquished cleanly if the parent IDE terminates the MCP server
+  let closed = false;
+  const close = async (): Promise<void> => {
+    if (closed) return;
+    closed = true;
+    clearInterval(hardwarePollTimer);
+    process.off("SIGINT", cleanup);
+    process.off("SIGTERM", cleanup);
+    await new Promise<void>((resolve) => {
+      io.close(() => resolve());
+    });
+    if (httpServer.listening) {
+      await new Promise<void>((resolve, reject) => {
+        httpServer.close((error) => error ? reject(error) : resolve());
+      });
+    }
+    activePortalStatus.running = false;
+    activePortalStatus.port = 0;
+    activePortalStatus.browserOpened = false;
+  };
   const cleanup = () => {
-    httpServer.close();
-    process.exit(0);
+    void close().finally(() => process.exit(0));
   };
 
   process.on("SIGINT", cleanup);
   process.on("SIGTERM", cleanup);
 
-  return { app, httpServer, io, authToken: PORTAL_AUTH_TOKEN };
+  return { app, httpServer, io, authToken: PORTAL_AUTH_TOKEN, close };
 }

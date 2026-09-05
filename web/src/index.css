@@ -1,12 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=Fira+Code:wght@300;400;500&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
-
 /* Minimal layout resets - all other styling is handled by Ant Design tokens */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
 body {
-  font-family: 'Inter', sans-serif;
-  height: 100vh;
+  font-family: inherit;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -17,8 +18,8 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: rgba(144, 143, 160, 0.5); }
 
 /* Monospace Helpers */
-.mono-label { font-family: 'Fira Code', monospace; }
-.data-font { font-family: 'Fira Code', monospace; }
+.mono-label { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; }
+.data-font { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; }
 
 @keyframes pulse { 
   0% { opacity: 0.5; } 
@@ -97,4 +98,129 @@ body {
 .ide-tabs .ant-tabs-content,
 .ide-tabs .ant-tabs-tabpane {
   height: 100%;
+}
+
+.cockpit-shell {
+  height: 100dvh !important;
+}
+
+.cockpit-header {
+  min-height: 64px;
+}
+
+.cockpit-header-main,
+.cockpit-header-actions {
+  min-width: 0;
+}
+
+.cockpit-project-select {
+  width: min(280px, 30vw) !important;
+}
+
+.cockpit-main-content {
+  min-width: 0;
+  min-height: 0;
+}
+
+.cockpit-command-feed,
+.cockpit-task-detail {
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .cockpit-header {
+    padding-right: 12px !important;
+  }
+
+  .cockpit-header-main {
+    gap: 10px !important;
+  }
+
+  .cockpit-title {
+    font-size: 16px !important;
+  }
+
+  .cockpit-project-select {
+    width: min(220px, 32vw) !important;
+  }
+
+  .cockpit-command-feed {
+    width: 280px !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .cockpit-header {
+    height: auto !important;
+    min-height: 56px;
+    padding: 4px 8px 4px 0 !important;
+  }
+
+  .cockpit-header-main {
+    gap: 6px !important;
+    flex: 1;
+  }
+
+  .cockpit-logo-cell {
+    width: 48px !important;
+  }
+
+  .cockpit-logo-cell img {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .cockpit-title,
+  .cockpit-auto-track-label,
+  .cockpit-session-badge {
+    display: none !important;
+  }
+
+  .cockpit-project-select {
+    width: min(210px, calc(100vw - 160px)) !important;
+  }
+
+  .cockpit-main-content {
+    flex-direction: column;
+  }
+
+  .cockpit-command-feed {
+    width: 100% !important;
+    height: 38%;
+    flex: 0 0 38%;
+    border-right: 0 !important;
+    border-bottom: 1px solid rgba(144, 143, 160, 0.2);
+  }
+
+  .cockpit-task-detail {
+    flex: 1 1 62%;
+  }
+
+  .cockpit-server-label {
+    display: none;
+  }
+
+  .cockpit-activity-bar,
+  .cockpit-activity-bar .ant-layout-sider-children,
+  .cockpit-activity-bar .ant-menu {
+    width: 48px !important;
+    min-width: 48px !important;
+  }
+
+  .cockpit-activity-bar .ant-menu-item {
+    width: 48px !important;
+    height: 52px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

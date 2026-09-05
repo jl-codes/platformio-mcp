@@ -49,6 +49,14 @@ import {
   AgentGetLastReportParamsSchema,
   AgentGenerateBoardReportParamsSchema,
   GetPolicyStatusParamsSchema,
+  AgentResolveTargetParamsSchema,
+  GetMonitorStatusParamsSchema,
+  CaptureSerialWindowParamsSchema,
+  AgentMonitorHealthParamsSchema,
+  CancelTaskParamsSchema,
+  ListTaskHistoryParamsSchema,
+  GetApprovalRequestParamsSchema,
+  ListPendingApprovalsParamsSchema,
 } from "./types.js";
 import { registerCommand, updateCommandStatus } from "./utils/command-registry.js";
 import { mcpContext } from "./utils/mcp-context.js";
@@ -59,7 +67,12 @@ import { getBoardInfo } from "./tools/boards.js";
 import { getProjectConfig, getSystemInfo, getProjectContext } from "./tools/projects.js";
 import { cleanProject, checkProject, runTests } from "./tools/build.js";
 import { uploadFilesystem } from "./tools/upload.js";
-import { stopMonitor, queryLogs } from "./tools/monitor.js";
+import {
+  captureSerialWindow,
+  getMonitorStatus,
+  stopMonitor,
+  queryLogs,
+} from "./tools/monitor.js";
 import { spoolLargeDataset } from "./utils/spooler.js";
 import { listBoardsCore } from "./core/boards.js";
 import { listDevicesCore } from "./core/devices.js";
@@ -67,7 +80,11 @@ import { initProjectCore } from "./core/project.js";
 import { buildProjectCore } from "./core/build.js";
 import { uploadFirmwareCore } from "./core/flash.js";
 import { startMonitorCore } from "./core/monitor.js";
-import { checkTaskStatusCore } from "./core/tasks.js";
+import {
+  cancelTaskCore,
+  checkTaskStatusCore,
+  listTaskHistoryCore,
+} from "./core/tasks.js";
 import { getDashboardStatusCore } from "./core/dashboard.js";
 
 import {
@@ -84,6 +101,7 @@ import {
   agentGetLastReport,
   agentSafePinAudit,
   agentValidateProject,
+  agentMonitorHealth,
 } from "./tools/agent.js";
 import { checkPlatformIOInstalled } from "./platformio.js";
 import { formatPlatformIOError } from "./utils/errors.js";
@@ -98,6 +116,18 @@ import { portalEvents } from "./api/events.js";
 import crypto from "node:crypto";
 import { evaluatePolicy } from "./core/policy/evaluate-policy.js";
 import { getPolicyStatus } from "./core/policy/status.js";
+import {
+  resolveTarget,
+  resolveWriteTarget,
+} from "./core/target-resolution.js";
+import {
+  getApprovalRequestSummary,
+  listPendingApprovalSummaries,
+} from "./core/policy/approvals.js";
+import {
+  createToolErrorResult,
+  createToolResult,
+} from "./mcp/tool-result.js";
 
 function toolToPolicyAction(toolName: string): string {
   switch (toolName) {
@@ -682,6 +712,184 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "agent_resolve_target",
+        description:
+          "Resolves exactly one PlatformIO environment, board, and attached physical device. Returns ambiguity instead of guessing and issues a short-lived binding for write workflows.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string", description: "Exact PlatformIO project directory." },
+            environment: { type: "string", description: "Optional declared PlatformIO environment." },
+            port: { type: "string", description: "Optional exact attached serial port." },
+            bindingTtlSeconds: { type: "integer", minimum: 30, maximum: 900 },
+          },
+          required: ["projectDir"],
+        },
+        annotations: {
+          title: "Resolve PlatformIO Target",
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      {
+        name: "get_monitor_status",
+        description:
+          "Reports active, inactive, or stale serial monitor state with a bounded incremental cursor.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string", description: "Optional exact PlatformIO project directory." },
+            port: { type: "string", description: "Optional exact serial port." },
+          },
+        },
+        annotations: {
+          title: "Inspect Serial Monitor",
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      {
+        name: "capture_serial_window",
+        description:
+          "Acquires a bounded serial-monitor lease, captures redacted incremental output, and restores or releases resources on every exit path.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string" },
+            port: { type: "string" },
+            environment: { type: "string" },
+            baudRate: { type: "integer", minimum: 1, maximum: 2000000 },
+            durationSeconds: { type: "integer", minimum: 1, maximum: 60 },
+            maxBytes: { type: "integer", minimum: 256, maximum: 65536 },
+            cursor: { type: "string", maxLength: 512 },
+          },
+          required: ["projectDir"],
+        },
+        annotations: {
+          title: "Capture Serial Window",
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: false,
+        },
+      },
+      {
+        name: "agent_monitor_health",
+        description:
+          "Resolves one device, performs a bounded serial capture, evaluates health markers, and persists change-only automation state when automationKey is provided.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string" },
+            environment: { type: "string" },
+            port: { type: "string" },
+            baudRate: { type: "integer", minimum: 1, maximum: 2000000 },
+            captureDurationSeconds: { type: "integer", minimum: 1, maximum: 60 },
+            maxBytes: { type: "integer", minimum: 256, maximum: 65536 },
+            expectedMarkers: { type: "array", maxItems: 20, items: { type: "string", maxLength: 128 } },
+            rejectedPatterns: { type: "array", maxItems: 20, items: { type: "string", maxLength: 128 } },
+            automationKey: { type: "string", maxLength: 80 },
+            cursor: { type: "string", maxLength: 512 },
+            failureThreshold: { type: "integer", minimum: 1, maximum: 10 },
+          },
+          required: ["projectDir"],
+        },
+        annotations: {
+          title: "Evaluate Serial Health",
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: false,
+        },
+      },
+      {
+        name: "cancel_task",
+        description:
+          "Idempotently cancels one known background task and releases only resources proven to be owned by that task.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            taskId: { type: "string", maxLength: 128 },
+            projectDir: { type: "string" },
+          },
+          required: ["taskId"],
+        },
+        annotations: {
+          title: "Cancel PlatformIO Task",
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      {
+        name: "list_task_history",
+        description:
+          "Returns compact project-scoped task history after reconciling stale tracked processes.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string" },
+            limit: { type: "integer", minimum: 1, maximum: 100 },
+            status: {
+              type: "string",
+              enum: ["inactive", "running", "success", "error", "terminated"],
+            },
+          },
+          required: ["projectDir"],
+        },
+        annotations: {
+          title: "List PlatformIO Tasks",
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      {
+        name: "get_approval_request",
+        description:
+          "Reads one approval request and expiry without exposing approve or deny mutations to the agent.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            approvalId: { type: "string", maxLength: 128 },
+            projectDir: { type: "string" },
+          },
+          required: ["approvalId"],
+        },
+        annotations: {
+          title: "Inspect Approval Request",
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      {
+        name: "list_pending_approvals",
+        description:
+          "Lists pending project-scoped approval requests without exposing any approval mutation.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectDir: { type: "string" },
+            limit: { type: "integer", minimum: 1, maximum: 100 },
+          },
+        },
+        annotations: {
+          title: "List Pending Approvals",
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      {
         name: "system_info",
         description: "Gets sys diagnostic path output.",
         inputSchema: {
@@ -785,6 +993,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         devicePort: typeof args.port === "string" ? args.port : undefined,
         taskId: activityId,
         actor: "agent",
+        actorClass: args.automationKey ? "scheduled" : "interactive",
+        automationKey:
+          typeof args.automationKey === "string" ? args.automationKey : undefined,
+        targetBindingDigest:
+          typeof args.targetBinding?.digest === "string"
+            ? args.targetBinding.digest
+            : undefined,
       },
     );
 
@@ -905,12 +1120,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "upload_filesystem": {
         const params = UploadFilesystemParamsSchema.parse(args);
+        const uploadTarget = await resolveWriteTarget({
+          projectDir: params.projectDir,
+          port: params.port,
+          environment: params.environment,
+          targetBinding: params.targetBinding,
+        });
 
         const executeTask = () =>
           uploadFilesystem(
             params.projectDir,
-            params.port,
-            params.environment,
+            uploadTarget.port,
+            uploadTarget.environment,
             params.verbose,
             params.background,
             args.start_monitor
@@ -940,6 +1161,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           background: params.background,
           startMonitorAfter: args.start_monitor,
           sessionId: params.sessionId,
+          targetBinding: params.targetBinding,
         });
 
         return {
@@ -1221,6 +1443,126 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
+      }
+
+      case "agent_resolve_target": {
+        const params = AgentResolveTargetParamsSchema.parse(args);
+        const result = await resolveTarget(params);
+        return createToolResult({
+          success: result.success,
+          status: result.success
+            ? "completed"
+            : result.status === "unavailable"
+              ? "unavailable"
+              : "blocked",
+          summary: result.summary,
+          data: result,
+          nextSteps: result.nextSteps,
+        });
+      }
+
+      case "get_monitor_status": {
+        const params = GetMonitorStatusParamsSchema.parse(args);
+        const result = getMonitorStatus(params.port, params.projectDir);
+        return createToolResult({
+          success: true,
+          status: "completed",
+          summary: params.port
+            ? `Retrieved monitor status for ${params.port}.`
+            : "Retrieved current serial monitor status.",
+          data: result,
+        });
+      }
+
+      case "capture_serial_window": {
+        const params = CaptureSerialWindowParamsSchema.parse(args);
+        const result = await captureSerialWindow(params);
+        return createToolResult({
+          success: true,
+          status: "completed",
+          summary: `Captured ${result.bytes} redacted serial bytes from ${result.port}.`,
+          data: result,
+          taskId: result.taskId,
+          logPaths: [result.logPath],
+        });
+      }
+
+      case "agent_monitor_health": {
+        const params = AgentMonitorHealthParamsSchema.parse(args);
+        const result = await agentMonitorHealth(params);
+        return createToolResult({
+          success: result.success,
+          status: result.success ? "completed" : "failed",
+          summary: `Serial health is ${result.health.status}; ${
+            result.shouldNotify ? "reporting this state" : "unchanged state is quiet"
+          }.`,
+          data: result,
+          nextSteps: [result.health.recommendedAction],
+        });
+      }
+
+      case "cancel_task": {
+        const params = CancelTaskParamsSchema.parse(args);
+        const result = await cancelTaskCore(params);
+        if (result.status === "not_found") {
+          return createToolErrorResult(`Task '${params.taskId}' was not found.`, {
+            status: "unavailable",
+            data: result,
+            nextSteps: ["Call list_task_history with the exact project directory."],
+          });
+        }
+        return createToolResult({
+          success: true,
+          status: result.status === "cancelled" ? "cancelled" : "completed",
+          summary:
+            result.status === "cancelled"
+              ? `Cancelled task ${result.taskId}.`
+              : `Task ${result.taskId} was already terminal.`,
+          data: result,
+          taskId: result.taskId,
+        });
+      }
+
+      case "list_task_history": {
+        const params = ListTaskHistoryParamsSchema.parse(args);
+        const result = await listTaskHistoryCore(params);
+        return createToolResult({
+          success: true,
+          status: "completed",
+          summary: `Retrieved ${result.tasks.length} recent task record(s).`,
+          data: result,
+        });
+      }
+
+      case "get_approval_request": {
+        const params = GetApprovalRequestParamsSchema.parse(args);
+        const approval = getApprovalRequestSummary(
+          params.approvalId,
+          params.projectDir,
+        );
+        if (!approval) {
+          return createToolErrorResult(
+            `Approval request '${params.approvalId}' was not found in this scope.`,
+            { status: "unavailable" },
+          );
+        }
+        return createToolResult({
+          success: true,
+          status: "completed",
+          summary: `Approval ${approval.id} is ${approval.status}.`,
+          data: approval,
+        });
+      }
+
+      case "list_pending_approvals": {
+        const params = ListPendingApprovalsParamsSchema.parse(args);
+        const approvals = listPendingApprovalSummaries(params);
+        return createToolResult({
+          success: true,
+          status: "completed",
+          summary: `Found ${approvals.length} pending approval request(s).`,
+          data: { approvals },
+        });
       }
 
       case "system_info": {

@@ -40,10 +40,17 @@ type DaemonContext = {
   watcher?: fs.FSWatcher; // Tailing pointer
   poller?: ReturnType<typeof setInterval>; // Polling fallback for Windows fs.watch
   taskId?: string; // UUID to isolate socket routing
+  projectDir?: string; // Workspace that owns the monitor log
+  startedAt: string; // Monitor start or rehydration timestamp
+  lastActivityAt?: string; // Last observed log write timestamp
 };
 
 // Global pool of hardware streams managed by the MCP server
 const activeDaemons: Record<string, DaemonContext> = {};
+const captureLeases = new Map<
+  string,
+  { leaseId: string; acquiredAt: string; projectDir: string }
+>();
 
 export function getSpoolerStates() {
   const clean: Record<string, Omit<DaemonContext, "watcher" | "poller">> = {};
@@ -67,6 +74,7 @@ function emitNewLogBytes(port: string, daemon: DaemonContext): void {
     const text = buffer.toString();
     if (text.length > 0) {
       portalEvents.emitSerialLog(port, text, daemon.taskId);
+      daemon.lastActivityAt = new Date().toISOString();
     }
     daemon.fileOffset = stat.size;
   } catch {
@@ -249,6 +257,8 @@ export async function rehydrateMonitors(): Promise<void> {
               logFile,
               fileOffset: currentSize,
               taskId: restoredTaskId,
+              projectDir,
+              startedAt: new Date().toISOString(),
             };
             activeDaemons[port] = daemon;
 
@@ -352,6 +362,8 @@ export async function startMonitor(
     logFile,
     fileOffset: 0,
     taskId: monitorTaskId,
+    projectDir,
+    startedAt: new Date().toISOString(),
   };
   activeDaemons[activePort] = daemon;
 
@@ -384,7 +396,13 @@ export async function startMonitor(
 
   portalEvents.emitSpoolerStates(getSpoolerStates());
 
-  return { success: true, port: activePort, logFile };
+  return {
+    success: true,
+    port: activePort,
+    logFile,
+    taskId: monitorTaskId,
+    startedAt: daemon.startedAt,
+  };
 }
 
 import { getCommandHistory, findCommandAcrossWorkspaces } from "../utils/command-registry.js";
@@ -463,4 +481,304 @@ export async function queryLogs(
   }
 
   return { success: true, content: redactSecretsInText(stitchedLines.join("\n")) };
+}
+
+/** Stable status details for one serial monitor. */
+export interface MonitorStatusResult {
+  state: "active" | "inactive" | "stale";
+  port?: string;
+  baudRate?: number;
+  environment?: string;
+  projectDir?: string;
+  taskId?: string;
+  leaseOwner?: string;
+  logPath?: string;
+  cursor?: string;
+  startedAt?: string;
+  lastActivityAt?: string;
+}
+
+/**
+ * Creates an opaque incremental-read cursor for a monitor log.
+ *
+ * @param logPath - Absolute monitor log path.
+ * @param offset - Next byte offset to read.
+ * @returns Bounded opaque cursor string.
+ */
+function encodeMonitorCursor(logPath: string, offset: number): string {
+  const payload = {
+    version: 1,
+    logHash: crypto.createHash("sha256").update(path.resolve(logPath)).digest("hex"),
+    offset,
+  };
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
+/**
+ * Reads and validates an opaque incremental monitor cursor.
+ *
+ * @param cursor - Cursor supplied by a previous read.
+ * @param logPath - Current monitor log path.
+ * @returns Validated byte offset.
+ */
+function decodeMonitorCursor(cursor: string, logPath: string): number {
+  try {
+    const payload = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
+      version?: number;
+      logHash?: string;
+      offset?: number;
+    };
+    const expectedHash = crypto
+      .createHash("sha256")
+      .update(path.resolve(logPath))
+      .digest("hex");
+    if (
+      payload.version !== 1 ||
+      payload.logHash !== expectedHash ||
+      !Number.isSafeInteger(payload.offset) ||
+      (payload.offset ?? -1) < 0
+    ) {
+      throw new Error("invalid cursor");
+    }
+    return payload.offset!;
+  } catch {
+    throw new PlatformIOError(
+      "The serial cursor is invalid or belongs to an expired monitor log.",
+      "CURSOR_EXPIRED",
+    );
+  }
+}
+
+/**
+ * Returns active, inactive, or stale monitor state without changing hardware.
+ *
+ * @param port - Optional exact port selector.
+ * @param projectDir - Optional project scope.
+ * @returns One status record when selected, otherwise all matching records.
+ */
+export function getMonitorStatus(
+  port?: string,
+  projectDir?: string,
+): MonitorStatusResult | { monitors: MonitorStatusResult[] } {
+  const trackedPids = getActiveMonitorPids(projectDir);
+  const statuses = Object.entries(activeDaemons)
+    .filter(
+      ([activePort, daemon]) =>
+        (!port || activePort === port) &&
+        (!projectDir || path.resolve(daemon.projectDir ?? "") === path.resolve(projectDir)),
+    )
+    .map(([activePort, daemon]): MonitorStatusResult => {
+      let size = 0;
+      let lastActivityAt = daemon.lastActivityAt;
+      try {
+        const stats = fs.statSync(daemon.logFile);
+        size = stats.size;
+        lastActivityAt = lastActivityAt ?? stats.mtime.toISOString();
+      } catch {
+        // A missing spool file is represented as stale below.
+      }
+      const trackedPid = trackedPids[activePort];
+      const stale =
+        !fs.existsSync(daemon.logFile) ||
+        (trackedPid !== undefined && !isPidAlive(trackedPid));
+      return {
+        state: stale ? "stale" : "active",
+        port: activePort,
+        baudRate: daemon.baudRate,
+        environment: daemon.environment,
+        projectDir: daemon.projectDir,
+        taskId: daemon.taskId,
+        leaseOwner: captureLeases.get(activePort)?.leaseId,
+        logPath: daemon.logFile,
+        cursor: encodeMonitorCursor(daemon.logFile, size),
+        startedAt: daemon.startedAt,
+        lastActivityAt,
+      };
+    });
+
+  if (port) {
+    return statuses[0] ?? { state: "inactive", port, projectDir };
+  }
+  return { monitors: statuses };
+}
+
+/** Structured result from one bounded serial monitor capture. */
+export interface SerialWindowResult {
+  success: true;
+  port: string;
+  projectDir: string;
+  content: string;
+  bytes: number;
+  cursor: string;
+  cursorExpired: false;
+  truncated: boolean;
+  logPath: string;
+  taskId?: string;
+  startedMonitor: boolean;
+  capturedAt: string;
+}
+
+/**
+ * Reads one bounded byte range from an existing monitor log.
+ *
+ * @param logPath - Exact active monitor log path.
+ * @param options - Cursor, explicit starting offset, and byte ceiling.
+ * @returns Redacted content, cursor, and truncation metadata.
+ */
+export function readSerialWindowFromFile(
+  logPath: string,
+  options: { cursor?: string; startOffset?: number; maxBytes?: number } = {},
+): {
+  content: string;
+  bytes: number;
+  cursor: string;
+  truncated: boolean;
+  finalSize: number;
+} {
+  const finalSize = fs.statSync(logPath).size;
+  const requestedStart = options.cursor
+    ? decodeMonitorCursor(options.cursor, logPath)
+    : Math.max(0, options.startOffset ?? 0);
+  if (requestedStart > finalSize) {
+    throw new PlatformIOError(
+      "The serial cursor predates the current rotated monitor log.",
+      "CURSOR_EXPIRED",
+    );
+  }
+  const maxBytes = Math.min(65_536, Math.max(256, options.maxBytes ?? 16_384));
+  const readStart = Math.max(requestedStart, finalSize - maxBytes);
+  const bytesToRead = Math.max(0, finalSize - readStart);
+  let content = "";
+  if (bytesToRead > 0) {
+    const descriptor = fs.openSync(logPath, "r");
+    try {
+      const buffer = Buffer.alloc(bytesToRead);
+      fs.readSync(descriptor, buffer, 0, bytesToRead, readStart);
+      content = redactSecretsInText(buffer.toString("utf8"));
+    } finally {
+      fs.closeSync(descriptor);
+    }
+  }
+  return {
+    content,
+    bytes: Buffer.byteLength(content, "utf8"),
+    cursor: encodeMonitorCursor(logPath, finalSize),
+    truncated: readStart > requestedStart,
+    finalSize,
+  };
+}
+
+/**
+ * Acquires a bounded read lease, captures incremental serial bytes, and cleans up.
+ *
+ * @param input - Port, duration, cursor, and output bounds.
+ * @returns Redacted incremental serial evidence and a new cursor.
+ */
+export async function captureSerialWindow(input: {
+  projectDir: string;
+  port?: string;
+  environment?: string;
+  baudRate?: number;
+  durationSeconds?: number;
+  maxBytes?: number;
+  cursor?: string;
+}): Promise<SerialWindowResult> {
+  const projectDir = path.resolve(input.projectDir);
+  let selectedPort = input.port;
+  let startedMonitor = false;
+
+  if (!selectedPort) {
+    const matchingPorts = Object.entries(activeDaemons)
+      .filter(([, daemon]) => path.resolve(daemon.projectDir ?? "") === projectDir)
+      .map(([activePort]) => activePort);
+    if (matchingPorts.length > 1) {
+      throw new PlatformIOError(
+        "Multiple active monitors match this project; specify one exact port.",
+        "AMBIGUOUS_TARGET",
+      );
+    }
+    selectedPort = matchingPorts[0];
+  }
+
+  if (!selectedPort || !activeDaemons[selectedPort]) {
+    const started = await startMonitor(
+      selectedPort,
+      input.baudRate,
+      projectDir,
+      input.environment,
+    );
+    selectedPort = started.port;
+    startedMonitor = true;
+  }
+
+  const daemon = activeDaemons[selectedPort];
+  if (!daemon) {
+    throw new PlatformIOError(
+      "Serial monitor did not become available for capture.",
+      "MONITOR_UNAVAILABLE",
+    );
+  }
+  if (captureLeases.has(selectedPort)) {
+    throw new PlatformIOError(
+      `A bounded capture is already running on ${selectedPort}.`,
+      "OVERLAPPING_RUN",
+    );
+  }
+
+  const leaseId = crypto.randomUUID();
+  captureLeases.set(selectedPort, {
+    leaseId,
+    acquiredAt: new Date().toISOString(),
+    projectDir,
+  });
+  const durationMs = Math.min(60, Math.max(0, input.durationSeconds ?? 5)) * 1000;
+  const maxBytes = Math.min(65_536, Math.max(256, input.maxBytes ?? 16_384));
+
+  try {
+    let initialSize = 0;
+    try {
+      initialSize = fs.statSync(daemon.logFile).size;
+    } catch {
+      // The monitor process may create the spool file on its first write.
+    }
+    const startOffset = input.cursor
+      ? decodeMonitorCursor(input.cursor, daemon.logFile)
+      : initialSize;
+    if (durationMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, durationMs));
+    }
+
+    try {
+      fs.statSync(daemon.logFile);
+    } catch {
+      throw new PlatformIOError(
+        "The serial monitor log is unavailable.",
+        "MONITOR_UNAVAILABLE",
+      );
+    }
+    const window = readSerialWindowFromFile(daemon.logFile, {
+      startOffset,
+      maxBytes,
+    });
+
+    return {
+      success: true,
+      port: selectedPort,
+      projectDir,
+      content: window.content,
+      bytes: window.bytes,
+      cursor: window.cursor,
+      cursorExpired: false,
+      truncated: window.truncated,
+      logPath: daemon.logFile,
+      taskId: daemon.taskId,
+      startedMonitor,
+      capturedAt: new Date().toISOString(),
+    };
+  } finally {
+    captureLeases.delete(selectedPort);
+    if (startedMonitor) {
+      await stopMonitor(selectedPort, projectDir).catch(() => {});
+    }
+  }
 }

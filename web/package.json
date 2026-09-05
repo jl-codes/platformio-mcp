@@ -11,6 +11,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
+    "test:e2e:codex": "npm run build && playwright test e2e/codex-browser.spec.ts --project=chromium",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {

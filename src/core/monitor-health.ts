@@ -38,6 +38,19 @@ export interface MonitorHealthResult {
   observedAt: string;
 }
 
+/** Reasons an interactive task or automation should surface a health result. */
+export type MonitorNotificationReason =
+  | "initial"
+  | "failure"
+  | "recovery"
+  | "target_changed";
+
+/** Change-aware notification decision for one health observation. */
+export interface MonitorNotificationDecision {
+  shouldNotify: boolean;
+  notificationReason?: MonitorNotificationReason;
+}
+
 /**
  * Compiles a bounded pattern. Plain strings are matched literally; an `re:`
  * prefix opts into a restricted regular expression.
@@ -126,10 +139,9 @@ export function evaluateMonitorHealth(input: {
     .update(
       JSON.stringify({
         status,
-        matchedExpectations,
-        unmatchedExpectations,
-        matchedRejectedPatterns,
-        evidence,
+        matchedExpectations: [...matchedExpectations].sort(),
+        unmatchedExpectations: [...unmatchedExpectations].sort(),
+        matchedRejectedPatterns: [...matchedRejectedPatterns].sort(),
       }),
     )
     .digest("hex");
@@ -167,4 +179,51 @@ export function evaluateMonitorHealth(input: {
     recommendedAction: recommendedAction[status],
     observedAt: input.observedAt ?? new Date().toISOString(),
   };
+}
+
+/**
+ * Decides whether a monitor result is actionable enough to notify the user.
+ * Identical failures are emitted once, while an optional threshold suppresses
+ * transient failures until they recur.
+ *
+ * @param input - Current result and prior automation state.
+ * @returns Notification flag and stable reason.
+ */
+export function decideMonitorNotification(input: {
+  automation: boolean;
+  health: MonitorHealthResult;
+  previousDigest?: string;
+  targetChanged?: boolean;
+  failureThreshold?: number;
+}): MonitorNotificationDecision {
+  const initial = input.previousDigest === undefined;
+  const failure = !["healthy", "inconclusive"].includes(input.health.status);
+
+  if (input.targetChanged) {
+    return { shouldNotify: true, notificationReason: "target_changed" };
+  }
+  if (input.health.recovered) {
+    return { shouldNotify: true, notificationReason: "recovery" };
+  }
+  if (!input.automation) {
+    return {
+      shouldNotify: true,
+      notificationReason: failure ? "failure" : "initial",
+    };
+  }
+  if (failure) {
+    const threshold = Math.min(10, Math.max(1, input.failureThreshold ?? 1));
+    const thresholdReached = input.health.consecutiveFailures === threshold;
+    const changedAfterThreshold =
+      input.health.consecutiveFailures > threshold &&
+      input.health.changed &&
+      !initial;
+    return thresholdReached || changedAfterThreshold
+      ? { shouldNotify: true, notificationReason: "failure" }
+      : { shouldNotify: false };
+  }
+  if (initial) {
+    return { shouldNotify: true, notificationReason: "initial" };
+  }
+  return { shouldNotify: false };
 }

@@ -211,7 +211,10 @@ export async function findCommandAcrossWorkspaces(
 ): Promise<{ command: CommandRecord; history: CommandRecord[]; projectDir?: string } | undefined> {
   // 1. Check the global (SERVER_DATA_DIR) registry first
   const globalHistory = getCommandHistory();
-  const globalMatch = globalHistory.find(c => c.id === taskId);
+  const globalMatch = globalHistory.find(
+    (command) =>
+      command.id === taskId || command.tasks.some((task) => task.taskId === taskId),
+  );
   if (globalMatch) return { command: globalMatch, history: globalHistory };
 
   // 2. Search all known project workspaces
@@ -219,7 +222,10 @@ export async function findCommandAcrossWorkspaces(
   const workspaces = await getWorkspaces();
   for (const ws of workspaces) {
     const wsHistory = getCommandHistory(ws);
-    const found = wsHistory.find(c => c.id === taskId);
+    const found = wsHistory.find(
+      (command) =>
+        command.id === taskId || command.tasks.some((task) => task.taskId === taskId),
+    );
     if (found) return { command: found, history: wsHistory, projectDir: ws };
   }
 

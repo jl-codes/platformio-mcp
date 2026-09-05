@@ -77,6 +77,40 @@ describe("Portal API Security & Telemetry Tailing", () => {
       expect(response.status).not.toBe(401);
     });
 
+    it("exchanges a launch ticket once for an HttpOnly strict session", async () => {
+      const { getDashboardStatus } = await import("../src/api/server.js");
+      const payload = await getDashboardStatus(false);
+      const launchUrl = new URL(payload.launchUrl);
+      const launchPath = `${launchUrl.pathname}${launchUrl.search}`;
+      const exchange = await request(server).get(launchPath);
+
+      expect(exchange.status).toBe(303);
+      expect(exchange.headers.location).toBe("/");
+      const cookie = exchange.headers["set-cookie"]?.[0];
+      expect(cookie).toContain("pio_mcp_session=");
+      expect(cookie).toContain("HttpOnly");
+      expect(cookie).toContain("SameSite=Strict");
+
+      const sessionResponse = await request(server)
+        .get("/api/devices")
+        .set("Cookie", cookie);
+      expect(sessionResponse.status).not.toBe(401);
+
+      const replay = await request(server).get(launchPath);
+      expect(replay.status).toBe(401);
+    });
+
+    it("sets strict security headers on the unauthenticated health response", async () => {
+      const response = await request(server).get("/healthz");
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ status: "alive" });
+      expect(response.headers["content-security-policy"]).toContain(
+        "default-src 'self'",
+      );
+      expect(response.headers["referrer-policy"]).toBe("no-referrer");
+      expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    });
+
     it("should reject WebSocket connections without an auth payload", () => {
       return new Promise<void>((resolve) => {
         const clientSocket = Client(`http://localhost:${port}`);
@@ -153,9 +187,11 @@ describe("Portal API Security & Telemetry Tailing", () => {
       const payload = await getDashboardStatus(false);
       
       expect(payload.status).toBe("online");
-      expect(payload.token).toBe(authToken);
-      expect(payload.url).toContain("http://localhost:" + port);
-      expect(payload.secureLink).toContain(`?token=${authToken}`);
+      expect(payload.token).toBe("[REDACTED_DEPRECATED]");
+      expect(payload.baseUrl).toBe(`http://127.0.0.1:${port}`);
+      expect(payload.launchUrl).toContain("/auth/launch?ticket=");
+      expect(payload.launchUrl).not.toContain(authToken);
+      expect(payload.expiresAt).toBeDefined();
     });
   });
 
