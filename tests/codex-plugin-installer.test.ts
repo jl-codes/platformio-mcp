@@ -2,7 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { installCodexPlugin } from "../scripts/installers/codex.js";
+import {
+  installCodexPlugin,
+  runCodexPluginCommand,
+} from "../scripts/installers/codex.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -27,6 +30,27 @@ afterEach(() => {
 });
 
 describe("Codex plugin installer", () => {
+  it("invokes the native Windows Codex executable without a shell", () => {
+    const spawnCommand = vi.fn(() => ({
+      error: undefined,
+      status: 0,
+      stderr: "",
+      stdout: '{"installed":[]}',
+    }));
+
+    expect(
+      runCodexPluginCommand(["plugin", "list", "--json"], {
+        platform: "win32",
+        spawnCommand,
+      }),
+    ).toBe('{"installed":[]}');
+    expect(spawnCommand).toHaveBeenCalledWith(
+      "codex.exe",
+      ["plugin", "list", "--json"],
+      expect.objectContaining({ shell: false, windowsHide: true }),
+    );
+  });
+
   it("adds the local marketplace and plugin without a shell", async () => {
     const packageRoot = createPackageRoot();
     const commands: string[][] = [];
@@ -58,6 +82,7 @@ describe("Codex plugin installer", () => {
       packageRoot,
       "--json",
     ]);
+    expect(commands).toContainEqual(["plugin", "list", "--json"]);
     expect(commands).toContainEqual([
       "plugin",
       "add",

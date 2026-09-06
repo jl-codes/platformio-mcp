@@ -172,11 +172,14 @@ export async function installCodex() {
  * Runs one Codex plugin command without a shell.
  *
  * @param {string[]} args Exact CLI arguments.
+ * @param {{ platform?: string, spawnCommand?: typeof spawnSync }} [options] Execution seams for tests.
  * @returns {string} Standard output.
  */
-function runCodexPluginCommand(args) {
-  const command = process.platform === "win32" ? "codex.cmd" : "codex";
-  const result = spawnSync(command, args, {
+function runCodexPluginCommand(args, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const command = platform === "win32" ? "codex.exe" : "codex";
+  const execute = options.spawnCommand ?? spawnSync;
+  const result = execute(command, args, {
     encoding: "utf8",
     shell: false,
     windowsHide: true,
@@ -252,7 +255,7 @@ export async function installCodexPlugin(options = {}) {
     runCommand(["plugin", "marketplace", "add", packageRoot, "--json"]);
   }
 
-  const plugins = runCommand(["plugin", "list", "--available", "--json"]);
+  const plugins = runCommand(["plugin", "list", "--json"]);
   const pluginAdded = !jsonOutputContains(plugins, "platformio-mcp");
   if (pluginAdded) {
     runCommand(["plugin", "add", "platformio-mcp@platformio-mcp", "--json"]);
