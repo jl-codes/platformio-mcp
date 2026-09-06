@@ -20,12 +20,27 @@ async function runCli(args: string[], cwd: string) {
   return JSON.parse(stdout) as unknown;
 }
 
+async function runCliText(args: string[], cwd: string) {
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    ["--import", "tsx", "src/cli.ts", ...args],
+    {
+      cwd,
+      maxBuffer: 1024 * 1024,
+      env: process.env,
+    },
+  );
+  return stdout;
+}
+
 describe("CLI agent workflow smoke tests", () => {
   let tempProjectDir: string;
   const repoRoot = process.cwd();
 
   beforeAll(async () => {
-    tempProjectDir = await fs.mkdtemp(path.join(os.tmpdir(), "pio-cli-agent-smoke-"));
+    tempProjectDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "pio-cli-agent-smoke-"),
+    );
     await fs.mkdir(path.join(tempProjectDir, "src"), { recursive: true });
     await fs.writeFile(
       path.join(tempProjectDir, "src", "main.cpp"),
@@ -63,12 +78,7 @@ describe("CLI agent workflow smoke tests", () => {
 
   it("retrieves agent-last-report from CLI", async () => {
     const payload = (await runCli(
-      [
-        "agent-last-report",
-        "--project-dir",
-        tempProjectDir,
-        "--json",
-      ],
+      ["agent-last-report", "--project-dir", tempProjectDir, "--json"],
       repoRoot,
     )) as { success: boolean; report?: { tool?: string } };
 
@@ -78,12 +88,7 @@ describe("CLI agent workflow smoke tests", () => {
 
   it("returns policy-status from CLI", async () => {
     const payload = (await runCli(
-      [
-        "policy-status",
-        "--project-dir",
-        tempProjectDir,
-        "--json",
-      ],
+      ["policy-status", "--project-dir", tempProjectDir, "--json"],
       repoRoot,
     )) as {
       profile: string;
@@ -94,5 +99,54 @@ describe("CLI agent workflow smoke tests", () => {
     expect(payload.profile).toBeDefined();
     expect(payload.allowedOperations).toContain("agent_safe_pin_audit");
     expect(payload.approvalRequiredOperations).toContain("upload_firmware");
+  });
+
+  it("documents and validates the full Codex Plugin from CLI", async () => {
+    const help = await runCliText(["--help"], repoRoot);
+    expect(help).toContain(
+      "install --<cline|claude|vscode|antigravity|codex|codex-plugin>",
+    );
+    expect(help).toContain("plugin validate [--require-runtime]");
+
+    const payload = (await runCli(
+      ["plugin", "validate", "--require-runtime", "--json"],
+      repoRoot,
+    )) as {
+      success: boolean;
+      skills: number;
+      runtimePresent: boolean;
+    };
+    expect(payload).toEqual({
+      success: true,
+      skills: 8,
+      runtimePresent: true,
+    });
+  });
+
+  it("exposes read-only target, monitor, task, and approval state from CLI", async () => {
+    const target = (await runCli(
+      ["target-resolve", "--project-dir", tempProjectDir, "--json"],
+      repoRoot,
+    )) as { success: boolean; status: string };
+    expect(target).toMatchObject({ success: false, status: "invalid_config" });
+
+    const monitor = (await runCli(
+      ["monitor-status", "--project-dir", tempProjectDir, "--json"],
+      repoRoot,
+    )) as { monitors: unknown[] };
+    expect(monitor.monitors).toEqual([]);
+
+    const history = (await runCli(
+      ["task-history", "--project-dir", tempProjectDir, "--json"],
+      repoRoot,
+    )) as { tasks: unknown[]; observedAt: string };
+    expect(history.tasks).toEqual([]);
+    expect(new Date(history.observedAt).toString()).not.toBe("Invalid Date");
+
+    const approvals = (await runCli(
+      ["pending-approvals", "--project-dir", tempProjectDir, "--json"],
+      repoRoot,
+    )) as { approvals: unknown[] };
+    expect(approvals.approvals).toEqual([]);
   });
 });

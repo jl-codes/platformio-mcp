@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      publish_npm:
+        description: Publish the validated tarball to npm
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build_release:
+    name: Build release artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci && npm --prefix web ci
+
+      - name: Run release gates
+        run: |
+          npx tsc --noEmit
+          npm run lint
+          npm audit --audit-level=low
+          npm --prefix web audit --audit-level=low
+          npm run test:ci:unit
+          npm --prefix web run test -- --run
+          npm run test:e2e:ci
+          npm run plugin:sync:check
+          npm run plugin:build
+          npm run plugin:validate
+          npm run plugin:test
+          npm run smoke-test
+          git diff --exit-code -- plugins/platformio-mcp
+
+      - name: Build npm tarball
+        run: |
+          mkdir -p release-artifacts
+          npm pack
+          mv platformio-mcp-*.tgz release-artifacts/
+          cp plugins/platformio-mcp/runtime/inventory.json release-artifacts/plugin-runtime-inventory.json
+
+      - name: Upload immutable artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: platformio-mcp-release
+          path: release-artifacts
+          if-no-files-found: error
+
+      - name: Publish npm package when explicitly requested
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
+        run: npm publish release-artifacts/platformio-mcp-*.tgz --access public
+
+      - name: Attach artifacts to GitHub tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" release-artifacts/* --generate-notes --verify-tag

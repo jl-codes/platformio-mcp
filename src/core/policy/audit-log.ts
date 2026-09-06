@@ -3,6 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import type { AuditEvent } from "./types.js";
 import { SERVER_DATA_DIR } from "../../utils/paths.js";
+import { portalEvents } from "../../api/events.js";
 
 function ensureDir(dir: string) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -32,6 +33,8 @@ export function appendAuditEvent(
     const localFile = path.join(localDir, "events.jsonl");
     fs.appendFileSync(localFile, JSON.stringify(event) + "\n", "utf8");
   }
+
+  portalEvents.emitSafetyStateUpdated(input.workspaceDir);
 
   return event;
 }

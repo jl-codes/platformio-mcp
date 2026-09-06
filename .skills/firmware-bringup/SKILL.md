@@ -18,26 +18,15 @@ Use this skill when the user wants to bring up a new embedded board or create a 
 
 ## Workflow
 
-1. List connected devices.
-2. Search for the likely PlatformIO board ID.
-3. Initialize or inspect the project.
-4. Add a minimal boot marker, such as `BOOT_OK`, to serial output.
-5. Build the project.
-6. If build succeeds, ask the user before flashing.
-7. Flash the firmware after approval.
-8. Start serial monitoring.
-9. Verify expected boot output.
-10. Summarize result and next steps.
+1. Inspect the exact `projectDir` with `get_project_context` and `get_policy_status`.
+2. Use `list_devices` and `list_boards` only for discovery, then call `agent_resolve_target` with one environment and optional explicit port.
+3. Stop if target resolution is ambiguous, unavailable, or lower-confidence than the user accepts.
+4. Initialize the project only when requested, then add a minimal serial boot marker such as `BOOT_OK`.
+5. Call `agent_validate_project`, then `agent_build_diagnose` for the resolved environment.
+6. If the build succeeds, request explicit approval for `agent_flash_monitor_verify` using the resolved binding.
+7. After approval, flash and verify bounded runtime markers. Keep the returned task ID, log paths, and binding digest.
+8. Report build, flash, monitor, and assertion outcomes separately with one next action.
 
 ## Preferred Commands
 
-Use available repo tools or CLI commands equivalent to:
-
-```bash
-pio-mcp devices
-pio-mcp boards search esp32
-pio-mcp init --board esp32dev --framework arduino
-pio-mcp build
-pio-mcp flash --port auto
-pio-mcp monitor --timeout 30
-```
+Use the PlatformIO MCP tools directly. Do not substitute shell commands for build, upload, lock, or monitor operations while the MCP server is available.

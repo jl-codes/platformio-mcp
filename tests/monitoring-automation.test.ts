@@ -3,6 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  clearAutomationMonitorState,
+  getAutomationStatePath,
+  listAutomationStates,
   readAutomationState,
   withAutomationStateLock,
   writeAutomationState,
@@ -154,10 +157,53 @@ describe("monitoring automation primitives", () => {
     );
     await new Promise((resolve) => setTimeout(resolve, 25));
     await expect(
-      withAutomationStateLock(projectDir, "serial-health", async () => undefined),
+      withAutomationStateLock(
+        projectDir,
+        "serial-health",
+        async () => undefined,
+      ),
     ).rejects.toMatchObject({ code: "OVERLAPPING_RUN" });
     releaseFirst();
     await first;
+  });
+
+  it("clears monitoring state without resetting the hardware-write budget", async () => {
+    const projectDir = createProject();
+    const initial = readAutomationState(projectDir, "nightly-hil");
+    writeAutomationState(projectDir, {
+      ...initial,
+      cursor: "cursor-before-reset",
+      digest: "digest-before-reset",
+      lastStatus: "failed",
+      consecutiveFailures: 3,
+      consecutiveHardwareWrites: 2,
+      lastHardwareWriteAction: "upload_filesystem",
+      lastHardwareWriteAt: new Date().toISOString(),
+    });
+    const statePath = getAutomationStatePath(projectDir, "nightly-hil");
+    const stale = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    stale.updatedAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
+    fs.writeFileSync(statePath, JSON.stringify(stale), "utf8");
+
+    expect(listAutomationStates(projectDir)).toMatchObject([
+      {
+        automationKey: "nightly-hil",
+        lastStatus: "failed",
+        consecutiveFailures: 3,
+        consecutiveHardwareWrites: 2,
+      },
+    ]);
+
+    const reset = await clearAutomationMonitorState(projectDir, "nightly-hil");
+    expect(reset).toMatchObject({
+      automationKey: "nightly-hil",
+      consecutiveFailures: 0,
+      consecutiveHardwareWrites: 2,
+      lastHardwareWriteAction: "upload_filesystem",
+    });
+    expect(reset.cursor).toBeUndefined();
+    expect(reset.digest).toBeUndefined();
+    expect(reset.lastStatus).toBeUndefined();
   });
 
   it("reads serial logs incrementally with byte bounds and opaque cursors", () => {
@@ -165,7 +211,11 @@ describe("monitoring automation primitives", () => {
     const logPath = path.join(projectDir, "monitor.log");
     fs.writeFileSync(logPath, "BOOT_OK\n", "utf8");
     const initial = readSerialWindowFromFile(logPath);
-    fs.appendFileSync(logPath, `password=supersecret\n${"x".repeat(400)}`, "utf8");
+    fs.appendFileSync(
+      logPath,
+      `password=supersecret\n${"x".repeat(400)}`,
+      "utf8",
+    );
     const next = readSerialWindowFromFile(logPath, {
       cursor: initial.cursor,
       maxBytes: 256,

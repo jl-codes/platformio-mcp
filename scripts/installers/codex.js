@@ -27,6 +27,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { validateCodexPlugin } from "../validate-codex-plugin.mjs";
 
 const BLOCK_KEY = "platformio";
 
@@ -165,5 +168,112 @@ export async function installCodex() {
   );
 }
 
+/**
+ * Runs one Codex plugin command without a shell.
+ *
+ * @param {string[]} args Exact CLI arguments.
+ * @returns {string} Standard output.
+ */
+function runCodexPluginCommand(args) {
+  const command = process.platform === "win32" ? "codex.cmd" : "codex";
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    shell: false,
+    windowsHide: true,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      (result.stderr || result.stdout || "Codex plugin command failed.").trim(),
+    );
+  }
+  return result.stdout.trim();
+}
+
+/** Returns every string nested in a JSON-compatible value. */
+function collectStrings(value, output = []) {
+  if (typeof value === "string") output.push(value);
+  else if (Array.isArray(value)) {
+    for (const item of value) collectStrings(item, output);
+  } else if (value && typeof value === "object") {
+    for (const item of Object.values(value)) collectStrings(item, output);
+  }
+  return output;
+}
+
+/** Tests structured CLI JSON output for one exact normalized value. */
+function jsonOutputContains(output, expected, normalizePath = false) {
+  try {
+    const normalize = (value) =>
+      normalizePath
+        ? value.replaceAll("\\", "/").replace(/\/$/u, "").toLowerCase()
+        : value;
+    const normalizedExpected = normalize(expected);
+    return collectStrings(JSON.parse(output)).some(
+      (value) => normalize(value) === normalizedExpected,
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Installs the repo-local Codex plugin and marketplace additively.
+ * The legacy MCP-only config installer remains available as `--codex`.
+ *
+ * @param {{ packageRoot?: string, runCommand?: (args: string[]) => string, validatePlugin?: (options: { requireRuntime: boolean, repoRoot: string }) => unknown }} [options]
+ * @returns {Promise<{ marketplaceAdded: boolean, pluginAdded: boolean, packageRoot: string }>} Installation summary.
+ */
+export async function installCodexPlugin(options = {}) {
+  const packageRoot = path.resolve(
+    options.packageRoot ??
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".."),
+  );
+  const marketplacePath = path.join(
+    packageRoot,
+    ".agents",
+    "plugins",
+    "marketplace.json",
+  );
+  const pluginPath = path.join(packageRoot, "plugins", "platformio-mcp");
+  if (!fs.existsSync(marketplacePath) || !fs.existsSync(pluginPath)) {
+    throw new Error(
+      `Codex plugin assets are missing from package root: ${packageRoot}`,
+    );
+  }
+
+  const validatePlugin = options.validatePlugin ?? validateCodexPlugin;
+  validatePlugin({ requireRuntime: true, repoRoot: packageRoot });
+
+  const runCommand = options.runCommand ?? runCodexPluginCommand;
+  const marketplaces = runCommand(["plugin", "marketplace", "list", "--json"]);
+  const marketplaceAdded = !jsonOutputContains(marketplaces, packageRoot, true);
+  if (marketplaceAdded) {
+    runCommand(["plugin", "marketplace", "add", packageRoot, "--json"]);
+  }
+
+  const plugins = runCommand(["plugin", "list", "--available", "--json"]);
+  const pluginAdded = !jsonOutputContains(plugins, "platformio-mcp");
+  if (pluginAdded) {
+    runCommand(["plugin", "add", "platformio-mcp@platformio-mcp", "--json"]);
+  }
+
+  console.log(
+    pluginAdded
+      ? "✅ PlatformIO MCP Codex Plugin installed."
+      : "✅ PlatformIO MCP Codex Plugin is already installed.",
+  );
+  console.log(
+    "Next: start a new Codex task so the plugin skills and MCP tools are loaded.",
+  );
+  return { marketplaceAdded, pluginAdded, packageRoot };
+}
+
 // Exported for unit testing.
-export { findBlockRange, renderTomlBlock, mergeCodexConfig };
+export {
+  findBlockRange,
+  renderTomlBlock,
+  mergeCodexConfig,
+  runCodexPluginCommand,
+  jsonOutputContains,
+};

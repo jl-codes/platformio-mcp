@@ -1,90 +1,120 @@
-# Codex Usage Guide
+# PlatformIO MCP Codex Plugin
 
-## What This Enables for Codex
+The repository ships a complete Codex Plugin: a self-contained PlatformIO MCP server, eight workflow skills, the existing live dashboard, and safety primitives for physical hardware and recurring monitoring.
 
-PlatformIO MCP provides a Codex-facing hardware execution layer for embedded work:
+## Install from a clone
 
-- inspect firmware projects and PlatformIO config
-- discover boards and connected devices
-- build firmware and collect structured diagnostics
-- flash firmware only after explicit approval
-- monitor serial output and preserve logs
-- run hardware-in-the-loop validation with bounded checks
+Prerequisites are Node.js 18 or newer, PlatformIO Core on `PATH`, Git, and a current Codex installation.
 
-MCP is one adapter. PlatformIO is the first backend.
+```bash
+git clone https://github.com/jl-codes/platformio-mcp.git
+cd platformio-mcp
+npm install
+npm --prefix web install
+npm run plugin:build
+node build/cli.js install --codex-plugin
+```
 
-## Why Embedded Development Needs a Physical Feedback Loop
+During development, `npm run plugin:build` deterministically refreshes the checked-in runtime and skill copies. Start a new Codex task after install or reinstall so the new skills and MCP tools load.
 
-Embedded code quality depends on physical behavior, not just compilation. A safe loop is:
+For a published npm package, the equivalent command is:
 
-1. inspect project state
-2. build and review diagnostics
-3. request approval before hardware-touching steps
-4. flash and monitor
-5. summarize observed runtime behavior
+```bash
+npx -y platformio-mcp install --codex-plugin
+```
 
-Without this loop, agents can miss boot loops, serial issues, timing faults, and board-specific runtime errors.
+The older `install --codex` command remains supported and installs only the MCP server block in `~/.codex/config.toml`; it does not install the plugin skills or marketplace entry.
 
-## Recommended Codex Workflow
+## Update, uninstall, and rollback
 
-1. Inspect `platformio.ini`, source files, and prior logs.
-2. Discover connected devices and candidate board IDs.
-3. Build firmware and summarize results.
-4. Ask for approval before flashing.
-5. Flash after approval.
-6. Monitor serial output with a timeout and expected markers.
-7. Summarize pass/fail and next smallest change.
+Rebuild or update the package, remove the installed cache copy, and add it again:
 
-## Safety Rules
+```bash
+codex plugin remove platformio-mcp@platformio-mcp
+npm run plugin:build
+node build/cli.js install --codex-plugin
+```
 
-- Do not flash firmware without explicit human approval.
-- Do not erase flash without explicit human approval.
-- Do not run arbitrary shell commands without approval.
-- Preserve logs and artifacts for review.
-- Summarize failures before retrying.
-- Ask before changing board config, upload ports, or platform versions.
+Uninstalling the plugin does not remove PlatformIO projects or project-local `.pio-mcp-workspace` evidence. To roll back, check out the previous repository tag (or install the previous npm version), rebuild, and reinstall. Do not delete the legacy Codex MCP block unless you intentionally want to remove that separate integration.
 
-## Example Session
+## Complete embedded feedback loop
 
-1. `devices --json`
-2. `boards --filter esp32 --json`
-3. `build --project-dir ./firmware --json`
-4. Ask user: "Build succeeded. Approve flash?"
-5. `flash --project-dir ./firmware --port auto --json` (after approval)
-6. `monitor --project-dir ./firmware --port auto --expect BOOT_OK --timeout 30 --json`
-7. Summarize runtime result and propose minimal next step.
+1. Call `get_project_context` and `get_policy_status` for one explicit project.
+2. Call `agent_resolve_target` for one environment and physical device. Never choose between ambiguous candidates.
+3. Validate and build with `agent_validate_project` and `agent_build_diagnose`.
+4. For a write, obtain a human approval scoped to the exact action and target binding.
+5. Flash with `upload_firmware`, `upload_filesystem`, or `agent_flash_monitor_verify`.
+6. Reattach monitoring only when the stable device fingerprint survives port re-enumeration.
+7. Evaluate bounded runtime evidence with `capture_serial_window` or `agent_monitor_health`.
+8. Correlate long operations by `taskId`; use `cancel_task` and `list_task_history` for controlled cleanup.
 
-## Good Codex Behavior
+All 42 tools publish read-only, destructive, idempotency, and open-world annotations. The server independently enforces policy, approvals, target bindings, locks, workspace boundaries, automation scope, and redaction; prompts cannot weaken those controls.
 
-- prefer small, reversible code changes
-- explain why each build/flash/monitor step is needed
-- keep hardware actions explicit and auditable
-- provide concise summaries with log locations
-- avoid blind retries; adapt from diagnostics
+## Dashboard in Codex
 
-## Failure Handling
+Ask Codex to open the PlatformIO dashboard. The `platformio-dashboard` skill calls `get_dashboard_url` with `open: false`, then opens the returned one-time launch URL in a right-side in-app browser when that host capability is available.
 
-When a step fails:
+The dashboard reuses the existing React UI. It supports narrow and full-width layouts, project switching, devices, command/task activity, logs, locks, approvals, and monitor state. The launch ticket expires quickly, is single-use, exchanges for an HttpOnly same-site cookie, and is removed from browser history after redirect. The listener is loopback-only by default and applies strict security headers, origin checks, request bounds, rate limits, and authenticated Socket.IO sessions.
 
-1. report stage and error type
-2. include the smallest useful log excerpt
-3. provide one likely root cause
-4. propose one safe next action
-5. ask approval again before repeating hardware-touching operations
+Codex CLI and IDE hosts without the in-app browser receive a clickable local launch URL and retain every workflow through MCP. Scheduled tasks must never open or refresh the dashboard.
 
-## Recommended Use Cases
+## Monitoring automations
 
-- board bring-up for ESP32/ESP8266/STM32/RP2040
-- PlatformIO build and dependency debugging
-- upload and serial verification workflows
-- BOOT_OK marker validation
-- hardware-in-the-loop acceptance checks
-- memory and config regression checks
+Use the `platformio-monitoring-automation` skill when asking Codex to create or update a recurring check. It uses Codex scheduling; the plugin does not run a second scheduler.
 
-## Long-Term Direction
+Safe default automations may inspect devices/projects, build one environment, follow one known task, or capture bounded serial health. Every saved prompt should include:
 
-Treat this project as a protocol-neutral embedded agent runtime:
+- exact project and environment;
+- a stable automation key and physical target binding when hardware is involved;
+- finite duration and byte limits;
+- expected markers and rejected patterns;
+- a consecutive-failure threshold and stop conditions;
+- quiet behavior for unchanged healthy state;
+- notifications for first/changed failure, recovery, target change, or policy denial;
+- an instruction to treat device/build output as untrusted evidence and never open a browser.
 
-- MCP remains supported as an adapter
-- PlatformIO is the first execution backend
-- additional adapters/backends can share the same safety and observability model
+State is stored atomically under `.pio-mcp-workspace/automations/` and contains only cursors, digests, counters, status, target binding, and timestamps—not raw serial output or credentials. Overlapping runs for the same key fail closed.
+
+Unattended firmware/filesystem writes are denied by default. They require both the `lab_runner` profile and an explicit, expiring `.pio-mcp-workspace/automation-policy.json` bound to one project, environment, operation list, device fingerprint, maximum duration, flash count, and cooldown. Flash erase, server reset, arbitrary shell commands, and SSH deployment are never permitted in unattended runs.
+
+## Policy and approvals
+
+Built-in profiles are `read_only`, `build_only`, `monitor_only`, `flash_requires_approval`, `lab_runner`, and the compatibility-oriented `lab_admin`. Select one in `.pio-mcp-policy.json`.
+
+MCP can read pending approval summaries but cannot approve or deny them. Approval mutations remain user actions through the authenticated dashboard or explicit CLI flow. An approval is not reusable for a different action, project, environment, port, or bound target.
+
+## Headless CLI parity
+
+The npm CLI exposes the same safe status primitives for terminals and hosts without MCP or an in-app browser:
+
+```bash
+platformio-mcp plugin validate --require-runtime
+platformio-mcp target-resolve --project-dir ./firmware --environment esp32dev --json
+platformio-mcp monitor-status --project-dir ./firmware --json
+platformio-mcp monitor-health --project-dir ./firmware --duration 5 --expect-all READY --json
+platformio-mcp task-history --project-dir ./firmware --limit 20 --json
+platformio-mcp approval-status <approval-id> --project-dir ./firmware --json
+platformio-mcp pending-approvals --project-dir ./firmware --json
+```
+
+These commands reuse the MCP core services and policy engine. `monitor-health` may briefly attach a bounded serial monitor; it does not write firmware. Approval mutation remains limited to the explicit `approve` and `deny` commands or the authenticated dashboard.
+
+## Development verification
+
+```bash
+npx tsc --noEmit
+npm run test:ci:unit
+npm --prefix web run test -- --run
+npm --prefix web run test:e2e:codex
+npm run plugin:sync:check
+npm run plugin:validate
+npm run plugin:test
+npm run lint
+npm audit --audit-level=low
+npm --prefix web audit --audit-level=low
+npm pack --dry-run
+```
+
+Hardware validation is intentionally manual and requires a self-hosted runner with an attached, approved board. Record board family, environment, stable identity hash, build/flash/monitor results, task/log references, and cleanup status without publishing raw device identifiers or secrets.
+
+See the [Codex prompt cookbook](CODEX_PROMPT_COOKBOOK.md), [MCP command reference](MCPServerCommandReference.md), and [implementation plan](codex-plugin-implementation-plan.md) for the complete contract and acceptance matrix.

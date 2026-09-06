@@ -33,6 +33,7 @@ interface WorkspaceCockpitProps {
   setActiveWorkspace?: (ws: string) => void;
   autoTrack?: boolean;
   setAutoTrack?: (val: boolean) => void;
+  safetyRevision?: number;
 }
 
 const { Text } = Typography;
@@ -41,7 +42,7 @@ export default function WorkspaceCockpit({
   status, commands, buildLogs, buildLogFile, serialLogs, spoolerStates,
   activeWorkspace, lockState, openTabs, setOpenTabs, activeTabRef, setActiveTabRef,
   historicalLogBuffer, hardware = [], apiBase, token, isDarkMode, setIsDarkMode,
-  knownWorkspaces = [], setActiveWorkspace, autoTrack = true, setAutoTrack
+  knownWorkspaces = [], setActiveWorkspace, autoTrack = true, setAutoTrack, safetyRevision = 0
 }: WorkspaceCockpitProps) {
   
   const [activeMenu, setActiveMenu] = useState('agent-stream');
@@ -255,6 +256,7 @@ export default function WorkspaceCockpit({
                 lockState={lockState}
                 apiBase={apiBase}
                 token={token}
+                safetyRevision={safetyRevision}
               />
             </div>
           )}

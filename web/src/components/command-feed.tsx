@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Badge, Typography, Collapse, Button, Space, Switch, Tooltip, Tag, Divider, Segmented, theme } from 'antd';
+import { Badge, Typography, Collapse, Button, Space, Switch, Tooltip, Tag, Divider, Segmented, Popconfirm, message, theme } from 'antd';
 import { 
   ExperimentOutlined, 
   CheckSquareOutlined, 
@@ -97,7 +97,7 @@ export interface CommandFeedProps {
 
 const parseLeniently = (str: string): any => {
   let pos = 0;
-  
+
   const skipWhitespace = () => {
     while (pos < str.length && (str[pos] === ' ' || str[pos] === '\n' || str[pos] === '\r' || str[pos] === '\t')) pos++;
   };
@@ -277,6 +277,25 @@ export default function CommandFeed({
   const [showActiveOnly, setShowActiveOnly] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<string>('All Sources');
   
+  const cancelTask = async (taskId: string) => {
+    if (!apiBase || !token || !activeWorkspace) {
+      throw new Error('Select a workspace before cancelling a task.');
+    }
+    const response = await fetch(`${apiBase}/api/tasks/${encodeURIComponent(taskId)}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ projectDir: activeWorkspace }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body.error || `Failed to cancel task ${taskId}`);
+    }
+    message.success(body.status === 'already_terminal' ? 'Task already finished.' : `Cancelled task ${taskId}`);
+  };
+
   const getCommandBadgeProps = (cmd: CommandRecord) => {
     const hasRunningTask = cmd.tasks?.some(task => task.status === 'running');
     const isActiveSpooler = cmd.tasks?.some(task => 
@@ -537,6 +556,23 @@ export default function CommandFeed({
                             {task.exitCode !== undefined && (
                               <Text style={{ fontSize: 11, color: '#8c8c8c' }}>(Exit: {task.exitCode})</Text>
                             )}
+                            {task.status === 'running' && activeWorkspace && apiBase && token ? (
+                              <Popconfirm
+                                title="Cancel this task?"
+                                description="Only the selected workspace-owned process and resources will be stopped."
+                                okText="Cancel task"
+                                okButtonProps={{ danger: true }}
+                                onConfirm={() =>
+                                  cancelTask(task.taskId).catch((error: any) =>
+                                    message.error(error?.message || 'Failed to cancel task'),
+                                  )
+                                }
+                              >
+                                <Button size="small" danger icon={<StopOutlined />}>
+                                  Cancel
+                                </Button>
+                              </Popconfirm>
+                            ) : null}
                           </div>
                           {task.error && (
                             <div style={{ marginBottom: 12, padding: '6px 10px', backgroundColor: 'rgba(255, 77, 79, 0.05)', borderLeft: '2px solid #ff4d4f', borderRadius: 4 }}>
@@ -647,7 +683,14 @@ export default function CommandFeed({
       />
 
       <div style={{ marginTop: 12 }}>
-        <Collapse defaultActiveKey={[]} ghost expandIconPosition="start" className="command-feed-collapse">
+        <Collapse
+          defaultActiveKey={displayedCommands
+            .filter(cmd => cmd.status === 'running' || cmd.tasks?.some(task => task.status === 'running'))
+            .map(cmd => cmd.id)}
+          ghost
+          expandIconPosition="start"
+          className="command-feed-collapse"
+        >
           {displayedCommands.map(cmd => renderCommandPanel(cmd))}
         </Collapse>
       </div>

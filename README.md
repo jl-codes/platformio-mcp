@@ -22,6 +22,10 @@ MCP is one adapter. PlatformIO is the first backend.
 - Persistent workflow artifacts in `.pio-mcp-workspace/` (`lastAgentReport.json`, `boardReport.json`)
 - Board intelligence reports (`agent_generate_board_report`)
 - Policy profile introspection (`get_policy_status`)
+- Exact project/environment/device bindings (`agent_resolve_target`)
+- Bounded, cursor-based serial health checks (`agent_monitor_health`)
+- Idempotent task cancellation and compact history (`cancel_task`, `list_task_history`)
+- Read-only approval status for agents; approval remains human-controlled
 
 All risky operations still honor policy and approval rules.
 
@@ -67,6 +71,29 @@ npx platformio-mcp install --antigravity
 npx platformio-mcp install --codex
 ```
 
+### 4. Install the full Codex Plugin
+
+The Codex Plugin adds the bundled MCP runtime, focused embedded skills, secure in-app dashboard flow, and monitoring-automation guidance. From a clone:
+
+```bash
+npm install
+npm --prefix web install
+npm run plugin:build
+node build/cli.js install --codex-plugin
+```
+
+From npm:
+
+```bash
+npx -y platformio-mcp install --codex-plugin
+```
+
+Start a new Codex task after installation. The legacy `install --codex` command remains available for MCP-only configuration. See the [full Codex Plugin guide](docs/CODEX.md) for update, uninstall, browser fallback, policy, automation, and rollback details.
+
+The plugin release gates run on Windows, macOS, and Linux, exercise the authenticated dashboard in Chromium, validate the bundled runtime and 42-tool registry, and keep physical-board evidence in a separate manual workflow. That workflow uploads only bounded, sanitized evidence; raw hardware logs stay on the self-hosted runner. See the [release and validation guide](docs/CODEX_PLUGIN_RELEASE.md).
+
+For headless verification and status inspection, the same CLI also provides `plugin validate`, `target-resolve`, `monitor-status`, `monitor-health`, `task-history`, `approval-status`, and `pending-approvals`. Run `platformio-mcp --help` for bounded options and JSON output support.
+
 ## Manual MCP Config
 
 ```json
@@ -111,7 +138,9 @@ Policy profiles can be selected per-project via `.pio-mcp-policy.json`:
 Supported profiles:
 - `read_only`
 - `build_only`
+- `monitor_only`
 - `flash_requires_approval`
+- `lab_runner` (explicit, expiring unattended-lab policy required)
 - `lab_admin`
 
 CLI approval workflows:
@@ -170,7 +199,7 @@ CI/CD test tiers:
 - `npm run test:ci:unit` runs unit/component coverage used in cross-platform CI.
 - `npm run test:e2e:ci` runs CI-safe end-to-end tests for agent workflows and CLI wiring.
 - `.github/workflows/ci.yml` runs typecheck, tests, and package smoke checks on pull requests/pushes.
-- `.github/workflows/hardware-e2e.yml` is a manual self-hosted runner workflow for real hardware MCP E2E (`RUN_MCP_E2E=1`).
+- `.github/workflows/hardware-e2e.yml` is a manual self-hosted-runner workflow for one explicitly confirmed physical-board write, bundled-plugin protocol checks, post-flash identity/serial assertions, cleanup proof, and sanitized evidence.
 
 ## Contributing
 

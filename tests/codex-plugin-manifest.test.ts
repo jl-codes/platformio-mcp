@@ -36,7 +36,11 @@ describe("Codex plugin manifest", () => {
     ) as {
       name: string;
       version: string;
-      interface: { defaultPrompt: string[] };
+      interface: {
+        defaultPrompt: string[];
+        logoDark: string;
+        screenshots: string[];
+      };
     };
     const marketplace = readJson(".agents/plugins/marketplace.json") as {
       plugins: Array<{ name: string; source: { path: string } }>;
@@ -45,6 +49,10 @@ describe("Codex plugin manifest", () => {
     expect(manifest.name).toBe("platformio-mcp");
     expect(manifest.version).toBe(packageJson.version);
     expect(manifest.interface.defaultPrompt).toHaveLength(3);
+    expect(manifest.interface.logoDark).toBe("./assets/logo-dark.png");
+    expect(manifest.interface.screenshots).toEqual([
+      "./assets/screenshot-dashboard.png",
+    ]);
     expect(marketplace.plugins).toContainEqual(
       expect.objectContaining({
         name: manifest.name,
@@ -67,7 +75,7 @@ describe("Codex plugin manifest", () => {
       tools: Record<string, string[]>;
     };
 
-    expect(declaredTools.size).toBe(34);
+    expect(declaredTools.size).toBe(42);
     expect(new Set(Object.keys(coverage.tools))).toEqual(declaredTools);
     for (const skillNames of Object.values(coverage.tools)) {
       expect(skillNames.length).toBeGreaterThan(0);

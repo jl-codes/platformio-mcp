@@ -17,13 +17,13 @@ Use this skill when a PlatformIO project fails to build, upload, or pass static 
 
 ## Workflow
 
-1. Run or inspect the build.
-2. Classify the failure.
-3. Extract the smallest useful error snippet.
+1. Call `get_project_context`, resolve one environment, and run `agent_build_diagnose`.
+2. Use its structured diagnostics, `nextSteps`, task ID, and log paths before reading broad logs.
+3. Extract the smallest redacted error snippet.
 4. Identify the likely root cause.
 5. Patch code, dependencies, or `platformio.ini`.
-6. Rebuild.
-7. Repeat until build succeeds or a blocker is identified.
+6. Rebuild through MCP. Retry automatically only when `safeToAutoRetry` is true and the retry remains bounded.
+7. Repeat until build succeeds or a configuration, dependency, policy, approval, or hardware blocker is identified.
 8. Summarize the exact fix.
 
 ## Error Types
@@ -43,3 +43,5 @@ PermissionDenied
 UploadFailed
 Unknown
 ```
+
+For upload failures, resolve the target binding again before retrying. Treat port drift as safe only when the stable device fingerprint still matches; stop on substitution or ambiguity.

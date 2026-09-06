@@ -12,13 +12,15 @@ interface WorkspaceConfigProps {
   token: string;
   activeWorkspace: string | null;
   lockState: LockState;
+  safetyRevision?: number;
 }
 
 export default function WorkspaceConfig({ 
   apiBase, 
   token, 
   activeWorkspace,
-  lockState
+  lockState,
+  safetyRevision = 0
 }: WorkspaceConfigProps) {
   const [environments, setEnvironments] = useState<any[]>([]);
   const [isFetchingEnv, setIsFetchingEnv] = useState(false);
@@ -116,7 +118,18 @@ export default function WorkspaceConfig({
     };
 
     fetchSafety();
-  }, [activeWorkspace, apiBase, token, safetyRefreshKey]);
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchSafety();
+      }
+    };
+    window.addEventListener('focus', refreshOnFocus);
+    document.addEventListener('visibilitychange', refreshOnFocus);
+    return () => {
+      window.removeEventListener('focus', refreshOnFocus);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [activeWorkspace, apiBase, token, safetyRefreshKey, safetyRevision]);
 
   return (
     <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto' }}>

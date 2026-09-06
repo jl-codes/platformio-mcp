@@ -61,6 +61,7 @@ function App() {
   const [spoolerStates, setSpoolerStates] = useState<Record<string, SpoolerState>>({});
   const [activeWorkspace, setActiveWorkspace] = useState<string | null>(parsedProjectDir);
   const [lockState, setLockState] = useState<LockState>({ isLocked: false });
+  const [safetyRevision, setSafetyRevision] = useState(0);
 
   const [openTabs, setOpenTabs] = useState<TabRef[]>([]);
   const [activeTabRef, setActiveTabRef] = useState<TabRef | null>(null);
@@ -236,6 +237,12 @@ function App() {
       }
     });
 
+    socket.on('safety_state_updated', (data: { projectDir?: string }) => {
+      if (!data.projectDir || data.projectDir === activeWorkspaceRef.current) {
+        setSafetyRevision((revision) => revision + 1);
+      }
+    });
+
     socket.on('workspace_state', (data: { projectDir: string }) => {
       if (autoTrackRef.current) {
         setActiveWorkspace(data.projectDir);
@@ -326,6 +333,7 @@ function App() {
       socket.off('connect');
       socket.off('server_status');
       socket.off('command_history_updated');
+      socket.off('safety_state_updated');
       socket.off('build_log');
       socket.off('build_clear');
       socket.off('build_state');
@@ -416,6 +424,7 @@ function App() {
         setActiveWorkspace={setActiveWorkspace}
         autoTrack={autoTrack}
         setAutoTrack={setAutoTrack}
+        safetyRevision={safetyRevision}
       />
     </ConfigProvider>
   );

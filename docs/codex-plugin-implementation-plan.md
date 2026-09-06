@@ -6,7 +6,7 @@ Ship a first-class `platformio-mcp` Codex Plugin from this repository. A develop
 
 The plugin will combine:
 
-- the existing local PlatformIO MCP server and its 34 tools;
+- the original 34-tool PlatformIO MCP surface plus eight integration primitives, represented by one typed 42-tool registry;
 - focused skills for discovery, bring-up, build diagnosis, flashing, serial monitoring, hardware-in-the-loop testing, and automation setup;
 - a dashboard-launch skill that opens the existing authenticated PlatformIO MCP UI in Codex desktop's in-app browser panel and degrades cleanly to a clickable local URL on hosts without that browser;
 - explicit tool metadata and server-side policy enforcement for physical-device safety;
@@ -25,6 +25,23 @@ The integration is successful when a fresh clone can offer the plugin without re
 8. Open the live dashboard inside Codex for visual inspection, approvals, logs, and task control when the host supports it.
 9. Persist evidence and report only meaningful changes.
 10. Optionally schedule safe, recurring health checks through Codex.
+
+## Implementation Status (2026-09-05)
+
+This plan is being implemented on draft PR [#20](https://github.com/jl-codes/platformio-mcp/pull/20). The pull request remains intentionally in draft until the physical-board release gate is satisfied.
+
+| Plan area | Current status | Evidence or remaining gate |
+| --- | --- | --- |
+| Plugin package and marketplace | Implemented | Repo-local marketplace, canonical manifest, branding, eight synced skills, self-contained bundled runtime, install/update flow, cache-portability contracts, version parity, and deterministic inventory are present. |
+| Complete MCP integration | Implemented | The typed registry exposes 42 tools with one handler, schema, annotations, policy action, risk classification, skill/command-reference coverage, and automated registry validation. |
+| Existing dashboard in Codex | Software-complete | The existing React dashboard is bundled unchanged in purpose and enhanced for narrow Codex panels, authenticated REST/Socket.IO, approvals, task cancellation, monitor state, policy visibility, and safe cursor reset. Chromium acceptance passes for the single-use launch session and 420 px panel. A screenshot-only Playwright case is opt-in. |
+| Monitoring and task control | Implemented | Target binding, bounded incremental capture, cursors/digests, health transitions, task history/cancellation, monitor leases, cleanup, and project-local automation state are covered by tests. |
+| Automation integration and safety | Software-complete | The automation skill uses Codex host automations rather than a plugin scheduler; quiet-success, alert/recovery, teardown, and UI-free background behavior are specified. Default profiles cannot perform unattended writes. The explicit `lab_runner` path is independently bounded by exact project/environment/device binding, expiry, cooldown, and write budget. Manual host create/update/pause/resume/delete acceptance remains open. |
+| Software verification | Passing locally | 152 root tests, 12 agent/CLI E2E tests, 10 dashboard component tests, 10 plugin tests, and 2 Chromium journeys pass; typecheck, production build, smoke test, sync/manifest validation, deterministic rebuild, package dry-run, and both dependency audits pass. Three additional MCP agent smoke cases are Linux-only and configured in CI. Lint has zero errors. |
+| CI, release, and evidence handling | Implemented, pending CI execution | Windows/macOS/Linux plugin jobs, Chromium, release artifact validation, manual hardware E2E, and sanitized hardware-evidence packaging are defined. Raw hardware logs remain on the self-hosted runner. |
+| Physical hardware acceptance | Open release gate | No physical-board commands were run while preparing this implementation. At least one physical-board record, followed by the applicable ESP32/RP2040/STM32/Arduino matrix rows, is still required before the PR can leave draft status or the plugin can be released. |
+
+The status table is the delivery checkpoint; the detailed matrix and release gates below remain authoritative. A software-complete row does not waive its listed manual or hardware proof.
 
 ## User Review Required
 
@@ -521,8 +538,10 @@ The MCP tools remain the canonical execution API. The browser is a complementary
   - Add a plugin-installed test path on the self-hosted rig.
   - Exercise discover, resolve, build, approved flash, monitor reattach, runtime assertions, cancellation, and lock release.
   - Add a repeated monitor-health run to prove change detection and recovery reporting.
+  - Require exact project/environment/port inputs and an explicit workflow-dispatch hardware-write confirmation.
+  - Run protocol tests through the bundled plugin launcher, reject a post-flash device-identity change, prove no tracked task remains, and upload only sanitized evidence.
 
-- [NEW] [`.github/workflows/codex-plugin-release.yml`](../.github/workflows/codex-plugin-release.yml)
+- [NEW] [`.github/workflows/release.yml`](../.github/workflows/release.yml)
   - Build and validate plugin artifacts from the same commit as the npm package.
   - Verify package/plugin semantic version parity.
   - Produce a deterministic plugin archive and checksum.

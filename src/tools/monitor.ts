@@ -15,18 +15,27 @@ import { validateSerialPort, validateBaudRate } from "../utils/validation.js";
 import { PlatformIOError } from "../utils/errors.js";
 import { portSemaphoreManager } from "../utils/semaphore.js";
 import { getFirstDevice } from "./devices.js";
-import { registerPioMonitorPid, killPioMonitorByPort } from "../utils/process-manager.js";
+import {
+  registerPioMonitorPid,
+  killPioMonitorByPort,
+} from "../utils/process-manager.js";
 import { platformioExecutor } from "../platformio.js";
 import { portalEvents } from "../api/events.js";
 import { logDiagnostic as logDiag } from "../utils/logger.js";
 import { tailFileBounded } from "../utils/tail.js";
 import { getLogDir, rotateSpoolerStreams } from "../utils/spooler.js";
 import { getWorkspaces, rewriteRegistry } from "../utils/workspace-registry.js";
-import { getActiveMonitorPids, isPidAlive, isBuildActive } from "../utils/process-manager.js";
+import {
+  getActiveMonitorPids,
+  isPidAlive,
+  isBuildActive,
+} from "../utils/process-manager.js";
 import { mcpContext } from "../utils/mcp-context.js";
 import { redactSecretsInText } from "../core/policy/redact.js";
-
-
+import {
+  resolveWriteTarget,
+  type TargetBinding,
+} from "../core/target-resolution.js";
 
 /**
  * State and context mapping for an actively spooled hardware port.
@@ -56,6 +65,8 @@ export function getSpoolerStates() {
   const clean: Record<string, Omit<DaemonContext, "watcher" | "poller">> = {};
   for (const [port, daemon] of Object.entries(activeDaemons)) {
     const { watcher, poller, ...rest } = daemon;
+    void watcher;
+    void poller;
     clean[port] = rest;
   }
   return clean;
@@ -80,12 +91,17 @@ function emitNewLogBytes(port: string, daemon: DaemonContext): void {
   } catch {
   } finally {
     if (fd !== undefined) {
-      try { fs.closeSync(fd); } catch {}
+      try {
+        fs.closeSync(fd);
+      } catch {}
     }
   }
 }
 
-function startWindowsPollingFallback(port: string, daemon: DaemonContext): void {
+function startWindowsPollingFallback(
+  port: string,
+  daemon: DaemonContext,
+): void {
   if (process.platform !== "win32" || daemon.poller) return;
 
   daemon.poller = setInterval(() => {
@@ -99,7 +115,6 @@ function startWindowsPollingFallback(port: string, daemon: DaemonContext): void 
  * @param maxHistory - Maximum total bounded files to retain.
  */
 
-
 /**
  * Safely stops an active monitor daemon session and unlocks its port.
  *
@@ -107,8 +122,11 @@ function startWindowsPollingFallback(port: string, daemon: DaemonContext): void 
  * @param projectDir - Optional project directory context.
  */
 export async function stopMonitor(port: string, projectDir?: string) {
-  logDiag(`[Spooler Diagnostic] stopMonitor called for port ${port}.`, projectDir);
-  
+  logDiag(
+    `[Spooler Diagnostic] stopMonitor called for port ${port}.`,
+    projectDir,
+  );
+
   if (activeDaemons[port]) {
     logDiag(`[Spooler Diagnostic] Deleting activeDaemons context.`, projectDir);
     const daemon = activeDaemons[port];
@@ -117,46 +135,49 @@ export async function stopMonitor(port: string, projectDir?: string) {
       daemon.poller = undefined;
     }
     if (daemon.watcher) {
-      // ARCHITECTURAL EXCEPTION: While synchronous fs calls are broadly banned to prevent 
-      // event loop blocking, fs.statSync and fs.readSync are mathematically required here 
-      // at the exact nanosecond of process termination. Using asynchronous promises yields 
-      // to the event loop, causing the FSEvents watcher to close before the OS can flush 
+      // ARCHITECTURAL EXCEPTION: While synchronous fs calls are broadly banned to prevent
+      // event loop blocking, fs.statSync and fs.readSync are mathematically required here
+      // at the exact nanosecond of process termination. Using asynchronous promises yields
+      // to the event loop, causing the FSEvents watcher to close before the OS can flush
       // the final chunk event, permanently dropping the trailing output lines from the UI.
       try {
         const stat = fs.statSync(daemon.logFile);
         if (stat.size > (daemon.fileOffset || 0)) {
           const buffer = Buffer.alloc(stat.size - (daemon.fileOffset || 0));
           const fd = fs.openSync(daemon.logFile, "r");
-          fs.readSync(fd, buffer, 0, buffer.length, (daemon.fileOffset || 0));
+          fs.readSync(fd, buffer, 0, buffer.length, daemon.fileOffset || 0);
           fs.closeSync(fd);
           portalEvents.emitSerialLog(port, buffer.toString(), daemon.taskId);
         }
       } catch {}
-      try { daemon.watcher.close(); } catch {}
+      try {
+        daemon.watcher.close();
+      } catch {}
     }
     delete activeDaemons[port];
     portalEvents.emitSpoolerStates(getSpoolerStates());
     try {
       portSemaphoreManager.releasePort(port);
-    } catch (e) {}
+    } catch {}
   }
 
-  logDiag(`[Spooler Diagnostic] Triggering killPioMonitorByPort on ${port}...`, projectDir);
+  logDiag(
+    `[Spooler Diagnostic] Triggering killPioMonitorByPort on ${port}...`,
+    projectDir,
+  );
   await killPioMonitorByPort(port, projectDir);
   logDiag(`[Spooler Diagnostic] killPioMonitorByPort completed.`, projectDir);
 }
 
-
-
-async function spawnPioMonitor(targetPort: string, projectDir?: string, rootCommandId?: string) {
+async function spawnPioMonitor(
+  targetPort: string,
+  projectDir?: string,
+  rootCommandId?: string,
+) {
   const daemon = activeDaemons[targetPort];
   if (!daemon) return;
 
-  const monitorArgs = [
-    "--port", targetPort,
-    "--quiet",
-    "--raw"
-  ];
+  const monitorArgs = ["--port", targetPort, "--quiet", "--raw"];
 
   if (daemon.environment) {
     monitorArgs.push("--environment", daemon.environment);
@@ -164,20 +185,35 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string, rootComm
     monitorArgs.push("--baud", daemon.baudRate.toString());
   }
 
-  logDiag(`[Spooler] Spawning pio monitor (Env: ${daemon.environment || "None"}) via executor for ${targetPort}`, projectDir);
+  logDiag(
+    `[Spooler] Spawning pio monitor (Env: ${daemon.environment || "None"}) via executor for ${targetPort}`,
+    projectDir,
+  );
 
   // Instead of node managing the streams via stdout.on, we pass the file descriptor directly to the OS.
-  const outFd = fs.openSync(daemon.logFile, 'a');
-  const proc = await platformioExecutor.spawn("device", ["monitor", ...monitorArgs], {
-    detached: true,
-    useFakeTty: true,
-    stdio: ['ignore', outFd, outFd]
-  });
+  const outFd = fs.openSync(daemon.logFile, "a");
+  const proc = await platformioExecutor.spawn(
+    "device",
+    ["monitor", ...monitorArgs],
+    {
+      detached: true,
+      useFakeTty: true,
+      stdio: ["ignore", outFd, outFd],
+    },
+  );
 
   if (proc.pid) {
     // Record PID to workspace tracker
     const cliDesc = `pio device monitor ${monitorArgs.join(" ")}`;
-    await registerPioMonitorPid(targetPort, proc.pid, projectDir, rootCommandId, daemon.logFile, daemon.taskId, cliDesc);
+    await registerPioMonitorPid(
+      targetPort,
+      proc.pid,
+      projectDir,
+      rootCommandId,
+      daemon.logFile,
+      daemon.taskId,
+      cliDesc,
+    );
   }
 
   // Symlink or copy to 'latest-monitor.log' for easy querying
@@ -199,7 +235,10 @@ async function spawnPioMonitor(targetPort: string, projectDir?: string, rootComm
   // Unref ensures the MCP server process can exit independently without waiting for the monitor daemon
   proc.unref();
 
-  logDiag(`[Spooler] Monitor started detached with PID ${proc.pid}`, projectDir);
+  logDiag(
+    `[Spooler] Monitor started detached with PID ${proc.pid}`,
+    projectDir,
+  );
 }
 
 /**
@@ -227,7 +266,10 @@ export async function rehydrateMonitors(): Promise<void> {
         const pid = pids[port];
         if (isPidAlive(pid)) {
           if (!activeDaemons[port]) {
-            const logFile = path.join(getLogDir("monitor", projectDir), "latest-monitor.log");
+            const logFile = path.join(
+              getLogDir("monitor", projectDir),
+              "latest-monitor.log",
+            );
             let currentSize = 0;
             try {
               if (fs.existsSync(logFile)) {
@@ -240,11 +282,21 @@ export async function rehydrateMonitors(): Promise<void> {
             let restoredTaskId: string | undefined;
             try {
               const history = getCommandHistory();
-              const cmd = [...history].reverse().find(c =>
-                c.tasks?.some(t => t.type === "monitor" && t.status === "running" && t.port === port)
-              );
+              const cmd = [...history]
+                .reverse()
+                .find((c) =>
+                  c.tasks?.some(
+                    (t) =>
+                      t.type === "monitor" &&
+                      t.status === "running" &&
+                      t.port === port,
+                  ),
+                );
               restoredTaskId = cmd?.tasks.find(
-                t => t.type === "monitor" && t.status === "running" && t.port === port
+                (t) =>
+                  t.type === "monitor" &&
+                  t.status === "running" &&
+                  t.port === port,
               )?.taskId;
             } catch {}
             if (!restoredTaskId) {
@@ -263,18 +315,25 @@ export async function rehydrateMonitors(): Promise<void> {
             activeDaemons[port] = daemon;
 
             try {
-               daemon.watcher = fs.watch(logFile, (eventType) => {
-                if (eventType === 'change') {
+              daemon.watcher = fs.watch(logFile, (eventType) => {
+                if (eventType === "change") {
                   try {
                     const stat = fs.statSync(logFile);
                     if (stat.size > (daemon.fileOffset || 0)) {
-                      const stream = fs.createReadStream(logFile, { start: daemon.fileOffset || 0, end: stat.size - 1 });
-                      stream.on('data', (chunk) => {
-                        portalEvents.emitSerialLog(port, chunk.toString(), daemon.taskId);
+                      const stream = fs.createReadStream(logFile, {
+                        start: daemon.fileOffset || 0,
+                        end: stat.size - 1,
+                      });
+                      stream.on("data", (chunk) => {
+                        portalEvents.emitSerialLog(
+                          port,
+                          chunk.toString(),
+                          daemon.taskId,
+                        );
                       });
                       daemon.fileOffset = stat.size;
                     }
-                  } catch (e) {}
+                  } catch {}
                 }
               });
               daemon.watcher.on("error", () => {
@@ -282,9 +341,14 @@ export async function rehydrateMonitors(): Promise<void> {
               });
               startWindowsPollingFallback(port, daemon);
               rehydrationCount++;
-              logDiag(`[Monitor Recovery] Successfully rehydrated stream for ${port} (PID: ${pid}) in ${projectDir}`);
+              logDiag(
+                `[Monitor Recovery] Successfully rehydrated stream for ${port} (PID: ${pid}) in ${projectDir}`,
+              );
             } catch (e: any) {
-               logDiag(`[Monitor Recovery] Failed to attach fs.watch to orphaned port ${port}: ${e.message}`, projectDir);
+              logDiag(
+                `[Monitor Recovery] Failed to attach fs.watch to orphaned port ${port}: ${e.message}`,
+                projectDir,
+              );
             }
           }
         }
@@ -311,7 +375,7 @@ export async function startMonitor(
   const effectiveCommandId = rootCommandId || ctx?.activityId;
   let activePort = port;
   let activeHwid: string | null = null;
-  
+
   if (!activePort) {
     const defaultDevice = await getFirstDevice();
     if (!defaultDevice)
@@ -372,23 +436,30 @@ export async function startMonitor(
   // Attach UI portal tailing
   try {
     daemon.watcher = fs.watch(logFile, (eventType) => {
-      if (eventType === 'change') {
+      if (eventType === "change") {
         try {
           const stat = fs.statSync(logFile);
           if (stat.size > (daemon.fileOffset || 0)) {
-            const stream = fs.createReadStream(logFile, { start: daemon.fileOffset || 0, end: stat.size - 1 });
-            stream.on('data', (chunk) => {
-              portalEvents.emitSerialLog(activePort!, chunk.toString(), daemon.taskId);
+            const stream = fs.createReadStream(logFile, {
+              start: daemon.fileOffset || 0,
+              end: stat.size - 1,
+            });
+            stream.on("data", (chunk) => {
+              portalEvents.emitSerialLog(
+                activePort!,
+                chunk.toString(),
+                daemon.taskId,
+              );
             });
             daemon.fileOffset = stat.size;
           }
-        } catch (e) {}
+        } catch {}
       }
     });
     daemon.watcher.on("error", () => {
       // Ignore watcher errors on constrained environments.
     });
-  } catch (e) {
+  } catch {
     logDiag(`[Spooler] Failed to attach fs.watch to ${logFile}`, projectDir);
   }
 
@@ -405,7 +476,10 @@ export async function startMonitor(
   };
 }
 
-import { getCommandHistory, findCommandAcrossWorkspaces } from "../utils/command-registry.js";
+import {
+  getCommandHistory,
+  findCommandAcrossWorkspaces,
+} from "../utils/command-registry.js";
 
 /**
  * Tool for agents to scan historical offline device payloads.
@@ -421,8 +495,8 @@ export async function queryLogs(
   let targetPaths: string[] = [];
 
   if (taskId) {
-    let history = getCommandHistory(projectDir);
-    let cmd = history.find(c => c.id === taskId);
+    const history = getCommandHistory(projectDir);
+    let cmd = history.find((c) => c.id === taskId);
 
     // Cross-workspace fallback: if the caller omitted projectDir, the task
     // may live in a project-specific registry rather than the global one.
@@ -435,7 +509,7 @@ export async function queryLogs(
 
     if (cmd) {
       targetPaths = cmd.tasks
-        .flatMap(a => a.logPaths || [])
+        .flatMap((a) => a.logPaths || [])
         .filter((f): f is string => Boolean(f && fs.existsSync(f)));
     }
   } else if (logPath) {
@@ -468,7 +542,7 @@ export async function queryLogs(
     try {
       const regex = new RegExp(searchPattern, "i");
       stitchedLines = stitchedLines.filter((line) => regex.test(line));
-    } catch (e) {
+    } catch {
       return {
         success: false,
         content: `Invalid regex search pattern provided: ${searchPattern}`,
@@ -480,7 +554,10 @@ export async function queryLogs(
     stitchedLines = stitchedLines.slice(-lines);
   }
 
-  return { success: true, content: redactSecretsInText(stitchedLines.join("\n")) };
+  return {
+    success: true,
+    content: redactSecretsInText(stitchedLines.join("\n")),
+  };
 }
 
 /** Stable status details for one serial monitor. */
@@ -508,7 +585,10 @@ export interface MonitorStatusResult {
 function encodeMonitorCursor(logPath: string, offset: number): string {
   const payload = {
     version: 1,
-    logHash: crypto.createHash("sha256").update(path.resolve(logPath)).digest("hex"),
+    logHash: crypto
+      .createHash("sha256")
+      .update(path.resolve(logPath))
+      .digest("hex"),
     offset,
   };
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
@@ -523,7 +603,9 @@ function encodeMonitorCursor(logPath: string, offset: number): string {
  */
 function decodeMonitorCursor(cursor: string, logPath: string): number {
   try {
-    const payload = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
+    const payload = JSON.parse(
+      Buffer.from(cursor, "base64url").toString("utf8"),
+    ) as {
       version?: number;
       logHash?: string;
       offset?: number;
@@ -565,7 +647,8 @@ export function getMonitorStatus(
     .filter(
       ([activePort, daemon]) =>
         (!port || activePort === port) &&
-        (!projectDir || path.resolve(daemon.projectDir ?? "") === path.resolve(projectDir)),
+        (!projectDir ||
+          path.resolve(daemon.projectDir ?? "") === path.resolve(projectDir)),
     )
     .map(([activePort, daemon]): MonitorStatusResult => {
       let size = 0;
@@ -682,14 +765,25 @@ export async function captureSerialWindow(input: {
   durationSeconds?: number;
   maxBytes?: number;
   cursor?: string;
+  targetBinding?: TargetBinding;
 }): Promise<SerialWindowResult> {
   const projectDir = path.resolve(input.projectDir);
-  let selectedPort = input.port;
+  const verifiedTarget = input.targetBinding
+    ? await resolveWriteTarget({
+        projectDir,
+        environment: input.environment,
+        port: input.port,
+        targetBinding: input.targetBinding,
+      })
+    : undefined;
+  let selectedPort = verifiedTarget?.port ?? input.port;
   let startedMonitor = false;
 
   if (!selectedPort) {
     const matchingPorts = Object.entries(activeDaemons)
-      .filter(([, daemon]) => path.resolve(daemon.projectDir ?? "") === projectDir)
+      .filter(
+        ([, daemon]) => path.resolve(daemon.projectDir ?? "") === projectDir,
+      )
       .map(([activePort]) => activePort);
     if (matchingPorts.length > 1) {
       throw new PlatformIOError(
@@ -705,7 +799,7 @@ export async function captureSerialWindow(input: {
       selectedPort,
       input.baudRate,
       projectDir,
-      input.environment,
+      verifiedTarget?.environment ?? input.environment,
     );
     selectedPort = started.port;
     startedMonitor = true;
@@ -731,7 +825,8 @@ export async function captureSerialWindow(input: {
     acquiredAt: new Date().toISOString(),
     projectDir,
   });
-  const durationMs = Math.min(60, Math.max(0, input.durationSeconds ?? 5)) * 1000;
+  const durationMs =
+    Math.min(60, Math.max(0, input.durationSeconds ?? 5)) * 1000;
   const maxBytes = Math.min(65_536, Math.max(256, input.maxBytes ?? 16_384));
 
   try {

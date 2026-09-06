@@ -46,6 +46,39 @@
     "agent_get_last_report": ["pio-manager", "hardware-in-the-loop-test"],
     "agent_generate_board_report": ["pio-manager", "hardware-in-the-loop-test"],
     "get_policy_status": ["pio-manager", "platformio-monitoring-automation"],
+    "agent_resolve_target": [
+      "pio-manager",
+      "firmware-bringup",
+      "esp32-flash-monitor",
+      "platformio-monitoring-automation"
+    ],
+    "get_monitor_status": [
+      "pio-manager",
+      "serial-diagnostics",
+      "platformio-dashboard"
+    ],
+    "capture_serial_window": [
+      "pio-manager",
+      "serial-diagnostics",
+      "platformio-monitoring-automation"
+    ],
+    "agent_monitor_health": [
+      "pio-manager",
+      "serial-diagnostics",
+      "platformio-monitoring-automation"
+    ],
+    "cancel_task": [
+      "pio-manager",
+      "hardware-in-the-loop-test",
+      "platformio-dashboard"
+    ],
+    "list_task_history": [
+      "pio-manager",
+      "hardware-in-the-loop-test",
+      "platformio-dashboard"
+    ],
+    "get_approval_request": ["pio-manager", "platformio-dashboard"],
+    "list_pending_approvals": ["pio-manager", "platformio-dashboard"],
     "system_info": ["pio-manager", "platformio-debug"],
     "check_project": ["pio-manager", "platformio-debug"],
     "run_tests": ["pio-manager", "hardware-in-the-loop-test"],

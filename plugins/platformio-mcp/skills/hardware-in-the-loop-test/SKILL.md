@@ -19,15 +19,17 @@ Use this skill to validate firmware behavior on a real device, not just through 
 
 ## Workflow
 
-1. Define expected behavior.
-2. Build firmware.
-3. Ask before flashing.
-4. Flash firmware.
-5. Monitor device output.
-6. Check expected serial strings, timing, or telemetry.
-7. Mark pass/fail.
-8. Save build logs, flash logs, and serial logs.
-9. Summarize results.
+1. Define finite expected markers, rejected patterns, timeout, stability window, and safe physical behavior.
+2. Resolve one project, environment, board, and stable device binding; stop on ambiguity or replacement.
+3. Validate and build with `agent_build_diagnose`.
+4. Ask for an approval scoped to the exact flash workflow and target binding.
+5. Run `agent_flash_monitor_verify` after approval.
+6. Check bounded serial markers, timing, or telemetry and retain task/log/artifact references.
+7. Mark build, flash, monitor, and assertions independently as pass, fail, or inconclusive.
+8. Cancel runaway tracked tasks with `cancel_task`; confirm cleanup with `list_task_history`, `get_monitor_status`, and lock status.
+9. Save redacted evidence and summarize the result.
+
+Scheduled HIL writes require a pre-existing, exact, expiring `lab_runner` policy. A saved prompt cannot create, approve, or broaden that policy, and default scheduled monitoring must remain read/build/monitor-only.
 
 ## Example Test Definition
 

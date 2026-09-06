@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import CommandFeed, { CommandRecord } from '../components/command-feed';
 import React from 'react';
 
@@ -20,6 +20,12 @@ Object.defineProperty(window, 'matchMedia', {
 
 describe('CommandFeed Component', () => {
   const mockOnOpenTab = vi.fn();
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
 
   it('renders MCP Layer correctly', async () => {
     const commands: CommandRecord[] = [{
@@ -93,5 +99,44 @@ describe('CommandFeed Component', () => {
     render(<CommandFeed commands={commands} onOpenTab={mockOnOpenTab} activeTabRef={null} />);
     
     expect(screen.getAllByText('Legacy Execution').length).toBeGreaterThan(0);
+  });
+
+  it('cancels a running task through the authenticated workspace endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ status: 'cancelled' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const commands: CommandRecord[] = [{
+      id: 'cancel-command',
+      commandDesc: 'build',
+      timestamp: Date.now(),
+      status: 'running',
+      mcpToolName: 'build_project',
+      tasks: [{ taskId: 'cancel-task', type: 'build', status: 'running' }],
+    }];
+
+    render(
+      <CommandFeed
+        commands={commands}
+        onOpenTab={mockOnOpenTab}
+        activeTabRef={null}
+        activeWorkspace="/demo/project"
+        apiBase="http://127.0.0.1:3001"
+        token="dashboard-token"
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /cancel/i }));
+    fireEvent.click(await screen.findByText('Cancel task'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://127.0.0.1:3001/api/tasks/cancel-task/cancel',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ projectDir: '/demo/project' }),
+        }),
+      );
+    });
   });
 });

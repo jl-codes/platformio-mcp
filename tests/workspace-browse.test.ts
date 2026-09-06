@@ -4,19 +4,10 @@ import { startPortalServer } from "../src/api/server.js";
 import { Server as HttpServer } from "http";
 import fs from "node:fs";
 
-// Mock child_process for the osascript prompt
-vi.mock("child_process", async (importOriginal) => {
-  const actual: any = await importOriginal();
-  return {
-    ...actual,
-    execSync: vi.fn((cmd: string) => {
-      if (cmd.includes("choose folder") || cmd.includes("zenity")) {
-        return "/tmp/invalid-pio-project-test";
-      }
-      return actual.execSync(cmd);
-    })
-  };
-});
+vi.mock("../src/api/folder-picker.js", () => ({
+  pickWorkspaceDirectory: vi.fn(() => "/tmp/invalid-pio-project-test"),
+  WorkspacePickerUnavailableError: class extends Error {},
+}));
 
 // Mock platformio runner to avoid hangs
 vi.mock("../src/platformio.js", () => ({
@@ -31,6 +22,7 @@ describe("Workspace Browse Validation", () => {
   let app: any;
   let server: HttpServer;
   let authToken: string;
+  let closePortal: () => Promise<void>;
 
   beforeAll(async () => {
     process.env.PORTAL_PORT = "0";
@@ -38,6 +30,7 @@ describe("Workspace Browse Validation", () => {
     app = portal.app;
     server = portal.httpServer;
     authToken = portal.authToken;
+    closePortal = portal.close;
 
     await new Promise<void>((resolve) => {
       server.on("listening", () => resolve());
@@ -45,7 +38,7 @@ describe("Workspace Browse Validation", () => {
   });
 
   afterAll(async () => {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closePortal();
   });
 
   it("should return 400 when an invalid folder without platformio.ini is selected", async () => {

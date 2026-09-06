@@ -92,12 +92,25 @@ describeBundledRuntime("bundled Codex plugin runtime", () => {
         throw new Error(`${message}\nPackaged server stderr:\n${stderr}`);
       });
       const result = await client.listTools();
-      expect(result.tools).toHaveLength(34);
+      expect(result.tools).toHaveLength(42);
+      expect(
+        result.tools.every(
+          (tool) =>
+            tool.annotations &&
+            typeof tool.annotations.readOnlyHint === "boolean" &&
+            typeof tool.annotations.destructiveHint === "boolean" &&
+            typeof tool.annotations.idempotentHint === "boolean" &&
+            typeof tool.annotations.openWorldHint === "boolean",
+        ),
+      ).toBe(true);
       expect(result.tools.map((tool) => tool.name)).toContain(
         "get_dashboard_url",
       );
       expect(result.tools.map((tool) => tool.name)).toContain(
         "agent_flash_monitor_verify",
+      );
+      expect(result.tools.map((tool) => tool.name)).toContain(
+        "agent_monitor_health",
       );
     } finally {
       await client.close();

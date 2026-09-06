@@ -1,11 +1,20 @@
 import path from "node:path";
-import { actionRiskLevels, defaultPolicy, deniedActionPatterns } from "./default-policy.js";
+import {
+  actionRiskLevels,
+  defaultPolicy,
+  deniedActionPatterns,
+} from "./default-policy.js";
 import {
   approveRequest,
   createApprovalRequest,
   getApproval,
 } from "./approvals.js";
 import { appendAuditEvent } from "./audit-log.js";
+import {
+  reserveAutomationWriteBudget,
+  validateAutomationScope,
+  type AutomationScopeInput,
+} from "./automation-policy.js";
 import { loadEffectivePolicyState } from "./load-policy.js";
 import type {
   PolicyDecision,
@@ -111,9 +120,93 @@ export async function evaluatePolicy(
       context.actorClass ??
       (context.actor === "system" ? "system" : "interactive"),
   } as const;
+  let scheduledScopeInput: AutomationScopeInput | undefined;
+  let scheduledWriteOperation = false;
+
+  if (context.actorClass === "scheduled" && context.automationKey) {
+    try {
+      scheduledScopeInput = {
+        automationKey: context.automationKey,
+        action,
+        projectDir: String(args.projectDir ?? context.workspaceDir ?? ""),
+        environment:
+          typeof args.environment === "string"
+            ? args.environment
+            : typeof (args.targetBinding as Record<string, unknown> | undefined)
+                  ?.environment === "string"
+              ? String(
+                  (args.targetBinding as Record<string, unknown>).environment,
+                )
+              : undefined,
+        targetBinding:
+          typeof args.targetBinding === "object" && args.targetBinding !== null
+            ? (args.targetBinding as Parameters<
+                typeof validateAutomationScope
+              >[0]["targetBinding"])
+            : undefined,
+        maxRunDurationSeconds:
+          typeof args.maxRunDurationSeconds === "number"
+            ? args.maxRunDurationSeconds
+            : typeof args.captureDurationSeconds === "number"
+              ? args.captureDurationSeconds
+              : typeof args.durationSeconds === "number"
+                ? args.durationSeconds
+                : typeof args.timeoutSeconds === "number"
+                  ? args.timeoutSeconds
+                  : 300,
+      };
+      scheduledWriteOperation =
+        validateAutomationScope(scheduledScopeInput).writeOperation;
+    } catch (error) {
+      const reason =
+        error instanceof Error
+          ? error.message
+          : "Unattended automation scope was denied.";
+      const denied = decision("deny", reason, action, riskLevel);
+      if (policy.audit_all_agent_actions) {
+        appendAuditEvent({
+          action,
+          status: "denied",
+          reason,
+          riskLevel,
+          ...auditContext,
+        });
+      }
+      return denied;
+    }
+  }
+
+  const reserveScheduledWrite = async (): Promise<
+    PolicyDecision | undefined
+  > => {
+    if (!scheduledScopeInput || !scheduledWriteOperation) return undefined;
+    try {
+      await reserveAutomationWriteBudget(scheduledScopeInput);
+      return undefined;
+    } catch (error) {
+      const reason =
+        error instanceof Error
+          ? error.message
+          : "Unattended hardware-write budget was denied.";
+      const denied = decision("deny", reason, action, riskLevel);
+      if (policy.audit_all_agent_actions) {
+        appendAuditEvent({
+          action,
+          status: "denied",
+          reason,
+          riskLevel,
+          ...auditContext,
+        });
+      }
+      return denied;
+    }
+  };
 
   // Hard deny known dangerous command aliases/patterns.
-  if (policy.deny.includes(action) || deniedActionPatterns.some((p) => p.test(action))) {
+  if (
+    policy.deny.includes(action) ||
+    deniedActionPatterns.some((p) => p.test(action))
+  ) {
     const denied = decision(
       "deny",
       `Action '${action}' is denied by policy.`,
@@ -155,7 +248,10 @@ export async function evaluatePolicy(
     return denied;
   }
 
-  if (policy.require_device_lock_for_upload && (action === "upload_firmware" || action === "upload_filesystem")) {
+  if (
+    policy.require_device_lock_for_upload &&
+    (action === "upload_firmware" || action === "upload_filesystem")
+  ) {
     // Runtime lock manager still enforces this; policy check remains informative.
     if (!hasProjectDir(args)) {
       const denied = decision(
@@ -191,6 +287,8 @@ export async function evaluatePolicy(
         request.status === "approved" &&
         approvalMatchesScope(action, args, request)
       ) {
+        const reservationDenied = await reserveScheduledWrite();
+        if (reservationDenied) return reservationDenied;
         const allowed = decision(
           "allow",
           `Action '${action}' is allowed via approved request ${explicitApprovalId}.`,
@@ -213,6 +311,8 @@ export async function evaluatePolicy(
     }
 
     if (explicitApproved) {
+      const reservationDenied = await reserveScheduledWrite();
+      if (reservationDenied) return reservationDenied;
       const approved = createApprovalRequest({
         action,
         riskLevel,
@@ -269,8 +369,9 @@ export async function evaluatePolicy(
     return needsApproval;
   }
 
-  const allowList = policy.allow.length > 0 ? policy.allow : defaultPolicy.allow;
-  const isAllowed = allowList.includes(action) || !policy.deny.includes(action);
+  const allowList =
+    policy.allow.length > 0 ? policy.allow : defaultPolicy.allow;
+  const isAllowed = allowList.includes(action);
   const result = isAllowed
     ? decision(
         "allow",
@@ -285,6 +386,11 @@ export async function evaluatePolicy(
         riskLevel,
       );
 
+  if (result.status === "allow") {
+    const reservationDenied = await reserveScheduledWrite();
+    if (reservationDenied) return reservationDenied;
+  }
+
   if (policy.audit_all_agent_actions) {
     appendAuditEvent({
       action,
@@ -298,4 +404,3 @@ export async function evaluatePolicy(
 
   return result;
 }
-

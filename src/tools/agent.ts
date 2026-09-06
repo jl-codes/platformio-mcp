@@ -36,6 +36,8 @@ import {
 } from "../core/automation-state.js";
 import {
   resolveTarget,
+  resolveWriteTarget,
+  type TargetBinding,
   type TargetResolutionResult,
 } from "../core/target-resolution.js";
 import { validateAutomationScope } from "../core/policy/automation-policy.js";
@@ -768,21 +770,31 @@ export async function agentFlashMonitorVerify(input: {
   projectDir: string;
   environment?: string;
   port?: string;
+  targetBinding?: TargetBinding;
   expectAll?: string[];
   rejectPatterns?: string[];
   timeoutSeconds?: number;
   stabilityWindowSeconds?: number;
   autoBuild?: boolean;
+  maxRunDurationSeconds?: number;
 }): Promise<AgentFlashMonitorVerifyResult> {
   const validatedPath = validateProjectPath(input.projectDir);
   const timeoutSeconds = input.timeoutSeconds ?? 45;
   const stabilityWindowSeconds = input.stabilityWindowSeconds ?? 10;
   const expectAll = input.expectAll ?? [];
   const rejectPatterns = input.rejectPatterns ?? [];
+  const verifiedInput = input.targetBinding
+    ? await resolveWriteTarget({
+        projectDir: validatedPath,
+        environment: input.environment,
+        port: input.port,
+        targetBinding: input.targetBinding,
+      })
+    : undefined;
   const target = await resolveTarget({
     projectDir: validatedPath,
-    environment: input.environment,
-    port: input.port,
+    environment: verifiedInput?.environment ?? input.environment,
+    port: verifiedInput?.port ?? input.port,
   });
   const environment = target.environment ?? input.environment ?? "unresolved";
   const shouldAutoBuild = input.autoBuild ?? true;
@@ -889,6 +901,7 @@ export async function agentFlashMonitorVerify(input: {
     startMonitorAfter: true,
     verbose: true,
     targetBinding: target.binding,
+    maxRunDurationSeconds: input.maxRunDurationSeconds,
   });
 
   if ("status" in uploadResult && uploadResult.status === "running") {
@@ -1215,6 +1228,8 @@ export async function agentMonitorHealth(input: {
         lastStatus: health.status,
         consecutiveFailures: health.consecutiveFailures,
         targetBinding: target.binding,
+        consecutiveHardwareWrites:
+          health.status === "healthy" ? 0 : prior.consecutiveHardwareWrites,
       });
     }
 

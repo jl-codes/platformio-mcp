@@ -30,12 +30,18 @@ const SOURCE_SKILLS = [
   [".skills/esp32-flash-monitor", "esp32-flash-monitor"],
   [".skills/serial-diagnostics", "serial-diagnostics"],
   [".skills/hardware-in-the-loop-test", "hardware-in-the-loop-test"],
+  [".skills/platformio-dashboard", "platformio-dashboard"],
+  [
+    ".skills/platformio-monitoring-automation",
+    "platformio-monitoring-automation",
+  ],
 ];
 
 /** Binary assets copied from the repository's maintained artwork. */
 const ASSET_COPIES = [
   ["docs/assets/pio_mcp_220x220.png", "assets/icon.png"],
   ["docs/assets/pio_mcp_220x220.png", "assets/logo.png"],
+  ["docs/assets/pio_mcp_220x220.png", "assets/logo-dark.png"],
 ];
 
 /**

@@ -30,6 +30,8 @@
     "brandColor": "#2F80ED",
     "composerIcon": "./assets/icon.png",
     "logo": "./assets/logo.png",
+    "logoDark": "./assets/logo-dark.png",
+    "screenshots": ["./assets/screenshot-dashboard.png"],
     "defaultPrompt": [
       "Inspect and validate this PlatformIO project.",
       "Build, flash with approval, and verify the device output.",

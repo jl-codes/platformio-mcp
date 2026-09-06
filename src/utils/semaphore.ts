@@ -82,7 +82,7 @@ export class SemaphoreManager {
         const content = fs.readFileSync(filePath, "utf-8");
         const parsed = JSON.parse(content);
         return parsed.current_claim || parsed;
-      } catch (e) {
+      } catch {
         return null;
       }
     }
