@@ -3,3 +3,6 @@
 
 # Runtime inventory hashes raw bytes; never apply checkout newline conversion.
 plugins/platformio-mcp/runtime/** -text
+
+# Generated skills include portable shell assets and are synchronized as LF text.
+plugins/platformio-mcp/skills/** -text

@@ -6,13 +6,29 @@
  * - launchPlatformIOMcp: Starts the server with transparent stdio and signals.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PLUGIN_ROOT = resolve(SCRIPT_DIR, "..");
+
+/**
+ * Tests whether two path spellings identify the same file.
+ * macOS commonly aliases `/var` to `/private/var`, including its temp folder.
+ * @param {string} left First path.
+ * @param {string} right Second path.
+ * @param {(path: string) => string} [canonicalize] Canonical path resolver.
+ * @returns {boolean} Whether both paths resolve to the same file.
+ */
+export function pathsReferToSameFile(left, right, canonicalize = realpathSync) {
+  try {
+    return canonicalize(left) === canonicalize(right);
+  } catch {
+    return resolve(left) === resolve(right);
+  }
+}
 
 /**
  * Resolves a launch command without spawning a shell.
@@ -107,7 +123,10 @@ export function launchPlatformIOMcp(spec = getLaunchSpec()) {
   return child;
 }
 
-const invokedPath = process.argv[1] ? resolve(process.argv[1]) : "";
-if (invokedPath === fileURLToPath(import.meta.url)) {
+const invokedPath = process.argv[1];
+if (
+  invokedPath &&
+  pathsReferToSameFile(invokedPath, fileURLToPath(import.meta.url))
+) {
   launchPlatformIOMcp();
 }

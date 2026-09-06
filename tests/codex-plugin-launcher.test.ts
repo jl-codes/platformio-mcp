@@ -7,13 +7,32 @@ import fs from "node:fs";
 import os from "node:os";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { describe, expect, it } from "vitest";
-import { getLaunchSpec } from "../plugins/platformio-mcp/scripts/launch-platformio-mcp.mjs";
+import { describe, expect, it, vi } from "vitest";
+import {
+  getLaunchSpec,
+  pathsReferToSameFile,
+} from "../plugins/platformio-mcp/scripts/launch-platformio-mcp.mjs";
 
 const PLUGIN_ROOT = path.join(process.cwd(), "plugins", "platformio-mcp");
 const RUNTIME_PATH = path.join(PLUGIN_ROOT, "runtime", "platformio-mcp.mjs");
 
 describe("Codex plugin launcher", () => {
+  it("recognizes macOS temporary-directory path aliases", () => {
+    const canonicalize = vi.fn(
+      () =>
+        "/private/var/folders/cache/platformio-mcp/scripts/launch-platformio-mcp.mjs",
+    );
+
+    expect(
+      pathsReferToSameFile(
+        "/var/folders/cache/platformio-mcp/scripts/launch-platformio-mcp.mjs",
+        "/private/var/folders/cache/platformio-mcp/scripts/launch-platformio-mcp.mjs",
+        canonicalize,
+      ),
+    ).toBe(true);
+    expect(canonicalize).toHaveBeenCalledTimes(2);
+  });
+
   it("prefers the self-contained runtime and disables OS browser launch", () => {
     const spec = getLaunchSpec({
       pluginRoot: PLUGIN_ROOT,

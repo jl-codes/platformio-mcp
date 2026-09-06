@@ -72,6 +72,7 @@ describe("Codex plugin manifest", () => {
     const textExtensions = new Set([".css", ".html", ".js", ".json", ".mjs"]);
 
     expect(attributes).toContain("plugins/platformio-mcp/runtime/** -text");
+    expect(attributes).toContain("plugins/platformio-mcp/skills/** -text");
     for (const entry of inventory.files) {
       if (!textExtensions.has(path.extname(entry.path))) continue;
       const contents = fs.readFileSync(
