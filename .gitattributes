@@ -1,2 +1,5 @@
 # Mark hook scripts as generated so GitHub excludes them from language stats
 .clinerules/hooks/* linguist-generated=true
+
+# Runtime inventory hashes raw bytes; never apply checkout newline conversion.
+plugins/platformio-mcp/runtime/** -text

@@ -85,7 +85,7 @@ function assertPluginDestination(destination) {
  */
 function normalizeText(value) {
   return `${value
-    .replaceAll("\r\n", "\n")
+    .replace(/\r+\n?/gu, "\n")
     .split("\n")
     .map((line) => line.replace(/[ \t]+$/u, ""))
     .join("\n")

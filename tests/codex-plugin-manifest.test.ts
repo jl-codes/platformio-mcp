@@ -61,6 +61,27 @@ describe("Codex plugin manifest", () => {
     );
   });
 
+  it("keeps byte-addressed runtime artifacts checkout-stable", () => {
+    const attributes = fs.readFileSync(
+      path.join(REPO_ROOT, ".gitattributes"),
+      "utf8",
+    );
+    const inventory = readJson(
+      "plugins/platformio-mcp/runtime/inventory.json",
+    ) as { files: Array<{ path: string }> };
+    const textExtensions = new Set([".css", ".html", ".js", ".json", ".mjs"]);
+
+    expect(attributes).toContain("plugins/platformio-mcp/runtime/** -text");
+    for (const entry of inventory.files) {
+      if (!textExtensions.has(path.extname(entry.path))) continue;
+      const contents = fs.readFileSync(
+        path.join(PLUGIN_ROOT, "runtime", entry.path),
+        "utf8",
+      );
+      expect(contents, entry.path).not.toContain("\r");
+    }
+  });
+
   it("maps every declared MCP tool to at least one packaged skill", () => {
     const serverSource = fs.readFileSync(
       path.join(REPO_ROOT, "src", "index.ts"),

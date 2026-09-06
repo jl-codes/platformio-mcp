@@ -24,7 +24,13 @@ import { syncCodexPlugin } from "./sync-codex-plugin.mjs";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PLUGIN_ROOT = join(REPO_ROOT, "plugins", "platformio-mcp");
 const RUNTIME_ROOT = join(PLUGIN_ROOT, "runtime");
-const TEXT_RUNTIME_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".mjs"]);
+const TEXT_RUNTIME_EXTENSIONS = new Set([
+  ".css",
+  ".html",
+  ".js",
+  ".json",
+  ".mjs",
+]);
 
 /**
  * Normalizes generated text for stable cross-platform diffs.
@@ -33,7 +39,7 @@ const TEXT_RUNTIME_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".mjs"
  */
 function normalizeText(value) {
   return `${value
-    .replaceAll("\r\n", "\n")
+    .replace(/\r+\n?/gu, "\n")
     .split("\n")
     .map((line) => line.replace(/[ \t]+$/u, ""))
     .join("\n")
