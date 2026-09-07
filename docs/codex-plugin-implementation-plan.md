@@ -28,7 +28,7 @@ The integration is successful when a fresh clone can offer the plugin without re
 
 ## Implementation Status (2026-09-07)
 
-This plan is being implemented on draft PR [#20](https://github.com/jl-codes/platformio-mcp/pull/20). The pull request remains intentionally in draft until the physical-board release gate is satisfied.
+This plan is being implemented on draft PR [#20](https://github.com/jl-codes/platformio-mcp/pull/20). The minimum physical-board gate is satisfied; the pull request remains in draft for final maintainer review and publication of the latest evidence commit.
 
 | Plan area | Current status | Evidence or remaining gate |
 | --- | --- | --- |
@@ -39,7 +39,7 @@ This plan is being implemented on draft PR [#20](https://github.com/jl-codes/pla
 | Automation integration and safety | Validated | The automation skill uses Codex host automations rather than a plugin scheduler; quiet-success, alert/recovery, teardown, and UI-free background behavior are specified. Default profiles cannot perform unattended writes. The explicit `lab_runner` path is independently bounded by exact project/environment/device binding, expiry, cooldown, and write budget. Host create, view, resume, pause, delete, and cleanup acceptance passed with a temporary paused read-only PlatformIO monitor definition. |
 | Software verification | Passing locally | 155 root tests, 12 agent/CLI E2E tests, 10 dashboard component tests, 12 plugin tests, and 4 Chromium journeys pass; typecheck, production build, smoke test, sync/manifest validation, deterministic rebuild, package dry-run, and both dependency audits pass. Three additional MCP agent smoke cases are Linux-only and configured in CI. Lint has zero errors. |
 | CI, release, and evidence handling | Passing | Windows/macOS/Linux quality and plugin jobs, Chromium, Agent/CLI E2E, package smoke, deterministic rebuild, npm-pack inspection, and dependency audits pass on the draft PR. The obsolete Cline PR Detective workflow is disabled in GitHub and removed from the branch; the repository-owned CI matrix is authoritative. Active workflows use the Node 24-based `actions/checkout@v7` and `actions/setup-node@v7` runtimes while testing the package on Node 20. Manual hardware E2E and sanitized hardware-evidence packaging are defined. Raw hardware logs remain on the self-hosted runner. |
-| Physical hardware acceptance | Open release gate | No physical-board commands were run while preparing this implementation. At least one physical-board record, followed by the applicable ESP32/RP2040/STM32/Arduino matrix rows, is still required before the PR can leave draft status or the plugin can be released. |
+| Physical hardware acceptance | Minimum release gate satisfied | The [redacted ESP32-S3 acceptance record](hardware-acceptance-esp32s3.md) combines a prior user-authorized, SHA-verified physical upload/re-enumeration/serial run and user-confirmed working display with a current non-invasive check through the 42-tool bundled runtime. The current check resolved the exact project/environment/device, enforced `flash_requires_approval`, issued a short-lived binding, exposed history, and left no lock, running task, active monitor, or pending approval. No new flash or GPIO change was performed. RP2040, STM32, Arduino-class, fresh-workflow, and deliberate crash-injection rows remain explicitly unavailable rather than inferred. |
 
 The status table is the delivery checkpoint; the detailed matrix and release gates below remain authoritative. A software-complete row does not waive its listed manual or hardware proof.
 
@@ -794,10 +794,10 @@ For every skill, test:
 
 | Scenario                     | Minimum coverage                                                           |
 | ---------------------------- | -------------------------------------------------------------------------- |
-| ESP32 family                 | Build, approved flash, USB re-enumeration, serial assertion, crash pattern |
-| RP2040 family                | Build, approved flash, monitor reconnect                                   |
-| STM32 family                 | Build and upload method selection; monitor when supported                  |
-| Arduino-class board          | Build, approved flash, simple boot marker                                  |
+| ESP32 family                 | Accepted: build, user-authorized SHA-verified flash, USB re-enumeration, serial assertion, and working display. Deliberate crash injection was not run under the non-invasive gate; see [record](hardware-acceptance-esp32s3.md). |
+| RP2040 family                | Unavailable for this acceptance: build, approved flash, monitor reconnect  |
+| STM32 family                 | Unavailable for this acceptance: build and upload method selection; monitor when supported |
+| Arduino-class board          | Unavailable for this acceptance: build, approved flash, simple boot marker |
 | No device attached           | Build-only success and explicit monitoring/flash blocker                   |
 | Multiple devices attached    | Ambiguity response; no guessed write target                                |
 | Simulator/native environment | Build and tests without requiring physical hardware                        |

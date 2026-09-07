@@ -65,6 +65,8 @@ For each dispatch, select one checkout-relative fixture, exact PlatformIO enviro
 
 The workflow runs `node scripts/prepare-hardware-evidence.mjs` after the hardware checks. It uploads only `test-results/hardware-evidence/`, which contains bounded, sanitized copies and a path-free SHA-256 manifest. The sanitizer accepts only safe text files from the project-local log and audit directories, rejects symlinks and oversized inputs, and redacts credentials, user paths, serial ports, MAC addresses, hardware IDs, and stable device fingerprints. Raw `.pio-mcp-workspace` logs are never uploaded and remain on the self-hosted runner for local diagnosis. `tests/hardware-evidence.test.ts` verifies both redaction and boundary behavior.
 
+The initial one-board usability gate is documented in the [redacted ESP32-S3 acceptance record](hardware-acceptance-esp32s3.md). It combines a prior user-authorized, SHA-verified physical upload/re-enumeration/serial record with a current read-only check through the exact 42-tool bundled runtime. The record clearly labels that no fresh upload or GPIO change occurred during the current check. This satisfies the minimum requirement for one real board; it does not claim coverage for unavailable board families, deliberate crash injection, or a fresh `hardware-e2e.yml` dispatch.
+
 ## Release
 
 1. Update package version and changelog.
