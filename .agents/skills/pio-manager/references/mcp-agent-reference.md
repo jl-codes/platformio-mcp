@@ -1,6 +1,6 @@
-# PlatformIO MCP Agent Command Reference
+# PIO Agent Command Reference
 
-This is a distilled reference designed specifically for AI agents. It contains the 26 tools provided by the PlatformIO MCP server, focusing entirely on required arguments, best practices, and edge cases. JSON schemas and parameter types are omitted here as they are automatically provided to you via your native MCP Tool Declarations.
+This is a distilled reference designed specifically for AI agents. It contains the tools provided by PIO Agent's PlatformIO MCP server, focusing entirely on required arguments, best practices, and edge cases. JSON schemas and parameter types are omitted here as they are automatically provided to you via your native MCP Tool Declarations.
 
 ## Command Index
 

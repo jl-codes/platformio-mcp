@@ -1,9 +1,9 @@
 {
   "name": "platformio-mcp",
   "version": "2.2.2",
-  "description": "Build, flash, test, and monitor PlatformIO firmware safely from Codex.",
+  "description": "PIO Agent builds, flashes, tests, and monitors PlatformIO firmware safely from Codex using PlatformIO MCP.",
   "author": {
-    "name": "PlatformIO MCP Server Contributors",
+    "name": "PIO Agent Contributors",
     "url": "https://github.com/jl-codes"
   },
   "homepage": "https://github.com/jl-codes/platformio-mcp#readme",
@@ -11,6 +11,7 @@
   "license": "MIT",
   "keywords": [
     "platformio",
+    "pio-agent",
     "embedded",
     "firmware",
     "microcontroller",
@@ -20,22 +21,27 @@
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
-    "displayName": "PlatformIO MCP",
-    "shortDescription": "Build, flash, and monitor embedded projects.",
-    "longDescription": "A complete local PlatformIO workflow for Codex: discover boards, inspect projects, diagnose builds, flash with policy-backed approvals, monitor serial output, run hardware tests, and open the live dashboard.",
-    "developerName": "PlatformIO MCP Server Contributors",
+    "displayName": "PIO Agent",
+    "shortDescription": "Your PlatformIO build, flash, and monitor agent.",
+    "longDescription": "Built on PlatformIO MCP, PIO Agent is a complete local embedded control plane for Codex: discover boards, inspect projects, diagnose builds, flash with policy-backed approvals, monitor serial output, run hardware tests, and operate the live dashboard.",
+    "developerName": "PIO Agent Contributors",
     "category": "Developer Tools",
-    "capabilities": ["Interactive", "Write"],
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
     "websiteURL": "https://github.com/jl-codes/platformio-mcp",
-    "brandColor": "#2F80ED",
+    "brandColor": "#1687F8",
     "composerIcon": "./assets/icon.png",
     "logo": "./assets/logo.png",
     "logoDark": "./assets/logo-dark.png",
-    "screenshots": ["./assets/screenshot-dashboard.png"],
+    "screenshots": [
+      "./assets/screenshot-dashboard.png"
+    ],
     "defaultPrompt": [
       "Inspect and validate this PlatformIO project.",
       "Build, flash with approval, and verify the device output.",
-      "Open the PlatformIO dashboard and monitor this device."
+      "Open the PIO Agent dashboard and monitor this device."
     ]
   }
 }

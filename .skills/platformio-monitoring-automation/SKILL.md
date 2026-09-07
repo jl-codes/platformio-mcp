@@ -5,7 +5,7 @@ description: Create or update recurring PlatformIO build, device-presence, seria
 
 # PlatformIO Monitoring Automation
 
-Use Codex's host scheduler for cadence and PlatformIO MCP for bounded observations. Do not implement a second scheduler or edit scheduler files directly.
+Use Codex's host scheduler for cadence and PIO Agent's PlatformIO MCP runtime for bounded observations. Do not implement a second scheduler or edit scheduler files directly.
 
 ## Preconditions
 

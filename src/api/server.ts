@@ -1543,7 +1543,7 @@ export function startPortalServer(defaultPort = 8080) {
 
   io.on("connection", async (socket) => {
     socket.emit("connection_established", {
-      message: "Connected to PIO MCP Backend",
+      message: "Connected to PIO Agent backend",
     });
 
     // Provide initial status state

@@ -263,8 +263,8 @@ export async function installCodexPlugin(options = {}) {
 
   console.log(
     pluginAdded
-      ? "✅ PlatformIO MCP Codex Plugin installed."
-      : "✅ PlatformIO MCP Codex Plugin is already installed.",
+      ? "✅ PIO Agent Codex Plugin installed."
+      : "✅ PIO Agent Codex Plugin is already installed.",
   );
   console.log(
     "Next: start a new Codex task so the plugin skills and MCP tools are loaded.",

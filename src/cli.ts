@@ -72,7 +72,7 @@ type ParsedArgs = {
 };
 
 function printCliHelp() {
-  console.log(`platformio-mcp / pio-agent
+  console.log(`PIO Agent (pio-agent / platformio-mcp)
 
 USAGE:
   pio-agent <command> [options]

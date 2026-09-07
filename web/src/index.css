@@ -3,6 +3,13 @@
 
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: light dark;
+  --pio-blue: #1687f8;
+  --pio-cyan: #25d9ff;
+  --pio-navy-950: #050c16;
+  --pio-navy-900: #07111f;
+  --pio-navy-800: #0f1b2b;
+  --pio-border: rgba(78, 159, 228, 0.24);
 }
 
 body {
@@ -14,8 +21,8 @@ body {
 /* Custom Scrollbar for inner components */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(144, 143, 160, 0.3); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(144, 143, 160, 0.5); }
+::-webkit-scrollbar-thumb { background: rgba(72, 145, 207, 0.4); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(37, 217, 255, 0.56); }
 
 /* Monospace Helpers */
 .mono-label { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; }
@@ -102,10 +109,36 @@ body {
 
 .cockpit-shell {
   height: 100dvh !important;
+  background-image:
+    radial-gradient(circle at 16% -10%, rgba(22, 135, 248, 0.13), transparent 34%),
+    linear-gradient(180deg, rgba(37, 217, 255, 0.025), transparent 32%);
 }
 
 .cockpit-header {
-  min-height: 64px;
+  align-items: center;
+  background:
+    linear-gradient(112deg, rgba(22, 135, 248, 0.16), transparent 32%),
+    linear-gradient(180deg, #0c1a2a 0%, #07111f 100%) !important;
+  border-bottom: 1px solid rgba(37, 217, 255, 0.3);
+  box-shadow: 0 10px 32px rgba(1, 9, 18, 0.28);
+  display: flex;
+  height: 72px;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 0 20px 0 0 !important;
+  position: relative;
+  z-index: 20;
+}
+
+.cockpit-header::after {
+  background: linear-gradient(90deg, var(--pio-cyan), var(--pio-blue), transparent 72%);
+  bottom: -1px;
+  content: "";
+  height: 1px;
+  left: 0;
+  opacity: 0.8;
+  position: absolute;
+  width: 42%;
 }
 
 .cockpit-header-main,
@@ -113,19 +146,179 @@ body {
   min-width: 0;
 }
 
+.cockpit-header-main {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  height: 100%;
+}
+
 .cockpit-header-actions {
   flex-shrink: 0;
 }
 
+.cockpit-logo-cell {
+  align-items: center;
+  align-self: stretch;
+  background: linear-gradient(145deg, rgba(37, 217, 255, 0.07), rgba(22, 135, 248, 0.14));
+  border-right: 1px solid rgba(37, 217, 255, 0.18);
+  display: flex;
+  justify-content: center;
+  width: 72px;
+}
+
+.cockpit-logo {
+  filter: drop-shadow(0 8px 16px rgba(22, 135, 248, 0.3));
+  height: 52px;
+  object-fit: contain;
+  width: 52px;
+}
+
+.cockpit-brand-lockup {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  justify-content: center;
+  line-height: 1;
+}
+
+.cockpit-title {
+  background: linear-gradient(94deg, #f6fbff 5%, #9edcff 54%, #25d9ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.075em;
+}
+
+.cockpit-brand-subtitle {
+  color: #7fabc9;
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  margin-top: 5px;
+}
+
 .cockpit-title,
+.cockpit-brand-subtitle,
 .cockpit-auto-track-label,
 .cockpit-session-badge,
 .cockpit-server-label {
   white-space: nowrap;
 }
 
+.cockpit-auto-track-label,
+.cockpit-header-actions .ant-badge-status-text,
+.cockpit-header-actions .ant-typography {
+  color: #a8bfd4 !important;
+}
+
+.cockpit-project-select {
+  background: rgba(12, 32, 51, 0.9) !important;
+  border-color: rgba(75, 143, 199, 0.4) !important;
+  color: #e8f1fa !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease !important;
+}
+
+.cockpit-project-select:hover,
+.cockpit-project-select:focus-visible {
+  border-color: var(--pio-cyan) !important;
+  box-shadow: 0 0 0 2px rgba(37, 217, 255, 0.12) !important;
+}
+
 .cockpit-project-select {
   width: min(280px, 30vw) !important;
+}
+
+.cockpit-status-pill {
+  align-items: center;
+  background: rgba(17, 39, 61, 0.82);
+  border: 1px solid rgba(75, 143, 199, 0.28);
+  border-radius: 999px;
+  display: inline-flex;
+  min-height: 30px;
+  padding: 3px 10px;
+}
+
+.cockpit-activity-bar {
+  box-shadow: 8px 0 26px rgba(1, 9, 18, 0.14);
+}
+
+.cockpit-activity-bar .ant-menu-item {
+  border-left: 2px solid transparent;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.cockpit-activity-bar .ant-menu-item-selected {
+  background: linear-gradient(90deg, rgba(37, 217, 255, 0.9), var(--pio-blue)) !important;
+  border-left-color: #d8f8ff;
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.1), 0 0 22px rgba(22, 135, 248, 0.22);
+}
+
+.workspace-config .ant-card,
+.cockpit-command-feed .ant-card {
+  border-color: var(--pio-border);
+  box-shadow: 0 10px 28px rgba(1, 9, 18, 0.09);
+}
+
+.workspace-config .ant-card-head {
+  background: linear-gradient(90deg, rgba(22, 135, 248, 0.07), transparent 72%);
+  border-bottom-color: var(--pio-border);
+}
+
+.pio-auth-state {
+  align-items: center;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(22, 135, 248, 0.16), transparent 32%),
+    #f5f9fd;
+  color: #11243a;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100dvh;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+}
+
+.pio-auth-state-dark {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(22, 135, 248, 0.2), transparent 34%),
+    #07111f;
+  color: #e8f1fa;
+}
+
+.pio-auth-state img {
+  filter: drop-shadow(0 22px 42px rgba(22, 135, 248, 0.26));
+  height: 128px;
+  object-fit: contain;
+  width: 128px;
+}
+
+.pio-auth-copy {
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+  gap: 9px;
+  max-width: 520px;
+}
+
+.pio-auth-brand {
+  color: var(--pio-cyan);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.pio-auth-loading img {
+  animation: pio-agent-pulse 1.8s ease-in-out infinite;
+  height: 108px;
+  width: 108px;
+}
+
+@keyframes pio-agent-pulse {
+  0%, 100% { opacity: 0.52; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1.04); }
 }
 
 .cockpit-main-content {
@@ -149,8 +342,11 @@ body {
   }
 
   .cockpit-title {
-    font-size: 16px !important;
-    flex-shrink: 0;
+    font-size: 17px;
+  }
+
+  .cockpit-brand-subtitle {
+    display: none;
   }
 
   .cockpit-auto-track-label,
@@ -190,11 +386,11 @@ body {
   }
 
   .cockpit-logo-cell img {
-    width: 32px !important;
-    height: 32px !important;
+    width: 38px !important;
+    height: 38px !important;
   }
 
-  .cockpit-title,
+  .cockpit-brand-lockup,
   .cockpit-auto-track-label,
   .cockpit-session-badge {
     display: none !important;

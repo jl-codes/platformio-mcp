@@ -1,4 +1,4 @@
-# PlatformIO MCP Skills
+# PIO Agent Skills
 
 This directory contains agent-readable skills for embedded development workflows.
 
@@ -30,4 +30,4 @@ Agents should:
 
 MCP is one adapter. PlatformIO is the first backend.
 
-The larger goal is to provide a safe embedded agent runtime that lets Codex and other coding agents build, flash, monitor, test, and debug physical devices.
+The larger goal is to provide the safe PIO Agent runtime that lets Codex and other coding agents build, flash, monitor, test, and debug physical devices.

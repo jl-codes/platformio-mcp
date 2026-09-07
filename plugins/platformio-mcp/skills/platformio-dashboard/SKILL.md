@@ -1,9 +1,9 @@
 ---
 name: platformio-dashboard
-description: Open and operate the existing PlatformIO MCP dashboard when the user asks to view projects, devices, logs, approvals, tasks, locks, or monitor state in a visual interface. Do not use for unattended or scheduled runs.
+description: Open and operate the PIO Agent dashboard when the user asks to view projects, devices, logs, approvals, tasks, locks, or monitor state in a visual interface. Do not use for unattended or scheduled runs.
 ---
 
-# PlatformIO Dashboard
+# PIO Agent Dashboard
 
 Use the existing dashboard as an interactive human-control surface. MCP tools remain the execution API and the fallback when a browser is unavailable.
 
@@ -12,7 +12,7 @@ Use the existing dashboard as an interactive human-control surface. MCP tools re
 1. Resolve the exact project directory from the active workspace or ask for it when multiple PlatformIO projects are plausible.
 2. Call `get_dashboard_url` with that `projectDir` and `open: false`. Never ask the MCP server to launch the operating system's default browser.
 3. Check that the result reports `status: online`. Treat the launch URL as a short-lived credential: do not quote it in prose, logs, code, or automation prompts.
-4. When the Codex host exposes an in-app browser capability, open the launch URL in a right-side panel. Reuse the current PlatformIO dashboard tab when the host provides a tab identifier.
+4. When the Codex host exposes an in-app browser capability, open the launch URL in a right-side panel. Reuse the current PIO Agent dashboard tab when the host provides a tab identifier.
 5. Otherwise, give the user one labeled clickable launch URL and continue the requested workflow with MCP tools. Say that the in-app browser is unavailable; do not claim the page opened.
 
 ## Operate safely

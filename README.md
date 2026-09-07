@@ -1,10 +1,14 @@
 <p align="center">
-  <img src="docs/assets/pio_mcp_220x220.png" alt="PlatformIO MCP" width="220"/>
+  <img src="docs/assets/pio_agent.png" alt="PIO Agent" width="240"/>
 </p>
 
-# PlatformIO MCP
+# PIO Agent
 
-PlatformIO MCP is the open-source, agent-first hardware execution layer for embedded development.
+PIO Agent is the open-source, agent-first hardware execution layer for embedded development, built on the PlatformIO MCP runtime.
+
+## Brand and Compatibility
+
+**PIO Agent** is the product and Codex Plugin name. **PlatformIO MCP** is the underlying MCP runtime and the compatibility identity used by existing installations. The package, Codex plugin ID, marketplace ID, configuration keys, and skill namespace remain `platformio-mcp`; both `pio-agent` and `platformio-mcp` are supported executable names. This lets existing consumers upgrade without migration while new users see PIO Agent throughout the interface.
 
 It exposes PlatformIO workflows for board discovery, project setup, build, flash, monitor, diagnostics, and task orchestration through:
 - an MCP server adapter
@@ -39,9 +43,15 @@ npx platformio-mcp dashboard
 
 ### 2. Use the CLI
 
+The installed executable is available as both `pio-agent` and `platformio-mcp`. For a one-off npm invocation before global installation, select the existing package explicitly:
+
 ```bash
-npx platformio-mcp devices
-npx platformio-mcp boards --filter esp32
+npx --package platformio-mcp pio-agent --help
+```
+
+```bash
+npx --package platformio-mcp pio-agent devices
+npx --package platformio-mcp pio-agent boards --filter esp32
 npx platformio-mcp init --board esp32dev --framework arduino --project-dir ./firmware
 npx platformio-mcp build --project-dir ./firmware
 npx platformio-mcp flash --project-dir ./firmware --port auto
@@ -73,7 +83,7 @@ npx platformio-mcp install --codex
 
 ### 4. Install the full Codex Plugin
 
-The Codex Plugin adds the bundled MCP runtime, focused embedded skills, secure in-app dashboard flow, and monitoring-automation guidance. From a clone:
+The PIO Agent Codex Plugin adds the bundled MCP runtime, focused embedded skills, secure in-app dashboard flow, and monitoring-automation guidance. Codex requires one stable plugin identifier, so install selectors and skill namespaces remain `platformio-mcp`; the installed product is shown as PIO Agent. From a clone:
 
 ```bash
 npm install
@@ -120,7 +130,7 @@ On Windows, use `npx.cmd` if your host requires explicit shim resolution.
 
 ## Safety Model
 
-PlatformIO MCP enforces policy decisions across CLI and MCP flows.
+PIO Agent enforces policy decisions across CLI and MCP flows.
 
 - Actions can be `allow`, `deny`, or `requires_approval`
 - Risky operations (for example firmware upload/reset paths) require explicit approval
@@ -173,7 +183,7 @@ Guides and references:
 - [Agent Skills Directory](.skills/README.md)
 
 Specifications:
-- [PIO MCP Design Specification](docs/PIOMCPDesignSpecification.md)
+- [PIO Agent Design Specification](docs/PIOMCPDesignSpecification.md)
 - [Web UX Design Specification](docs/WebUXDesignSpecification.md)
 - [Development Guide](docs/reference/DevelopmentGuide.md)
 

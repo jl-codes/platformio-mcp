@@ -104,7 +104,7 @@ Do not flash or perform any hardware-touching action without my explicit approva
 ## Open the Dashboard in Codex
 
 ```text
-Open the existing PlatformIO MCP dashboard for ./firmware in the Codex right-side browser panel. Reuse an existing dashboard tab if one is open. Do not launch my operating system browser, expose the launch credential, or change hardware state.
+Open the PIO Agent dashboard for ./firmware in the Codex right-side browser panel. Reuse an existing dashboard tab if one is open. Do not launch my operating system browser, expose the launch credential, or change hardware state.
 ```
 
 ## Create a Quiet Serial-Health Automation

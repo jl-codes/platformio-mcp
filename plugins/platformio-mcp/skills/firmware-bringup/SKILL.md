@@ -29,4 +29,4 @@ Use this skill when the user wants to bring up a new embedded board or create a 
 
 ## Preferred Commands
 
-Use the PlatformIO MCP tools directly. Do not substitute shell commands for build, upload, lock, or monitor operations while the MCP server is available.
+Use the PIO Agent PlatformIO MCP tools directly. Do not substitute shell commands for build, upload, lock, or monitor operations while the MCP server is available.

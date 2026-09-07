@@ -2020,20 +2020,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 /**
- * Print CLI help text for the platformio-mcp binary.
+ * Print CLI help text for the pio-agent and platformio-mcp binaries.
  */
 function printCliHelp() {
-  console.log(`platformio-mcp — PlatformIO MCP server with web dashboard
+  console.log(`PIO Agent — PlatformIO MCP server with web dashboard
 
 USAGE:
-  platformio-mcp                       Start MCP stdio server (default — for AI agents)
-  platformio-mcp dashboard             Open the web dashboard in your browser
-  platformio-mcp install --cline       Install into Cline (VS Code extension or CLI)
-  platformio-mcp install --claude      Install into Claude Desktop
-  platformio-mcp install --vscode      Install into VS Code native MCP support
-  platformio-mcp install --antigravity Install into Google Antigravity
-  platformio-mcp install --codex       Install into OpenAI Codex CLI
-  platformio-mcp install --codex-plugin Install the full Codex Plugin and skills
+  pio-agent                            Start MCP stdio server (default — for AI agents)
+  pio-agent dashboard                  Open the web dashboard in your browser
+  pio-agent install --cline            Install into Cline (VS Code extension or CLI)
+  pio-agent install --claude           Install into Claude Desktop
+  pio-agent install --vscode           Install into VS Code native MCP support
+  pio-agent install --antigravity      Install into Google Antigravity
+  pio-agent install --codex            Install into OpenAI Codex CLI
+  pio-agent install --codex-plugin     Install the full Codex Plugin and skills
+
+  The legacy platformio-mcp executable is an equivalent alias.
 
 FLAGS (when starting MCP server):
   --open-dashboard-on-start            Auto-open dashboard when agent connects
@@ -2080,7 +2082,7 @@ async function main() {
   if (subcommand === "dashboard") {
     // Boot HTTP server, open browser, hold the event loop open via httpServer.
     const result = await getDashboardStatusCore({ open: true });
-    console.log(`PlatformIO MCP Dashboard: ${result.secureLink}`);
+    console.log(`PIO Agent Dashboard: ${result.secureLink}`);
     console.log(`Press Ctrl+C to stop.`);
     // Express http server keeps the event loop alive; SIGINT cleanup is wired
     // inside startPortalServer().
@@ -2091,7 +2093,7 @@ async function main() {
     const target = cliArgs.find((a) => a.startsWith("--"))?.replace(/^--/, "");
     if (!target) {
       console.error(
-        "Usage: platformio-mcp install --<cline|claude|vscode|antigravity|codex|codex-plugin>",
+        "Usage: pio-agent install --<cline|claude|vscode|antigravity|codex|codex-plugin>",
       );
       process.exit(1);
     }
@@ -2193,7 +2195,7 @@ async function main() {
 
   logDiag("\n\n=======================================================");
   logDiag(
-    `🚀 PlatformIO MCP Server v${version} (Build: ${gitHash}) running on stdio`,
+    `🚀 PIO Agent v${version} (Build: ${gitHash}) running on stdio`,
   );
   logDiag("🚀 Server supports 1000+ boards across 30+ platforms");
   logDiag("=======================================================\n");

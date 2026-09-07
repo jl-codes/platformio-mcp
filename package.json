@@ -1,7 +1,7 @@
 {
   "name": "platformio-mcp",
   "version": "2.2.2",
-  "description": "PlatformIO MCP server + web dashboard for AI agents (Cline, Claude Desktop, VS Code, Antigravity). Supports 1000+ boards across 30+ platforms.",
+  "description": "PIO Agent: a PlatformIO MCP server and visual control plane for AI-assisted embedded development across 1000+ boards.",
   "type": "module",
   "main": "build/index.js",
   "bin": {
@@ -43,6 +43,7 @@
     "mcp",
     "model-context-protocol",
     "platformio",
+    "pio-agent",
     "embedded",
     "iot",
     "arduino",
@@ -56,7 +57,7 @@
     "ai",
     "dashboard"
   ],
-  "author": "PlatformIO MCP Server Contributors",
+  "author": "PIO Agent Contributors",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"

@@ -1,6 +1,6 @@
-# Codex Plugin Release and Validation Guide
+# PIO Agent Codex Plugin Release and Validation Guide
 
-This guide is the release checklist for the repo-local `platformio-mcp` Codex Plugin. The plugin version must always equal the root npm package version and both artifacts must be built from the same commit.
+This guide is the release checklist for the repo-local PIO Agent Codex Plugin. Its stable identifier is `platformio-mcp`, and its executable aliases are `pio-agent` and `platformio-mcp`. The plugin version must always equal the root npm package version and both artifacts must be built from the same commit.
 
 ## Build the artifacts
 

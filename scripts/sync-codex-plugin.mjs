@@ -21,6 +21,13 @@ import { fileURLToPath } from "node:url";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PLUGIN_ROOT = join(REPO_ROOT, "plugins", "platformio-mcp");
 const PLUGIN_SKILLS_ROOT = join(PLUGIN_ROOT, "skills");
+/** Repository marketplace whose visible brand follows the plugin manifest. */
+const MARKETPLACE_PATH = join(
+  REPO_ROOT,
+  ".agents",
+  "plugins",
+  "marketplace.json",
+);
 
 /** Source skills included in the initial plugin distribution. */
 const SOURCE_SKILLS = [
@@ -39,9 +46,9 @@ const SOURCE_SKILLS = [
 
 /** Binary assets copied from the repository's maintained artwork. */
 const ASSET_COPIES = [
-  ["docs/assets/pio_mcp_220x220.png", "assets/icon.png"],
-  ["docs/assets/pio_mcp_220x220.png", "assets/logo.png"],
-  ["docs/assets/pio_mcp_220x220.png", "assets/logo-dark.png"],
+  ["docs/assets/pio_agent.png", "assets/icon.png"],
+  ["docs/assets/pio_agent.png", "assets/logo.png"],
+  ["docs/assets/pio_agent.png", "assets/logo-dark.png"],
 ];
 
 /**
@@ -190,6 +197,20 @@ export function syncCodexPlugin(options = {}) {
     if (!check) {
       manifest.version = packageJson.version;
       writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    }
+  }
+
+  const marketplace = JSON.parse(readFileSync(MARKETPLACE_PATH, "utf8"));
+  const displayName = manifest.interface?.displayName;
+  if (marketplace.interface?.displayName !== displayName) {
+    drift.push(relative(REPO_ROOT, MARKETPLACE_PATH));
+    if (!check) {
+      marketplace.interface ??= {};
+      marketplace.interface.displayName = displayName;
+      writeFileSync(
+        MARKETPLACE_PATH,
+        `${JSON.stringify(marketplace, null, 2)}\n`,
+      );
     }
   }
 

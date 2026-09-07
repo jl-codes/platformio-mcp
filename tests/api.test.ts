@@ -128,7 +128,7 @@ describe("Portal API Security & Telemetry Tailing", () => {
           auth: { token: authToken },
         });
         clientSocket.on("connection_established", (data) => {
-          expect(data.message).toContain("Connected to PIO MCP Backend");
+          expect(data.message).toContain("Connected to PIO Agent backend");
           clientSocket.close();
           resolve();
         });

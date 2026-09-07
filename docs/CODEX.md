@@ -1,6 +1,6 @@
-# PlatformIO MCP Codex Plugin
+# PIO Agent Codex Plugin
 
-The repository ships a complete Codex Plugin: a self-contained PlatformIO MCP server, eight workflow skills, the existing live dashboard, and safety primitives for physical hardware and recurring monitoring.
+The repository ships the complete PIO Agent Codex Plugin, built on PlatformIO MCP: a self-contained MCP server, eight workflow skills, the live PIO Agent dashboard, and safety primitives for physical hardware and recurring monitoring. The stable package, marketplace, plugin identifier, and skill namespace remain `platformio-mcp`; the preferred executable alias and user-facing product name are `pio-agent` and PIO Agent.
 
 ## Install from a clone
 
@@ -52,7 +52,7 @@ All 42 tools publish read-only, destructive, idempotency, and open-world annotat
 
 ## Dashboard in Codex
 
-Ask Codex to open the PlatformIO dashboard. The `platformio-dashboard` skill calls `get_dashboard_url` with `open: false`, then opens the returned one-time launch URL in a right-side in-app browser when that host capability is available.
+Ask Codex to open the PIO Agent dashboard. The `platformio-dashboard` skill calls `get_dashboard_url` with `open: false`, then opens the returned one-time launch URL in a right-side in-app browser when that host capability is available.
 
 The dashboard reuses the existing React UI. It supports narrow and full-width layouts, project switching, devices, command/task activity, logs, locks, approvals, and monitor state. The launch ticket expires quickly, is single-use, exchanges for an HttpOnly same-site cookie, and is removed from browser history after redirect. The listener is loopback-only by default and applies strict security headers, origin checks, request bounds, rate limits, and authenticated Socket.IO sessions.
 
@@ -85,16 +85,16 @@ MCP can read pending approval summaries but cannot approve or deny them. Approva
 
 ## Headless CLI parity
 
-The npm CLI exposes the same safe status primitives for terminals and hosts without MCP or an in-app browser:
+The npm CLI exposes the same safe status primitives for terminals and hosts without MCP or an in-app browser. `pio-agent` and `platformio-mcp` invoke the same binary:
 
 ```bash
-platformio-mcp plugin validate --require-runtime
-platformio-mcp target-resolve --project-dir ./firmware --environment esp32dev --json
-platformio-mcp monitor-status --project-dir ./firmware --json
-platformio-mcp monitor-health --project-dir ./firmware --duration 5 --expect-all READY --json
-platformio-mcp task-history --project-dir ./firmware --limit 20 --json
-platformio-mcp approval-status <approval-id> --project-dir ./firmware --json
-platformio-mcp pending-approvals --project-dir ./firmware --json
+pio-agent plugin validate --require-runtime
+pio-agent target-resolve --project-dir ./firmware --environment esp32dev --json
+pio-agent monitor-status --project-dir ./firmware --json
+pio-agent monitor-health --project-dir ./firmware --duration 5 --expect-all READY --json
+pio-agent task-history --project-dir ./firmware --limit 20 --json
+pio-agent approval-status <approval-id> --project-dir ./firmware --json
+pio-agent pending-approvals --project-dir ./firmware --json
 ```
 
 These commands reuse the MCP core services and policy engine. `monitor-health` may briefly attach a bounded serial monitor; it does not write firmware. Approval mutation remains limited to the explicit `approve` and `deny` commands or the authenticated dashboard.

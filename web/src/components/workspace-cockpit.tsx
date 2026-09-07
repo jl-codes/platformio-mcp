@@ -109,16 +109,16 @@ export default function WorkspaceCockpit({
   return (
     <Layout className="cockpit-shell" style={{ overflow: 'hidden' }}>
       {/* Top Global Header */}
-      <Header className="cockpit-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px 0 0', borderBottom: '1px solid rgba(144, 143, 160, 0.2)' }}>
-        <div className="cockpit-header-main" style={{ display: 'flex', alignItems: 'center', height: '100%', gap: '24px' }}>
-          {/* Logo container: 64px width exactly matches the Sider width below */}
-          <div className="cockpit-logo-cell" style={{ width: '64px', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <img src="/pio_mcp_220x220.png" alt="PIO MCP" style={{ height: '40px', width: '40px', objectFit: 'contain' }} />
+      <Header className="cockpit-header">
+        <div className="cockpit-header-main">
+          <div className="cockpit-logo-cell">
+            <img className="cockpit-logo" src="/pio_agent.png" alt="PIO Agent" />
           </div>
-          
-          <span className="mono-label cockpit-title" style={{ color: '#4080D0', fontSize: '22px', fontWeight: 'bold' }}>
-            PLATFORMIO MCP
-          </span>
+
+          <div className="cockpit-brand-lockup" aria-label="PIO Agent, PlatformIO control plane">
+            <span className="mono-label cockpit-title">PIO AGENT</span>
+            <span className="mono-label cockpit-brand-subtitle">PLATFORMIO CONTROL PLANE</span>
+          </div>
 
           <Dropdown
             menu={{
@@ -152,8 +152,12 @@ export default function WorkspaceCockpit({
         </div>
         
         <Space className="cockpit-header-actions" align="center">
-          <Badge className="cockpit-session-badge" color="#4080D0" text={<span className="mono-label">CODEX SESSION</span>} />
-          <Badge status={status === 'online' ? 'success' : 'error'} text={<span className="mono-label cockpit-server-label" style={{ color: 'inherit' }}>SERVER: {status.toUpperCase()}</span>} />
+          <span className="cockpit-status-pill cockpit-session-badge">
+            <Badge color="#25D9FF" text={<span className="mono-label">CODEX SESSION</span>} />
+          </span>
+          <span className="cockpit-status-pill">
+            <Badge status={status === 'online' ? 'success' : 'error'} text={<span className="mono-label cockpit-server-label">SERVER: {status.toUpperCase()}</span>} />
+          </span>
           <ThemeSelector isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
         </Space>
       </Header>

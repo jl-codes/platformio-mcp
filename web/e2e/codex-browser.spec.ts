@@ -83,7 +83,16 @@ test("opens the real dashboard through a single-use Codex browser session", asyn
   page,
 }) => {
   const launch = await openSanitizedDashboard(page);
-  await expect(page.getByText("PLATFORMIO MCP")).toBeVisible();
+  await expect(page).toHaveTitle("PIO Agent");
+  await expect(page.getByText("PIO AGENT")).toBeVisible();
+  await expect(page.getByRole("img", { name: "PIO Agent" })).toHaveAttribute(
+    "src",
+    "/pio_agent.png",
+  );
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
+    "href",
+    "/pio_agent.png",
+  );
   await expect(page.getByText("CODEX SESSION")).toBeVisible();
   expect(launch.baseUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/u);
   expect(launch.token).toBe("[REDACTED_DEPRECATED]");
@@ -168,7 +177,7 @@ test("keeps the medium-width Codex header on one line", async ({ page }) => {
   });
 
   expect(geometry.headerTop).toBe(0);
-  expect(geometry.headerBottom).toBe(64);
+  expect(geometry.headerBottom).toBe(72);
   expect(geometry.itemsOutsideHeader).toEqual([]);
 });
 

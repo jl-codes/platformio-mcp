@@ -1,14 +1,14 @@
-# PlatformIO MCP Codex Plugin Implementation Plan
+# PIO Agent Codex Plugin Implementation Plan
 
 ## Goal Description
 
-Ship a first-class `platformio-mcp` Codex Plugin from this repository. A developer who clones the repository should be able to discover and install the plugin from the repo-local marketplace, start the bundled PlatformIO MCP server, invoke focused embedded-development skills, use the existing dashboard, and create safe monitoring automations without manually assembling MCP configuration.
+Ship the first-class PIO Agent Codex Plugin, built on PlatformIO MCP, from this repository under the stable `platformio-mcp` plugin identifier. A developer who clones the repository should be able to discover PIO Agent in the repo-local marketplace, invoke it through either the `pio-agent` or `platformio-mcp` executable, start the bundled PlatformIO MCP server, use focused embedded-development skills, operate the existing dashboard, and create safe monitoring automations without manually assembling MCP configuration.
 
 The plugin will combine:
 
 - the original 34-tool PlatformIO MCP surface plus eight integration primitives, represented by one typed 42-tool registry;
 - focused skills for discovery, bring-up, build diagnosis, flashing, serial monitoring, hardware-in-the-loop testing, and automation setup;
-- a dashboard-launch skill that opens the existing authenticated PlatformIO MCP UI in Codex desktop's in-app browser panel and degrades cleanly to a clickable local URL on hosts without that browser;
+- a dashboard-launch skill that opens the authenticated PIO Agent UI in Codex desktop's in-app browser panel and degrades cleanly to a clickable local URL on hosts without that browser;
 - explicit tool metadata and server-side policy enforcement for physical-device safety;
 - a repo-local marketplace entry, branded install metadata, validation, tests, and release automation;
 - bounded, change-aware monitoring primitives that work well in both interactive Codex tasks and unattended scheduled tasks.
@@ -188,7 +188,7 @@ The checked-in plugin directory is the installable product. Source skills remain
   - Keep the entry repo-local so a clone can be added with Codex's marketplace command or discovered by supported desktop project flows.
 
 - [NEW] [`plugins/platformio-mcp/.codex-plugin/plugin.json`](../plugins/platformio-mcp/.codex-plugin/plugin.json)
-  - Use `platformio-mcp` as the immutable plugin identifier.
+  - Use `platformio-mcp` as the immutable plugin identifier and component namespace. Codex does not define plugin-ID aliases; expose PIO Agent through `interface.displayName`, marketplace display metadata, and the supported `pio-agent` executable alias.
   - Keep the plugin version synchronized with the root package version.
   - Point `skills` at `./skills/` and `mcpServers` at `./.mcp.json`.
   - Include repository, license, homepage, publisher, keywords, and complete interface metadata.
@@ -215,7 +215,7 @@ The checked-in plugin directory is the installable product. Source skills remain
   - Never interpolate user text into a shell command.
 
 - [NEW] [`plugins/platformio-mcp/assets/`](../plugins/platformio-mcp/assets/)
-  - Derive plugin icon and logo files from [`docs/assets/pio_mcp_220x220.png`](assets/pio_mcp_220x220.png).
+  - Derive plugin icon and logo files from [`docs/assets/pio_agent.png`](assets/pio_agent.png).
   - Add one current dashboard screenshot after removing project paths, ports, tokens, and device identifiers.
   - Validate image existence, format, dimensions, contrast, and file size in CI.
 
@@ -282,7 +282,7 @@ Every plugin skill must name the relevant MCP tools, require explicit `projectDi
   - For actuators or high-power outputs, require a separate physical-safety confirmation even if firmware upload is already approved.
 
 - [NEW] [`plugins/platformio-mcp/skills/platformio-dashboard/SKILL.md`](../plugins/platformio-mcp/skills/platformio-dashboard/SKILL.md)
-  - Trigger when the user asks to open, show, inspect, or work in the PlatformIO MCP dashboard.
+  - Trigger when the user asks to open, show, inspect, or work in the PIO Agent dashboard.
   - Resolve the requested `projectDir`, call `get_dashboard_url` with `open: false`, verify the dashboard health endpoint, and pass the short-lived launch URL to the host's browser-opening capability.
   - On Codex desktop, open the page in a right-side in-app browser panel and reuse the existing dashboard tab when the host exposes a tab identifier.
   - Feature-detect browser support. On Codex CLI, the IDE extension, or another headless client, return one clearly labeled clickable URL and continue to offer every operation through MCP tools.
@@ -573,7 +573,7 @@ Feature-complete means every row passes its software proof, safety proof, and—
 
 ### Host and Plugin Responsibilities
 
-| Responsibility                                | Codex host                          | PlatformIO MCP plugin                |
+| Responsibility                                | Codex host                          | PIO Agent plugin                     |
 | --------------------------------------------- | ----------------------------------- | ------------------------------------ |
 | Store cadence and wake a task                 | Yes                                 | No                                   |
 | Choose same-task heartbeat or standalone run  | Yes, guided by the automation skill | No                                   |
@@ -833,7 +833,7 @@ The work is complete when:
 
 - the repo contains a valid installable `platformio-mcp` plugin and repo marketplace;
 - a fresh clone offers the plugin through documented Codex flows;
-- the plugin exposes all existing PlatformIO MCP functionality and focused workflow skills;
+- the PIO Agent plugin exposes all existing PlatformIO MCP functionality and focused workflow skills;
 - build, flash, filesystem upload, monitor, diagnostics, locks, libraries, dashboard, policy, and agent workflows remain functional and represented in the generated traceability report;
 - an interactive request opens the existing authenticated dashboard in Codex desktop's in-app browser panel, while CLI/IDE clients receive an honest link/headless fallback and scheduled runs remain UI-free;
 - monitoring is bounded, incremental, change-aware, cancellable, and safe for scheduled runs;
@@ -851,4 +851,4 @@ The work is complete when:
 - [OpenAI MCP plugin UI](https://developers.openai.com/plugins/build/chatgpt-ui)
 - [Codex scheduled tasks](https://learn.chatgpt.com/docs/automations)
 - [PlatformIO MCP command reference](MCPServerCommandReference.md)
-- [PlatformIO MCP Codex guide](CODEX.md)
+- [PIO Agent Codex guide](CODEX.md)

@@ -1,5 +1,5 @@
 /**
- * Validates the repository marketplace and packaged PlatformIO MCP plugin.
+ * Validates the repository marketplace and packaged PIO Agent plugin.
  *
  * Provides:
  * - validateCodexPlugin: Checks manifest, paths, skills, assets, and runtime.
@@ -81,6 +81,8 @@ export function validateCodexPlugin(options = {}) {
 
   if (manifest.name !== "platformio-mcp")
     errors.push("Plugin name must be platformio-mcp.");
+  if (manifest.interface?.displayName !== "PIO Agent")
+    errors.push("Plugin display name must be PIO Agent.");
   if (manifest.version !== packageJson.version)
     errors.push("Plugin/package versions differ.");
   if (
@@ -150,6 +152,9 @@ export function validateCodexPlugin(options = {}) {
     (entry) => entry?.name === "platformio-mcp",
   );
   if (!marketplaceEntry) errors.push("Marketplace entry is missing.");
+  if (marketplace.interface?.displayName !== "PIO Agent") {
+    errors.push("Marketplace display name must be PIO Agent.");
+  }
   if (marketplaceEntry?.source?.path !== "./plugins/platformio-mcp") {
     errors.push("Marketplace source path is incorrect.");
   }

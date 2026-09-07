@@ -30,29 +30,42 @@ describe("Codex plugin manifest", () => {
   });
 
   it("keeps package, plugin, and marketplace identities aligned", () => {
-    const packageJson = readJson("package.json") as { version: string };
+    const packageJson = readJson("package.json") as {
+      bin: Record<string, string>;
+      version: string;
+    };
     const manifest = readJson(
       "plugins/platformio-mcp/.codex-plugin/plugin.json",
     ) as {
       name: string;
       version: string;
       interface: {
+        displayName: string;
         defaultPrompt: string[];
         logoDark: string;
         screenshots: string[];
       };
     };
     const marketplace = readJson(".agents/plugins/marketplace.json") as {
+      interface: { displayName: string };
       plugins: Array<{ name: string; source: { path: string } }>;
     };
 
     expect(manifest.name).toBe("platformio-mcp");
+    expect(manifest.interface.displayName).toBe("PIO Agent");
+    expect(marketplace.interface.displayName).toBe("PIO Agent");
+    expect(packageJson.bin["pio-agent"]).toBe(packageJson.bin["platformio-mcp"]);
     expect(manifest.version).toBe(packageJson.version);
     expect(manifest.interface.defaultPrompt).toHaveLength(3);
     expect(manifest.interface.logoDark).toBe("./assets/logo-dark.png");
     expect(manifest.interface.screenshots).toEqual([
       "./assets/screenshot-dashboard.png",
     ]);
+    expect(
+      fs.readFileSync(path.join(PLUGIN_ROOT, "assets", "icon.png")),
+    ).toEqual(
+      fs.readFileSync(path.join(REPO_ROOT, "docs", "assets", "pio_agent.png")),
+    );
     expect(marketplace.plugins).toContainEqual(
       expect.objectContaining({
         name: manifest.name,

@@ -3,23 +3,28 @@
   "files": [
     {
       "path": "platformio-mcp.mjs",
-      "bytes": 3525498,
-      "sha256": "1896ae7e8919788115ba02653ba3ba127fa83b116d3d089c7f5d9198084fe59d"
+      "bytes": 3525536,
+      "sha256": "9ddb1c326bdb04da4d21b376d29d2cd7e907f1635d62d771631341a74644059f"
     },
     {
-      "path": "web/assets/index-C0MqEjFq.css",
-      "bytes": 4759,
-      "sha256": "7bc73a27b40e8789e6cfb1e59609256afe1d994ad409ffeed47c507c8bb75af1"
+      "path": "web/assets/index-Dbc_ys0m.js",
+      "bytes": 951388,
+      "sha256": "578dc69a11c3320ac174712eeb3c706b93872a100a9d00c0d4fa7304a9ab668c"
     },
     {
-      "path": "web/assets/index-CcN3GU7t.js",
-      "bytes": 951663,
-      "sha256": "54554a57a20b398280447fe49db057c09d29088fd22856aaa0c943ea34b277e7"
+      "path": "web/assets/index-oDJsajs4.css",
+      "bytes": 8603,
+      "sha256": "39984f1ecfdac32fdcc8fd7a6c9af4984d8f949584e2ca36b0844fdce993738c"
     },
     {
       "path": "web/index.html",
-      "bytes": 471,
-      "sha256": "b66d874f112f307cf096ec924882da1109b576dcff57a4cf6cf352108b4f5454"
+      "bytes": 615,
+      "sha256": "c263e55aff144a820e7e1faa3130e5e8c8214c0dc5bd8462468c73aa751ed810"
+    },
+    {
+      "path": "web/pio_agent.png",
+      "bytes": 1891209,
+      "sha256": "5d7d74026273141d3bbcb89da1ee0de83ceef1e2d2308c2bd10d95bf8a6ab730"
     },
     {
       "path": "web/pio_mcp_128x128.ico",
