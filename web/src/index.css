@@ -113,6 +113,17 @@ body {
   min-width: 0;
 }
 
+.cockpit-header-actions {
+  flex-shrink: 0;
+}
+
+.cockpit-title,
+.cockpit-auto-track-label,
+.cockpit-session-badge,
+.cockpit-server-label {
+  white-space: nowrap;
+}
+
 .cockpit-project-select {
   width: min(280px, 30vw) !important;
 }
@@ -139,6 +150,12 @@ body {
 
   .cockpit-title {
     font-size: 16px !important;
+    flex-shrink: 0;
+  }
+
+  .cockpit-auto-track-label,
+  .cockpit-session-badge {
+    display: none !important;
   }
 
   .cockpit-project-select {
@@ -147,6 +164,12 @@ body {
 
   .cockpit-command-feed {
     width: 280px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .cockpit-server-label {
+    display: none;
   }
 }
 
@@ -185,6 +208,63 @@ body {
     flex-direction: column;
   }
 
+  .cockpit-config-view {
+    overflow-x: hidden !important;
+    padding: 12px !important;
+  }
+
+  .workspace-config {
+    min-width: 0;
+    padding: 0 !important;
+    width: 100%;
+  }
+
+  .workspace-config .ant-row {
+    margin-inline: 0 !important;
+    min-width: 0;
+  }
+
+  .workspace-config .ant-col {
+    max-width: 100%;
+    min-width: 0;
+    padding-inline: 0 !important;
+  }
+
+  .workspace-config .ant-card {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .workspace-config .ant-card-head,
+  .workspace-config .ant-card-body {
+    padding-inline: 12px !important;
+  }
+
+  .workspace-config .ant-card-head-wrapper {
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .workspace-config .ant-card-extra,
+  .workspace-config .ant-card-head-title,
+  .workspace-config .ant-space-item {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .workspace-config .ant-card-extra {
+    margin-inline-start: 0;
+  }
+
+  .workspace-config .ant-space {
+    max-width: 100%;
+  }
+
+  .workspace-config .ant-typography {
+    overflow-wrap: anywhere;
+  }
+
   .cockpit-command-feed {
     width: 100% !important;
     height: 38%;
@@ -211,6 +291,28 @@ body {
   .cockpit-activity-bar .ant-menu-item {
     width: 48px !important;
     height: 52px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .cockpit-header-main {
+    overflow: hidden;
+  }
+
+  .cockpit-project-select {
+    width: max(112px, calc(100vw - 190px)) !important;
+  }
+
+  .workspace-config .ant-card-head-title .ant-typography {
+    font-size: 12px;
+  }
+
+  .workspace-config .ant-card-extra {
+    flex-basis: 100%;
+  }
+
+  .workspace-config .ant-card-extra .ant-btn {
+    width: 100%;
   }
 }
 

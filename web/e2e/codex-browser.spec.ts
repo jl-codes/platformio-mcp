@@ -18,6 +18,33 @@ async function openSanitizedDashboard(page: Page) {
   await page.route("**/api/commands?*", async (route) => {
     await route.fulfill({ json: [] });
   });
+  await page.route("**/api/system/info*", async (route) => {
+    await route.fulfill({
+      json: {
+        core_version: { value: "6.1.16" },
+        python_version: { value: "3.14.4-final.0" },
+        system: { value: "windows_amd64" },
+        global_lib_nums: { value: 0 },
+      },
+    });
+  });
+  await page.route("**/api/projects/config?*", async (route) => {
+    await route.fulfill({
+      json: [
+        [
+          "env:esp32dev",
+          [
+            ["platform", "espressif32"],
+            ["board", "esp32dev"],
+            ["framework", "arduino"],
+          ],
+        ],
+      ],
+    });
+  });
+  await page.route("**/api/libraries/installed?*", async (route) => {
+    await route.fulfill({ json: [] });
+  });
 
   const launch = await getDashboardStatus(false);
   await page.goto(launch.launchUrl);
@@ -91,6 +118,107 @@ test("remains operable in a narrow right-side Codex panel", async ({
   expect(
     Math.abs((geometry.feedWidth ?? 0) - (geometry.detailWidth ?? 0)),
   ).toBeLessThan(2);
+});
+
+test("keeps the medium-width Codex header on one line", async ({ page }) => {
+  await page.setViewportSize({ width: 820, height: 760 });
+  await openSanitizedDashboard(page);
+
+  await expect(page.locator(".cockpit-title")).toBeVisible();
+  await expect(page.locator(".cockpit-auto-track-label")).toBeHidden();
+  await expect(page.locator(".cockpit-session-badge")).toBeHidden();
+  await expect(page.locator(".cockpit-server-label")).toBeVisible();
+
+  const geometry = await page.evaluate(() => {
+    const header = document
+      .querySelector<HTMLElement>(".cockpit-header")
+      ?.getBoundingClientRect();
+    const visibleItems = [
+      ".cockpit-title",
+      ".cockpit-project-select",
+      ".cockpit-server-label",
+      ".cockpit-header-actions [role='switch']",
+    ]
+      .map((selector) => {
+        const rect = document
+          .querySelector<HTMLElement>(selector)
+          ?.getBoundingClientRect();
+        return rect
+          ? {
+              bottom: rect.bottom,
+              left: rect.left,
+              right: rect.right,
+              selector,
+              top: rect.top,
+            }
+          : null;
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+    return {
+      headerBottom: header?.bottom,
+      headerTop: header?.top,
+      itemsOutsideHeader: visibleItems.filter(
+        (item) =>
+          item.top < (header?.top ?? 0) - 1 ||
+          item.bottom > (header?.bottom ?? 0) + 1 ||
+          item.left < 0 ||
+          item.right > window.innerWidth,
+      ),
+    };
+  });
+
+  expect(geometry.headerTop).toBe(0);
+  expect(geometry.headerBottom).toBe(64);
+  expect(geometry.itemsOutsideHeader).toEqual([]);
+});
+
+test("keeps project telemetry readable at the minimum Codex panel width", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 760 });
+  await openSanitizedDashboard(page);
+  await page.locator(".cockpit-activity-bar .ant-menu-item").nth(1).click();
+
+  await expect(page.getByText("PIO Core", { exact: true })).toBeVisible();
+  await expect(page.getByText("windows_amd64", { exact: true })).toBeVisible();
+  await expect(page.getByText("esp32dev", { exact: true }).first()).toBeVisible();
+
+  const geometry = await page.evaluate(() => {
+    const configView = document.querySelector<HTMLElement>(
+      ".cockpit-config-view",
+    );
+    const workspace = document.querySelector<HTMLElement>(
+      ".workspace-config",
+    );
+    const cards = Array.from(
+      document.querySelectorAll<HTMLElement>(".workspace-config .ant-card"),
+    );
+    const cardTitles = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        ".workspace-config .ant-card-head-title",
+      ),
+    );
+    return {
+      configClientWidth: configView?.clientWidth,
+      configScrollWidth: configView?.scrollWidth,
+      overflowingCardTitles: cardTitles.filter(
+        (title) => title.scrollWidth > title.clientWidth,
+      ).length,
+      workspaceRight: workspace?.getBoundingClientRect().right,
+      widestCardRight: Math.max(
+        0,
+        ...cards.map((card) => card.getBoundingClientRect().right),
+      ),
+      viewportWidth: window.innerWidth,
+    };
+  });
+
+  expect(geometry.configScrollWidth).toBeLessThanOrEqual(
+    geometry.configClientWidth ?? 0,
+  );
+  expect(geometry.overflowingCardTitles).toBe(0);
+  expect(geometry.workspaceRight).toBeLessThanOrEqual(geometry.viewportWidth);
+  expect(geometry.widestCardRight).toBeLessThanOrEqual(geometry.viewportWidth);
 });
 
 test("captures a sanitized plugin dashboard screenshot", async ({ page }) => {

@@ -132,7 +132,7 @@ export default function WorkspaceConfig({
   }, [activeWorkspace, apiBase, token, safetyRefreshKey, safetyRevision]);
 
   return (
-    <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="workspace-config" style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto' }}>
       <Row gutter={[24, 24]}>
         {/* Core System Info Panel */}
         <Col xs={24} md={8}>

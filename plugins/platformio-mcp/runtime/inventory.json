@@ -7,19 +7,19 @@
       "sha256": "1896ae7e8919788115ba02653ba3ba127fa83b116d3d089c7f5d9198084fe59d"
     },
     {
-      "path": "web/assets/index-BD0JqUhG.css",
-      "bytes": 3366,
-      "sha256": "9cbafd8aa3ebb0b29cba1d3e50fbcd8dbef2f230406ddce8a38f8397c1bf9e90"
+      "path": "web/assets/index-C0MqEjFq.css",
+      "bytes": 4759,
+      "sha256": "7bc73a27b40e8789e6cfb1e59609256afe1d994ad409ffeed47c507c8bb75af1"
     },
     {
-      "path": "web/assets/index-CrkhUCVi.js",
-      "bytes": 951571,
-      "sha256": "9369459b1e62661f78c479963e3c3384277afe35beb955beacd72170a16a10d0"
+      "path": "web/assets/index-CcN3GU7t.js",
+      "bytes": 951663,
+      "sha256": "54554a57a20b398280447fe49db057c09d29088fd22856aaa0c943ea34b277e7"
     },
     {
       "path": "web/index.html",
       "bytes": 471,
-      "sha256": "07312d0c0ef6b7f144769dc36655954bf5573e0ba6107e6cbd2505b4cd2f7a6d"
+      "sha256": "b66d874f112f307cf096ec924882da1109b576dcff57a4cf6cf352108b4f5454"
     },
     {
       "path": "web/pio_mcp_128x128.ico",

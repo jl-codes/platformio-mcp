@@ -145,7 +145,7 @@ export default function WorkspaceCockpit({
             </Button>
           </Dropdown>
           
-          <Space align="center">
+          <Space className="cockpit-auto-track" align="center">
             <Switch checked={autoTrack} onChange={setAutoTrack} size="small" />
             <Text className="cockpit-auto-track-label" type="secondary" style={{ fontSize: 11, letterSpacing: 0.5, margin: 0 }}>AUTO-TRACK</Text>
           </Space>
@@ -250,7 +250,7 @@ export default function WorkspaceCockpit({
               </div>
             </>
           ) : (
-            <div style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
+            <div className="cockpit-config-view" style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
               <WorkspaceConfig 
                 activeWorkspace={activeWorkspace}
                 lockState={lockState}
