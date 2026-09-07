@@ -10,6 +10,23 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['build/**', 'node_modules/**'],
+    files: ['web/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      'prefer-const': 'warn',
+    },
+  },
+  {
+    ignores: [
+      'build/**',
+      'node_modules/**',
+      'web/dist/**',
+      'web/playwright-report/**',
+      'web/test-results/**',
+    ],
   }
 );
