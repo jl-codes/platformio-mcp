@@ -14,7 +14,9 @@ import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const ALIAS_ROOT = resolve(REPO_ROOT, "packages", "pio-mcp");
+
+/** Thin npm packages that expose supported names for the canonical CLI. */
+const COMPATIBILITY_PACKAGES = ["pio-mcp", "pio-agent"];
 
 /** Files that make the published server and Codex plugin usable. */
 const REQUIRED_FILES = [
@@ -29,8 +31,8 @@ const REQUIRED_FILES = [
   "web/dist/index.html",
 ];
 
-/** Files required for the published pio-mcp compatibility package. */
-const ALIAS_REQUIRED_FILES = ["README.md", "bin.js", "package.json"];
+/** Files required for each published compatibility package. */
+const COMPATIBILITY_REQUIRED_FILES = ["README.md", "bin.js", "package.json"];
 
 /** Content that must never leave a developer or CI workspace in an npm package. */
 const FORBIDDEN_PATHS = [
@@ -193,31 +195,43 @@ function scanPackedText(packageRoot, paths) {
 }
 
 const packageJson = readJson("package.json");
-const aliasPackageJson = readJson("packages/pio-mcp/package.json");
 const report = inspectPackage(".");
-const aliasReport = inspectPackage("./packages/pio-mcp");
 const paths = validateReport(report, packageJson, REQUIRED_FILES);
-const aliasPaths = validateReport(
-  aliasReport,
-  aliasPackageJson,
-  ALIAS_REQUIRED_FILES,
-);
 scanPackedText(REPO_ROOT, paths);
-scanPackedText(ALIAS_ROOT, aliasPaths);
 
-if (aliasPackageJson.version !== packageJson.version) {
-  throw new Error("pio-mcp and platformio-mcp package versions differ.");
-}
-if (
-  aliasPackageJson.dependencies?.["platformio-mcp"] !==
-  `^${packageJson.version}`
-) {
-  throw new Error("pio-mcp does not depend on the matching 3.x package line.");
-}
+const compatibilityResults = COMPATIBILITY_PACKAGES.map((packageName) => {
+  const packageRoot = resolve(REPO_ROOT, "packages", packageName);
+  const compatibilityPackageJson = readJson(
+    `packages/${packageName}/package.json`,
+  );
+  const compatibilityReport = inspectPackage(`./packages/${packageName}`);
+  const compatibilityPaths = validateReport(
+    compatibilityReport,
+    compatibilityPackageJson,
+    COMPATIBILITY_REQUIRED_FILES,
+  );
+  scanPackedText(packageRoot, compatibilityPaths);
 
-for (const [packageReport, packagePaths] of [
-  [report, paths],
-  [aliasReport, aliasPaths],
+  if (compatibilityPackageJson.version !== packageJson.version) {
+    throw new Error(
+      `${packageName} and platformio-mcp package versions differ.`,
+    );
+  }
+  if (
+    compatibilityPackageJson.dependencies?.["platformio-mcp"] !==
+    `^${packageJson.version}`
+  ) {
+    throw new Error(
+      `${packageName} does not depend on the matching 3.x package line.`,
+    );
+  }
+
+  return { report: compatibilityReport, paths: compatibilityPaths };
+});
+
+for (const { report: packageReport, paths: packagePaths } of [
+  { report, paths },
+  ...compatibilityResults,
 ]) {
   console.log(
     `Validated ${packageReport.name}@${packageReport.version}: ` +

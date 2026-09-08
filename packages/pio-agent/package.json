@@ -1,0 +1,40 @@
+{
+  "name": "pio-agent",
+  "version": "3.0.0",
+  "description": "Product-name npm alias for PIO Agent, powered by the canonical platformio-mcp package.",
+  "type": "module",
+  "bin": {
+    "pio-agent": "bin.js"
+  },
+  "files": [
+    "bin.js",
+    "README.md"
+  ],
+  "dependencies": {
+    "platformio-mcp": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "platformio",
+    "pio-agent",
+    "embedded",
+    "arduino",
+    "esp32",
+    "stm32",
+    "alias"
+  ],
+  "author": "PIO Agent Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jl-codes/platformio-mcp.git",
+    "directory": "packages/pio-agent"
+  },
+  "bugs": {
+    "url": "https://github.com/jl-codes/platformio-mcp/issues"
+  },
+  "homepage": "https://github.com/jl-codes/platformio-mcp#readme"
+}

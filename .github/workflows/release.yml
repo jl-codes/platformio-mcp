@@ -69,8 +69,10 @@ jobs:
           mkdir -p release-artifacts
           npm pack
           npm pack ./packages/pio-mcp
+          npm pack ./packages/pio-agent
           mv "platformio-mcp-${version}.tgz" release-artifacts/
           mv "pio-mcp-${version}.tgz" release-artifacts/
+          mv "pio-agent-${version}.tgz" release-artifacts/
           cp plugins/platformio-mcp/runtime/inventory.json release-artifacts/plugin-runtime-inventory.json
 
       - name: Upload immutable artifacts
@@ -84,7 +86,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.publish_npm
         run: |
           version="$(node -p "require('./package.json').version")"
-          for package_name in platformio-mcp pio-mcp; do
+          for package_name in platformio-mcp pio-mcp pio-agent; do
             if npm view "${package_name}@${version}" version >/dev/null 2>&1; then
               echo "${package_name}@${version} is already published; skipping"
             else

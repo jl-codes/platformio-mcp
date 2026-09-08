@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   health, and bounded lab checks with quiet healthy-state behavior.
 - **PIO Agent branding and CLI alias** while preserving `platformio-mcp` as the
   stable npm package, executable, MCP server, and Codex plugin identifier.
+- **Installable npm compatibility names** for `pio-mcp` and `pio-agent`, both
+  delegating to the canonical `platformio-mcp` CLI implementation.
 
 ### Changed
 
