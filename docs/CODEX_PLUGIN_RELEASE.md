@@ -70,15 +70,16 @@ The initial one-board usability gate is documented in the [redacted ESP32-S3 acc
 
 ## Release
 
-1. Update the package, compatibility-package, plugin, and changelog versions.
+1. Update the canonical package, both compatibility packages, plugin, and changelog versions.
 2. Regenerate plugin content and runtime.
 3. Run all software, browser, package, secret-scan, and available hardware gates.
 4. Update the draft PR with exact evidence and residual matrix gaps; mark ready only when required evidence exists.
-5. Configure npm trusted publishing for both `platformio-mcp` and its existing
-   `pio-mcp` compatibility package, repository `jl-codes/platformio-mcp`,
-   workflow `release.yml`, with direct publishing allowed. The release workflow
-   uses a GitHub-hosted Node 24 runner and OIDC; it does not require a long-lived
-   npm token.
+5. Configure npm trusted publishing for `platformio-mcp` plus the `pio-mcp` and
+   `pio-agent` compatibility packages, repository `jl-codes/platformio-mcp`,
+   workflow `release.yml`, with direct publishing allowed. A new compatibility
+   package must first be published once by an npm owner before npm exposes its
+   trusted-publisher settings. The release workflow uses a GitHub-hosted Node 24
+   runner and OIDC; routine releases do not require a long-lived npm token.
 6. Merge after review, create the signed `v<package-version>` tag, and manually
    dispatch the release workflow from that exact tag with npm publishing
    enabled if authorized.

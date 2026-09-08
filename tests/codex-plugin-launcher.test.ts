@@ -78,22 +78,32 @@ describe("Codex plugin launcher", () => {
     expect(spec.command).toBe("npx");
   });
 
-  it("keeps the pio-mcp compatibility package aligned with the CLI", () => {
-    const aliasRoot = path.join(process.cwd(), "packages", "pio-mcp");
-    const aliasPackage = JSON.parse(
-      fs.readFileSync(path.join(aliasRoot, "package.json"), "utf8"),
-    ) as { dependencies: Record<string, string>; version: string };
-    const aliasLauncher = fs.readFileSync(
-      path.join(aliasRoot, "bin.js"),
-      "utf8",
-    );
+  it.each(["pio-mcp", "pio-agent"])(
+    "keeps the %s compatibility package aligned with the CLI",
+    (packageName) => {
+      const aliasRoot = path.join(process.cwd(), "packages", packageName);
+      const aliasPackage = JSON.parse(
+        fs.readFileSync(path.join(aliasRoot, "package.json"), "utf8"),
+      ) as {
+        bin: Record<string, string>;
+        dependencies: Record<string, string>;
+        name: string;
+        version: string;
+      };
+      const aliasLauncher = fs.readFileSync(
+        path.join(aliasRoot, "bin.js"),
+        "utf8",
+      );
 
-    expect(aliasPackage.version).toBe(PACKAGE_VERSION);
-    expect(aliasPackage.dependencies["platformio-mcp"]).toBe(
-      `^${PACKAGE_VERSION}`,
-    );
-    expect(aliasLauncher).toContain('import("platformio-mcp/build/cli.js")');
-  });
+      expect(aliasPackage.name).toBe(packageName);
+      expect(aliasPackage.version).toBe(PACKAGE_VERSION);
+      expect(aliasPackage.bin[packageName]).toBe("bin.js");
+      expect(aliasPackage.dependencies["platformio-mcp"]).toBe(
+        `^${PACKAGE_VERSION}`,
+      );
+      expect(aliasLauncher).toContain('import("platformio-mcp/build/cli.js")');
+    },
+  );
 });
 
 const describeBundledRuntime = fs.existsSync(RUNTIME_PATH)

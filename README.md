@@ -8,7 +8,7 @@ PIO Agent is the open-source, agent-first hardware execution layer for embedded 
 
 ## Brand and Compatibility
 
-**PIO Agent** is the product and Codex Plugin name. **PlatformIO MCP** is the underlying MCP runtime and the compatibility identity used by existing installations. The package, Codex plugin ID, marketplace ID, configuration keys, and skill namespace remain `platformio-mcp`; both `pio-agent` and `platformio-mcp` are supported executable names. This lets existing consumers upgrade without migration while new users see PIO Agent throughout the interface.
+**PIO Agent** is the product and Codex Plugin name. **PlatformIO MCP** is the underlying MCP runtime and the compatibility identity used by existing installations. The Codex plugin ID, marketplace ID, configuration keys, and skill namespace remain `platformio-mcp`. On npm, `platformio-mcp` is the canonical package while `pio-mcp` and `pio-agent` are thin compatibility packages that delegate to it. The canonical package also installs both `platformio-mcp` and `pio-agent` executable names. This lets existing consumers upgrade without migration while new users see PIO Agent throughout the interface.
 
 It exposes PlatformIO workflows for board discovery, project setup, build, flash, monitor, diagnostics, and task orchestration through:
 - an MCP server adapter
@@ -43,10 +43,12 @@ npx platformio-mcp dashboard
 
 ### 2. Use the CLI
 
-The installed executable is available as both `pio-agent` and `platformio-mcp`. For a one-off npm invocation before global installation, select the existing package explicitly:
+All three npm names are supported. `platformio-mcp` is canonical; `pio-mcp` and `pio-agent` install the same CLI through thin dependency-only aliases:
 
 ```bash
-npx --package platformio-mcp pio-agent --help
+npx platformio-mcp --help
+npx pio-mcp --help
+npx pio-agent --help
 ```
 
 ```bash
