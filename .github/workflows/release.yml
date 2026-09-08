@@ -88,7 +88,7 @@ jobs:
             if npm view "${package_name}@${version}" version >/dev/null 2>&1; then
               echo "${package_name}@${version} is already published; skipping"
             else
-              npm publish "release-artifacts/${package_name}-${version}.tgz" --access public
+              npm publish "./release-artifacts/${package_name}-${version}.tgz" --access public
             fi
           done
 
