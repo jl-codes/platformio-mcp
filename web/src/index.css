@@ -449,6 +449,24 @@ body {
     min-width: 0;
   }
 
+  .workspace-config .ant-card-head-title {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .workspace-config .ant-card-head-title .ant-space {
+    align-items: flex-start;
+    display: flex;
+    max-width: 100%;
+  }
+
+  .workspace-config .ant-card-head-title .ant-space-item:last-child,
+  .workspace-config .ant-card-head-title .ant-typography {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
   .workspace-config .ant-card-extra {
     margin-inline-start: 0;
   }

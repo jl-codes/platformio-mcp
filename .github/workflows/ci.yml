@@ -159,7 +159,7 @@ jobs:
         run: git diff --exit-code -- plugins/platformio-mcp
 
       - name: Inspect npm package contents
-        run: npm pack --dry-run
+        run: npm run package:validate
 
   codex_browser:
     name: Codex Dashboard Browser (Chromium)

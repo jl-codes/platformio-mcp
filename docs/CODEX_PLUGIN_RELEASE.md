@@ -14,7 +14,8 @@ npm run plugin:test
 npm run lint
 npm audit --audit-level=low
 npm --prefix web audit --audit-level=low
-npm pack --dry-run
+npm --prefix web run test:e2e:codex
+npm run package:validate
 ```
 
 `plugin:build` bundles the Node MCP server and production dashboard into `plugins/platformio-mcp/runtime/`, normalizes generated text, and writes a SHA-256 inventory. PlatformIO Core and board toolchains remain external prerequisites.
@@ -69,12 +70,22 @@ The initial one-board usability gate is documented in the [redacted ESP32-S3 acc
 
 ## Release
 
-1. Update package version and changelog.
+1. Update the package, compatibility-package, plugin, and changelog versions.
 2. Regenerate plugin content and runtime.
 3. Run all software, browser, package, secret-scan, and available hardware gates.
 4. Update the draft PR with exact evidence and residual matrix gaps; mark ready only when required evidence exists.
-5. Merge after review, create the signed/tagged release, and publish the exact npm tarball if authorized.
-6. Install from the published artifact in a fresh environment and verify the inventory checksum.
+5. Configure npm trusted publishing for both `platformio-mcp` and its existing
+   `pio-mcp` compatibility package, repository `jl-codes/platformio-mcp`,
+   workflow `release.yml`, with direct publishing allowed. The release workflow
+   uses a GitHub-hosted Node 24 runner and OIDC; it does not require a long-lived
+   npm token.
+6. Merge after review, create the signed `v<package-version>` tag, and manually
+   dispatch the release workflow from that exact tag with npm publishing
+   enabled if authorized.
+7. Let the workflow create the GitHub Release and publish the exact validated
+   npm tarball with provenance.
+8. Install from the published artifact in a fresh environment and verify the
+   inventory checksum.
 
 ## Rollback
 

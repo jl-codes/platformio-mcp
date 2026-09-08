@@ -15,6 +15,9 @@ import {
 
 const PLUGIN_ROOT = path.join(process.cwd(), "plugins", "platformio-mcp");
 const RUNTIME_PATH = path.join(PLUGIN_ROOT, "runtime", "platformio-mcp.mjs");
+const PACKAGE_VERSION = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+).version as string;
 
 describe("Codex plugin launcher", () => {
   it("recognizes macOS temporary-directory path aliases", () => {
@@ -59,7 +62,10 @@ describe("Codex plugin launcher", () => {
 
     expect(spec.source).toBe("npm");
     expect(spec.command).toBe("npx.cmd");
-    expect(spec.args.slice(0, 2)).toEqual(["-y", "platformio-mcp@2.2.2"]);
+    expect(spec.args.slice(0, 2)).toEqual([
+      "-y",
+      `platformio-mcp@${PACKAGE_VERSION}`,
+    ]);
   });
 
   it("uses the portable npm executable on non-Windows hosts", () => {
@@ -70,6 +76,23 @@ describe("Codex plugin launcher", () => {
     });
 
     expect(spec.command).toBe("npx");
+  });
+
+  it("keeps the pio-mcp compatibility package aligned with the CLI", () => {
+    const aliasRoot = path.join(process.cwd(), "packages", "pio-mcp");
+    const aliasPackage = JSON.parse(
+      fs.readFileSync(path.join(aliasRoot, "package.json"), "utf8"),
+    ) as { dependencies: Record<string, string>; version: string };
+    const aliasLauncher = fs.readFileSync(
+      path.join(aliasRoot, "bin.js"),
+      "utf8",
+    );
+
+    expect(aliasPackage.version).toBe(PACKAGE_VERSION);
+    expect(aliasPackage.dependencies["platformio-mcp"]).toBe(
+      `^${PACKAGE_VERSION}`,
+    );
+    expect(aliasLauncher).toContain('import("platformio-mcp/build/cli.js")');
   });
 });
 
