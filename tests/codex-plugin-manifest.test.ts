@@ -62,10 +62,14 @@ describe("Codex plugin manifest", () => {
       "./assets/screenshot-dashboard.png",
     ]);
     expect(
-      fs.readFileSync(path.join(PLUGIN_ROOT, "assets", "icon.png")),
-    ).toEqual(
-      fs.readFileSync(path.join(REPO_ROOT, "docs", "assets", "pio_agent.png")),
-    );
+      fs
+        .readFileSync(path.join(PLUGIN_ROOT, "assets", "icon.png"))
+        .equals(
+          fs.readFileSync(
+            path.join(REPO_ROOT, "docs", "assets", "pio_agent.png"),
+          ),
+        ),
+    ).toBe(true);
     expect(marketplace.plugins).toContainEqual(
       expect.objectContaining({
         name: manifest.name,
