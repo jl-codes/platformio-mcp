@@ -7,6 +7,40 @@ on:
         description: Optional run annotation
         required: false
         type: string
+      project_dir:
+        description: Checkout-relative PlatformIO fixture
+        required: true
+        default: examples/esp32-serial-verify
+        type: string
+      environment:
+        description: Exact PlatformIO environment
+        required: true
+        default: esp32dev
+        type: string
+      port:
+        description: Exact initial serial port
+        required: true
+        type: string
+      board_family:
+        description: Public board-family label for evidence
+        required: true
+        default: ESP32
+        type: string
+      expected_marker:
+        description: Required post-flash serial marker
+        required: true
+        default: BOOT_OK
+        type: string
+      capture_duration_seconds:
+        description: Bounded post-flash capture duration (1-60)
+        required: true
+        default: "10"
+        type: string
+      confirm_hardware_write:
+        description: Explicitly authorize one firmware upload to the selected target
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -20,10 +54,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -31,7 +65,51 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run MCP hardware e2e suite
+      - name: Build and validate the installed-plugin artifact
+        run: |
+          npm run plugin:build
+          npm run plugin:validate
+          npm run plugin:test
+
+      - name: Run MCP protocol suite through the bundled plugin launcher
         env:
           RUN_MCP_E2E: "1"
+          PIO_MCP_TEST_SERVER_PATH: plugins/platformio-mcp/scripts/launch-platformio-mcp.mjs
         run: npm run test -- tests/mcp.test.ts
+
+      - name: Require explicit workflow write authorization
+        env:
+          PIO_HIL_CONFIRM_WRITE: ${{ inputs.confirm_hardware_write }}
+        run: node -e "if (process.env.PIO_HIL_CONFIRM_WRITE !== 'true') throw new Error('Dispatch again with confirm_hardware_write enabled.')"
+
+      - name: Run one bounded physical-board acceptance flow
+        env:
+          PIO_HIL_CONFIRM_WRITE: ${{ inputs.confirm_hardware_write }}
+          PIO_HIL_PROJECT_DIR: ${{ inputs.project_dir }}
+          PIO_HIL_ENVIRONMENT: ${{ inputs.environment }}
+          PIO_HIL_PORT: ${{ inputs.port }}
+          PIO_HIL_BOARD_FAMILY: ${{ inputs.board_family }}
+          PIO_HIL_EXPECTED_MARKER: ${{ inputs.expected_marker }}
+          PIO_HIL_CAPTURE_DURATION_SECONDS: ${{ inputs.capture_duration_seconds }}
+        run: node scripts/run-hardware-acceptance.mjs
+
+      - name: Verify no tracked task, monitor, or lock remains
+        if: always()
+        env:
+          RUN_MCP_E2E: "1"
+        run: npm run test -- tests/task-control.test.ts tests/monitoring-automation.test.ts
+
+      - name: Prepare redacted hardware evidence
+        if: always()
+        env:
+          PIO_HIL_PROJECT_DIR: ${{ inputs.project_dir }}
+        run: node scripts/prepare-hardware-evidence.mjs
+
+      - name: Upload redacted hardware evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platformio-hardware-evidence-${{ github.run_id }}
+          path: test-results/hardware-evidence
+          if-no-files-found: ignore
+          retention-days: 14

@@ -1,10 +1,14 @@
 <p align="center">
-  <img src="docs/assets/pio_mcp_220x220.png" alt="PlatformIO MCP" width="220"/>
+  <img src="docs/assets/pio_agent.png" alt="PIO Agent" width="240"/>
 </p>
 
-# PlatformIO MCP
+# PIO Agent
 
-PlatformIO MCP is the open-source, agent-first hardware execution layer for embedded development.
+PIO Agent is the open-source, agent-first hardware execution layer for embedded development, built on the PlatformIO MCP runtime.
+
+## Brand and Compatibility
+
+**PIO Agent** is the product and Codex Plugin name. **PlatformIO MCP** is the underlying MCP runtime and the compatibility identity used by existing installations. The package, Codex plugin ID, marketplace ID, configuration keys, and skill namespace remain `platformio-mcp`; both `pio-agent` and `platformio-mcp` are supported executable names. This lets existing consumers upgrade without migration while new users see PIO Agent throughout the interface.
 
 It exposes PlatformIO workflows for board discovery, project setup, build, flash, monitor, diagnostics, and task orchestration through:
 - an MCP server adapter
@@ -22,6 +26,10 @@ MCP is one adapter. PlatformIO is the first backend.
 - Persistent workflow artifacts in `.pio-mcp-workspace/` (`lastAgentReport.json`, `boardReport.json`)
 - Board intelligence reports (`agent_generate_board_report`)
 - Policy profile introspection (`get_policy_status`)
+- Exact project/environment/device bindings (`agent_resolve_target`)
+- Bounded, cursor-based serial health checks (`agent_monitor_health`)
+- Idempotent task cancellation and compact history (`cancel_task`, `list_task_history`)
+- Read-only approval status for agents; approval remains human-controlled
 
 All risky operations still honor policy and approval rules.
 
@@ -35,9 +43,15 @@ npx platformio-mcp dashboard
 
 ### 2. Use the CLI
 
+The installed executable is available as both `pio-agent` and `platformio-mcp`. For a one-off npm invocation before global installation, select the existing package explicitly:
+
 ```bash
-npx platformio-mcp devices
-npx platformio-mcp boards --filter esp32
+npx --package platformio-mcp pio-agent --help
+```
+
+```bash
+npx --package platformio-mcp pio-agent devices
+npx --package platformio-mcp pio-agent boards --filter esp32
 npx platformio-mcp init --board esp32dev --framework arduino --project-dir ./firmware
 npx platformio-mcp build --project-dir ./firmware
 npx platformio-mcp flash --project-dir ./firmware --port auto
@@ -67,6 +81,29 @@ npx platformio-mcp install --antigravity
 npx platformio-mcp install --codex
 ```
 
+### 4. Install the full Codex Plugin
+
+The PIO Agent Codex Plugin adds the bundled MCP runtime, focused embedded skills, secure in-app dashboard flow, and monitoring-automation guidance. Codex requires one stable plugin identifier, so install selectors and skill namespaces remain `platformio-mcp`; the installed product is shown as PIO Agent. From a clone:
+
+```bash
+npm install
+npm --prefix web install
+npm run plugin:build
+node build/cli.js install --codex-plugin
+```
+
+From npm:
+
+```bash
+npx -y platformio-mcp install --codex-plugin
+```
+
+Start a new Codex task after installation. The legacy `install --codex` command remains available for MCP-only configuration. See the [full Codex Plugin guide](docs/CODEX.md) for update, uninstall, browser fallback, policy, automation, and rollback details.
+
+The plugin release gates run on Windows, macOS, and Linux, exercise the authenticated dashboard in Chromium, validate the bundled runtime and 42-tool registry, and keep physical-board evidence in a separate manual workflow. That workflow uploads only bounded, sanitized evidence; raw hardware logs stay on the self-hosted runner. See the [release and validation guide](docs/CODEX_PLUGIN_RELEASE.md).
+
+For headless verification and status inspection, the same CLI also provides `plugin validate`, `target-resolve`, `monitor-status`, `monitor-health`, `task-history`, `approval-status`, and `pending-approvals`. Run `platformio-mcp --help` for bounded options and JSON output support.
+
 ## Manual MCP Config
 
 ```json
@@ -93,7 +130,7 @@ On Windows, use `npx.cmd` if your host requires explicit shim resolution.
 
 ## Safety Model
 
-PlatformIO MCP enforces policy decisions across CLI and MCP flows.
+PIO Agent enforces policy decisions across CLI and MCP flows.
 
 - Actions can be `allow`, `deny`, or `requires_approval`
 - Risky operations (for example firmware upload/reset paths) require explicit approval
@@ -111,7 +148,9 @@ Policy profiles can be selected per-project via `.pio-mcp-policy.json`:
 Supported profiles:
 - `read_only`
 - `build_only`
+- `monitor_only`
 - `flash_requires_approval`
+- `lab_runner` (explicit, expiring unattended-lab policy required)
 - `lab_admin`
 
 CLI approval workflows:
@@ -144,7 +183,7 @@ Guides and references:
 - [Agent Skills Directory](.skills/README.md)
 
 Specifications:
-- [PIO MCP Design Specification](docs/PIOMCPDesignSpecification.md)
+- [PIO Agent Design Specification](docs/PIOMCPDesignSpecification.md)
 - [Web UX Design Specification](docs/WebUXDesignSpecification.md)
 - [Development Guide](docs/reference/DevelopmentGuide.md)
 
@@ -170,7 +209,7 @@ CI/CD test tiers:
 - `npm run test:ci:unit` runs unit/component coverage used in cross-platform CI.
 - `npm run test:e2e:ci` runs CI-safe end-to-end tests for agent workflows and CLI wiring.
 - `.github/workflows/ci.yml` runs typecheck, tests, and package smoke checks on pull requests/pushes.
-- `.github/workflows/hardware-e2e.yml` is a manual self-hosted runner workflow for real hardware MCP E2E (`RUN_MCP_E2E=1`).
+- `.github/workflows/hardware-e2e.yml` is a manual self-hosted-runner workflow for one explicitly confirmed physical-board write, bundled-plugin protocol checks, post-flash identity/serial assertions, cleanup proof, and sanitized evidence.
 
 ## Contributing
 

@@ -16,6 +16,7 @@ import treeKill from "tree-kill";
 import lockfile from "proper-lockfile";
 import { logDiagnostic as logDiag } from "./logger.js";
 import { registerCommand, updateTaskStatus, getCommandHistory } from "./command-registry.js";
+import type { TaskRecord } from "./command-registry.js";
 import crypto from "node:crypto";
 import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
 
@@ -302,6 +303,91 @@ export async function unregisterBuildPid(projectDir?: string): Promise<void> {
   } catch (e: any) {
     throw new Error(`Registry contention timeout: ${e.message}`);
   }
+}
+
+/**
+ * Removes one exact build PID from the project tracker.
+ *
+ * @param pid - Tracked build process ID.
+ * @param projectDir - Owning project directory.
+ * @returns Resolves after the tracker is updated.
+ */
+async function unregisterBuildPidValue(
+  pid: number,
+  projectDir?: string,
+): Promise<void> {
+  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  if (!fs.existsSync(pidsFile)) return;
+  const release = await lockfile.lock(pidsFile, {
+    retries: { retries: 5, minTimeout: 50, maxTimeout: 200 },
+  });
+  try {
+    const pids = JSON.parse(fs.readFileSync(pidsFile, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    delete pids[String(pid)];
+    fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+  } finally {
+    await release();
+  }
+}
+
+/**
+ * Terminates one process only after proving it belongs to the selected task.
+ *
+ * @param task - Persisted task record containing PID and hardware scope.
+ * @param projectDir - Owning project directory.
+ * @returns Whether a live tracked process was terminated.
+ */
+export async function killTrackedTaskProcess(
+  task: TaskRecord,
+  projectDir?: string,
+): Promise<boolean> {
+  if (!task.pid) return false;
+
+  const monitorPids = getActiveMonitorPids(projectDir);
+  const buildPidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  let buildPids: Record<string, unknown> = {};
+  if (fs.existsSync(buildPidsFile)) {
+    try {
+      buildPids = JSON.parse(fs.readFileSync(buildPidsFile, "utf8")) as Record<
+        string,
+        unknown
+      >;
+    } catch {
+      buildPids = {};
+    }
+  }
+
+  const trackedMonitor =
+    task.type === "monitor" &&
+    Boolean(task.port) &&
+    monitorPids[task.port!] === task.pid;
+  const trackedBuild =
+    task.type !== "monitor" && Object.hasOwn(buildPids, String(task.pid));
+  if (!trackedMonitor && !trackedBuild) {
+    if (!isPidAlive(task.pid)) return false;
+    throw new Error(
+      `Refusing to terminate PID ${task.pid}; it is not owned by task ${task.taskId}.`,
+    );
+  }
+
+  if (isPidAlive(task.pid)) {
+    await new Promise<void>((resolve, reject) => {
+      treeKill(task.pid!, "SIGTERM", (error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
+
+  if (trackedMonitor && task.port) {
+    await unregisterPioMonitorPid(task.port, projectDir);
+  } else if (trackedBuild) {
+    await unregisterBuildPidValue(task.pid, projectDir);
+  }
+  return true;
 }
 
 /**

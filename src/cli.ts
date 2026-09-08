@@ -11,14 +11,20 @@ import {
   AgentFlashMonitorVerifyParamsSchema,
   AgentGenerateBoardReportParamsSchema,
   AgentGetLastReportParamsSchema,
+  AgentMonitorHealthParamsSchema,
+  AgentResolveTargetParamsSchema,
   AgentSafePinAuditParamsSchema,
   AgentValidateProjectParamsSchema,
   BuildProjectParamsSchema,
   CheckTaskStatusParamsSchema,
+  GetApprovalRequestParamsSchema,
   GetPolicyStatusParamsSchema,
   GetDashboardUrlParamsSchema,
+  GetMonitorStatusParamsSchema,
   InitProjectParamsSchema,
   ListBoardsParamsSchema,
+  ListPendingApprovalsParamsSchema,
+  ListTaskHistoryParamsSchema,
   StartMonitorParamsSchema,
   UploadFirmwareParamsSchema,
 } from "./types.js";
@@ -31,7 +37,11 @@ import {
   startMonitorCore,
   waitForExpectedSerialOutput,
 } from "./core/monitor.js";
-import { checkTaskStatusSummaryCore } from "./core/tasks.js";
+import {
+  checkTaskStatusSummaryCore,
+  listTaskHistoryCore,
+} from "./core/tasks.js";
+import { resolveTarget } from "./core/target-resolution.js";
 import { getDashboardStatusCore } from "./core/dashboard.js";
 import { toCliStructuredError } from "./core/cli-diagnostics.js";
 import { evaluatePolicy } from "./core/policy/evaluate-policy.js";
@@ -40,16 +50,20 @@ import {
   approveRequest,
   denyRequest,
   getApproval,
+  getApprovalRequestSummary,
   listApprovalRequests,
+  listPendingApprovalSummaries,
 } from "./core/policy/approvals.js";
 import {
   agentBuildDiagnose,
   agentFlashMonitorVerify,
   agentGenerateBoardReport,
   agentGetLastReport,
+  agentMonitorHealth,
   agentSafePinAudit,
   agentValidateProject,
 } from "./tools/agent.js";
+import { getMonitorStatus } from "./tools/monitor.js";
 
 type OptionValue = string | boolean;
 type ParsedArgs = {
@@ -58,7 +72,7 @@ type ParsedArgs = {
 };
 
 function printCliHelp() {
-  console.log(`platformio-mcp / pio-agent
+  console.log(`PIO Agent (pio-agent / platformio-mcp)
 
 USAGE:
   pio-agent <command> [options]
@@ -71,7 +85,11 @@ COMMANDS:
   build --project-dir <dir> [--environment <env>] [--background] [--verbose]
   flash --project-dir <dir> [--port <port|auto>] [--environment <env>] [--background] [--start-monitor]
   monitor [--project-dir <dir>] [--port <port|auto>] [--environment <env>] [--timeout <seconds>] [--expect <text>] [--background]
+  target-resolve --project-dir <dir> [--environment <env>] [--port <port>] [--binding-ttl <seconds>]
+  monitor-status [--project-dir <dir>] [--port <port>]
+  monitor-health --project-dir <dir> [--environment <env>] [--port <port>] [--duration <seconds>] [--expect-all <csv>] [--reject-patterns <csv>]
   task-status <task-id>
+  task-history --project-dir <dir> [--status <status>] [--limit <n>]
   agent-validate --project-dir <dir>
   agent-build-diagnose --project-dir <dir> [--environment <env>] [--verbose]
   agent-safe-pin-audit --project-dir <dir> --board <id>
@@ -80,10 +98,13 @@ COMMANDS:
   agent-board-report --project-dir <dir> --board <id>
   policy-status [--project-dir <dir>]
   approvals [--status <pending|approved|denied|expired>] [--limit <n>]
+  approval-status <approval-id> [--project-dir <dir>]
+  pending-approvals [--project-dir <dir>] [--limit <n>]
   approve <approval-id>
   deny <approval-id>
   dashboard
-  install --<cline|claude|vscode|antigravity|codex>
+  install --<cline|claude|vscode|antigravity|codex|codex-plugin>
+  plugin validate [--require-runtime]
 
 GLOBAL FLAGS:
   --json
@@ -206,8 +227,16 @@ function actionForCommand(command: string): string {
       return "upload_firmware";
     case "monitor":
       return "start_monitor";
+    case "target-resolve":
+      return "agent_resolve_target";
+    case "monitor-status":
+      return "get_monitor_status";
+    case "monitor-health":
+      return "agent_monitor_health";
     case "task-status":
       return "check_task_status";
+    case "task-history":
+      return "list_task_history";
     case "agent-validate":
       return "agent_validate_project";
     case "agent-build-diagnose":
@@ -224,8 +253,14 @@ function actionForCommand(command: string): string {
       return "get_policy_status";
     case "dashboard":
       return "get_dashboard_url";
+    case "plugin":
+      return "get_policy_status";
     case "install":
       return "run_shell_command";
+    case "approval-status":
+      return "get_approval_request";
+    case "pending-approvals":
+      return "list_pending_approvals";
     case "approvals":
     case "approve":
     case "deny":
@@ -238,7 +273,9 @@ function actionForCommand(command: string): string {
 async function promptApproval(reason: string): Promise<boolean> {
   const rl = createInterface({ input, output });
   try {
-    const answer = await rl.question(`Policy: approval required\nReason: ${reason}\nApprove? [y/N] `);
+    const answer = await rl.question(
+      `Policy: approval required\nReason: ${reason}\nApprove? [y/N] `,
+    );
     const normalized = answer.trim().toLowerCase();
     return normalized === "y" || normalized === "yes";
   } finally {
@@ -261,9 +298,7 @@ function readVersion(): string {
 async function runInstallSubcommand(rawArgs: string[]) {
   const target = rawArgs.find((a) => a.startsWith("--"))?.replace(/^--/, "");
   if (!target) {
-    throw new Error(
-      "Usage: install --<cline|claude|vscode|antigravity|codex>",
-    );
+    throw new Error("Usage: install --<cline|claude|vscode|antigravity|codex>");
   }
 
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -279,6 +314,31 @@ async function runInstallSubcommand(rawArgs: string[]) {
     runInstaller: (targetName: string) => Promise<void>;
   };
   await runInstaller(target);
+}
+
+async function runPluginSubcommand(rawArgs: string[]) {
+  const { options, positionals } = parseArgs(rawArgs);
+  if (positionals[0] !== "validate" || positionals.length !== 1) {
+    throw new Error("Usage: plugin validate [--require-runtime]");
+  }
+
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const validatorEntry = path.join(
+    currentDir,
+    "..",
+    "scripts",
+    "validate-codex-plugin.mjs",
+  );
+  const validatorUrl = pathToFileURL(validatorEntry).href;
+  const { validateCodexPlugin } = (await import(validatorUrl)) as {
+    validateCodexPlugin: (options?: { requireRuntime?: boolean }) => {
+      skills: number;
+      runtimePresent: boolean;
+    };
+  };
+  return validateCodexPlugin({
+    requireRuntime: asBoolean(options["require-runtime"]) ?? false,
+  });
 }
 
 async function runCliCommand(command: string, rawArgs: string[]) {
@@ -474,6 +534,47 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         return;
       }
 
+      case "target-resolve": {
+        const params = AgentResolveTargetParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+          environment: asString(options.environment),
+          port: normalizePortOption(asString(options.port)),
+          bindingTtlSeconds: asNumber(options["binding-ttl"]),
+        });
+        const result = await resolveTarget(params);
+        printOutput(result, jsonMode);
+        return;
+      }
+
+      case "monitor-status": {
+        const params = GetMonitorStatusParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+          port: normalizePortOption(asString(options.port)),
+        });
+        const result = getMonitorStatus(params.port, params.projectDir);
+        printOutput(result, jsonMode);
+        return;
+      }
+
+      case "monitor-health": {
+        const params = AgentMonitorHealthParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+          environment: asString(options.environment),
+          port: normalizePortOption(asString(options.port)),
+          baudRate: asNumber(options["baud-rate"]),
+          captureDurationSeconds: asNumber(options.duration),
+          maxBytes: asNumber(options["max-bytes"]),
+          expectedMarkers: asCsv(options["expect-all"]),
+          rejectedPatterns: asCsv(options["reject-patterns"]),
+          automationKey: asString(options["automation-key"]),
+          cursor: asString(options.cursor),
+          failureThreshold: asNumber(options["failure-threshold"]),
+        });
+        const result = await agentMonitorHealth(params);
+        printOutput(result, jsonMode);
+        return;
+      }
+
       case "task-status": {
         const taskId = positionals[0];
         const params = CheckTaskStatusParamsSchema.parse({
@@ -482,6 +583,17 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           logPath: asString(options["log-path"]),
         });
         const result = await checkTaskStatusSummaryCore(params);
+        printOutput(result, jsonMode);
+        return;
+      }
+
+      case "task-history": {
+        const params = ListTaskHistoryParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+          limit: asNumber(options.limit),
+          status: asString(options.status),
+        });
+        const result = await listTaskHistoryCore(params);
         printOutput(result, jsonMode);
         return;
       }
@@ -517,7 +629,10 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           projectDir: asString(options["project-dir"]),
           boardId: asString(options.board),
         });
-        const result = await agentSafePinAudit(params.projectDir, params.boardId);
+        const result = await agentSafePinAudit(
+          params.projectDir,
+          params.boardId,
+        );
         printOutput(result, jsonMode);
         return;
       }
@@ -601,6 +716,34 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         return;
       }
 
+      case "approval-status": {
+        const params = GetApprovalRequestParamsSchema.parse({
+          approvalId: positionals[0],
+          projectDir: asString(options["project-dir"]),
+        });
+        const result = getApprovalRequestSummary(
+          params.approvalId,
+          params.projectDir,
+        );
+        if (!result) {
+          throw new Error(
+            `Approval request '${params.approvalId}' was not found in this scope.`,
+          );
+        }
+        printOutput(result, jsonMode);
+        return;
+      }
+
+      case "pending-approvals": {
+        const params = ListPendingApprovalsParamsSchema.parse({
+          projectDir: asString(options["project-dir"]),
+          limit: asNumber(options.limit),
+        });
+        const result = listPendingApprovalSummaries(params);
+        printOutput({ approvals: result }, jsonMode);
+        return;
+      }
+
       case "approve": {
         const approvalId = positionals[0];
         if (!approvalId) {
@@ -639,6 +782,18 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         return;
       }
 
+      case "plugin": {
+        const result = await runPluginSubcommand(rawArgs);
+        printOutput(
+          {
+            success: true,
+            ...result,
+          },
+          jsonMode,
+        );
+        return;
+      }
+
       default:
         throw new Error(`Unknown command: ${command}`);
     }
@@ -650,7 +805,11 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       build: "build",
       flash: "upload",
       monitor: "monitor",
+      "target-resolve": "devices",
+      "monitor-status": "monitor",
+      "monitor-health": "monitor",
       "task-status": "tasks",
+      "task-history": "tasks",
       "agent-validate": "agent",
       "agent-build-diagnose": "build",
       "agent-safe-pin-audit": "agent",
@@ -659,10 +818,13 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       "agent-board-report": "agent",
       "policy-status": "policy",
       approvals: "policy",
+      "approval-status": "policy",
+      "pending-approvals": "policy",
       approve: "policy",
       deny: "policy",
       dashboard: "dashboard",
       install: "install",
+      plugin: "plugin",
     };
     const structured = toCliStructuredError(error, {
       stage: stageMap[command] ?? "unknown",
@@ -688,7 +850,11 @@ async function main() {
     "build",
     "flash",
     "monitor",
+    "target-resolve",
+    "monitor-status",
+    "monitor-health",
     "task-status",
+    "task-history",
     "agent-validate",
     "agent-build-diagnose",
     "agent-safe-pin-audit",
@@ -697,10 +863,13 @@ async function main() {
     "agent-board-report",
     "policy-status",
     "approvals",
+    "approval-status",
+    "pending-approvals",
     "approve",
     "deny",
     "dashboard",
     "install",
+    "plugin",
   ]);
 
   if (args.includes("--help") || command === "help") {

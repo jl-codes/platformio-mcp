@@ -23,6 +23,24 @@ import {
 } from "../core/runtime-assertions.js";
 import { listDevicesCore } from "../core/devices.js";
 import { uploadFirmwareCore } from "../core/flash.js";
+import {
+  decideMonitorNotification,
+  evaluateMonitorHealth,
+  type MonitorHealthResult,
+  type MonitorNotificationReason,
+} from "../core/monitor-health.js";
+import {
+  readAutomationState,
+  withAutomationStateLock,
+  writeAutomationState,
+} from "../core/automation-state.js";
+import {
+  resolveTarget,
+  resolveWriteTarget,
+  type TargetBinding,
+  type TargetResolutionResult,
+} from "../core/target-resolution.js";
+import { validateAutomationScope } from "../core/policy/automation-policy.js";
 import { getBoardProfile } from "../boards/index.js";
 import { findFirmwareArtifact } from "../utils/build-cache.js";
 import {
@@ -33,6 +51,7 @@ import {
 import { validateProjectPath } from "../utils/validation.js";
 import { getBoardInfo } from "./boards.js";
 import { getProjectConfig } from "./projects.js";
+import { captureSerialWindow } from "./monitor.js";
 import type {
   AgentBoardReport,
   AgentBuildDiagnoseResult,
@@ -751,24 +770,63 @@ export async function agentFlashMonitorVerify(input: {
   projectDir: string;
   environment?: string;
   port?: string;
+  targetBinding?: TargetBinding;
   expectAll?: string[];
   rejectPatterns?: string[];
   timeoutSeconds?: number;
   stabilityWindowSeconds?: number;
   autoBuild?: boolean;
+  maxRunDurationSeconds?: number;
 }): Promise<AgentFlashMonitorVerifyResult> {
   const validatedPath = validateProjectPath(input.projectDir);
   const timeoutSeconds = input.timeoutSeconds ?? 45;
   const stabilityWindowSeconds = input.stabilityWindowSeconds ?? 10;
   const expectAll = input.expectAll ?? [];
   const rejectPatterns = input.rejectPatterns ?? [];
-  const environment = input.environment ?? "default";
+  const verifiedInput = input.targetBinding
+    ? await resolveWriteTarget({
+        projectDir: validatedPath,
+        environment: input.environment,
+        port: input.port,
+        targetBinding: input.targetBinding,
+      })
+    : undefined;
+  const target = await resolveTarget({
+    projectDir: validatedPath,
+    environment: verifiedInput?.environment ?? input.environment,
+    port: verifiedInput?.port ?? input.port,
+  });
+  const environment = target.environment ?? input.environment ?? "unresolved";
   const shouldAutoBuild = input.autoBuild ?? true;
+
+  if (!target.success || !target.binding || !target.port || !target.environment) {
+    const unresolvedResult: AgentFlashMonitorVerifyResult = {
+      success: false,
+      projectDir: validatedPath,
+      environment,
+      flashSuccess: false,
+      monitorSuccess: false,
+      verificationStatus: "inconclusive",
+      matchedExpectations: [],
+      unmatchedExpectations: expectAll,
+      rejectedPatterns: [],
+      detectedRuntimeErrors: [],
+      recommendedNextAction: `${target.summary} ${target.nextSteps[0] ?? "Resolve one exact target."}`,
+    };
+    persistAgentReport(
+      validatedPath,
+      "agent_flash_monitor_verify",
+      false,
+      "Flash workflow stopped because no exact target binding was available.",
+      unresolvedResult,
+    );
+    return unresolvedResult;
+  }
 
   if (shouldAutoBuild) {
     const targetEnvironments = inferArtifactTargetEnvironments(
       validatedPath,
-      input.environment,
+      target.environment,
     );
     const hasArtifacts = hasResolvedFirmwareArtifacts(
       validatedPath,
@@ -778,7 +836,7 @@ export async function agentFlashMonitorVerify(input: {
     if (!hasArtifacts) {
       const build = await buildProjectCore({
         projectDir: validatedPath,
-        environment: input.environment,
+        environment: target.environment,
       });
 
       if ("status" in build && build.status === "running") {
@@ -838,10 +896,12 @@ export async function agentFlashMonitorVerify(input: {
 
   const uploadResult = await uploadFirmwareCore({
     projectDir: validatedPath,
-    port: input.port,
-    environment: input.environment,
+    port: target.port,
+    environment: target.environment,
     startMonitorAfter: true,
     verbose: true,
+    targetBinding: target.binding,
+    maxRunDurationSeconds: input.maxRunDurationSeconds,
   });
 
   if ("status" in uploadResult && uploadResult.status === "running") {
@@ -958,6 +1018,7 @@ export async function agentFlashMonitorVerify(input: {
     recommendedNextAction: runtimeSummary.action,
     rawMonitorLogPath: monitorCollection.monitorSuccess ? monitorLogPath : undefined,
     monitorSnippet: monitorCollection.output.slice(-2000),
+    targetBindingDigest: target.binding.digest,
   };
 
   persistAgentReport(
@@ -1040,4 +1101,156 @@ export async function agentGenerateBoardReport(
     report,
   );
   return report;
+}
+
+/** Result from one interactive or scheduled serial-health check. */
+export interface AgentMonitorHealthResult {
+  success: boolean;
+  target: TargetResolutionResult;
+  health: MonitorHealthResult;
+  automationKey?: string;
+  targetChanged: boolean;
+  shouldNotify: boolean;
+  notificationReason?: MonitorNotificationReason;
+}
+
+/**
+ * Resolves one target, captures a bounded serial window, and tracks changes.
+ *
+ * @param input - Target selectors, assertions, and optional automation key.
+ * @returns Change-aware health result with no raw unbounded device output.
+ */
+export async function agentMonitorHealth(input: {
+  projectDir: string;
+  environment?: string;
+  port?: string;
+  baudRate?: number;
+  captureDurationSeconds?: number;
+  maxBytes?: number;
+  expectedMarkers?: string[];
+  rejectedPatterns?: string[];
+  automationKey?: string;
+  cursor?: string;
+  failureThreshold?: number;
+}): Promise<AgentMonitorHealthResult> {
+  const projectDir = validateProjectPath(input.projectDir);
+
+  const execute = async (): Promise<AgentMonitorHealthResult> => {
+    const prior = input.automationKey
+      ? readAutomationState(projectDir, input.automationKey)
+      : undefined;
+    const target = await resolveTarget({
+      projectDir,
+      environment: input.environment,
+      port: input.port,
+    });
+    const targetChanged = Boolean(
+      prior?.targetBinding &&
+        target.binding &&
+        prior.targetBinding.deviceFingerprint !==
+          target.binding.deviceFingerprint,
+    );
+
+    if (!target.success || !target.port || !target.environment || !target.binding) {
+      const health = evaluateMonitorHealth({
+        serialOutput: "",
+        expectedMarkers: input.expectedMarkers,
+        rejectedPatterns: input.rejectedPatterns,
+        disconnected: target.status === "unavailable",
+        previousDigest: prior?.digest,
+        previousStatus: prior?.lastStatus as
+          | MonitorHealthResult["status"]
+          | undefined,
+        previousConsecutiveFailures: prior?.consecutiveFailures,
+      });
+      if (input.automationKey && prior) {
+        writeAutomationState(projectDir, {
+          ...prior,
+          digest: health.digest,
+          lastStatus: health.status,
+          consecutiveFailures: health.consecutiveFailures,
+        });
+      }
+      const notification = decideMonitorNotification({
+        automation: Boolean(input.automationKey),
+        health,
+        previousDigest: prior?.digest,
+        targetChanged,
+        failureThreshold: input.failureThreshold,
+      });
+      return {
+        success: false,
+        target,
+        health,
+        automationKey: input.automationKey,
+        targetChanged,
+        ...notification,
+      };
+    }
+
+    if (input.automationKey) {
+      validateAutomationScope({
+        automationKey: input.automationKey,
+        action: "agent_monitor_health",
+        projectDir,
+        environment: target.environment,
+        targetBinding: target.binding,
+        maxRunDurationSeconds: input.captureDurationSeconds ?? 5,
+      });
+    }
+
+    const capture = await captureSerialWindow({
+      projectDir,
+      port: target.port,
+      environment: target.environment,
+      baudRate: input.baudRate,
+      durationSeconds: input.captureDurationSeconds,
+      maxBytes: input.maxBytes,
+      cursor: input.cursor ?? prior?.cursor,
+    });
+    const health = evaluateMonitorHealth({
+      serialOutput: capture.content,
+      expectedMarkers: input.expectedMarkers,
+      rejectedPatterns: input.rejectedPatterns,
+      cursor: capture.cursor,
+      previousDigest: prior?.digest,
+      previousStatus: prior?.lastStatus as
+        | MonitorHealthResult["status"]
+        | undefined,
+      previousConsecutiveFailures: prior?.consecutiveFailures,
+    });
+
+    if (input.automationKey && prior) {
+      writeAutomationState(projectDir, {
+        ...prior,
+        cursor: capture.cursor,
+        digest: health.digest,
+        lastStatus: health.status,
+        consecutiveFailures: health.consecutiveFailures,
+        targetBinding: target.binding,
+        consecutiveHardwareWrites:
+          health.status === "healthy" ? 0 : prior.consecutiveHardwareWrites,
+      });
+    }
+
+    const notification = decideMonitorNotification({
+      automation: Boolean(input.automationKey),
+      health,
+      previousDigest: prior?.digest,
+      targetChanged,
+      failureThreshold: input.failureThreshold,
+    });
+    return {
+      success: health.status === "healthy",
+      target,
+      health,
+      automationKey: input.automationKey,
+      targetChanged,
+      ...notification,
+    };
+  };
+
+  return input.automationKey
+    ? withAutomationStateLock(projectDir, input.automationKey, execute)
+    : execute();
 }

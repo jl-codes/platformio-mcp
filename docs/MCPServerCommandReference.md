@@ -11,6 +11,7 @@ This document serves as the definitive reference for all tools exposed by the Pl
 | [`get_board_info`](#get_board_info) | Gets detailed information about a specific board including MCU, frequency, flash, RAM, and supported frameworks. |
 | **Device Management** | |
 | [`list_devices`](#list_devices) | Lists all connected serial devices that can be used for firmware upload and monitoring. |
+| [`agent_resolve_target`](#agent_resolve_target) | Resolves one environment, board, physical device, and short-lived target binding without guessing. |
 | **Project Operations** | |
 | [`init_project`](#init_project) | Initializes a new PlatformIO project with the specified board and optional framework. |
 | [`get_project_config`](#get_project_config) | Dumps `platformio.ini` JSON. |
@@ -28,6 +29,8 @@ This document serves as the definitive reference for all tools exposed by the Pl
 | [`upload_firmware`](#upload_firmware) | Uploads compiled firmware to a connected device. |
 | [`upload_filesystem`](#upload_filesystem) | Builds and uploads a SPIFFS/LittleFS filesystem image to the connected device. |
 | [`check_task_status`](#check_task_status) | Polls the status of an ongoing background build or upload task. |
+| [`cancel_task`](#cancel_task) | Idempotently cancels one tracked task while proving process ownership. |
+| [`list_task_history`](#list_task_history) | Lists compact, project-scoped task history and reconciles stale records. |
 | **Testing and Analysis** | |
 | [`check_project`](#check_project) | Static analysis validation. |
 | [`run_tests`](#run_tests) | Validates unit tests locally/remote. |
@@ -40,6 +43,9 @@ This document serves as the definitive reference for all tools exposed by the Pl
 | [`start_monitor`](#start_monitor) | Manually start or restart the background serial-to-disk spooler for a specific device. |
 | [`stop_monitor`](#stop_monitor) | Kills the active background serial listener and unlocks the UART. |
 | [`query_logs`](#query_logs) | Scans the latest active background serial trace spool, returning a filtered string block. |
+| [`get_monitor_status`](#get_monitor_status) | Inspects active monitor state without starting a new monitor. |
+| [`capture_serial_window`](#capture_serial_window) | Captures a bounded, redacted serial window with an incremental cursor. |
+| [`agent_monitor_health`](#agent_monitor_health) | Resolves a target, captures serial evidence, classifies health, and persists change-only automation state. |
 | **Library Management** | |
 | [`search_libraries`](#search_libraries) | Searches the PlatformIO library registry for available libraries by name, keywords, or description. |
 | [`install_library`](#install_library) | Installs a library from the PlatformIO registry to a specific project boundary. |
@@ -48,8 +54,10 @@ This document serves as the definitive reference for all tools exposed by the Pl
 | [`update_library`](#update_library) | Upgrades library versions. |
 | **Policy** | |
 | [`get_policy_status`](#get_policy_status) | Returns active policy profile and allowed operations. |
+| [`get_approval_request`](#get_approval_request) | Reads one safe approval summary without exposing approval mutation. |
+| [`list_pending_approvals`](#list_pending_approvals) | Lists safe, optionally project-scoped pending approval summaries. |
 | **Diagnostics/Dashboard** | |
-| [`get_dashboard_url`](#get_dashboard_url) | Retrieves the address and auth token for the MCP Web Dashboard. |
+| [`get_dashboard_url`](#get_dashboard_url) | Starts or locates the local dashboard and returns a short-lived, single-use browser launch URL. |
 
 ## Board Discovery
 
@@ -1129,14 +1137,15 @@ When you execute a prompt like this, your agent will typically make the followin
 ## Diagnostics/Dashboard
 
 ### `get_dashboard_url`
-- **Description:** Retrieves the address and auth token for the MCP Web Dashboard. Automatically starts the web server on demand if offline.
+- **Description:** Starts or locates the loopback-only MCP Web Dashboard and returns a short-lived, single-use browser launch URL. The reusable process token is never returned.
 - **Underlying PIO Command:** `pio home --no-open`
 - **Parameters:**
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `open` | boolean | no | If true, automatically opens the authenticated GUI link natively in the system's browser. |
-- **Returns:** JSON object with dashboard URL and auth token.
+| `projectDir` | string | no | Project to select after the secure browser session is established. |
+- **Returns:** Structured result containing `baseUrl`, `launchUrl`, `expiresAt`, `projectDir`, and `status`. Compatibility aliases are marked deprecated and `token` is redacted.
 
 - **Usage Example:**
 
@@ -1149,7 +1158,8 @@ When you execute a prompt like this, your agent will typically make the followin
 {
   "name": "get_dashboard_url",
   "arguments": {
-    "open": true
+    "open": false,
+    "projectDir": "/absolute/path/to/firmware"
   }
 }
 ```
@@ -1159,10 +1169,15 @@ When you execute a prompt like this, your agent will typically make the followin
 
 ```json
 {
-  "url": "http://localhost:3000",
-  "token": "abc123xyz"
+  "baseUrl": "http://127.0.0.1:8080",
+  "launchUrl": "<single-use launch URL>",
+  "expiresAt": "2026-09-05T18:00:00.000Z",
+  "status": "online",
+  "token": "[REDACTED_DEPRECATED]"
 }
 ```
+
+- **Security:** Launch tickets expire after 60 seconds, are deleted on first use, exchange for an HttpOnly SameSite session cookie, and disappear from browser history after redirect. Plugin skills always use `open: false`; scheduled runs never open UI.
 
 
 - **Best Practices / Edge Cases:** Use this to surface the observability UI to the human user automatically.
@@ -1240,6 +1255,60 @@ When you execute a prompt like this, your agent will typically make the followin
 | `boardId` | string | yes | Target board ID |
 
 - **Returns:** `{ boardId, platform, frameworks, mcu, flashBytes, ramBytes, dangerousPins, inputOnlyPins, flashSpiPins, recommendedMonitorBaudRate, generatedAt }`.
+
+## Target, Monitoring, Task, and Approval Primitives
+
+### `agent_resolve_target`
+
+- **Description:** Resolves exactly one declared PlatformIO environment, board, and attached physical device. It returns ambiguity or unavailability instead of guessing.
+- **Parameters:** `projectDir` (required), `environment`, `port`, and `bindingTtlSeconds` (30-900).
+- **Returns:** Resolution status, confidence, candidates/next steps when blocked, and a short-lived `targetBinding` containing project, environment, board, port, stable device fingerprint, digest, and expiry.
+- **Safety:** Pass the complete binding to hardware-changing tools. Bindings are revalidated immediately before writes and tolerate port re-enumeration only when the stable physical fingerprint still matches.
+
+### `get_monitor_status`
+
+- **Description:** Reads active serial monitor state without creating a monitor.
+- **Parameters:** Optional `projectDir` and `port` filters.
+- **Returns:** Active flag, port, project/environment, task/log path, start time, last activity, and capture-lease state.
+
+### `capture_serial_window`
+
+- **Description:** Acquires one bounded monitor lease and returns only the requested serial window.
+- **Parameters:** `projectDir` (required), plus optional exact `port`, `environment`, `baudRate`, `durationSeconds` (maximum 60), `maxBytes` (maximum 65,536), and prior opaque `cursor`.
+- **Returns:** Redacted content, byte count, next cursor, truncation/cursor-expiry status, task ID, and log path.
+- **Safety:** The owned monitor and lease are released in `finally`; malformed/expired cursors fail safely rather than rereading an unbounded file.
+
+### `agent_monitor_health`
+
+- **Description:** Resolves one target, captures bounded serial evidence, classifies health, and optionally persists change-only automation state.
+- **Parameters:** Capture fields plus `expectedMarkers`, `rejectedPatterns`, `automationKey`, `cursor`, and `failureThreshold` (1-10).
+- **Returns:** `healthy`, `degraded`, `failed`, `silent`, `disconnected`, or `inconclusive`; matched/missing patterns; redacted evidence; digest; failure streak; target-change/recovery flags; and whether the host should notify.
+- **Automation behavior:** Identical failures are debounced, unchanged healthy state is quiet, and first/changed failure, target change, and recovery are surfaced once. Literal patterns are default; `re:` opts into a restricted regular-expression subset.
+
+### `cancel_task`
+
+- **Description:** Idempotently cancels one known PlatformIO background task.
+- **Parameters:** `taskId` (required) and optional project scope.
+- **Returns:** `cancelled`, `already_terminal`, or `not_found` with exact task metadata.
+- **Safety:** The process manager verifies PID ownership from the task registry before termination and will not kill unrelated processes.
+
+### `list_task_history`
+
+- **Description:** Reconciles stale records and returns compact project-scoped task history.
+- **Parameters:** `projectDir` (required), optional status, and `limit` (maximum 100).
+- **Returns:** Newest task records with state, command type, timestamps, task ID, and bounded log references.
+
+### `get_approval_request`
+
+- **Description:** Reads one approval request without exposing approve/deny capability.
+- **Parameters:** `approvalId` (required) and optional `projectDir` boundary.
+- **Returns:** An allowlisted summary containing action, risk, reason, status, expiry, and non-secret project/environment/port scope.
+
+### `list_pending_approvals`
+
+- **Description:** Lists newest pending approval summaries without exposing mutations or raw arguments.
+- **Parameters:** Optional exact `projectDir` and `limit` (maximum 100).
+- **Returns:** Safe project-scoped approval summaries. A scoped query excludes legacy/global requests that do not prove the same project boundary.
 
 ## Policy
 

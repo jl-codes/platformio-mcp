@@ -6,8 +6,13 @@ import { ConfigProvider, theme } from 'antd';
 const parsedToken = new URLSearchParams(window.location.search).get('token') || '';
 const parsedProjectDir = new URLSearchParams(window.location.search).get('projectDir') || null;
 // Detect API base implicitly during local development
-const apiBase = window.location.origin.includes('localhost:5173') ? 'http://localhost:8080' : '';
-const socket: Socket = io(apiBase || '/', { auth: { token: parsedToken } });
+const apiBase = /^(http:\/\/localhost|http:\/\/127\.0\.0\.1):5173$/.test(window.location.origin)
+  ? 'http://127.0.0.1:8080'
+  : '';
+const socket: Socket = io(apiBase || '/', {
+  auth: { token: parsedToken },
+  withCredentials: true,
+});
 
 export type AgentEvent = {
   timestamp: number;
@@ -48,7 +53,7 @@ export type TabRef = {
 
 function App() {
   const [status, setStatus] = useState<'online' | 'offline'>('offline');
-  const [authStatus, setAuthStatus] = useState<'checking' | 'valid' | 'invalid'>(parsedToken ? 'checking' : 'invalid');
+  const [authStatus, setAuthStatus] = useState<'checking' | 'valid' | 'invalid'>('checking');
   const [commands, setCommands] = useState<any[]>([]);
   const [buildLogs, setBuildLogs] = useState<Record<string, LogEvent[]>>({});
   const [buildLogFile, setBuildLogFile] = useState<string | null>(null);
@@ -56,6 +61,7 @@ function App() {
   const [spoolerStates, setSpoolerStates] = useState<Record<string, SpoolerState>>({});
   const [activeWorkspace, setActiveWorkspace] = useState<string | null>(parsedProjectDir);
   const [lockState, setLockState] = useState<LockState>({ isLocked: false });
+  const [safetyRevision, setSafetyRevision] = useState(0);
 
   const [openTabs, setOpenTabs] = useState<TabRef[]>([]);
   const [activeTabRef, setActiveTabRef] = useState<TabRef | null>(null);
@@ -231,6 +237,12 @@ function App() {
       }
     });
 
+    socket.on('safety_state_updated', (data: { projectDir?: string }) => {
+      if (!data.projectDir || data.projectDir === activeWorkspaceRef.current) {
+        setSafetyRevision((revision) => revision + 1);
+      }
+    });
+
     socket.on('workspace_state', (data: { projectDir: string }) => {
       if (autoTrackRef.current) {
         setActiveWorkspace(data.projectDir);
@@ -321,6 +333,7 @@ function App() {
       socket.off('connect');
       socket.off('server_status');
       socket.off('command_history_updated');
+      socket.off('safety_state_updated');
       socket.off('build_log');
       socket.off('build_clear');
       socket.off('build_state');
@@ -338,10 +351,11 @@ function App() {
   if (authStatus === 'invalid') {
     return (
       <ConfigProvider theme={{ algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
-        <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#1E1E1E' : '#ffffff', flexDirection: 'column', gap: 24 }}>
-          <img src="/pio_mcp_220x220.png" alt="PIO MCP" style={{ height: '80px', width: '80px', objectFit: 'contain' }} />
-          <div style={{ color: isDarkMode ? '#989898' : '#333333', fontSize: '18px', fontFamily: 'Fira Code, monospace', textAlign: 'center' }}>
-            Access Denied: The dashboard token is invalid or has expired.
+        <div className={`pio-auth-state ${isDarkMode ? 'pio-auth-state-dark' : ''}`}>
+          <img src="/pio_agent.png" alt="PIO Agent" />
+          <div className="pio-auth-copy">
+            <span className="mono-label pio-auth-brand">PIO AGENT</span>
+            <span>Access denied: this dashboard session is invalid or has expired.</span>
           </div>
         </div>
       </ConfigProvider>
@@ -351,15 +365,9 @@ function App() {
   if (authStatus === 'checking') {
     return (
       <ConfigProvider theme={{ algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
-        <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#1E1E1E' : '#ffffff' }}>
-          <img src="/pio_mcp_220x220.png" alt="PIO MCP" style={{ height: '60px', width: '60px', objectFit: 'contain', opacity: 0.3, animation: 'pulse 1.5s infinite' }} />
-          <style>{`
-            @keyframes pulse {
-              0% { opacity: 0.3; transform: scale(1); }
-              50% { opacity: 0.8; transform: scale(1.05); }
-              100% { opacity: 0.3; transform: scale(1); }
-            }
-          `}</style>
+        <div className={`pio-auth-state pio-auth-loading ${isDarkMode ? 'pio-auth-state-dark' : ''}`}>
+          <img src="/pio_agent.png" alt="PIO Agent loading" />
+          <span className="mono-label pio-auth-brand">INITIALIZING PIO AGENT</span>
         </div>
       </ConfigProvider>
     );
@@ -370,20 +378,27 @@ function App() {
       theme={{
         algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
-          colorPrimary: '#4080D0',
-          colorBgBase: isDarkMode ? '#1E1E1E' : '#ffffff',
-          colorText: isDarkMode ? '#989898' : '#333333',
+          colorPrimary: '#1687F8',
+          colorInfo: '#25D9FF',
+          colorBgBase: isDarkMode ? '#07111F' : '#F5F9FD',
+          colorBgContainer: isDarkMode ? '#0F1B2B' : '#FFFFFF',
+          colorBgElevated: isDarkMode ? '#152338' : '#FFFFFF',
+          colorText: isDarkMode ? '#E8F1FA' : '#11243A',
+          colorTextSecondary: isDarkMode ? '#91A8C0' : '#526A82',
+          colorBorderSecondary: isDarkMode ? '#203B58' : '#D5E3F0',
+          borderRadius: 8,
         },
         components: {
           Layout: {
-            siderBg: isDarkMode ? '#323232' : '#ffffff',
-            headerBg: isDarkMode ? '#323232' : '#ececec',
-            bodyBg: isDarkMode ? '#1E1E1E' : '#ffffff',
+            siderBg: isDarkMode ? '#091523' : '#F7FAFD',
+            headerBg: isDarkMode ? '#091523' : '#FFFFFF',
+            bodyBg: isDarkMode ? '#07111F' : '#F5F9FD',
           },
           Menu: {
-            darkItemBg: '#323232',
-            darkItemColor: '#989898',
-            darkItemSelectedBg: '#4080D0',
+            darkItemBg: '#091523',
+            darkItemColor: '#91A8C0',
+            darkItemSelectedBg: '#1687F8',
+            darkItemSelectedColor: '#FFFFFF',
           }
         }
       }}
@@ -411,6 +426,7 @@ function App() {
         setActiveWorkspace={setActiveWorkspace}
         autoTrack={autoTrack}
         setAutoTrack={setAutoTrack}
+        safetyRevision={safetyRevision}
       />
     </ConfigProvider>
   );

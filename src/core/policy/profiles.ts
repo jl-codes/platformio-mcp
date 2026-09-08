@@ -27,6 +27,17 @@ const READ_ONLY_ALLOW = [
   "agent_get_last_report",
   "agent_generate_board_report",
   "get_policy_status",
+  "get_monitor_status",
+  "list_task_history",
+  "get_approval_request",
+  "list_pending_approvals",
+  "agent_resolve_target",
+  "get_project_context",
+  "get_lock_status",
+  "search_libraries",
+  "list_installed_libraries",
+  "system_info",
+  "get_dashboard_url",
 ];
 
 const BUILD_ONLY_ALLOW = [
@@ -35,6 +46,16 @@ const BUILD_ONLY_ALLOW = [
   "check_project",
   "run_tests",
   "agent_build_diagnose",
+];
+
+const MONITOR_ONLY_ALLOW = [
+  ...READ_ONLY_ALLOW,
+  "query_logs",
+  "start_monitor",
+  "stop_monitor",
+  "capture_serial_window",
+  "agent_monitor_health",
+  "cancel_task",
 ];
 
 /**
@@ -70,6 +91,25 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
         "upload_firmware",
         "upload_filesystem",
         "reset_server_state",
+        "agent_flash_monitor_verify",
+      ]),
+    ),
+  },
+  monitor_only: {
+    ...defaultPolicy,
+    allow: MONITOR_ONLY_ALLOW,
+    approval_required: [],
+    deny: Array.from(
+      new Set([
+        ...defaultPolicy.deny,
+        "build_project",
+        "check_project",
+        "run_tests",
+        "upload_firmware",
+        "upload_filesystem",
+        "clean_project",
+        "reset_server_state",
+        "agent_build_diagnose",
         "agent_flash_monitor_verify",
       ]),
     ),
@@ -119,6 +159,22 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
     approval_required: [],
     deny: defaultPolicy.deny,
   },
+  lab_runner: {
+    ...defaultPolicy,
+    allow: Array.from(
+      new Set([
+        ...BUILD_ONLY_ALLOW,
+        ...MONITOR_ONLY_ALLOW,
+        "upload_firmware",
+        "upload_filesystem",
+        "agent_flash_monitor_verify",
+      ]),
+    ),
+    approval_required: ["reset_server_state"],
+    deny: Array.from(
+      new Set([...defaultPolicy.deny, "erase_flash", "run_shell_command"]),
+    ),
+  },
 };
 
 /**
@@ -127,19 +183,26 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
  * @param config - Profile configuration entry.
  * @returns Effective policy config for the selected profile.
  */
-export function resolvePolicyProfile(config: PolicyProfileConfig): PolicyConfig {
-  const base = policyProfiles[config.profile] ?? policyProfiles.flash_requires_approval;
+export function resolvePolicyProfile(
+  config: PolicyProfileConfig,
+): PolicyConfig {
+  const base =
+    policyProfiles[config.profile] ?? policyProfiles.flash_requires_approval;
   if (!config.overrides) return base;
   return {
-    approval_required: config.overrides.approval_required ?? base.approval_required,
+    approval_required:
+      config.overrides.approval_required ?? base.approval_required,
     allow: config.overrides.allow ?? base.allow,
     deny: config.overrides.deny ?? base.deny,
     require_workspace_boundary:
-      config.overrides.require_workspace_boundary ?? base.require_workspace_boundary,
+      config.overrides.require_workspace_boundary ??
+      base.require_workspace_boundary,
     require_device_lock_for_upload:
-      config.overrides.require_device_lock_for_upload ?? base.require_device_lock_for_upload,
+      config.overrides.require_device_lock_for_upload ??
+      base.require_device_lock_for_upload,
     redact_secrets_from_logs:
-      config.overrides.redact_secrets_from_logs ?? base.redact_secrets_from_logs,
+      config.overrides.redact_secrets_from_logs ??
+      base.redact_secrets_from_logs,
     audit_all_agent_actions:
       config.overrides.audit_all_agent_actions ?? base.audit_all_agent_actions,
   };

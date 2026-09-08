@@ -19,15 +19,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         node: [20]
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -35,11 +35,43 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install dashboard dependencies
+        run: npm --prefix web ci
+
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Lint server sources
+        run: npm run lint
+
       - name: Run unit and component tests
         run: npm run test:ci:unit
+
+      - name: Run dashboard component tests
+        run: npm --prefix web run test -- --run
+
+  dependency_audit:
+    name: Production dependency audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependency graphs
+        run: npm ci && npm --prefix web ci
+
+      - name: Audit shipped server dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Audit shipped dashboard dependencies
+        run: npm --prefix web audit --omit=dev --audit-level=moderate
 
   agent_cli_e2e:
     name: Agent/CLI E2E (Linux)
@@ -48,10 +80,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -69,10 +101,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -85,3 +117,80 @@ jobs:
 
       - name: Validate package smoke checks
         run: npm run smoke-test
+
+  codex_plugin:
+    name: Codex Plugin (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [quality, dependency_audit]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install server dependencies
+        run: npm ci
+
+      - name: Install dashboard dependencies
+        run: npm --prefix web ci
+
+      - name: Verify generated skill copies
+        run: npm run plugin:sync:check
+
+      - name: Build plugin runtime
+        run: npm run plugin:build
+
+      - name: Validate plugin package and bundled MCP handshake
+        run: npm run plugin:validate
+
+      - name: Run plugin contract and cache-portability tests
+        run: npm run plugin:test
+
+      - name: Verify deterministic checked-in plugin output
+        run: git diff --exit-code -- plugins/platformio-mcp
+
+      - name: Inspect npm package contents
+        run: npm pack --dry-run
+
+  codex_browser:
+    name: Codex Dashboard Browser (Chromium)
+    runs-on: ubuntu-latest
+    needs: quality
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci && npm --prefix web ci
+
+      - name: Install Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run secure session and narrow-panel journeys
+        run: npm --prefix web run test:e2e:codex
+
+      - name: Upload browser traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-browser-traces
+          path: web/test-results
+          if-no-files-found: ignore
+          retention-days: 7

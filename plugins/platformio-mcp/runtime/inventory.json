@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "platformio-mcp.mjs",
+      "bytes": 3525536,
+      "sha256": "9ddb1c326bdb04da4d21b376d29d2cd7e907f1635d62d771631341a74644059f"
+    },
+    {
+      "path": "web/assets/index-Dbc_ys0m.js",
+      "bytes": 951388,
+      "sha256": "578dc69a11c3320ac174712eeb3c706b93872a100a9d00c0d4fa7304a9ab668c"
+    },
+    {
+      "path": "web/assets/index-oDJsajs4.css",
+      "bytes": 8603,
+      "sha256": "39984f1ecfdac32fdcc8fd7a6c9af4984d8f949584e2ca36b0844fdce993738c"
+    },
+    {
+      "path": "web/index.html",
+      "bytes": 615,
+      "sha256": "c263e55aff144a820e7e1faa3130e5e8c8214c0dc5bd8462468c73aa751ed810"
+    },
+    {
+      "path": "web/pio_agent.png",
+      "bytes": 1891209,
+      "sha256": "5d7d74026273141d3bbcb89da1ee0de83ceef1e2d2308c2bd10d95bf8a6ab730"
+    },
+    {
+      "path": "web/pio_mcp_128x128.ico",
+      "bytes": 81118,
+      "sha256": "9ced423e1f40370d1d05c4561cee9f02c8eeeb6cacc63364d1cc24a9eba5c4ce"
+    },
+    {
+      "path": "web/pio_mcp_220x220.png",
+      "bytes": 70018,
+      "sha256": "5ff7a448d82ba6025e3e3688398737a8055d899b4b06cb53f625ea25cc261a37"
+    }
+  ]
+}

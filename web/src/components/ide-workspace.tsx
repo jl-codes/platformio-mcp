@@ -73,8 +73,8 @@ export default function IDEWorkspace({
     return (
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
         <Empty 
-          image="/pio_mcp_220x220.png"
-          imageStyle={{ height: 180, marginBottom: 24, opacity: 0.85 }}
+          image="/pio_agent.png"
+          imageStyle={{ height: 190, marginBottom: 20, opacity: 0.92, filter: 'drop-shadow(0 18px 34px rgba(22, 135, 248, 0.2))' }}
           description={<Text type="secondary" style={{ fontFamily: 'Fira Code', fontSize: '14px', letterSpacing: '1px' }}>NO TABS OPEN. SELECT A TRACE FROM THE COMMAND FEED.</Text>} 
         />
       </div>

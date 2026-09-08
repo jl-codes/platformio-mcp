@@ -49,9 +49,9 @@ class PortalEventEmitter extends EventEmitter {
           if (stat.size > 2 * 1024 * 1024) {
             await fs.promises.rename(logFile, logFile + ".1");
           }
-        } catch (e) {}
+        } catch {}
         await fs.promises.appendFile(logFile, JSON.stringify(payload) + "\n");
-      } catch (e) {}
+      } catch {}
     }
   }
 
@@ -163,6 +163,18 @@ class PortalEventEmitter extends EventEmitter {
    */
   emitCommandHistoryUpdated(projectDir: string) {
     this.emit("command_history_updated", {
+      timestamp: Date.now(),
+      projectDir,
+    });
+  }
+
+  /**
+   * Emits a lightweight invalidation signal for policy, approval, and automation state.
+   *
+   * @param projectDir Optional workspace affected by the state change.
+   */
+  emitSafetyStateUpdated(projectDir?: string) {
+    this.emit("safety_state_updated", {
       timestamp: Date.now(),
       projectDir,
     });

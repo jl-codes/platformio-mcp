@@ -5,6 +5,7 @@
  * Provides:
  * - startPortalServer: Initializes Express and Socket.io endpoints and hooks into the event bus
  * - getDashboardStatus: Conditionally bootstraps server and returns secure URL payload
+ * - resolveDashboardWebRoot: Locates dashboard assets in source and bundled runtimes
  * - activePortalStatus: Global registry for UI runtime variables
  *
  * REST API Routes:
@@ -36,34 +37,90 @@ import fs from "node:fs";
 import { hardwareLockManager } from "../utils/lock-manager.js";
 import { isBuildActive } from "../utils/process-manager.js";
 import { tailFileBounded } from "../utils/tail.js";
-import { getCommandHistory, registerCommand, updateCommandStatus } from "../utils/command-registry.js";
+import {
+  getCommandHistory,
+  registerCommand,
+  updateCommandStatus,
+} from "../utils/command-registry.js";
 import { mcpContext } from "../utils/mcp-context.js";
 import { getWorkspaces } from "../utils/workspace-registry.js";
 import { getProjectConfig, isValidProject } from "../tools/projects.js";
-import { searchLibraries, listInstalledLibraries, installLibrary, uninstallLibrary } from "../tools/libraries.js";
-import { buildProject, cleanProject, checkProject, runTests } from "../tools/build.js";
+import {
+  searchLibraries,
+  listInstalledLibraries,
+  installLibrary,
+  uninstallLibrary,
+} from "../tools/libraries.js";
+import {
+  buildProject,
+  cleanProject,
+  checkProject,
+  runTests,
+} from "../tools/build.js";
 import { uploadFirmware, uploadFilesystem } from "../tools/upload.js";
 import { GLOBAL_LOCKS_DIR } from "../utils/paths.js";
 import { addWorkspace } from "../utils/workspace-registry.js";
-import { killAllTrackedProcesses, sweepGhostTasks } from "../utils/process-manager.js";
-import { execSync } from "node:child_process";
+import {
+  killAllTrackedProcesses,
+  sweepGhostTasks,
+} from "../utils/process-manager.js";
 import {
   approveRequest,
   denyRequest,
   getApproval,
   listApprovalRequests,
 } from "../core/policy/approvals.js";
-import { readRecentAuditEvents } from "../core/policy/audit-log.js";
+import {
+  appendAuditEvent,
+  readRecentAuditEvents,
+} from "../core/policy/audit-log.js";
+import { getPolicyStatus } from "../core/policy/status.js";
+import {
+  clearAutomationMonitorState,
+  listAutomationStates,
+} from "../core/automation-state.js";
+import { cancelTaskCore } from "../core/tasks.js";
 import { diagnoseBuildLog } from "../core/diagnostics/build-diagnostics.js";
 import { diagnoseUploadLog } from "../core/diagnostics/upload-diagnostics.js";
 import { diagnoseSerialLog } from "../core/diagnostics/serial-diagnostics.js";
 import type { DiagnosticResult } from "../core/diagnostics/types.js";
+import {
+  pickWorkspaceDirectory,
+  WorkspacePickerUnavailableError,
+} from "./folder-picker.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * Resolves dashboard assets for both repository builds and installed plugins.
+ * @param environment Process environment containing an optional bundled UI override.
+ * @param moduleDirectory Directory containing the compiled API server module.
+ * @returns Absolute path to the dashboard's production assets.
+ */
+export function resolveDashboardWebRoot(
+  environment: NodeJS.ProcessEnv = process.env,
+  moduleDirectory: string = __dirname,
+): string {
+  const configuredPath = environment.PIO_MCP_WEB_DIST?.trim();
+  return configuredPath
+    ? path.resolve(configuredPath)
+    : path.join(moduleDirectory, "..", "..", "web", "dist");
+}
+
 // Secure randomized access token for local API authentication
 const PORTAL_AUTH_TOKEN = crypto.randomUUID();
+const DASHBOARD_SESSION_COOKIE = "pio_mcp_session";
+const LAUNCH_TICKET_TTL_MS = 60_000;
+const DASHBOARD_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+
+type LaunchTicket = {
+  expiresAt: number;
+  projectDir?: string;
+};
+
+const launchTickets = new Map<string, LaunchTicket>();
+const dashboardSessions = new Map<string, number>();
 
 /**
  * Global singleton tracking the health, bound port, and session payload
@@ -72,13 +129,99 @@ const PORTAL_AUTH_TOKEN = crypto.randomUUID();
 export const activePortalStatus = {
   running: false,
   port: 0,
+  host: "127.0.0.1",
   token: PORTAL_AUTH_TOKEN,
   // Tracks whether we have already spawned an OS browser tab for this process
   // lifetime. Prevents the "million windows" failure mode where repeated
   // invocations of getDashboardStatus(true) (rehydration, tool calls, multiple
   // Cline profiles, etc.) each fire a fresh open(secureLink).
-  browserOpened: false
+  browserOpened: false,
 };
+
+/**
+ * Resolves and validates the dashboard listener host.
+ *
+ * @returns Explicit loopback host, or an intentionally enabled non-loopback host.
+ */
+function resolvePortalHost(): string {
+  const host = process.env.PIO_MCP_BIND_HOST?.trim() || "127.0.0.1";
+  const loopback =
+    host === "127.0.0.1" || host === "localhost" || host === "::1";
+  if (!loopback && process.env.PIO_MCP_ALLOW_NON_LOOPBACK !== "true") {
+    throw new Error(
+      "Non-loopback dashboard binding requires PIO_MCP_ALLOW_NON_LOOPBACK=true.",
+    );
+  }
+  if (!loopback) {
+    console.error(
+      `[WARN] Dashboard is intentionally binding to non-loopback host '${host}'.`,
+    );
+  }
+  return host;
+}
+
+/**
+ * Formats a listener host for use in an HTTP URL.
+ *
+ * @param host - IPv4, IPv6, or hostname listener.
+ * @returns URL-safe host segment.
+ */
+function formatUrlHost(host: string): string {
+  return host.includes(":") ? `[${host}]` : host;
+}
+
+/**
+ * Parses a request Cookie header without accepting duplicate values.
+ *
+ * @param header - Raw Cookie header.
+ * @returns Cookie name/value mapping.
+ */
+function parseCookies(header?: string): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  for (const part of header?.split(";") ?? []) {
+    const separator = part.indexOf("=");
+    if (separator <= 0) continue;
+    const name = part.slice(0, separator).trim();
+    if (Object.hasOwn(cookies, name)) continue;
+    cookies[name] = decodeURIComponent(part.slice(separator + 1).trim());
+  }
+  return cookies;
+}
+
+/**
+ * Checks a dashboard session and prunes expired entries.
+ *
+ * @param cookieHeader - Request Cookie header.
+ * @returns True when a non-expired session cookie is present.
+ */
+function hasValidDashboardSession(cookieHeader?: string): boolean {
+  const now = Date.now();
+  for (const [sessionId, expiresAt] of dashboardSessions) {
+    if (expiresAt <= now) dashboardSessions.delete(sessionId);
+  }
+  const sessionId = parseCookies(cookieHeader)[DASHBOARD_SESSION_COOKIE];
+  return Boolean(sessionId && (dashboardSessions.get(sessionId) ?? 0) > now);
+}
+
+/**
+ * Creates one short-lived, single-use browser launch ticket.
+ *
+ * @param projectDir - Optional project selected after authentication.
+ * @returns Raw ticket and expiry for immediate browser launch.
+ */
+function issueLaunchTicket(projectDir?: string): {
+  ticket: string;
+  expiresAt: string;
+} {
+  const now = Date.now();
+  for (const [ticket, value] of launchTickets) {
+    if (value.expiresAt <= now) launchTickets.delete(ticket);
+  }
+  const ticket = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = now + LAUNCH_TICKET_TTL_MS;
+  launchTickets.set(ticket, { expiresAt, projectDir });
+  return { ticket, expiresAt: new Date(expiresAt).toISOString() };
+}
 
 function parseDeviceLocks() {
   const locks: Array<{
@@ -138,18 +281,26 @@ function diagnoseByTaskType(
  * Retrieves the operational footprint of the user-facing Web Dashboard.
  * Intelligently boots the local Express daemon on demand if it is dormant,
  * and intercepts hard-blocks configured via environment flags.
- * 
+ *
  * @param autoOpen If true, seamlessly dispatches a subshell command to route the host's default web browser to the secure link.
  * @param projectDir Optional project directory to register upon startup.
  * @returns A dictionary dictating the physical port, localhost domain string, and active session cryptographic token.
  */
-export async function getDashboardStatus(autoOpen: boolean = false, projectDir?: string) {
-  if (process.argv.includes("--disable-dashboard") || process.env.PIO_MCP_DISABLE_DASHBOARD === "true") {
-    throw new Error("Dashboard is administratively disabled by the host environment.");
+export async function getDashboardStatus(
+  autoOpen: boolean = false,
+  projectDir?: string,
+) {
+  if (
+    process.argv.includes("--disable-dashboard") ||
+    process.env.PIO_MCP_DISABLE_DASHBOARD === "true"
+  ) {
+    throw new Error(
+      "Dashboard is administratively disabled by the host environment.",
+    );
   }
 
   if (projectDir) {
-    addWorkspace(projectDir);
+    await addWorkspace(projectDir);
   }
 
   if (!activePortalStatus.running) {
@@ -169,23 +320,36 @@ export async function getDashboardStatus(autoOpen: boolean = false, projectDir?:
     });
   }
 
-  const url = `http://localhost:${activePortalStatus.port}`;
-  let secureLink = `${url}?token=${activePortalStatus.token}`;
-  if (projectDir) {
-    secureLink += `&projectDir=${encodeURIComponent(projectDir)}`;
-  }
-  
+  const baseUrl = `http://${formatUrlHost(activePortalStatus.host)}:${activePortalStatus.port}`;
+  const launch = issueLaunchTicket(projectDir);
+  const launchUrl = `${baseUrl}/auth/launch?ticket=${encodeURIComponent(launch.ticket)}`;
+
   if (autoOpen) {
     // Guarded — see browserOpened + PIO_MCP_NO_BROWSER below
-    if (process.env.PIO_MCP_NO_BROWSER === "true" || process.argv.includes("--no-browser")) {
-      // user opted out of auto-opening — leave secureLink in the return payload only
+    if (
+      process.env.PIO_MCP_NO_BROWSER === "true" ||
+      process.argv.includes("--no-browser")
+    ) {
+      // User opted out of auto-opening; return the launch URL only.
     } else if (!activePortalStatus.browserOpened) {
       activePortalStatus.browserOpened = true;
-      open(secureLink).catch(() => { /* swallow — dashboard URL is logged anyway */ });
+      open(launchUrl).catch(() => {
+        /* The launch URL remains available to the caller. */
+      });
     }
   }
 
-  return { url, token: activePortalStatus.token, secureLink, status: "online" };
+  return {
+    baseUrl,
+    launchUrl,
+    expiresAt: launch.expiresAt,
+    projectDir,
+    status: "online",
+    url: baseUrl,
+    secureLink: launchUrl,
+    token: "[REDACTED_DEPRECATED]",
+    deprecatedAuthenticationFields: ["url", "secureLink", "token"],
+  };
 }
 
 /**
@@ -196,40 +360,93 @@ export async function getDashboardStatus(autoOpen: boolean = false, projectDir?:
 export function startPortalServer(defaultPort = 8080) {
   const app = express();
   const httpServer = createServer(app);
+  const portalHost = resolvePortalHost();
+  activePortalStatus.host = portalHost;
+
+  app.disable("x-powered-by");
+  app.use((_req, res, next) => {
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://127.0.0.1:* ws://localhost:* ws://[::1]:*",
+    );
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
 
   // Configure strict CORS for local UI dev mode
-  const allowedOrigins = [/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/];
+  const allowedOrigins = [
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+    /^http:\/\/\[::1\](:\d+)?$/,
+  ];
   const corsOptions = {
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
       // Allow requests with no origin (like curl) or explicitly matched localhost origins
-      if (!origin || allowedOrigins.some(regex => regex.test(origin))) {
+      if (!origin || allowedOrigins.some((regex) => regex.test(origin))) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        callback(new Error("Not allowed by CORS"));
       }
-    }
+    },
+    credentials: true,
   };
 
   app.use(cors(corsOptions));
-  app.use(express.json());
+  app.use(express.json({ limit: "256kb", strict: true }));
 
   // Unauthenticated health ping for deployment orchestrators
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "alive" });
   });
 
+  // Exchanges a single-use launch ticket for an HttpOnly dashboard session.
+  app.get("/auth/launch", (req, res) => {
+    const ticket = typeof req.query.ticket === "string" ? req.query.ticket : "";
+    const launch = launchTickets.get(ticket);
+    launchTickets.delete(ticket);
+    if (!launch || launch.expiresAt <= Date.now()) {
+      res.status(401).send("Dashboard launch ticket is invalid or expired.");
+      return;
+    }
+    const sessionId = crypto.randomBytes(32).toString("base64url");
+    dashboardSessions.set(sessionId, Date.now() + DASHBOARD_SESSION_TTL_MS);
+    res.cookie(DASHBOARD_SESSION_COOKIE, sessionId, {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: false,
+      path: "/",
+      maxAge: DASHBOARD_SESSION_TTL_MS,
+    });
+    if (launch.projectDir) {
+      portalEvents.emitWorkspaceState(launch.projectDir);
+    }
+    const redirect = launch.projectDir
+      ? `/?projectDir=${encodeURIComponent(launch.projectDir)}`
+      : "/";
+    res.redirect(303, redirect);
+  });
+
   // REST Auth Middleware restricting access to /api endpoints
   const apiLimiter = rateLimit({
     windowMs: 5 * 60 * 1000,
     limit: 100,
-    message: { error: "Too many requests from this IP, please try again after 5 minutes" }
+    message: {
+      error: "Too many requests from this IP, please try again after 5 minutes",
+    },
   });
 
   app.use("/api", apiLimiter);
 
   app.use("/api", (req, res, next) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader || authHeader !== `Bearer ${PORTAL_AUTH_TOKEN}`) {
+    const validBearer = authHeader === `Bearer ${PORTAL_AUTH_TOKEN}`;
+    const validSession = hasValidDashboardSession(req.headers.cookie);
+    if (!validBearer && !validSession) {
       res.status(401).json({ error: "Unauthorized: Invalid or missing token" });
       return;
     }
@@ -238,9 +455,9 @@ export function startPortalServer(defaultPort = 8080) {
 
   /**
    * Retrieves a list of all connected serial devices (e.g., development boards).
-   * 
+   *
    * Route: GET /api/devices
-   * 
+   *
    * @returns JSON array of connected hardware devices
    */
   app.get("/api/devices", async (_req, res) => {
@@ -254,9 +471,9 @@ export function startPortalServer(defaultPort = 8080) {
 
   /**
    * Alias for /api/devices. Retrieves a list of connected serial devices.
-   * 
+   *
    * Route: GET /api/hardware
-   * 
+   *
    * @returns JSON array of connected hardware devices
    */
   app.get("/api/hardware", async (_req, res) => {
@@ -271,9 +488,9 @@ export function startPortalServer(defaultPort = 8080) {
   /**
    * Retrieves the historical and active command registry for the workspace.
    * Clears out any ghost tasks before returning the history.
-   * 
+   *
    * Route: GET /api/commands
-   * 
+   *
    * @param {string} [req.query.projectDir] - Optional project directory to scope the command history
    * @returns JSON array representing the chronological command history
    */
@@ -310,6 +527,33 @@ export function startPortalServer(defaultPort = 8080) {
       const deviceLocks = parseDeviceLocks();
       const commandHistory = getCommandHistory(projectDir);
       const recentCommands = commandHistory.slice(-40).reverse();
+      const policy = getPolicyStatus(projectDir);
+      const automationStates = projectDir
+        ? listAutomationStates(projectDir)
+        : [];
+      const activeMonitors = Object.entries(getSpoolerStates())
+        .filter(
+          ([, monitor]) => !projectDir || monitor.projectDir === projectDir,
+        )
+        .map(([port, monitor]) => ({
+          port,
+          taskId: monitor.taskId,
+          environment: monitor.environment,
+          startedAt: monitor.startedAt,
+          lastActivityAt: monitor.lastActivityAt,
+        }));
+      const recentTasks = recentCommands
+        .flatMap((command) =>
+          command.tasks.map((task) => ({
+            commandId: command.id,
+            taskId: task.taskId,
+            type: task.type,
+            status: task.status,
+            port: task.port,
+            startedAt: new Date(command.timestamp).toISOString(),
+          })),
+        )
+        .slice(0, 20);
 
       const recentDiagnostics: Array<{
         commandId?: string;
@@ -326,13 +570,16 @@ export function startPortalServer(defaultPort = 8080) {
         exists: boolean;
       }> = [];
 
-      const extractResponseDiagnostic = (response: any): DiagnosticResult | undefined => {
+      const extractResponseDiagnostic = (
+        response: any,
+      ): DiagnosticResult | undefined => {
         if (!response) return undefined;
         if (response.diagnostic) return response.diagnostic as DiagnosticResult;
         if (Array.isArray(response?.content) && response.content[0]?.text) {
           try {
             const parsed = JSON.parse(response.content[0].text);
-            if (parsed?.diagnostic) return parsed.diagnostic as DiagnosticResult;
+            if (parsed?.diagnostic)
+              return parsed.diagnostic as DiagnosticResult;
           } catch {
             // Ignore parse failures.
           }
@@ -341,7 +588,9 @@ export function startPortalServer(defaultPort = 8080) {
       };
 
       for (const cmd of recentCommands) {
-        const commandLevelDiagnostic = extractResponseDiagnostic(cmd.mcpResponse);
+        const commandLevelDiagnostic = extractResponseDiagnostic(
+          cmd.mcpResponse,
+        );
         if (commandLevelDiagnostic) {
           recentDiagnostics.push({
             commandId: cmd.id,
@@ -399,12 +648,23 @@ export function startPortalServer(defaultPort = 8080) {
       const dedupedDiagnostics = recentDiagnostics
         .filter((item, idx, arr) => {
           const key = `${item.commandId ?? "none"}::${item.taskId ?? "none"}::${item.diagnostic.timestamp}`;
-          return arr.findIndex((x) => `${x.commandId ?? "none"}::${x.taskId ?? "none"}::${x.diagnostic.timestamp}` === key) === idx;
+          return (
+            arr.findIndex(
+              (x) =>
+                `${x.commandId ?? "none"}::${x.taskId ?? "none"}::${x.diagnostic.timestamp}` ===
+                key,
+            ) === idx
+          );
         })
         .slice(0, 50);
 
       res.json({
+        projectDir,
+        policy,
         pendingApprovals,
+        automationStates,
+        activeMonitors,
+        recentTasks,
         recentAuditEvents: recentAuditEvents.slice(0, 100),
         deviceLocks,
         recentDiagnostics: dedupedDiagnostics,
@@ -454,6 +714,18 @@ export function startPortalServer(defaultPort = 8080) {
         return;
       }
       const approved = approveRequest(id);
+      appendAuditEvent({
+        action: "dashboard_approve_request",
+        status: "approved",
+        reason: `Approval ${id} was approved by an interactive dashboard user.`,
+        riskLevel: existing.riskLevel,
+        approvalId: id,
+        actorClass: "interactive",
+        workspaceDir:
+          typeof existing.metadata?.projectDir === "string"
+            ? existing.metadata.projectDir
+            : undefined,
+      });
       res.json({ success: true, approval: approved });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -474,6 +746,18 @@ export function startPortalServer(defaultPort = 8080) {
         return;
       }
       const denied = denyRequest(id);
+      appendAuditEvent({
+        action: "dashboard_deny_request",
+        status: "denied",
+        reason: `Approval ${id} was denied by an interactive dashboard user.`,
+        riskLevel: existing.riskLevel,
+        approvalId: id,
+        actorClass: "interactive",
+        workspaceDir:
+          typeof existing.metadata?.projectDir === "string"
+            ? existing.metadata.projectDir
+            : undefined,
+      });
       res.json({ success: true, approval: denied });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -481,10 +765,88 @@ export function startPortalServer(defaultPort = 8080) {
   });
 
   /**
+   * Clears stale monitor cursors without resetting a lab-runner write budget.
+   *
+   * Route: POST /api/safety/automations/:key/clear
+   */
+  app.post("/api/safety/automations/:key/clear", async (req, res) => {
+    try {
+      const projectDir = req.body?.projectDir;
+      if (
+        typeof projectDir !== "string" ||
+        !(await isValidProject(projectDir))
+      ) {
+        res
+          .status(400)
+          .json({ error: "A valid PlatformIO project is required." });
+        return;
+      }
+      const automationKey = req.params.key;
+      const state = await clearAutomationMonitorState(
+        projectDir,
+        automationKey,
+      );
+      appendAuditEvent({
+        action: "clear_automation_monitor_state",
+        status: "completed",
+        reason:
+          "An interactive dashboard user reset monitor cursors while preserving the hardware-write budget.",
+        riskLevel: "medium",
+        automationKey,
+        actorClass: "interactive",
+        workspaceDir: projectDir,
+      });
+      res.json({ success: true, state });
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  /**
+   * Cancels one running task owned by the selected workspace.
+   *
+   * Route: POST /api/tasks/:id/cancel
+   */
+  app.post("/api/tasks/:id/cancel", async (req, res) => {
+    try {
+      const projectDir = req.body?.projectDir;
+      if (
+        typeof projectDir !== "string" ||
+        !(await isValidProject(projectDir))
+      ) {
+        res
+          .status(400)
+          .json({ error: "A valid PlatformIO project is required." });
+        return;
+      }
+      const result = await cancelTaskCore({
+        taskId: req.params.id,
+        projectDir,
+      });
+      if (result.status === "not_found") {
+        res.status(404).json({ error: `Task not found: ${req.params.id}` });
+        return;
+      }
+      appendAuditEvent({
+        action: "cancel_task",
+        status: "completed",
+        reason: `Task ${result.taskId} was cancelled by an interactive dashboard user.`,
+        riskLevel: "medium",
+        taskId: result.taskId,
+        actorClass: "interactive",
+        workspaceDir: projectDir,
+      });
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  /**
    * Retrieves a list of all recognized PlatformIO workspace projects from the registry.
-   * 
+   *
    * Route: GET /api/workspaces
-   * 
+   *
    * @returns JSON array of registered workspaces
    */
   app.get("/api/workspaces", async (_req, res) => {
@@ -498,9 +860,9 @@ export function startPortalServer(defaultPort = 8080) {
 
   /**
    * Wrapper function for executing an MCP tool command triggered via the Web Dashboard.
-   * Handles registering the command in the telemetry ledger, executing it safely 
+   * Handles registering the command in the telemetry ledger, executing it safely
    * within the MCP context, tracking the response, and standardizing error handling.
-   * 
+   *
    * @param toolName - The identifier of the MCP tool being executed
    * @param projectDir - The target PlatformIO workspace directory
    * @param requestPayload - The raw JSON body of the API request
@@ -512,107 +874,143 @@ export function startPortalServer(defaultPort = 8080) {
     projectDir: string,
     requestPayload: any,
     action: () => Promise<any>,
-    res: any
+    res: any,
   ) {
-  if (!projectDir) {
-    res.status(400).json({ error: "Missing projectDir parameter" });
-    return;
-  }
-  
-  const activityId = crypto.randomUUID();
-  try {
-    await registerCommand({
-      id: activityId,
-      commandDesc: `Dashboard Action`,
-      timestamp: Date.now(),
-      status: "running",
-      tasks: [],
-      mcpRequest: requestPayload,
-      mcpToolName: toolName,
-      source: "dashboard"
-    }, projectDir);
+    if (!projectDir) {
+      res.status(400).json({ error: "Missing projectDir parameter" });
+      return;
+    }
 
-    const result = await mcpContext.run({ activityId, targetProjectDir: projectDir }, action);
-
-    let storedResponse = result;
+    const activityId = crypto.randomUUID();
     try {
-      const responseString = JSON.stringify(result);
-      if (responseString.length > 1000) {
-        storedResponse = { truncated: true, message: "Response truncated to save ledger space" };
-      }
-    } catch {}
+      await registerCommand(
+        {
+          id: activityId,
+          commandDesc: `Dashboard Action`,
+          timestamp: Date.now(),
+          status: "running",
+          tasks: [],
+          mcpRequest: requestPayload,
+          mcpToolName: toolName,
+          source: "dashboard",
+        },
+        projectDir,
+      );
 
-    await updateCommandStatus(activityId, {
-      status: (result?.status === "running" && result?.message === "Task dispatched to background.") ? "running" : "success",
-      mcpResponse: storedResponse
-    }, projectDir);
+      const result = await mcpContext.run(
+        { activityId, targetProjectDir: projectDir },
+        action,
+      );
 
-    res.json(result);
-  } catch (e: any) {
-    await updateCommandStatus(activityId, {
-      status: "error",
-      mcpResponse: { error: e.message }
-    }, projectDir);
-    res.status(500).json({ error: e.message });
+      let storedResponse = result;
+      try {
+        const responseString = JSON.stringify(result);
+        if (responseString.length > 1000) {
+          storedResponse = {
+            truncated: true,
+            message: "Response truncated to save ledger space",
+          };
+        }
+      } catch {}
+
+      await updateCommandStatus(
+        activityId,
+        {
+          status:
+            result?.status === "running" &&
+            result?.message === "Task dispatched to background."
+              ? "running"
+              : "success",
+          mcpResponse: storedResponse,
+        },
+        projectDir,
+      );
+
+      res.json(result);
+    } catch (e: any) {
+      await updateCommandStatus(
+        activityId,
+        {
+          status: "error",
+          mcpResponse: { error: e.message },
+        },
+        projectDir,
+      );
+      res.status(500).json({ error: e.message });
+    }
   }
-}
 
   /**
    * Compiles the project source code and generates firmware binary.
-   * 
+   *
    * Route: POST /api/commands/build
-   * 
+   *
    * @param {string} req.body.projectDir - Path to the PlatformIO project directory
    * @param {string} [req.body.environment] - Optional specific environment to build
    * @param {boolean} [req.body.verbose] - If true, returns the complete verbose build log
    * @returns JSON object containing the command execution result and task status
    */
   app.post("/api/commands/build", async (req, res) => {
-    executeDashboardCommand("build_project", req.body.projectDir, req.body, async () => {
-      const { projectDir, environment, verbose } = req.body;
-      return await buildProject(projectDir, environment, verbose, true);
-    }, res);
+    executeDashboardCommand(
+      "build_project",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        const { projectDir, environment, verbose } = req.body;
+        return await buildProject(projectDir, environment, verbose, true);
+      },
+      res,
+    );
   });
 
   /**
    * Forcefully cleans all server locks and terminates tracked compilation PIDs.
-   * 
+   *
    * Route: POST /api/server/reset
-   * 
+   *
    * @param {string} [req.body.projectDir] - Optional project directory to scope the reset
    * @returns JSON object confirming the reset operation
    */
   app.post("/api/server/reset", async (req, res) => {
-    executeDashboardCommand("reset_server_state", req.body.projectDir, req.body, async () => {
-      const projectDir = req.body.projectDir as string | undefined;
-      await killAllTrackedProcesses(projectDir);
+    executeDashboardCommand(
+      "reset_server_state",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        const projectDir = req.body.projectDir as string | undefined;
+        await killAllTrackedProcesses(projectDir);
 
-      // Release MCP Explicit Lock
-      const status = hardwareLockManager.getLockStatus();
-      if (status.isLocked && status.sessionId) {
-        hardwareLockManager.releaseLock(status.sessionId);
-      }
+        // Release MCP Explicit Lock
+        const status = hardwareLockManager.getLockStatus();
+        if (status.isLocked && status.sessionId) {
+          hardwareLockManager.releaseLock(status.sessionId);
+        }
 
-      // Release OS-level Semaphores
-      try {
-        if (fs.existsSync(GLOBAL_LOCKS_DIR)) {
-          for (const file of fs.readdirSync(GLOBAL_LOCKS_DIR)) {
-            if (file.endsWith(".json") || file.endsWith(".lock")) {
-              fs.unlinkSync(path.join(GLOBAL_LOCKS_DIR, file));
+        // Release OS-level Semaphores
+        try {
+          if (fs.existsSync(GLOBAL_LOCKS_DIR)) {
+            for (const file of fs.readdirSync(GLOBAL_LOCKS_DIR)) {
+              if (file.endsWith(".json") || file.endsWith(".lock")) {
+                fs.unlinkSync(path.join(GLOBAL_LOCKS_DIR, file));
+              }
             }
           }
-        }
-      } catch (e) {}
-      
-      return { success: true, message: "System state has been reset and all locks cleared." };
-    }, res);
+        } catch {}
+
+        return {
+          success: true,
+          message: "System state has been reset and all locks cleared.",
+        };
+      },
+      res,
+    );
   });
 
   /**
    * Opens a native OS dialog to select and register a new PlatformIO workspace.
-   * 
+   *
    * Route: POST /api/workspaces/browse
-   * 
+   *
    * @returns JSON object with the registered path, or an error if invalid
    */
   /**
@@ -632,7 +1030,10 @@ export function startPortalServer(defaultPort = 8080) {
       }
       const resolved = path.resolve(dir);
       if (!(await isValidProject(resolved))) {
-        res.status(400).json({ error: "This folder is not a PlatformIO project. Please initialize it using the AI Agent or terminal first, then try opening it again." });
+        res.status(400).json({
+          error:
+            "This folder is not a PlatformIO project. Please initialize it using the AI Agent or terminal first, then try opening it again.",
+        });
         return;
       }
       await addWorkspace(resolved);
@@ -646,22 +1047,7 @@ export function startPortalServer(defaultPort = 8080) {
 
   app.post("/api/workspaces/browse", async (_req, res) => {
     try {
-      let result: string | null = null;
-
-      if (process.platform === "darwin") {
-        result = execSync("osascript -e 'POSIX path of (choose folder)'").toString().trim();
-      } else if (process.platform === "win32") {
-        const ps = `[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Select PlatformIO Project'; $f.ShowNewFolderButton = $false; if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath } else { '' }`;
-        result = execSync(`powershell -NoProfile -Command "${ps}"`, { timeout: 60000 }).toString().trim();
-      } else {
-        // Linux: try zenity, then fall back to manual input
-        try {
-          result = execSync("zenity --file-selection --directory --title='Select PlatformIO Project'", { timeout: 60000 }).toString().trim();
-        } catch {
-          res.status(400).json({ error: "Native folder picker is not available on this system. Please use the text input to enter the project path directly." });
-          return;
-        }
-      }
+      let result = pickWorkspaceDirectory();
 
       if (result) {
         result = path.resolve(result);
@@ -669,9 +1055,12 @@ export function startPortalServer(defaultPort = 8080) {
         if (!(await isValidProject(result))) {
           // TODO(Option B): UI Board Selector flow
           // In the future, instead of returning a strict error here, return a payload like { needs_init: true, path: result }
-          // This would trigger a React modal where the user can search and select from 1000+ PlatformIO boards 
+          // This would trigger a React modal where the user can search and select from 1000+ PlatformIO boards
           // to run `pio project init` before automatically adding it to the registry.
-          res.status(400).json({ error: "This folder is not a PlatformIO project. Please initialize it using the AI Agent or terminal first, then try opening it again." });
+          res.status(400).json({
+            error:
+              "This folder is not a PlatformIO project. Please initialize it using the AI Agent or terminal first, then try opening it again.",
+          });
           return;
         }
         await addWorkspace(result);
@@ -682,30 +1071,43 @@ export function startPortalServer(defaultPort = 8080) {
         res.status(400).json({ error: "No folder selected" });
       }
     } catch (e: any) {
+      if (e instanceof WorkspacePickerUnavailableError) {
+        res.status(400).json({
+          error:
+            "Native folder picker is not available on this system. Please use the text input to enter the project path directly.",
+        });
+        return;
+      }
       res.status(500).json({ error: e.message });
     }
   });
 
   /**
    * Removes build artifacts and compiled files from the project.
-   * 
+   *
    * Route: POST /api/commands/clean
-   * 
+   *
    * @param {string} req.body.projectDir - Path to the PlatformIO project directory
    * @returns JSON object containing the command execution result
    */
   app.post("/api/commands/clean", async (req, res) => {
-    executeDashboardCommand("clean_project", req.body.projectDir, req.body, async () => {
-      const { projectDir } = req.body;
-      return await cleanProject(projectDir, true);
-    }, res);
+    executeDashboardCommand(
+      "clean_project",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        const { projectDir } = req.body;
+        return await cleanProject(projectDir, true);
+      },
+      res,
+    );
   });
 
   /**
    * Uploads compiled firmware to a connected device. Automatically builds if necessary.
-   * 
+   *
    * Route: POST /api/commands/upload_firmware
-   * 
+   *
    * @param {string} req.body.projectDir - Path to the PlatformIO project directory
    * @param {string} [req.body.environment] - Optional specific environment from platformio.ini
    * @param {string} [req.body.port] - Optional upload port (auto-detected if not specified)
@@ -714,66 +1116,105 @@ export function startPortalServer(defaultPort = 8080) {
    * @returns JSON object containing the command execution result
    */
   app.post("/api/commands/upload_firmware", async (req, res) => {
-    executeDashboardCommand("upload_firmware", req.body.projectDir, req.body, async () => {
-      const { projectDir, environment, port, start_monitor, verbose } = req.body;
-      return await uploadFirmware(projectDir, port, environment, verbose, true, start_monitor);
-    }, res);
+    executeDashboardCommand(
+      "upload_firmware",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        const { projectDir, environment, port, start_monitor, verbose } =
+          req.body;
+        return await uploadFirmware(
+          projectDir,
+          port,
+          environment,
+          verbose,
+          true,
+          start_monitor,
+        );
+      },
+      res,
+    );
   });
 
   /**
    * Builds and uploads a SPIFFS/LittleFS filesystem image to the connected device.
-   * 
+   *
    * Route: POST /api/commands/upload_filesystem
-   * 
+   *
    * @param {string} req.body.projectDir - Path to the PlatformIO project directory
    * @param {string} [req.body.environment] - Optional specific environment from platformio.ini
    * @param {string} [req.body.port] - Optional upload port
    * @returns JSON object containing the command execution result
    */
   app.post("/api/commands/upload_filesystem", async (req, res) => {
-    executeDashboardCommand("upload_filesystem", req.body.projectDir, req.body, async () => {
-      const { projectDir, environment, port } = req.body;
-      return await uploadFilesystem(projectDir, port, environment, false, true, false);
-    }, res);
+    executeDashboardCommand(
+      "upload_filesystem",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        const { projectDir, environment, port } = req.body;
+        return await uploadFilesystem(
+          projectDir,
+          port,
+          environment,
+          false,
+          true,
+          false,
+        );
+      },
+      res,
+    );
   });
 
   /**
    * Validates unit tests locally or on hardware.
-   * 
+   *
    * Route: POST /api/commands/run_tests
-   * 
+   *
    * @param {string} req.body.projectDir - Path to the PlatformIO project directory
    * @param {string} [req.body.environment] - Optional specific environment to test
    * @returns JSON object containing the command execution result
    */
   app.post("/api/commands/run_tests", async (req, res) => {
-    executeDashboardCommand("run_tests", req.body.projectDir, req.body, async () => {
-      const { projectDir, environment } = req.body;
-      return await runTests(projectDir, environment, true);
-    }, res);
+    executeDashboardCommand(
+      "run_tests",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        const { projectDir, environment } = req.body;
+        return await runTests(projectDir, environment, true);
+      },
+      res,
+    );
   });
 
   /**
    * Runs static analysis validation on the project source code.
-   * 
+   *
    * Route: POST /api/commands/check_project
-   * 
+   *
    * @param {string} req.body.projectDir - Path to the PlatformIO project directory
    * @param {string} [req.body.environment] - Optional specific environment to check
    * @returns JSON object containing the command execution result
    */
   app.post("/api/commands/check_project", async (req, res) => {
-    executeDashboardCommand("check_project", req.body.projectDir, req.body, async () => {
-      const { projectDir, environment } = req.body;
-      return await checkProject(projectDir, environment, true);
-    }, res);
+    executeDashboardCommand(
+      "check_project",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        const { projectDir, environment } = req.body;
+        return await checkProject(projectDir, environment, true);
+      },
+      res,
+    );
   });
 
   /**
    * Retrieves and serves a complete log file from a specific background task.
-   * 
+   *
    * Route: GET /api/logs
-   * 
+   *
    * @param {string} req.query.taskId - The UUID of the task to retrieve logs for
    * @param {string} [req.query.projectDir] - The project directory associated with the task
    * @returns Raw text stream of the log file contents
@@ -785,10 +1226,12 @@ export function startPortalServer(defaultPort = 8080) {
         res.status(400).json({ error: "Missing taskId parameter" });
         return;
       }
-      
+
       const history = getCommandHistory(projectDir as string | undefined);
-      const task = history.flatMap(c => c.tasks || []).find(t => t.taskId === taskId);
-      
+      const task = history
+        .flatMap((c) => c.tasks || [])
+        .find((t) => t.taskId === taskId);
+
       if (!task) {
         res.status(404).json({ error: "Task not found in registry" });
         return;
@@ -797,15 +1240,15 @@ export function startPortalServer(defaultPort = 8080) {
         res.status(404).json({ error: "No log paths mapped for this task" });
         return;
       }
-      
+
       if (!fs.existsSync(task.logPaths[0])) {
         res.status(404).json({ error: "Log file missing from disk" });
         return;
       }
-      
+
       // Serve file completely
       const fileStream = fs.createReadStream(task.logPaths[0]);
-      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader("Content-Type", "text/plain");
       fileStream.pipe(res);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -814,9 +1257,9 @@ export function startPortalServer(defaultPort = 8080) {
 
   /**
    * Retrieves system diagnostic path output and PIO environment information.
-   * 
+   *
    * Route: GET /api/system/info
-   * 
+   *
    * @returns JSON object with system diagnostics
    */
   app.get("/api/system/info", async (_req, res) => {
@@ -831,9 +1274,9 @@ export function startPortalServer(defaultPort = 8080) {
 
   /**
    * Dumps the parsed platformio.ini JSON configuration for a workspace.
-   * 
+   *
    * Route: GET /api/projects/config
-   * 
+   *
    * @param {string} req.query.projectDir - Path to the PlatformIO project directory
    * @returns JSON object of the parsed platformio.ini configuration
    */
@@ -853,9 +1296,9 @@ export function startPortalServer(defaultPort = 8080) {
 
   /**
    * Searches the PlatformIO library registry for available libraries.
-   * 
+   *
    * Route: GET /api/libraries/search
-   * 
+   *
    * @param {string} req.query.query - Search query string
    * @returns JSON array of search results
    */
@@ -875,16 +1318,18 @@ export function startPortalServer(defaultPort = 8080) {
 
   /**
    * Lists all installed libraries either globally or for a specific project.
-   * 
+   *
    * Route: GET /api/libraries/installed
-   * 
+   *
    * @param {string} [req.query.projectDir] - Path to the PlatformIO project directory
    * @returns JSON array of installed libraries
    */
   app.get("/api/libraries/installed", async (req, res) => {
     try {
       const { projectDir } = req.query;
-      const libs = await listInstalledLibraries(projectDir as string | undefined);
+      const libs = await listInstalledLibraries(
+        projectDir as string | undefined,
+      );
       res.json(libs);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -894,148 +1339,182 @@ export function startPortalServer(defaultPort = 8080) {
   /**
    * Installs a library from the PlatformIO registry to a specific project.
    * Acquires the hardware queue lock during operation.
-   * 
+   *
    * Route: POST /api/libraries/install
-   * 
+   *
    * @param {string} req.body.library - Library name or ID to install
    * @param {string} req.body.projectDir - Path to the PlatformIO project directory
    * @returns JSON object containing the command execution result
    */
   app.post("/api/libraries/install", async (req, res) => {
-    executeDashboardCommand("install_library", req.body.projectDir, req.body, async () => {
-      const { library, projectDir } = req.body;
-      
-      const lockStatus = hardwareLockManager.getLockStatus();
-      if (lockStatus.isLocked) {
-        if (!isBuildActive(projectDir)) {
-          hardwareLockManager.releaseLock(lockStatus.sessionId!);
-        } else {
-          throw new Error("Hardware queue is currently locked by an active agent operation. Please wait for the build to finish.");
+    executeDashboardCommand(
+      "install_library",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        const { library, projectDir } = req.body;
+
+        const lockStatus = hardwareLockManager.getLockStatus();
+        if (lockStatus.isLocked) {
+          if (!isBuildActive(projectDir)) {
+            hardwareLockManager.releaseLock(lockStatus.sessionId!);
+          } else {
+            throw new Error(
+              "Hardware queue is currently locked by an active agent operation. Please wait for the build to finish.",
+            );
+          }
         }
-      }
 
-      const reqSessionId = crypto.randomUUID();
-      hardwareLockManager.acquireLock(reqSessionId, "Installing Library: " + library);
-      portalEvents.emitLockState(hardwareLockManager.getLockStatus());
-
-      try {
-        return await installLibrary(library, { projectDir });
-      } finally {
-        hardwareLockManager.releaseLock(reqSessionId);
+        const reqSessionId = crypto.randomUUID();
+        hardwareLockManager.acquireLock(
+          reqSessionId,
+          "Installing Library: " + library,
+        );
         portalEvents.emitLockState(hardwareLockManager.getLockStatus());
-      }
-    }, res);
+
+        try {
+          return await installLibrary(library, { projectDir });
+        } finally {
+          hardwareLockManager.releaseLock(reqSessionId);
+          portalEvents.emitLockState(hardwareLockManager.getLockStatus());
+        }
+      },
+      res,
+    );
   });
 
   /**
    * Removes a library from a specific project.
    * Acquires the hardware queue lock during operation.
-   * 
+   *
    * Route: POST /api/libraries/uninstall
-   * 
+   *
    * @param {string} req.body.library - Library name or ID to uninstall
    * @param {string} req.body.projectDir - Path to the PlatformIO project directory
    * @returns JSON object containing the command execution result
    */
   app.post("/api/libraries/uninstall", async (req, res) => {
-    executeDashboardCommand("uninstall_library", req.body.projectDir, req.body, async () => {
-      const { library, projectDir } = req.body;
+    executeDashboardCommand(
+      "uninstall_library",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        const { library, projectDir } = req.body;
 
-      const lockStatus = hardwareLockManager.getLockStatus();
-      if (lockStatus.isLocked) {
-        if (!isBuildActive(projectDir)) {
-          hardwareLockManager.releaseLock(lockStatus.sessionId!);
-        } else {
-          throw new Error("Hardware queue is currently locked by an active agent operation. Please wait for the build to finish.");
+        const lockStatus = hardwareLockManager.getLockStatus();
+        if (lockStatus.isLocked) {
+          if (!isBuildActive(projectDir)) {
+            hardwareLockManager.releaseLock(lockStatus.sessionId!);
+          } else {
+            throw new Error(
+              "Hardware queue is currently locked by an active agent operation. Please wait for the build to finish.",
+            );
+          }
         }
-      }
 
-      const reqSessionId = crypto.randomUUID();
-      hardwareLockManager.acquireLock(reqSessionId, "Uninstalling Library: " + library);
-      portalEvents.emitLockState(hardwareLockManager.getLockStatus());
-
-      try {
-        return await uninstallLibrary(library, projectDir);
-      } finally {
-        hardwareLockManager.releaseLock(reqSessionId);
+        const reqSessionId = crypto.randomUUID();
+        hardwareLockManager.acquireLock(
+          reqSessionId,
+          "Uninstalling Library: " + library,
+        );
         portalEvents.emitLockState(hardwareLockManager.getLockStatus());
-      }
-    }, res);
+
+        try {
+          return await uninstallLibrary(library, projectDir);
+        } finally {
+          hardwareLockManager.releaseLock(reqSessionId);
+          portalEvents.emitLockState(hardwareLockManager.getLockStatus());
+        }
+      },
+      res,
+    );
   });
-
-
 
   /**
    * Manually starts or restarts the background serial-to-disk spooler for a specific device.
-   * 
+   *
    * Route: POST /api/spooler/start
-   * 
+   *
    * @param {string} [req.body.port] - Optional COM path
    * @param {string} req.body.projectDir - Path to the PlatformIO project directory
    * @returns JSON object containing the command execution result
    */
   app.post("/api/spooler/start", async (req, res) => {
-    executeDashboardCommand("start_monitor", req.body.projectDir, req.body, async () => {
-      const { port, projectDir } = req.body;
-      const lockStatus = hardwareLockManager.getLockStatus();
-      
-      if (lockStatus.isLocked) {
-        if (!isBuildActive(projectDir)) {
-          // Orphaned explicit lock detected (agent forgot to release or crashed).
-          // Auto-evict the stale lock so the UI isn't permanently bricked.
-          hardwareLockManager.releaseLock(lockStatus.sessionId!);
-        } else {
-          throw new Error(
-            "Hardware queue is currently locked by an active agent operation.",
-          );
+    executeDashboardCommand(
+      "start_monitor",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        const { port, projectDir } = req.body;
+        const lockStatus = hardwareLockManager.getLockStatus();
+
+        if (lockStatus.isLocked) {
+          if (!isBuildActive(projectDir)) {
+            // Orphaned explicit lock detected (agent forgot to release or crashed).
+            // Auto-evict the stale lock so the UI isn't permanently bricked.
+            hardwareLockManager.releaseLock(lockStatus.sessionId!);
+          } else {
+            throw new Error(
+              "Hardware queue is currently locked by an active agent operation.",
+            );
+          }
         }
-      }
-      return await startMonitor(
-        port,
-        115200,
-        projectDir,
-      );
-    }, res);
+        return await startMonitor(port, 115200, projectDir);
+      },
+      res,
+    );
   });
 
   /**
    * Kills the active background serial listener and unlocks the UART.
-   * 
+   *
    * Route: POST /api/spooler/stop
-   * 
+   *
    * @param {string} [req.body.port] - Optional COM port to stop listening on. If omitted, stops all.
    * @returns JSON object containing the command execution result
    */
   app.post("/api/spooler/stop", async (req, res) => {
-    executeDashboardCommand("stop_monitor", req.body.projectDir, req.body, async () => {
-      const { port } = req.body;
-      if (port) {
-        await stopMonitor(port);
-      } else {
-        // Fallback: stop all if no port specified (though UI should always specify)
-        const states = getSpoolerStates();
-        for (const p of Object.keys(states)) {
-          await stopMonitor(p);
+    executeDashboardCommand(
+      "stop_monitor",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        const { port } = req.body;
+        if (port) {
+          await stopMonitor(port);
+        } else {
+          // Fallback: stop all if no port specified (though UI should always specify)
+          const states = getSpoolerStates();
+          for (const p of Object.keys(states)) {
+            await stopMonitor(p);
+          }
         }
-      }
-      return { success: true };
-    }, res);
+        return { success: true };
+      },
+      res,
+    );
   });
 
   /**
    * Launches the native PIO Home server in the background.
-   * 
+   *
    * Route: POST /api/commands/pio_home
-   * 
+   *
    * @param {string} [req.body.projectDir] - Optional project directory
    * @returns JSON object confirming launch
    */
   app.post("/api/commands/pio_home", async (req, res) => {
-    executeDashboardCommand("start_pio_home", req.body.projectDir, req.body, async () => {
-      // Execute the PIO Home server in the background
-      exec("pio home --port 8008");
-      return { success: true, message: "PIO Home launched" };
-    }, res);
+    executeDashboardCommand(
+      "start_pio_home",
+      req.body.projectDir,
+      req.body,
+      async () => {
+        // Execute the PIO Home server in the background
+        exec("pio home --port 8008");
+        return { success: true, message: "PIO Home launched" };
+      },
+      res,
+    );
   });
 
   const io = new Server(httpServer, {
@@ -1048,7 +1527,10 @@ export function startPortalServer(defaultPort = 8080) {
   // Socket.io Auth Middleware
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
-    if (token === PORTAL_AUTH_TOKEN) {
+    if (
+      token === PORTAL_AUTH_TOKEN ||
+      hasValidDashboardSession(socket.handshake.headers.cookie)
+    ) {
       next();
     } else {
       next(new Error("Unauthorized"));
@@ -1056,19 +1538,19 @@ export function startPortalServer(defaultPort = 8080) {
   });
 
   // Serve static UI if built
-  const webDistPath = path.join(__dirname, "..", "..", "web", "dist");
+  const webDistPath = resolveDashboardWebRoot();
   app.use(express.static(webDistPath));
 
   io.on("connection", async (socket) => {
     socket.emit("connection_established", {
-      message: "Connected to PIO MCP Backend",
+      message: "Connected to PIO Agent backend",
     });
 
     // Provide initial status state
     socket.emit("server_status", { timestamp: Date.now(), status: "online" });
     const spoolers = getSpoolerStates();
     socket.emit("spooler_states", spoolers);
-    
+
     // Hydrate last 1000 lines of active serial logs
     for (const [port, daemon] of Object.entries(spoolers)) {
       if (daemon.logFile && fs.existsSync(daemon.logFile)) {
@@ -1081,9 +1563,9 @@ export function startPortalServer(defaultPort = 8080) {
             timestamp: Date.now(),
             port,
             taskId: daemon.taskId,
-            data: tailLines.join("\n")
+            data: tailLines.join("\n"),
           });
-        } catch (e) {}
+        } catch {}
       }
     }
 
@@ -1101,7 +1583,11 @@ export function startPortalServer(defaultPort = 8080) {
       });
 
       // Hydrate last 100 agent activity logs
-      const activityLogPath = path.join(activeWorkspace, ".pio-mcp-workspace", "agent_activities.jsonl");
+      const activityLogPath = path.join(
+        activeWorkspace,
+        ".pio-mcp-workspace",
+        "agent_activities.jsonl",
+      );
       if (fs.existsSync(activityLogPath)) {
         try {
           const lines = await tailFileBounded(activityLogPath);
@@ -1111,11 +1597,17 @@ export function startPortalServer(defaultPort = 8080) {
               socket.emit("agent_activity", JSON.parse(line));
             }
           }
-        } catch (e) {}
+        } catch {}
       }
 
       // Provide initial build log state natively mapped to PR 4 structure
-      const latestBuildLog = path.join(activeWorkspace, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
+      const latestBuildLog = path.join(
+        activeWorkspace,
+        ".pio-mcp-workspace",
+        "logs",
+        "build",
+        "latest-build.log",
+      );
       if (fs.existsSync(latestBuildLog)) {
         socket.emit("build_state", {
           timestamp: Date.now(),
@@ -1138,7 +1630,7 @@ export function startPortalServer(defaultPort = 8080) {
               });
             }
           }
-        } catch (e) {}
+        } catch {}
       }
     }
   });
@@ -1150,8 +1642,15 @@ export function startPortalServer(defaultPort = 8080) {
   portalEvents.on("serial_log", (data) => io.emit("serial_log", data));
   portalEvents.on("server_status", (data) => io.emit("server_status", data));
   portalEvents.on("spooler_states", (data) => io.emit("spooler_states", data));
-  portalEvents.on("command_history_updated", (data) => io.emit("command_history_updated", data));
-  portalEvents.on("hardware_state_updated", (data) => io.emit("hardware_state_updated", data));
+  portalEvents.on("command_history_updated", (data) =>
+    io.emit("command_history_updated", data),
+  );
+  portalEvents.on("safety_state_updated", (data) =>
+    io.emit("safety_state_updated", data),
+  );
+  portalEvents.on("hardware_state_updated", (data) =>
+    io.emit("hardware_state_updated", data),
+  );
   portalEvents.on("workspace_state", (data) =>
     io.emit("workspace_state", data),
   );
@@ -1165,16 +1664,13 @@ export function startPortalServer(defaultPort = 8080) {
   const maxRetries = 10;
 
   const startListening = () => {
-    httpServer.listen(port, () => {
+    httpServer.listen(port, portalHost, () => {
       activePortalStatus.running = true;
       activePortalStatus.port = (httpServer.address() as any)?.port || port;
 
       console.error(`\n======================================================`);
       console.error(
-        `🚀 MCP Server Web Portal running at: http://localhost:${activePortalStatus.port}`,
-      );
-      console.error(
-        `🔑 Authentication Token: ${PORTAL_AUTH_TOKEN}`,
+        `MCP Server Web Portal listening on http://${formatUrlHost(portalHost)}:${activePortalStatus.port}`,
       );
       console.error(`======================================================\n`);
 
@@ -1211,21 +1707,40 @@ export function startPortalServer(defaultPort = 8080) {
   startListening();
 
   // Background loop to poll hardware state
-  setInterval(async () => {
+  const hardwarePollTimer = setInterval(async () => {
     try {
       const devices = await listDevices();
       portalEvents.emitHardwareStateUpdated(devices);
-    } catch (e) {}
+    } catch {}
   }, 5000);
+  hardwarePollTimer.unref();
 
   // Ensure port 8080 is relinquished cleanly if the parent IDE terminates the MCP server
+  let closed = false;
+  const close = async (): Promise<void> => {
+    if (closed) return;
+    closed = true;
+    clearInterval(hardwarePollTimer);
+    process.off("SIGINT", cleanup);
+    process.off("SIGTERM", cleanup);
+    await new Promise<void>((resolve) => {
+      io.close(() => resolve());
+    });
+    if (httpServer.listening) {
+      await new Promise<void>((resolve, reject) => {
+        httpServer.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
+    activePortalStatus.running = false;
+    activePortalStatus.port = 0;
+    activePortalStatus.browserOpened = false;
+  };
   const cleanup = () => {
-    httpServer.close();
-    process.exit(0);
+    void close().finally(() => process.exit(0));
   };
 
   process.on("SIGINT", cleanup);
   process.on("SIGTERM", cleanup);
 
-  return { app, httpServer, io, authToken: PORTAL_AUTH_TOKEN };
+  return { app, httpServer, io, authToken: PORTAL_AUTH_TOKEN, close };
 }

@@ -73,7 +73,7 @@ export class HardwareLockManager {
       reason: reason || "Explicit Pipeline Lock",
       lockedAt: Date.now(),
     };
-    try { portalEvents.emitLockState(this.state); } catch (e) {}
+    try { portalEvents.emitLockState(this.state); } catch {}
   }
 
   /**
@@ -82,7 +82,7 @@ export class HardwareLockManager {
   public releaseLock(sessionId: string): void {
     if (this.state.isLocked && this.state.sessionId === sessionId) {
       this.state = { isLocked: false };
-      try { portalEvents.emitLockState(this.state); } catch (e) {}
+      try { portalEvents.emitLockState(this.state); } catch {}
     }
   }
 

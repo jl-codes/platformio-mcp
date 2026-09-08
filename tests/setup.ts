@@ -6,11 +6,26 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const SERVER_PATH = path.resolve(__dirname, "../src/index.ts");
 
+function resolveServerLaunch(): { command: string; args: string[] } {
+  const configuredPath = process.env.PIO_MCP_TEST_SERVER_PATH;
+  if (!configuredPath) {
+    return {
+      command: process.execPath,
+      args: ["--import", "tsx", SERVER_PATH],
+    };
+  }
+  return {
+    command: process.execPath,
+    args: [path.resolve(configuredPath)],
+  };
+}
+
 export class MCPTestHarness {
   public client: Client;
   private transport: StdioClientTransport;
 
   constructor() {
+    const launch = resolveServerLaunch();
     const homeDir =
       process.env.HOME ||
       process.env.USERPROFILE ||
@@ -21,8 +36,8 @@ export class MCPTestHarness {
       .join(path.delimiter);
 
     this.transport = new StdioClientTransport({
-      command: process.execPath, // Path to node binary
-      args: ["--import", "tsx", SERVER_PATH],
+      command: launch.command,
+      args: launch.args,
       env: {
         ...process.env,
         PATH: mergedPath,
@@ -36,7 +51,7 @@ export class MCPTestHarness {
       },
       {
         capabilities: {},
-      }
+      },
     );
   }
 

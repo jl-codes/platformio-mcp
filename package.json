@@ -1,7 +1,7 @@
 {
   "name": "platformio-mcp",
   "version": "2.2.2",
-  "description": "PlatformIO MCP server + web dashboard for AI agents (Cline, Claude Desktop, VS Code, Antigravity). Supports 1000+ boards across 30+ platforms.",
+  "description": "PIO Agent: a PlatformIO MCP server and visual control plane for AI-assisted embedded development across 1000+ boards.",
   "type": "module",
   "main": "build/index.js",
   "bin": {
@@ -9,9 +9,12 @@
     "pio-agent": "build/cli.js"
   },
   "files": [
+    ".agents/plugins/marketplace.json",
     "build",
+    "plugins/platformio-mcp",
     "web/dist",
     "scripts/installers",
+    "scripts/validate-codex-plugin.mjs",
     "LICENSE",
     "README.md"
   ],
@@ -22,19 +25,25 @@
     "watch": "tsc --watch",
     "test": "vitest run tests",
     "test:ci:unit": "vitest run tests --exclude tests/mcp.test.ts --exclude tests/mcp-agent-smoke.test.ts",
-    "test:e2e:ci": "vitest run tests/agent-workflows.test.ts tests/cli-agent-smoke.test.ts",
+    "test:e2e:ci": "vitest run tests/agent-workflows.test.ts tests/cli-agent-smoke.test.ts tests/mcp-agent-smoke.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "plugin:sync": "node scripts/sync-codex-plugin.mjs",
+    "plugin:sync:check": "node scripts/sync-codex-plugin.mjs --check",
+    "plugin:build": "npm run plugin:sync && npm run build:ui && tsc && node scripts/build-codex-plugin.mjs",
+    "plugin:validate": "node scripts/validate-codex-plugin.mjs --require-runtime",
+    "plugin:test": "vitest run tests/codex-plugin-manifest.test.ts tests/codex-plugin-launcher.test.ts tests/codex-plugin-skills.test.ts",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "smoke-test": "node -e \"require('fs').accessSync('build/index.js'); require('fs').accessSync('build/cli.js'); require('fs').accessSync('web/dist/index.html'); require('fs').accessSync('scripts/installers/index.js')\"",
-    "prepublishOnly": "npm run build && npm run smoke-test"
+    "smoke-test": "node -e \"require('fs').accessSync('build/index.js'); require('fs').accessSync('build/cli.js'); require('fs').accessSync('web/dist/index.html'); require('fs').accessSync('scripts/installers/index.js'); require('fs').accessSync('scripts/validate-codex-plugin.mjs')\"",
+    "prepublishOnly": "npm run build && npm run plugin:build && npm run plugin:validate && npm run plugin:test && npm run smoke-test"
   },
   "keywords": [
     "mcp",
     "model-context-protocol",
     "platformio",
+    "pio-agent",
     "embedded",
     "iot",
     "arduino",
@@ -48,7 +57,7 @@
     "ai",
     "dashboard"
   ],
-  "author": "PlatformIO MCP Server Contributors",
+  "author": "PIO Agent Contributors",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
@@ -56,7 +65,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.5",
-    "express": "^4.21.0",
+    "express": "^5.2.1",
     "express-rate-limit": "^8.3.2",
     "open": "^10.2.0",
     "proper-lockfile": "^4.1.2",
@@ -72,6 +81,7 @@
     "@types/proper-lockfile": "^4.1.4",
     "@types/supertest": "^7.2.0",
     "@vitest/ui": "^4.0.0",
+    "esbuild": "^0.28.2",
     "eslint": "^9.0.0",
     "prettier": "^3.1.0",
     "socket.io-client": "^4.8.3",

@@ -435,7 +435,7 @@ function resolvePioPath(): string {
         if (fs.existsSync(p)) return p;
       }
     }
-  } catch (e) {
+  } catch {
     // Ignore error if command -v OR where fails (e.g. not in PATH)
   }
 

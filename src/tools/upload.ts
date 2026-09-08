@@ -8,7 +8,6 @@
  * - buildAndUpload: Compiles and dispatches binaries.
  */
 
-
 import crypto from "node:crypto";
 import { mcpContext } from "../utils/mcp-context.js";
 import { executeWithSpooling } from "../utils/spooler.js";
@@ -44,8 +43,10 @@ export async function uploadFilesystem(
   verbose?: boolean,
   background?: boolean,
   startMonitorAfter?: boolean,
+  maxRunDurationSeconds?: number,
 ): Promise<UploadResult> {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
+  const rootCommandId =
+    mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
 
   if (environment && !validateEnvironmentName(environment)) {
@@ -61,7 +62,8 @@ export async function uploadFilesystem(
   try {
     let activePort = port;
     let hwid: string | undefined;
-    const { getFirstDevice, findDeviceByPort, waitForDeviceByHwid } = await import("./devices.js");
+    const { getFirstDevice, findDeviceByPort, waitForDeviceByHwid } =
+      await import("./devices.js");
 
     if (!activePort) {
       const device = await getFirstDevice();
@@ -83,42 +85,60 @@ export async function uploadFilesystem(
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Filesystem Upload");
 
-    const uploadResult = await executeWithSpooling(
-      "run",
-      uploadArgs.slice(1),
-      {
-        cwd: validatedPath,
-        projectDir: validatedPath,
-        timeout: background ? 3600000 : 600000,
-        background,
-        activePort,
-        rootCommandId,
-        artifactType: "upload",
-        onSuccess: startMonitorAfter ? async () => {
-          if (hwid) {
-            const newPort = await waitForDeviceByHwid(hwid, 10000, (msg) => console.error(msg.trim()));
-            if (newPort) {
-              await startMonitor(newPort, undefined, validatedPath, environment, rootCommandId);
-              return;
+    const uploadResult = await executeWithSpooling("run", uploadArgs.slice(1), {
+      cwd: validatedPath,
+      projectDir: validatedPath,
+      timeout: maxRunDurationSeconds
+        ? maxRunDurationSeconds * 1000
+        : background
+          ? 3600000
+          : 600000,
+      background,
+      activePort,
+      rootCommandId,
+      artifactType: "upload",
+      onSuccess: startMonitorAfter
+        ? async () => {
+            if (hwid) {
+              const newPort = await waitForDeviceByHwid(hwid, 10000, (msg) =>
+                console.error(msg.trim()),
+              );
+              if (newPort) {
+                await startMonitor(
+                  newPort,
+                  undefined,
+                  validatedPath,
+                  environment,
+                  rootCommandId,
+                );
+                return;
+              }
+            }
+
+            let device = null;
+            for (let i = 0; i < 20; i++) {
+              await new Promise((resolve) => setTimeout(resolve, 500));
+              device = await getFirstDevice();
+              if (device) break;
+            }
+            if (device) {
+              await startMonitor(
+                device.port,
+                undefined,
+                validatedPath,
+                environment,
+                rootCommandId,
+              );
+            } else {
+              console.error(
+                `[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`,
+              );
             }
           }
-          
-          let device = null;
-          for (let i = 0; i < 20; i++) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            device = await getFirstDevice();
-            if (device) break;
-          }
-          if (device) {
-            await startMonitor(device.port, undefined, validatedPath, environment, rootCommandId);
-          } else {
-            console.error(`[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`);
-          }
-        } : undefined
-      },
-    );
+        : undefined,
+    });
 
-    if ('status' in uploadResult) {
+    if ("status" in uploadResult) {
       return uploadResult as unknown as UploadResult;
     }
 
@@ -133,9 +153,7 @@ export async function uploadFilesystem(
       success: uploadSuccess,
       port: activePort,
       output: uploadSuccess && !verbose ? undefined : safeOutput,
-      errors: uploadSuccess
-        ? undefined
-        : parseStderrErrors(safeOutput),
+      errors: uploadSuccess ? undefined : parseStderrErrors(safeOutput),
       rawLogPath: uploadResult.fullLogPath,
       diagnostic,
     };
@@ -172,8 +190,10 @@ export async function uploadFirmware(
   verbose?: boolean,
   background?: boolean,
   startMonitorAfter?: boolean,
+  maxRunDurationSeconds?: number,
 ): Promise<UploadResult> {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
+  const rootCommandId =
+    mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
 
   if (environment && !validateEnvironmentName(environment)) {
@@ -189,7 +209,8 @@ export async function uploadFirmware(
   try {
     let activePort = port;
     let hwid: string | undefined;
-    const { getFirstDevice, findDeviceByPort, waitForDeviceByHwid } = await import("./devices.js");
+    const { getFirstDevice, findDeviceByPort, waitForDeviceByHwid } =
+      await import("./devices.js");
 
     if (!activePort) {
       const device = await getFirstDevice();
@@ -211,42 +232,60 @@ export async function uploadFirmware(
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Firmware Upload");
 
-    const uploadResult = await executeWithSpooling(
-      "run",
-      uploadArgs.slice(1),
-      {
-        cwd: validatedPath,
-        projectDir: validatedPath,
-        timeout: background ? 3600000 : 600000,
-        background,
-        activePort,
-        rootCommandId,
-        artifactType: "upload",
-        onSuccess: startMonitorAfter ? async () => {
-          if (hwid) {
-            const newPort = await waitForDeviceByHwid(hwid, 10000, (msg) => console.error(msg.trim()));
-            if (newPort) {
-              await startMonitor(newPort, undefined, validatedPath, environment, rootCommandId);
-              return;
+    const uploadResult = await executeWithSpooling("run", uploadArgs.slice(1), {
+      cwd: validatedPath,
+      projectDir: validatedPath,
+      timeout: maxRunDurationSeconds
+        ? maxRunDurationSeconds * 1000
+        : background
+          ? 3600000
+          : 600000,
+      background,
+      activePort,
+      rootCommandId,
+      artifactType: "upload",
+      onSuccess: startMonitorAfter
+        ? async () => {
+            if (hwid) {
+              const newPort = await waitForDeviceByHwid(hwid, 10000, (msg) =>
+                console.error(msg.trim()),
+              );
+              if (newPort) {
+                await startMonitor(
+                  newPort,
+                  undefined,
+                  validatedPath,
+                  environment,
+                  rootCommandId,
+                );
+                return;
+              }
+            }
+
+            let device = null;
+            for (let i = 0; i < 20; i++) {
+              await new Promise((resolve) => setTimeout(resolve, 500));
+              device = await getFirstDevice();
+              if (device) break;
+            }
+            if (device) {
+              await startMonitor(
+                device.port,
+                undefined,
+                validatedPath,
+                environment,
+                rootCommandId,
+              );
+            } else {
+              console.error(
+                `[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`,
+              );
             }
           }
+        : undefined,
+    });
 
-          let device = null;
-          for (let i = 0; i < 20; i++) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            device = await getFirstDevice();
-            if (device) break;
-          }
-          if (device) {
-            await startMonitor(device.port, undefined, validatedPath, environment, rootCommandId);
-          } else {
-            console.error(`[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`);
-          }
-        } : undefined
-      },
-    );
-
-    if ('status' in uploadResult) {
+    if ("status" in uploadResult) {
       return uploadResult as unknown as UploadResult;
     }
 
@@ -261,9 +300,7 @@ export async function uploadFirmware(
       success: uploadSuccess,
       port: activePort,
       output: uploadSuccess && !verbose ? undefined : safeOutput,
-      errors: uploadSuccess
-        ? undefined
-        : parseStderrErrors(safeOutput),
+      errors: uploadSuccess ? undefined : parseStderrErrors(safeOutput),
       rawLogPath: uploadResult.fullLogPath,
       diagnostic,
     };
@@ -301,7 +338,14 @@ export async function uploadAndMonitor(
   background?: boolean,
   startMonitorAfter?: boolean,
 ): Promise<UploadResult> {
-  return uploadFirmware(projectDir, port, environment, verbose, background, startMonitorAfter);
+  return uploadFirmware(
+    projectDir,
+    port,
+    environment,
+    verbose,
+    background,
+    startMonitorAfter,
+  );
 }
 
 /**
@@ -322,5 +366,12 @@ export async function buildAndUpload(
   background?: boolean,
   startMonitorAfter?: boolean,
 ): Promise<UploadResult> {
-  return uploadFirmware(projectDir, port, environment, verbose, background, startMonitorAfter);
+  return uploadFirmware(
+    projectDir,
+    port,
+    environment,
+    verbose,
+    background,
+    startMonitorAfter,
+  );
 }

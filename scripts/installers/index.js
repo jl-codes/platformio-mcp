@@ -13,9 +13,16 @@ import { installCline } from "./cline.js";
 import { installClaude } from "./claude.js";
 import { installVscode } from "./vscode.js";
 import { installAntigravity } from "./antigravity.js";
-import { installCodex } from "./codex.js";
+import { installCodex, installCodexPlugin } from "./codex.js";
 
-const VALID_TARGETS = ["cline", "claude", "vscode", "antigravity", "codex"];
+const VALID_TARGETS = [
+  "cline",
+  "claude",
+  "vscode",
+  "antigravity",
+  "codex",
+  "codex-plugin",
+];
 
 export async function runInstaller(target) {
   switch (target) {
@@ -29,6 +36,8 @@ export async function runInstaller(target) {
       return installAntigravity();
     case "codex":
       return installCodex();
+    case "codex-plugin":
+      return installCodexPlugin();
     default:
       console.error(
         `Unknown installer target: --${target}. Valid: ${VALID_TARGETS.map((t) => "--" + t).join(", ")}`,

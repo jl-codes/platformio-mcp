@@ -1,6 +1,7 @@
 import { uploadFirmware } from "../tools/upload.js";
 import type { UploadResult } from "../types.js";
 import { hardwareLockManager } from "../utils/lock-manager.js";
+import { resolveWriteTarget, type TargetBinding } from "./target-resolution.js";
 
 export type UploadFirmwareCoreInput = {
   projectDir: string;
@@ -10,19 +11,24 @@ export type UploadFirmwareCoreInput = {
   background?: boolean;
   startMonitorAfter?: boolean;
   sessionId?: string;
+  targetBinding?: TargetBinding;
+  maxRunDurationSeconds?: number;
 };
 
 export async function uploadFirmwareCore(
   input: UploadFirmwareCoreInput,
 ): Promise<UploadResult> {
+  const target = await resolveWriteTarget(input);
+
   const executeTask = () =>
     uploadFirmware(
       input.projectDir,
-      input.port,
-      input.environment,
+      target.port,
+      target.environment,
       input.verbose,
       input.background,
       input.startMonitorAfter,
+      input.maxRunDurationSeconds,
     );
 
   if (input.sessionId) {

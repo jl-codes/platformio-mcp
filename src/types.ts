@@ -222,7 +222,6 @@ export interface UploadResult {
   diagnostic?: DiagnosticResult; // Structured diagnostic summary for agent-safe recovery flows
 }
 
-
 // ============================================================================
 // Library Types
 // ============================================================================
@@ -390,7 +389,6 @@ export const ReleaseLockParamsSchema = z.object({
     .describe("Unique ID of the agent session releasing the lock"),
 });
 
-
 // Get board info parameters
 /**
  * Zod schema for get_board_info tool parameters.
@@ -449,7 +447,9 @@ export const BuildProjectParamsSchema = z.object({
   background: z
     .boolean()
     .optional()
-    .describe("If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."),
+    .describe(
+      "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
+    ),
 });
 
 // Clean project parameters
@@ -465,7 +465,9 @@ export const CleanProjectParamsSchema = z.object({
   background: z
     .boolean()
     .optional()
-    .describe("If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."),
+    .describe(
+      "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
+    ),
 });
 
 // Check project parameters
@@ -481,7 +483,9 @@ export const CheckProjectParamsSchema = z.object({
   background: z
     .boolean()
     .optional()
-    .describe("If true, dispatches the static analysis to the background and returns immediately."),
+    .describe(
+      "If true, dispatches the static analysis to the background and returns immediately.",
+    ),
 });
 
 // Run tests parameters
@@ -501,7 +505,9 @@ export const RunTestsParamsSchema = z.object({
   background: z
     .boolean()
     .optional()
-    .describe("If true, dispatches the test execution to the background and returns immediately."),
+    .describe(
+      "If true, dispatches the test execution to the background and returns immediately.",
+    ),
 });
 
 // Upload firmware parameters
@@ -531,11 +537,24 @@ export const UploadFirmwareParamsSchema = z.object({
   background: z
     .boolean()
     .optional()
-    .describe("If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."),
+    .describe(
+      "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
+    ),
   startMonitorAfter: z
     .boolean()
     .optional()
-    .describe("If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."),
+    .describe(
+      "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration.",
+    ),
+  targetBinding: z
+    .lazy(() => TargetBindingSchema)
+    .optional()
+    .describe("Optional short-lived binding returned by agent_resolve_target."),
+  automationKey: z
+    .string()
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
+    .optional(),
+  maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
 });
 
 // Upload filesystem parameters
@@ -565,13 +584,25 @@ export const UploadFilesystemParamsSchema = z.object({
   background: z
     .boolean()
     .optional()
-    .describe("If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."),
+    .describe(
+      "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
+    ),
   startMonitorAfter: z
     .boolean()
     .optional()
-    .describe("If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."),
+    .describe(
+      "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration.",
+    ),
+  targetBinding: z
+    .lazy(() => TargetBindingSchema)
+    .optional()
+    .describe("Optional short-lived binding returned by agent_resolve_target."),
+  automationKey: z
+    .string()
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
+    .optional(),
+  maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
 });
-
 
 // Search libraries parameters
 export const SearchLibrariesParamsSchema = z.object({
@@ -591,7 +622,10 @@ export const InstallLibraryParamsSchema = z.object({
     .optional()
     .describe("Project directory (installs globally if not specified)"),
   version: z.string().optional().describe("Specific version to install"),
-  global: z.boolean().optional().describe("If true, installs the library globally"),
+  global: z
+    .boolean()
+    .optional()
+    .describe("If true, installs the library globally"),
 });
 
 // Uninstall library parameters
@@ -601,7 +635,10 @@ export const UninstallLibraryParamsSchema = z.object({
     .string()
     .optional()
     .describe("Project directory (uninstalls globally if not specified)"),
-  global: z.boolean().optional().describe("If true, uninstalls from global storage"),
+  global: z
+    .boolean()
+    .optional()
+    .describe("If true, uninstalls from global storage"),
 });
 
 // Update library parameters
@@ -611,7 +648,10 @@ export const UpdateLibraryParamsSchema = z.object({
     .string()
     .optional()
     .describe("Project directory (updates globally if not specified)"),
-  global: z.boolean().optional().describe("If true, updates from global storage"),
+  global: z
+    .boolean()
+    .optional()
+    .describe("If true, updates from global storage"),
 });
 
 // List installed libraries parameters
@@ -628,38 +668,181 @@ export const ListInstalledLibrariesParamsSchema = z.object({
 
 // Monitor parameters
 export const StartMonitorParamsSchema = z.object({
-  port: z.string().optional().describe("Optional serial port to monitor (auto-detected if not specified)"),
-  baudRate: z.number().optional().describe("Baud rate for serial connection (defaults to 115200)"),
-  projectDir: z.string().optional().describe("Optional project directory for workspace log storage"),
-  environment: z.string().optional().describe("Optional PlatformIO environment context"),
+  port: z
+    .string()
+    .optional()
+    .describe(
+      "Optional serial port to monitor (auto-detected if not specified)",
+    ),
+  baudRate: z
+    .number()
+    .optional()
+    .describe("Baud rate for serial connection (defaults to 115200)"),
+  projectDir: z
+    .string()
+    .optional()
+    .describe("Optional project directory for workspace log storage"),
+  environment: z
+    .string()
+    .optional()
+    .describe("Optional PlatformIO environment context"),
 });
 
 export const StopMonitorParamsSchema = z.object({
   port: z.string().describe("Serial port to stop monitoring"),
-  projectDir: z.string().optional().describe("Optional project directory containing the workspace logs"),
+  projectDir: z
+    .string()
+    .optional()
+    .describe("Optional project directory containing the workspace logs"),
 });
 
 export const QueryLogsParamsSchema = z.object({
-  lines: z.number().optional().describe("Fetch this many tail lines from the end of the log (default: 100)"),
-  searchPattern: z.string().optional().describe("Optional Regex pattern to filter the spool for specific keywords."),
-  taskId: z.string().optional().describe("Target standard task ID to retrieve logs for."),
-  logPath: z.string().optional().describe("Optional relative path to a log to query directly."),
+  lines: z
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .optional()
+    .describe(
+      "Fetch this many tail lines from the end of the log (default: 100, maximum: 1000)",
+    ),
+  searchPattern: z
+    .string()
+    .max(128)
+    .optional()
+    .describe(
+      "Optional bounded pattern to filter the spool for specific keywords.",
+    ),
+  taskId: z
+    .string()
+    .optional()
+    .describe("Target standard task ID to retrieve logs for."),
+  logPath: z
+    .string()
+    .optional()
+    .describe("Optional relative path to a log to query directly."),
   port: z.string().optional().describe("Specific COM port to query logs for."),
-  projectDir: z.string().optional().describe("Target project checkout to query local .log cache instead of global cache."),
+  projectDir: z
+    .string()
+    .optional()
+    .describe(
+      "Target project checkout to query local .log cache instead of global cache.",
+    ),
 });
 
 export const CheckTaskStatusParamsSchema = z.object({
   taskId: z.string().optional().describe("Optional task ID to check status."),
-  logPath: z.string().optional().describe("Optional relative log path to check."),
-  projectDir: z.string().optional().describe("Optional project directory to scope the check."),
+  logPath: z
+    .string()
+    .optional()
+    .describe("Optional relative log path to check."),
+  projectDir: z
+    .string()
+    .optional()
+    .describe("Optional project directory to scope the check."),
+});
+
+/** Short-lived physical target binding accepted by write workflows. */
+export const TargetBindingSchema = z.object({
+  digest: z.string().length(64),
+  projectDir: z.string().min(1).max(4096),
+  environment: z.string().min(1).max(80),
+  board: z.string().min(1).max(100),
+  port: z.string().min(1).max(512),
+  deviceFingerprint: z.string().length(64),
+  createdAt: z.string().datetime(),
+  expiresAt: z.string().datetime(),
+});
+
+/** Zod schema for deterministic project/environment/device resolution. */
+export const AgentResolveTargetParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096),
+  environment: z.string().min(1).max(80).optional(),
+  port: z.string().min(1).max(512).optional(),
+  bindingTtlSeconds: z.number().int().min(30).max(900).optional(),
+});
+
+/** Zod schema for active serial monitor status inspection. */
+export const GetMonitorStatusParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096).optional(),
+  port: z.string().min(1).max(512).optional(),
+});
+
+/** Zod schema for one bounded serial capture lease. */
+export const CaptureSerialWindowParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096),
+  port: z.string().min(1).max(512).optional(),
+  environment: z.string().min(1).max(80).optional(),
+  baudRate: z.number().int().min(1).max(2_000_000).optional(),
+  durationSeconds: z.number().int().min(1).max(60).optional(),
+  maxBytes: z.number().int().min(256).max(65_536).optional(),
+  cursor: z.string().min(1).max(512).optional(),
+  targetBinding: TargetBindingSchema.optional(),
+  automationKey: z
+    .string()
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
+    .optional(),
+});
+
+/** Zod schema for change-aware serial health evaluation. */
+export const AgentMonitorHealthParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096),
+  port: z.string().min(1).max(512).optional(),
+  environment: z.string().min(1).max(80).optional(),
+  baudRate: z.number().int().min(1).max(2_000_000).optional(),
+  captureDurationSeconds: z.number().int().min(1).max(60).optional(),
+  maxBytes: z.number().int().min(256).max(65_536).optional(),
+  expectedMarkers: z.array(z.string().min(1).max(128)).max(20).optional(),
+  rejectedPatterns: z.array(z.string().min(1).max(128)).max(20).optional(),
+  automationKey: z
+    .string()
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
+    .optional(),
+  cursor: z.string().min(1).max(512).optional(),
+  failureThreshold: z.number().int().min(1).max(10).optional(),
+});
+
+/** Zod schema for idempotent cancellation of one tracked background task. */
+export const CancelTaskParamsSchema = z.object({
+  taskId: z.string().min(1).max(128),
+  projectDir: z.string().min(1).max(4096).optional(),
+});
+
+/** Zod schema for compact project-scoped task history. */
+export const ListTaskHistoryParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096),
+  limit: z.number().int().min(1).max(100).optional(),
+  status: z
+    .enum(["inactive", "running", "success", "error", "terminated"])
+    .optional(),
+});
+
+/** Zod schema for reading one approval request without mutating it. */
+export const GetApprovalRequestParamsSchema = z.object({
+  approvalId: z.string().min(1).max(128),
+  projectDir: z.string().min(1).max(4096).optional(),
+});
+
+/** Zod schema for project-scoped pending approval inspection. */
+export const ListPendingApprovalsParamsSchema = z.object({
+  projectDir: z.string().min(1).max(4096).optional(),
+  limit: z.number().int().min(1).max(100).optional(),
 });
 
 /**
  * Zod schema for get_dashboard_url tool parameters.
  */
 export const GetDashboardUrlParamsSchema = z.object({
-  open: z.boolean().optional().describe("If true, automatically opens the local dashboard UI in the system's default browser."),
-  projectDir: z.string().optional().describe("Optional project directory to initialize the dashboard with."),
+  open: z
+    .boolean()
+    .optional()
+    .describe(
+      "If true, automatically opens the local dashboard UI in the system's default browser.",
+    ),
+  projectDir: z
+    .string()
+    .optional()
+    .describe("Optional project directory to initialize the dashboard with."),
 });
 
 /**
@@ -677,7 +860,9 @@ export const GetProjectContextParamsSchema = z.object({
   includeBuildHistory: z
     .boolean()
     .optional()
-    .describe("If true, include the most recent build/upload status summary from the workspace log directory."),
+    .describe(
+      "If true, include the most recent build/upload status summary from the workspace log directory.",
+    ),
 });
 
 /**
@@ -704,7 +889,11 @@ export interface ProjectContext {
   /** Absolute path to the most recent firmware artifact, if available. */
   firmwarePath?: string;
   /** Auto-detected connected serial devices (port + description). */
-  connectedDevices?: Array<{ port: string; description: string; detectedBoard?: string }>;
+  connectedDevices?: Array<{
+    port: string;
+    description: string;
+    detectedBoard?: string;
+  }>;
   /** Brief summary of the most recent build, when `includeBuildHistory` is true. */
   lastBuild?: { status: string; logPath?: string };
   /** Actionable hints for the agent (e.g. "run init_project first"). */
@@ -739,7 +928,11 @@ export interface AgentValidateProjectResult {
   boardIds: string[]; // Board IDs declared across environments
   sourceFiles: string[]; // Source files discovered under src/
   missingConfigEntries: string[]; // Missing or suspicious config entries
-  connectedDevices: Array<{ port: string; description: string; detectedBoard?: string }>; // Connected serial devices
+  connectedDevices: Array<{
+    port: string;
+    description: string;
+    detectedBoard?: string;
+  }>; // Connected serial devices
   nextSteps: string[]; // Recommended next actions for the agent
 }
 
@@ -786,6 +979,7 @@ export interface AgentFlashMonitorVerifyResult {
   recommendedNextAction: string; // Single recommended next step
   rawMonitorLogPath?: string; // Path to monitor log consumed for verification
   monitorSnippet?: string; // Tail snippet used as runtime evidence
+  targetBindingDigest?: string; // Short-lived binding used for the write operation
 }
 
 /**
@@ -901,14 +1095,16 @@ export const AgentFlashMonitorVerifyParamsSchema = z.object({
     .string()
     .optional()
     .describe("Optional specific environment from platformio.ini"),
-  port: z
-    .string()
-    .optional()
-    .describe("Optional serial upload port"),
+  port: z.string().optional().describe("Optional serial upload port"),
+  targetBinding: TargetBindingSchema.optional().describe(
+    "Short-lived exact target binding returned by agent_resolve_target.",
+  ),
   expect_all: z
     .array(z.string())
     .optional()
-    .describe("All expected runtime markers that should appear in serial output."),
+    .describe(
+      "All expected runtime markers that should appear in serial output.",
+    ),
   reject_patterns: z
     .array(z.string())
     .optional()
@@ -930,7 +1126,14 @@ export const AgentFlashMonitorVerifyParamsSchema = z.object({
   autoBuild: z
     .boolean()
     .optional()
-    .describe("If true, build before flashing when no firmware artifact is detected."),
+    .describe(
+      "If true, build before flashing when no firmware artifact is detected.",
+    ),
+  automationKey: z
+    .string()
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
+    .optional(),
+  maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
 });
 
 /**
@@ -961,6 +1164,7 @@ export const GetPolicyStatusParamsSchema = z.object({
   projectDir: z
     .string()
     .optional()
-    .describe("Optional project directory to resolve local policy profile context."),
+    .describe(
+      "Optional project directory to resolve local policy profile context.",
+    ),
 });
-

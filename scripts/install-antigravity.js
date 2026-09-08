@@ -21,7 +21,7 @@ const binaryPath = path.join(repoRoot, 'build', 'index.js');
 const nodeExecPath = process.execPath; // Binds explicitly to the current active NVM Node layer.
 
 console.log('----------------------------------------------------');
-console.log(' PlatformIO MCP -> Antigravity Bridging Utility');
+console.log(' PIO Agent -> Antigravity Bridging Utility');
 console.log('----------------------------------------------------');
 
 if (!fs.existsSync(binaryPath)) {
