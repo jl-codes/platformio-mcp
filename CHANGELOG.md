@@ -5,6 +5,49 @@ All notable changes to **platformio-mcp** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-09-08
+
+### Added
+
+- **PIO Agent Codex Plugin** shipped directly from the main repository, with a
+  repo-local marketplace entry, eight workflow skills, a bundled 42-tool MCP
+  runtime, and cache-portable installation.
+- **Codex-native dashboard workflow** that opens the authenticated PlatformIO
+  control plane in Codex's browser panel while retaining complete headless CLI
+  and MCP fallbacks.
+- **Agent-grade embedded workflows** for target resolution, background builds,
+  approval-bound flashing, serial monitoring, runtime assertions, diagnostics,
+  cancellation, locking, and bounded hardware-in-the-loop evidence.
+- **Monitoring automation support** for build health, device presence, serial
+  health, and bounded lab checks with quiet healthy-state behavior.
+- **PIO Agent branding and CLI alias** while preserving `platformio-mcp` as the
+  stable npm package, executable, MCP server, and Codex plugin identifier.
+
+### Changed
+
+- Promoted the package and plugin to **3.0.0** to reflect the new integrated
+  product surface and release contract.
+- Hardened the release workflow with the Codex narrow-panel Chromium journey,
+  exact tag/version validation, npm tarball inspection, and token-free npm OIDC
+  publishing support.
+- Restricted npm package inputs to immutable runtime, plugin, dashboard, and
+  installer assets so local logs and workspace state cannot enter a release.
+- Updated the `pio-mcp` compatibility package to depend on `platformio-mcp`
+  3.x and use the PIO Agent product name.
+
+### Fixed
+
+- Allowed long dashboard card titles to wrap at the 320-pixel minimum Codex
+  panel width instead of being clipped by Ant Design's default no-wrap rule.
+
+### Security
+
+- Kept the authenticated loopback dashboard, approval-bound hardware writes,
+  redacted evidence, and deterministic bundled-runtime validation as mandatory
+  release gates.
+- Rejected mutable server state, audit logs, credential files, high-confidence
+  token signatures, and browser-test artifacts from npm package manifests.
+
 ## [2.2.2] - 2026-05-18
 
 ### Added

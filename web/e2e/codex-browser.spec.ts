@@ -210,9 +210,9 @@ test("keeps project telemetry readable at the minimum Codex panel width", async 
     return {
       configClientWidth: configView?.clientWidth,
       configScrollWidth: configView?.scrollWidth,
-      overflowingCardTitles: cardTitles.filter(
-        (title) => title.scrollWidth > title.clientWidth,
-      ).length,
+      overflowingCardTitles: cardTitles
+        .filter((title) => title.scrollWidth > title.clientWidth)
+        .map((title) => title.textContent?.trim() ?? "<untitled>"),
       workspaceRight: workspace?.getBoundingClientRect().right,
       widestCardRight: Math.max(
         0,
@@ -225,7 +225,7 @@ test("keeps project telemetry readable at the minimum Codex panel width", async 
   expect(geometry.configScrollWidth).toBeLessThanOrEqual(
     geometry.configClientWidth ?? 0,
   );
-  expect(geometry.overflowingCardTitles).toBe(0);
+  expect(geometry.overflowingCardTitles).toEqual([]);
   expect(geometry.workspaceRight).toBeLessThanOrEqual(geometry.viewportWidth);
   expect(geometry.widestCardRight).toBeLessThanOrEqual(geometry.viewportWidth);
 });

@@ -5,4 +5,4 @@
  * The CLI router inside platformio-mcp inspects process.argv directly, so a
  * simple dynamic import is enough to forward every argument unchanged.
  */
-import("platformio-mcp");
+import("platformio-mcp/build/cli.js");

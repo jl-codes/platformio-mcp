@@ -1,6 +1,6 @@
 {
   "name": "platformio-mcp",
-  "version": "2.2.2",
+  "version": "3.0.0",
   "description": "PIO Agent builds, flashes, tests, and monitors PlatformIO firmware safely from Codex using PlatformIO MCP.",
   "author": {
     "name": "PIO Agent Contributors",
