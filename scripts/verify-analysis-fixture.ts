@@ -89,6 +89,10 @@ await assert.rejects(
     "code" in error &&
     error.code === "ANALYSIS_ELF_MISMATCH",
 );
+const filtered = await reportFirmwareSize(context, 25, "^fixture_add");
+assert.equal(filtered.symbolCount, 1);
+assert.equal(filtered.topSymbols[0].name, symbol.name);
+assert.deepEqual(filtered.totals, size.totals);
 const source = await fs.readFile(path.join(projectDir, "src/main.cpp"));
 const version = await runAnalysisProcess(tools.nm, ["--version"], {
   cwd: projectDir,
@@ -118,6 +122,7 @@ const evidence = {
     expectedHash: true,
     wrongHashRejected: true,
     symbolAttribution: true,
+    filteredSymbols: true,
   },
   totals: size.totals,
   symbolCount: size.symbolCount,

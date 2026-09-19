@@ -154,3 +154,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added literal-by-default matching and explicit regex execution in a terminable worker, with input/pattern/line/memory/deadline and concurrent-worker bounds. Existing query_logs case-insensitive regex now uses this boundary; legacy assertion substring behavior is unchanged.
 - Added optional Python named-group/reference translation and explicit rejection of incompatible escape semantics. Documented the ECMAScript subset and typed failure behavior in serial-patterns.md.
 - Adversarial backtracking tests verify timeout, main-event-loop responsiveness, termination/recovery and concurrency limits. Session/capture compatibility adapter integration and physical serial acceptance remain outstanding.
+
+## Firmware symbol filtering
+
+- Size report engine now supports optional case-insensitive regex filtering of symbol names or source paths, independently preserving anchors. Matching occurs before top-symbol/file selection; whole-image sections and totals are unchanged.
+- Filters use bounded workers, batched input and the shared report deadline. Invalid expressions fail explicitly, including empty symbol tables. Existing unfiltered callers remain supported.
+- Verification: TypeScript and 15 report/matcher tests passed. The real Windows Xtensa verifier also passed with a single known fixture function selected from 1,864 symbols and unchanged whole-image totals; updated evidence records filteredSymbols.
+- Public adapters, authorized metadata/package discovery, board/partition memory accounting, retained build/upload identity and the broader implementation/distribution stages remain pending.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "observedAt": "2026-09-19T19:53:01.571Z",
+  "observedAt": "2026-09-19T20:15:45.299Z",
   "host": {
     "platform": "win32",
     "arch": "x64",
@@ -22,7 +22,8 @@
     "unresolvedFrame": true,
     "expectedHash": true,
     "wrongHashRejected": true,
-    "symbolAttribution": true
+    "symbolAttribution": true,
+    "filteredSymbols": true
   },
   "totals": {
     "text": 177153,

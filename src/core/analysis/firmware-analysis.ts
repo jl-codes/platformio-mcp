@@ -1,4 +1,6 @@
 /** Firmware crash and size report engines; adapters must supply authorized build context. */
+import { matchBoundedLines } from "../bounded-pattern.js";
+import type { SizeSymbol } from "./size-parser.js";
 import { PlatformIOError } from "../../utils/errors.js";
 import {
   extractCrash,
@@ -95,10 +97,54 @@ export async function decodeFirmwareCrash(
   );
 }
 
+/** Filters names and source paths independently, preserving regex anchors and symbol order. */
+async function filterSizeSymbols(
+  symbols: SizeSymbol[],
+  pattern: string,
+  deadline: number,
+): Promise<SizeSymbol[]> {
+  const matched = new Set<number>();
+  let texts: string[] = [];
+  let owners: number[] = [];
+  let bytes = 0;
+  const flush = async () => {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0)
+      throw new PlatformIOError(
+        "Analysis report exceeded its execution deadline.",
+        "ANALYSIS_TIMEOUT",
+      );
+    for (const index of await matchBoundedLines(texts, pattern, {
+      mode: "regex",
+      ignoreCase: true,
+      pythonNamedGroups: true,
+      timeoutMs: Math.min(1000, remaining),
+    }))
+      matched.add(owners[index]);
+    texts = [];
+    owners = [];
+    bytes = 0;
+  };
+  for (let index = 0; index < symbols.length; index++) {
+    for (const text of [symbols[index].name, symbols[index].file]) {
+      if (!text) continue;
+      const length = Buffer.byteLength(text);
+      if (texts.length >= 4096 || bytes + length > 1024 * 1024) await flush();
+      texts.push(text);
+      owners.push(index);
+      bytes += length;
+    }
+  }
+  // Compile even for an empty symbol table so invalid patterns never appear successful.
+  await flush();
+  return symbols.filter((_symbol, index) => matched.has(index));
+}
+
 /** Reports static section and symbol sizes without presenting estimates as device capacities. */
 export async function reportFirmwareSize(
   context: FirmwareAnalysisContext,
   top = 25,
+  filter?: string,
 ) {
   if (!Number.isInteger(top) || top < 1 || top > 1000)
     throw new PlatformIOError(
@@ -136,7 +182,10 @@ export async function reportFirmwareSize(
           "GNU size did not produce totals for the selected image.",
           "ANALYSIS_SIZE_INVALID",
         );
-      const symbols = parseNm(symbolsOutput.stdout);
+      const parsedSymbols = parseNm(symbolsOutput.stdout);
+      const symbols = filter
+        ? await filterSizeSymbols(parsedSymbols, filter, deadline)
+        : parsedSymbols;
       const files = groupSymbolsByFile(symbols, context.projectDir);
       return {
         ok: true as const,
@@ -146,6 +195,7 @@ export async function reportFirmwareSize(
         totals,
         sections,
         symbolCount: symbols.length,
+        filter: filter ?? null,
         topSymbols: symbols.slice(0, top),
         topFiles: files.slice(0, top),
         notes: [

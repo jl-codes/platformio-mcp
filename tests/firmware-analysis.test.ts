@@ -99,6 +99,28 @@ describe("firmware report engines", () => {
     });
     expect(new Set(snapshots).size).toBe(1);
   });
+  it("filters names or paths before ranking without changing whole-image totals", async () => {
+    vi.mocked(runAnalysisProcess).mockImplementation(async (tool, args) => ({
+      stdout: tool.endsWith("nm.exe")
+        ? "08000100 00000010 T selected\t/fixture/other.cpp:2\n08000200 00000020 T another\t/fixture/selected.cpp:3\n08000300 00000030 T unrelated\n"
+        : args[0] === "-A"
+          ? ".text 96 134217728"
+          : "96 0 0 96 60 firmware.elf",
+      stderr: "",
+    }));
+    const report = await reportFirmwareSize(
+      context,
+      1,
+      "^SELECTED$|selected[.]cpp$",
+    );
+    expect(report.symbolCount).toBe(2);
+    expect(report.topSymbols.map((symbol) => symbol.name)).toEqual(["another"]);
+    expect(report.totals.flashEstimate).toBe(96);
+    expect(report.filter).toBe("^SELECTED$|selected[.]cpp$");
+    await expect(reportFirmwareSize(context, 1, "[")).rejects.toMatchObject({
+      code: "PATTERN_INVALID",
+    });
+  });
   it("removes snapshots after tool failure", async () => {
     vi.mocked(runAnalysisProcess).mockImplementation(async (_tool, args) => {
       snapshots.push(args[2]);
