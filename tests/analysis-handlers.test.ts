@@ -1,3 +1,4 @@
+import { approveRequest, getApproval } from "../src/core/policy/approvals.js";
 /** Handler integration with real policy/package/ELF validation and mocked external processes. */
 import fs from "node:fs";
 import os from "node:os";
@@ -171,4 +172,33 @@ it("does not return decoded output after policy changes during a utility call", 
       text: "PC: 0x08001234",
     }),
   ).rejects.toMatchObject({ code: "POLICY_CHANGED" });
+});
+
+it("consumes one request-bound grant for metadata and size stages, rejecting changed input and replay", async () => {
+  const policy = path.join(root, "operator.json");
+  fs.writeFileSync(policy, '{"approval_required":["build_project"]}');
+  vi.stubEnv("PIO_MCP_POLICY_FILE", policy);
+  const input = {
+    projectDir: project,
+    environment: "fixture",
+    filter: "known",
+  };
+  const pending = await firmwareSizeReport(input).catch((error) => error);
+  expect(pending.code).toBe("APPROVAL_REQUIRED");
+  const id = pending.context.policyDecision.approvalId;
+  approveRequest(id);
+  await expect(
+    firmwareSizeReport({ ...input, filter: "other", approvalId: id }),
+  ).rejects.toMatchObject({ code: "APPROVAL_REQUIRED" });
+  expect(platformioExecutor.execute).not.toHaveBeenCalled();
+  expect(await firmwareSizeReport({ ...input, approvalId: id })).toMatchObject({
+    ok: true,
+    memorySource: "platformio",
+  });
+  expect(platformioExecutor.execute).toHaveBeenCalledTimes(2);
+  expect(getApproval(id)?.status).toBe("consumed");
+  await expect(
+    firmwareSizeReport({ ...input, approvalId: id }),
+  ).rejects.toMatchObject({ code: "APPROVAL_REQUIRED" });
+  expect(platformioExecutor.execute).toHaveBeenCalledTimes(2);
 });

@@ -1,4 +1,5 @@
 /** Authorized PlatformIO metadata and size-check collection for analysis adapters. */
+import { createPolicyRevisionGuard } from "../policy/revision-guard.js";
 import { platformioExecutor } from "../../platformio.js";
 import {
   validateProjectPath,
@@ -34,20 +35,104 @@ function scope(input: BuildContextInput) {
   };
 }
 
-/** Collects fresh metadata under build permission; no process-global metadata cache is used. */
-export async function collectBuildMetadata(
-  input: BuildContextInput,
-  caller: PolicyEvaluationContext = {},
-) {
+/** Opaque process-local collection capability; structurally similar caller objects are not authority. */
+export interface BuildCollectionAuthorization {
+  readonly projectDir: string;
+  readonly environment: string;
+}
+const collectionAuthorities = new WeakMap<
+  BuildCollectionAuthorization,
+  { check: () => void; stages: Set<string> }
+>();
+
+/** Authorizes one complete analysis request and invalidates its internal capability on completion. */
+export async function withAuthorizedBuildCollection<T>(
+  input: BuildContextInput & {
+    analysisPurpose: "decode_backtrace" | "firmware_size_report";
+    requestDigest: string;
+  },
+  caller: PolicyEvaluationContext,
+  execute: (authorization: BuildCollectionAuthorization) => Promise<T>,
+): Promise<T> {
   const selected = scope(input);
+  const check = createPolicyRevisionGuard(selected.projectDir);
   return dispatchAuthorizedAction(
     "build_project",
     {
       ...selected,
       approvalId: input.approvalId,
-      analysisPurpose: "project_metadata",
+      analysisPurpose: input.analysisPurpose,
+      requestDigest: input.requestDigest,
     },
     { ...caller, workspaceDir: selected.projectDir },
+    async () => {
+      check();
+      const authorization = Object.freeze({ ...selected });
+      collectionAuthorities.set(authorization, {
+        check,
+        stages: new Set(
+          input.analysisPurpose === "firmware_size_report"
+            ? ["project_metadata", "check_program_size"]
+            : ["project_metadata"],
+        ),
+      });
+      try {
+        return await execute(authorization);
+      } finally {
+        collectionAuthorities.delete(authorization);
+      }
+    },
+  );
+}
+
+/** Runs an authorized stage once, or performs standalone authorization for legacy/internal callers. */
+async function collectionStage<T>(
+  input: BuildContextInput,
+  args: Record<string, unknown>,
+  caller: PolicyEvaluationContext,
+  authorization: BuildCollectionAuthorization | undefined,
+  execute: () => Promise<T>,
+): Promise<T> {
+  if (!authorization)
+    return dispatchAuthorizedAction(
+      "build_project",
+      args,
+      { ...caller, workspaceDir: input.projectDir },
+      execute,
+    );
+  const state = collectionAuthorities.get(authorization);
+  const purpose = String(args.analysisPurpose);
+  if (
+    !state ||
+    authorization.projectDir !== input.projectDir ||
+    authorization.environment !== input.environment ||
+    !state.stages.has(purpose)
+  )
+    throw new PlatformIOError(
+      "Analysis collection authority is invalid, expired or already used.",
+      "ANALYSIS_AUTHORITY_INVALID",
+    );
+  state.check();
+  state.stages.delete(purpose);
+  return execute();
+}
+
+/** Collects fresh metadata under build permission; no process-global metadata cache is used. */
+export async function collectBuildMetadata(
+  input: BuildContextInput,
+  caller: PolicyEvaluationContext = {},
+  authorization?: BuildCollectionAuthorization,
+) {
+  const selected = scope(input);
+  return collectionStage(
+    selected,
+    {
+      ...selected,
+      approvalId: input.approvalId,
+      analysisPurpose: "project_metadata",
+    },
+    caller,
+    authorization,
     async () => {
       const result = await platformioExecutor.execute(
         "project",
@@ -72,17 +157,19 @@ export async function collectProgramMemory(
   input: BuildContextInput,
   elfPath: string,
   caller: PolicyEvaluationContext = {},
+  authorization?: BuildCollectionAuthorization,
 ): Promise<ProgramMemoryEvidence> {
   const selected = scope(input);
-  return dispatchAuthorizedAction(
-    "build_project",
+  return collectionStage(
+    selected,
     {
       ...selected,
       elfPath,
       approvalId: input.approvalId,
       analysisPurpose: "check_program_size",
     },
-    { ...caller, workspaceDir: selected.projectDir },
+    caller,
+    authorization,
     async () => {
       const before = await readElfIdentity(elfPath);
       const result = await platformioExecutor.execute(

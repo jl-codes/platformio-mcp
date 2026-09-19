@@ -1,11 +1,14 @@
 /** Validated firmware analysis handlers shared by future MCP/CLI compatibility adapters. */
 import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import { z } from "zod";
 import { getSystemInfo } from "./projects.js";
 import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
 import type { PolicyEvaluationContext } from "../core/policy/types.js";
 import {
+  withAuthorizedBuildCollection,
+  type BuildCollectionAuthorization,
   collectBuildMetadata,
   collectProgramMemory,
 } from "../core/analysis/collect-build-context.js";
@@ -55,6 +58,7 @@ async function resolveContext(
     | z.infer<typeof FirmwareSizeParamsSchema>
     | z.infer<typeof DecodeBacktraceParamsSchema>,
   caller: PolicyEvaluationContext,
+  authorization: BuildCollectionAuthorization,
 ): Promise<FirmwareAnalysisContext> {
   const projectDir = await fs.realpath(input.projectDir);
   const validatePolicy = createPolicyRevisionGuard(projectDir);
@@ -63,7 +67,7 @@ async function resolveContext(
     environment: input.environment,
     approvalId: input.approvalId,
   };
-  const metadata = await collectBuildMetadata(selected, caller);
+  const metadata = await collectBuildMetadata(selected, caller, authorization);
   validatePolicy();
   const systemInfo = await dispatchAuthorizedAction(
     "system_info",
@@ -90,32 +94,72 @@ async function resolveContext(
   };
 }
 
+/** Binds all normalized report arguments without persisting potentially secret crash text. */
+async function authorizedAnalysis<T>(
+  params:
+    | z.infer<typeof FirmwareSizeParamsSchema>
+    | z.infer<typeof DecodeBacktraceParamsSchema>,
+  purpose: "decode_backtrace" | "firmware_size_report",
+  caller: PolicyEvaluationContext,
+  execute: (
+    context: FirmwareAnalysisContext,
+    authorization: BuildCollectionAuthorization,
+  ) => Promise<T>,
+): Promise<T> {
+  const projectDir = await fs.realpath(params.projectDir);
+  const { approvalId, ...request } = params;
+  const normalized = { ...request, projectDir };
+  const requestDigest = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(normalized))
+    .digest("hex");
+  return withAuthorizedBuildCollection(
+    {
+      projectDir,
+      environment: params.environment,
+      approvalId,
+      analysisPurpose: purpose,
+      requestDigest,
+    },
+    caller,
+    async (authorization) =>
+      execute(
+        await resolveContext({ ...params, projectDir }, caller, authorization),
+        authorization,
+      ),
+  );
+}
+
 /** Decodes a supplied crash log against the explicitly selected build environment. */
 export async function decodeBacktrace(
   input: unknown,
   caller: PolicyEvaluationContext = {},
 ) {
   const params = DecodeBacktraceParamsSchema.parse(input);
-  const context = await resolveContext(params, caller);
-  return decodeFirmwareCrash(context, params.text, params.includeAllHex);
+  return authorizedAnalysis(params, "decode_backtrace", caller, (context) =>
+    decodeFirmwareCrash(context, params.text, params.includeAllHex),
+  );
 }
 
-/** Produces one size report from matching fresh metadata, ELF and board accounting. */
+/** Produces one size report under a single request-bound build grant with stage revision checks. */
 export async function firmwareSizeReport(
   input: unknown,
   caller: PolicyEvaluationContext = {},
 ) {
   const params = FirmwareSizeParamsSchema.parse(input);
-  const context = await resolveContext(params, caller);
-  context.validatePolicy?.();
-  context.memoryEvidence = await collectProgramMemory(
-    {
-      projectDir: context.projectDir,
-      environment: context.environment,
-      approvalId: params.approvalId,
-    },
-    context.elfPath,
+  return authorizedAnalysis(
+    params,
+    "firmware_size_report",
     caller,
+    async (context, authorization) => {
+      context.validatePolicy?.();
+      context.memoryEvidence = await collectProgramMemory(
+        { projectDir: context.projectDir, environment: context.environment },
+        context.elfPath,
+        caller,
+        authorization,
+      );
+      return reportFirmwareSize(context, params.top, params.filter);
+    },
   );
-  return reportFirmwareSize(context, params.top, params.filter);
 }

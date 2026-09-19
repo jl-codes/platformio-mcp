@@ -201,3 +201,11 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Integrated the guard between analysis metadata/system-info stages, before size collection and GNU utility execution, and before returning final decoded/size results. Each process-producing collector still performs its own authorization.
 - Verification: TypeScript and 14 handler/report tests passed, including a policy change during metadata generation and a change during a decoder utility call. Later effects/output are rejected with POLICY_CHANGED.
 - This is analysis-stage coverage only. Full queued-operation/composite grant revalidation across existing build/upload/serial/debug flows, public analysis registration and the rest of the plan remain outstanding.
+
+## Composite analysis build approval
+
+- Analysis handlers now authorize the whole normalized report request once, binding purpose/project/environment and a digest of all report arguments. Raw crash text is not persisted in grant metadata; changing text/filter/hash/options changes the request digest.
+- Metadata and program-size stages share a process-local, scope-bound capability issued only after authorization. Each allowed stage is one-use, policy revisions are checked, and the capability is invalidated when the callback finishes. Caller-shaped objects cannot forge this authority.
+- Standalone collectors retain their own authorization. System-info inspection retains its independent policy check; this change does not bypass separate operator restrictions on inspection.
+- Verification: TypeScript and 17 handler/collector tests passed. A build-approval-required policy allows one approved exact size request to finish both stages; changed filter and consumed-grant replay do not execute processes. Forged and expired internal capabilities are rejected.
+- Public MCP/CLI registration, alias contracts, retained-artifact/build locks and live end-to-end collector acceptance remain pending, as do the remaining parity and release stages.

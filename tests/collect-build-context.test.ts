@@ -4,6 +4,7 @@ import path from "node:path";
 import { beforeEach, afterEach, it, expect, vi } from "vitest";
 import { platformioExecutor } from "../src/platformio.js";
 import {
+  withAuthorizedBuildCollection,
   collectBuildMetadata,
   collectProgramMemory,
 } from "../src/core/analysis/collect-build-context.js";
@@ -130,5 +131,25 @@ it("authorizes before reading the artifact or running size-check scripts", async
       path.join(project, "missing.elf"),
     ),
   ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(platformioExecutor.execute).not.toHaveBeenCalled();
+});
+
+it("rejects structurally forged internal collection authority", async () => {
+  const input = { projectDir: project, environment: "fixture" };
+  await expect(collectBuildMetadata(input, {}, input)).rejects.toMatchObject({
+    code: "ANALYSIS_AUTHORITY_INVALID",
+  });
+  expect(platformioExecutor.execute).not.toHaveBeenCalled();
+});
+it("invalidates internal collection authority when its authorized callback finishes", async () => {
+  const input = { projectDir: project, environment: "fixture" };
+  const authority = await withAuthorizedBuildCollection(
+    { ...input, analysisPurpose: "decode_backtrace", requestDigest: "test" },
+    {},
+    async (capability) => capability,
+  );
+  await expect(
+    collectBuildMetadata(input, {}, authority),
+  ).rejects.toMatchObject({ code: "ANALYSIS_AUTHORITY_INVALID" });
   expect(platformioExecutor.execute).not.toHaveBeenCalled();
 });
