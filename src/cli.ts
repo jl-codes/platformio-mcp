@@ -1,79 +1,107 @@
 #!/usr/bin/env node
 
 import fs from "node:fs";
+import { spawn } from "node:child_process";
+import crypto from "node:crypto";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "node:readline/promises";
 import { PlatformIOError } from "./utils/errors.js";
-import {
-  AgentBuildDiagnoseParamsSchema,
-  AgentFlashMonitorVerifyParamsSchema,
-  AgentGenerateBoardReportParamsSchema,
-  AgentGetLastReportParamsSchema,
-  AgentMonitorHealthParamsSchema,
-  AgentResolveTargetParamsSchema,
-  AgentSafePinAuditParamsSchema,
-  AgentValidateProjectParamsSchema,
-  BuildProjectParamsSchema,
-  CheckTaskStatusParamsSchema,
-  GetApprovalRequestParamsSchema,
-  GetPolicyStatusParamsSchema,
-  GetDashboardUrlParamsSchema,
-  GetMonitorStatusParamsSchema,
-  InitProjectParamsSchema,
-  ListBoardsParamsSchema,
-  ListPendingApprovalsParamsSchema,
-  ListTaskHistoryParamsSchema,
-  StartMonitorParamsSchema,
-  UploadFirmwareParamsSchema,
-} from "./types.js";
-import { listDevicesCore } from "./core/devices.js";
-import { listBoardsCore } from "./core/boards.js";
-import { initProjectCore } from "./core/project.js";
-import { buildProjectCore } from "./core/build.js";
-import { uploadFirmwareCore } from "./core/flash.js";
-import {
-  startMonitorCore,
-  waitForExpectedSerialOutput,
-} from "./core/monitor.js";
-import {
-  checkTaskStatusSummaryCore,
-  listTaskHistoryCore,
-} from "./core/tasks.js";
-import { resolveTarget } from "./core/target-resolution.js";
-import { getDashboardStatusCore } from "./core/dashboard.js";
 import { toCliStructuredError } from "./core/cli-diagnostics.js";
 import { evaluatePolicy } from "./core/policy/evaluate-policy.js";
-import { getPolicyStatus } from "./core/policy/status.js";
+import { printOutput } from "./cli/output.js";
+import { mcpContext } from "./utils/mcp-context.js";
+import type { CommandHandler, OptionValue } from "./cli/commands/types.js";
+import { devices } from "./cli/commands/devices.js";
+import { boards, boardInfo } from "./cli/commands/boards.js";
+import { init, project, clean, test } from "./cli/commands/project.js";
+import { lib } from "./cli/commands/lib.js";
+import { logs } from "./cli/commands/logs.js";
+import { build } from "./cli/commands/build.js";
+import { flash, uploadFs } from "./cli/commands/flash.js";
 import {
-  approveRequest,
-  denyRequest,
-  getApproval,
-  getApprovalRequestSummary,
-  listApprovalRequests,
-  listPendingApprovalSummaries,
-} from "./core/policy/approvals.js";
+  monitor,
+  monitorStatus,
+  monitorHealth,
+  monitorStop,
+} from "./cli/commands/monitor.js";
+import { taskStatus, taskHistory, taskCancel } from "./cli/commands/task.js";
 import {
-  agentBuildDiagnose,
-  agentFlashMonitorVerify,
-  agentGenerateBoardReport,
-  agentGetLastReport,
-  agentMonitorHealth,
-  agentSafePinAudit,
-  agentValidateProject,
-} from "./tools/agent.js";
-import { getMonitorStatus } from "./tools/monitor.js";
+  targetResolve,
+  agentValidate,
+  agentBuildDiagnoseCmd,
+  agentSafePinAuditCmd,
+  agentFlashMonitorVerifyCmd,
+  agentLastReport,
+  agentBoardReport,
+} from "./cli/commands/agent.js";
+import {
+  policyStatus,
+  approvals,
+  approvalStatus,
+  pendingApprovals,
+  approve,
+  deny,
+} from "./cli/commands/policy.js";
 import { lockStatus, portRelease } from "./cli/commands/lock.js";
+import {
+  dashboard,
+  install,
+  plugin,
+  systemInfo,
+} from "./cli/commands/system.js";
+import { asString, asBoolean } from "./cli/args.js";
 
-type OptionValue = string | boolean;
+export const COMMANDS: Record<string, CommandHandler> = {
+  devices,
+  boards,
+  "board-info": boardInfo,
+  init,
+  lib,
+  project,
+  clean,
+  test,
+  build,
+  flash,
+  monitor,
+  "monitor-status": monitorStatus,
+  "monitor-health": monitorHealth,
+  "monitor-stop": monitorStop,
+  "task-status": taskStatus,
+  "task-history": taskHistory,
+  "task-cancel": taskCancel,
+  "target-resolve": targetResolve,
+  "agent-validate": agentValidate,
+  "agent-build-diagnose": agentBuildDiagnoseCmd,
+  "agent-safe-pin-audit": agentSafePinAuditCmd,
+  "agent-flash-monitor-verify": agentFlashMonitorVerifyCmd,
+  "agent-last-report": agentLastReport,
+  "agent-board-report": agentBoardReport,
+  "policy-status": policyStatus,
+  approvals,
+  "approval-status": approvalStatus,
+  "pending-approvals": pendingApprovals,
+  approve,
+  deny,
+  "lock-status": lockStatus,
+  "port-release": portRelease,
+  dashboard,
+  install,
+  plugin,
+  logs,
+  "system-info": systemInfo,
+  "upload-fs": uploadFs,
+};
+
 type ParsedArgs = {
   options: Record<string, OptionValue>;
   positionals: string[];
 };
 
-function printCliHelp() {
-  console.log(`PIO Agent (pio-agent / platformio-mcp)
+function printCliHelp(options: { stream?: "stdout" | "stderr" } = {}) {
+  const emit = options.stream === "stderr" ? console.error : console.log;
+  emit(`PIO Agent (pio-agent / platformio-mcp)
 
 USAGE:
   pio-agent <command> [options]
@@ -82,15 +110,29 @@ USAGE:
 COMMANDS:
   devices
   boards --filter <value>
+  board-info --board <id>
   init --board <id> --project-dir <dir> [--framework <name>]
+  lib search <query> [--limit <n>]
+  lib install <name> [--project-dir <dir>] [--version <v>]
+  lib uninstall <name> [--project-dir <dir>]
+  lib update <name> [--project-dir <dir>]
+  lib list [--project-dir <dir>]
+  project check --project-dir <dir> [--environment <env>] [--background]
+  project config --project-dir <dir>
+  project context --project-dir <dir> [--include-build-history]
+  clean --project-dir <dir> [--background]
+  test --project-dir <dir> [--environment <env>] [--background]
   build --project-dir <dir> [--environment <env>] [--background] [--verbose]
   flash --project-dir <dir> [--port <port|auto>] [--environment <env>] [--background] [--start-monitor]
+  upload-fs --project-dir <dir> [--port <port>] [--environment <env>] [--verbose] [--background] [--start-monitor]
   monitor [--project-dir <dir>] [--port <port|auto>] [--environment <env>] [--timeout <seconds>] [--expect <text>] [--background]
   target-resolve --project-dir <dir> [--environment <env>] [--port <port>] [--binding-ttl <seconds>]
   monitor-status [--project-dir <dir>] [--port <port>]
   monitor-health --project-dir <dir> [--environment <env>] [--port <port>] [--duration <seconds>] [--expect-all <csv>] [--reject-patterns <csv>]
+  monitor-stop --port <port> [--project-dir <dir>]
   task-status <task-id>
   task-history --project-dir <dir> [--status <status>] [--limit <n>]
+  task-cancel <task-id> [--project-dir <dir>]
   agent-validate --project-dir <dir>
   agent-build-diagnose --project-dir <dir> [--environment <env>] [--verbose]
   agent-safe-pin-audit --project-dir <dir> --board <id>
@@ -103,11 +145,14 @@ COMMANDS:
   pending-approvals [--project-dir <dir>] [--limit <n>]
   approve <approval-id>
   deny <approval-id>
+  dashboard [--serve] [--port <port>]
   lock status [--port <port>]
   port release --port <port> [--force]
-  dashboard
   install --<cline|claude|vscode|antigravity|codex|codex-plugin>
   plugin validate [--require-runtime]
+  logs query [--lines <n>] [--search <text>] [--task-id <id>] [--log-path <p>] [--project-dir <dir>] [--port <port>]
+  logs capture --project-dir <dir> [--port <port>] [--environment <env>] [--baud-rate <n>] [--duration <seconds>] [--max-bytes <n>] [--cursor <c>]
+  system-info
 
 GLOBAL FLAGS:
   --json
@@ -116,7 +161,8 @@ GLOBAL FLAGS:
   --version
 
 SERVER MODE:
-  Running with no command starts MCP stdio server (legacy behavior).
+  serve                      Start the MCP stdio server explicitly.
+  (no command)               Deprecated: starts the MCP server. Use \`serve\`.
 `);
 }
 
@@ -155,68 +201,23 @@ function parseArgs(args: string[]): ParsedArgs {
   return { options, positionals };
 }
 
-function asString(value: OptionValue | undefined): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
-function asBoolean(value: OptionValue | undefined): boolean | undefined {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") {
-    const normalized = value.toLowerCase();
-    if (["true", "1", "yes", "on"].includes(normalized)) return true;
-    if (["false", "0", "no", "off"].includes(normalized)) return false;
-  }
-  return undefined;
-}
-
-function asNumber(value: OptionValue | undefined): number | undefined {
-  if (typeof value !== "string") return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function asCsv(value: OptionValue | undefined): string[] | undefined {
-  if (typeof value !== "string") return undefined;
-  const items = value
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-  return items.length > 0 ? items : undefined;
-}
-
-function normalizePortOption(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  if (value.toLowerCase() === "auto") return undefined;
-  return value;
-}
-
-function printHuman(data: unknown) {
-  if (typeof data === "string") {
-    console.log(data);
-    return;
-  }
-  if (Array.isArray(data)) {
-    if (data.length === 0) {
-      console.log("No results.");
-      return;
-    }
-    for (const item of data) {
-      console.log(JSON.stringify(item, null, 2));
-    }
-    return;
-  }
-  console.log(JSON.stringify(data, null, 2));
-}
-
-function printOutput(data: unknown, jsonMode: boolean) {
-  if (jsonMode) {
-    console.log(JSON.stringify(data, null, 2));
-    return;
-  }
-  printHuman(data);
-}
-
-function actionForCommand(command: string): string {
+/**
+ * Maps a CLI command (plus, for commands whose handler dispatches its own
+ * subcommand from `positionals[0]` — `lib`, `project`, and `logs` — that
+ * first positional) to the policy action name used for risk classification.
+ * Unlike `lock`/`port`, which fold into distinct hyphenated registry keys in
+ * `main()` before this is called, `lib`/`project`/`logs` are each a single
+ * registry entry, so this is the one place that needs to know their
+ * subcommands too: a mutating one (e.g. `lib install`) must get a
+ * different, higher-risk action name than a read-only one (e.g. `lib
+ * search`, `project config`, `logs query`) sharing the same command word.
+ * See `actionRiskLevels` in src/core/policy/default-policy.ts for the
+ * per-action risk tier this feeds.
+ */
+export function actionForCommand(
+  command: string,
+  positionals: string[],
+): string {
   switch (command) {
     case "devices":
       return "list_devices";
@@ -224,10 +225,48 @@ function actionForCommand(command: string): string {
       return "list_boards";
     case "init":
       return "init_project";
+    case "board-info":
+      return "get_board_info";
+    case "system-info":
+      return "system_info";
+    case "lib":
+      switch (positionals[0]) {
+        case "install":
+          return "install_library";
+        case "uninstall":
+          return "uninstall_library";
+        case "update":
+          return "update_library";
+        case "list":
+          return "list_installed_libraries";
+        case "search":
+        default:
+          return "search_libraries";
+      }
+    case "project":
+      switch (positionals[0]) {
+        case "check":
+          return "check_project";
+        case "context":
+          return "get_project_context";
+        case "config":
+        default:
+          return "get_project_config";
+      }
+    case "clean":
+      return "clean_project";
+    case "test":
+      return "run_tests";
+    case "logs":
+      return positionals[0] === "capture"
+        ? "capture_serial_window"
+        : "query_logs";
     case "build":
       return "build_project";
     case "flash":
       return "upload_firmware";
+    case "upload-fs":
+      return "upload_filesystem";
     case "monitor":
       return "start_monitor";
     case "target-resolve":
@@ -236,10 +275,18 @@ function actionForCommand(command: string): string {
       return "get_monitor_status";
     case "monitor-health":
       return "agent_monitor_health";
+    case "monitor-stop":
+      return "stop_monitor";
     case "task-status":
-      return "check_task_status";
+      // Mirrors src/mcp/tool-registry.ts, which maps check_task_status to the
+      // query_logs policy action. check_task_status is not itself in the
+      // default policy's allow list, so mapping to it denies every poll -- and
+      // the skills instruct agents to poll this after any --background command.
+      return "query_logs";
     case "task-history":
       return "list_task_history";
+    case "task-cancel":
+      return "cancel_task";
     case "agent-validate":
       return "agent_validate_project";
     case "agent-build-diagnose":
@@ -254,12 +301,12 @@ function actionForCommand(command: string): string {
       return "agent_generate_board_report";
     case "policy-status":
       return "get_policy_status";
+    case "dashboard":
+      return "get_dashboard_url";
     case "lock-status":
       return "get_lock_status";
     case "port-release":
       return "release_port_claim";
-    case "dashboard":
-      return "get_dashboard_url";
     case "plugin":
       return "get_policy_status";
     case "install":
@@ -302,56 +349,101 @@ function readVersion(): string {
   }
 }
 
-async function runInstallSubcommand(rawArgs: string[]) {
-  const target = rawArgs.find((a) => a.startsWith("--"))?.replace(/^--/, "");
-  if (!target) {
-    throw new Error("Usage: install --<cline|claude|vscode|antigravity|codex>");
-  }
+/**
+ * Commands that perform work, as opposed to reporting state.
+ *
+ * Only these map a returned `success: false` to a non-zero exit code. A query
+ * answering "no" -- `task-cancel` on an already-finished task, a health probe
+ * with nothing to assert against -- has not failed, and exiting non-zero there
+ * breaks the idempotent cleanup and classification the skills prescribe.
+ *
+ * Thrown errors always exit non-zero regardless of this set: a command that
+ * could not run at all is a failure whatever it was going to do.
+ */
+export const OPERATION_COMMANDS = new Set([
+  "build",
+  "clean",
+  "test",
+  "flash",
+  "upload-fs",
+  "init",
+  "project",
+  "lib",
+  "agent-build-diagnose",
+  "agent-flash-monitor-verify",
+]);
 
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const installerEntry = path.join(
-    currentDir,
-    "..",
-    "scripts",
-    "installers",
-    "index.js",
-  );
-  const installerUrl = pathToFileURL(installerEntry).href;
-  const { runInstaller } = (await import(installerUrl)) as {
-    runInstaller: (targetName: string) => Promise<void>;
-  };
-  await runInstaller(target);
-}
+/**
+ * Commands whose `--background` must genuinely return immediately.
+ *
+ * The spooler's background mode keeps the PARENT alive: the completion
+ * bookkeeping -- task status, PID unregister, port-claim release, the
+ * --start-monitor hook -- runs in the parent's `.then()` after the child
+ * exits. Under the long-lived MCP server that is exactly right. Under a
+ * one-shot CLI it meant `pio-agent build --background` printed
+ * `{status:"running"}` and then sat there for the whole build, which is the
+ * opposite of what the skills promise agents.
+ *
+ * So the CLI backgrounds by re-executing ITSELF in foreground mode as a
+ * detached child, with the task id assigned up front. The foreground path
+ * already does all of the bookkeeping, including onSuccess hooks, so nothing
+ * has to be serialised across processes and the MCP path is untouched. The
+ * child is short-lived (it ends with the task), which is consistent with
+ * "nothing outlives the command it was asked for".
+ */
+const BACKGROUND_REEXEC_COMMANDS = new Set([
+  "build",
+  "flash",
+  "upload-fs",
+  "clean",
+  "test",
+  "project",
+]);
 
-async function runPluginSubcommand(rawArgs: string[]) {
-  const { options, positionals } = parseArgs(rawArgs);
-  if (positionals[0] !== "validate" || positionals.length !== 1) {
-    throw new Error("Usage: plugin validate [--require-runtime]");
-  }
+/** Hidden flag the detached child receives so both sides agree on the task id. */
+const TASK_ID_FLAG = "--__task-id";
 
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const validatorEntry = path.join(
-    currentDir,
-    "..",
-    "scripts",
-    "validate-codex-plugin.mjs",
-  );
-  const validatorUrl = pathToFileURL(validatorEntry).href;
-  const { validateCodexPlugin } = (await import(validatorUrl)) as {
-    validateCodexPlugin: (options?: { requireRuntime?: boolean }) => {
-      skills: number;
-      runtimePresent: boolean;
-    };
-  };
-  return validateCodexPlugin({
-    requireRuntime: asBoolean(options["require-runtime"]) ?? false,
+function dispatchDetached(
+  command: string,
+  rest: string[],
+  jsonMode: boolean,
+): void {
+  const taskId = crypto.randomUUID();
+  const childArgs = [
+    process.argv[1],
+    command,
+    ...rest.filter((a) => a !== "--background"),
+    TASK_ID_FLAG,
+    taskId,
+  ];
+  if (jsonMode && !childArgs.includes("--json")) childArgs.push("--json");
+
+  // The child's own stdout/stderr are not ours to relay -- its result is
+  // recorded via task status, which is what `task-status <id>` reads.
+  const child = spawn(process.execPath, childArgs, {
+    detached: true,
+    stdio: "ignore",
+    env: process.env,
   });
+  child.unref();
+
+  printOutput(
+    {
+      status: "running",
+      taskId,
+      pid: child.pid,
+      message:
+        "Task dispatched to a detached process. Poll with " +
+        `\`pio-agent task-status ${taskId} --project-dir <dir>\`.`,
+    },
+    jsonMode,
+  );
 }
 
-async function runCliCommand(command: string, rawArgs: string[]) {
+export async function runCliCommand(command: string, rawArgs: string[]) {
   const { options, positionals } = parseArgs(rawArgs);
   const jsonMode = Boolean(options.json);
-  const actionName = actionForCommand(command);
+  const actionName = actionForCommand(command, positionals);
   const projectDirForPolicy = asString(options["project-dir"]);
   const approvalOpt = asBoolean(options.approve);
   let policyArgs: Record<string, unknown> = {
@@ -419,416 +511,68 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       }
     }
 
-    switch (command) {
-      case "devices": {
-        const result = await listDevicesCore();
-        printOutput(result, jsonMode);
+    const handler = COMMANDS[command];
+    if (handler) {
+      if (
+        asBoolean(options.background) &&
+        BACKGROUND_REEXEC_COMMANDS.has(command)
+      ) {
+        dispatchDetached(command, rawArgs, jsonMode);
         return;
       }
 
-      case "boards": {
-        const params = ListBoardsParamsSchema.parse({
-          filter: asString(options.filter),
-        });
-        const result = await listBoardsCore(params.filter);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "init": {
-        const params = InitProjectParamsSchema.parse({
-          board: asString(options.board),
-          framework: asString(options.framework),
-          projectDir: asString(options["project-dir"]),
-        });
-        const result = await initProjectCore(params);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "build": {
-        const params = BuildProjectParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-          environment: asString(options.environment),
-          verbose: asBoolean(options.verbose),
-          background: asBoolean(options.background),
-        });
-        const result = await buildProjectCore(params);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "flash": {
-        const params = UploadFirmwareParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-          port: normalizePortOption(asString(options.port)),
-          environment: asString(options.environment),
-          verbose: asBoolean(options.verbose),
-          background: asBoolean(options.background),
-          start_monitor: asBoolean(options["start-monitor"]),
-        });
-        const result = await uploadFirmwareCore({
-          projectDir: params.projectDir,
-          port: params.port,
-          environment: params.environment,
-          verbose: params.verbose,
-          background: params.background,
-          startMonitorAfter: asBoolean(options["start-monitor"]),
-        });
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "monitor": {
-        const timeoutSeconds = asNumber(options.timeout) ?? 30;
-        const expect = asString(options.expect);
-        const background = asBoolean(options.background) ?? false;
-
-        const params = StartMonitorParamsSchema.parse({
-          port: normalizePortOption(asString(options.port)),
-          projectDir: asString(options["project-dir"]),
-          environment: asString(options.environment),
-        });
-
-        const startResult = await startMonitorCore({
-          port: params.port,
-          projectDir: params.projectDir,
-          environment: params.environment,
-        });
-
-        if (!expect || background) {
-          printOutput(
+      // A detached child carries the task id its parent already reported.
+      // The spooler reads it from this context as the command id, so
+      // `task-status <id>` finds the run without every handler threading it.
+      const preassignedTaskId = asString(options["__task-id"]);
+      const run = () => handler({ options, positionals, jsonMode, rawArgs });
+      const result = preassignedTaskId
+        ? await mcpContext.run(
             {
-              ...startResult,
-              expectation:
-                expect && background
-                  ? {
-                      skipped: true,
-                      reason:
-                        "--expect was ignored because monitor was started in background mode.",
-                    }
-                  : undefined,
+              activityId: preassignedTaskId,
+              targetProjectDir: asString(options["project-dir"]),
             },
-            jsonMode,
-          );
-          return;
+            run,
+          )
+        : await run();
+      if (result !== undefined) {
+        printOutput(result, jsonMode);
+        // `success: false` is overloaded: for a command that DOES work it
+        // means the work failed, but for a query it often just means the
+        // answer was negative -- no task by that id, a health probe that was
+        // inconclusive, no logs yet. Only the former is a process failure.
+        // Mapping both to exit 1 made `monitor-health` fail on its own
+        // documented invocation and `task-cancel` fail at being idempotent.
+        if (
+          OPERATION_COMMANDS.has(command) &&
+          result !== null &&
+          typeof result === "object" &&
+          (result as { success?: unknown }).success === false
+        ) {
+          process.exitCode = 1;
         }
-
-        const expectation = await waitForExpectedSerialOutput({
-          logFile: startResult.logFile,
-          expect,
-          timeoutSeconds,
-        });
-
-        if (!expectation.matched) {
-          throw new PlatformIOError(
-            `Expected serial output '${expect}' was not observed within ${timeoutSeconds}s.`,
-            "EXPECTATION_TIMEOUT",
-          );
-        }
-
-        printOutput(
-          {
-            ...startResult,
-            expectation: {
-              expected: expect,
-              timeoutSeconds,
-              ...expectation,
-            },
-          },
-          jsonMode,
-        );
-        return;
       }
-
-      case "target-resolve": {
-        const params = AgentResolveTargetParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-          environment: asString(options.environment),
-          port: normalizePortOption(asString(options.port)),
-          bindingTtlSeconds: asNumber(options["binding-ttl"]),
-        });
-        const result = await resolveTarget(params);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "monitor-status": {
-        const params = GetMonitorStatusParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-          port: normalizePortOption(asString(options.port)),
-        });
-        const result = getMonitorStatus(params.port, params.projectDir);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "monitor-health": {
-        const params = AgentMonitorHealthParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-          environment: asString(options.environment),
-          port: normalizePortOption(asString(options.port)),
-          baudRate: asNumber(options["baud-rate"]),
-          captureDurationSeconds: asNumber(options.duration),
-          maxBytes: asNumber(options["max-bytes"]),
-          expectedMarkers: asCsv(options["expect-all"]),
-          rejectedPatterns: asCsv(options["reject-patterns"]),
-          automationKey: asString(options["automation-key"]),
-          cursor: asString(options.cursor),
-          failureThreshold: asNumber(options["failure-threshold"]),
-        });
-        const result = await agentMonitorHealth(params);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "task-status": {
-        const taskId = positionals[0];
-        const params = CheckTaskStatusParamsSchema.parse({
-          taskId,
-          projectDir: asString(options["project-dir"]),
-          logPath: asString(options["log-path"]),
-        });
-        const result = await checkTaskStatusSummaryCore(params);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "task-history": {
-        const params = ListTaskHistoryParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-          limit: asNumber(options.limit),
-          status: asString(options.status),
-        });
-        const result = await listTaskHistoryCore(params);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "agent-validate": {
-        const params = AgentValidateProjectParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-        });
-        const result = await agentValidateProject(params.projectDir);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "agent-build-diagnose": {
-        const params = AgentBuildDiagnoseParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-          environment: asString(options.environment),
-          verbose: asBoolean(options.verbose),
-          background: asBoolean(options.background),
-        });
-        const result = await agentBuildDiagnose(
-          params.projectDir,
-          params.environment,
-          params.verbose,
-          params.background,
-        );
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "agent-safe-pin-audit": {
-        const params = AgentSafePinAuditParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-          boardId: asString(options.board),
-        });
-        const result = await agentSafePinAudit(
-          params.projectDir,
-          params.boardId,
-        );
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "agent-flash-monitor-verify": {
-        const params = AgentFlashMonitorVerifyParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-          environment: asString(options.environment),
-          port: normalizePortOption(asString(options.port)),
-          expect_all: asCsv(options["expect-all"]),
-          reject_patterns: asCsv(options["reject-patterns"]),
-          timeoutSeconds: asNumber(options.timeout),
-          stabilityWindowSeconds: asNumber(options["stability-window"]),
-          autoBuild: asBoolean(options["auto-build"]),
-        });
-        const result = await agentFlashMonitorVerify({
-          projectDir: params.projectDir,
-          environment: params.environment,
-          port: params.port,
-          expectAll: params.expect_all,
-          rejectPatterns: params.reject_patterns,
-          timeoutSeconds: params.timeoutSeconds,
-          stabilityWindowSeconds: params.stabilityWindowSeconds,
-          autoBuild: params.autoBuild,
-        });
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "agent-last-report": {
-        const params = AgentGetLastReportParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-        });
-        const result = await agentGetLastReport(params.projectDir);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "agent-board-report": {
-        const params = AgentGenerateBoardReportParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-          boardId: asString(options.board),
-        });
-        const result = await agentGenerateBoardReport(
-          params.projectDir,
-          params.boardId,
-        );
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "lock-status": {
-        const result = await lockStatus({ options, positionals, jsonMode });
-        if (result !== undefined) printOutput(result, jsonMode);
-        return;
-      }
-
-      case "port-release": {
-        const result = await portRelease({ options, positionals, jsonMode });
-        if (result !== undefined) printOutput(result, jsonMode);
-        return;
-      }
-
-      case "policy-status": {
-        const params = GetPolicyStatusParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-        });
-        const result = getPolicyStatus(params.projectDir);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "dashboard": {
-        const params = GetDashboardUrlParamsSchema.parse({
-          open: true,
-          projectDir: asString(options["project-dir"]),
-        });
-        const result = await getDashboardStatusCore(params);
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "approvals": {
-        const status = asString(options.status) as
-          | "pending"
-          | "approved"
-          | "denied"
-          | "expired"
-          | undefined;
-        const limit = asNumber(options.limit);
-        const result = listApprovalRequests({ status, limit });
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "approval-status": {
-        const params = GetApprovalRequestParamsSchema.parse({
-          approvalId: positionals[0],
-          projectDir: asString(options["project-dir"]),
-        });
-        const result = getApprovalRequestSummary(
-          params.approvalId,
-          params.projectDir,
-        );
-        if (!result) {
-          throw new Error(
-            `Approval request '${params.approvalId}' was not found in this scope.`,
-          );
-        }
-        printOutput(result, jsonMode);
-        return;
-      }
-
-      case "pending-approvals": {
-        const params = ListPendingApprovalsParamsSchema.parse({
-          projectDir: asString(options["project-dir"]),
-          limit: asNumber(options.limit),
-        });
-        const result = listPendingApprovalSummaries(params);
-        printOutput({ approvals: result }, jsonMode);
-        return;
-      }
-
-      case "approve": {
-        const approvalId = positionals[0];
-        if (!approvalId) {
-          throw new Error("Usage: approve <approval-id>");
-        }
-        const existing = getApproval(approvalId);
-        if (!existing) {
-          throw new Error(`Approval not found: ${approvalId}`);
-        }
-        const approval = approveRequest(approvalId);
-        printOutput({ success: true, approval }, jsonMode);
-        return;
-      }
-
-      case "deny": {
-        const approvalId = positionals[0];
-        if (!approvalId) {
-          throw new Error("Usage: deny <approval-id>");
-        }
-        const existing = getApproval(approvalId);
-        if (!existing) {
-          throw new Error(`Approval not found: ${approvalId}`);
-        }
-        const approval = denyRequest(approvalId);
-        printOutput({ success: true, approval }, jsonMode);
-        return;
-      }
-
-      case "install": {
-        await runInstallSubcommand(rawArgs);
-        if (!jsonMode) {
-          console.log("Installer completed.");
-        } else {
-          console.log(JSON.stringify({ success: true }, null, 2));
-        }
-        return;
-      }
-
-      case "plugin": {
-        const result = await runPluginSubcommand(rawArgs);
-        printOutput(
-          {
-            success: true,
-            ...result,
-          },
-          jsonMode,
-        );
-        return;
-      }
-
-      default:
-        throw new Error(`Unknown command: ${command}`);
+      return;
     }
+
+    throw new Error(`Unknown command: ${command}`);
   } catch (error) {
     const stageMap: Record<string, string> = {
       devices: "devices",
       boards: "boards",
+      "board-info": "boards",
       init: "init",
       build: "build",
       flash: "upload",
+      "upload-fs": "upload",
       monitor: "monitor",
       "target-resolve": "devices",
       "monitor-status": "monitor",
       "monitor-health": "monitor",
+      "monitor-stop": "monitor",
       "task-status": "tasks",
       "task-history": "tasks",
+      "task-cancel": "tasks",
       "agent-validate": "agent",
       "agent-build-diagnose": "build",
       "agent-safe-pin-audit": "agent",
@@ -842,8 +586,16 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       approve: "policy",
       deny: "policy",
       dashboard: "dashboard",
+      "lock-status": "lock",
+      "port-release": "port",
       install: "install",
       plugin: "plugin",
+      lib: "lib",
+      project: "project",
+      clean: "build",
+      test: "build",
+      logs: "monitor",
+      "system-info": "system",
     };
     const structured = toCliStructuredError(error, {
       stage: stageMap[command] ?? "unknown",
@@ -862,54 +614,44 @@ async function runCliCommand(command: string, rawArgs: string[]) {
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
-  const knownCommands = new Set([
-    "devices",
-    "boards",
-    "init",
-    "build",
-    "flash",
-    "monitor",
-    "target-resolve",
-    "monitor-status",
-    "monitor-health",
-    "task-status",
-    "task-history",
-    "agent-validate",
-    "agent-build-diagnose",
-    "agent-safe-pin-audit",
-    "agent-flash-monitor-verify",
-    "agent-last-report",
-    "agent-board-report",
-    "lock-status",
-    "port-release",
-    "policy-status",
-    "approvals",
-    "approval-status",
-    "pending-approvals",
-    "approve",
-    "deny",
-    "dashboard",
-    "install",
-    "plugin",
-  ]);
+  const knownCommands = new Set(Object.keys(COMMANDS));
 
+  // These matched --help/--version ANYWHERE in argv, so `lib install <name>
+  // --version 1.2.3` -- the form the pio-manager skill prescribes -- printed
+  // the CLI's own version and installed nothing. They are global flags only
+  // when they lead, or when no command was given; after a command they belong
+  // to that command.
+  // --help never takes a value, so it is safe to honour anywhere: `pio-agent
+  // build --help` must work, and the CLI's own error messages point at it.
+  // --version DOES take a value in `lib install <name> --version 1.2.3`, so it
+  // is global only when it leads.
   if (args.includes("--help") || command === "help") {
     printCliHelp();
     return;
   }
 
-  if (args.includes("--version") || command === "version") {
+  if (command === "--version" || command === "version") {
     console.log(readVersion());
     return;
   }
 
-  // Fold the two-word forms ("lock status", "port release") into their
-  // registry keys. The claim errors tell users to run `pio-agent port release`,
-  // so it has to exist in the same change that introduces those errors.
+  // Any other leading flag (`pio-agent --json`) is a mistake, not a request to
+  // start the MCP server, which is what falling through would do.
+  if (command?.startsWith("--")) {
+    console.error(`Unknown option: ${command}`);
+    printCliHelp({ stream: "stderr" });
+    process.exit(1);
+  }
+
+  // Fold two-word forms ("lock status", "port release") into their registry
+  // keys before the knownCommands lookup. Task 12 (Phase C) will formalise
+  // this into a real subcommand registry; keep this minimal until then.
+  const TWO_WORD = new Set(["lock", "port"]);
   let resolved = command;
   let rest = args.slice(1);
   if (
-    (command === "lock" || command === "port") &&
+    command &&
+    TWO_WORD.has(command) &&
     rest[0] &&
     !rest[0].startsWith("--")
   ) {
@@ -922,18 +664,71 @@ async function main() {
     return;
   }
 
+  if (command === "serve") {
+    // src/index.ts's own main() re-parses process.argv (it is not spawned as
+    // a new process — the array is shared) and treats the first non-flag
+    // token as its own subcommand. Left as "serve", it would see an
+    // unrecognized subcommand, print its help to stdout, and never start the
+    // MCP server. Strip the "serve" word but keep any trailing flags (e.g.
+    // --open-dashboard-on-start) so they still reach index.ts's parsing.
+    process.argv = [process.argv[0], process.argv[1], ...args.slice(1)];
+    await import("./index.js");
+    return;
+  }
+
   if (command && !command.startsWith("--")) {
+    // stdout stays clean on failure: a caller parsing --json must not receive
+    // 3KB of help text where a payload was expected.
     console.error(`Unknown command: ${command}`);
-    printCliHelp();
+    printCliHelp({ stream: "stderr" });
     process.exit(1);
   }
 
-  // No CLI command was passed: preserve legacy behavior and start MCP server.
+  // Bare invocation still starts the MCP server so existing client configs
+  // keep working. The warning goes to stderr only: stdout carries MCP stdio
+  // JSON-RPC framing and must never be polluted with anything else.
+  console.error(
+    "[pio-agent] Starting the MCP server because no command was given.\n" +
+      "[pio-agent] This is deprecated. Use `pio-agent serve` to start the MCP\n" +
+      "[pio-agent] server explicitly, or run a command such as `pio-agent build`.\n" +
+      "[pio-agent] Run `pio-agent --help` to see all commands.",
+  );
   await import("./index.js");
 }
 
-main().catch((error) => {
-  const structured = toCliStructuredError(error);
-  console.error(JSON.stringify(structured, null, 2));
-  process.exit(1);
-});
+/**
+ * True only when this file is the process entry point (run directly via
+ * `node build/cli.js`, the `pio-agent`/`platformio-mcp` bin symlinks, or
+ * `tsx src/cli.ts`) rather than imported as a module — e.g. by
+ * tests/cli-agent-smoke.test.ts, which spawns it as a child process, but
+ * still resolves the same file. realpath both sides so a bin symlink still
+ * compares equal to the resolved module path.
+ */
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    // Compare canonical forms on both sides. realpathSync returns the on-disk
+    // casing via GetFinalPathNameByHandleW on Windows while the module URL may
+    // carry the casing the caller typed, and a drive-letter or 8.3 mismatch
+    // would make this silently false -- main() never runs, exit 0, no output.
+    const canon = (f: string) => {
+      const r = path.resolve(f);
+      return process.platform === "win32" ? r.toLowerCase() : r;
+    };
+    return (
+      canon(fs.realpathSync(entry)) ===
+      canon(fs.realpathSync(fileURLToPath(import.meta.url)))
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
+  main().catch((error) => {
+    const structured = toCliStructuredError(error);
+    console.error(JSON.stringify(structured, null, 2));
+    process.exit(1);
+  });
+}
