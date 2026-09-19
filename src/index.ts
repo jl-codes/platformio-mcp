@@ -66,6 +66,7 @@ import { mcpContext } from "./utils/mcp-context.js";
 import { addWorkspace } from "./utils/workspace-registry.js";
 
 // Import tool functions from feature modules
+import { decodeBacktrace, firmwareSizeReport } from "./tools/analysis.js";
 import { getBoardInfo } from "./tools/boards.js";
 import {
   getProjectConfig,
@@ -196,6 +197,86 @@ const automationKeyInputSchema = {
  * exposed by this server.
  */
 const toolDefinitions: ToolDefinition[] = [
+  {
+    name: "decode_backtrace",
+    description:
+      "Decode crash addresses against the selected current ELF. Requires build permission for metadata; does not prove flashed-device identity.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: {
+          type: "string",
+          description: "Explicit PlatformIO project directory.",
+        },
+        environment: {
+          type: "string",
+          minLength: 1,
+          maxLength: 50,
+          description:
+            "Explicit build environment; metadata collection can execute project scripts.",
+        },
+        approvalId: {
+          type: "string",
+        },
+        expectedElfSha256: {
+          type: "string",
+          pattern: "^[a-fA-F0-9]{64}$",
+        },
+        text: {
+          type: "string",
+          minLength: 1,
+          description: "Crash output, at most 1 MiB UTF-8.",
+        },
+        includeAllHex: {
+          type: "boolean",
+        },
+      },
+      required: ["projectDir", "environment", "text"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "size_report",
+    description:
+      "Report GNU symbols and PlatformIO memory accounting for one environment. Metadata and size checks require build permission and may execute project scripts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: {
+          type: "string",
+          description: "Explicit PlatformIO project directory.",
+        },
+        environment: {
+          type: "string",
+          minLength: 1,
+          maxLength: 50,
+          description:
+            "Explicit build environment; metadata collection can execute project scripts.",
+        },
+        approvalId: {
+          type: "string",
+        },
+        expectedElfSha256: {
+          type: "string",
+          pattern: "^[a-fA-F0-9]{64}$",
+        },
+        top: {
+          type: "integer",
+          minimum: 1,
+          maximum: 1000,
+          default: 25,
+        },
+        filter: {
+          type: "string",
+          maxLength: 4096,
+          description:
+            "Case-insensitive bounded regex applied to symbol names or source paths.",
+        },
+      },
+      required: ["projectDir", "environment"],
+      additionalProperties: false,
+    },
+  },
   {
     name: "list_boards",
     description:
@@ -1105,7 +1186,8 @@ const toolDefinitions: ToolDefinition[] = [
         },
         compileOnly: {
           type: "boolean",
-          description: "Compile tests without uploading or executing them. Enforced by build_only policy.",
+          description:
+            "Compile tests without uploading or executing them. Enforced by build_only policy.",
         },
         background: {
           type: "boolean",
@@ -1186,6 +1268,73 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   let commandRegistered = false;
 
   try {
+    if (name === "decode_backtrace" || name === "size_report") {
+      const safeRequest = {
+        projectDir: args.projectDir,
+        environment: args.environment,
+      };
+      const caller = {
+        workspaceDir: targetProjectDir,
+        actor: "agent" as const,
+        taskId: activityId,
+        actorClass: "interactive" as const,
+      };
+      const onAuthorized = async () => {
+        await registerCommand(
+          {
+            id: activityId,
+            commandDesc: `MCP Tool: ${name}`,
+            timestamp: Date.now(),
+            status: "running",
+            tasks: [],
+            mcpToolName: name,
+            mcpRequest: safeRequest,
+          },
+          targetProjectDir,
+        );
+        commandRegistered = true;
+        portalEvents.emitActivity(name, safeRequest, "running", activityId);
+      };
+      const result = await mcpContext.run(
+        { activityId, targetProjectDir },
+        () =>
+          registeredTool.handler(args, {
+            dispatch: async (tool, parameters) =>
+              tool === "decode_backtrace"
+                ? decodeBacktrace(parameters, caller, onAuthorized)
+                : firmwareSizeReport(parameters, caller, onAuthorized),
+          }),
+      );
+      const response = createToolResult({
+        success: result.ok,
+        status: result.ok ? "completed" : "failed",
+        summary:
+          name === "size_report"
+            ? "Firmware size report completed."
+            : result.ok
+              ? "Crash addresses decoded against the selected ELF."
+              : "No crash addresses resolved against the selected ELF.",
+        data: result,
+      });
+      await updateCommandStatus(
+        activityId,
+        {
+          status: result.ok ? "success" : "error",
+          mcpResponse: {
+            success: result.ok,
+            summary: response.structuredContent.summary,
+          },
+        },
+        targetProjectDir,
+      );
+      portalEvents.emitActivity(
+        name,
+        safeRequest,
+        result.ok ? "success" : "error",
+        activityId,
+      );
+      return response;
+    }
     const policyDecision = await authorizeAction(name, args, {
       workspaceDir: targetProjectDir,
       devicePort: typeof args.port === "string" ? args.port : undefined,
@@ -2001,10 +2150,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       );
 
     if (commandRegistered)
-      portalEvents.emitActivity(name, args, "error", activityId);
+      portalEvents.emitActivity(
+        name,
+        name === "decode_backtrace" || name === "size_report"
+          ? { projectDir: args.projectDir, environment: args.environment }
+          : args,
+        "error",
+        activityId,
+      );
 
     const errorMessage = formatPlatformIOError(error);
-    return createToolErrorResult(errorMessage);
+    return createToolErrorResult(errorMessage, {
+      status: error.code === "APPROVAL_REQUIRED" ? "blocked" : "failed",
+      data: { code: error.code },
+      policyDecision: error.context?.policyDecision,
+    });
   }
 });
 

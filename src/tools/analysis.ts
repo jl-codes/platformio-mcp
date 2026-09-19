@@ -101,6 +101,7 @@ async function authorizedAnalysis<T>(
     | z.infer<typeof DecodeBacktraceParamsSchema>,
   purpose: "decode_backtrace" | "firmware_size_report",
   caller: PolicyEvaluationContext,
+  onAuthorized: (() => Promise<void>) | undefined,
   execute: (
     context: FirmwareAnalysisContext,
     authorization: BuildCollectionAuthorization,
@@ -122,11 +123,13 @@ async function authorizedAnalysis<T>(
       requestDigest,
     },
     caller,
-    async (authorization) =>
-      execute(
+    async (authorization) => {
+      await onAuthorized?.();
+      return execute(
         await resolveContext({ ...params, projectDir }, caller, authorization),
         authorization,
-      ),
+      );
+    },
   );
 }
 
@@ -134,10 +137,16 @@ async function authorizedAnalysis<T>(
 export async function decodeBacktrace(
   input: unknown,
   caller: PolicyEvaluationContext = {},
+  onAuthorized?: () => Promise<void>,
 ) {
   const params = DecodeBacktraceParamsSchema.parse(input);
-  return authorizedAnalysis(params, "decode_backtrace", caller, (context) =>
-    decodeFirmwareCrash(context, params.text, params.includeAllHex),
+  return authorizedAnalysis(
+    params,
+    "decode_backtrace",
+    caller,
+    onAuthorized,
+    (context) =>
+      decodeFirmwareCrash(context, params.text, params.includeAllHex),
   );
 }
 
@@ -145,12 +154,14 @@ export async function decodeBacktrace(
 export async function firmwareSizeReport(
   input: unknown,
   caller: PolicyEvaluationContext = {},
+  onAuthorized?: () => Promise<void>,
 ) {
   const params = FirmwareSizeParamsSchema.parse(input);
   return authorizedAnalysis(
     params,
     "firmware_size_report",
     caller,
+    onAuthorized,
     async (context, authorization) => {
       context.validatePolicy?.();
       context.memoryEvidence = await collectProgramMemory(

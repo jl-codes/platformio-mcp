@@ -83,6 +83,8 @@
     "check_project": ["pio-manager", "platformio-debug"],
     "run_tests": ["pio-manager", "hardware-in-the-loop-test"],
     "uninstall_library": ["pio-manager", "platformio-debug"],
-    "update_library": ["pio-manager", "platformio-debug"]
+    "update_library": ["pio-manager", "platformio-debug"],
+    "decode_backtrace": ["serial-diagnostics", "platformio-debug"],
+    "size_report": ["platformio-debug"]
   }
 }

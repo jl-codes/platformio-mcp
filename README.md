@@ -102,7 +102,7 @@ npx -y platformio-mcp install --codex-plugin
 
 Start a new Codex task after installation. The legacy `install --codex` command remains available for MCP-only configuration. See the [full Codex Plugin guide](docs/CODEX.md) for update, uninstall, browser fallback, policy, automation, and rollback details.
 
-The plugin release gates run on Windows, macOS, and Linux, exercise the authenticated dashboard in Chromium, validate the bundled runtime and 42-tool registry, and keep physical-board evidence in a separate manual workflow. That workflow uploads only bounded, sanitized evidence; raw hardware logs stay on the self-hosted runner. See the [release and validation guide](docs/CODEX_PLUGIN_RELEASE.md).
+The plugin release gates run on Windows, macOS, and Linux, exercise the authenticated dashboard in Chromium, validate the bundled runtime and 44-tool registry, and keep physical-board evidence in a separate manual workflow. That workflow uploads only bounded, sanitized evidence; raw hardware logs stay on the self-hosted runner. See the [release and validation guide](docs/CODEX_PLUGIN_RELEASE.md).
 
 For headless verification and status inspection, the same CLI also provides `plugin validate`, `target-resolve`, `monitor-status`, `monitor-health`, `task-history`, `approval-status`, and `pending-approvals`. Run `platformio-mcp --help` for bounded options and JSON output support.
 
@@ -223,3 +223,7 @@ Contributions are welcome.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+### Firmware crash and size analysis
+
+The MCP tools `decode_backtrace` and `size_report` analyze an explicitly selected project/environment using its registered GNU toolchain. Metadata and memory checks require build permission because they can execute project scripts. Reports identify the exact ELF, retain unresolved crash addresses, and distinguish PlatformIO memory usage from GNU estimates. They do not prove which firmware is on a device. See [firmware analysis](docs/firmware-analysis.md) for inputs, approval behavior, evidence and current limits.

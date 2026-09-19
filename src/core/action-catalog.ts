@@ -25,6 +25,22 @@ const READ: ActionSafetyMetadata = {
 
 /** Existing callable MCP actions; additions require matching registered handlers. */
 export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  decode_backtrace: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true,
+  },
+  size_report: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true,
+  },
   list_boards: READ,
   get_board_info: READ,
   list_devices: READ,

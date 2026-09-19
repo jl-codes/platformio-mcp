@@ -80,7 +80,7 @@ function preservesSchema(actual: any, baseline: any, location: string): void {
 describe("stdio MCP policy boundary", () => {
   it("keeps all 42 existing tool declarations available", async () => {
     const listed = await harness.client.listTools();
-    expect(listed.tools).toHaveLength(42);
+    expect(listed.tools).toHaveLength(44);
   });
   it("preserves every pinned upstream tool input contract", async () => {
     const baseline = JSON.parse(
@@ -101,6 +101,25 @@ describe("stdio MCP policy boundary", () => {
       const tool = actual.get(original.name);
       expect(tool, original.name).toBeDefined();
       preservesSchema(tool!.inputSchema, original.inputSchema, original.name);
+    }
+  });
+  it("lists analysis as build-capable and denies it under read-only policy", async () => {
+    const listed = await harness.client.listTools();
+    for (const name of ["decode_backtrace", "size_report"]) {
+      expect(
+        listed.tools.find((tool) => tool.name === name)?.annotations
+          ?.readOnlyHint,
+      ).toBe(false);
+      const response = await harness.client.callTool({
+        name,
+        arguments: {
+          projectDir: project,
+          environment: "fixture",
+          ...(name === "decode_backtrace" ? { text: "PC: 0x08001234" } : {}),
+        },
+      });
+      expect(response.isError).toBe(true);
+      expect(JSON.stringify(response)).toContain("POLICY_DENIED");
     }
   });
   it("returns a denied result before creating a workspace execution ledger", async () => {
