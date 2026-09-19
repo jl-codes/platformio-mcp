@@ -66,6 +66,7 @@ import { mcpContext } from "./utils/mcp-context.js";
 import { addWorkspace } from "./utils/workspace-registry.js";
 
 // Import tool functions from feature modules
+import { executePackageAction, type PackageAction } from "./tools/packages.js";
 import { decodeBacktrace, firmwareSizeReport } from "./tools/analysis.js";
 import { getBoardInfo } from "./tools/boards.js";
 import {
@@ -197,6 +198,177 @@ const automationKeyInputSchema = {
  * exposed by this server.
  */
 const toolDefinitions: ToolDefinition[] = [
+  {
+    name: "pkg_search",
+    description:
+      "Search PlatformIO library, platform or tool registry packages by type and page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        query: {
+          type: "string",
+          minLength: 1,
+          maxLength: 4096,
+        },
+        kind: {
+          type: "string",
+          enum: ["library", "platform", "tool"],
+          default: "library",
+        },
+        page: {
+          type: "integer",
+          minimum: 1,
+          maximum: 100000,
+          default: 1,
+        },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pkg_install",
+    description:
+      "Install a library, platform or tool in a project and save dependencies through PlatformIO.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        projectDir: {
+          type: "string",
+          minLength: 1,
+        },
+        environment: {
+          type: "string",
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+        spec: {
+          type: "string",
+          minLength: 1,
+          maxLength: 4096,
+        },
+        kind: {
+          type: "string",
+          enum: ["library", "platform", "tool"],
+          default: "library",
+        },
+      },
+      required: ["projectDir", "spec"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pkg_uninstall",
+    description:
+      "Remove a library, platform or tool from a project and its declared dependencies.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        projectDir: {
+          type: "string",
+          minLength: 1,
+        },
+        environment: {
+          type: "string",
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+        spec: {
+          type: "string",
+          minLength: 1,
+          maxLength: 4096,
+        },
+        kind: {
+          type: "string",
+          enum: ["library", "platform", "tool"],
+          default: "library",
+        },
+      },
+      required: ["projectDir", "spec"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pkg_list",
+    description:
+      "List project packages and environments. Requires build permission because PlatformIO loads platform code.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        projectDir: {
+          type: "string",
+          minLength: 1,
+        },
+        environment: {
+          type: "string",
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pkg_outdated",
+    description:
+      "Report outdated project packages. Requires build permission because PlatformIO loads platform code.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        projectDir: {
+          type: "string",
+          minLength: 1,
+        },
+        environment: {
+          type: "string",
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pkg_update",
+    description:
+      "Update project dependencies within declared version constraints, with retained output and configuration change hashes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        projectDir: {
+          type: "string",
+          minLength: 1,
+        },
+        environment: {
+          type: "string",
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
   {
     name: "decode_backtrace",
     description:
@@ -1268,7 +1440,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   let commandRegistered = false;
 
   try {
-    if (name === "decode_backtrace" || name === "size_report") {
+    if (
+      name === "decode_backtrace" ||
+      name === "size_report" ||
+      name.startsWith("pkg_")
+    ) {
       const safeRequest = {
         projectDir: args.projectDir,
         environment: args.environment,
@@ -1300,16 +1476,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         () =>
           registeredTool.handler(args, {
             dispatch: async (tool, parameters) =>
-              tool === "decode_backtrace"
-                ? decodeBacktrace(parameters, caller, onAuthorized)
-                : firmwareSizeReport(parameters, caller, onAuthorized),
+              tool.startsWith("pkg_")
+                ? executePackageAction(
+                    tool as PackageAction,
+                    parameters,
+                    caller,
+                    onAuthorized,
+                  )
+                : tool === "decode_backtrace"
+                  ? decodeBacktrace(parameters, caller, onAuthorized)
+                  : firmwareSizeReport(parameters, caller, onAuthorized),
           }),
       );
       const response = createToolResult({
         success: result.ok,
         status: result.ok ? "completed" : "failed",
-        summary:
-          name === "size_report"
+        summary: name.startsWith("pkg_")
+          ? result.summary
+          : name === "size_report"
             ? "Firmware size report completed."
             : result.ok
               ? "Crash addresses decoded against the selected ELF."
@@ -1333,7 +1517,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         result.ok ? "success" : "error",
         activityId,
       );
-      return response;
+      return { ...response, ...(!result.ok ? { isError: true } : {}) };
     }
     const policyDecision = await authorizeAction(name, args, {
       workspaceDir: targetProjectDir,
@@ -2152,7 +2336,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (commandRegistered)
       portalEvents.emitActivity(
         name,
-        name === "decode_backtrace" || name === "size_report"
+        name === "decode_backtrace" ||
+          name === "size_report" ||
+          name.startsWith("pkg_")
           ? { projectDir: args.projectDir, environment: args.environment }
           : args,
         "error",

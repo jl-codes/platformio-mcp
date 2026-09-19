@@ -6,7 +6,7 @@ import { PlatformIOError } from "../../utils/errors.js";
  * Captures a policy revision, not an authorization grant. Each operation still needs authorization.
  * Invoke the returned check immediately before later effects and before returning sensitive results.
  */
-export function createPolicyRevisionGuard(workspaceDir: string): () => void {
+export function createPolicyRevisionGuard(workspaceDir?: string): () => void {
   const expected = loadEffectivePolicyState(workspaceDir).digest;
   return () => {
     if (loadEffectivePolicyState(workspaceDir).digest !== expected)

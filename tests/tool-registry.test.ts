@@ -7,6 +7,13 @@ import {
 } from "../src/mcp/tool-registry.js";
 
 const TOOL_NAMES = [
+  "pkg_search",
+  "pkg_install",
+  "pkg_uninstall",
+  "pkg_list",
+  "pkg_outdated",
+  "pkg_update",
+
   "decode_backtrace",
   "size_report",
   "list_boards",
@@ -65,7 +72,7 @@ describe("MCP tool registry", () => {
   it("assigns one complete contract and fixed-name handler to every tool", async () => {
     const registry = createToolRegistry<string>(definitions());
     const listed = listRegisteredTools(registry);
-    expect(listed).toHaveLength(44);
+    expect(listed).toHaveLength(50);
     expect(
       listed.every(
         (tool) =>

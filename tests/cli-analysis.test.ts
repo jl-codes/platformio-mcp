@@ -65,3 +65,32 @@ it("rejects invalid numeric report arguments before policy execution", () =>
   expect(run("size-report", "--top", "invalid").errorType).toBe(
     "InvalidArguments",
   ));
+
+it("routes modern package commands through the same policy before execution", () => {
+  for (const command of ["pkg-list", "pkg-outdated", "pkg-update"])
+    expect(run(command).errorType).toBe("PolicyDenied");
+  for (const command of ["pkg-install", "pkg-uninstall"])
+    expect(
+      run(command, "--spec", "owner/fixture@1", "--kind", "tool").errorType,
+    ).toBe("PolicyDenied");
+  expect(fs.existsSync(path.join(project, ".pio-mcp-packages.lock"))).toBe(
+    false,
+  );
+});
+it("rejects invalid package CLI arguments before invoking PlatformIO", () => {
+  expect(
+    run("pkg-search", "--query", "fixture", "--page", "invalid").errorType,
+  ).toBe("InvalidArguments");
+  expect(
+    run("pkg-install", "--spec", "fixture", "--kind", "invalid").errorType,
+  ).toBe("InvalidArguments");
+});
+
+it("does not silently ignore package scope-changing flags", () => {
+  expect(run("pkg-install", "--spec", "fixture", "--global").errorType).toBe(
+    "PACKAGE_INPUT_INVALID",
+  );
+  expect(run("pkg-update", "--spec", "fixture").errorType).toBe(
+    "PACKAGE_INPUT_INVALID",
+  );
+});

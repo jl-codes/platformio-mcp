@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { executePackageAction, type PackageAction } from "./tools/packages.js";
 import { decodeBacktrace, firmwareSizeReport } from "./tools/analysis.js";
 import { operationForCliCommand } from "./core/action-catalog.js";
 import {
@@ -105,6 +106,10 @@ COMMANDS:
   agent-board-report --project-dir <dir> --board <id>
   decode-backtrace --project-dir <dir> --environment <env> <--text <value>|--text-file <path>> [--include-all-hex]
   size-report --project-dir <dir> --environment <env> [--top <n>] [--filter <regex>]
+  pkg-search --query <query> [--kind library|platform|tool] [--page <n>]
+  pkg-install --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
+  pkg-uninstall --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
+  pkg-list|pkg-outdated|pkg-update --project-dir <dir> [--environment <env>]
   policy-status [--project-dir <dir>]
   policy-enroll --project-dir <dir>
   policy-revoke --project-dir <dir>
@@ -353,7 +358,11 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       printOutput(result, jsonMode);
       return;
     }
-    if (command === "decode-backtrace" || command === "size-report") {
+    if (
+      command === "decode-backtrace" ||
+      command === "size-report" ||
+      command.startsWith("pkg-")
+    ) {
       const scope = {
         projectDir: projectDirForPolicy,
         environment: asString(options.environment),
@@ -361,7 +370,58 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         expectedElfSha256: asString(options["expected-elf-sha256"]),
       };
       let parameters: Record<string, unknown>;
-      if (command === "decode-backtrace") {
+      if (command.startsWith("pkg-")) {
+        const allowed = new Set([
+          "json",
+          "approve",
+          "approval-id",
+          "project-dir",
+          "environment",
+          ...(command === "pkg-search"
+            ? ["query", "kind", "page"]
+            : command === "pkg-install" || command === "pkg-uninstall"
+              ? ["spec", "kind"]
+              : []),
+        ]);
+        if (
+          positionals.length ||
+          Object.keys(options).some((key) => !allowed.has(key))
+        )
+          throw new PlatformIOError(
+            "Unknown package option or positional argument.",
+            "PACKAGE_INPUT_INVALID",
+          );
+        const project = asString(options["project-dir"]);
+        if (command !== "pkg-search" && !project)
+          throw new PlatformIOError(
+            "Package commands require --project-dir.",
+            "PACKAGE_INPUT_INVALID",
+          );
+        parameters =
+          command === "pkg-search"
+            ? {
+                query: asString(options.query),
+                kind: asString(options.kind),
+                page:
+                  options.page === undefined
+                    ? undefined
+                    : typeof options.page === "string"
+                      ? Number(options.page)
+                      : NaN,
+                approvalId: scope.approvalId,
+              }
+            : {
+                projectDir: project,
+                environment: scope.environment,
+                approvalId: scope.approvalId,
+                ...(command === "pkg-install" || command === "pkg-uninstall"
+                  ? {
+                      spec: asString(options.spec),
+                      kind: asString(options.kind),
+                    }
+                  : {}),
+              };
+      } else if (command === "decode-backtrace") {
         const text = asString(options.text),
           file = asString(options["text-file"]);
         if ((text === undefined) === (file === undefined))
@@ -386,10 +446,22 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           filter: asString(options.filter),
         };
       const run = (args: Record<string, unknown>) =>
-        (command === "decode-backtrace" ? decodeBacktrace : firmwareSizeReport)(
-          args,
-          { actor: "user", actorClass: "interactive" },
-        );
+        command.startsWith("pkg-")
+          ? executePackageAction(
+              command.replace("pkg-", "pkg_") as PackageAction,
+              args,
+              {
+                actor: "user",
+                actorClass: "interactive",
+                workspaceDir: projectDirForPolicy,
+              },
+            )
+          : (command === "decode-backtrace"
+              ? decodeBacktrace
+              : firmwareSizeReport)(args, {
+              actor: "user",
+              actorClass: "interactive",
+            });
       let result;
       try {
         result = await run(parameters);
@@ -866,6 +938,13 @@ async function runCliCommand(command: string, rawArgs: string[]) {
     }
   } catch (error) {
     const stageMap: Record<string, string> = {
+      "pkg-search": "packages",
+      "pkg-install": "packages",
+      "pkg-uninstall": "packages",
+      "pkg-list": "packages",
+      "pkg-outdated": "packages",
+      "pkg-update": "packages",
+
       "decode-backtrace": "analysis",
       "size-report": "analysis",
       devices: "devices",
@@ -913,6 +992,13 @@ async function main() {
   const args = configurePolicyFileFromArgs(process.argv.slice(2));
   const command = args[0];
   const knownCommands = new Set([
+    "pkg-search",
+    "pkg-install",
+    "pkg-uninstall",
+    "pkg-list",
+    "pkg-outdated",
+    "pkg-update",
+
     "decode-backtrace",
     "size-report",
     "devices",

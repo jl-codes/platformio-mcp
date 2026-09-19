@@ -292,9 +292,21 @@
       "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
       "parameters": "spec: str, project_dir: str | None=None, env: str | None=None, type: str='library'",
       "returns": "dict[str, Any]",
-      "implementationStatus": "not_assessed_against_upstream",
-      "acceptanceStatus": "not_run",
-      "requirementId": "PAR-24"
+      "implementationStatus": "canonical_partial",
+      "acceptanceStatus": "windows_mcp_partial",
+      "requirementId": "PAR-24",
+      "evidence": [
+        "tests/packages.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/cli-analysis.test.ts",
+        "docs/reviews/package-mcp-windows-evidence.json"
+      ],
+      "remaining": [
+        "reference aliases and exact result adapters",
+        "default project resolution",
+        "dashboard integration",
+        "cross-platform acceptance"
+      ]
     },
     {
       "referenceTool": "pio_pkg_list",
@@ -304,9 +316,21 @@
       "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
       "parameters": "project_dir: str | None=None, env: str | None=None",
       "returns": "dict[str, Any]",
-      "implementationStatus": "not_assessed_against_upstream",
-      "acceptanceStatus": "not_run",
-      "requirementId": "PAR-25"
+      "implementationStatus": "canonical_partial",
+      "acceptanceStatus": "windows_mcp_partial",
+      "requirementId": "PAR-25",
+      "evidence": [
+        "tests/packages.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/cli-analysis.test.ts",
+        "docs/reviews/package-mcp-windows-evidence.json"
+      ],
+      "remaining": [
+        "reference aliases and exact result adapters",
+        "default project resolution",
+        "dashboard integration",
+        "cross-platform acceptance"
+      ]
     },
     {
       "referenceTool": "pio_pkg_outdated",
@@ -316,9 +340,21 @@
       "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
       "parameters": "project_dir: str | None=None, env: str | None=None",
       "returns": "dict[str, Any]",
-      "implementationStatus": "not_assessed_against_upstream",
-      "acceptanceStatus": "not_run",
-      "requirementId": "PAR-26"
+      "implementationStatus": "canonical_partial",
+      "acceptanceStatus": "windows_mcp_partial",
+      "requirementId": "PAR-26",
+      "evidence": [
+        "tests/packages.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/cli-analysis.test.ts",
+        "docs/reviews/package-mcp-windows-evidence.json"
+      ],
+      "remaining": [
+        "reference aliases and exact result adapters",
+        "default project resolution",
+        "dashboard integration",
+        "cross-platform acceptance"
+      ]
     },
     {
       "referenceTool": "pio_pkg_search",
@@ -328,9 +364,21 @@
       "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
       "parameters": "query: str, type: str='library', page: int=1",
       "returns": "dict[str, Any]",
-      "implementationStatus": "not_assessed_against_upstream",
-      "acceptanceStatus": "not_run",
-      "requirementId": "PAR-27"
+      "implementationStatus": "canonical_partial",
+      "acceptanceStatus": "windows_mcp_partial",
+      "requirementId": "PAR-27",
+      "evidence": [
+        "tests/packages.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/cli-analysis.test.ts",
+        "docs/reviews/package-mcp-windows-evidence.json"
+      ],
+      "remaining": [
+        "reference aliases and exact result adapters",
+        "default project resolution",
+        "dashboard integration",
+        "cross-platform acceptance"
+      ]
     },
     {
       "referenceTool": "pio_pkg_uninstall",
@@ -340,9 +388,21 @@
       "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
       "parameters": "spec: str, project_dir: str | None=None, env: str | None=None, type: str='library'",
       "returns": "dict[str, Any]",
-      "implementationStatus": "not_assessed_against_upstream",
-      "acceptanceStatus": "not_run",
-      "requirementId": "PAR-28"
+      "implementationStatus": "canonical_partial",
+      "acceptanceStatus": "windows_mcp_partial",
+      "requirementId": "PAR-28",
+      "evidence": [
+        "tests/packages.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/cli-analysis.test.ts",
+        "docs/reviews/package-mcp-windows-evidence.json"
+      ],
+      "remaining": [
+        "reference aliases and exact result adapters",
+        "default project resolution",
+        "dashboard integration",
+        "cross-platform acceptance"
+      ]
     },
     {
       "referenceTool": "pio_pkg_update",
@@ -352,9 +412,21 @@
       "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
       "parameters": "project_dir: str | None=None, env: str | None=None",
       "returns": "dict[str, Any]",
-      "implementationStatus": "not_assessed_against_upstream",
-      "acceptanceStatus": "not_run",
-      "requirementId": "PAR-29"
+      "implementationStatus": "canonical_partial",
+      "acceptanceStatus": "windows_mcp_partial",
+      "requirementId": "PAR-29",
+      "evidence": [
+        "tests/packages.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/cli-analysis.test.ts",
+        "docs/reviews/package-mcp-windows-evidence.json"
+      ],
+      "remaining": [
+        "reference aliases and exact result adapters",
+        "default project resolution",
+        "dashboard integration",
+        "cross-platform acceptance"
+      ]
     },
     {
       "referenceTool": "pio_port_diagnose",

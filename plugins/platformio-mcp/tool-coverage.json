@@ -85,6 +85,12 @@
     "uninstall_library": ["pio-manager", "platformio-debug"],
     "update_library": ["pio-manager", "platformio-debug"],
     "decode_backtrace": ["serial-diagnostics", "platformio-debug"],
-    "size_report": ["platformio-debug"]
+    "size_report": ["platformio-debug"],
+    "pkg_search": ["pio-manager", "platformio-debug"],
+    "pkg_install": ["pio-manager", "platformio-debug"],
+    "pkg_uninstall": ["pio-manager", "platformio-debug"],
+    "pkg_list": ["pio-manager", "platformio-debug"],
+    "pkg_outdated": ["pio-manager", "platformio-debug"],
+    "pkg_update": ["pio-manager", "platformio-debug"]
   }
 }

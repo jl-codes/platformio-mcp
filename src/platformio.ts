@@ -48,6 +48,7 @@ export async function execPioCommand(
     cwd?: string;
     timeout?: number;
     parseJson?: boolean;
+    env?: NodeJS.ProcessEnv;
     onOutput?: (chunk: string) => void;
   } = {},
 ): Promise<CommandResult> {
@@ -62,6 +63,7 @@ export async function execPioCommand(
         args,
         {
           cwd: options.cwd,
+          env: options.env,
           timeout,
           maxBuffer: 10 * 1024 * 1024,
         },
@@ -233,6 +235,7 @@ export class PlatformIOExecutor {
     options?: {
       cwd?: string;
       timeout?: number;
+      env?: NodeJS.ProcessEnv;
       onOutput?: (c: string) => void;
     },
   ): Promise<CommandResult> {

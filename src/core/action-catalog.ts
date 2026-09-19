@@ -1,7 +1,7 @@
 /**
  * Shared action identity and safety catalog.
  * Provides MCP_ACTIONS, actionRiskLevels and policyActionForCliCommand.
- * This catalog contains implemented legacy actions only, never planned tools.
+ * This catalog contains implemented actions only, never planned tools.
  */
 import type { PolicyRiskLevel } from "./policy/types.js";
 
@@ -25,6 +25,55 @@ const READ: ActionSafetyMetadata = {
 
 /** Existing callable MCP actions; additions require matching registered handlers. */
 export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  pkg_search: {
+    policyAction: "search_libraries",
+    riskLevel: "low",
+    readOnly: true,
+    destructive: false,
+    idempotent: true,
+    openWorld: true,
+  },
+  pkg_install: {
+    policyAction: "install_library",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true,
+  },
+  pkg_uninstall: {
+    policyAction: "uninstall_library",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: true,
+    idempotent: false,
+    openWorld: true,
+  },
+  pkg_list: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true,
+  },
+  pkg_outdated: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true,
+  },
+  pkg_update: {
+    policyAction: "update_library",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: true,
+    idempotent: false,
+    openWorld: true,
+  },
+
   decode_backtrace: {
     policyAction: "build_project",
     riskLevel: "medium",
@@ -223,6 +272,19 @@ export const actionRiskLevels: Record<string, PolicyRiskLevel> = {
 /** Resolves the existing CLI spelling to its concrete operation. */
 export function operationForCliCommand(command: string): string {
   switch (command) {
+    case "pkg-search":
+      return "pkg_search";
+    case "pkg-install":
+      return "pkg_install";
+    case "pkg-uninstall":
+      return "pkg_uninstall";
+    case "pkg-list":
+      return "pkg_list";
+    case "pkg-outdated":
+      return "pkg_outdated";
+    case "pkg-update":
+      return "pkg_update";
+
     case "decode-backtrace":
       return "decode_backtrace";
     case "size-report":

@@ -144,7 +144,7 @@ describeBundledRuntime("bundled Codex plugin runtime", () => {
         throw new Error(`${message}\nPackaged server stderr:\n${stderr}`);
       });
       const result = await client.listTools();
-      expect(result.tools).toHaveLength(44);
+      expect(result.tools).toHaveLength(50);
       expect(
         result.tools.every(
           (tool) =>

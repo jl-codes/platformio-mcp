@@ -80,7 +80,7 @@ function preservesSchema(actual: any, baseline: any, location: string): void {
 describe("stdio MCP policy boundary", () => {
   it("keeps all 42 existing tool declarations available", async () => {
     const listed = await harness.client.listTools();
-    expect(listed.tools).toHaveLength(44);
+    expect(listed.tools).toHaveLength(50);
   });
   it("preserves every pinned upstream tool input contract", async () => {
     const baseline = JSON.parse(
@@ -116,6 +116,33 @@ describe("stdio MCP policy boundary", () => {
           projectDir: project,
           environment: "fixture",
           ...(name === "decode_backtrace" ? { text: "PC: 0x08001234" } : {}),
+        },
+      });
+      expect(response.isError).toBe(true);
+      expect(JSON.stringify(response)).toContain("POLICY_DENIED");
+    }
+  });
+  it("registers all modern package operations and denies project effects under read-only policy", async () => {
+    const listed = await harness.client.listTools();
+    for (const name of [
+      "pkg_install",
+      "pkg_uninstall",
+      "pkg_update",
+      "pkg_list",
+      "pkg_outdated",
+    ]) {
+      expect(
+        listed.tools.find((tool) => tool.name === name)?.annotations
+          ?.readOnlyHint,
+      ).toBe(false);
+      const response = await harness.client.callTool({
+        name,
+        arguments: {
+          projectDir: project,
+          environment: "fixture",
+          ...(name === "pkg_install" || name === "pkg_uninstall"
+            ? { spec: "owner/fixture@1" }
+            : {}),
         },
       });
       expect(response.isError).toBe(true);
