@@ -108,6 +108,60 @@ describe("owned serial sessions", () => {
     f.manager.forget(f.owner, started.sessionId);
     expect(f.manager.list(f.owner)).toEqual([]);
   });
+  it("rechecks endpoint identity after asynchronous backend loading and releases without opening on replacement", async () => {
+    const f = fixture();
+    const request = f.request();
+    let changed = false;
+    const revalidate = vi.fn(() => {
+      if (changed)
+        throw new PlatformIOError(
+          "Endpoint replaced.",
+          "SERIAL_ENDPOINT_CHANGED",
+        );
+    });
+    const original = f.transport.getMockImplementation()!;
+    f.transport.mockImplementationOnce(async (...args) => {
+      const transport = await original(...args);
+      changed = true;
+      return transport;
+    });
+    await expect(
+      f.manager.start(f.owner, { ...request, revalidateEndpoint: revalidate }),
+    ).rejects.toMatchObject({
+      code: "SERIAL_ENDPOINT_CHANGED",
+      context: { cleanupPending: false },
+    });
+    expect(revalidate).toHaveBeenCalledTimes(2);
+    expect(f.ports.get(request.path)?.isOpen).toBe(false);
+    const lease = f.leases.acquire(request.resource);
+    f.leases.release(lease);
+  });
+
+  it("closes an opened transport when endpoint revalidation detects replacement after open", async () => {
+    const f = fixture();
+    const request = f.request();
+    let checks = 0;
+    await expect(
+      f.manager.start(f.owner, {
+        ...request,
+        revalidateEndpoint: () => {
+          if (++checks === 3)
+            throw new PlatformIOError(
+              "Endpoint replaced.",
+              "SERIAL_ENDPOINT_CHANGED",
+            );
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "SERIAL_ENDPOINT_CHANGED",
+      context: { cleanupPending: false },
+    });
+    expect(checks).toBe(3);
+    expect(f.ports.get(request.path)?.isOpen).toBe(false);
+    const lease = f.leases.acquire(request.resource);
+    f.leases.release(lease);
+  });
+
   it("never accepts a guessed session ID or copied owner object as authority", async () => {
     const f = fixture();
     const started = await f.manager.start(f.owner, f.request());

@@ -27,3 +27,9 @@ The manager admits at most eight starting/live/cleanup-pending sessions. It reta
 Software tests use the maintained SerialPort mock stream and real temporary lease files. They cover owner isolation, UTF-8 echo, exclusive leases, policy changes, payload mutation, retained reads, cancelled startup, one-shot failure cleanup, delayed native closure, failed lease release and bounded retention. Real-policy tests additionally exercise read-only/build-only/monitor-only profiles, exact byte/baud approval binding, one-use consumption, concrete denies, source changes and invalid-policy cleanup. No physical device was opened.
 
 Physical alias/re-enumeration resolution, legacy monitor/upload migration, public dispatcher wiring, canonical and reference tool adapters, output redaction, plugin/wheel native packaging and real-device acceptance remain required before exposing this service. Existing PlatformIO monitor filters continue through the legacy monitor path; they are not silently interpreted by direct mode.
+
+## Endpoint-aware startup
+
+The internal `startEndpoint` entry point resolves OS aliases, supplies the canonical path and lease key, and retains a revalidation callback for the original selection. Startup checks endpoint metadata before acquiring its lease, immediately before opening after asynchronous backend loading, and after opening. A detected replacement takes the ordinary confirmed-close cleanup path. Endpoint metadata is not physical-board identity and cannot eliminate the race inside the operating system's native open operation; trusted discovery and device-specific identity verification remain required.
+
+The lower-level `start` entry point remains an internal adapter interface for verified physical resource identities. Its optional revalidation callback is executable trusted code, never a public tool parameter. Read access to retained buffers and owned cleanup do not depend on the endpoint still being present.

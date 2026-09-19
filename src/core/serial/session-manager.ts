@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
+import { resolveSerialEndpoint } from "../devices/serial-endpoint.js";
 import { PlatformIOError } from "../../utils/errors.js";
 import {
   DeviceLeaseStore,
@@ -35,6 +36,8 @@ export interface SerialSessionRequest extends DirectSerialOptions {
   projectDir: string;
   resource: DeviceResource;
   buffer?: SerialBufferLimits;
+  /** Trusted adapter guard; never accepted from public JSON arguments. */
+  revalidateEndpoint?: () => void;
 }
 /** Authorization binds concrete session/request details without putting raw serial commands in metadata. */
 export interface SerialSessionAuthorization {
@@ -113,6 +116,20 @@ export class SerialSessionManager {
     return owner;
   }
 
+  /** Resolve OS endpoint aliases before authorization; this does not establish physical board identity. */
+  async startEndpoint(
+    owner: SerialSessionOwner,
+    input: Omit<SerialSessionRequest, "resource" | "revalidateEndpoint">,
+  ): Promise<SerialSessionInfo> {
+    const endpoint = resolveSerialEndpoint(input.path);
+    return this.start(owner, {
+      ...input,
+      path: endpoint.canonicalPort,
+      resource: endpoint.resource,
+      revalidateEndpoint: () => endpoint.revalidate(),
+    });
+  }
+
   /** Authorize, acquire ownership, construct an unopened transport, revalidate, then open explicitly. */
   async start(
     owner: SerialSessionOwner,
@@ -152,6 +169,7 @@ export class SerialSessionManager {
       confirmedClosed: false,
       request: {
         path: input.path,
+        revalidateEndpoint: input.revalidateEndpoint,
         baudRate: input.baudRate,
         operationTimeoutMs: input.operationTimeoutMs ?? 5000,
         buffer: Object.freeze({
@@ -173,6 +191,7 @@ export class SerialSessionManager {
       const guard = await this.authorize(session, "start");
       this.ensureNotStopped(session);
       guard();
+      session.request.revalidateEndpoint?.();
       session.lease = this.leases.acquire(session.request.resource);
       session.transport = await this.makeTransport(session.request, (bytes) =>
         session.buffer.append(bytes),
@@ -189,9 +208,11 @@ export class SerialSessionManager {
       });
       this.ensureNotStopped(session);
       guard();
+      session.request.revalidateEndpoint?.();
       await session.transport.open();
       this.ensureNotStopped(session);
       guard();
+      session.request.revalidateEndpoint?.();
       session.startPending = false;
       this.markEnded(session);
       return this.info(session);
