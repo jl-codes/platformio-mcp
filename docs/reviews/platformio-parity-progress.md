@@ -84,3 +84,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Rejected inconsistent/multiple-image totals and unsafe numeric sizes. Source grouping respects path boundaries and does not misattribute sibling directories.
 - Validation: 18 analysis tests passed across size, crash and ELF identity modules; TypeScript and focused lint passed.
 - Remaining analysis acceptance is unchanged: these fixtures do not establish ELF load-segment accounting, partition capacity, real toolchain execution or physical firmware identity. The public size-report/decoder tools are not yet registered.
+
+## Analysis execution and toolchain selection milestone
+
+- Added bounded native analysis execution with no shell, literal argument arrays, finite timeout/output limits, cancellation, deterministic locale and typed failures. Failed/truncated output cannot be mistaken for a successful report.
+- Added compiler-companion resolution restricted to explicit trusted installation roots, real-path containment and exact matching GNU utility prefixes. Missing tools are reported rather than replaced by a heuristic selection from another installation.
+- Verification: 28 tests passed across five analysis modules. Process tests execute Node fixtures only; resolver fixtures are never executed. TypeScript validation passed.
+- Next: connect these components to immutable artifact snapshots and report engines; integrate selected-environment metadata, artifact manifests, canonical/compatibility interfaces and real toolchain fixtures. Trusted roots must be supplied by host/package discovery, never accepted directly from tool-call arguments.
