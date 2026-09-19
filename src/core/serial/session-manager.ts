@@ -35,6 +35,7 @@ export interface SerialSessionOwner {
 export interface SerialSessionRequest extends DirectSerialOptions {
   projectDir: string;
   resource: DeviceResource;
+  additionalResources?: readonly DeviceResource[]; // Trusted additional identity scopes, at most two.
   buffer?: SerialBufferLimits;
   /** Trusted adapter guard; never accepted from public JSON arguments. */
   revalidateEndpoint?: () => void;
@@ -45,6 +46,7 @@ export interface SerialSessionAuthorization {
   sessionId?: string;
   projectDir: string;
   resource: Readonly<DeviceResource>;
+  additionalResources?: readonly Readonly<DeviceResource>[];
   path: string;
   baudRate: number;
   operationTimeoutMs: number;
@@ -84,7 +86,7 @@ interface Session {
   stopRequested: boolean;
   confirmedClosed: boolean;
   transport?: DirectSerialTransport;
-  lease?: DeviceLease;
+  leases: DeviceLease[];
   cleanupError?: string;
 }
 
@@ -148,6 +150,30 @@ export class SerialSessionManager {
         "Serial project directory is not a directory.",
         "SERIAL_PROJECT_INVALID",
       );
+    if (
+      input.additionalResources !== undefined &&
+      (!Array.isArray(input.additionalResources) ||
+        input.additionalResources.length > 2)
+    )
+      throw new PlatformIOError(
+        "Too many serial identity scopes.",
+        "SERIAL_RESOURCE_INVALID",
+      );
+    const additionalResources = Object.freeze(
+      (input.additionalResources ?? []).map((resource) =>
+        Object.freeze({ kind: resource.kind, identity: resource.identity }),
+      ),
+    );
+    const resources = [input.resource, ...additionalResources];
+    if (
+      resources.some((resource) => resource.kind !== "serial") ||
+      new Set(resources.map((resource) => resource.identity)).size !==
+        resources.length
+    )
+      throw new PlatformIOError(
+        "Serial identity scopes must be distinct serial resources.",
+        "SERIAL_RESOURCE_INVALID",
+      );
     const buffer = new SerialSessionBuffer(input.buffer);
     this.prune();
     if (
@@ -167,6 +193,7 @@ export class SerialSessionManager {
       startPending: true,
       stopRequested: false,
       confirmedClosed: false,
+      leases: [],
       request: {
         path: input.path,
         revalidateEndpoint: input.revalidateEndpoint,
@@ -180,6 +207,7 @@ export class SerialSessionManager {
             Math.min(16384, input.buffer?.maxBytes ?? 1048576),
         }),
         projectDir,
+        additionalResources,
         resource: Object.freeze({
           kind: input.resource.kind,
           identity: input.resource.identity,
@@ -192,7 +220,12 @@ export class SerialSessionManager {
       this.ensureNotStopped(session);
       guard();
       session.request.revalidateEndpoint?.();
-      session.lease = this.leases.acquire(session.request.resource);
+      // Acquisition never waits: any contention rolls back the already-acquired scopes before opening.
+      for (const resource of [
+        session.request.resource,
+        ...additionalResources,
+      ].sort((a, b) => a.identity.localeCompare(b.identity)))
+        session.leases.push(this.leases.acquire(resource));
       session.transport = await this.makeTransport(session.request, (bytes) =>
         session.buffer.append(bytes),
       );
@@ -240,7 +273,7 @@ export class SerialSessionManager {
         {
           ...(error instanceof PlatformIOError ? error.context : {}),
           sessionId: session.id,
-          cleanupPending: !!session.lease,
+          cleanupPending: session.leases.length > 0,
         },
       );
     } finally {
@@ -377,6 +410,9 @@ export class SerialSessionManager {
         bufferLimits: request.buffer as Required<SerialBufferLimits>,
         projectDir: request.projectDir,
         resource: request.resource,
+        ...(request.additionalResources?.length
+          ? { additionalResources: request.additionalResources }
+          : {}),
         path: request.path,
         baudRate: request.baudRate,
         ...(bytes
@@ -422,23 +458,23 @@ export class SerialSessionManager {
 
   private releaseLease(session: Session): void {
     if (!session.confirmedClosed) return;
-    if (!session.lease) {
-      session.cleanupError = undefined;
-      this.markEnded(session);
-      return;
+    const pending: DeviceLease[] = [];
+    for (const lease of session.leases) {
+      try {
+        this.leases.release(lease);
+      } catch {
+        pending.push(lease);
+      }
     }
-    try {
-      this.leases.release(session.lease);
-      session.lease = undefined;
-      session.cleanupError = undefined;
-    } catch {
-      session.cleanupError = "SERIAL_LEASE_RELEASE_FAILED";
-    }
+    session.leases = pending;
+    session.cleanupError = pending.length
+      ? "SERIAL_LEASE_RELEASE_FAILED"
+      : undefined;
     this.markEnded(session);
   }
 
   private cleanupPending(session: Session): boolean {
-    return session.startPending || !!session.lease;
+    return session.startPending || session.leases.length > 0;
   }
   private markEnded(session: Session): void {
     if (!this.cleanupPending(session)) {

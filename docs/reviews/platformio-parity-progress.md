@@ -316,3 +316,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added a bounded internal binding between canonical endpoint identity and optional structured USB descriptors. It rejects conflicting aliases and duplicate USB descriptors across endpoints, labels descriptor absence, and requires selection/authorization again after identity changes or port movement. No automatic reconnect or physical authenticity is claimed.
 - TypeScript and 20 endpoint/discovery tests passed. New tests cover case normalization, serial-number changes, duplicate descriptors, conflicting alias metadata, re-enumeration refusal and malformed/oversized input. No device enumeration or port opening was performed.
 - Native discovery and dual endpoint/USB lease acquisition still need integration before public serial exposure. The PR remains draft with the full parity and publication goal active.
+
+## Combined serial ownership scopes
+
+- Session startup now accepts bounded trusted additional identity scopes, snapshots them before authorization, binds all scopes to approval arguments and the target digest, and acquires each before transport construction. Contention rolls back prior acquisitions without opening a port. Cleanup retains only failed lease releases for owned retry.
+- TypeScript and 29 session/policy tests passed, including simultaneous endpoint/USB exclusion, rollback on a second busy scope and partial release retry without replaying successful release capabilities. These tests use temporary leases and mock serial transports. Native discovery integration, legacy migration and physical acceptance remain open.

@@ -93,7 +93,13 @@ export class PolicySerialSessionService {
         devicePort: request.path,
         targetBindingDigest: createHash("sha256")
           .update(
-            JSON.stringify([request.resource.kind, request.resource.identity]),
+            JSON.stringify([
+              [request.resource.kind, request.resource.identity],
+              ...(request.additionalResources ?? []).map((resource) => [
+                resource.kind,
+                resource.identity,
+              ]),
+            ]),
           )
           .digest("hex"),
       },

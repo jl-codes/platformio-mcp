@@ -33,3 +33,9 @@ Physical alias/re-enumeration resolution, legacy monitor/upload migration, publi
 The internal `startEndpoint` entry point resolves OS aliases, supplies the canonical path and lease key, and retains a revalidation callback for the original selection. Startup checks endpoint metadata before acquiring its lease, immediately before opening after asynchronous backend loading, and after opening. A detected replacement takes the ordinary confirmed-close cleanup path. Endpoint metadata is not physical-board identity and cannot eliminate the race inside the operating system's native open operation; trusted discovery and device-specific identity verification remain required.
 
 The lower-level `start` entry point remains an internal adapter interface for verified physical resource identities. Its optional revalidation callback is executable trusted code, never a public tool parameter. Read access to retained buffers and owned cleanup do not depend on the endpoint still being present.
+
+## Multiple identity scopes
+
+Trusted adapters may supply up to two additional distinct serial resource identities alongside the primary endpoint identity. The manager snapshots these scopes before authorization, includes them in authorization arguments and the policy target digest, and acquires them in sorted order before constructing a transport. Acquisition never waits: contention triggers rollback through the normal cleanup path, with no port opened. This is coordinated acquisition, not a filesystem-wide atomic transaction.
+
+After confirmed closure, each acquired lease is released independently. Only failed releases remain for owner cleanup retry; successful capabilities are not replayed. Capacity and cleanup status account for every retained lease. The discovery adapter must still supply verified USB scopes, and legacy monitor/upload paths still require migration to this shared domain.

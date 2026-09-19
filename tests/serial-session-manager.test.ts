@@ -162,6 +162,68 @@ describe("owned serial sessions", () => {
     f.leases.release(lease);
   });
 
+  it("holds endpoint and USB scopes together and releases both after confirmed closure", async () => {
+    const f = fixture();
+    const request = f.request();
+    const usb = { kind: "serial" as const, identity: "usb:fixture" };
+    const session = await f.manager.start(f.owner, {
+      ...request,
+      additionalResources: [usb],
+    });
+    for (const resource of [request.resource, usb])
+      expect(() => f.leases.acquire(resource)).toThrow(
+        expect.objectContaining({ code: "DEVICE_BUSY" }),
+      );
+    await f.manager.stop(f.owner, session.sessionId);
+    for (const resource of [request.resource, usb])
+      f.leases.release(f.leases.acquire(resource));
+  });
+  it("rolls back acquired scopes without opening when a later identity scope is busy", async () => {
+    const f = fixture();
+    const request = {
+      ...f.request(),
+      resource: { kind: "serial" as const, identity: "a:endpoint" },
+    };
+    const usb = { kind: "serial" as const, identity: "z:usb" };
+    const held = f.leases.acquire(usb);
+    try {
+      await expect(
+        f.manager.start(f.owner, { ...request, additionalResources: [usb] }),
+      ).rejects.toMatchObject({
+        code: "DEVICE_BUSY",
+        context: { cleanupPending: false },
+      });
+      expect(f.transport).not.toHaveBeenCalled();
+      f.leases.release(f.leases.acquire(request.resource));
+    } finally {
+      f.leases.release(held);
+    }
+  });
+
+  it("retains only failed lease releases for owned cleanup retry", async () => {
+    const f = fixture();
+    const request = f.request();
+    const usb = { kind: "serial" as const, identity: "usb:retry" };
+    const session = await f.manager.start(f.owner, {
+      ...request,
+      additionalResources: [usb],
+    });
+    const release = f.leases.release.bind(f.leases);
+    const spy = vi
+      .spyOn(f.leases, "release")
+      .mockImplementationOnce(() => {
+        throw new Error("temporary failure");
+      })
+      .mockImplementation(release);
+    await f.manager.stop(f.owner, session.sessionId);
+    // confirmedClosed cleanup and stop may each attempt release; all successful handles must be dropped.
+    const after = await f.manager.stop(f.owner, session.sessionId);
+    expect(after.cleanupPending).toBe(false);
+    expect(spy.mock.calls.length).toBe(3);
+    for (const resource of [request.resource, usb])
+      f.leases.release(f.leases.acquire(resource));
+  });
+
   it("never accepts a guessed session ID or copied owner object as authority", async () => {
     const f = fixture();
     const started = await f.manager.start(f.owner, f.request());
