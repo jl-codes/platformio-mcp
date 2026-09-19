@@ -481,3 +481,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Inventory collection now requires an explicit caller authorization assertion and invokes it for requested/canonical roots, library entries, manifest boundaries/read chunks and final return. A revoked authorization propagates even inside recoverable manifest-error handling.
 - TypeScript compilation and 16 dependency tests passed, including denial before root access and revocation after manifest open. The hook is not itself a policy grant: the forthcoming canonical service must supply the evaluated scope/revision checks. Public integration remains incomplete.
+
+### Authorized dependency service
+
+- Connected resolved configuration, scoped inventory and optional build through separate canonical authorization stages with distinct approval IDs. Inventory checks policy revision and resolved root containment; build uses an explicit dependency-build action mapped to build permission.
+- Incomplete inventory prevents a successful report. Build evidence includes exit status, duration and bounded redacted tail. LDF graph is explicitly `not_collected`, so full reference parity is not claimed.
+- TypeScript compilation and 19 dependency tests pass, including real read-only policy, no implicit build, explicit build denial before subprocess execution and malformed inventory failure.
+- Service remains internal pending build graph parsing, public MCP/CLI/compatibility integration and broader acceptance. No actual PlatformIO build or deployment was performed.

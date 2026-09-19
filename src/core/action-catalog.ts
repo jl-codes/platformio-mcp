@@ -283,6 +283,11 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
 
 /** Implemented internal service actions; these are not advertised as MCP tools. */
 export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  dependency_inventory: { ...READ, policyAction: "get_project_config" },
+  dependency_build: {
+    ...MCP_ACTIONS.build_project,
+    policyAction: "build_project",
+  },
   serial_startup_discovery: { ...READ, policyAction: "list_devices" },
   serial_session_start: {
     ...MCP_ACTIONS.start_monitor,
