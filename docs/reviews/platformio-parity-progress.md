@@ -457,3 +457,9 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Duplicate library names do not establish a winner or an unambiguous cycle edge. Version constraints are not described as exact reproducible pins. Manifest cycles do not claim an observed build recursion failure.
 - TypeScript compilation and four tests pass, including a 2000-node chain, self-cycle, duplicate identities and oversized graph rejection.
 - Not yet exposed: filesystem inventory, declaration/manifest parsing, optional authorized build/LDF evidence, canonical MCP/CLI registration and compatibility adapter remain required for PAR-07. No hardware or package execution/publication occurred.
+
+### Dependency manifest parsing
+
+- Added bounded declaration parsing and JSON/Arduino manifest extraction. Registry constraints are distinguished from opaque local/VCS/archive sources; malformed evidence is rejected rather than converted into a successful empty manifest.
+- Limits: 4096-character declarations, 1 MiB manifests, 512 dependencies per manifest, bounded names/versions. Arduino duplicate relevant fields and malformed constraints fail explicitly.
+- TypeScript compilation and ten dependency parser/audit tests pass. Filesystem inventory, canonical authorization/registration, optional build evidence, and compatibility integration remain open.
