@@ -85,7 +85,7 @@ export class PolicySerialSessionService {
       "resource" | "additionalResources" | "revalidateEndpoint"
     >,
   ) {
-    this.sessions.list(owner);
+    const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
     if (!path.isAbsolute(input.projectDir))
       throw new PlatformIOError(
@@ -109,6 +109,7 @@ export class PolicySerialSessionService {
       { ...request, snapshots: 4, approvalId: context.discoveryApprovalId },
       { ...context.caller, workspaceDir: request.projectDir },
       async () => {
+        checkOwner();
         guard();
         const batch = {
           projectDir: request.projectDir,

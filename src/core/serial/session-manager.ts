@@ -124,6 +124,20 @@ export class SerialSessionManager {
     return owner;
   }
 
+  /** Capture owner cleanup before asynchronous adapter authorization starts. */
+  createStartupGuard(owner: SerialSessionOwner): () => void {
+    this.requireOwner(owner);
+    const generation = this.ownerStops.get(owner) ?? 0;
+    return () => {
+      this.requireOwner(owner);
+      if ((this.ownerStops.get(owner) ?? 0) !== generation)
+        throw new PlatformIOError(
+          "Serial startup was stopped.",
+          "SERIAL_CLOSED",
+        );
+    };
+  }
+
   /** Resolve OS endpoint aliases before authorization; this does not establish physical board identity. */
   async startEndpoint(
     owner: SerialSessionOwner,

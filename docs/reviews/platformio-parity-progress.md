@@ -354,3 +354,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Added internal serial_startup_discovery mapped to list_devices and connected PolicySerialSessionService.startWithDiscovery to native enumeration, identity binding, combined leases and existing open authorization. Its exact-request approval is consumed once for at most four snapshots within 30 seconds; private request context and revision checks prevent reuse after startup finishes. Session-open grants remain separate.
 - TypeScript and 42 session/policy/native-provider tests passed, including approval-required composite startup completing all four snapshots and replay rejection before another enumeration. Rebuilt plugin runtime; plugin validation and 14 plugin tests passed. Public tool exposure, legacy exclusion and physical acceptance remain open.
+
+## Cancellation across composite authorization
+
+- Added an owner startup guard captured before composite policy authorization. Owner cleanup during that asynchronous boundary now prevents discovery and transport construction, closing the gap before the manager's discovery reservation exists.
+- TypeScript and 39 manager/policy tests passed, including immediate owner cleanup during actual composite dispatch and rejection of standalone list_devices grants for startup discovery. Public adapters, native packaging and the full remaining parity/acceptance/release scope remain open.

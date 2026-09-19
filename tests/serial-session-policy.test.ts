@@ -350,3 +350,49 @@ it("authorizes bounded startup discovery once without replaying a list_devices g
   await approval(start(id));
   expect(list).toHaveBeenCalledTimes(4);
 });
+
+it("does not begin discovery after owner cleanup during composite authorization", async () => {
+  const list = vi.fn(async () => [{ path: "COM44" }]);
+  const f = fixture({
+    discoveryLoad: async () => ({ list }),
+    resolveEndpoint: (port) =>
+      resolveSerialEndpoint(port, { platform: "win32" }),
+  });
+  const pending = f.service.run({}, () =>
+    f.service.startWithDiscovery(f.owner, {
+      projectDir: f.projectDir,
+      path: "COM44",
+      baudRate: 115200,
+    }),
+  );
+  await f.service.sessions.stopAll(f.owner);
+  await expect(pending).rejects.toMatchObject({ code: "SERIAL_CLOSED" });
+  expect(list).not.toHaveBeenCalled();
+  expect(f.transport).not.toHaveBeenCalled();
+});
+it("does not accept a standalone enumeration grant for composite startup", async () => {
+  const list = vi.fn(async () => [{ path: "COM44" }]);
+  const f = fixture({
+    discoveryLoad: async () => ({ list }),
+    resolveEndpoint: (port) =>
+      resolveSerialEndpoint(port, { platform: "win32" }),
+  });
+  f.policy({
+    profile: "flash_requires_approval",
+    overrides: { approval_required: ["list_devices"] },
+  });
+  const id = await approval(
+    f.service.run({}, () => f.service.listSerialDevices(f.projectDir)),
+  );
+  approveRequest(id);
+  await approval(
+    f.service.run({ discoveryApprovalId: id }, () =>
+      f.service.startWithDiscovery(f.owner, {
+        projectDir: f.projectDir,
+        path: "COM44",
+        baudRate: 115200,
+      }),
+    ),
+  );
+  expect(list).not.toHaveBeenCalled();
+});
