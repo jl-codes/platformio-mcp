@@ -476,3 +476,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Canonical environment inspection now additionally retains resolved library extra directories, dependency-finder mode and compatibility mode. Added internal audit input selection honoring explicit/default environments and configured lib_dir/libdeps_dir instead of hard-coded locations. Returned roots require subsequent authorization.
 - Invalid environment path components and malformed directory/list settings are rejected. Commas in paths are preserved.
 - TypeScript compilation, 18 configuration/project/compatibility tests, plugin validation and three npm archive validations passed. Runtime rebuilt for additive configuration fields. Public dependency execution/authorization and optional build evidence remain open.
+
+### Dependency collection authorization hooks
+
+- Inventory collection now requires an explicit caller authorization assertion and invokes it for requested/canonical roots, library entries, manifest boundaries/read chunks and final return. A revoked authorization propagates even inside recoverable manifest-error handling.
+- TypeScript compilation and 16 dependency tests passed, including denial before root access and revocation after manifest open. The hook is not itself a policy grant: the forthcoming canonical service must supply the evaluated scope/revision checks. Public integration remains incomplete.

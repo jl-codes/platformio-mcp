@@ -22,10 +22,13 @@ it("collects preferred JSON and properties, deduplicates roots and reports incom
       path.join(root, "Broken", "library.properties"),
       "name=Hidden fallback",
     );
-    const result = await collectDependencyInventory([
-      { directory: root, source: "lib" },
-      { directory: root, source: "extra" },
-    ]);
+    const result = await collectDependencyInventory(
+      [
+        { directory: root, source: "lib" },
+        { directory: root, source: "extra" },
+      ],
+      () => {},
+    );
     expect(result.libraries).toHaveLength(4);
     expect(result.libraries).toContainEqual(
       expect.objectContaining({
@@ -50,9 +53,10 @@ it("allows absent optional roots and refuses oversized manifests", async () => {
   try {
     expect(
       (
-        await collectDependencyInventory([
-          { directory: path.join(root, "absent"), source: "lib" },
-        ])
+        await collectDependencyInventory(
+          [{ directory: path.join(root, "absent"), source: "lib" }],
+          () => {},
+        )
       ).complete,
     ).toBe(true);
     await fs.mkdir(path.join(root, "Big"));
@@ -61,8 +65,42 @@ it("allows absent optional roots and refuses oversized manifests", async () => {
       "x".repeat(1024 * 1024 + 1),
     );
     await expect(
-      collectDependencyInventory([{ directory: root, source: "lib" }]),
+      collectDependencyInventory(
+        [{ directory: root, source: "lib" }],
+        () => {},
+      ),
     ).rejects.toMatchObject({ code: "DEPENDENCY_LIMIT" });
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+it("propagates authorization denial before reading a root", async () => {
+  await expect(
+    collectDependencyInventory(
+      [{ directory: "unread-root", source: "lib" }],
+      () => {
+        throw new Error("revoked");
+      },
+    ),
+  ).rejects.toThrow("revoked");
+});
+
+it("does not downgrade a revoked manifest read into an inventory diagnostic", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "pio-inventory-"));
+  try {
+    await fs.mkdir(path.join(root, "A"));
+    await fs.writeFile(path.join(root, "A", "library.json"), '{"name":"A"}');
+    let manifestChecks = 0;
+    await expect(
+      collectDependencyInventory(
+        [{ directory: root, source: "lib" }],
+        (target) => {
+          if (target.endsWith("library.json") && ++manifestChecks === 3)
+            throw new Error("authorization changed after open");
+        },
+      ),
+    ).rejects.toThrow("authorization changed after open");
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }

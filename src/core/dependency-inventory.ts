@@ -18,9 +18,19 @@ export interface DependencyInventoryDiagnostic {
 /** Scan one directory level per approved root; never silently follow library or manifest links. */
 export async function collectDependencyInventory(
   roots: readonly DependencyInventoryRoot[],
+  assertAuthorized: (directory: string) => void,
 ) {
   if (roots.length > 64)
     throw new PlatformIOError("Too many library roots.", "DEPENDENCY_LIMIT");
+  let authorizationFailed = false;
+  const check = (directory: string) => {
+    try {
+      assertAuthorized(directory);
+    } catch (error) {
+      authorizationFailed = true;
+      throw error;
+    }
+  };
   const libraries: DependencyLibrary[] = [];
   const diagnostics: DependencyInventoryDiagnostic[] = [];
   let entries = 0,
@@ -28,6 +38,7 @@ export async function collectDependencyInventory(
   const seenRoots = new Set<string>();
   for (const root of roots) {
     const directory = path.resolve(root.directory);
+    check(directory);
     let canonical: string;
     try {
       canonical = await fs.realpath(directory);
@@ -36,6 +47,7 @@ export async function collectDependencyInventory(
       diagnostics.push({ path: directory, code: "ROOT_UNREADABLE" });
       continue;
     }
+    check(canonical);
     if (seenRoots.has(canonical)) continue;
     seenRoots.add(canonical);
     let handle;
@@ -53,6 +65,7 @@ export async function collectDependencyInventory(
         );
       if (entry.name.startsWith(".")) continue;
       const libraryPath = path.join(canonical, entry.name);
+      check(libraryPath);
       if (entry.isSymbolicLink()) {
         diagnostics.push({
           path: libraryPath,
@@ -72,10 +85,12 @@ export async function collectDependencyInventory(
         ["library.properties", "properties"],
       ] as const) {
         const manifestPath = path.join(libraryPath, filename);
+        check(manifestPath);
         let info;
         try {
           info = await fs.lstat(manifestPath);
         } catch (error) {
+          if (authorizationFailed) throw error;
           if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
           diagnostics.push({ path: manifestPath, code: "MANIFEST_UNREADABLE" });
           break;
@@ -92,9 +107,11 @@ export async function collectDependencyInventory(
             "Library manifest byte budget exceeded.",
             "DEPENDENCY_LIMIT",
           );
+        check(manifestPath);
         try {
           const file = await fs.open(manifestPath, "r");
           try {
+            check(manifestPath);
             const opened = await file.stat();
             if (
               !opened.isFile() ||
@@ -105,6 +122,7 @@ export async function collectDependencyInventory(
             const buffer = Buffer.alloc(1024 * 1024 + 1);
             let used = 0;
             while (used < buffer.length) {
+              check(manifestPath);
               const read = await file.read(
                 buffer,
                 used,
@@ -120,6 +138,7 @@ export async function collectDependencyInventory(
                 "Library manifest byte budget exceeded.",
                 "DEPENDENCY_LIMIT",
               );
+            check(manifestPath);
             manifest = parseDependencyManifest(
               buffer.subarray(0, used).toString("utf8"),
               format,
@@ -128,6 +147,7 @@ export async function collectDependencyInventory(
             await file.close();
           }
         } catch (error) {
+          if (authorizationFailed) throw error;
           if (
             error instanceof PlatformIOError &&
             error.code === "DEPENDENCY_LIMIT"
@@ -158,6 +178,7 @@ export async function collectDependencyInventory(
       });
     }
   }
+  for (const root of roots) check(path.resolve(root.directory));
   return {
     libraries,
     diagnostics,
