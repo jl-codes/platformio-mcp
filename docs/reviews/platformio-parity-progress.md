@@ -334,3 +334,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Fixed initial discovery escaping owner-wide cleanup: each discovery captures an owner stop generation, checked before creating a session. Pending discovery now reserves bounded session capacity and releases its reservation on timeout/failure or transfers it synchronously to startup. Request fields and provider callbacks are captured before the first wait.
 - TypeScript and 34 session/policy tests passed, including cleanup followed by a late discovery result and eight stalled discoveries excluding a ninth startup until timeout. No hardware was opened.
+
+## Native serial discovery provider
+
+- Added lazy optional-backend enumeration with required authorization, revision guards before/after native work, bounded validated identity-only snapshots and explicit errors. One outstanding request per provider remains reserved after caller timeout until native work settles, avoiding accumulation of stalled native calls.
+- TypeScript and five injected-provider tests passed: normalized output, authorization denial before loading, policy revocation during loading, timeout/concurrency retention, malformed/oversized results and enumeration failure. No actual device enumeration was performed. Shared policy adapter wiring and native distribution packaging remain required before public exposure.
