@@ -269,3 +269,22 @@ it("rejects a real policy change during backend loading before the port opens", 
   });
   expect(f.ports.get(f.request.path)!.isOpen).toBe(false);
 });
+
+it("authorizes native discovery with the real inspection policy before loading", async () => {
+  const f = fixture();
+  const list = vi.fn(async () => [{ path: "COM42" }]);
+  const load = vi.fn(async () => ({ list }));
+  const service = new PolicySerialSessionService({ discoveryLoad: load });
+  await expect(service.listSerialDevices(f.projectDir)).rejects.toMatchObject({
+    code: "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED",
+  });
+  expect(load).not.toHaveBeenCalled();
+  await expect(
+    service.run({}, () => service.listSerialDevices(f.projectDir)),
+  ).resolves.toEqual([{ path: "COM42" }]);
+  f.policy({ profile: "read_only", overrides: { deny: ["list_devices"] } });
+  await expect(
+    service.run({}, () => service.listSerialDevices(f.projectDir)),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(load).toHaveBeenCalledTimes(1);
+});

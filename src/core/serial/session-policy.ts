@@ -2,6 +2,12 @@
  * Real policy-dispatcher integration for the owned serial session service.
  * Provides PolicySerialSessionService with request-local approvals and existing permission-source resolution.
  */
+import fs from "node:fs";
+import path from "node:path";
+import {
+  NativeSerialDiscovery,
+  type NativeSerialDiscoveryOptions,
+} from "../devices/native-serial-discovery.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import { dispatchAuthorizedAction } from "../action-dispatcher.js";
@@ -32,16 +38,73 @@ const OPERATIONS = Object.freeze({
  */
 export class PolicySerialSessionService {
   readonly sessions: SerialSessionManager;
+  private readonly discovery: NativeSerialDiscovery;
+  private readonly discoveryProject = new AsyncLocalStorage<string>();
   private readonly context = new AsyncLocalStorage<
     Readonly<SerialPolicyRequestContext>
   >();
 
   /** Optional dependency injection supplies leases/transports only, never an authorization override. */
-  constructor(dependencies: Omit<SerialSessionDependencies, "authorize"> = {}) {
+  constructor(
+    dependencies: Omit<SerialSessionDependencies, "authorize"> & {
+      discoveryLoad?: NativeSerialDiscoveryOptions["load"];
+    } = {},
+  ) {
+    this.discovery = new NativeSerialDiscovery({
+      load: dependencies.discoveryLoad,
+      authorize: () => this.authorizeDiscovery(),
+    });
     this.sessions = new SerialSessionManager({
       ...dependencies,
       authorize: (request) => this.authorize(request),
     });
+  }
+
+  /** Enumerate through one shared native provider under this request's canonical workspace policy. */
+  async listSerialDevices(projectDir: string) {
+    if (!path.isAbsolute(projectDir))
+      throw new PlatformIOError(
+        "Serial project directory must be absolute.",
+        "SERIAL_PROJECT_INVALID",
+      );
+    const canonical = fs.realpathSync.native(projectDir);
+    if (!fs.statSync(canonical).isDirectory())
+      throw new PlatformIOError(
+        "Serial project directory is not a directory.",
+        "SERIAL_PROJECT_INVALID",
+      );
+    return this.discoveryProject.run(canonical, () => this.discovery.list());
+  }
+
+  /** Use the existing inspection action; a serial-open approval is never reused as an enumeration grant. */
+  private async authorizeDiscovery(): Promise<() => void> {
+    const context = this.context.getStore();
+    const projectDir = this.discoveryProject.getStore();
+    if (!context || !projectDir)
+      throw new PlatformIOError(
+        "Serial discovery requires a trusted request context.",
+        "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED",
+      );
+    let check: (() => void) | undefined;
+    try {
+      check = createPolicyRevisionGuard(projectDir);
+    } catch (error) {
+      if (!(error instanceof PolicyConfigError)) throw error;
+    }
+    return dispatchAuthorizedAction(
+      "list_devices",
+      { projectDir },
+      { ...context.caller, workspaceDir: projectDir },
+      async () => {
+        if (!check)
+          throw new PlatformIOError(
+            "Policy changed during discovery authorization.",
+            "POLICY_CHANGED",
+          );
+        check();
+        return check;
+      },
+    );
   }
 
   /** Keep approval/caller context isolated across overlapping client requests. */

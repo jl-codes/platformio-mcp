@@ -339,3 +339,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Added lazy optional-backend enumeration with required authorization, revision guards before/after native work, bounded validated identity-only snapshots and explicit errors. One outstanding request per provider remains reserved after caller timeout until native work settles, avoiding accumulation of stalled native calls.
 - TypeScript and five injected-provider tests passed: normalized output, authorization denial before loading, policy revocation during loading, timeout/concurrency retention, malformed/oversized results and enumeration failure. No actual device enumeration was performed. Shared policy adapter wiring and native distribution packaging remain required before public exposure.
+
+## Native discovery policy integration
+
+- PolicySerialSessionService now shares one native discovery provider across requests and authorizes enumeration through the existing list_devices dispatcher. The canonical workspace overrides caller workspace metadata; absent trusted request context denies before backend loading. Native discovery retains its revision checks and concurrency bound. Open/write approval IDs are not forwarded to enumeration.
+- TypeScript and 18 policy/native-provider tests passed, including actual default inspection permission and explicit list_devices denial before loading. No device was enumerated or opened. Hosted PR run 35474147693 at 37870bc completed successfully across all jobs; later local commits require a fresh run.
