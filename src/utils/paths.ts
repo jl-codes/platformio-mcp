@@ -88,5 +88,16 @@ export function ensureGlobalDirs(): void {
  */
 export function sanitizePortName(port: string): string {
   // Replace slashes, dots, and colons with underscores
-  return port.replace(/[\/\.:]/g, "_").replace(/^_+|_+$/g, "");
+  const base = port.replace(/[\/\.:]/g, "_").replace(/^_+|_+$/g, "");
+
+  // Windows resolves legacy DOS device names in the FINAL path component, even
+  // with an extension: "COM3.json" is the COM3 serial device, not a file. A
+  // claim file named after COM1-9 would therefore be written OUT OF THE UART
+  // and could never be linked or listed. Only these names are prefixed, so every
+  // other claim filename stays byte-identical to what older versions wrote.
+  const RESERVED = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+  if (RESERVED.test(base)) return `port_${base}`;
+
+  // ".." sanitises to nothing, which would name the claim file ".json".
+  return base === "" ? "port_unnamed" : base;
 }
