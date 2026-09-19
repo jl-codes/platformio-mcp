@@ -1103,6 +1103,10 @@ const toolDefinitions: ToolDefinition[] = [
           type: "string",
           description: "Specific environment to test",
         },
+        compileOnly: {
+          type: "boolean",
+          description: "Compile tests without uploading or executing them. Enforced by build_only policy.",
+        },
         background: {
           type: "boolean",
           description: "Run testing in background",
@@ -1898,6 +1902,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     params.projectDir,
                     params.environment,
                     params.background,
+                    params.compileOnly,
                   );
                 const result = params.sessionId
                   ? (hardwareLockManager.requireLock(params.sessionId),

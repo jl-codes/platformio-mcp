@@ -9,6 +9,7 @@
  * - listTargets: Discovers valid compilation targets.
  */
 
+import { loadEffectivePolicyState } from "../core/policy/load-policy.js";
 import { platformioExecutor } from "../platformio.js";
 import { executeWithSpooling } from "../utils/spooler.js";
 import type { BuildResult, CleanResult } from "../types.js";
@@ -286,6 +287,7 @@ export async function runTests(
   projectDir: string,
   environment?: string,
   background?: boolean,
+  compileOnly?: boolean,
 ): Promise<BuildResult> {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
@@ -294,8 +296,17 @@ export async function runTests(
     throw new BuildError(`Invalid environment name: ${environment}`, { environment });
   }
 
+  if (compileOnly !== undefined && typeof compileOnly !== "boolean") {
+    throw new BuildError("compileOnly must be a boolean", { projectDir });
+  }
+  // Resolve at execution time so every adapter obeys the current build-only profile.
+  // Both flags are essential: skipping upload alone can still reset/open a device.
+  const buildOnly = loadEffectivePolicyState(validatedPath).profile === "build_only";
   try {
     const args: string[] = [];
+    if (compileOnly || buildOnly) {
+      args.push("--without-uploading", "--without-testing");
+    }
     if (environment) {
       args.push("--environment", environment);
     }

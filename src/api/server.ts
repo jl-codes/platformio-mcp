@@ -1221,8 +1221,8 @@ export function startPortalServer(defaultPort = 8080) {
       req.body.projectDir,
       req.body,
       async () => {
-        const { projectDir, environment } = req.body;
-        return await runTests(projectDir, environment, true);
+        const { projectDir, environment, compileOnly } = req.body;
+        return await runTests(projectDir, environment, true, compileOnly);
       },
       res,
     );

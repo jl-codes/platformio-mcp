@@ -108,3 +108,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Verified source function/line, retained unresolved address, expected identity and mismatch rejection, size symbol counts/ranking and source attribution. GNU nm --size-sort omits unsized symbols, so the verifier compares identical invocation modes.
 - Real evidence confirms generic GNU size estimates differ from PlatformIO board accounting; recorded both in fixture documentation. Do not equate these estimates with device allocation or partition capacity.
 - Remaining: Cortex-M and other-host fixture acceptance, selected-environment discovery, real board/partition accounting, retained build/upload manifests, tool adapters, and all physical acceptance/distribution work already tracked above.
+
+## Compile-only test enforcement
+
+- Added optional compileOnly to existing MCP/schema/dashboard test adapters without removing legacy parameters.
+- The shared runner rereads policy at execution and forces both --without-uploading and --without-testing under build_only, even when compileOnly is explicitly false. Malformed mode values and invalid policy fail before dispatch.
+- Verification: TypeScript passed; 10 tests across test-execution-mode and policy-profile passed, including exact process arguments, full-test regression, and no process on invalid configuration. These are mocked process-boundary checks, not physical acceptance.
+- Remaining: native/embedded target classification, hardware-test approval and device binding, queued-effect revalidation throughout other operations, and the broader plan's pending implementation/acceptance/publication stages.

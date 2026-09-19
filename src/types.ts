@@ -502,6 +502,7 @@ export const RunTestsParamsSchema = z.object({
     .string()
     .optional()
     .describe("Specific environment to test (from platformio.ini)"),
+  compileOnly: z.boolean().optional().describe("Build tests without uploading or executing them. Always enforced by the build_only profile."),
   background: z
     .boolean()
     .optional()

@@ -59,3 +59,9 @@ This lifecycle does not by itself establish operator identity. Entrypoint authen
 Dashboard build, clean, upload, test, package-mutation, serial-monitor, reset and PIO Home commands now evaluate the same server policy as MCP/CLI operations before execution. Authentication alone does not authorize a command. A policy denial returns HTTP 403; an approval request returns HTTP 409 with the request identifier.
 
 The dashboard asks the operator to approve a challenged operation and then retries the original payload with that grant. It stops if policy challenges the retry again. The concrete workflow is part of the grant scope: an approval for a firmware upload does not authorize the broader flash-and-monitor workflow.
+
+### Compile-only tests
+
+The `build_only` profile forces PlatformIO test execution to include both `--without-uploading` and `--without-testing`. Skipping upload alone is insufficient because the testing stage can still open/reset a device. This rule is enforced in the shared runner at execution time, including direct internal callers and dashboard requests. `compileOnly: false` cannot override it.
+
+MCP `run_tests` and the dashboard command API also accept the optional boolean `compileOnly`; `true` requests this behavior under any profile. Omission preserves existing full-test behavior outside `build_only`. This stage restriction does not sandbox arbitrary project build scripts. Native-versus-embedded target classification and hardware-test approval binding remain separate implementation work.
