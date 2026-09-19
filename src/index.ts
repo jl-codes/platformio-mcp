@@ -10,6 +10,8 @@
  * - CallToolRequestSchema handler: Routes tool requests to their respective backend logic.
  */
 
+import { withProjectCompatibility } from "./adapters/project-compat-registry.js";
+import { executeProjectCompatibility } from "./adapters/project-compat.js";
 import { parseCompatibilityLaunch } from "./adapters/compatibility-mode.js";
 import { withPackageCompatibility } from "./adapters/package-compat-registry.js";
 import { executePackageCompatibility } from "./adapters/package-compat.js";
@@ -1513,6 +1515,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name } = request.params;
   const packageCompatibility = name.startsWith("pio_pkg_");
+  const projectCompatibility = [
+    "pio_project_envs",
+    "pio_project_metadata",
+  ].includes(name);
+  const compatibilityTool = packageCompatibility || projectCompatibility;
   const projectInspection = [
     "project_envs",
     "project_metadata",
@@ -1521,7 +1528,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const args: any = request.params.arguments || {};
   const registeredTool = getRegisteredTool(toolRegistry, name);
   const activityId = crypto.randomUUID();
-  const targetProjectDir = packageCompatibility
+  const targetProjectDir = compatibilityTool
     ? args.project_dir || compatibilityProjectDir || process.cwd()
     : args.projectDir || portalEvents.getLastKnownWorkspace();
   let commandRegistered = false;
@@ -1531,12 +1538,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       name === "decode_backtrace" ||
       name === "size_report" ||
       name.startsWith("pkg_") ||
-      packageCompatibility ||
+      compatibilityTool ||
       projectInspection
     ) {
       const safeRequest = {
-        projectDir: packageCompatibility ? args.project_dir : args.projectDir,
-        environment: packageCompatibility ? args.env : args.environment,
+        projectDir: compatibilityTool ? args.project_dir : args.projectDir,
+        environment: compatibilityTool ? args.env : args.environment,
       };
       const caller = {
         workspaceDir: targetProjectDir,
@@ -1565,8 +1572,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         () =>
           registeredTool.handler(args, {
             dispatch: async (tool, parameters) =>
-              packageCompatibility
-                ? executePackageCompatibility(
+              compatibilityTool
+                ? (projectCompatibility
+                    ? executeProjectCompatibility
+                    : executePackageCompatibility)(
                     tool,
                     parameters,
                     { projectDir: compatibilityProjectDir, cwd: process.cwd() },
@@ -1596,7 +1605,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         success: result.ok,
         status: result.ok ? "completed" : "failed",
         summary:
-          name.startsWith("pkg_") || packageCompatibility || projectInspection
+          name.startsWith("pkg_") || compatibilityTool || projectInspection
             ? result.summary
             : name === "size_report"
               ? "Firmware size report completed."
@@ -1622,7 +1631,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         result.ok ? "success" : "error",
         activityId,
       );
-      if (packageCompatibility)
+      if (compatibilityTool)
         return {
           content: [{ type: "text", text: JSON.stringify(result) }],
           structuredContent: result,
@@ -2509,7 +2518,9 @@ async function main() {
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
-    toolRegistry = withPackageCompatibility(toolRegistry);
+    toolRegistry = withProjectCompatibility(
+      withPackageCompatibility(toolRegistry),
+    );
   }
   const subcommand = cliArgs.find((a) => !a.startsWith("--"));
 

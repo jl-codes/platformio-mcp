@@ -429,3 +429,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added `docs/package-compatibility.md` with the current partial coverage and outstanding reference error-envelope differences.
 - Verification: TypeScript compilation; 26 package/adapter/real-stdio tests; 14 plugin tests; plugin validation; npm archive validation for platformio-mcp, pio-agent and pio-mcp. Rebuilt bundled runtime. Prior pushed revision CI run 35476085519 passed.
 - No package publication, release tag, merge or hardware operation was performed. Full 40-tool parity and remaining release gates remain open.
+
+### Project inspection compatibility integration
+
+- Added opt-in `pio_project_envs` and `pio_project_metadata` aliases with snake-case argument/result mapping, resolved project defaults shared with package aliases, bounded metadata, and unchanged canonical authorization. Compatibility mode now exposes 61 tools; normal mode remains 53.
+- Metadata alias requires the same build permission as canonical metadata because project scripts/dependency installation may execute. Real stdio tests verify read-only denial through both entry points.
+- Verification: TypeScript compilation; 22 adapter/project/real-MCP tests; 14 plugin tests; plugin and all three npm archive validations. Bundled runtime rebuilt.
+- This covers eight advertised reference aliases, not full 40-tool acceptance. Reference error envelopes and exact result/default equivalence still require broader contract verification. No publication or hardware execution occurred.

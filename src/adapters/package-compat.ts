@@ -2,9 +2,10 @@
  * Pinned Python-reference package argument mapping to canonical package actions.
  * Provides mapPackageCompatibilityRequest; execution must still use executePackageAction and its policy boundary.
  */
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import {
+  resolveCompatibilityProject,
+  type CompatibilityProjectDefaults,
+} from "./compatibility-project.js";
 import { z } from "zod";
 import { PlatformIOError } from "../utils/errors.js";
 import { executePackageAction, type PackageAction } from "../tools/packages.js";
@@ -49,44 +50,8 @@ const schemas = {
 };
 /** Exactly the six package names in the frozen reference registry. */
 export type PackageCompatibilityName = keyof typeof schemas;
-/** Launch-owned defaults; public requests must not supply the environment or process directory. */
-export interface PackageCompatibilityDefaults {
-  projectDir?: string;
-  cwd?: string;
-  home?: string;
-}
-
-/** Resolve the reference's explicit path, launch default, then cwd, requiring a PlatformIO project. */
-async function projectDirectory(
-  requested: string | null | undefined,
-  defaults: PackageCompatibilityDefaults,
-): Promise<string> {
-  let selected =
-    requested || defaults.projectDir || defaults.cwd || process.cwd();
-  if (
-    selected === "~" ||
-    selected.startsWith("~/") ||
-    selected.startsWith("~\\")
-  )
-    selected = path.join(defaults.home ?? os.homedir(), selected.slice(2));
-  else if (selected.startsWith("~"))
-    throw new PlatformIOError(
-      "Named-user home expansion is unsupported; pass an absolute project path.",
-      "COMPAT_PROJECT_INVALID",
-    );
-  const canonical = await fs.realpath(
-    path.resolve(defaults.cwd ?? process.cwd(), selected),
-  );
-  if (
-    !(await fs.stat(canonical)).isDirectory() ||
-    !(await fs.stat(path.join(canonical, "platformio.ini"))).isFile()
-  )
-    throw new PlatformIOError(
-      "Expected a PlatformIO project directory.",
-      "COMPAT_PROJECT_INVALID",
-    );
-  return canonical;
-}
+/** Backward-compatible name for the shared launch-owned project defaults. */
+export type PackageCompatibilityDefaults = CompatibilityProjectDefaults;
 
 /** Validate the reference vocabulary and map names only; no subprocess, policy grant or package mutation occurs. */
 export async function mapPackageCompatibilityRequest(
@@ -120,7 +85,7 @@ export async function mapPackageCompatibilityRequest(
   return {
     action,
     args: {
-      projectDir: await projectDirectory(args.project_dir, defaults),
+      projectDir: await resolveCompatibilityProject(args.project_dir, defaults),
       ...(args.env ? { environment: args.env } : {}),
       ...("spec" in args && "type" in args
         ? { spec: args.spec, kind: args.type }
