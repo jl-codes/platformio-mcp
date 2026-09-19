@@ -64,6 +64,7 @@ import {
   agentValidateProject,
 } from "./tools/agent.js";
 import { getMonitorStatus } from "./tools/monitor.js";
+import { lockStatus, portRelease } from "./cli/commands/lock.js";
 
 type OptionValue = string | boolean;
 type ParsedArgs = {
@@ -102,6 +103,8 @@ COMMANDS:
   pending-approvals [--project-dir <dir>] [--limit <n>]
   approve <approval-id>
   deny <approval-id>
+  lock status [--port <port>]
+  port release --port <port> [--force]
   dashboard
   install --<cline|claude|vscode|antigravity|codex|codex-plugin>
   plugin validate [--require-runtime]
@@ -251,6 +254,10 @@ function actionForCommand(command: string): string {
       return "agent_generate_board_report";
     case "policy-status":
       return "get_policy_status";
+    case "lock-status":
+      return "get_lock_status";
+    case "port-release":
+      return "release_port_claim";
     case "dashboard":
       return "get_dashboard_url";
     case "plugin":
@@ -684,6 +691,18 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         return;
       }
 
+      case "lock-status": {
+        const result = await lockStatus({ options, positionals, jsonMode });
+        if (result !== undefined) printOutput(result, jsonMode);
+        return;
+      }
+
+      case "port-release": {
+        const result = await portRelease({ options, positionals, jsonMode });
+        if (result !== undefined) printOutput(result, jsonMode);
+        return;
+      }
+
       case "policy-status": {
         const params = GetPolicyStatusParamsSchema.parse({
           projectDir: asString(options["project-dir"]),
@@ -861,6 +880,8 @@ async function main() {
     "agent-flash-monitor-verify",
     "agent-last-report",
     "agent-board-report",
+    "lock-status",
+    "port-release",
     "policy-status",
     "approvals",
     "approval-status",
@@ -882,8 +903,22 @@ async function main() {
     return;
   }
 
-  if (command && knownCommands.has(command)) {
-    await runCliCommand(command, args.slice(1));
+  // Fold the two-word forms ("lock status", "port release") into their
+  // registry keys. The claim errors tell users to run `pio-agent port release`,
+  // so it has to exist in the same change that introduces those errors.
+  let resolved = command;
+  let rest = args.slice(1);
+  if (
+    (command === "lock" || command === "port") &&
+    rest[0] &&
+    !rest[0].startsWith("--")
+  ) {
+    resolved = `${command}-${rest[0]}`;
+    rest = rest.slice(1);
+  }
+
+  if (resolved && knownCommands.has(resolved)) {
+    await runCliCommand(resolved, rest);
     return;
   }
 

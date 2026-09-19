@@ -75,3 +75,9 @@ playwright-report/
 web/playwright-report/
 test-results/
 web/test-results/
+
+# Build artifacts from `npm pack`
+*.tgz
+
+# Agent worktrees checked out inside the repo; never source.
+.claude/worktrees/

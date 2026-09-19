@@ -27,6 +27,9 @@ export const actionRiskLevels: Record<string, PolicyRiskLevel> = {
   get_dashboard_url: "low",
   acquire_lock: "low",
   release_lock: "low",
+  // Clears a stale port claim or an abandoned reclaim breaker; refuses a live
+  // claim without --force, so it is a recovery step, not a hardware action.
+  release_port_claim: "medium",
 
   start_monitor: "medium",
   stop_monitor: "medium",
@@ -101,6 +104,7 @@ export const defaultPolicy: PolicyConfig = {
     "get_dashboard_url",
     "acquire_lock",
     "release_lock",
+    "release_port_claim",
     "init_project",
     "clean_project",
     "install_library",
