@@ -421,3 +421,11 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Added an internal launch parser for --compat platformio-mcp-python, its equals form and PIO_MCP_COMPAT. Normal mode stays unset; unsupported/empty modes, missing flag values and duplicate selections fail explicitly. Positional arguments following -- remain untouched, as do unrelated policy arguments. The parser does not modify policy or environment state.
 - TypeScript and ten launch-parser tests passed. Entry-point/registry integration is still pending; the existence of this parser does not yet enable public aliases.
+
+### Opt-in package MCP integration
+
+- Connected six package aliases to the real MCP registry and canonical executor. Normal mode retains 53 tools; explicit compatibility mode advertises 59. Canonical metadata and permissions are retained.
+- Both server and CLI entry points accept the launch flag; environment selection is covered through the CLI entry point. Read-only policy rejects alias installation.
+- Added `docs/package-compatibility.md` with the current partial coverage and outstanding reference error-envelope differences.
+- Verification: TypeScript compilation; 26 package/adapter/real-stdio tests; 14 plugin tests; plugin validation; npm archive validation for platformio-mcp, pio-agent and pio-mcp. Rebuilt bundled runtime. Prior pushed revision CI run 35476085519 passed.
+- No package publication, release tag, merge or hardware operation was performed. Full 40-tool parity and remaining release gates remain open.

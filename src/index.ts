@@ -10,6 +10,9 @@
  * - CallToolRequestSchema handler: Routes tool requests to their respective backend logic.
  */
 
+import { parseCompatibilityLaunch } from "./adapters/compatibility-mode.js";
+import { withPackageCompatibility } from "./adapters/package-compat-registry.js";
+import { executePackageCompatibility } from "./adapters/package-compat.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -1495,7 +1498,8 @@ const toolDefinitions: ToolDefinition[] = [
   },
 ];
 
-const toolRegistry = createToolRegistry<any>(toolDefinitions);
+let toolRegistry = createToolRegistry<any>(toolDefinitions);
+let compatibilityProjectDir: string | undefined;
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools: listRegisteredTools(toolRegistry) };
@@ -1508,6 +1512,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name } = request.params;
+  const packageCompatibility = name.startsWith("pio_pkg_");
   const projectInspection = [
     "project_envs",
     "project_metadata",
@@ -1516,8 +1521,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const args: any = request.params.arguments || {};
   const registeredTool = getRegisteredTool(toolRegistry, name);
   const activityId = crypto.randomUUID();
-  const targetProjectDir =
-    args.projectDir || portalEvents.getLastKnownWorkspace();
+  const targetProjectDir = packageCompatibility
+    ? args.project_dir || compatibilityProjectDir || process.cwd()
+    : args.projectDir || portalEvents.getLastKnownWorkspace();
   let commandRegistered = false;
 
   try {
@@ -1525,11 +1531,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       name === "decode_backtrace" ||
       name === "size_report" ||
       name.startsWith("pkg_") ||
+      packageCompatibility ||
       projectInspection
     ) {
       const safeRequest = {
-        projectDir: args.projectDir,
-        environment: args.environment,
+        projectDir: packageCompatibility ? args.project_dir : args.projectDir,
+        environment: packageCompatibility ? args.env : args.environment,
       };
       const caller = {
         workspaceDir: targetProjectDir,
@@ -1558,30 +1565,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         () =>
           registeredTool.handler(args, {
             dispatch: async (tool, parameters) =>
-              projectInspection
-                ? executeProjectInspection(
-                    tool as ProjectInspectionAction,
+              packageCompatibility
+                ? executePackageCompatibility(
+                    tool,
                     parameters,
+                    { projectDir: compatibilityProjectDir, cwd: process.cwd() },
                     caller,
                     onAuthorized,
                   )
-                : tool.startsWith("pkg_")
-                  ? executePackageAction(
-                      tool as PackageAction,
+                : projectInspection
+                  ? executeProjectInspection(
+                      tool as ProjectInspectionAction,
                       parameters,
                       caller,
                       onAuthorized,
                     )
-                  : tool === "decode_backtrace"
-                    ? decodeBacktrace(parameters, caller, onAuthorized)
-                    : firmwareSizeReport(parameters, caller, onAuthorized),
+                  : tool.startsWith("pkg_")
+                    ? executePackageAction(
+                        tool as PackageAction,
+                        parameters,
+                        caller,
+                        onAuthorized,
+                      )
+                    : tool === "decode_backtrace"
+                      ? decodeBacktrace(parameters, caller, onAuthorized)
+                      : firmwareSizeReport(parameters, caller, onAuthorized),
           }),
       );
       const response = createToolResult({
         success: result.ok,
         status: result.ok ? "completed" : "failed",
         summary:
-          name.startsWith("pkg_") || projectInspection
+          name.startsWith("pkg_") || packageCompatibility || projectInspection
             ? result.summary
             : name === "size_report"
               ? "Firmware size report completed."
@@ -1607,6 +1622,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         result.ok ? "success" : "error",
         activityId,
       );
+      if (packageCompatibility)
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          structuredContent: result,
+          ...(!result.ok ? { isError: true } : {}),
+        };
       return { ...response, ...(!result.ok ? { isError: true } : {}) };
     }
     const policyDecision = await authorizeAction(name, args, {
@@ -2484,7 +2505,12 @@ async function main() {
   // Dispatches BEFORE the MCP server boots. The default behavior (no subcommand)
   // is preserved: start the MCP stdio server for AI agents.
   // ---------------------------------------------------------------------------
-  const cliArgs = configurePolicyFileFromArgs(process.argv.slice(2));
+  const compatibility = parseCompatibilityLaunch(process.argv.slice(2));
+  const cliArgs = configurePolicyFileFromArgs(compatibility.args);
+  if (compatibility.mode) {
+    compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
+    toolRegistry = withPackageCompatibility(toolRegistry);
+  }
   const subcommand = cliArgs.find((a) => !a.startsWith("--"));
 
   if (cliArgs.includes("--help") || subcommand === "help") {

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { parseCompatibilityLaunch } from "./adapters/compatibility-mode.js";
 import {
   executeProjectInspection,
   type ProjectInspectionAction,
@@ -130,6 +131,8 @@ COMMANDS:
 
 GLOBAL FLAGS:
   --policy-file <path>  Explicit operator policy (or PIO_MCP_POLICY_FILE)
+  --compat platformio-mcp-python  Enable additional MCP compatibility tools
+                                 (or PIO_MCP_COMPAT=platformio-mcp-python)
   --json
   --approve
   --help
@@ -1034,7 +1037,9 @@ async function runCliCommand(command: string, rawArgs: string[]) {
 }
 
 async function main() {
-  const args = configurePolicyFileFromArgs(process.argv.slice(2));
+  const args = configurePolicyFileFromArgs(
+    parseCompatibilityLaunch(process.argv.slice(2)).args,
+  );
   const command = args[0];
   const knownCommands = new Set([
     "project-envs",
