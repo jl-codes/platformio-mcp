@@ -143,6 +143,9 @@ export function parseProjectEnvironments(output: string) {
       uploadPort: options.upload_port ?? null,
       uploadProtocol: options.upload_protocol ?? null,
       libraryDependencies: options.lib_deps ?? [],
+      libraryExtraDirectories: options.lib_extra_dirs ?? [],
+      libraryDependencyFinderMode: options.lib_ldf_mode ?? null,
+      libraryCompatibilityMode: options.lib_compat_mode ?? null,
       buildFlags: options.build_flags ?? [],
       extends: options.extends ?? [],
     }));

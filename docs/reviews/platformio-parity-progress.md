@@ -470,3 +470,9 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Limits: 64 roots, 4096 entries, 2048 libraries, 1 MiB per manifest and 16 MiB total manifest reads. Malformed preferred JSON does not fall back to properties. Missing manifests retain directory observations but mark evidence incomplete.
 - TypeScript compilation and 12 dependency tests pass. CI for pushed f06849c passed (35476792245 and 35476789366).
 - Inventory is internal: caller authorization, configuration scope, public MCP/CLI and build graph integration remain required. No publication occurred.
+
+### Resolved dependency configuration
+
+- Canonical environment inspection now additionally retains resolved library extra directories, dependency-finder mode and compatibility mode. Added internal audit input selection honoring explicit/default environments and configured lib_dir/libdeps_dir instead of hard-coded locations. Returned roots require subsequent authorization.
+- Invalid environment path components and malformed directory/list settings are rejected. Commas in paths are preserved.
+- TypeScript compilation, 18 configuration/project/compatibility tests, plugin validation and three npm archive validations passed. Runtime rebuilt for additive configuration fields. Public dependency execution/authorization and optional build evidence remain open.
