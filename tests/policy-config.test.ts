@@ -36,6 +36,23 @@ describe("strict policy configuration", () => {
     expect(() => parsePolicyDocument(text, source)).toThrow(PolicyConfigError);
   });
 
+  it("distinguishes server authority from unknown external host grants", () => {
+    const status = getPolicyStatus(root);
+    expect(status.serverPolicy).toEqual({
+      enforcement: "platformio-mcp",
+      valid: true,
+      digest: status.digest,
+    });
+    expect(status.hostPolicy).toMatchObject({
+      enforcement: "external",
+      effectivePermissions: "unknown",
+    });
+    vi.stubEnv("PIO_MCP_POLICY_FILE", path.join(root, "missing.json"));
+    const invalid = getPolicyStatus(root);
+    expect(invalid.serverPolicy.valid).toBe(false);
+    expect(invalid.hostPolicy).toEqual(status.hostPolicy);
+  });
+
   it("uses missing optional defaults without creating files", () => {
     const state = loadEffectivePolicyState(root);
     expect(state.profile).toBe("flash_requires_approval");

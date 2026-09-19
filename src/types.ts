@@ -1030,6 +1030,9 @@ export interface AgentGetLastReportResult {
  * Effective policy status payload returned by `get_policy_status`.
  */
 export interface PolicyStatusResult {
+  serverPolicy: { enforcement: "platformio-mcp"; valid: boolean; digest?: string };
+  hostPolicy: { enforcement: "external"; effectivePermissions: "unknown"; message: string };
+
   projectEnrollment?: { enrolled: boolean; digest: string }; // Exact project policy enrollment state
 
   valid: boolean; // False means execution is blocked by invalid configuration

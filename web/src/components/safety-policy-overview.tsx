@@ -81,6 +81,11 @@ type ActiveMonitorItem = {
 };
 
 type PolicyStatus = {
+  valid?: boolean;
+  error?: {message: string};
+  projectEnrollment?: {enrolled: boolean; digest: string};
+  sources?: Array<{kind: string; source: string; present: boolean}>;
+  hostPolicy?: {enforcement: string; effectivePermissions: string; message: string};
   profile: string;
   source: string;
   approvalRequiredOperations: string[];
@@ -178,32 +183,33 @@ export default function SafetyPolicyOverview({ payload, loading, apiBase, token,
         <Space direction="vertical" style={{ width: '100%' }} size={18}>
           <div>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              CODEX PLUGIN CONTROL PLANE
+              PLATFORMIO PERMISSIONS
             </Text>
             <div style={{ marginTop: 8 }}>
               <Space wrap>
                 <Tag color={payload.policy.profile === 'lab_runner' ? 'orange' : 'blue'}>
                   POLICY: {payload.policy.profile.toUpperCase()}
                 </Tag>
-                <Tag color={payload.policy.profile === 'lab_runner' ? 'volcano' : 'green'}>
-                  {payload.policy.profile === 'lab_runner' ? 'LAB-RUNNER PREAUTHORIZED' : 'INTERACTIVE APPROVALS'}
+                <Tag color={payload.policy.valid === false ? 'red' : 'blue'}>
+                  {payload.policy.valid === false ? 'INVALID POLICY' : 'SERVER POLICY'}
                 </Tag>
                 <Tag>{payload.activeMonitors.length} ACTIVE MONITORS</Tag>
                 <Tag>{payload.automationStates.length} MONITOR STATES</Tag>
               </Space>
             </div>
-            {payload.policy.profile === 'lab_runner' ? (
-              <Alert
-                style={{ marginTop: 10 }}
-                type="warning"
-                showIcon
-                title="Lab-runner writes remain limited to the exact repository policy, environment, device binding, cooldown, and persisted write budget."
-              />
-            ) : (
-              <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
-                Hardware-changing actions remain blocked until an interactive user approves the exact request.
-              </Text>
-            )}
+            {payload.policy.valid === false && <Alert style={{marginTop:10}} type="error" showIcon title={payload.policy.error?.message || 'Policy configuration is invalid. Execution is blocked.'} />}
+            {payload.policy.projectEnrollment && <Text style={{display:'block', marginTop:8}}>
+              Project permission increases: {payload.policy.projectEnrollment.enrolled ? 'enrolled by operator' : 'not enrolled; operator baseline applies'}.
+            </Text>}
+            <Text type="secondary" style={{display:'block', marginTop:8}}>
+              {payload.policy.hostPolicy?.message || 'Host permissions are enforced externally; their effective values are unknown to this server.'}
+            </Text>
+            <Text type="secondary" style={{display:'block', marginTop:8}}>
+              {payload.policy.approvalRequiredOperations.length} operations require server approval; {payload.policy.deniedOperations.length} are explicitly denied. The profile name alone is not a permission grant.
+            </Text>
+            <List size="small" dataSource={payload.policy.sources || [{kind:'policy', source:payload.policy.source, present:true}]}
+              renderItem={item => <List.Item><Text style={{wordBreak:'break-all'}}>{item.kind}: {item.source}{item.present ? '' : ' (not present)'}</Text></List.Item>} />
+
           </div>
 
           <div>

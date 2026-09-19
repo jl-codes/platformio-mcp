@@ -16,6 +16,12 @@ import { PolicyConfigError } from "./policy-schema.js";
  * @returns Effective policy status payload.
  */
 export function getPolicyStatus(workspaceDir?: string): PolicyStatusResult {
+  const hostPolicy = {
+    enforcement: "external" as const,
+    effectivePermissions: "unknown" as const,
+    message:
+      "Your MCP host enforces its own resolved permissions. PlatformIO policy status does not read or verify those runtime grants.",
+  };
   let state;
   try {
     state = loadEffectivePolicyState(workspaceDir);
@@ -23,6 +29,8 @@ export function getPolicyStatus(workspaceDir?: string): PolicyStatusResult {
     if (!(error instanceof PolicyConfigError)) throw error;
     return {
       valid: false,
+      serverPolicy: { enforcement: "platformio-mcp", valid: false },
+      hostPolicy,
       error: { code: "POLICY_CONFIG_INVALID", message: error.message },
       profile: "invalid",
       source: error.source,
@@ -38,6 +46,12 @@ export function getPolicyStatus(workspaceDir?: string): PolicyStatusResult {
   }
   return {
     valid: true,
+    serverPolicy: {
+      enforcement: "platformio-mcp",
+      valid: true,
+      digest: state.digest,
+    },
+    hostPolicy,
     sources: state.sources,
     digest: state.digest,
     projectEnrollment: state.projectEnrollment,
