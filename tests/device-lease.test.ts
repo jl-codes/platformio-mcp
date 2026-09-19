@@ -269,4 +269,273 @@ setInterval(()=>{},1000);
       await exited;
     }
   }, 20000);
+  it("keeps the original lease when transfer validation fails", () => {
+    const store = new DeviceLeaseStore({
+      root: directory(),
+      inspect: (pid) =>
+        pid === process.pid ? running() : { status: "unknown" },
+    });
+    const lease = store.acquire(resource);
+    const target = {
+      pid: process.pid === 42 ? 43 : 42,
+      platform: process.platform,
+      startToken: "child",
+    };
+    expect(() => store.transfer(lease, target)).toThrow(
+      expect.objectContaining({ code: "DEVICE_TRANSFER_INVALID" }),
+    );
+    expect(() => store.transfer({ ...lease }, target)).toThrow(
+      expect.objectContaining({ code: "DEVICE_LEASE_NOT_OWNED" }),
+    );
+    expect(() =>
+      store.transfer(lease, { ...target, pid: process.pid }),
+    ).toThrow();
+    expect(() => store.transfer(lease, { ...target, pid: -1 })).toThrow();
+    store.release(lease);
+  });
+  it("rejects a reused transfer target PID before changing the record", () => {
+    const targetPid = process.pid === 42 ? 43 : 42;
+    const store = new DeviceLeaseStore({
+      root: directory(),
+      inspect: (pid) =>
+        pid === process.pid
+          ? running()
+          : {
+              status: "running",
+              identity: {
+                pid,
+                platform: process.platform,
+                startToken: "replacement",
+              },
+            },
+    });
+    const lease = store.acquire(resource);
+    expect(() =>
+      store.transfer(lease, {
+        pid: targetPid,
+        platform: process.platform,
+        startToken: "original",
+      }),
+    ).toThrow(expect.objectContaining({ code: "DEVICE_TRANSFER_INVALID" }));
+    store.release(lease);
+  });
+  it("hands a lease to a real waiting child, invalidates the parent handle and consumes its ticket once", async () => {
+    const root = directory();
+    const childCwd = directory();
+    const script = path.join(childCwd, "adopter.mjs");
+    const storeUrl = pathToFileURL(
+      path.resolve("src/core/devices/device-lease.ts"),
+    ).href;
+    const identityUrl = pathToFileURL(
+      path.resolve("src/core/devices/process-identity.ts"),
+    ).href;
+    fs.writeFileSync(
+      script,
+      `
+      import {DeviceLeaseStore} from ${JSON.stringify(storeUrl)};
+      import {inspectProcessIdentity} from ${JSON.stringify(identityUrl)};
+      const store = new DeviceLeaseStore({root:process.argv[2]});
+      process.once('message', ticket => {
+        try {
+          const lease = store.adopt(ticket);
+          let replayRejected = false;
+          try { store.adopt(ticket); } catch (error) { replayRejected = error.code === 'DEVICE_TRANSFER_INVALID'; }
+          process.send({type:'adopted', replayRejected});
+          process.once('message', () => {
+            store.release(lease);
+            process.send({type:'released'}, () => process.disconnect());
+          });
+        } catch(error) { process.send({type:'failure', code:error.code}); process.disconnect(); }
+      });
+      process.send({type:'ready', observation:inspectProcessIdentity(process.pid)});
+    `,
+    );
+    const store = new DeviceLeaseStore({ root });
+    const lease = store.acquire(resource);
+    const child = spawn(
+      process.execPath,
+      [
+        "--import",
+        pathToFileURL(path.resolve("node_modules/tsx/dist/loader.mjs")).href,
+        script,
+        root,
+      ],
+      {
+        cwd: childCwd,
+        env: {
+          ...process.env,
+          PIO_MCP_DATA_DIR: path.join(childCwd, "another-data-root"),
+        },
+        stdio: ["ignore", "pipe", "pipe", "ipc"],
+        windowsHide: true,
+      },
+    );
+    const exited = once(child, "exit");
+    const nextMessage = () =>
+      new Promise<Record<string, unknown>>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => finish(new Error("handoff message timed out")),
+          10000,
+        );
+        const onError = (error: Error) => finish(error);
+        const onExit = () =>
+          finish(new Error("child exited before handoff message"));
+        const onMessage = (message: Record<string, unknown>) =>
+          finish(undefined, message);
+        const finish = (error?: Error, message?: Record<string, unknown>) => {
+          clearTimeout(timeout);
+          child.off("error", onError);
+          child.off("exit", onExit);
+          child.off("message", onMessage);
+          error ? reject(error) : resolve(message!);
+        };
+        child.once("error", onError);
+        child.once("exit", onExit);
+        child.once("message", onMessage);
+      });
+    try {
+      const ready = await nextMessage();
+      expect(ready.type).toBe("ready");
+      const observation = ready.observation as ProcessObservation;
+      expect(observation.status).toBe("running");
+      if (observation.status !== "running")
+        throw new Error("child identity missing");
+      const ticket = store.transfer(lease, observation.identity);
+      expect(() => store.release(lease)).toThrow(
+        expect.objectContaining({ code: "DEVICE_LEASE_NOT_OWNED" }),
+      );
+      expect(() => store.adopt(ticket)).toThrow(
+        expect.objectContaining({ code: "DEVICE_TRANSFER_INVALID" }),
+      );
+      const adopted = nextMessage();
+      child.send(ticket);
+      expect(await adopted).toMatchObject({
+        type: "adopted",
+        replayRejected: true,
+      });
+      expect(() => store.acquire(resource)).toThrow(
+        expect.objectContaining({ code: "DEVICE_BUSY" }),
+      );
+      const released = nextMessage();
+      child.send({ release: true });
+      expect(await released).toMatchObject({ type: "released" });
+      await exited;
+      const next = store.acquire(resource);
+      store.release(next);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+      await exited;
+    }
+  }, 20000);
+  it("retains child ownership after the coordinator exits", async () => {
+    const root = directory();
+    const fixture = directory();
+    const stopFile = path.join(fixture, "stop");
+    const holderScript = path.join(fixture, "orphan-holder.mjs");
+    const coordinatorScript = path.join(fixture, "coordinator.mjs");
+    const loader = pathToFileURL(
+      path.resolve("node_modules/tsx/dist/loader.mjs"),
+    ).href;
+    const storeUrl = pathToFileURL(
+      path.resolve("src/core/devices/device-lease.ts"),
+    ).href;
+    const identityUrl = pathToFileURL(
+      path.resolve("src/core/devices/process-identity.ts"),
+    ).href;
+    fs.writeFileSync(
+      holderScript,
+      `
+      import fs from 'node:fs';
+      import {DeviceLeaseStore} from ${JSON.stringify(storeUrl)};
+      import {inspectProcessIdentity} from ${JSON.stringify(identityUrl)};
+      const store = new DeviceLeaseStore({root:process.argv[2]});
+      let lease;
+      const expires = Date.now()+20000;
+      const timer = setInterval(()=> {
+        if (fs.existsSync(process.argv[3]) || Date.now()>expires) {
+          if (lease) store.release(lease);
+          clearInterval(timer); process.exit(0);
+        }
+      }, 25);
+      process.once('message', ticket=> {
+        lease=store.adopt(ticket);
+        process.send({type:'adopted'});
+      });
+      process.send({type:'ready', observation:inspectProcessIdentity(process.pid)});
+    `,
+    );
+    fs.writeFileSync(
+      coordinatorScript,
+      `
+      import {spawn} from 'node:child_process';
+      import {DeviceLeaseStore} from ${JSON.stringify(storeUrl)};
+      const store=new DeviceLeaseStore({root:process.argv[2]});
+      const lease=store.acquire(${JSON.stringify(resource)});
+      const child=spawn(process.execPath,['--import',${JSON.stringify(loader)},${JSON.stringify(holderScript)},process.argv[2],process.argv[3]], {
+        detached:true, stdio:['ignore','ignore','ignore','ipc'], windowsHide:true,
+      });
+      const timeout=setTimeout(()=>process.exit(2),10000);
+      child.once('message', message=> {
+        const identity=message.observation.identity;
+        const ticket=store.transfer(lease,identity);
+        child.once('message',()=> {
+          clearTimeout(timeout);
+          process.stdout.write(JSON.stringify(identity)+'\\n',()=>process.exit(0));
+        });
+        child.send(ticket);
+      });
+    `,
+    );
+    const coordinator = spawn(
+      process.execPath,
+      ["--import", loader, coordinatorScript, root, stopFile],
+      {
+        cwd: fixture,
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+      },
+    );
+    const coordinatorExited = once(coordinator, "exit");
+    let output = "";
+    coordinator.stdout!.on("data", (data: Buffer) => {
+      output += data.toString();
+    });
+    let holder:
+      | { pid: number; platform: NodeJS.Platform; startToken: string }
+      | undefined;
+    try {
+      const [code] = await coordinatorExited;
+      expect(code).toBe(0);
+      holder = JSON.parse(output.trim());
+      const observation = inspectProcessIdentity(holder!.pid);
+      expect(observation).toEqual({ status: "running", identity: holder });
+      const competitor = new DeviceLeaseStore({ root });
+      expect(() => competitor.acquire(resource)).toThrow(
+        expect.objectContaining({ code: "DEVICE_BUSY" }),
+      );
+      fs.writeFileSync(stopFile, "stop");
+      const deadline = Date.now() + 10000;
+      while (
+        Date.now() < deadline &&
+        fs.readdirSync(root).some((name) => name.endsWith(".json"))
+      )
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      const next = competitor.acquire(resource);
+      competitor.release(next);
+    } finally {
+      fs.writeFileSync(stopFile, "stop");
+      if (coordinator.exitCode === null && coordinator.signalCode === null)
+        coordinator.kill();
+      await coordinatorExited;
+      if (holder) {
+        const deadline = Date.now() + 5000;
+        while (
+          Date.now() < deadline &&
+          inspectProcessIdentity(holder.pid).status !== "absent"
+        )
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        expect(inspectProcessIdentity(holder.pid).status).toBe("absent");
+      }
+    }
+  }, 30000);
 });

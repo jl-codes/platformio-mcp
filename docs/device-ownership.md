@@ -18,8 +18,16 @@ Windows uses the process's UTC start time through [System.Diagnostics.Process.St
 
 An interrupted gate fails closed with `DEVICE_LEASE_GATE_BUSY`; it is never stolen merely because it is old. Persistent gates need operator inspection after confirming no update is in flight. There is not yet an automatic gate-repair command. A crashed process's completed lease record can be recovered normally once no interrupted gate remains.
 
+## Atomic process handoff
+
+An owner can transfer a lease to an already-started child's exact observed process identity. The child must wait behind an IPC barrier without accessing hardware. Transfer rechecks that identity under the update gate, changes the persisted owner, rotates the nonce and invalidates the parent's release handle. The returned ticket is internal IPC data; it is not a public tool input or permission grant.
+
+Only the target OS process can adopt the ticket. Adoption rotates the nonce again, so a second adoption cannot replay the ticket. Hardware access may start only after adoption succeeds. If the parent exits after transfer, the child's live identity continues blocking competitors. If the child exits before adoption, ordinary stale-owner recovery can reclaim the record. If ticket delivery fails while the child remains alive, ownership stays with the child until it exits or completes adoption; the parent must not release its old handle.
+
+Windows integration tests exercise real child adoption, rejected parent release/adoption, one-use tickets, and a detached holder that keeps its lease after the coordinator exits. The holder explicitly releases before the test competitor can acquire. These fixtures do not open hardware or establish ownership of grandchildren spawned by a hardware command.
+
 ## Integration still required
 
-Before replacing legacy semaphores, resolve COM/path aliases and USB re-enumeration identities, bind operation ownership, and handle monitor/uploader child processes that can outlive the server. A lease owned only by the parent must not be treated as free while such a child still accesses hardware. Atomic handoff, policy checks and owned cleanup belong in that integration. Direct serial sessions, legacy PlatformIO filter monitors, uploads and probe operations must all use the same domain before global hardware exclusion is claimed.
+Before replacing legacy semaphores, resolve COM/path aliases and USB re-enumeration identities, bind operation ownership, and handle monitor/uploader child processes that can outlive the server. A lease owned only by the parent must not be treated as free while such a child still accesses hardware. The handoff primitive is implemented, but actual monitor/uploader spawn barriers, descendant lifetime handling, policy checks and owned cleanup still belong in that integration. Direct serial sessions, legacy PlatformIO filter monitors, uploads and probe operations must all use the same domain before global hardware exclusion is claimed.
 
 These leases coordinate cooperating processes under one account. They do not block unrelated serial software, prevent arbitrary project scripts from opening hardware, or protect against hostile code with unrestricted access to the same user's files. Hardware acceptance, cross-platform contention and permission validation remain separate gates.

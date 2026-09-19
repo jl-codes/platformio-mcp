@@ -24,6 +24,11 @@ export interface DeviceLease {
   readonly resource: Readonly<DeviceResource>;
   readonly acquiredAt: string;
 }
+/** Internal IPC handoff ticket. The target process must adopt it before opening hardware. */
+export interface DeviceLeaseTransfer {
+  readonly resource: Readonly<DeviceResource>;
+  readonly nonce: string;
+}
 interface LeaseRecord {
   version: 1;
   resource: DeviceResource;
@@ -63,6 +68,31 @@ function resourceKey(resource: DeviceResource): string {
   return createHash("sha256")
     .update(JSON.stringify([resource.kind, resource.identity]))
     .digest("hex");
+}
+
+/** Validate persisted and handoff metadata without trusting a PID-shaped value alone. */
+function validProcessIdentity(value: ProcessIdentity): boolean {
+  return (
+    !!value &&
+    Number.isSafeInteger(value.pid) &&
+    value.pid >= 1 &&
+    value.pid <= 2147483647 &&
+    ["win32", "linux", "darwin"].includes(value.platform) &&
+    typeof value.startToken === "string" &&
+    value.startToken.length > 0 &&
+    value.startToken.length <= 256
+  );
+}
+
+function sameProcessIdentity(
+  first: ProcessIdentity,
+  second: ProcessIdentity,
+): boolean {
+  return (
+    first.pid === second.pid &&
+    first.platform === second.platform &&
+    first.startToken === second.startToken
+  );
 }
 
 /**
@@ -109,43 +139,122 @@ export class DeviceLeaseStore {
         acquiredAt: new Date().toISOString(),
       };
       this.writeRecord(key, record);
-      const lease: DeviceLease = Object.freeze({
-        resource: Object.freeze({
-          kind: resource.kind,
-          identity: resource.identity,
-        }),
-        acquiredAt: record.acquiredAt,
+      return this.createHandle(record);
+    });
+  }
+
+  /**
+   * Atomically transfer ownership to an already-started, verified child waiting behind an IPC barrier.
+   * The caller must keep the child from opening hardware until adoption succeeds. No process is spawned here.
+   * On success the old handle is invalid, even if delivery of the returned ticket subsequently fails.
+   */
+  transfer(lease: DeviceLease, target: ProcessIdentity): DeviceLeaseTransfer {
+    const held = this.requireHandle(lease);
+    const key = resourceKey(held.resource);
+    if (
+      !validProcessIdentity(target) ||
+      target.platform !== held.owner.platform ||
+      target.pid === held.owner.pid
+    )
+      throw new PlatformIOError(
+        "Invalid lease transfer target.",
+        "DEVICE_TRANSFER_INVALID",
+      );
+    return this.withGate(key, () => {
+      const current = this.requirePersistedOwner(key, held);
+      if (compareProcessIdentity(target, this.inspect(target.pid)) !== "alive")
+        throw new PlatformIOError(
+          "Lease transfer target is unavailable or its process identity changed.",
+          "DEVICE_TRANSFER_INVALID",
+        );
+      const transferred: LeaseRecord = {
+        ...current,
+        owner: { ...target },
+        nonce: randomUUID(),
+      };
+      this.writeRecord(key, transferred);
+      this.held.delete(lease);
+      return Object.freeze({
+        resource: Object.freeze({ ...current.resource }),
+        nonce: transferred.nonce,
       });
-      this.held.set(lease, record);
-      return lease;
+    });
+  }
+
+  /**
+   * Consume an IPC ticket only in the target OS process, rotating its nonce to prevent ticket replay.
+   * This grants lease custody, not tool authorization; public adapters must not accept transfer tickets.
+   */
+  adopt(ticket: DeviceLeaseTransfer): DeviceLease {
+    const key = resourceKey(ticket?.resource);
+    if (
+      typeof ticket.nonce !== "string" ||
+      !/^[a-f0-9-]{36}$/.test(ticket.nonce)
+    )
+      throw new PlatformIOError(
+        "Invalid lease transfer ticket.",
+        "DEVICE_TRANSFER_INVALID",
+      );
+    const owner = this.currentOwner();
+    return this.withGate(key, () => {
+      const current = this.readRecord(key);
+      if (
+        !current ||
+        current.nonce !== ticket.nonce ||
+        !sameProcessIdentity(current.owner, owner)
+      )
+        throw new PlatformIOError(
+          "Lease transfer ticket is stale or belongs to another process.",
+          "DEVICE_TRANSFER_INVALID",
+        );
+      const adopted = { ...current, nonce: randomUUID() };
+      this.writeRecord(key, adopted);
+      return this.createHandle(adopted);
     });
   }
 
   /** Release only a capability issued by this store whose persisted nonce and owner still match. */
   release(lease: DeviceLease): void {
+    const held = this.requireHandle(lease);
+    const key = resourceKey(held.resource);
+    this.withGate(key, () => {
+      this.requirePersistedOwner(key, held);
+      fs.unlinkSync(path.join(this.root, `${key}.json`));
+      this.held.delete(lease);
+    });
+  }
+
+  private createHandle(record: LeaseRecord): DeviceLease {
+    const lease: DeviceLease = Object.freeze({
+      resource: Object.freeze({ ...record.resource }),
+      acquiredAt: record.acquiredAt,
+    });
+    this.held.set(lease, record);
+    return lease;
+  }
+
+  private requireHandle(lease: DeviceLease): LeaseRecord {
     const held = this.held.get(lease);
     if (!held)
       throw new PlatformIOError(
         "Unknown or already released device lease.",
         "DEVICE_LEASE_NOT_OWNED",
       );
-    const key = resourceKey(held.resource);
-    this.withGate(key, () => {
-      const current = this.readRecord(key);
-      if (
-        !current ||
-        current.nonce !== held.nonce ||
-        current.owner.pid !== held.owner.pid ||
-        current.owner.platform !== held.owner.platform ||
-        current.owner.startToken !== held.owner.startToken
-      )
-        throw new PlatformIOError(
-          "Device lease ownership changed; refusing release.",
-          "DEVICE_LEASE_NOT_OWNED",
-        );
-      fs.unlinkSync(path.join(this.root, `${key}.json`));
-      this.held.delete(lease);
-    });
+    return held;
+  }
+
+  private requirePersistedOwner(key: string, held: LeaseRecord): LeaseRecord {
+    const current = this.readRecord(key);
+    if (
+      !current ||
+      current.nonce !== held.nonce ||
+      !sameProcessIdentity(current.owner, held.owner)
+    )
+      throw new PlatformIOError(
+        "Device lease ownership changed; refusing mutation.",
+        "DEVICE_LEASE_NOT_OWNED",
+      );
+    return current;
   }
 
   private currentOwner(): ProcessIdentity {
@@ -153,7 +262,8 @@ export class DeviceLeaseStore {
     const observation = this.inspect(process.pid);
     if (
       observation.status !== "running" ||
-      observation.identity.pid !== process.pid
+      observation.identity.pid !== process.pid ||
+      !validProcessIdentity(observation.identity)
     )
       throw new PlatformIOError(
         "Cannot establish this process's start identity.",
@@ -239,14 +349,7 @@ export class DeviceLeaseStore {
       if (
         record.version !== 1 ||
         resourceKey(record.resource) !== key ||
-        !record.owner ||
-        !Number.isSafeInteger(record.owner.pid) ||
-        record.owner.pid < 1 ||
-        record.owner.pid > 2147483647 ||
-        !["win32", "linux", "darwin"].includes(record.owner.platform) ||
-        typeof record.owner.startToken !== "string" ||
-        !record.owner.startToken ||
-        record.owner.startToken.length > 256 ||
+        !validProcessIdentity(record.owner) ||
         typeof record.nonce !== "string" ||
         !/^[a-f0-9-]{36}$/.test(record.nonce) ||
         typeof record.acquiredAt !== "string" ||
