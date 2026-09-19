@@ -64,6 +64,11 @@ it.each([
         });
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result)).toContain("POLICY_DENIED");
+        expect(result.structuredContent).toMatchObject({
+          ok: false,
+          error: "policy_denied",
+          status: "failed",
+        });
         const metadata = await client.callTool({
           name: "pio_project_metadata",
           arguments: {},

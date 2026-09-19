@@ -443,3 +443,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Compatibility error activity events retain only project/environment metadata rather than full caller arguments.
 - Verification: TypeScript compilation; 20 project/adapter/real-stdio tests including target alias read-only denial; 14 plugin tests; plugin and three npm archive validations. Runtime rebuilt. CI run 35476506906 for preceding pushed e84ad9e passed all ten jobs.
 - No deployment occurred. Full parity, hardware acceptance and release gates remain outstanding.
+
+### Compact compatibility failures
+
+- All nine implemented aliases now return compact structured exception results with `ok: false`, a reference-style expected-error category and retained canonical code. Approval requests remain blocked with scoped approval identity and selected policy fields.
+- The new context-exclusion test caught the legacy formatter including arbitrary exception context; the compatibility boundary now uses only the message and an allowlisted policy projection, with bounded redaction. Canonical envelopes remain unchanged.
+- Verification: TypeScript compilation; 10 error/real-MCP tests; 14 plugin tests; plugin and three npm archive validations. Runtime rebuilt.
+- Full reference error-class equivalence, remaining tools and release gates remain open. No publication occurred.

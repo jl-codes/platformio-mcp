@@ -24,8 +24,12 @@ executor and server policy. Codex continues to enforce its own host permissions.
 
 Successful executor responses use compact `ok`, `summary`, `log_path` and
 operation-specific fields. Unknown registry pagination counts are null rather
-than invented. Validation and policy exceptions currently use the existing MCP
-error envelope; complete reference error-shape coverage remains outstanding.
+than invented. Validation and policy exceptions use a compact `ok: false` result. Expected
+errors map to reference categories such as `policy_denied` and `not_found`, with
+the canonical code retained in `details.code`. Approval requests remain blocked
+and retain scoped `approval_id` and selected policy details. Diagnostics are
+bounded and redacted; arbitrary exception context is omitted. Complete
+reference error-class equivalence remains outstanding.
 Canonical commands and response envelopes are unchanged.
 
 Target discovery uses structured PlatformIO metadata instead of parsing console

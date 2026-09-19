@@ -4154,6 +4154,36 @@ var init_zod = __esm({
   }
 });
 
+// src/core/policy/redact.ts
+function redactSecretsInText(text4) {
+  let redacted = text4;
+  for (const pattern of secretPatterns) {
+    redacted = redacted.replace(pattern, replacement);
+  }
+  return redacted;
+}
+var secretPatterns, replacement;
+var init_redact = __esm({
+  "src/core/policy/redact.ts"() {
+    "use strict";
+    secretPatterns = [
+      /OPENAI_API_KEY=[^\s]+/gi,
+      /GITHUB_TOKEN=[^\s]+/gi,
+      /SUPABASE_KEY=[^\s]+/gi,
+      /AWS_SECRET_ACCESS_KEY=[^\s]+/gi,
+      /(?:wifi|wi-fi|wlan)[_-]?(?:password|pass|psk)\s*[:=]\s*[^\s,;]+/gi,
+      /(?:api[_-]?key|client[_-]?secret|provisioning[_-]?(?:key|secret))\s*[:=]\s*[^\s,;]+/gi,
+      /authorization\s*:\s*bearer\s+[^\s]+/gi,
+      /bearer\s+[a-z0-9._~+/=-]{12,}/gi,
+      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
+      /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gi,
+      /password\s*=\s*[^\s]+/gi,
+      /token\s*=\s*[^\s]+/gi
+    ];
+    replacement = "[REDACTED_SECRET]";
+  }
+});
+
 // src/utils/errors.ts
 function formatPlatformIOError(error2) {
   if (error2 instanceof PlatformIONotInstalledError) {
@@ -6194,36 +6224,6 @@ var init_workspace_registry = __esm({
     import_proper_lockfile = __toESM(require_proper_lockfile(), 1);
     init_paths();
     REGISTRY_FILE = path3.join(SERVER_DATA_DIR, "workspaces.json");
-  }
-});
-
-// src/core/policy/redact.ts
-function redactSecretsInText(text4) {
-  let redacted = text4;
-  for (const pattern of secretPatterns) {
-    redacted = redacted.replace(pattern, replacement);
-  }
-  return redacted;
-}
-var secretPatterns, replacement;
-var init_redact = __esm({
-  "src/core/policy/redact.ts"() {
-    "use strict";
-    secretPatterns = [
-      /OPENAI_API_KEY=[^\s]+/gi,
-      /GITHUB_TOKEN=[^\s]+/gi,
-      /SUPABASE_KEY=[^\s]+/gi,
-      /AWS_SECRET_ACCESS_KEY=[^\s]+/gi,
-      /(?:wifi|wi-fi|wlan)[_-]?(?:password|pass|psk)\s*[:=]\s*[^\s,;]+/gi,
-      /(?:api[_-]?key|client[_-]?secret|provisioning[_-]?(?:key|secret))\s*[:=]\s*[^\s,;]+/gi,
-      /authorization\s*:\s*bearer\s+[^\s]+/gi,
-      /bearer\s+[a-z0-9._~+/=-]{12,}/gi,
-      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
-      /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gi,
-      /password\s*=\s*[^\s]+/gi,
-      /token\s*=\s*[^\s]+/gi
-    ];
-    replacement = "[REDACTED_SECRET]";
   }
 });
 
@@ -91807,6 +91807,53 @@ var require_ip_address = __commonJS({
   }
 });
 
+// src/adapters/compatibility-error.ts
+init_zod();
+init_redact();
+var decisionSchema = external_exports.object({
+  status: external_exports.enum(["allow", "deny", "requires_approval"]),
+  reason: external_exports.string().max(8192),
+  action: external_exports.string().max(256),
+  riskLevel: external_exports.enum(["low", "medium", "high", "critical"]),
+  approvalId: external_exports.string().max(256).optional(),
+  timestamp: external_exports.string().max(128)
+});
+function compatibilityErrorResult(error2) {
+  const record2 = error2 && typeof error2 === "object" ? error2 : {};
+  const code = typeof record2.code === "string" && /^[A-Z0-9_]{1,128}$/.test(record2.code) ? record2.code : "INTERNAL_ERROR";
+  const names = {
+    POLICY_DENIED: "policy_denied",
+    APPROVAL_REQUIRED: "approval_required",
+    PLATFORMIO_NOT_INSTALLED: "pio_not_found",
+    ENOENT: "not_found",
+    ENOTDIR: "not_found",
+    COMPAT_ARGUMENT_INVALID: "ValueError",
+    COMPAT_PROJECT_INVALID: "ValueError"
+  };
+  const context = record2.context && typeof record2.context === "object" ? record2.context : {};
+  const parsed = decisionSchema.safeParse(context.policyDecision);
+  const policyDecision = parsed.success ? {
+    ...parsed.data,
+    reason: redactSecretsInText(parsed.data.reason).slice(0, 8192)
+  } : void 0;
+  const result = {
+    ok: false,
+    error: names[code] ?? code,
+    summary: redactSecretsInText(
+      typeof record2.message === "string" ? record2.message : "Compatibility operation failed."
+    ).slice(0, 8192),
+    log_path: null,
+    status: code === "APPROVAL_REQUIRED" ? "blocked" : "failed",
+    details: { code, ...policyDecision ? { policyDecision } : {} },
+    ...policyDecision?.approvalId ? { approval_id: policyDecision.approvalId } : {}
+  };
+  return {
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    structuredContent: result,
+    isError: true
+  };
+}
+
 // src/adapters/project-compat-registry.ts
 function withProjectCompatibility(base2) {
   const result = new Map(base2);
@@ -110575,6 +110622,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         "error",
         activityId
       );
+    if (compatibilityTool) return compatibilityErrorResult(error2);
     const errorMessage = formatPlatformIOError(error2);
     return createToolErrorResult(errorMessage, {
       status: error2.code === "APPROVAL_REQUIRED" ? "blocked" : "failed",

@@ -10,6 +10,7 @@
  * - CallToolRequestSchema handler: Routes tool requests to their respective backend logic.
  */
 
+import { compatibilityErrorResult } from "./adapters/compatibility-error.js";
 import { withProjectCompatibility } from "./adapters/project-compat-registry.js";
 import { executeProjectCompatibility } from "./adapters/project-compat.js";
 import { parseCompatibilityLaunch } from "./adapters/compatibility-mode.js";
@@ -2473,6 +2474,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         activityId,
       );
 
+    if (compatibilityTool) return compatibilityErrorResult(error);
     const errorMessage = formatPlatformIOError(error);
     return createToolErrorResult(errorMessage, {
       status: error.code === "APPROVAL_REQUIRED" ? "blocked" : "failed",
