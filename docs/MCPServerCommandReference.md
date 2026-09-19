@@ -1,5 +1,10 @@
 # MCP Server Command Reference
 
+> The CLI is now the primary interface. For the equivalent `pio-agent` command
+> for each MCP tool, see `docs/cli-first-adapter-design.md`. Three MCP tools
+> have no CLI equivalent by design: `reset_server_state`, `acquire_lock`, and
+> `release_lock`.
+
 This document serves as the definitive reference for all tools exposed by the PlatformIO MCP Server.
 
 ## Command Index

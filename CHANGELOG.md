@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Skills retargeted from MCP tool names to CLI commands. `pio-manager` is the
+  gateway skill: Tier 1 is the `pio-agent` CLI, MCP is Tier 2 only when a
+  server is already running, and it documents the stdout/stderr/exit-code
+  contract (three outcomes, not two) and the `PortBusy` / `DeviceBusy`
+  distinction. The dashboard skill never starts the dashboard itself; it tells
+  the user to run `pio-agent dashboard --serve`. README and the LLM
+  installation guide lead with the CLI; MCP is documented as optional.
 - 17 CLI commands closing the gap with the MCP tools: `lib`, `project`, `logs`,
   `board-info`, `clean`, `test`, `system-info`, `monitor-stop`, `task-cancel`,
   `upload-fs`, plus `serve` and `dashboard --serve`.
