@@ -463,3 +463,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added bounded declaration parsing and JSON/Arduino manifest extraction. Registry constraints are distinguished from opaque local/VCS/archive sources; malformed evidence is rejected rather than converted into a successful empty manifest.
 - Limits: 4096-character declarations, 1 MiB manifests, 512 dependencies per manifest, bounded names/versions. Arduino duplicate relevant fields and malformed constraints fail explicitly.
 - TypeScript compilation and ten dependency parser/audit tests pass. Filesystem inventory, canonical authorization/registration, optional build evidence, and compatibility integration remain open.
+
+### Dependency filesystem inventory
+
+- Added one-level inventory collection from caller-authorized roots, preferred JSON/properties parsing, duplicate-root suppression and explicit incomplete-evidence diagnostics. Observed library/manifest links are not silently scanned; opened manifest identity is checked against its prior stat. This is not claimed as a race-proof filesystem sandbox.
+- Limits: 64 roots, 4096 entries, 2048 libraries, 1 MiB per manifest and 16 MiB total manifest reads. Malformed preferred JSON does not fall back to properties. Missing manifests retain directory observations but mark evidence incomplete.
+- TypeScript compilation and 12 dependency tests pass. CI for pushed f06849c passed (35476792245 and 35476789366).
+- Inventory is internal: caller authorization, configuration scope, public MCP/CLI and build graph integration remain required. No publication occurred.
