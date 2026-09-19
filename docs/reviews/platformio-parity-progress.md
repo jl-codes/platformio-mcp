@@ -416,3 +416,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Added executePackageCompatibility, routing mapped requests through executePackageAction with the same authorization, locks, logs and config handling. Results provide reference-style output_tail/output/log_path fields and bounded tails (install success 15/failure 30, uninstall 15, list/update 40, outdated 60). Canonical output defaults remain 40 lines; both modes retain the 32 KiB cap. Canonical failure codes and unrecognized-output states remain explicit, and unknown search totals are null rather than invented zero counts.
 - TypeScript and 22 package/compatibility tests passed. Actual policy tests verify alias mutation denial before subprocess execution, unrecognized search remaining non-success and separate 40/60-line tail behavior with a mocked executor. Plugin runtime rebuilt and validated. Literal summary/error-string equivalence, complete parser-row shape mapping, opt-in registry/CLI exposure and host filtering remain unfinished; no reference alias is advertised yet.
+
+## Strict compatibility launch parsing
+
+- Added an internal launch parser for --compat platformio-mcp-python, its equals form and PIO_MCP_COMPAT. Normal mode stays unset; unsupported/empty modes, missing flag values and duplicate selections fail explicitly. Positional arguments following -- remain untouched, as do unrelated policy arguments. The parser does not modify policy or environment state.
+- TypeScript and ten launch-parser tests passed. Entry-point/registry integration is still pending; the existence of this parser does not yet enable public aliases.
