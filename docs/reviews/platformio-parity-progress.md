@@ -321,3 +321,11 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Session startup now accepts bounded trusted additional identity scopes, snapshots them before authorization, binds all scopes to approval arguments and the target digest, and acquires each before transport construction. Contention rolls back prior acquisitions without opening a port. Cleanup retains only failed lease releases for owned retry.
 - TypeScript and 29 session/policy tests passed, including simultaneous endpoint/USB exclusion, rollback on a second busy scope and partial release retry without replaying successful release capabilities. These tests use temporary leases and mock serial transports. Native discovery integration, legacy migration and physical acceptance remain open.
+
+## Discovery-aware startup and green hosted regression
+
+- Connected structured discovery binding to session startup through a trusted internal provider. Endpoint and USB scopes are supplied together; refreshed metadata is bounded by the operation deadline. Every awaited metadata check is followed by cancellation and policy revision checks before further effects. Timeout cannot later resume startup, though the provider remains responsible for bounding its own enumeration work.
+- Added integration tests for descriptor replacement during backend loading, stalled metadata and policy revocation during asynchronous verification. Native enumeration and public/legacy adapters remain outstanding.
+- Hosted run 35473907622 for commit 39be2fa completed successfully: three OS quality jobs, three OS plugin jobs, production dependency audit, Linux CLI end-to-end, Chromium dashboard and Linux build/smoke. This verifies the stale frontend refresh across the tested hosts, not later unpushed changes or physical hardware acceptance.
+
+- Local verification of discovery-aware startup: TypeScript passed; full backend suite passed 67 files / 470 tests, with 2 files / 22 tests skipped. Skipped cases are not acceptance evidence. Output is retained in `.platformio-mcp/discovery-session-regression.log`. No physical device was opened.

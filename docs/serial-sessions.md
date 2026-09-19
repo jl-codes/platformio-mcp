@@ -39,3 +39,9 @@ The lower-level `start` entry point remains an internal adapter interface for ve
 Trusted adapters may supply up to two additional distinct serial resource identities alongside the primary endpoint identity. The manager snapshots these scopes before authorization, includes them in authorization arguments and the policy target digest, and acquires them in sorted order before constructing a transport. Acquisition never waits: contention triggers rollback through the normal cleanup path, with no port opened. This is coordinated acquisition, not a filesystem-wide atomic transaction.
 
 After confirmed closure, each acquired lease is released independently. Only failed releases remain for owner cleanup retry; successful capabilities are not replayed. Capacity and cleanup status account for every retained lease. The discovery adapter must still supply verified USB scopes, and legacy monitor/upload paths still require migration to this shared domain.
+
+## Discovery-aware startup
+
+The internal `startDiscovered` entry point accepts a trusted enumeration provider, resolves the explicit endpoint, binds its structured USB descriptors when available, and supplies both endpoint and USB lease scopes to the session manager. Enumeration must be separately authorized by the adapter; no native enumeration is performed implicitly by the constructor. Each startup identity check refreshes discovery, with the configured operation deadline, before continuing. Stop and policy guards are checked again after every asynchronous metadata boundary. A late enumeration result cannot resume a timed-out startup. The deadline does not terminate the underlying enumeration provider; providers must also bound their own work.
+
+This entry point has fixture coverage for USB replacement during backend loading, stalled metadata and policy revocation during discovery. Native discovery, legacy monitor/upload migration, public adapters and physical verification remain pending.

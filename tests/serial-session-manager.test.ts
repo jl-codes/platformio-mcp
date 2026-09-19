@@ -11,6 +11,7 @@ import {
   type SerialSessionAuthorizer,
   type SerialSessionRequest,
 } from "../src/core/serial/session-manager.js";
+import { resolveSerialEndpoint } from "../src/core/devices/serial-endpoint.js";
 import { DeviceLeaseStore } from "../src/core/devices/device-lease.js";
 import {
   DirectSerialTransport,
@@ -222,6 +223,72 @@ describe("owned serial sessions", () => {
     expect(spy.mock.calls.length).toBe(3);
     for (const resource of [request.resource, usb])
       f.leases.release(f.leases.acquire(resource));
+  });
+
+  it("binds trusted discovery to both scopes and rejects USB replacement before open", async () => {
+    const f = fixture();
+    const record = {
+      path: "COM44",
+      vendorId: "10c4",
+      productId: "ea60",
+      serialNumber: "one",
+    };
+    const list = vi.fn(async () => [record]);
+    const original = f.transport.getMockImplementation()!;
+    f.transport.mockImplementationOnce(async (...args) => {
+      const transport = await original(...args);
+      list.mockResolvedValue([{ ...record, serialNumber: "two" }]);
+      return transport;
+    });
+    await expect(
+      f.manager.startDiscovered(
+        f.owner,
+        { projectDir: f.root, path: "com44", baudRate: 115200 },
+        {
+          list,
+          resolve: (port) => resolveSerialEndpoint(port, { platform: "win32" }),
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: "SERIAL_DEVICE_CHANGED",
+      context: { cleanupPending: false },
+    });
+    expect(f.ports.get("COM44")?.isOpen).toBe(false);
+  });
+  it("bounds stalled metadata checks without opening a transport", async () => {
+    const f = fixture();
+    await expect(
+      f.manager.start(f.owner, {
+        ...f.request(),
+        operationTimeoutMs: 10,
+        revalidateEndpoint: () => new Promise<void>(() => {}),
+      }),
+    ).rejects.toMatchObject({
+      code: "SERIAL_DISCOVERY_TIMEOUT",
+      context: { cleanupPending: false },
+    });
+    expect(f.transport).not.toHaveBeenCalled();
+  });
+
+  it("rechecks policy after asynchronous discovery before acquiring or opening", async () => {
+    let revoked = false;
+    const f = fixture(async () => () => {
+      if (revoked)
+        throw new PlatformIOError("Policy changed.", "POLICY_CHANGED");
+    });
+    await expect(
+      f.manager.start(f.owner, {
+        ...f.request(),
+        revalidateEndpoint: async () => {
+          await Promise.resolve();
+          revoked = true;
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "POLICY_CHANGED",
+      context: { cleanupPending: false },
+    });
+    expect(f.transport).not.toHaveBeenCalled();
   });
 
   it("never accepts a guessed session ID or copied owner object as authority", async () => {

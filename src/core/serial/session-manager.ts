@@ -6,6 +6,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
+import {
+  bindSerialDiscovery,
+  type SerialDiscoveryRecord,
+} from "../devices/serial-discovery-binding.js";
 import { resolveSerialEndpoint } from "../devices/serial-endpoint.js";
 import { PlatformIOError } from "../../utils/errors.js";
 import {
@@ -38,7 +42,7 @@ export interface SerialSessionRequest extends DirectSerialOptions {
   additionalResources?: readonly DeviceResource[]; // Trusted additional identity scopes, at most two.
   buffer?: SerialBufferLimits;
   /** Trusted adapter guard; never accepted from public JSON arguments. */
-  revalidateEndpoint?: () => void;
+  revalidateEndpoint?: () => void | Promise<void>;
 }
 /** Authorization binds concrete session/request details without putting raw serial commands in metadata. */
 export interface SerialSessionAuthorization {
@@ -132,6 +136,42 @@ export class SerialSessionManager {
     });
   }
 
+  /** Join trusted bounded discovery with endpoint and USB leases; adapters authorize enumeration separately. */
+  async startDiscovered(
+    owner: SerialSessionOwner,
+    input: Omit<
+      SerialSessionRequest,
+      "resource" | "additionalResources" | "revalidateEndpoint"
+    >,
+    discovery: {
+      list: () => Promise<readonly SerialDiscoveryRecord[]>;
+      resolve?: typeof resolveSerialEndpoint;
+    },
+  ): Promise<SerialSessionInfo> {
+    this.requireOwner(owner);
+    validateDirectSerialOptions(input);
+    const resolve = discovery.resolve ?? resolveSerialEndpoint;
+    const endpoint = resolve(input.path);
+    const binding = bindSerialDiscovery(
+      endpoint,
+      await this.withEndpointDeadline(
+        discovery.list,
+        input.operationTimeoutMs ?? 5000,
+      ),
+      resolve,
+    );
+    return this.start(owner, {
+      ...input,
+      path: endpoint.canonicalPort,
+      resource: endpoint.resource,
+      additionalResources: binding.usbIdentity
+        ? [{ kind: "serial", identity: binding.usbIdentity }]
+        : [],
+      revalidateEndpoint: async () =>
+        binding.revalidate(await discovery.list()),
+    });
+  }
+
   /** Authorize, acquire ownership, construct an unopened transport, revalidate, then open explicitly. */
   async start(
     owner: SerialSessionOwner,
@@ -219,7 +259,7 @@ export class SerialSessionManager {
       const guard = await this.authorize(session, "start");
       this.ensureNotStopped(session);
       guard();
-      session.request.revalidateEndpoint?.();
+      await this.checkEndpoint(session, guard);
       // Acquisition never waits: any contention rolls back the already-acquired scopes before opening.
       for (const resource of [
         session.request.resource,
@@ -241,11 +281,11 @@ export class SerialSessionManager {
       });
       this.ensureNotStopped(session);
       guard();
-      session.request.revalidateEndpoint?.();
+      await this.checkEndpoint(session, guard);
       await session.transport.open();
       this.ensureNotStopped(session);
       guard();
-      session.request.revalidateEndpoint?.();
+      await this.checkEndpoint(session, guard);
       session.startPending = false;
       this.markEnded(session);
       return this.info(session);
@@ -429,6 +469,47 @@ export class SerialSessionManager {
         "SERIAL_AUTHORIZATION_REQUIRED",
       );
     return guard;
+  }
+
+  /** Bound trusted metadata waits without letting a late result resume a failed startup. */
+  private async withEndpointDeadline<T>(
+    run: () => T | Promise<T>,
+    timeoutMs: number,
+  ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        Promise.resolve().then(run),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () =>
+              reject(
+                new PlatformIOError(
+                  "Serial endpoint verification timed out.",
+                  "SERIAL_DISCOVERY_TIMEOUT",
+                ),
+              ),
+            timeoutMs,
+          );
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  /** Recheck stop and policy after every asynchronous discovery boundary, before any device effect. */
+  private async checkEndpoint(
+    session: Session,
+    guard: () => void,
+  ): Promise<void> {
+    if (session.request.revalidateEndpoint)
+      await this.withEndpointDeadline(
+        session.request.revalidateEndpoint,
+        session.request.operationTimeoutMs!,
+      );
+    this.ensureNotStopped(session);
+    guard();
   }
 
   private requireOwner(owner: SerialSessionOwner): void {
