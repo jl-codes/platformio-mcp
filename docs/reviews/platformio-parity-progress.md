@@ -310,3 +310,9 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Connected OS alias resolution to an internal `startEndpoint` entry point. The session manager snapshots its trusted endpoint guard and checks it before leasing, after backend loading immediately before open, and after open. Replacement follows the existing confirmed-close lease cleanup path. This does not claim USB identity or remove native-open races.
 - Added backend-loading and post-open replacement tests: replacement prevents a pending open or closes an already-open transport, then releases the acquired lease. TypeScript and 40 endpoint/session/policy tests passed. Public routes, legacy resource coordination and physical acceptance remain open.
+
+## Structured serial discovery binding
+
+- Added a bounded internal binding between canonical endpoint identity and optional structured USB descriptors. It rejects conflicting aliases and duplicate USB descriptors across endpoints, labels descriptor absence, and requires selection/authorization again after identity changes or port movement. No automatic reconnect or physical authenticity is claimed.
+- TypeScript and 20 endpoint/discovery tests passed. New tests cover case normalization, serial-number changes, duplicate descriptors, conflicting alias metadata, re-enumeration refusal and malformed/oversized input. No device enumeration or port opening was performed.
+- Native discovery and dual endpoint/USB lease acquisition still need integration before public serial exposure. The PR remains draft with the full parity and publication goal active.
