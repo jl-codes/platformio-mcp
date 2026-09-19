@@ -75,3 +75,40 @@ export class SerialLineRedactor {
     return { text, redacted: text !== line };
   }
 }
+
+/** Scan all incoming characters before storage truncation; suppress whole PEM-bearing lines conservatively. */
+export class SerialStreamRedactor {
+  private window = "";
+  private block: string | undefined;
+  private sensitiveLine = false;
+
+  /** Observe one decoded character, including characters omitted from the retained line prefix. */
+  observe(character: string): void {
+    this.window = (this.window + character).slice(-80);
+    if (this.block) {
+      this.sensitiveLine = true;
+      if (this.window.toUpperCase().endsWith(`-----END ${this.block}-----`))
+        this.block = undefined;
+    } else {
+      const start = begin.exec(this.window);
+      if (start && start.index + start[0].length === this.window.length) {
+        this.block = start[1].toUpperCase();
+        this.sensitiveLine = true;
+      }
+    }
+  }
+
+  /** Render a retained prefix; previews do not alter the scanner's state. */
+  preview(prefix: string): string {
+    if (!prefix) return "";
+    return this.sensitiveLine || this.block
+      ? marker
+      : redactSecretsInText(prefix);
+  }
+
+  /** Commit framing after the completed line has been rendered. */
+  nextLine(): void {
+    this.window = "";
+    this.sensitiveLine = !!this.block;
+  }
+}

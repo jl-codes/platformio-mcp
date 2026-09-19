@@ -2,6 +2,7 @@
  * Bounded serial text storage and cursor reads, independent of device transport.
  * Provides SerialSessionBuffer with UTF-8 framing, loss accounting and cancellable waits.
  */
+import { SerialStreamRedactor } from "./serial-redaction.js";
 import { StringDecoder } from "node:string_decoder";
 import { performance } from "node:perf_hooks";
 import { PlatformIOError } from "../../utils/errors.js";
@@ -30,6 +31,8 @@ export interface SerialReadOptions {
 }
 /** A consistent bounded view; terminal state and cursor loss are independent of read outcome. */
 export interface SerialBufferRead {
+  redactionApplied: boolean; // Known-format filtering, not a guarantee that arbitrary secrets are detected.
+  redactionOutputMayBeTruncated: boolean;
   lines: string[];
   lineTruncatedBytes: number[];
   cursor: number; // Next unread completed-line cursor.
@@ -80,7 +83,7 @@ function boundedInteger(
 
 /**
  * Ring storage with bounded partial lines and at most 32 pending readers.
- * This class does not authorize callers, open ports, acquire device locks or redact output.
+ * This class does not authorize callers, open ports, acquire device locks or choose redaction policy. Optional filtering runs before storage and response budgets.
  * Those responsibilities belong to the owning session service and its public adapters.
  */
 export class SerialSessionBuffer {
@@ -88,6 +91,8 @@ export class SerialSessionBuffer {
   private readonly byteCapacity: number;
   private readonly lineCapacity: number;
   private readonly ring: Array<StoredLine | undefined>;
+  private readonly redactor?: SerialStreamRedactor;
+  private redactionClipped = false;
   private readonly decoder = new StringDecoder("utf8");
   private readonly waiters = new Set<() => void>();
   private head = 0;
@@ -107,7 +112,8 @@ export class SerialSessionBuffer {
   private error?: string;
 
   /** Construct storage limits; even empty lines consume one bounded ring entry. */
-  constructor(limits: SerialBufferLimits = {}) {
+  constructor(limits: SerialBufferLimits = {}, redact = false) {
+    if (redact) this.redactor = new SerialStreamRedactor();
     this.capacity = boundedInteger(
       limits.maxLines ?? 5000,
       1,
@@ -209,14 +215,18 @@ export class SerialSessionBuffer {
       bytes += row.bytes;
       cursor = row.cursor + 1;
     }
+    const renderedPartial = this.filterText(this.partial);
+    const renderedPartialBytes = Buffer.byteLength(renderedPartial);
     const unreadLines = cursor < this.nextCursor;
     const showPartial =
       !unreadLines &&
       lines.length < limit &&
-      bytes + this.partialBytes <= byteLimit;
+      bytes + renderedPartialBytes <= byteLimit;
     const moreAvailable =
       unreadLines || (!showPartial && this.partialBytes > 0);
     return {
+      redactionApplied: !!this.redactor,
+      redactionOutputMayBeTruncated: this.redactionClipped,
       lines,
       lineTruncatedBytes,
       cursor,
@@ -225,7 +235,7 @@ export class SerialSessionBuffer {
       cursorStatus: requested < first ? "stale" : "current",
       droppedLines: Math.max(0, first - requested),
       moreAvailable,
-      partial: showPartial ? this.partial : "",
+      partial: showPartial ? renderedPartial : "",
       partialCursor: this.nextCursor,
       partialTruncatedBytes: showPartial ? this.partialLost : 0,
       state: this.state,
@@ -335,6 +345,7 @@ export class SerialSessionBuffer {
         this.previousCr = character === "\r";
         continue;
       }
+      this.redactor?.observe(character);
       const bytes = Buffer.byteLength(character);
       if (this.partialLost || this.partialBytes + bytes > this.lineCapacity) {
         this.partialLost += bytes;
@@ -358,18 +369,43 @@ export class SerialSessionBuffer {
         "Serial line cursor exhausted.",
         "SERIAL_BUFFER_COUNTER_LIMIT",
       );
-    if (this.count === this.capacity) this.evict();
+    const text = this.filterText(this.partial);
+    const bytes = Buffer.byteLength(text);
+    while (
+      this.count &&
+      (this.count === this.capacity ||
+        this.storedBytes + bytes > this.byteCapacity)
+    )
+      this.evict();
     this.ring[(this.head + this.count) % this.capacity] = {
-      text: this.partial,
-      bytes: this.partialBytes,
+      text,
+      bytes,
       truncatedBytes: this.partialLost,
       cursor: this.nextCursor++,
     };
     this.count++;
-    this.storedBytes += this.partialBytes;
+    this.storedBytes += bytes;
+    this.redactor?.nextLine();
     this.partial = "";
     this.partialBytes = 0;
     this.partialLost = 0;
+  }
+
+  /** Apply filtering before response/storage budgeting; never split a UTF-8 code point. */
+  private filterText(text: string): string {
+    if (!this.redactor) return text;
+    const filtered = this.redactor.preview(text);
+    if (Buffer.byteLength(filtered) <= this.lineCapacity) return filtered;
+    this.redactionClipped = true;
+    let prefix = "",
+      bytes = 0;
+    for (const character of filtered) {
+      const size = Buffer.byteLength(character);
+      if (bytes + size > this.lineCapacity) break;
+      prefix += character;
+      bytes += size;
+    }
+    return prefix;
   }
 
   private evict(): void {

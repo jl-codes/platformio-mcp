@@ -374,3 +374,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Added an internal framed-line redactor using shared known-secret patterns plus persistent PEM block state. Partial previews do not mutate stream state; completed lines commit it, and matching closing delimiters end suppression. Input is bounded and unframed multiline input is rejected.
 - TypeScript and six redaction tests passed, covering credentials, unterminated multiline blocks, repeated previews, adjacent blocks, mismatched delimiters and input limits. Buffer/public integration remains open, particularly pre-truncation marker tracking and post-redaction response byte accounting. No public redaction guarantee is claimed yet.
+
+## Direct serial buffer redaction integration
+
+- Connected a bounded rolling PEM marker scanner and shared credential patterns to direct-session buffers. Markers are observed before source truncation, block state survives ring eviction, completed storage and partial snapshots are filtered, and matching operates on filtered views. Replacement expansion is clipped without splitting UTF-8 or exceeding budgets; additive metadata identifies filtering/clipping.
+- TypeScript and focused buffer/session/policy/redaction tests validate truncation-before-header handling, fragmented delimiters, eviction, filtered partials, replacement expansion and the real owned-session echo path. Direct mode currently filters unconditionally; legacy monitor behavior and public tool exposure are unchanged.

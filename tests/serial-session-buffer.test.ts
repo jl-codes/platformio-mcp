@@ -293,3 +293,35 @@ describe("serial session buffer", () => {
     expect(buffer.snapshot({ cursor: first.cursor }).lines).toEqual(["later"]);
   });
 });
+
+describe("redacted serial buffer", () => {
+  it("tracks PEM delimiters beyond a truncated line and across chunks and eviction", () => {
+    const buffer = new SerialSessionBuffer(
+      { maxLines: 1, maxBytes: 40, maxLineBytes: 20 },
+      true,
+    );
+    for (const character of "prefix too long -----BEGIN PRIVATE KEY-----\nsecret-body\n")
+      put(buffer, character);
+    expect(buffer.snapshot().lines).toEqual(["[REDACTED_SECRET]"]);
+    put(buffer, "more-secret");
+    expect(buffer.snapshot().partial).toBe("[REDACTED_SECRET]");
+    put(buffer, "\n-----END PRIVATE KEY-----\nready\n");
+    expect(buffer.snapshot().lines).toEqual(["ready"]);
+  });
+  it("redacts assignments in partial reads and bounds expanding replacement text", () => {
+    const buffer = new SerialSessionBuffer(
+      { maxBytes: 12, maxLineBytes: 12 },
+      true,
+    );
+    put(buffer, "token=x");
+    expect(buffer.snapshot()).toMatchObject({
+      partial: "[REDACTED_SE",
+      redactionApplied: true,
+      redactionOutputMayBeTruncated: true,
+    });
+    put(buffer, "\n");
+    expect(
+      Buffer.byteLength(buffer.snapshot().lines.join("")),
+    ).toBeLessThanOrEqual(12);
+  });
+});

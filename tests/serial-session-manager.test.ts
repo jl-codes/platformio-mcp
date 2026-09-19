@@ -361,6 +361,25 @@ describe("owned serial sessions", () => {
     await f.manager.stop(other, next.sessionId);
   });
 
+  it("returns and matches filtered text from the owned direct session buffer", async () => {
+    const f = fixture();
+    const started = await f.manager.start(f.owner, f.request());
+    await f.manager.write(
+      f.owner,
+      started.sessionId,
+      Buffer.from("wifi_password=private-value\n"),
+    );
+    const read = await f.manager.read(f.owner, started.sessionId, {
+      waitFor: "[REDACTED_SECRET]",
+      timeoutMs: 1000,
+    });
+    expect(read).toMatchObject({ matched: true, redactionApplied: true });
+    expect([...read.lines, read.partial].filter(Boolean)).toEqual([
+      "[REDACTED_SECRET]",
+    ]);
+    expect(JSON.stringify(read)).not.toContain("private-value");
+  });
+
   it("never accepts a guessed session ID or copied owner object as authority", async () => {
     const f = fixture();
     const started = await f.manager.start(f.owner, f.request());

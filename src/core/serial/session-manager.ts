@@ -253,7 +253,7 @@ export class SerialSessionManager {
         "Serial identity scopes must be distinct serial resources.",
         "SERIAL_RESOURCE_INVALID",
       );
-    const buffer = new SerialSessionBuffer(input.buffer);
+    const buffer = new SerialSessionBuffer(input.buffer, true);
     this.prune();
     this.requireCapacity();
     const session: Session = {
