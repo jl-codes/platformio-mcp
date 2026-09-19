@@ -1,4 +1,8 @@
 /** Package evidence, authorization and dependency persistence regression tests. */
+import {
+  executePackageCompatibility,
+  packageCompatibilityResult,
+} from "../src/adapters/package-compat.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -362,4 +366,59 @@ it("supports the reference's empty search query for a whole package kind", async
     ["search", "type:tool", "--page", "1"],
     expect.anything(),
   );
+});
+
+it("preserves the 60-line reference outdated report without changing the canonical default", async () => {
+  const output = Array.from({ length: 90 }, (_, index) => `row-${index}`).join(
+    "\n",
+  );
+  vi.mocked(platformioExecutor.execute).mockResolvedValue({
+    exitCode: 0,
+    stdout: output,
+    stderr: "",
+  });
+  const canonical = await executePackageAction("pkg_outdated", {
+    projectDir: project,
+  });
+  expect(canonical.outputTail.split("\n")).toHaveLength(40);
+  const compatible = await executePackageCompatibility("pio_pkg_outdated", {
+    project_dir: project,
+  });
+  expect(compatible).toMatchObject({
+    ok: true,
+    output: expect.stringContaining("row-30"),
+    log_path: expect.any(String),
+  });
+  expect((compatible as { output: string }).output.split("\n")).toHaveLength(
+    60,
+  );
+});
+it("routes compatibility mutation through canonical denial before executing", async () => {
+  fs.writeFileSync(
+    path.join(project, ".pio-mcp-policy.json"),
+    JSON.stringify({ profile: "read_only" }),
+  );
+  await expect(
+    executePackageCompatibility("pio_pkg_install", {
+      project_dir: project,
+      spec: "owner/package",
+    }),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(platformioExecutor.execute).not.toHaveBeenCalled();
+});
+it("does not turn unrecognized canonical search output into a successful compatibility result", async () => {
+  vi.mocked(platformioExecutor.execute).mockResolvedValue({
+    exitCode: 0,
+    stdout: "unknown-format",
+    stderr: "",
+  });
+  const canonical = await executePackageAction("pkg_search", {
+    query: "fixture",
+  });
+  expect(packageCompatibilityResult(canonical)).toMatchObject({
+    ok: false,
+    error: "PACKAGE_OUTPUT_UNRECOGNIZED",
+    total: null,
+    details: { parse_status: "unrecognized" },
+  });
 });

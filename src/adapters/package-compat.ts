@@ -7,7 +7,8 @@ import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
 import { PlatformIOError } from "../utils/errors.js";
-import type { PackageAction } from "../tools/packages.js";
+import { executePackageAction, type PackageAction } from "../tools/packages.js";
+import type { PolicyEvaluationContext } from "../core/policy/types.js";
 
 const text = z
   .string()
@@ -127,4 +128,73 @@ export async function mapPackageCompatibilityRequest(
       ...(args.approval_id ? { approvalId: args.approval_id } : {}),
     },
   };
+}
+
+/** Adapt completed canonical evidence without converting failures or unrecognized output into success. */
+export function packageCompatibilityResult(
+  result: Awaited<ReturnType<typeof executePackageAction>>,
+) {
+  const tail = (lines: number) =>
+    result.outputTail.split("\n").slice(-lines).join("\n");
+  const common = {
+    ok: result.ok,
+    summary: result.summary,
+    log_path: result.logPath ?? null,
+    ...(result.error ? { error: result.error } : {}),
+    details: {
+      action: result.action,
+      exit_code: result.exitCode,
+      ...(result.parseStatus ? { parse_status: result.parseStatus } : {}),
+      ...(result.configuration ? { configuration: result.configuration } : {}),
+    },
+  };
+  switch (result.action) {
+    case "pkg_search":
+      return {
+        ...common,
+        packages: result.packages ?? [],
+        total: "total" in result ? (result.total ?? null) : null,
+        page: "page" in result ? (result.page ?? null) : null,
+        pages: "pages" in result ? (result.pages ?? null) : null,
+        ...(result.ok
+          ? {
+              install_hint:
+                "install with pio_pkg_install(spec='owner/name@^version')",
+            }
+          : {}),
+      };
+    case "pkg_list":
+      return {
+        ...common,
+        packages: result.packages ?? [],
+        output_tail: tail(40),
+      };
+    case "pkg_outdated":
+      return { ...common, output: tail(60) };
+    case "pkg_install":
+      return { ...common, output_tail: tail(result.ok ? 15 : 30) };
+    case "pkg_uninstall":
+      return { ...common, output_tail: tail(15) };
+    case "pkg_update":
+      return { ...common, output_tail: tail(40) };
+  }
+}
+
+/** Route aliases through the canonical policy/locking implementation; authorization errors remain errors. */
+export async function executePackageCompatibility(
+  name: string,
+  input: unknown,
+  defaults: PackageCompatibilityDefaults = {},
+  caller: PolicyEvaluationContext = {},
+  onAuthorized?: () => Promise<void>,
+) {
+  const mapped = await mapPackageCompatibilityRequest(name, input, defaults);
+  const result = await executePackageAction(
+    mapped.action,
+    mapped.args,
+    caller,
+    onAuthorized,
+    { tailLines: mapped.action === "pkg_outdated" ? 60 : 40 },
+  );
+  return packageCompatibilityResult(result);
 }

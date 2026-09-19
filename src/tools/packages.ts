@@ -170,7 +170,14 @@ export async function executePackageAction(
   input: unknown,
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
+  outputOptions: { tailLines?: 40 | 60 } = {},
 ) {
+  const tailLines = outputOptions.tailLines ?? 40;
+  if (tailLines !== 40 && tailLines !== 60)
+    throw new PlatformIOError(
+      "Invalid package output limit.",
+      "PACKAGE_OUTPUT_LIMIT",
+    );
   if (
     ![
       "pkg_search",
@@ -364,7 +371,11 @@ export async function executePackageAction(
             }),
         projectDir,
         environment: "environment" in params ? params.environment : undefined,
-        outputTail: output.split(/\r?\n/).slice(-40).join("\n").slice(-32768),
+        outputTail: output
+          .split(/\r?\n/)
+          .slice(-tailLines)
+          .join("\n")
+          .slice(-32768),
         logPath,
         ...(projectDir
           ? {

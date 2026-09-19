@@ -101396,7 +101396,13 @@ async function retainOutput(projectDir, output) {
     await fs13.unlink(stale.path);
   return file;
 }
-async function executePackageAction(action, input, caller = {}, onAuthorized) {
+async function executePackageAction(action, input, caller = {}, onAuthorized, outputOptions = {}) {
+  const tailLines = outputOptions.tailLines ?? 40;
+  if (tailLines !== 40 && tailLines !== 60)
+    throw new PlatformIOError(
+      "Invalid package output limit.",
+      "PACKAGE_OUTPUT_LIMIT"
+    );
   if (![
     "pkg_search",
     "pkg_install",
@@ -101525,7 +101531,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized) {
         },
         projectDir,
         environment: "environment" in params ? params.environment : void 0,
-        outputTail: output.split(/\r?\n/).slice(-40).join("\n").slice(-32768),
+        outputTail: output.split(/\r?\n/).slice(-tailLines).join("\n").slice(-32768),
         logPath,
         ...projectDir ? {
           configuration: {
