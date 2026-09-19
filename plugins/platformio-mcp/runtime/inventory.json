@@ -2,9 +2,149 @@
   "schemaVersion": 1,
   "files": [
     {
+      "path": "native/dependencies.json",
+      "bytes": 2226,
+      "sha256": "346258bdd97cc283e03d144232469f37890ddb5cdf83a74b6437a402fe63b16a"
+    },
+    {
+      "path": "native/licenses/@serialport--binding-mock/LICENSE",
+      "bytes": 1072,
+      "sha256": "043e85e0a83eca4b33f6bc4e1f02e6382e1d9cf72a7a07dec36ddf0e83fe4254"
+    },
+    {
+      "path": "native/licenses/@serialport--bindings-cpp/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/@serialport--bindings-interface/LICENSE",
+      "bytes": 1072,
+      "sha256": "043e85e0a83eca4b33f6bc4e1f02e6382e1d9cf72a7a07dec36ddf0e83fe4254"
+    },
+    {
+      "path": "native/licenses/@serialport--parser-byte-length/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/@serialport--parser-cctalk/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/@serialport--parser-delimiter/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/@serialport--parser-inter-byte-timeout/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/@serialport--parser-packet-length/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/@serialport--parser-readline/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/@serialport--parser-ready/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/@serialport--parser-regex/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/@serialport--parser-slip-encoder/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/@serialport--parser-spacepacket/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/@serialport--stream/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/debug/LICENSE",
+      "bytes": 1139,
+      "sha256": "3a61c6c96caf5c1d9b623fb9b04c822b783dfcb78aa7e49c76a3f643e6ed7f95"
+    },
+    {
+      "path": "native/licenses/has-flag/license",
+      "bytes": 1109,
+      "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
+    },
+    {
+      "path": "native/licenses/ms/license.md",
+      "bytes": 1079,
+      "sha256": "1662fae9b5314d11cf51284e2dcd1f006a354f7343f08712a730fcff9a359801"
+    },
+    {
+      "path": "native/licenses/node-gyp-build/LICENSE",
+      "bytes": 1079,
+      "sha256": "7b3638496004b2daed183a91c4ba45d3ef6331db6c9d0eb1dd882a505630c172"
+    },
+    {
+      "path": "native/licenses/serialport/LICENSE",
+      "bytes": 1105,
+      "sha256": "12b8f57dbef742496d1356e7773fdf32924724bf1cdb2cd833c448611d04a525"
+    },
+    {
+      "path": "native/licenses/supports-color/license",
+      "bytes": 1109,
+      "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
+    },
+    {
+      "path": "native/serialport.cjs",
+      "bytes": 150032,
+      "sha256": "4003831808153dbfce3766f1180d9bb53ff3b61f05567522d8ee45dad7271f8d"
+    },
+    {
       "path": "platformio-mcp.mjs",
       "bytes": 3893724,
       "sha256": "371c3dd3dafd9d396673df3605a7ea93ff0bee95b82b8ce6bf824c6d0dbb1337"
+    },
+    {
+      "path": "prebuilds/darwin-x64+arm64/@serialport+bindings-cpp.node",
+      "bytes": 254416,
+      "sha256": "23daa6940614b42ac940c96e0f420d7576738a515f29c25bc1e1790f9abd5704"
+    },
+    {
+      "path": "prebuilds/linux-arm64/@serialport+bindings-cpp.armv8.glibc.node",
+      "bytes": 134312,
+      "sha256": "a92389bed45b1ea7f9613e6c01de18e60cf58d484cddf065d8603c9143876f8f"
+    },
+    {
+      "path": "prebuilds/linux-arm64/@serialport+bindings-cpp.armv8.musl.node",
+      "bytes": 134224,
+      "sha256": "c42316381abdbcdd3d56ce2b2bcec04cb62a6f092b57cf2bb8f963a155b55d57"
+    },
+    {
+      "path": "prebuilds/linux-x64/@serialport+bindings-cpp.glibc.node",
+      "bytes": 150744,
+      "sha256": "572054004570f2a93630ca716c32947257283d1abbfd536f7a91cf6d98dc50db"
+    },
+    {
+      "path": "prebuilds/linux-x64/@serialport+bindings-cpp.musl.node",
+      "bytes": 170080,
+      "sha256": "794a33f480832d57268a225a8560963cf4b8153334186cff13cf3cec40f7d99b"
+    },
+    {
+      "path": "prebuilds/win32-x64/@serialport+bindings-cpp.node",
+      "bytes": 233472,
+      "sha256": "eead9115994f9ad9471cd607ead9aa5c3dbf460c878bafdde41b68b57679fefc"
     },
     {
       "path": "web/assets/index-BkkxHhoR.js",

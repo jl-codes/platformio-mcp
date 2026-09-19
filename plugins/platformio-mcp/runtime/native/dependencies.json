@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "minimumNodeMajor": 20,
+  "packages": [
+    {
+      "name": "@serialport/binding-mock",
+      "version": "10.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/bindings-cpp",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/bindings-interface",
+      "version": "1.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/parser-byte-length",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/parser-cctalk",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/parser-delimiter",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/parser-inter-byte-timeout",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/parser-packet-length",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/parser-readline",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/parser-ready",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/parser-regex",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/parser-slip-encoder",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/parser-spacepacket",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@serialport/stream",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "debug",
+      "version": "4.4.0",
+      "license": "MIT"
+    },
+    {
+      "name": "has-flag",
+      "version": "4.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "ms",
+      "version": "2.1.3",
+      "license": "MIT"
+    },
+    {
+      "name": "node-gyp-build",
+      "version": "4.8.4",
+      "license": "MIT"
+    },
+    {
+      "name": "serialport",
+      "version": "13.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "supports-color",
+      "version": "7.2.0",
+      "license": "MIT"
+    }
+  ],
+  "prebuildTargets": [
+    "win32-x64",
+    "darwin-x64+arm64",
+    "linux-x64",
+    "linux-arm64"
+  ]
+}

@@ -2,6 +2,7 @@
  * Direct serial transport with bounded operations and independently confirmed physical closure.
  * Provides DirectSerialTransport and createDirectSerialTransport; authorization/leases belong to the session service.
  */
+import { loadSerialBackend } from "./serial-backend.js";
 import type { EventEmitter } from "node:events";
 import { PlatformIOError } from "../../utils/errors.js";
 
@@ -395,7 +396,7 @@ export async function createDirectSerialTransport(
       "SERIAL_BACKEND_UNAVAILABLE",
     );
   try {
-    const { SerialPort } = await import("serialport");
+    const { SerialPort } = await loadSerialBackend();
     const port = new SerialPort({
       path: options.path,
       baudRate: options.baudRate,

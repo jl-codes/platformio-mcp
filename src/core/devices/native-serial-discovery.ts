@@ -2,6 +2,7 @@
  * Authorized native serial enumeration with bounded results and concurrency.
  * Provides NativeSerialDiscovery; enumeration never opens a serial port.
  */
+import { loadSerialBackend } from "../serial/serial-backend.js";
 import { z } from "zod";
 import { PlatformIOError } from "../../utils/errors.js";
 import type { SerialDiscoveryRecord } from "./serial-discovery-binding.js";
@@ -42,7 +43,7 @@ async function loadBackend(): Promise<{ list: () => Promise<unknown> }> {
       "SERIAL_BACKEND_UNAVAILABLE",
     );
   try {
-    const { SerialPort } = await import("serialport");
+    const { SerialPort } = await loadSerialBackend();
     return { list: () => SerialPort.list() };
   } catch {
     throw new PlatformIOError(
