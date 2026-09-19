@@ -82,7 +82,8 @@ export function inspectProcessIdentity(pid: number): ProcessObservation {
         ],
         {
           encoding: "utf8",
-          timeout: 3000,
+          // Windows PowerShell cold startup can exceed three seconds on loaded hosts.
+          timeout: 10000,
           maxBuffer: 8192,
           windowsHide: true,
           stdio: ["ignore", "pipe", "pipe"],

@@ -364,3 +364,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Added permanent owner disconnection for adapter lifecycle handling. Disconnected principals cannot create new starts or writes, while owned cleanup remains retryable and retained reads remain policy checked. Disconnect invokes stopAll, preserving cancellation across pending startup authorization/discovery.
 - TypeScript and 40 manager/policy tests passed. The new lifecycle test verifies start/write rejection, retained status/read access, cleanup retry and independent operation by a newly issued owner. Actual public transport disconnect wiring remains open.
+
+## Windows process identity deadline
+
+- Hosted run 35474603931 failed one Windows host-identity test after about 3,025 ms: current-process observation was unknown. All other 479 Windows tests passed; Linux/macOS quality jobs passed. Downstream jobs were skipped. The timing is consistent with the three-second PowerShell deadline, though the sanitized observation does not expose the underlying exception.
+- Increased only the Windows metadata deadline to ten seconds and the two-observation test budget to 25 seconds. Unknown metadata still never establishes stale ownership; no fallback, cached token or weakened assertion was introduced. This may delay lease operations on an unresponsive Windows metadata backend, but remains bounded. Hosted verification is still required.

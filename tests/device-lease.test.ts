@@ -80,7 +80,7 @@ describe("process ownership identity", () => {
     const first = inspectProcessIdentity(process.pid);
     expect(first.status).toBe("running");
     expect(inspectProcessIdentity(process.pid)).toEqual(first);
-  }, 10000);
+  }, 25000);
 });
 
 describe("physical device lease store", () => {
