@@ -47,3 +47,12 @@ These are partial S2 implementation changes, not completion of S0-S7 or the full
 Namespace coverage is finite. Python package-name normalization makes the competitor's `platformio.mcp` equivalent to `platformio-mcp`; do not attempt to publish that occupied Python identity. Follow the checked-in namespace inventory and authenticate candidate ownership before publishing.
 
 
+
+## Approval integrity milestone
+
+- Bound grants to exact argument and policy identities; normal policy-generated records no longer persist raw argument secrets.
+- Atomic cross-process lifecycle mutations, approved-request expiry, terminal denial/expiry/consumption and exclusive one-use claims are implemented. Malformed storage fails closed instead of resetting silently.
+- Removed inline approval booleans from engine authorization. Existing CLI operator confirmation now approves and consumes a scoped request.
+- Isolated all Vitest workers from real operator policy/approval/audit data.
+- Full unit suite: 41 files / 203 tests passed (`approval-unit.log`). New tests cover parameter and policy changes, expiry, denied/consumed resurrection, persistence failure, malformed storage and four-process consumption races.
+- Remaining: trusted operator-channel separation, canonical alias normalization, policy revalidation immediately before queued effects, device/artifact resolution before grant identity, composite scopes, project enrollment, shared dispatcher and all subsequent parity/packaging/acceptance stages. CLI --approve remains an explicit operator CLI surface; it is not proof of human identity against an agent with unrestricted local process execution.

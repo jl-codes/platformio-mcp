@@ -98,7 +98,7 @@ COMMANDS:
   agent-last-report --project-dir <dir>
   agent-board-report --project-dir <dir> --board <id>
   policy-status [--project-dir <dir>]
-  approvals [--status <pending|approved|denied|expired>] [--limit <n>]
+  approvals [--status <pending|approved|denied|expired|consumed>] [--limit <n>]
   approval-status <approval-id> [--project-dir <dir>]
   pending-approvals [--project-dir <dir>] [--limit <n>]
   approve <approval-id>
@@ -354,10 +354,6 @@ async function runCliCommand(command: string, rawArgs: string[]) {
     projectDir: projectDirForPolicy,
   };
 
-  if (approvalOpt === true) {
-    policyArgs = { ...policyArgs, __approved: true };
-  }
-
   try {
     let decision = await evaluatePolicy(actionName, policyArgs, {
       workspaceDir: projectDirForPolicy,
@@ -395,9 +391,11 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         }
       }
 
+      if (!decision.approvalId || !approveRequest(decision.approvalId)) {
+        throw new PlatformIOError("Approval request is no longer available.", "APPROVAL_REQUIRED");
+      }
       policyArgs = {
         ...policyArgs,
-        __approved: true,
         approvalId: decision.approvalId,
       };
       decision = await evaluatePolicy(actionName, policyArgs, {
@@ -711,6 +709,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           | "approved"
           | "denied"
           | "expired"
+          | "consumed"
           | undefined;
         const limit = asNumber(options.limit);
         const result = listApprovalRequests({ status, limit });

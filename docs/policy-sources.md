@@ -43,3 +43,13 @@ PIO_MCP_POLICY_FILE = "/absolute/path/operator.yaml"
 ```
 
 Plugin-managed server configuration is a separate launch surface; do not assume a standalone `mcp_servers.platformio` entry also configures a bundled plugin. Plugin host acceptance and permission propagation must be verified against the final packaged release.
+
+## Approval lifecycle
+
+An approval now binds the complete operation arguments, project scope, automation scope and effective-policy digest. Changing any operation parameter or policy source requires a new approval. Argument secrets participate in the hash but are not copied into normal policy-generated approval records.
+
+Approved requests expire after their configured lifetime (30 minutes by default). A grant is consumed once before execution. Consumption is serialized across processes and recorded with an exclusive on-disk claim; a crash while saving the final status does not make the grant reusable. Denied, expired and consumed records cannot be approved again. A failed operation may consume its grant and require a fresh approval for retry.
+
+Existing approval records without an exact scope digest or expiry remain readable but cannot authorize execution. Create a new request and approve it through the operator workflow. Caller-supplied `approved`/`__approved` booleans and an `actor: user` label no longer grant authority inside the policy engine. The CLI retains its explicit confirmation/`--approve` workflow by approving a scoped request rather than bypassing evaluation.
+
+This lifecycle does not by itself establish operator identity. Entrypoint authentication, queued execution revalidation and resolved artifact/device binding remain separate enforcement requirements tracked in the implementation plan.

@@ -691,6 +691,7 @@ export function startPortalServer(defaultPort = 8080) {
         | "approved"
         | "denied"
         | "expired"
+          | "consumed"
         | undefined;
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
       const approvals = listApprovalRequests({ status, limit });

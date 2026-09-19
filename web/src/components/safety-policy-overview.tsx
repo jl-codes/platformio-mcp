@@ -10,7 +10,7 @@ type ApprovalItem = {
   riskLevel: 'low' | 'medium' | 'high' | 'critical';
   reason: string;
   requestedBy: 'agent' | 'user' | 'system';
-  status: 'pending' | 'approved' | 'denied' | 'expired';
+  status: 'pending' | 'approved' | 'denied' | 'expired' | 'consumed';
   createdAt: string;
   expiresAt?: string;
 };

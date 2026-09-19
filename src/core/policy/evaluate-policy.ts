@@ -1,10 +1,6 @@
 import path from "node:path";
 import { actionRiskLevels, deniedActionPatterns } from "./default-policy.js";
-import {
-  approveRequest,
-  createApprovalRequest,
-  getApproval,
-} from "./approvals.js";
+import { createApprovalRequest, consumeApproval } from "./approvals.js";
 import { appendAuditEvent } from "./audit-log.js";
 import {
   reserveAutomationWriteBudget,
@@ -15,6 +11,7 @@ import {
   loadEffectivePolicyState,
   type EffectivePolicyState,
 } from "./load-policy.js";
+import { approvalScopeDigest } from "./approval-scope.js";
 import { PolicyConfigError } from "./policy-schema.js";
 import type {
   PolicyDecision,
@@ -42,45 +39,6 @@ function isPathBoundaryUnsafe(projectDir: string): boolean {
   const resolved = path.resolve(projectDir);
   const root = path.parse(resolved).root;
   return resolved === root;
-}
-
-function approvalMatchesScope(
-  action: string,
-  args: Record<string, unknown>,
-  request: NonNullable<ReturnType<typeof getApproval>>,
-): boolean {
-  if (normalizeActionName(request.action) !== action) return false;
-  const metadata = request.metadata ?? {};
-  const approvedArgs =
-    typeof metadata.args === "object" && metadata.args !== null
-      ? (metadata.args as Record<string, unknown>)
-      : {};
-
-  for (const key of ["projectDir", "environment", "port"] as const) {
-    const approved = approvedArgs[key];
-    if (typeof approved !== "string") continue;
-    const current = args[key];
-    if (typeof current !== "string") return false;
-    const matches =
-      key === "projectDir"
-        ? path.resolve(approved) === path.resolve(current)
-        : approved === current;
-    if (!matches) return false;
-  }
-
-  const approvedBinding = approvedArgs.targetBinding;
-  if (typeof approvedBinding === "object" && approvedBinding !== null) {
-    const currentBinding = args.targetBinding;
-    if (
-      typeof currentBinding !== "object" ||
-      currentBinding === null ||
-      (approvedBinding as Record<string, unknown>).digest !==
-        (currentBinding as Record<string, unknown>).digest
-    ) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function decision(
@@ -286,19 +244,27 @@ export async function evaluatePolicy(
   }
 
   if (policy.approval_required.includes(action)) {
+    const scopeDigest = approvalScopeDigest(
+      action,
+      args,
+      effectivePolicy.digest,
+      context,
+    );
+    const scopeMetadata = {
+      args: {
+        projectDir: args.projectDir,
+        environment: args.environment,
+        port: args.port,
+      },
+      policyDigest: effectivePolicy.digest,
+      scopeVersion: 1,
+    };
     const explicitApprovalId =
       typeof args.approvalId === "string" ? args.approvalId : undefined;
-    const explicitApproved =
-      context.actor === "user" &&
-      (args.approved === true || args.__approved === true);
 
     if (explicitApprovalId) {
-      const request = getApproval(explicitApprovalId);
-      if (
-        request &&
-        request.status === "approved" &&
-        approvalMatchesScope(action, args, request)
-      ) {
+      const request = consumeApproval(explicitApprovalId, scopeDigest);
+      if (request) {
         const reservationDenied = await reserveScheduledWrite();
         if (reservationDenied) return reservationDenied;
         const allowed = decision(
@@ -322,43 +288,13 @@ export async function evaluatePolicy(
       }
     }
 
-    if (explicitApproved) {
-      const reservationDenied = await reserveScheduledWrite();
-      if (reservationDenied) return reservationDenied;
-      const approved = createApprovalRequest({
-        action,
-        riskLevel,
-        reason: `Action '${action}' explicitly approved by caller.`,
-        requestedBy: context.actor ?? "user",
-        metadata: { source: "inline-approved-flag" },
-      });
-      approveRequest(approved.id);
-      const allowed = decision(
-        "allow",
-        `Action '${action}' allowed by explicit caller approval.`,
-        action,
-        riskLevel,
-        approved.id,
-      );
-      if (policy.audit_all_agent_actions) {
-        appendAuditEvent({
-          action,
-          status: "approved",
-          reason: allowed.reason,
-          riskLevel,
-          ...auditContext,
-          approvalId: approved.id,
-        });
-      }
-      return allowed;
-    }
-
     const approval = createApprovalRequest({
       action,
       riskLevel,
       reason: `Action '${action}' requires explicit approval by policy.`,
       requestedBy: context.actor ?? "agent",
-      metadata: { args },
+      scopeDigest,
+      metadata: scopeMetadata,
       expiresInMinutes: 30,
     });
     const needsApproval = decision(

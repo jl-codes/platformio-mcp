@@ -40,9 +40,11 @@ export interface ApprovalRequest {
   riskLevel: PolicyRiskLevel;
   reason: string;
   requestedBy: "agent" | "user" | "system";
-  status: "pending" | "approved" | "denied" | "expired";
+  status: "pending" | "approved" | "denied" | "expired" | "consumed";
   createdAt: string;
   expiresAt?: string;
+  scopeDigest?: string; // Exact operation and effective-policy identity
+  consumedAt?: string; // Terminal one-time consumption timestamp
   metadata?: Record<string, unknown>;
 }
 
