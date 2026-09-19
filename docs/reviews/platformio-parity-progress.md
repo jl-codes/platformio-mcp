@@ -66,3 +66,13 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added explicit dashboard confirmation and exact-payload one-time retry for mutation controls, including reset and PIO Home. A second challenge is returned rather than automatically approved.
 - Verification: 42 backend files / 211 tests passed (`dispatcher-unit.log`); two additional real stdio tests passed (`mcp-authorization.log`); dashboard 4 files / 13 tests passed; web production build passed (bundle-size warning remains).
 - This is authorization consolidation, not completed S1 dispatch: handler/schema/result adapters are not yet consolidated, queued effects need revalidation, and administrative routes outside executeDashboardCommand still require the full enforcement review. Trusted-channel isolation, project enrollment, real artifact/device binding, all 40 parity implementations, distribution and acceptance remain open.
+
+## Firmware analysis foundation
+
+- Added bounded crash-address extraction for Xtensa/ESP32, RISC-V and Cortex-M, including wrapped backtraces, reset/cause evidence and corrupted traces.
+- Added GNU addr2line parsing with inline frames, unknown symbols, Windows/Unicode source paths and lossless 64-bit address normalization.
+- Corrected a reference behavior: RISC-V RA is not rewritten as an Xtensa windowed return address; A0 remains register data when RISC-V crash registers are present.
+- Added ELF content hashing and header/architecture validation through one bounded file descriptor, with explicit expected-hash mismatch errors. This establishes file identity, not proof that a device contains that artifact.
+- Focused validation: 13 tests across crash parser and ELF identity passed; TypeScript validation passed. ELF tests use synthetic headers and are not real toolchain or physical acceptance evidence.
+- Reference toolchain.py pinned-source SHA-256: `cc7ad3a96fdb7227563d873728e18631ce321c77f7b5955873d1cf6728103ac3`.
+- These helpers are not advertised as completed tools. Next analysis work: trusted toolchain resolution, bounded subprocess execution, retained build/upload artifact manifests, real ELF fixtures, size/symbol accounting, canonical/compatibility adapters and physical crash acceptance.
