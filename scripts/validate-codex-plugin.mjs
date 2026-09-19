@@ -5,6 +5,7 @@
  * - validateCodexPlugin: Checks manifest, paths, skills, assets, and runtime.
  */
 
+import { SERIAL_RUNTIME_FILES } from "./serial-runtime-contract.mjs";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -197,11 +198,24 @@ export function validateCodexPlugin(options = {}) {
   if (options.requireRuntime && !runtimePresent)
     errors.push("Bundled runtime is missing.");
   if (runtimePresent) {
+    for (const file of SERIAL_RUNTIME_FILES) {
+      if (!existsSync(join(pluginRoot, "runtime", file)))
+        errors.push(`Native serial payload missing: ${file}`);
+    }
     const inventoryPath = join(pluginRoot, "runtime", "inventory.json");
     if (!existsSync(inventoryPath)) {
       errors.push("Bundled runtime inventory is missing.");
     } else {
       const inventory = JSON.parse(readFileSync(inventoryPath, "utf8"));
+      const inventoryPaths = new Set(
+        (Array.isArray(inventory.files) ? inventory.files : []).map(
+          (entry) => entry.path,
+        ),
+      );
+      for (const file of SERIAL_RUNTIME_FILES) {
+        if (!inventoryPaths.has(file))
+          errors.push(`Native serial payload is not inventoried: ${file}`);
+      }
       for (const entry of Array.isArray(inventory.files)
         ? inventory.files
         : []) {

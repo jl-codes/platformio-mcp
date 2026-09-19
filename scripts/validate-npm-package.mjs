@@ -8,6 +8,7 @@
  * - Rejection of mutable workspace state, logs, credentials, and test artifacts.
  */
 
+import { SERIAL_RUNTIME_FILES } from "./serial-runtime-contract.mjs";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
@@ -20,6 +21,9 @@ const COMPATIBILITY_PACKAGES = ["pio-mcp", "pio-agent"];
 
 /** Files that make the published server and Codex plugin usable. */
 const REQUIRED_FILES = [
+  ...SERIAL_RUNTIME_FILES.map(
+    (file) => `plugins/platformio-mcp/runtime/${file}`,
+  ),
   ".agents/plugins/marketplace.json",
   "build/cli.js",
   "build/index.js",

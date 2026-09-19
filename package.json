@@ -21,6 +21,7 @@
     "web/dist",
     "scripts/installers",
     "scripts/validate-codex-plugin.mjs",
+    "scripts/serial-runtime-contract.mjs",
     "LICENSE",
     "README.md",
     "THIRD-PARTY-NOTICES.md"
