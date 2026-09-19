@@ -2,6 +2,9 @@
  * Real policy-dispatcher integration for the owned serial session service.
  * Provides PolicySerialSessionService with request-local approvals and existing permission-source resolution.
  */
+import { performance } from "node:perf_hooks";
+import { resolveSerialEndpoint } from "../devices/serial-endpoint.js";
+import { validateDirectSerialOptions } from "./serial-transport.js";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -19,6 +22,8 @@ import {
   SerialSessionManager,
   type SerialSessionAuthorization,
   type SerialSessionDependencies,
+  type SerialSessionOwner,
+  type SerialSessionRequest,
 } from "./session-manager.js";
 
 /** Trusted adapter context; only a scoped approval ID may originate in validated public arguments. */
@@ -40,6 +45,14 @@ const OPERATIONS = Object.freeze({
 export class PolicySerialSessionService {
   readonly sessions: SerialSessionManager;
   private readonly discovery: NativeSerialDiscovery;
+  private readonly discoveryBatch = new AsyncLocalStorage<{
+    projectDir: string;
+    remaining: number;
+    active: boolean;
+    expiresAt: number;
+    guard: () => void;
+  }>();
+  private readonly resolveEndpoint: typeof resolveSerialEndpoint;
   private readonly discoveryProject = new AsyncLocalStorage<string>();
   private readonly context = new AsyncLocalStorage<
     Readonly<SerialPolicyRequestContext>
@@ -49,8 +62,11 @@ export class PolicySerialSessionService {
   constructor(
     dependencies: Omit<SerialSessionDependencies, "authorize"> & {
       discoveryLoad?: NativeSerialDiscoveryOptions["load"];
+      resolveEndpoint?: typeof resolveSerialEndpoint;
     } = {},
   ) {
+    this.resolveEndpoint =
+      dependencies.resolveEndpoint ?? resolveSerialEndpoint;
     this.discovery = new NativeSerialDiscovery({
       load: dependencies.discoveryLoad,
       authorize: () => this.authorizeDiscovery(),
@@ -59,6 +75,60 @@ export class PolicySerialSessionService {
       ...dependencies,
       authorize: (request) => this.authorize(request),
     });
+  }
+
+  /** Authorize four identity snapshots for one startup; opening retains its separate permission check. */
+  async startWithDiscovery(
+    owner: SerialSessionOwner,
+    input: Omit<
+      SerialSessionRequest,
+      "resource" | "additionalResources" | "revalidateEndpoint"
+    >,
+  ) {
+    this.sessions.list(owner);
+    validateDirectSerialOptions(input);
+    if (!path.isAbsolute(input.projectDir))
+      throw new PlatformIOError(
+        "Serial project must be absolute.",
+        "SERIAL_PROJECT_INVALID",
+      );
+    const request = Object.freeze({
+      ...input,
+      projectDir: fs.realpathSync.native(input.projectDir),
+      buffer: input.buffer ? Object.freeze({ ...input.buffer }) : undefined,
+    });
+    const context = this.context.getStore();
+    if (!context)
+      throw new PlatformIOError(
+        "Trusted request context required.",
+        "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED",
+      );
+    const guard = createPolicyRevisionGuard(request.projectDir);
+    return dispatchAuthorizedAction(
+      "serial_startup_discovery",
+      { ...request, snapshots: 4, approvalId: context.discoveryApprovalId },
+      { ...context.caller, workspaceDir: request.projectDir },
+      async () => {
+        guard();
+        const batch = {
+          projectDir: request.projectDir,
+          remaining: 4,
+          active: true,
+          expiresAt: performance.now() + 30000,
+          guard,
+        };
+        try {
+          return await this.discoveryBatch.run(batch, () =>
+            this.sessions.startDiscovered(owner, request, {
+              list: () => this.listSerialDevices(request.projectDir),
+              resolve: this.resolveEndpoint,
+            }),
+          );
+        } finally {
+          batch.active = false;
+        }
+      },
+    );
   }
 
   /** Enumerate through one shared native provider under this request's canonical workspace policy. */
@@ -86,6 +156,28 @@ export class PolicySerialSessionService {
         "Serial discovery requires a trusted request context.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED",
       );
+    const batch = this.discoveryBatch.getStore();
+    if (batch) {
+      const guard = () => {
+        if (
+          !batch.active ||
+          batch.projectDir !== projectDir ||
+          performance.now() > batch.expiresAt
+        )
+          throw new PlatformIOError(
+            "Startup discovery scope expired.",
+            "SERIAL_DISCOVERY_SCOPE_INVALID",
+          );
+        batch.guard();
+      };
+      guard();
+      if (batch.remaining-- <= 0)
+        throw new PlatformIOError(
+          "Startup discovery limit exceeded.",
+          "SERIAL_DISCOVERY_SCOPE_INVALID",
+        );
+      return guard;
+    }
     let check: (() => void) | undefined;
     try {
       check = createPolicyRevisionGuard(projectDir);

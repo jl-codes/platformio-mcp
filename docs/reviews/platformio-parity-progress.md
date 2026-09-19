@@ -349,3 +349,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Added a separate validated discoveryApprovalId to trusted serial request context. list_devices consumes only this grant; session/open/write approval IDs remain separate. This completes standalone native inspection approval retries without relaxing one-use semantics.
 - TypeScript and 19 policy/native-provider tests passed, including approval-required discovery, rejection of a grant in the session field, successful explicit inspection grant consumption and replay rejection before another native load. Startup composite authorization for repeated metadata verification remains open.
+
+## Bounded startup inspection workflow
+
+- Added internal serial_startup_discovery mapped to list_devices and connected PolicySerialSessionService.startWithDiscovery to native enumeration, identity binding, combined leases and existing open authorization. Its exact-request approval is consumed once for at most four snapshots within 30 seconds; private request context and revision checks prevent reuse after startup finishes. Session-open grants remain separate.
+- TypeScript and 42 session/policy/native-provider tests passed, including approval-required composite startup completing all four snapshots and replay rejection before another enumeration. Rebuilt plugin runtime; plugin validation and 14 plugin tests passed. Public tool exposure, legacy exclusion and physical acceptance remain open.

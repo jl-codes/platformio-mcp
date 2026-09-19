@@ -99132,6 +99132,7 @@ var MCP_ACTIONS = {
   }
 };
 var INTERNAL_ACTIONS = {
+  serial_startup_discovery: { ...READ, policyAction: "list_devices" },
   serial_session_start: {
     ...MCP_ACTIONS.start_monitor,
     policyAction: "start_monitor",
