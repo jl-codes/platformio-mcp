@@ -406,3 +406,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Native loading now treats the known plugin bundle location or an adjacent native directory as packaged mode. Missing bundled JavaScript, missing native directory or missing host prebuild directory fails explicitly; it never falls through to another installed serialport package. Tests install a sentinel fallback and verify it is not executed.
 - Hosted run 35475578886 at 1c9feb1 passed Windows and Ubuntu quality jobs. macOS failed during setup-node with DNS ENOTFOUND for api.github.com and nodejs.org, before tests; dependent plugin/E2E/browser/smoke jobs were skipped. This is unavailable hosted evidence, not a native-load test failure. The next push reruns the suite.
+
+## Reference package argument adapter
+
+- Added strict argument mapping for all six pinned pio_pkg_* names into canonical pkg_* requests. Search retains library/page defaults. Project operations resolve explicit path, trusted launch default, then cwd, with current-user tilde expansion and a required platformio.ini. Nullable env/project fields follow reference defaults. The added approval_id field maps to the canonical scoped grant; approved flags and unknown parameters are rejected.
+- TypeScript and three mapping tests passed, covering all six names, nullable defaults, home/cwd resolution, package kind/environment/approval mapping and invalid inputs. No package command ran. Reference source was read from the pinned local AST/source inventory; attribution remains in THIRD-PARTY-NOTICES.md. Response adaptation, launch-mode registration, host tool filtering and real-policy alias execution tests remain open; these aliases are not advertised yet.
