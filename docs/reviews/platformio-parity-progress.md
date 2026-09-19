@@ -91,3 +91,12 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added compiler-companion resolution restricted to explicit trusted installation roots, real-path containment and exact matching GNU utility prefixes. Missing tools are reported rather than replaced by a heuristic selection from another installation.
 - Verification: 28 tests passed across five analysis modules. Process tests execute Node fixtures only; resolver fixtures are never executed. TypeScript validation passed.
 - Next: connect these components to immutable artifact snapshots and report engines; integrate selected-environment metadata, artifact manifests, canonical/compatibility interfaces and real toolchain fixtures. Trusted roots must be supplied by host/package discovery, never accepted directly from tool-call arguments.
+
+## Firmware report engines
+
+- Connected crash and size parsers to trusted compiler-companion selection and bounded utility execution.
+- Added private, hash-verified ELF snapshots so rebuilds cannot change the file analyzed between utility calls. Temporary copies are removed on success and failure.
+- Crash reports preserve unresolved frames and explicitly distinguish current-ELF identity from a supplied expected hash; neither is represented as proof of flashed-device contents.
+- Size reports retain static-estimate labeling and separate symbol attribution from section accounting. Reports share a 30-second utility-execution deadline and crash addresses are passed in bounded batches for Windows command-line limits.
+- Verification: 33 tests passed across six analysis files. Report-engine utilities are mocked; real toolchain fixture and physical acceptance remain outstanding.
+- Still required before public registration: host/package-derived environment/toolchain context, retained build/upload manifests, regex filtering, PlatformIO/partition accounting, canonical and compatibility result adapters, CLI/MCP integration, and real acceptance evidence.
