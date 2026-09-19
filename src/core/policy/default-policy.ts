@@ -1,54 +1,6 @@
-import type { PolicyConfig, PolicyRiskLevel } from "./types.js";
+import type { PolicyConfig } from "./types.js";
 
-export const actionRiskLevels: Record<string, PolicyRiskLevel> = {
-  list_devices: "low",
-  list_boards: "low",
-  get_board_info: "low",
-  get_project_config: "low",
-  get_policy_status: "low",
-  get_monitor_status: "low",
-  list_task_history: "low",
-  get_approval_request: "low",
-  list_pending_approvals: "low",
-  agent_resolve_target: "low",
-  build_project: "low",
-  check_project: "low",
-  query_logs: "low",
-  agent_validate_project: "low",
-  agent_build_diagnose: "low",
-  agent_safe_pin_audit: "low",
-  agent_get_last_report: "low",
-  agent_generate_board_report: "low",
-  get_project_context: "low",
-  get_lock_status: "low",
-  search_libraries: "low",
-  list_installed_libraries: "low",
-  system_info: "low",
-  get_dashboard_url: "low",
-  acquire_lock: "low",
-  release_lock: "low",
-
-  start_monitor: "medium",
-  stop_monitor: "medium",
-  capture_serial_window: "medium",
-  agent_monitor_health: "medium",
-  cancel_task: "medium",
-  install_library: "medium",
-  update_library: "medium",
-  clean_project: "medium",
-  init_project: "medium",
-  uninstall_library: "medium",
-
-  upload_firmware: "high",
-  upload_filesystem: "high",
-  reset_server_state: "high",
-  agent_flash_monitor_verify: "high",
-  run_tests: "high",
-
-  erase_flash: "critical",
-  run_shell_command: "critical",
-  ssh_deploy: "critical",
-};
+export { actionRiskLevels } from "../action-catalog.js";
 
 export const deniedActionPatterns = [
   /erase_disk/i,

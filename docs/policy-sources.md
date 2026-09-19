@@ -53,3 +53,9 @@ Approved requests expire after their configured lifetime (30 minutes by default)
 Existing approval records without an exact scope digest or expiry remain readable but cannot authorize execution. Create a new request and approve it through the operator workflow. Caller-supplied `approved`/`__approved` booleans and an `actor: user` label no longer grant authority inside the policy engine. The CLI retains its explicit confirmation/`--approve` workflow by approving a scoped request rather than bypassing evaluation.
 
 This lifecycle does not by itself establish operator identity. Entrypoint authentication, queued execution revalidation and resolved artifact/device binding remain separate enforcement requirements tracked in the implementation plan.
+
+## Dashboard command authorization
+
+Dashboard build, clean, upload, test, package-mutation, serial-monitor, reset and PIO Home commands now evaluate the same server policy as MCP/CLI operations before execution. Authentication alone does not authorize a command. A policy denial returns HTTP 403; an approval request returns HTTP 409 with the request identifier.
+
+The dashboard asks the operator to approve a challenged operation and then retries the original payload with that grant. It stops if policy challenges the retry again. The concrete workflow is part of the grant scope: an approval for a firmware upload does not authorize the broader flash-and-monitor workflow.

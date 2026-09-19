@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { operationForCliCommand } from "./core/action-catalog.js";
 import fs from "node:fs";
 import { configurePolicyFileFromArgs } from "./core/policy/policy-sources.js";
 import path from "node:path";
@@ -45,7 +46,7 @@ import {
 import { resolveTarget } from "./core/target-resolution.js";
 import { getDashboardStatusCore } from "./core/dashboard.js";
 import { toCliStructuredError } from "./core/cli-diagnostics.js";
-import { evaluatePolicy } from "./core/policy/evaluate-policy.js";
+import { authorizeAction } from "./core/action-dispatcher.js";
 import { getPolicyStatus } from "./core/policy/status.js";
 import {
   approveRequest,
@@ -215,63 +216,6 @@ function printOutput(data: unknown, jsonMode: boolean) {
   printHuman(data);
 }
 
-function actionForCommand(command: string): string {
-  switch (command) {
-    case "devices":
-      return "list_devices";
-    case "boards":
-      return "list_boards";
-    case "init":
-      return "init_project";
-    case "build":
-      return "build_project";
-    case "flash":
-      return "upload_firmware";
-    case "monitor":
-      return "start_monitor";
-    case "target-resolve":
-      return "agent_resolve_target";
-    case "monitor-status":
-      return "get_monitor_status";
-    case "monitor-health":
-      return "agent_monitor_health";
-    case "task-status":
-      return "check_task_status";
-    case "task-history":
-      return "list_task_history";
-    case "agent-validate":
-      return "agent_validate_project";
-    case "agent-build-diagnose":
-      return "agent_build_diagnose";
-    case "agent-safe-pin-audit":
-      return "agent_safe_pin_audit";
-    case "agent-flash-monitor-verify":
-      return "upload_firmware";
-    case "agent-last-report":
-      return "agent_get_last_report";
-    case "agent-board-report":
-      return "agent_generate_board_report";
-    case "policy-status":
-      return "get_policy_status";
-    case "dashboard":
-      return "get_dashboard_url";
-    case "plugin":
-      return "get_policy_status";
-    case "install":
-      return "run_shell_command";
-    case "approval-status":
-      return "get_approval_request";
-    case "pending-approvals":
-      return "list_pending_approvals";
-    case "approvals":
-    case "approve":
-    case "deny":
-      return "query_logs";
-    default:
-      return command;
-  }
-}
-
 async function promptApproval(reason: string): Promise<boolean> {
   const rl = createInterface({ input, output });
   try {
@@ -346,7 +290,7 @@ async function runPluginSubcommand(rawArgs: string[]) {
 async function runCliCommand(command: string, rawArgs: string[]) {
   const { options, positionals } = parseArgs(rawArgs);
   const jsonMode = Boolean(options.json);
-  const actionName = actionForCommand(command);
+  const actionName = operationForCliCommand(command);
   const projectDirForPolicy = asString(options["project-dir"]);
   const approvalOpt = asBoolean(options.approve);
   let policyArgs: Record<string, unknown> = {
@@ -355,9 +299,10 @@ async function runCliCommand(command: string, rawArgs: string[]) {
   };
 
   try {
-    let decision = await evaluatePolicy(actionName, policyArgs, {
+    let decision = await authorizeAction(actionName, policyArgs, {
       workspaceDir: projectDirForPolicy,
       actor: "user",
+      operationName: operationForCliCommand(command),
     });
 
     if (decision.status === "deny") {
@@ -392,15 +337,19 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       }
 
       if (!decision.approvalId || !approveRequest(decision.approvalId)) {
-        throw new PlatformIOError("Approval request is no longer available.", "APPROVAL_REQUIRED");
+        throw new PlatformIOError(
+          "Approval request is no longer available.",
+          "APPROVAL_REQUIRED",
+        );
       }
       policyArgs = {
         ...policyArgs,
         approvalId: decision.approvalId,
       };
-      decision = await evaluatePolicy(actionName, policyArgs, {
+      decision = await authorizeAction(actionName, policyArgs, {
         workspaceDir: projectDirForPolicy,
         actor: "user",
+        operationName: operationForCliCommand(command),
       });
       if (decision.status !== "allow") {
         const policyError = new PlatformIOError(

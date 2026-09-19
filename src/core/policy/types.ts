@@ -72,6 +72,7 @@ export interface AuditEvent {
 }
 
 export interface PolicyEvaluationContext {
+  operationName?: string; // Concrete implemented operation, including composite workflow identity
   workspaceDir?: string;
   devicePort?: string;
   taskId?: string;

@@ -1,3 +1,4 @@
+import { dashboardActionFetch } from "../lib/dashboard-action";
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Switch, Button, message } from 'antd';
 import { CodeOutlined } from '@ant-design/icons';
@@ -87,7 +88,7 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
       if (values.verbose !== undefined) payload.verbose = values.verbose;
       if (values.start_monitor !== undefined) payload.start_monitor = values.start_monitor;
 
-      const res = await fetch(`${apiBase}${endpoint}`, {
+      const res = await dashboardActionFetch(`${apiBase}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

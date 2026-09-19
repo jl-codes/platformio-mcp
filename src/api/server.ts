@@ -17,6 +17,8 @@
  * - /api/logs: Retrieve full background task log streams
  */
 import express from "express";
+import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
+import { PlatformIOError } from "../utils/errors.js";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
@@ -691,7 +693,7 @@ export function startPortalServer(defaultPort = 8080) {
         | "approved"
         | "denied"
         | "expired"
-          | "consumed"
+        | "consumed"
         | undefined;
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
       const approvals = listApprovalRequests({ status, limit });
@@ -883,24 +885,51 @@ export function startPortalServer(defaultPort = 8080) {
     }
 
     const activityId = crypto.randomUUID();
+    let registered = false;
     try {
-      await registerCommand(
+      const result = await dispatchAuthorizedAction(
+        toolName,
+        requestPayload,
         {
-          id: activityId,
-          commandDesc: `Dashboard Action`,
-          timestamp: Date.now(),
-          status: "running",
-          tasks: [],
-          mcpRequest: requestPayload,
-          mcpToolName: toolName,
-          source: "dashboard",
+          workspaceDir: projectDir,
+          devicePort:
+            typeof requestPayload.port === "string"
+              ? requestPayload.port
+              : undefined,
+          actor: "user",
+          actorClass: requestPayload.automationKey
+            ? "scheduled"
+            : "interactive",
+          automationKey:
+            typeof requestPayload.automationKey === "string"
+              ? requestPayload.automationKey
+              : undefined,
+          targetBindingDigest:
+            typeof requestPayload.targetBinding?.digest === "string"
+              ? requestPayload.targetBinding.digest
+              : undefined,
         },
-        projectDir,
-      );
+        async () => {
+          await registerCommand(
+            {
+              id: activityId,
+              commandDesc: `Dashboard Action`,
+              timestamp: Date.now(),
+              status: "running",
+              tasks: [],
+              mcpRequest: requestPayload,
+              mcpToolName: toolName,
+              source: "dashboard",
+            },
+            projectDir,
+          );
 
-      const result = await mcpContext.run(
-        { activityId, targetProjectDir: projectDir },
-        action,
+          registered = true;
+          return mcpContext.run(
+            { activityId, targetProjectDir: projectDir },
+            action,
+          );
+        },
       );
 
       let storedResponse = result;
@@ -929,14 +958,24 @@ export function startPortalServer(defaultPort = 8080) {
 
       res.json(result);
     } catch (e: any) {
-      await updateCommandStatus(
-        activityId,
-        {
-          status: "error",
-          mcpResponse: { error: e.message },
-        },
-        projectDir,
-      );
+      if (
+        e instanceof PlatformIOError &&
+        (e.code === "APPROVAL_REQUIRED" || e.code === "POLICY_DENIED")
+      ) {
+        res
+          .status(e.code === "APPROVAL_REQUIRED" ? 409 : 403)
+          .json({ success: false, error: e.message, ...e.context });
+        return;
+      }
+      if (registered)
+        await updateCommandStatus(
+          activityId,
+          {
+            status: "error",
+            mcpResponse: { error: e.message },
+          },
+          projectDir,
+        );
       res.status(500).json({ error: e.message });
     }
   }

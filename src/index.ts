@@ -122,7 +122,7 @@ import { execSync } from "node:child_process";
 import { logDiagnostic as logDiag } from "./utils/logger.js";
 import { portalEvents } from "./api/events.js";
 import crypto from "node:crypto";
-import { evaluatePolicy } from "./core/policy/evaluate-policy.js";
+import { authorizeAction } from "./core/action-dispatcher.js";
 import { getPolicyStatus } from "./core/policy/status.js";
 import { resolveTarget, resolveWriteTarget } from "./core/target-resolution.js";
 import {
@@ -1176,56 +1176,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name } = request.params;
   const args: any = request.params.arguments || {};
   const registeredTool = getRegisteredTool(toolRegistry, name);
-  if (args.projectDir) {
-    portalEvents.emitWorkspaceState(args.projectDir);
-  }
-
   const activityId = crypto.randomUUID();
-  portalEvents.emitActivity(name, args, "running", activityId);
-
-  // Group global commands into the currently active workspace UI if missing
   const targetProjectDir =
     args.projectDir || portalEvents.getLastKnownWorkspace();
-
-  // Expose the MCP tool initiation to the Web UI ledger
-  await registerCommand(
-    {
-      id: activityId,
-      commandDesc: `MCP Tool: ${name}`,
-      timestamp: Date.now(),
-      status: "running",
-      tasks: [],
-      mcpRequest: args,
-      mcpToolName: name,
-    },
-    targetProjectDir,
-  );
-
-  logDiag(
-    `[Command Execution] Tool invoked: '${name}' with arguments: ${JSON.stringify(args)}`,
-    targetProjectDir,
-  );
+  let commandRegistered = false;
 
   try {
-    const policyDecision = await evaluatePolicy(
-      registeredTool.policyAction,
-      args,
-      {
-        workspaceDir: targetProjectDir,
-        devicePort: typeof args.port === "string" ? args.port : undefined,
-        taskId: activityId,
-        actor: "agent",
-        actorClass: args.automationKey ? "scheduled" : "interactive",
-        automationKey:
-          typeof args.automationKey === "string"
-            ? args.automationKey
-            : undefined,
-        targetBindingDigest:
-          typeof args.targetBinding?.digest === "string"
-            ? args.targetBinding.digest
-            : undefined,
-      },
-    );
+    const policyDecision = await authorizeAction(name, args, {
+      workspaceDir: targetProjectDir,
+      devicePort: typeof args.port === "string" ? args.port : undefined,
+      taskId: activityId,
+      actor: "agent",
+      operationName: name,
+      actorClass: args.automationKey ? "scheduled" : "interactive",
+      automationKey:
+        typeof args.automationKey === "string" ? args.automationKey : undefined,
+      targetBindingDigest:
+        typeof args.targetBinding?.digest === "string"
+          ? args.targetBinding.digest
+          : undefined,
+    });
 
     if (policyDecision.status !== "allow") {
       const policyResponse = {
@@ -1234,9 +1204,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
       const response = createToolErrorResult(policyDecision.reason, {
         status:
-          policyDecision.status === "requires_approval"
-            ? "blocked"
-            : "failed",
+          policyDecision.status === "requires_approval" ? "blocked" : "failed",
         data: policyResponse,
         policyDecision,
         nextSteps:
@@ -1247,18 +1215,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             : undefined,
       });
 
-      await updateCommandStatus(
-        activityId,
-        {
-          status: "success",
-          mcpResponse: policyResponse as any,
-        },
-        targetProjectDir,
-      );
-
-      portalEvents.emitActivity(name, args, "success", activityId);
       return response;
     }
+
+    if (args.projectDir) portalEvents.emitWorkspaceState(args.projectDir);
+    portalEvents.emitActivity(name, args, "running", activityId);
+    // Expose the MCP tool initiation to the Web UI ledger
+    await registerCommand(
+      {
+        id: activityId,
+        commandDesc: `MCP Tool: ${name}`,
+        timestamp: Date.now(),
+        status: "running",
+        tasks: [],
+        mcpRequest: args,
+        mcpToolName: name,
+      },
+      targetProjectDir,
+    );
+
+    logDiag(
+      `[Command Execution] Tool invoked: '${name}' with arguments: ${JSON.stringify(args)}`,
+      targetProjectDir,
+    );
+
+    commandRegistered = true;
 
     const legacyResponse = await mcpContext.run(
       { activityId, targetProjectDir },
@@ -2004,16 +1985,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     return response;
   } catch (error: any) {
-    await updateCommandStatus(
-      activityId,
-      {
-        status: "error",
-        mcpResponse: { error: error.message },
-      },
-      targetProjectDir,
-    );
+    if (commandRegistered)
+      await updateCommandStatus(
+        activityId,
+        {
+          status: "error",
+          mcpResponse: { error: error.message },
+        },
+        targetProjectDir,
+      );
 
-    portalEvents.emitActivity(name, args, "error", activityId);
+    if (commandRegistered)
+      portalEvents.emitActivity(name, args, "error", activityId);
 
     const errorMessage = formatPlatformIOError(error);
     return createToolErrorResult(errorMessage);
@@ -2195,9 +2178,7 @@ async function main() {
   } catch {}
 
   logDiag("\n\n=======================================================");
-  logDiag(
-    `🚀 PIO Agent v${version} (Build: ${gitHash}) running on stdio`,
-  );
+  logDiag(`🚀 PIO Agent v${version} (Build: ${gitHash}) running on stdio`);
   logDiag("🚀 Server supports 1000+ boards across 30+ platforms");
   logDiag("=======================================================\n");
 }

@@ -54,6 +54,55 @@ describe("Portal API Security & Telemetry Tailing", () => {
     });
   });
 
+  describe("Server policy enforcement", () => {
+    it("blocks a denied build before reaching the PlatformIO executor", async () => {
+      const projectDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "pio-api-denied-"),
+      );
+      try {
+        fs.writeFileSync(
+          path.join(projectDir, ".pio-mcp-policy.json"),
+          '{"profile":"read_only"}',
+        );
+        const { platformioExecutor } = await import("../src/platformio.js");
+        const before = vi.mocked(platformioExecutor.spawn).mock.calls.length;
+        const response = await request(server)
+          .post("/api/commands/build")
+          .set("Authorization", `Bearer ${authToken}`)
+          .send({ projectDir });
+        expect(response.status).toBe(403);
+        expect(response.body.policyDecision.status).toBe("deny");
+        expect(vi.mocked(platformioExecutor.spawn).mock.calls.length).toBe(
+          before,
+        );
+      } finally {
+        fs.rmSync(projectDir, { recursive: true, force: true });
+      }
+    });
+
+    it("requires approval for dashboard uploads even with an inline approved flag", async () => {
+      const projectDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "pio-api-approval-"),
+      );
+      try {
+        const { platformioExecutor } = await import("../src/platformio.js");
+        const before = vi.mocked(platformioExecutor.spawn).mock.calls.length;
+        const response = await request(server)
+          .post("/api/commands/upload_firmware")
+          .set("Authorization", `Bearer ${authToken}`)
+          .send({ projectDir, approved: true });
+        expect(response.status).toBe(409);
+        expect(response.body.policyDecision.status).toBe("requires_approval");
+        expect(response.body.policyDecision.approvalId).toBeDefined();
+        expect(vi.mocked(platformioExecutor.spawn).mock.calls.length).toBe(
+          before,
+        );
+      } finally {
+        fs.rmSync(projectDir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("Security Lock-Down", () => {
     it("should reject REST API requests without a valid token", async () => {
       const response = await request(server).get("/api/devices");

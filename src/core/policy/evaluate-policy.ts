@@ -258,6 +258,7 @@ export async function evaluatePolicy(
       },
       policyDigest: effectivePolicy.digest,
       scopeVersion: 1,
+      operationName: context.operationName ?? action,
     };
     const explicitApprovalId =
       typeof args.approvalId === "string" ? args.approvalId : undefined;
@@ -291,7 +292,7 @@ export async function evaluatePolicy(
     const approval = createApprovalRequest({
       action,
       riskLevel,
-      reason: `Action '${action}' requires explicit approval by policy.`,
+      reason: `Operation '${context.operationName ?? action}' requires explicit approval by policy.`,
       requestedBy: context.actor ?? "agent",
       scopeDigest,
       metadata: scopeMetadata,

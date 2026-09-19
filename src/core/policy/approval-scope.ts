@@ -62,6 +62,7 @@ export function approvalScopeDigest(
     operation.projectDir = path.resolve(operation.projectDir);
   const encoded = canonical({
     action,
+    operationName: context.operationName ?? action,
     args: operation,
     policyDigest,
     workspaceDir: context.workspaceDir
