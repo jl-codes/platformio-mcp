@@ -1,4 +1,5 @@
 /** Dashboard command approval and exact-request retry, shared by mutation controls. */
+import { operatorApprovalFetch } from "./operator-approval";
 import { Modal } from "antd";
 
 /** Approval details displayed before the operator grants a pending command. */
@@ -65,7 +66,7 @@ export async function dashboardActionFetch(
     `/api/safety/approvals/${encodeURIComponent(decision.approvalId)}/approve`,
     new URL(url, window.location.href),
   );
-  const approved = await fetch(approvalUrl.href, {
+  const approved = await operatorApprovalFetch(approvalUrl.href, {
     method: "POST",
     headers: snapshot.headers,
     credentials: snapshot.credentials,

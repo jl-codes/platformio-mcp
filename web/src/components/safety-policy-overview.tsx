@@ -1,3 +1,4 @@
+import { operatorApprovalFetch } from "../lib/operator-approval";
 import React from 'react';
 import { Alert, Button, Card, Empty, List, Popconfirm, Space, Tag, Tooltip, Typography, message } from 'antd';
 import { SafetyCertificateOutlined, FileSearchOutlined, ClockCircleOutlined, SyncOutlined } from '@ant-design/icons';
@@ -128,7 +129,7 @@ function severityColor(severity: string) {
 
 export default function SafetyPolicyOverview({ payload, loading, apiBase, token, onActionComplete }: SafetyPolicyOverviewProps) {
   const updateApproval = async (id: string, action: 'approve' | 'deny') => {
-    const res = await fetch(`${apiBase}/api/safety/approvals/${encodeURIComponent(id)}/${action}`, {
+    const res = await operatorApprovalFetch(`${apiBase}/api/safety/approvals/${encodeURIComponent(id)}/${action}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,

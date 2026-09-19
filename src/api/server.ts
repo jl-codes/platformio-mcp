@@ -360,6 +360,21 @@ export async function getDashboardStatus(
  * @returns The established application instances { app, httpServer, io }
  */
 export function startPortalServer(defaultPort = 8080) {
+  // Independent operator authority: never included in launch URLs, cookies or MCP output.
+  const approvalCapability = process.env.PIO_MCP_APPROVAL_TOKEN;
+  if (approvalCapability !== undefined && (approvalCapability.length < 32 || approvalCapability.length > 256)) {
+    throw new Error("PIO_MCP_APPROVAL_TOKEN must contain 32 to 256 characters.");
+  }
+  const requireApprovalAuthority = (req: express.Request, res: express.Response): boolean => {
+    const supplied = req.headers["x-pio-approval-token"];
+    const expected = approvalCapability ? Buffer.from(approvalCapability) : undefined;
+    const candidate = typeof supplied === "string" ? Buffer.from(supplied) : undefined;
+    if (!expected || !candidate || expected.length !== candidate.length || !crypto.timingSafeEqual(expected, candidate)) {
+      res.status(403).json({code:"OPERATOR_APPROVAL_REQUIRED", error:"Approval changes require the separately configured operator capability. Use the local approve/deny CLI or provide the operator capability; dashboard access alone is insufficient."});
+      return false;
+    }
+    return true;
+  };
   const app = express();
   const httpServer = createServer(app);
   const portalHost = resolvePortalHost();
@@ -709,6 +724,7 @@ export function startPortalServer(defaultPort = 8080) {
    * Route: POST /api/safety/approvals/:id/approve
    */
   app.post("/api/safety/approvals/:id/approve", async (req, res) => {
+    if (!requireApprovalAuthority(req, res)) return;
     try {
       const { id } = req.params;
       const existing = getApproval(id);
@@ -720,7 +736,7 @@ export function startPortalServer(defaultPort = 8080) {
       appendAuditEvent({
         action: "dashboard_approve_request",
         status: "approved",
-        reason: `Approval ${id} was approved by an interactive dashboard user.`,
+        reason: `Approval ${id} was approved using the operator dashboard capability.`,
         riskLevel: existing.riskLevel,
         approvalId: id,
         actorClass: "interactive",
@@ -741,6 +757,7 @@ export function startPortalServer(defaultPort = 8080) {
    * Route: POST /api/safety/approvals/:id/deny
    */
   app.post("/api/safety/approvals/:id/deny", async (req, res) => {
+    if (!requireApprovalAuthority(req, res)) return;
     try {
       const { id } = req.params;
       const existing = getApproval(id);
@@ -752,7 +769,7 @@ export function startPortalServer(defaultPort = 8080) {
       appendAuditEvent({
         action: "dashboard_deny_request",
         status: "denied",
-        reason: `Approval ${id} was denied by an interactive dashboard user.`,
+        reason: `Approval ${id} was denied using the operator dashboard capability.`,
         riskLevel: existing.riskLevel,
         approvalId: id,
         actorClass: "interactive",

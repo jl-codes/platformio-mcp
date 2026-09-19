@@ -80,3 +80,11 @@ pio-agent policy-revoke --project-dir <absolute-project-path>
 Records live under the configured operator policy directory's `project-enrollments` folder, keyed by real project path. Enrollment binds both normalized policy documents. Changing a policy value or copying the project to another path requires new enrollment; formatting alone does not. Enrolled project policy still cannot weaken operator restrictions. Malformed records fail closed and can be revoked locally. Enrollment storage inside the project, including directory aliases, is rejected.
 
 These commands are local operator administration, not MCP tools or dashboard routes. They are not proof of human identity against an agent or script that already has unrestricted execution and write access as the operator's OS user. Protect this boundary with host/process permissions. Enrollment is not an OS sandbox for PlatformIO project scripts or package hooks.
+
+### Dashboard approval authority
+
+Dashboard viewing/operation access, including an MCP-returned launch URL and its session cookie, does not authorize approval changes. Approve and deny routes require a separate operator capability in addition to normal dashboard authentication.
+
+To enable dashboard approval, an operator configures a randomly generated secret of at least 32 characters using `PIO_MCP_APPROVAL_TOKEN` in the server's protected launch environment. The server accepts 32–256 characters and captures the value at startup. Restart the server to rotate it. The UI asks for the capability per approval; it is sent only in the approval request header and is not retained in browser storage. Do not put it in project files, URLs, or tool arguments. If it is not configured, use the local `pio-agent approve <id>` or `pio-agent deny <id>` operator CLI instead.
+
+The capability is never returned by dashboard launch or MCP APIs. Possession grants operator approval authority; it is not proof of human identity. An unrestricted process running as the operator can read its environment or invoke the CLI, so host/OS permissions remain the trusted boundary. Existing dashboard clients must supply the separate capability to approval mutation routes; ordinary operations retain their existing authentication.

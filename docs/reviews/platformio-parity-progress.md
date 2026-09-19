@@ -130,3 +130,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Dashboard policy overview displays contributing sources, invalid-configuration diagnostics and project enrollment. Removed profile-name-only claims that lab_runner is preauthorized or that all other profiles necessarily require interactive approval.
 - Verification: TypeScript and 18 focused policy tests passed; dashboard production build passed with the existing bundle-size warning. Dashboard regression now checks unenrolled lab_runner wording and external host authority.
 - Doctor/compatibility migration, trusted approval-channel separation and the rest of the reviewed plan remain outstanding.
+
+## Dashboard approval capability separation
+
+- Approve and deny API routes now require an independent operator capability captured from PIO_MCP_APPROVAL_TOKEN at server startup, in addition to existing dashboard authentication. Missing/wrong authority returns 403 without mutating approval records.
+- MCP/dashboard launch output, launch-session cookies and ordinary portal bearer tokens never carry this capability. Added an end-to-end API regression through getDashboardStatus, launch-ticket exchange, cookie authentication and both approval mutation routes, plus successful separately authorized approve/deny coverage.
+- Dashboard confirmation and the safety panel request the capability for each approval; it is added only to the approval request, never stored in browser persistence or carried into the execution retry. Local operator CLI approval remains supported. Same-user unrestricted process authority is explicitly outside this boundary.
+- Backend TypeScript and 18 API tests passed. UI build and focused capability/retry regression checks are recorded with this milestone. Remaining: queued-stage revalidation, exact device/artifact binding, administrative route review, full parity and distribution work.

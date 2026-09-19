@@ -35,6 +35,7 @@ describe("Portal API Security & Telemetry Tailing", () => {
     // Ephemeral port assignment
     process.env.PORTAL_PORT = "0";
 
+    vi.stubEnv("PIO_MCP_APPROVAL_TOKEN", "operator-test-capability-0123456789abcdef");
     const portal = startPortalServer();
     app = portal.app;
     server = portal.httpServer;
@@ -256,6 +257,22 @@ describe("Portal API Security & Telemetry Tailing", () => {
   });
 
   describe("Safety Approval APIs", () => {
+    it("rejects MCP dashboard launch and bearer authority for approval mutation", async () => {
+      const {getDashboardStatus} = await import("../src/api/server.js");
+      const {createApprovalRequest, getApproval} = await import("../src/core/policy/approvals.js");
+      const pending = createApprovalRequest({action:"upload_firmware",riskLevel:"high",reason:"attack path",requestedBy:"agent"});
+      const status = await getDashboardStatus(false);
+      expect(JSON.stringify(status)).not.toContain("operator-test-capability");
+      const launched = await request(server).get(new URL(status.launchUrl).pathname + new URL(status.launchUrl).search);
+      const cookie = launched.headers["set-cookie"];
+      for (const action of ["approve", "deny"]) {
+        const endpoint = `/api/safety/approvals/${pending.id}/${action}`;
+        expect((await request(server).post(endpoint).set("Cookie",cookie)).status).toBe(403);
+        expect((await request(server).post(endpoint).set("Authorization",`Bearer ${authToken}`)).status).toBe(403);
+      }
+      expect(getApproval(pending.id)?.status).toBe("pending");
+    });
+
     it("lists approvals and supports approve/deny actions", async () => {
       const { createApprovalRequest } =
         await import("../src/core/policy/approvals.js");
@@ -290,14 +307,16 @@ describe("Portal API Security & Telemetry Tailing", () => {
         .post(
           `/api/safety/approvals/${encodeURIComponent(approvalA.id)}/approve`,
         )
-        .set("Authorization", `Bearer ${authToken}`);
+        .set("Authorization", `Bearer ${authToken}`)
+        .set("X-Pio-Approval-Token", "operator-test-capability-0123456789abcdef");
       expect(approveRes.status).toBe(200);
       expect(approveRes.body.success).toBe(true);
       expect(approveRes.body.approval.status).toBe("approved");
 
       const denyRes = await request(server)
         .post(`/api/safety/approvals/${encodeURIComponent(approvalB.id)}/deny`)
-        .set("Authorization", `Bearer ${authToken}`);
+        .set("Authorization", `Bearer ${authToken}`)
+        .set("X-Pio-Approval-Token", "operator-test-capability-0123456789abcdef");
       expect(denyRes.status).toBe(200);
       expect(denyRes.body.success).toBe(true);
       expect(denyRes.body.approval.status).toBe("denied");

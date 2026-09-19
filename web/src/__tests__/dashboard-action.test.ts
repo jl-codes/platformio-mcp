@@ -1,6 +1,7 @@
 /** Approval retries must be explicit and preserve the exact requested operation. */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dashboardActionFetch } from "../lib/dashboard-action";
+vi.mock("../lib/operator-approval", () => ({operatorApprovalFetch: (url: string, init: RequestInit) => fetch(url, init)}));
 afterEach(() => vi.unstubAllGlobals());
 const pending = () =>
   new Response(
