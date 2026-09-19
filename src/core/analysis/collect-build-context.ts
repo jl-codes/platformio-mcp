@@ -57,7 +57,9 @@ export async function withAuthorizedBuildCollection<T>(
   const selected = scope(input);
   const check = createPolicyRevisionGuard(selected.projectDir);
   return dispatchAuthorizedAction(
-    "build_project",
+    input.analysisPurpose === "firmware_size_report"
+      ? "size_report"
+      : "decode_backtrace",
     {
       ...selected,
       approvalId: input.approvalId,

@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+import {
+  executeProjectInspection,
+  type ProjectInspectionAction,
+} from "./tools/project-inspection.js";
 import { executePackageAction, type PackageAction } from "./tools/packages.js";
 import { decodeBacktrace, firmwareSizeReport } from "./tools/analysis.js";
 import { operationForCliCommand } from "./core/action-catalog.js";
@@ -106,6 +110,8 @@ COMMANDS:
   agent-board-report --project-dir <dir> --board <id>
   decode-backtrace --project-dir <dir> --environment <env> <--text <value>|--text-file <path>> [--include-all-hex]
   size-report --project-dir <dir> --environment <env> [--top <n>] [--filter <regex>]
+  project-envs --project-dir <dir>
+  project-metadata|list-targets --project-dir <dir> [--environment <env>]
   pkg-search --query <query> [--kind library|platform|tool] [--page <n>]
   pkg-install --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
   pkg-uninstall --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
@@ -338,6 +344,11 @@ async function runCliCommand(command: string, rawArgs: string[]) {
   const { options, positionals } = parseArgs(rawArgs);
   const jsonMode = Boolean(options.json);
   const actionName = operationForCliCommand(command);
+  const projectInspection = [
+    "project-envs",
+    "project-metadata",
+    "list-targets",
+  ].includes(command);
   const projectDirForPolicy = asString(options["project-dir"]);
   const approvalOpt = asBoolean(options.approve);
   let policyArgs: Record<string, unknown> = {
@@ -361,7 +372,8 @@ async function runCliCommand(command: string, rawArgs: string[]) {
     if (
       command === "decode-backtrace" ||
       command === "size-report" ||
-      command.startsWith("pkg-")
+      command.startsWith("pkg-") ||
+      projectInspection
     ) {
       const scope = {
         projectDir: projectDirForPolicy,
@@ -370,7 +382,30 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         expectedElfSha256: asString(options["expected-elf-sha256"]),
       };
       let parameters: Record<string, unknown>;
-      if (command.startsWith("pkg-")) {
+      if (projectInspection) {
+        const allowed = new Set([
+          "json",
+          "approve",
+          "approval-id",
+          "project-dir",
+          ...(command === "project-envs" ? [] : ["environment"]),
+        ]);
+        if (
+          positionals.length ||
+          Object.keys(options).some((key) => !allowed.has(key))
+        )
+          throw new PlatformIOError(
+            "Unknown project inspection option or positional argument.",
+            "PROJECT_INPUT_INVALID",
+          );
+        parameters = {
+          projectDir: scope.projectDir,
+          approvalId: scope.approvalId,
+          ...(command === "project-envs"
+            ? {}
+            : { environment: scope.environment }),
+        };
+      } else if (command.startsWith("pkg-")) {
         const allowed = new Set([
           "json",
           "approve",
@@ -446,22 +481,28 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           filter: asString(options.filter),
         };
       const run = (args: Record<string, unknown>) =>
-        command.startsWith("pkg-")
-          ? executePackageAction(
-              command.replace("pkg-", "pkg_") as PackageAction,
+        projectInspection
+          ? executeProjectInspection(
+              command.replaceAll("-", "_") as ProjectInspectionAction,
               args,
-              {
+              { actor: "user", actorClass: "interactive" },
+            )
+          : command.startsWith("pkg-")
+            ? executePackageAction(
+                command.replace("pkg-", "pkg_") as PackageAction,
+                args,
+                {
+                  actor: "user",
+                  actorClass: "interactive",
+                  workspaceDir: projectDirForPolicy,
+                },
+              )
+            : (command === "decode-backtrace"
+                ? decodeBacktrace
+                : firmwareSizeReport)(args, {
                 actor: "user",
                 actorClass: "interactive",
-                workspaceDir: projectDirForPolicy,
-              },
-            )
-          : (command === "decode-backtrace"
-              ? decodeBacktrace
-              : firmwareSizeReport)(args, {
-              actor: "user",
-              actorClass: "interactive",
-            });
+              });
       let result;
       try {
         result = await run(parameters);
@@ -938,6 +979,10 @@ async function runCliCommand(command: string, rawArgs: string[]) {
     }
   } catch (error) {
     const stageMap: Record<string, string> = {
+      "project-envs": "inspection",
+      "project-metadata": "inspection",
+      "list-targets": "inspection",
+
       "pkg-search": "packages",
       "pkg-install": "packages",
       "pkg-uninstall": "packages",
@@ -992,6 +1037,10 @@ async function main() {
   const args = configurePolicyFileFromArgs(process.argv.slice(2));
   const command = args[0];
   const knownCommands = new Set([
+    "project-envs",
+    "project-metadata",
+    "list-targets",
+
     "pkg-search",
     "pkg-install",
     "pkg-uninstall",

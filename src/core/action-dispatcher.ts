@@ -2,7 +2,7 @@
  * Shared operation authorization boundary.
  * Provides dispatchAuthorizedAction so adapters cannot execute callbacks before policy allows them.
  */
-import { MCP_ACTIONS, actionRiskLevels } from "./action-catalog.js";
+import { policyNamesForOperation, actionRiskLevels } from "./action-catalog.js";
 import { evaluatePolicy } from "./policy/evaluate-policy.js";
 import type {
   PolicyDecision,
@@ -43,13 +43,10 @@ export async function authorizeAction(
   args: Record<string, unknown>,
   context: PolicyEvaluationContext,
 ): Promise<PolicyDecision> {
-  const metadata = Object.hasOwn(MCP_ACTIONS, name)
-    ? MCP_ACTIONS[name]
-    : undefined;
   const action =
     name === "start_pio_home"
       ? "run_shell_command"
-      : (metadata?.policyAction ?? name);
+      : policyNamesForOperation(name).at(-1)!;
   if (!Object.hasOwn(actionRiskLevels, action))
     throw new PlatformIOError(`Unknown operation: ${name}`, "UNKNOWN_ACTION");
   return evaluatePolicy(action, args, {

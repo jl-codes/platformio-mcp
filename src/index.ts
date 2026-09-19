@@ -66,6 +66,10 @@ import { mcpContext } from "./utils/mcp-context.js";
 import { addWorkspace } from "./utils/workspace-registry.js";
 
 // Import tool functions from feature modules
+import {
+  executeProjectInspection,
+  type ProjectInspectionAction,
+} from "./tools/project-inspection.js";
 import { executePackageAction, type PackageAction } from "./tools/packages.js";
 import { decodeBacktrace, firmwareSizeReport } from "./tools/analysis.js";
 import { getBoardInfo } from "./tools/boards.js";
@@ -198,6 +202,78 @@ const automationKeyInputSchema = {
  * exposed by this server.
  */
 const toolDefinitions: ToolDefinition[] = [
+  {
+    name: "project_envs",
+    description:
+      "List resolved project environments, inherited board/framework/port settings and configured defaults without running build scripts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: {
+          type: "string",
+          minLength: 1,
+          maxLength: 32768,
+        },
+        approvalId: {
+          type: "string",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "project_metadata",
+    description:
+      "Generate bounded build metadata for selected or all environments. Requires build permission; may execute project scripts or install dependencies.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: {
+          type: "string",
+          minLength: 1,
+          maxLength: 32768,
+        },
+        approvalId: {
+          type: "string",
+        },
+        environment: {
+          type: "string",
+          minLength: 1,
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "list_targets",
+    description:
+      "List structured target metadata for selected or all environments. Requires build permission; does not execute the listed targets.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: {
+          type: "string",
+          minLength: 1,
+          maxLength: 32768,
+        },
+        approvalId: {
+          type: "string",
+        },
+        environment: {
+          type: "string",
+          minLength: 1,
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
   {
     name: "pkg_search",
     description:
@@ -1432,6 +1508,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name } = request.params;
+  const projectInspection = [
+    "project_envs",
+    "project_metadata",
+    "list_targets",
+  ].includes(name);
   const args: any = request.params.arguments || {};
   const registeredTool = getRegisteredTool(toolRegistry, name);
   const activityId = crypto.randomUUID();
@@ -1443,7 +1524,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (
       name === "decode_backtrace" ||
       name === "size_report" ||
-      name.startsWith("pkg_")
+      name.startsWith("pkg_") ||
+      projectInspection
     ) {
       const safeRequest = {
         projectDir: args.projectDir,
@@ -1476,28 +1558,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         () =>
           registeredTool.handler(args, {
             dispatch: async (tool, parameters) =>
-              tool.startsWith("pkg_")
-                ? executePackageAction(
-                    tool as PackageAction,
+              projectInspection
+                ? executeProjectInspection(
+                    tool as ProjectInspectionAction,
                     parameters,
                     caller,
                     onAuthorized,
                   )
-                : tool === "decode_backtrace"
-                  ? decodeBacktrace(parameters, caller, onAuthorized)
-                  : firmwareSizeReport(parameters, caller, onAuthorized),
+                : tool.startsWith("pkg_")
+                  ? executePackageAction(
+                      tool as PackageAction,
+                      parameters,
+                      caller,
+                      onAuthorized,
+                    )
+                  : tool === "decode_backtrace"
+                    ? decodeBacktrace(parameters, caller, onAuthorized)
+                    : firmwareSizeReport(parameters, caller, onAuthorized),
           }),
       );
       const response = createToolResult({
         success: result.ok,
         status: result.ok ? "completed" : "failed",
-        summary: name.startsWith("pkg_")
-          ? result.summary
-          : name === "size_report"
-            ? "Firmware size report completed."
-            : result.ok
-              ? "Crash addresses decoded against the selected ELF."
-              : "No crash addresses resolved against the selected ELF.",
+        summary:
+          name.startsWith("pkg_") || projectInspection
+            ? result.summary
+            : name === "size_report"
+              ? "Firmware size report completed."
+              : result.ok
+                ? "Crash addresses decoded against the selected ELF."
+                : "No crash addresses resolved against the selected ELF.",
         data: result,
       });
       await updateCommandStatus(
@@ -2338,7 +2428,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         name,
         name === "decode_backtrace" ||
           name === "size_report" ||
-          name.startsWith("pkg_")
+          name.startsWith("pkg_") ||
+          projectInspection
           ? { projectDir: args.projectDir, environment: args.environment }
           : args,
         "error",

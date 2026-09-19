@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "platformio-mcp.mjs",
-      "bytes": 3877334,
-      "sha256": "5704c96a9cc9ce44b4459c3ff57d68efbc4a7bc1b822c737518cf869c05d7582"
+      "bytes": 3892405,
+      "sha256": "cfebbfb4b071c995930a7bb6a6219c2c15393c71e622eb3a26e6c371bc496b21"
     },
     {
       "path": "web/assets/index-DE-4pUMU.css",

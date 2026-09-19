@@ -25,6 +25,31 @@ const READ: ActionSafetyMetadata = {
 
 /** Existing callable MCP actions; additions require matching registered handlers. */
 export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  project_envs: {
+    policyAction: "get_project_config",
+    riskLevel: "low",
+    readOnly: true,
+    destructive: false,
+    idempotent: true,
+    openWorld: false,
+  },
+  project_metadata: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true,
+  },
+  list_targets: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true,
+  },
+
   pkg_search: {
     policyAction: "search_libraries",
     riskLevel: "low",
@@ -272,6 +297,13 @@ export const actionRiskLevels: Record<string, PolicyRiskLevel> = {
 /** Resolves the existing CLI spelling to its concrete operation. */
 export function operationForCliCommand(command: string): string {
   switch (command) {
+    case "project-envs":
+      return "project_envs";
+    case "project-metadata":
+      return "project_metadata";
+    case "list-targets":
+      return "list_targets";
+
     case "pkg-search":
       return "pkg_search";
     case "pkg-install":
@@ -347,5 +379,23 @@ export function operationForCliCommand(command: string): string {
 /** Resolves CLI names through the same permission mapping as the MCP registry. */
 export function policyActionForCliCommand(command: string): string {
   const name = operationForCliCommand(command);
-  return MCP_ACTIONS[name]?.policyAction ?? name;
+  return policyNamesForOperation(name).at(-1)!;
+}
+
+/**
+ * Resolve a concrete operation and its permission ancestors without losing restrictions on either.
+ * A category grant covers its mapped operations; an operation grant does not grant its siblings.
+ */
+export function policyNamesForOperation(name: string): string[] {
+  const names: string[] = [];
+  let current = name;
+  while (!names.includes(current)) {
+    names.push(current);
+    const parent = Object.hasOwn(MCP_ACTIONS, current)
+      ? MCP_ACTIONS[current].policyAction
+      : undefined;
+    if (!parent || parent === current) return names;
+    current = parent;
+  }
+  throw new Error(`Cyclic policy mapping for ${name}`);
 }

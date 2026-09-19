@@ -94,3 +94,11 @@ The capability is never returned by dashboard launch or MCP APIs. Possession gra
 Analysis discovers the selected compiler package under the Core directory reported by the host's PlatformIO system information. Package manifests and installation records must agree on toolchain name and version. Companion utilities must stay within that package after resolving filesystem aliases. These records establish installation selection, not publisher signatures or protection against an adversarial process running as the same OS user.
 
 For a custom/native GNU installation, operators can set `PIO_MCP_TOOLCHAIN_ROOTS` to a JSON array of absolute installation directories in the server launch environment. This replaces automatic package discovery. Empty/malformed values fail; filesystem roots and directories overlapping the selected project are rejected. This setting is not accepted as a tool-call argument. No fallback to arbitrary utilities on PATH occurs.
+
+### Concrete tools and shared permission categories
+
+A mapped operation has both its own name and its shared category: for example, `size_report` and `project_metadata` use `build_project`, while `pkg_install` uses `install_library`. Denies and approval requirements on either name remain effective. A category allow covers its mapped operations; allowing one concrete operation does not allow the category itself or sibling tools.
+
+For example, an operator policy containing `allow: [size_report, system_info]` permits that report and its host-toolchain inspection but does not permit `build_project`, `decode_backtrace` or `project_metadata`. `deny: [build_project]` blocks all of those operations even if one is individually allowed. `deny: [size_report]` blocks the report without blocking an otherwise permitted build. A project can add a restrictive approval requirement on a mapped tool without enrollment; it cannot remove an operator/category requirement or extend the operator's allow ceiling.
+
+Composite analysis grants now use the public report operation identity, so the shared metadata/size stages cannot bypass a report-specific restriction. Old request grants bound to the previous generic build operation must be requested again; they are not silently promoted. This server-side mapping does not expose or override Codex's independent host tool controls.

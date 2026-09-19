@@ -184,9 +184,21 @@
       "sourceSha256": "faf067ef3aad4aef8ec87d39c54f53355bb526842dbfde66d317ba7f8eb3bdf9",
       "parameters": "project_dir: str | None=None, env: str | None=None",
       "returns": "dict[str, Any]",
-      "implementationStatus": "not_assessed_against_upstream",
-      "acceptanceStatus": "not_run",
-      "requirementId": "PAR-15"
+      "implementationStatus": "canonical_partial",
+      "acceptanceStatus": "windows_mcp_partial",
+      "requirementId": "PAR-15",
+      "evidence": [
+        "tests/project-inspection.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/cli-analysis.test.ts",
+        "docs/reviews/project-inspection-mcp-windows-evidence.json"
+      ],
+      "remaining": [
+        "reference aliases and exact result adapters",
+        "default project resolution",
+        "dashboard integration",
+        "cross-platform acceptance"
+      ]
     },
     {
       "referenceTool": "pio_memory_watch",
@@ -460,9 +472,21 @@
       "sourceSha256": "3dc0e791d8890159d0df4de963ab2d3f11bb0ce2398ba54dbd9ec627e8237dc1",
       "parameters": "project_dir: str | None=None",
       "returns": "dict[str, Any]",
-      "implementationStatus": "not_assessed_against_upstream",
-      "acceptanceStatus": "not_run",
-      "requirementId": "PAR-32"
+      "implementationStatus": "canonical_partial",
+      "acceptanceStatus": "windows_mcp_partial",
+      "requirementId": "PAR-32",
+      "evidence": [
+        "tests/project-inspection.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/cli-analysis.test.ts",
+        "docs/reviews/project-inspection-mcp-windows-evidence.json"
+      ],
+      "remaining": [
+        "reference aliases and exact result adapters",
+        "default project resolution",
+        "dashboard integration",
+        "cross-platform acceptance"
+      ]
     },
     {
       "referenceTool": "pio_project_init",
@@ -484,9 +508,21 @@
       "sourceSha256": "3dc0e791d8890159d0df4de963ab2d3f11bb0ce2398ba54dbd9ec627e8237dc1",
       "parameters": "project_dir: str | None=None, env: str | None=None",
       "returns": "dict[str, Any]",
-      "implementationStatus": "not_assessed_against_upstream",
-      "acceptanceStatus": "not_run",
-      "requirementId": "PAR-34"
+      "implementationStatus": "canonical_partial",
+      "acceptanceStatus": "windows_mcp_partial",
+      "requirementId": "PAR-34",
+      "evidence": [
+        "tests/project-inspection.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/cli-analysis.test.ts",
+        "docs/reviews/project-inspection-mcp-windows-evidence.json"
+      ],
+      "remaining": [
+        "reference aliases and exact result adapters",
+        "default project resolution",
+        "dashboard integration",
+        "cross-platform acceptance"
+      ]
     },
     {
       "referenceTool": "pio_run_target",

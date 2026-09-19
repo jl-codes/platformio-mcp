@@ -91,6 +91,9 @@
     "pkg_uninstall": ["pio-manager", "platformio-debug"],
     "pkg_list": ["pio-manager", "platformio-debug"],
     "pkg_outdated": ["pio-manager", "platformio-debug"],
-    "pkg_update": ["pio-manager", "platformio-debug"]
+    "pkg_update": ["pio-manager", "platformio-debug"],
+    "project_envs": ["pio-manager", "platformio-debug"],
+    "project_metadata": ["pio-manager", "platformio-debug"],
+    "list_targets": ["pio-manager", "platformio-debug"]
   }
 }

@@ -94,3 +94,9 @@ it("does not silently ignore package scope-changing flags", () => {
     "PACKAGE_INPUT_INVALID",
   );
 });
+
+it("routes project metadata and target discovery through the shared CLI permission boundary", () => {
+  for (const command of ["project-metadata", "list-targets"])
+    expect(run(command).errorType).toBe("PolicyDenied");
+  expect(run("project-envs").errorType).toBe("PROJECT_INPUT_INVALID"); // This helper adds --environment, unsupported for the complete environment inventory.
+});

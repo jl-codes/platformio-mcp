@@ -75,7 +75,7 @@ describe("shared action authorization", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
   it("uses the same permission identity for equivalent CLI and MCP entrypoints", () => {
-    expect(Object.keys(MCP_ACTIONS)).toHaveLength(50);
+    expect(Object.keys(MCP_ACTIONS)).toHaveLength(53);
     for (const [cli, operation] of [
       ["task-status", "check_task_status"],
       ["dashboard", "get_dashboard_url"],
@@ -87,4 +87,72 @@ describe("shared action authorization", () => {
       );
     }
   });
+});
+
+function operatorPolicy(document: unknown) {
+  fs.writeFileSync(path.join(root, "policy.yaml"), JSON.stringify(document));
+}
+it("honors concrete-operation denies even when its shared category is allowed", async () => {
+  operatorPolicy({ deny: ["pkg_install", "size_report"] });
+  expect((await authorizeAction("pkg_install", {}, {})).status).toBe("deny");
+  expect((await authorizeAction("size_report", {}, {})).status).toBe("deny");
+  expect((await authorizeAction("install_library", {}, {})).status).toBe(
+    "allow",
+  );
+  expect((await authorizeAction("build_project", {}, {})).status).toBe("allow");
+});
+it("a category deny wins over a narrower tool grant", async () => {
+  operatorPolicy({ allow: ["pkg_install"], deny: ["install_library"] });
+  expect((await authorizeAction("pkg_install", {}, {})).status).toBe("deny");
+});
+it("an exact operation allow list does not enable its category or siblings", async () => {
+  operatorPolicy({ allow: ["size_report"] });
+  expect((await authorizeAction("size_report", {}, {})).status).toBe("allow");
+  expect((await authorizeAction("decode_backtrace", {}, {})).status).toBe(
+    "deny",
+  );
+  expect((await authorizeAction("build_project", {}, {})).status).toBe("deny");
+});
+it("retains restrictive project approval requirements for mapped operations without enrollment", async () => {
+  const project = path.join(root, "project");
+  fs.mkdirSync(project);
+  fs.writeFileSync(
+    path.join(project, ".pio-mcp-policy.json"),
+    JSON.stringify({
+      profile: "flash_requires_approval",
+      overrides: { approval_required: ["size_report"] },
+    }),
+  );
+  const context = { workspaceDir: project };
+  const args = { projectDir: project };
+  const pending = await authorizeAction("size_report", args, context);
+  expect(pending.status).toBe("requires_approval");
+  approveRequest(pending.approvalId!);
+  expect(
+    (
+      await authorizeAction(
+        "size_report",
+        { ...args, approvalId: pending.approvalId },
+        context,
+      )
+    ).status,
+  ).toBe("allow");
+  expect(
+    (
+      await authorizeAction(
+        "size_report",
+        { ...args, approvalId: pending.approvalId },
+        context,
+      )
+    ).status,
+  ).toBe("requires_approval");
+});
+it("keeps category approval requirements when only a narrow operation is allowed", async () => {
+  operatorPolicy({
+    allow: ["size_report"],
+    approval_required: ["build_project"],
+  });
+  expect((await authorizeAction("size_report", {}, {})).status).toBe(
+    "requires_approval",
+  );
 });

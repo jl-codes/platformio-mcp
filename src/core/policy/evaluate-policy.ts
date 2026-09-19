@@ -1,3 +1,5 @@
+/** Enforce category and concrete-operation policy with one-use request-bound approvals. */
+import { policyNamesForOperation } from "../action-catalog.js";
 import path from "node:path";
 import { actionRiskLevels, deniedActionPatterns } from "./default-policy.js";
 import { createApprovalRequest, consumeApproval } from "./approvals.js";
@@ -65,6 +67,12 @@ export async function evaluatePolicy(
 ): Promise<PolicyDecision> {
   const action = normalizeActionName(actionName);
   const riskLevel = riskForAction(action);
+  const operationNames = policyNamesForOperation(
+    context.operationName ?? action,
+  );
+  // Ignore a caller-provided unrelated name; only the catalog establishes mapped authority.
+  const permissionNames =
+    operationNames.at(-1) === action ? operationNames : [action];
   let effectivePolicy: EffectivePolicyState;
   try {
     effectivePolicy = loadEffectivePolicyState(context.workspaceDir);
@@ -174,7 +182,7 @@ export async function evaluatePolicy(
 
   // Hard deny known dangerous command aliases/patterns.
   if (
-    policy.deny.includes(action) ||
+    permissionNames.some((name) => policy.deny.includes(name)) ||
     deniedActionPatterns.some((p) => p.test(action))
   ) {
     const denied = decision(
@@ -243,7 +251,7 @@ export async function evaluatePolicy(
     }
   }
 
-  if (policy.approval_required.includes(action)) {
+  if (permissionNames.some((name) => policy.approval_required.includes(name))) {
     const scopeDigest = approvalScopeDigest(
       action,
       args,
@@ -319,7 +327,7 @@ export async function evaluatePolicy(
   }
 
   const allowList = policy.allow;
-  const isAllowed = allowList.includes(action);
+  const isAllowed = permissionNames.some((name) => allowList.includes(name));
   const result = isAllowed
     ? decision(
         "allow",

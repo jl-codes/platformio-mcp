@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-19T21:20:39.692Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.15.0"
+  },
+  "transport": "MCP stdio",
+  "toolCount": 53,
+  "checks": {
+    "nestedInheritance": true,
+    "multipleBases": true,
+    "commonEnvironment": true,
+    "extraConfiguration": true,
+    "nonFirstDefault": true,
+    "readOnlyConfiguration": true,
+    "readOnlyMetadataDenied": true,
+    "liveBuildMetadata": true,
+    "structuredTargets": true
+  },
+  "metadata": {
+    "environment": "analysis-esp32s3",
+    "defines": 21,
+    "includeDirectories": 200,
+    "targetNames": [
+      "buildfs",
+      "size",
+      "upload",
+      "uploadfs",
+      "uploadfsota",
+      "erase"
+    ]
+  },
+  "physicalDeviceTest": false
+}

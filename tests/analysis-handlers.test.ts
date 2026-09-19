@@ -202,3 +202,17 @@ it("consumes one request-bound grant for metadata and size stages, rejecting cha
   ).rejects.toMatchObject({ code: "APPROVAL_REQUIRED" });
   expect(platformioExecutor.execute).toHaveBeenCalledTimes(2);
 });
+
+it("enforces the public analysis operation's restriction at its composite grant boundary", async () => {
+  fs.writeFileSync(
+    path.join(project, ".pio-mcp-policy.json"),
+    JSON.stringify({
+      profile: "flash_requires_approval",
+      overrides: { deny: ["size_report"] },
+    }),
+  );
+  await expect(
+    firmwareSizeReport({ projectDir: project, environment: "fixture" }),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(platformioExecutor.execute).not.toHaveBeenCalled();
+});

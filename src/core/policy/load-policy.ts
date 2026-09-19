@@ -5,6 +5,7 @@
  * - loadEffectivePolicyState: Resolves layers and preserves operator restrictions.
  * - loadEffectivePolicy: Returns the resolved policy for existing callers.
  */
+import { policyNamesForOperation } from "../action-catalog.js";
 import {
   projectEnrollmentIdentity,
   isProjectEnrolled,
@@ -109,7 +110,8 @@ function applyOperatorCeiling(
       ? undefined
       : new Set([...operator.allow, ...(operator.approval_required ?? [])]);
   const permitted = (action: string) =>
-    operatorActions === undefined || operatorActions.has(action);
+    operatorActions === undefined ||
+    policyNamesForOperation(action).some((name) => operatorActions.has(name));
   return {
     ...policy,
     allow: policy.allow.filter(permitted),

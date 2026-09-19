@@ -80,7 +80,7 @@ function preservesSchema(actual: any, baseline: any, location: string): void {
 describe("stdio MCP policy boundary", () => {
   it("keeps all 42 existing tool declarations available", async () => {
     const listed = await harness.client.listTools();
-    expect(listed.tools).toHaveLength(50);
+    expect(listed.tools).toHaveLength(53);
   });
   it("preserves every pinned upstream tool input contract", async () => {
     const baseline = JSON.parse(
@@ -167,4 +167,24 @@ describe("stdio MCP policy boundary", () => {
       ),
     ).toBe(false);
   });
+});
+
+it("marks configuration as inspection and denies metadata/target scripts through MCP", async () => {
+  const listed = await harness.client.listTools();
+  expect(
+    listed.tools.find((tool) => tool.name === "project_envs")?.annotations
+      ?.readOnlyHint,
+  ).toBe(true);
+  for (const name of ["project_metadata", "list_targets"]) {
+    expect(
+      listed.tools.find((tool) => tool.name === name)?.annotations
+        ?.readOnlyHint,
+    ).toBe(false);
+    const response = await harness.client.callTool({
+      name,
+      arguments: { projectDir: project },
+    });
+    expect(response.isError).toBe(true);
+    expect(JSON.stringify(response)).toContain("POLICY_DENIED");
+  }
 });
