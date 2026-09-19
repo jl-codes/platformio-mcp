@@ -180,3 +180,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Captured all 42 original MCP input contracts from pinned upstream 40e12ccb8e85fcaf33b46c50b6d832665728e773 into platformio-product-contracts.json. Capture uses static TypeScript literal/constant parsing, never evaluation of upstream server code; source SHA-256 and revision are recorded. The --check mode verifies reproducibility.
 - Real stdio MCP tests now compare every original input schema, allowing new optional fields while rejecting removed inputs, newly required fields and common narrowing constraints. All three stdio checks passed. Description-only edits are not treated as input compatibility breaks.
 - S0 still needs output/behavior contracts and full CLI/dashboard inventories; these checks do not prove full functional parity or retained physical behavior. The remaining implementation, PR, publication and installed-artifact acceptance requirements are unchanged.
+
+## Host toolchain package discovery
+
+- Added selection of the compiler's registered toolchain package using the host system-info Core directory and bounded package.json/.piopm records with matching name/version. Resolved package roots cannot escape the installation or overlap the selected project.
+- Explicit operator PIO_MCP_TOOLCHAIN_ROOTS JSON configuration supports custom/native installations without accepting trust roots from public tool arguments. Invalid/empty/broad/project-owned roots fail closed; no arbitrary PATH fallback occurs.
+- Verification: TypeScript and 15 discovery/resolver tests passed. Current MCP system_info reported Core 6.1.16 at the installed host directory; real discovery plus companion resolution succeeded for ESP32-S3 GNU 8.4.0+2021r2-patch5. Package registration is not publisher-signature verification.
+- Analysis adapters still need to join host system-info collection, authorized metadata, toolchain discovery and report execution. Retained artifact/lock integration, compatibility/public registration and all remaining plan stages are open.
