@@ -1,4 +1,5 @@
 /** Report-engine fixtures verify orchestration; real toolchain/hardware acceptance remains separate. */
+import { readElfIdentity } from "../src/core/analysis/elf-identity.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -119,6 +120,39 @@ describe("firmware report engines", () => {
     expect(report.filter).toBe("^SELECTED$|selected[.]cpp$");
     await expect(reportFirmwareSize(context, 1, "[")).rejects.toMatchObject({
       code: "PATTERN_INVALID",
+    });
+  });
+  it("uses only successful memory accounting bound to the same environment and ELF", async () => {
+    vi.mocked(runAnalysisProcess).mockImplementation(async (tool, args) => ({
+      stdout: tool.endsWith("nm.exe")
+        ? ""
+        : args[0] === "-A"
+          ? ".text 16 134217728"
+          : "16 0 0 16 10 firmware.elf",
+      stderr: "",
+    }));
+    const identity = await readElfIdentity(context.elfPath);
+    context.memoryEvidence = {
+      environment: context.environment,
+      elfSha256: identity.sha256,
+      exitCode: 0,
+      output:
+        "RAM: 10.0% (used 10 bytes from 100 bytes)\nFlash: 20.0% (used 20 bytes from 100 bytes)",
+    };
+    expect(await reportFirmwareSize(context)).toMatchObject({
+      memorySource: "platformio",
+      memory: { flash: { usedBytes: 20 } },
+      totals: { flashEstimate: 16 },
+    });
+    context.memoryEvidence.exitCode = 1;
+    expect(await reportFirmwareSize(context)).toMatchObject({
+      memorySource: "estimate_from_size",
+      memory: null,
+      memoryUnavailableReason: "size_check_failed",
+    });
+    context.memoryEvidence.elfSha256 = "0".repeat(64);
+    await expect(reportFirmwareSize(context)).rejects.toMatchObject({
+      code: "ANALYSIS_MEMORY_MISMATCH",
     });
   });
   it("removes snapshots after tool failure", async () => {

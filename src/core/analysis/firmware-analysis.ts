@@ -1,4 +1,8 @@
 /** Firmware crash and size report engines; adapters must supply authorized build context. */
+import {
+  parsePlatformioMemory,
+  type ProgramMemoryEvidence,
+} from "./platformio-memory.js";
 import { matchBoundedLines } from "../bounded-pattern.js";
 import type { SizeSymbol } from "./size-parser.js";
 import { PlatformIOError } from "../../utils/errors.js";
@@ -25,6 +29,7 @@ export interface FirmwareAnalysisContext {
   compilerPath: string;
   trustedToolchainRoots: readonly string[];
   expectedElfSha256?: string;
+  memoryEvidence?: ProgramMemoryEvidence;
   signal?: AbortSignal;
 }
 
@@ -160,6 +165,28 @@ export async function reportFirmwareSize(
     context.elfPath,
     context.expectedElfSha256,
     async (snapshot, identity) => {
+      const evidence = context.memoryEvidence;
+      if (
+        evidence &&
+        (evidence.environment !== context.environment ||
+          evidence.elfSha256 !== identity.sha256)
+      ) {
+        throw new PlatformIOError(
+          "Memory accounting does not match the selected environment and ELF.",
+          "ANALYSIS_MEMORY_MISMATCH",
+        );
+      }
+      const memory =
+        evidence?.exitCode === 0
+          ? parsePlatformioMemory(evidence.output)
+          : undefined;
+      const memoryUnavailableReason = memory
+        ? null
+        : !evidence
+          ? "not_collected"
+          : evidence.exitCode !== 0
+            ? "size_check_failed"
+            : "unsupported_or_incomplete_output";
       const sectionsOutput = await runAnalysisProcess(
         tools.size,
         ["-A", snapshot],
@@ -191,7 +218,11 @@ export async function reportFirmwareSize(
         ok: true as const,
         environment: context.environment,
         elf: identity,
-        memorySource: "estimate_from_size" as const,
+        memorySource: memory
+          ? ("platformio" as const)
+          : ("estimate_from_size" as const),
+        memory: memory ?? null,
+        memoryUnavailableReason,
         totals,
         sections,
         symbolCount: symbols.length,

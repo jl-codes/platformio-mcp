@@ -161,3 +161,9 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Filters use bounded workers, batched input and the shared report deadline. Invalid expressions fail explicitly, including empty symbol tables. Existing unfiltered callers remain supported.
 - Verification: TypeScript and 15 report/matcher tests passed. The real Windows Xtensa verifier also passed with a single known fixture function selected from 1,864 symbols and unchanged whole-image totals; updated evidence records filteredSymbols.
 - Public adapters, authorized metadata/package discovery, board/partition memory accounting, retained build/upload identity and the broader implementation/distribution stages remain pending.
+
+## PlatformIO memory accounting integration
+
+- Added bounded parsing of PlatformIO RAM/Flash usage, retaining the reported program allocation limits instead of substituting physical chip capacity. Incomplete output stays unknown; duplicate environment reports, unsafe integers and inconsistent percentages are rejected.
+- Size report engine accepts host-supplied successful size-check evidence bound to the same environment and ELF SHA-256. It keeps GNU totals separate, labels PlatformIO accounting distinctly, rejects stale/mismatched evidence and exposes an explicit fallback reason for missing/failed/unsupported output.
+- Verification: TypeScript and 12 parser/report tests passed, including observed ESP32-S3 figures, failed-command fallback and hash mismatch. This does not yet capture evidence from an authorized live checkprogsize operation or prove partition-table/upload identity; those adapters and acceptance remain required.
