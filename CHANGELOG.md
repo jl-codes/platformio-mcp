@@ -5,6 +5,42 @@ All notable changes to **platformio-mcp** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Two processes could flash the same board.** The per-port claim was not a
+  lock: `claimPort` overwrote any existing claim unconditionally and the flash
+  paths never checked it. Claims are now published atomically (temp file plus
+  `link()`, which never exposes a partial file), stale claims are reclaimed
+  under a breaker, releases are owner-checked, and a monitor claim tracks the
+  detached monitor child rather than the process that launched it. Two TTLs
+  apply -- 30 min for uploads (`PIO_PORT_CLAIM_TTL_MS`), 24 h for monitors
+  (`PIO_MONITOR_CLAIM_TTL_MS`) -- so a live monitor is never reclaimed by a
+  flash-sized timer, yet a recycled PID cannot wedge a port forever.
+- `stopMonitor` force-cleared a claim on a kill it never verified; it now
+  requires proof the monitor is gone, and says on stderr whose monitor it is
+  stopping when that monitor belongs to another session.
+- `pio-agent monitor` printed its result and then never exited (an un-unref'd
+  log watcher; on Windows, also the polling fallback).
+- On Windows, a claim for `COM1`-`COM9` would have been written to the serial
+  device itself (reserved DOS device names); those filenames are now prefixed.
+- Upload claims leaked when the spooler timed out or failed to spawn, wedging
+  the port under the long-lived MCP server.
+- `reset_server_state` skipped `.reclaim` breakers and `.tmp.` files, so it
+  reported "all locks cleared" while leaving a wedged port behind.
+
+### Changed
+
+- **Diagnostics: the log-matcher `errorType: "PortBusy"` is renamed
+  `"DeviceBusy"`** (the OS reporting the device busy, often transient, still
+  `safeToAutoRetry: true`). `"PortBusy"` now means another pio-agent process
+  holds a claim on the port and is `safeToAutoRetry: false`. This `diagnostic`
+  object ships inside MCP `upload_firmware` / `upload_filesystem` results, so
+  consumers matching the old string must update.
+- `pio-agent lock status` and `pio-agent port release --port <p> [--force]`
+  are added, since the claim errors point users at them for recovery.
+
 ## [3.0.0] - 2026-09-08
 
 ### Added

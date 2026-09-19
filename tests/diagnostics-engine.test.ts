@@ -17,14 +17,14 @@ describe("Diagnostics Engine", () => {
     expect(result.rawLogPath).toContain(".pio-mcp-workspace/logs/build/a.log");
   });
 
-  it("classifies upload PortBusy failures", () => {
+  it("classifies upload DeviceBusy failures", () => {
     const result = diagnoseUploadLog("Error: [Errno 16] Resource busy", {
       taskId: "upload-123",
     });
 
     expect(result.success).toBe(false);
     expect(result.stage).toBe("upload");
-    expect(result.errorType).toBe("PortBusy");
+    expect(result.errorType).toBe("DeviceBusy");
     expect(result.safeToAutoRetry).toBe(true);
     expect(result.taskId).toBe("upload-123");
   });
@@ -49,4 +49,3 @@ describe("Diagnostics Engine", () => {
     expect(result.severity).toBe("info");
   });
 });
-

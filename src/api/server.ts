@@ -990,7 +990,14 @@ export function startPortalServer(defaultPort = 8080) {
         try {
           if (fs.existsSync(GLOBAL_LOCKS_DIR)) {
             for (const file of fs.readdirSync(GLOBAL_LOCKS_DIR)) {
-              if (file.endsWith(".json") || file.endsWith(".lock")) {
+              // Match src/index.ts: breakers and temp files must go too, or a
+              // "reset all locks" leaves a wedged port behind.
+              if (
+                file.endsWith(".json") ||
+                file.endsWith(".lock") ||
+                file.endsWith(".reclaim") ||
+                file.includes(".tmp.")
+              ) {
                 fs.unlinkSync(path.join(GLOBAL_LOCKS_DIR, file));
               }
             }

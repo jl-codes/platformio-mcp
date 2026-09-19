@@ -36,7 +36,8 @@ export const buildMatchers: DiagnosticMatcher[] = [
   {
     errorType: "LinkerError",
     pattern: /undefined reference|ld returned/i,
-    recommendedAction: "Check missing symbols, library linkage, or build flags.",
+    recommendedAction:
+      "Check missing symbols, library linkage, or build flags.",
     severity: "error",
     safeToAutoRetry: false,
   },
@@ -76,10 +77,13 @@ export const buildMatchers: DiagnosticMatcher[] = [
 
 export const uploadMatchers: DiagnosticMatcher[] = [
   {
-    errorType: "PortBusy",
+    errorType: "DeviceBusy",
     pattern: /Resource busy|Access is denied|device or resource busy/i,
     recommendedAction:
-      "Release the serial port lock or stop the active monitor process.",
+      "The OS reported the serial device as busy, which is often transient. " +
+      "Close any other serial monitor, wait a moment, and retry once. This is " +
+      "distinct from PortBusy, which means another pio-agent process holds a " +
+      "claim on the port.",
     severity: "error",
     safeToAutoRetry: true,
   },
