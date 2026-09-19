@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-19T19:53:01.571Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.15.0"
+  },
+  "environment": "analysis-esp32s3",
+  "board": "esp32-s3-devkitc-1",
+  "platform": "espressif32@7.0.1",
+  "sourceSha256": "d7e1998ac7c944abb25f8a48e924198bb2c115b513a2e46db7adb0163bf68a30",
+  "elf": {
+    "sha256": "acde361f81f50a4a47a7676ba724da5983feb1122c9c027db6080dcefb291f1f",
+    "architecture": "xtensa",
+    "bytes": 6975824
+  },
+  "utilityVersion": "GNU nm (crosstool-NG esp-2021r2-patch5) 2.35.1.20201223",
+  "checks": {
+    "knownFunction": true,
+    "sourceLine": 6,
+    "unresolvedFrame": true,
+    "expectedHash": true,
+    "wrongHashRejected": true,
+    "symbolAttribution": true
+  },
+  "totals": {
+    "text": 177153,
+    "data": 56264,
+    "bss": 170717,
+    "flashEstimate": 233417,
+    "ramEstimate": 226981
+  },
+  "symbolCount": 1864,
+  "physicalDeviceTest": false
+}

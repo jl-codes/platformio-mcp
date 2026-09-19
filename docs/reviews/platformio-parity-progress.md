@@ -100,3 +100,11 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Size reports retain static-estimate labeling and separate symbol attribution from section accounting. Reports share a 30-second utility-execution deadline and crash addresses are passed in bounded batches for Windows command-line limits.
 - Verification: 33 tests passed across six analysis files. Report-engine utilities are mocked; real toolchain fixture and physical acceptance remain outstanding.
 - Still required before public registration: host/package-derived environment/toolchain context, retained build/upload manifests, regex filtering, PlatformIO/partition accounting, canonical and compatibility result adapters, CLI/MCP integration, and real acceptance evidence.
+
+## Real Xtensa toolchain acceptance
+
+- Built repository-owned ESP32-S3 debug firmware through MCP build_project, exact task `a9162b01-4e62-4051-aa84-a9b3842d6473`, environment `analysis-esp32s3`, Espressif32 7.0.1. Task completed successfully; no device upload occurred.
+- Added an explicit, non-skipping real-toolchain verifier and reproduction instructions. Windows x64 GNU nm/size/addr2line checks passed against the 6,975,824-byte ELF; evidence is in `analysis-xtensa-windows-evidence.json`.
+- Verified source function/line, retained unresolved address, expected identity and mismatch rejection, size symbol counts/ranking and source attribution. GNU nm --size-sort omits unsized symbols, so the verifier compares identical invocation modes.
+- Real evidence confirms generic GNU size estimates differ from PlatformIO board accounting; recorded both in fixture documentation. Do not equate these estimates with device allocation or partition capacity.
+- Remaining: Cortex-M and other-host fixture acceptance, selected-environment discovery, real board/partition accounting, retained build/upload manifests, tool adapters, and all physical acceptance/distribution work already tracked above.
