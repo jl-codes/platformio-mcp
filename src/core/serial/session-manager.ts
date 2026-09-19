@@ -100,6 +100,7 @@ interface Session {
  */
 export class SerialSessionManager {
   private readonly owners = new WeakSet<SerialSessionOwner>();
+  private readonly disconnectedOwners = new WeakSet<SerialSessionOwner>();
   private readonly ownerStops = new WeakMap<SerialSessionOwner, number>();
   private pendingDiscovery = 0;
   private readonly sessions = new Map<string, Session>();
@@ -126,10 +127,10 @@ export class SerialSessionManager {
 
   /** Capture owner cleanup before asynchronous adapter authorization starts. */
   createStartupGuard(owner: SerialSessionOwner): () => void {
-    this.requireOwner(owner);
+    this.requireActiveOwner(owner);
     const generation = this.ownerStops.get(owner) ?? 0;
     return () => {
-      this.requireOwner(owner);
+      this.requireActiveOwner(owner);
       if ((this.ownerStops.get(owner) ?? 0) !== generation)
         throw new PlatformIOError(
           "Serial startup was stopped.",
@@ -164,7 +165,7 @@ export class SerialSessionManager {
       resolve?: typeof resolveSerialEndpoint;
     },
   ): Promise<SerialSessionInfo> {
-    this.requireOwner(owner);
+    this.requireActiveOwner(owner);
     validateDirectSerialOptions(input);
     const request = {
       ...input,
@@ -215,7 +216,7 @@ export class SerialSessionManager {
     owner: SerialSessionOwner,
     input: SerialSessionRequest,
   ): Promise<SerialSessionInfo> {
-    this.requireOwner(owner);
+    this.requireActiveOwner(owner);
     validateDirectSerialOptions(input);
     if (!path.isAbsolute(input.projectDir))
       throw new PlatformIOError(
@@ -378,9 +379,11 @@ export class SerialSessionManager {
         "Serial writes are limited to 64 KiB.",
         "SERIAL_WRITE_LIMIT",
       );
+    this.requireActiveOwner(owner);
     const copy = Buffer.from(bytes);
     const guard = await this.authorize(session, "write", copy);
     this.ensureNotStopped(session);
+    this.requireActiveOwner(owner);
     guard();
     if (!session.transport)
       throw new PlatformIOError("Serial session is not open.", "SERIAL_CLOSED");
@@ -466,6 +469,15 @@ export class SerialSessionManager {
     return Promise.all(
       this.list(owner).map((session) => this.stop(owner, session.sessionId)),
     );
+  }
+
+  /** Permanently disable new device effects for a disconnected principal; owned cleanup remains retryable. */
+  async disconnectOwner(
+    owner: SerialSessionOwner,
+  ): Promise<SerialSessionInfo[]> {
+    this.requireOwner(owner);
+    this.disconnectedOwners.add(owner);
+    return this.stopAll(owner);
   }
 
   private async authorize(
@@ -556,6 +568,15 @@ export class SerialSessionManager {
       throw new PlatformIOError(
         "Serial session capacity is full; close an owned session first.",
         "SERIAL_SESSION_LIMIT",
+      );
+  }
+
+  private requireActiveOwner(owner: SerialSessionOwner): void {
+    this.requireOwner(owner);
+    if (this.disconnectedOwners.has(owner))
+      throw new PlatformIOError(
+        "Serial client disconnected.",
+        "SERIAL_OWNER_DISCONNECTED",
       );
   }
 

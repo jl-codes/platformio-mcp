@@ -59,3 +59,7 @@ Inspection-approval policies can pass a separate `discoveryApprovalId` in truste
 Opening still passes through ordinary `serial_session_start` authorization with the resolved endpoint/USB identities. The composite inspection grant does not authorize opening, reading or writing. The normal MCP registry remains unchanged. Public adapters and shared legacy device coordination remain outstanding.
 
 The policy adapter captures the owner cleanup generation before asynchronous composite authorization. If owner cleanup occurs during that authorization, startup fails before native discovery begins. This extends cancellation coverage to the period before the session manager reserves discovery capacity. A standalone enumeration approval cannot authorize the four-snapshot startup workflow.
+
+## Client disconnection
+
+Trusted adapters call `disconnectOwner` when a client connection ends. It permanently disables new startup and writes for that owner and invokes owner-wide stop, invalidating pending discovery and authorization. Owned status, retained reads under current policy, and cleanup retries remain available to trusted cleanup code; a failed close does not lose its lease-release capability. A reconnect receives a new owner object. Merely stopping all sessions remains reversible for an active client. Transport adapters still need to wire their actual disconnect events to this lifecycle.

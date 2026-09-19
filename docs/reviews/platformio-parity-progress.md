@@ -359,3 +359,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Added an owner startup guard captured before composite policy authorization. Owner cleanup during that asynchronous boundary now prevents discovery and transport construction, closing the gap before the manager's discovery reservation exists.
 - TypeScript and 39 manager/policy tests passed, including immediate owner cleanup during actual composite dispatch and rejection of standalone list_devices grants for startup discovery. Public adapters, native packaging and the full remaining parity/acceptance/release scope remain open.
+
+## Disconnected serial principals
+
+- Added permanent owner disconnection for adapter lifecycle handling. Disconnected principals cannot create new starts or writes, while owned cleanup remains retryable and retained reads remain policy checked. Disconnect invokes stopAll, preserving cancellation across pending startup authorization/discovery.
+- TypeScript and 40 manager/policy tests passed. The new lifecycle test verifies start/write rejection, retained status/read access, cleanup retry and independent operation by a newly issued owner. Actual public transport disconnect wiring remains open.

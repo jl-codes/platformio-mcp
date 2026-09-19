@@ -339,6 +339,28 @@ describe("owned serial sessions", () => {
     expect(started.state).toBe("open");
   });
 
+  it("permanently prevents disconnected owners from starting or writing while keeping owned cleanup available", async () => {
+    const f = fixture();
+    const started = await f.manager.start(f.owner, f.request());
+    await f.manager.disconnectOwner(f.owner);
+    await expect(f.manager.start(f.owner, f.request())).rejects.toMatchObject({
+      code: "SERIAL_OWNER_DISCONNECTED",
+    });
+    await expect(
+      f.manager.write(f.owner, started.sessionId, Buffer.from("command")),
+    ).rejects.toMatchObject({ code: "SERIAL_OWNER_DISCONNECTED" });
+    expect(
+      (await f.manager.stop(f.owner, started.sessionId)).cleanupPending,
+    ).toBe(false);
+    expect(f.manager.list(f.owner)).toHaveLength(1);
+    expect((await f.manager.read(f.owner, started.sessionId)).state).toBe(
+      "stopped",
+    );
+    const other = f.manager.createOwner();
+    const next = await f.manager.start(other, f.request());
+    await f.manager.stop(other, next.sessionId);
+  });
+
   it("never accepts a guessed session ID or copied owner object as authority", async () => {
     const f = fixture();
     const started = await f.manager.start(f.owner, f.request());
