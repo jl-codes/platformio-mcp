@@ -173,3 +173,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added fresh selected-environment metadata collection and checkprogsize collection through the shared build authorization boundary, with explicit purpose-bound arguments and finite process timeouts. Read-only policy denies before process execution; metadata is not cached globally.
 - Size collection hashes the selected ELF before and after the command and rejects a changed artifact, rather than associating a rebuild's usage with stale analysis. Failure status remains explicit in collected evidence.
 - Validation covers denied execution, exact environment/arguments, failed metadata, flag-like environment input, successful evidence binding and ELF mutation during the command. Public analysis adapters, host package discovery, interprocess build locks/retained manifests and real collection acceptance still remain outstanding.
+
+## Full regression and pinned legacy input contracts
+
+- Full backend regression at b0fe691 passed 55 files / 302 tests (`.platformio-mcp/parity-regression-current.log`). This covers implemented behavior, not unimplemented parity or physical acceptance.
+- Captured all 42 original MCP input contracts from pinned upstream 40e12ccb8e85fcaf33b46c50b6d832665728e773 into platformio-product-contracts.json. Capture uses static TypeScript literal/constant parsing, never evaluation of upstream server code; source SHA-256 and revision are recorded. The --check mode verifies reproducibility.
+- Real stdio MCP tests now compare every original input schema, allowing new optional fields while rejecting removed inputs, newly required fields and common narrowing constraints. All three stdio checks passed. Description-only edits are not treated as input compatibility breaks.
+- S0 still needs output/behavior contracts and full CLI/dashboard inventories; these checks do not prove full functional parity or retained physical behavior. The remaining implementation, PR, publication and installed-artifact acceptance requirements are unchanged.
