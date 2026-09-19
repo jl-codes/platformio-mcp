@@ -384,3 +384,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Hosted Windows job 105982136299 in run 35474815808 failed a simple case-insensitive regex on PATTERN_TIMEOUT. The previous implementation started its execution timer at worker construction, including startup. Added a ready/start handshake: worker startup is bounded to five seconds, then the existing 1–2,000 ms compilation/execution budget starts before the worker is allowed to run. No untrusted regex executes during startup.
 - TypeScript and 33 matcher/lifecycle/buffer tests passed. Simulated slow startup retains the full matching budget; startup expiry ignores late readiness. Real-worker catastrophic-backtracking and capacity recovery tests continue to pass. Rebuilt plugin; validation and 14 plugin tests passed. Hosted confirmation is pending.
+
+## Consolidated serial regression and migration evidence
+
+- Full local backend verification at 2e48a00: TypeScript passed; 70 files / 494 tests passed, 2 files / 22 tests skipped. Output retained in `.platformio-mcp/serial-redaction-regression.log`. Skipped cases do not establish acceptance.
+- Hosted run 35475114306 at 5c5928c completed successfully across all quality, dependency, plugin, CLI, browser and smoke jobs. The newer worker handshake still needs hosted confirmation.
+- Inspected actual legacy monitor/spooler paths: legacy claims are written by the server while hardware child processes can outlive it. A plain replacement of those claim files with parent-owned leases would not satisfy child ownership. Monitor/uploader spawn barriers and surviving-child custody remain mandatory before shared exclusion/public serial parity can be claimed.
+- Inspected installed pinned bindings-cpp 13.0.0 prebuilds: Windows x64, universal macOS x64/arm64 and glibc Linux x64/arm64 binaries are present. This is dependency availability only; the existing plugin builder does not yet package the native dependency closure, and no wheel/native-host acceptance or release is established.
