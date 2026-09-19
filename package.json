@@ -108,5 +108,8 @@
   "bugs": {
     "url": "https://github.com/jl-codes/platformio-mcp/issues"
   },
-  "homepage": "https://github.com/jl-codes/platformio-mcp#readme"
+  "homepage": "https://github.com/jl-codes/platformio-mcp#readme",
+  "optionalDependencies": {
+    "serialport": "13.0.0"
+  }
 }
