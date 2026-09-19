@@ -63,3 +63,9 @@ The policy adapter captures the owner cleanup generation before asynchronous com
 ## Client disconnection
 
 Trusted adapters call `disconnectOwner` when a client connection ends. It permanently disables new startup and writes for that owner and invokes owner-wide stop, invalidating pending discovery and authorization. Owned status, retained reads under current policy, and cleanup retries remain available to trusted cleanup code; a failed close does not lose its lease-release capability. A reconnect receives a new owner object. Merely stopping all sessions remains reversible for an active client. Transport adapters still need to wire their actual disconnect events to this lifecycle.
+
+## Serial redaction component
+
+The internal SerialLineRedactor filters known credential assignments using the shared policy redactor and tracks multiline private-key/certificate blocks. Completed lines commit state; partial previews do not. A block stays hidden until its matching closing delimiter arrives, including empty payload lines and malformed mismatched delimiters. Input must already be framed and bounded to 64 KiB per line. This is heuristic secret filtering, not detection of arbitrary unknown secret values.
+
+It is not yet connected to the serial buffer or public reads. Integration must track block markers before truncating source lines, commit state before ring eviction, apply response byte limits after replacement, preserve partial/cursor semantics and distinguish filtering from byte loss. Raw buffer output must not be presented as redacted until that integration is complete.

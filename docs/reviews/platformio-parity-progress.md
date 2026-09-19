@@ -369,3 +369,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Hosted run 35474603931 failed one Windows host-identity test after about 3,025 ms: current-process observation was unknown. All other 479 Windows tests passed; Linux/macOS quality jobs passed. Downstream jobs were skipped. The timing is consistent with the three-second PowerShell deadline, though the sanitized observation does not expose the underlying exception.
 - Increased only the Windows metadata deadline to ten seconds and the two-observation test budget to 25 seconds. Unknown metadata still never establishes stale ownership; no fallback, cached token or weakened assertion was introduced. This may delay lease operations on an unresponsive Windows metadata backend, but remains bounded. Hosted verification is still required.
+
+## Stateful serial secret filtering
+
+- Added an internal framed-line redactor using shared known-secret patterns plus persistent PEM block state. Partial previews do not mutate stream state; completed lines commit it, and matching closing delimiters end suppression. Input is bounded and unframed multiline input is rejected.
+- TypeScript and six redaction tests passed, covering credentials, unterminated multiline blocks, repeated previews, adjacent blocks, mismatched delimiters and input limits. Buffer/public integration remains open, particularly pre-truncation marker tracking and post-redaction response byte accounting. No public redaction guarantee is claimed yet.
