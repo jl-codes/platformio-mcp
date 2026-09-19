@@ -32,7 +32,9 @@ export type SerialTransportState =
   | "error";
 
 /** Validate before constructing a native binding or starting any device operation. */
-function validateOptions(options: DirectSerialOptions): number {
+export function validateDirectSerialOptions(
+  options: DirectSerialOptions,
+): number {
   const timeout = options.operationTimeoutMs ?? 5000;
   if (
     typeof options.path !== "string" ||
@@ -59,6 +61,10 @@ function validateOptions(options: DirectSerialOptions): number {
  */
 export class DirectSerialTransport {
   readonly confirmedClosed: Promise<void>;
+  readonly terminated: Promise<"stopped" | "disconnected" | "error">;
+  private resolveTerminated!: (
+    state: "stopped" | "disconnected" | "error",
+  ) => void;
   private resolveClosed!: () => void;
   private physicallyClosed = false;
   private current: SerialTransportState = "idle";
@@ -80,12 +86,15 @@ export class DirectSerialTransport {
     options: DirectSerialOptions,
     private readonly onData: (bytes: Buffer) => void,
   ) {
-    this.timeout = validateOptions(options);
+    this.timeout = validateDirectSerialOptions(options);
     if (port.isOpen || port.opening || port.closing)
       throw new PlatformIOError(
         "Serial transport requires an unopened binding.",
         "SERIAL_TRANSPORT_ARGUMENT_INVALID",
       );
+    this.terminated = new Promise((resolve) => {
+      this.resolveTerminated = resolve;
+    });
     this.confirmedClosed = new Promise((resolve) => {
       this.resolveClosed = resolve;
     });
@@ -122,7 +131,7 @@ export class DirectSerialTransport {
       ),
     );
     port.on("close", () => {
-      this.terminal ??= "disconnected";
+      this.markTerminal("disconnected");
       this.finishClosed();
     });
   }
@@ -242,7 +251,7 @@ export class DirectSerialTransport {
 
   /** Request shutdown and wait boundedly; timeout leaves confirmedClosed pending until actual closure. */
   async close(): Promise<void> {
-    this.terminal ??= "stopped";
+    this.markTerminal("stopped");
     this.abortPending(
       new PlatformIOError("Serial operation stopped.", "SERIAL_CLOSED"),
     );
@@ -308,12 +317,18 @@ export class DirectSerialTransport {
     });
   }
 
+  private markTerminal(state: "stopped" | "disconnected" | "error"): void {
+    if (this.terminal) return;
+    this.terminal = state;
+    this.resolveTerminated(state);
+  }
+
   private abortPending(error: Error): void {
     for (const reject of [...this.pending]) reject(error);
   }
 
   private fail(error: Error): void {
-    this.terminal ??= "error";
+    this.markTerminal("error");
     this.abortPending(error);
     this.requestClose();
   }
@@ -355,7 +370,7 @@ export class DirectSerialTransport {
       return;
     this.physicallyClosed = true;
     this.closing = false;
-    this.terminal ??= "stopped";
+    this.markTerminal("stopped");
     this.abortPending(
       new PlatformIOError("Serial connection closed.", "SERIAL_CLOSED"),
     );
@@ -373,7 +388,7 @@ export async function createDirectSerialTransport(
   options: DirectSerialOptions,
   onData: (bytes: Buffer) => void,
 ): Promise<DirectSerialTransport> {
-  validateOptions(options);
+  validateDirectSerialOptions(options);
   if (Number(process.versions.node.split(".")[0]) < 20)
     throw new PlatformIOError(
       "Direct serial transport requires Node 20 or newer; the PlatformIO monitor remains available.",
