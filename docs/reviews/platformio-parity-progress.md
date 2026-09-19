@@ -379,3 +379,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Connected a bounded rolling PEM marker scanner and shared credential patterns to direct-session buffers. Markers are observed before source truncation, block state survives ring eviction, completed storage and partial snapshots are filtered, and matching operates on filtered views. Replacement expansion is clipped without splitting UTF-8 or exceeding budgets; additive metadata identifies filtering/clipping.
 - TypeScript and focused buffer/session/policy/redaction tests validate truncation-before-header handling, fragmented delimiters, eviction, filtered partials, replacement expansion and the real owned-session echo path. Direct mode currently filters unconditionally; legacy monitor behavior and public tool exposure are unchanged.
+
+## Separate regex startup and execution deadlines
+
+- Hosted Windows job 105982136299 in run 35474815808 failed a simple case-insensitive regex on PATTERN_TIMEOUT. The previous implementation started its execution timer at worker construction, including startup. Added a ready/start handshake: worker startup is bounded to five seconds, then the existing 1–2,000 ms compilation/execution budget starts before the worker is allowed to run. No untrusted regex executes during startup.
+- TypeScript and 33 matcher/lifecycle/buffer tests passed. Simulated slow startup retains the full matching budget; startup expiry ignores late readiness. Real-worker catastrophic-backtracking and capacity recovery tests continue to pass. Rebuilt plugin; validation and 14 plugin tests passed. Hosted confirmation is pending.

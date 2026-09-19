@@ -31,6 +31,7 @@ function regexSource(pattern: string, translate: boolean): string {
 // Constant worker source: patterns and log text are data, never interpolated executable code.
 const WORKER_SOURCE = `
 const {parentPort,workerData}=require('node:worker_threads');
+parentPort.once('message', () => {
 try {
   const regex=new RegExp(workerData.pattern,workerData.ignoreCase?'i':'');
   const indices=[];
@@ -39,6 +40,8 @@ try {
   }
   parentPort.postMessage({indices});
 } catch {parentPort.postMessage({invalid:true});}
+});
+parentPort.postMessage({ready:true});
 `;
 
 let activeRegexWorkers = 0;
@@ -106,6 +109,8 @@ export async function matchBoundedLines(
     });
     activeRegexWorkers++;
     let settled = false;
+    let executing = false;
+    let timer: ReturnType<typeof setTimeout>;
     const finish = (error?: Error, indices?: number[]) => {
       if (settled) return;
       settled = true;
@@ -120,19 +125,45 @@ export async function matchBoundedLines(
           else resolve(indices!);
         }, reject);
     };
-    const timer = setTimeout(
+    timer = setTimeout(
       () =>
         finish(
           new PlatformIOError(
-            "Regex exceeded its execution deadline.",
-            "PATTERN_TIMEOUT",
+            "Regex worker exceeded its startup deadline.",
+            "PATTERN_WORKER_STARTUP_TIMEOUT",
           ),
         ),
-      timeoutMs,
+      5000,
     );
-    worker.once(
+    worker.on(
       "message",
-      (message: { invalid?: boolean; indices: number[] }) =>
+      (message: { ready?: boolean; invalid?: boolean; indices?: number[] }) => {
+        if (settled) return;
+        if (message.ready) {
+          if (executing) return;
+          executing = true;
+          clearTimeout(timer);
+          timer = setTimeout(
+            () =>
+              finish(
+                new PlatformIOError(
+                  "Regex exceeded its execution deadline.",
+                  "PATTERN_TIMEOUT",
+                ),
+              ),
+            timeoutMs,
+          );
+          // Start the budget before permitting compilation or matching in the ready worker.
+          worker.postMessage({ run: true });
+          return;
+        }
+        if (!executing)
+          return finish(
+            new PlatformIOError(
+              "Unexpected regex worker response.",
+              "PATTERN_WORKER_FAILED",
+            ),
+          );
         finish(
           message.invalid
             ? new PlatformIOError(
@@ -141,7 +172,8 @@ export async function matchBoundedLines(
               )
             : undefined,
           message.indices,
-        ),
+        );
+      },
     );
     worker.once("error", () =>
       finish(

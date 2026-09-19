@@ -22642,6 +22642,8 @@ async function matchBoundedLines(lines2, pattern, options = {}) {
     });
     activeRegexWorkers++;
     let settled = false;
+    let executing = false;
+    let timer;
     const finish = (error2, indices) => {
       if (settled) return;
       settled = true;
@@ -22653,24 +22655,50 @@ async function matchBoundedLines(lines2, pattern, options = {}) {
         else resolve(indices);
       }, reject);
     };
-    const timer = setTimeout(
+    timer = setTimeout(
       () => finish(
         new PlatformIOError(
-          "Regex exceeded its execution deadline.",
-          "PATTERN_TIMEOUT"
+          "Regex worker exceeded its startup deadline.",
+          "PATTERN_WORKER_STARTUP_TIMEOUT"
         )
       ),
-      timeoutMs
+      5e3
     );
-    worker.once(
+    worker.on(
       "message",
-      (message) => finish(
-        message.invalid ? new PlatformIOError(
-          "Invalid or unsupported regular expression.",
-          "PATTERN_INVALID"
-        ) : void 0,
-        message.indices
-      )
+      (message) => {
+        if (settled) return;
+        if (message.ready) {
+          if (executing) return;
+          executing = true;
+          clearTimeout(timer);
+          timer = setTimeout(
+            () => finish(
+              new PlatformIOError(
+                "Regex exceeded its execution deadline.",
+                "PATTERN_TIMEOUT"
+              )
+            ),
+            timeoutMs
+          );
+          worker.postMessage({ run: true });
+          return;
+        }
+        if (!executing)
+          return finish(
+            new PlatformIOError(
+              "Unexpected regex worker response.",
+              "PATTERN_WORKER_FAILED"
+            )
+          );
+        finish(
+          message.invalid ? new PlatformIOError(
+            "Invalid or unsupported regular expression.",
+            "PATTERN_INVALID"
+          ) : void 0,
+          message.indices
+        );
+      }
     );
     worker.once(
       "error",
@@ -22696,6 +22724,7 @@ var init_bounded_pattern = __esm({
     init_errors2();
     WORKER_SOURCE = `
 const {parentPort,workerData}=require('node:worker_threads');
+parentPort.once('message', () => {
 try {
   const regex=new RegExp(workerData.pattern,workerData.ignoreCase?'i':'');
   const indices=[];
@@ -22704,6 +22733,8 @@ try {
   }
   parentPort.postMessage({indices});
 } catch {parentPort.postMessage({invalid:true});}
+});
+parentPort.postMessage({ready:true});
 `;
     activeRegexWorkers = 0;
   }
