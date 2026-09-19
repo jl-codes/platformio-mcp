@@ -291,6 +291,54 @@ describe("owned serial sessions", () => {
     expect(f.transport).not.toHaveBeenCalled();
   });
 
+  it("cancels pending initial discovery on owner cleanup and never opens after its late result", async () => {
+    const f = fixture();
+    let finish!: (records: { path: string }[]) => void;
+    const pending = f.manager.startDiscovered(
+      f.owner,
+      { projectDir: f.root, path: "COM44", baudRate: 115200 },
+      {
+        list: () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+        resolve: (port) => resolveSerialEndpoint(port, { platform: "win32" }),
+      },
+    );
+    await Promise.resolve();
+    await f.manager.stopAll(f.owner);
+    finish([{ path: "COM44" }]);
+    await expect(pending).rejects.toMatchObject({ code: "SERIAL_CLOSED" });
+    expect(f.transport).not.toHaveBeenCalled();
+  });
+  it("counts stalled discovery against session capacity and returns capacity after timeout", async () => {
+    const f = fixture();
+    const requests = Array.from({ length: 8 }, () =>
+      f.manager.startDiscovered(
+        f.owner,
+        {
+          projectDir: f.root,
+          path: "COM44",
+          baudRate: 115200,
+          operationTimeoutMs: 20,
+        },
+        {
+          list: () => new Promise(() => {}),
+          resolve: (port) => resolveSerialEndpoint(port, { platform: "win32" }),
+        },
+      ),
+    );
+    const settled = Promise.allSettled(requests);
+    await expect(f.manager.start(f.owner, f.request())).rejects.toMatchObject({
+      code: "SERIAL_SESSION_LIMIT",
+    });
+    expect(
+      (await settled).every((result) => result.status === "rejected"),
+    ).toBe(true);
+    const started = await f.manager.start(f.owner, f.request());
+    expect(started.state).toBe("open");
+  });
+
   it("never accepts a guessed session ID or copied owner object as authority", async () => {
     const f = fixture();
     const started = await f.manager.start(f.owner, f.request());

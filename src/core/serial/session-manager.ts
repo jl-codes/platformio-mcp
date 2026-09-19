@@ -100,6 +100,8 @@ interface Session {
  */
 export class SerialSessionManager {
   private readonly owners = new WeakSet<SerialSessionOwner>();
+  private readonly ownerStops = new WeakMap<SerialSessionOwner, number>();
+  private pendingDiscovery = 0;
   private readonly sessions = new Map<string, Session>();
   private readonly leases: DeviceLeaseStore;
   private readonly makeTransport: typeof createDirectSerialTransport;
@@ -150,26 +152,48 @@ export class SerialSessionManager {
   ): Promise<SerialSessionInfo> {
     this.requireOwner(owner);
     validateDirectSerialOptions(input);
-    const resolve = discovery.resolve ?? resolveSerialEndpoint;
-    const endpoint = resolve(input.path);
-    const binding = bindSerialDiscovery(
-      endpoint,
-      await this.withEndpointDeadline(
-        discovery.list,
-        input.operationTimeoutMs ?? 5000,
-      ),
-      resolve,
-    );
-    return this.start(owner, {
+    const request = {
       ...input,
-      path: endpoint.canonicalPort,
-      resource: endpoint.resource,
-      additionalResources: binding.usbIdentity
-        ? [{ kind: "serial", identity: binding.usbIdentity }]
-        : [],
-      revalidateEndpoint: async () =>
-        binding.revalidate(await discovery.list()),
-    });
+      buffer: input.buffer ? { ...input.buffer } : undefined,
+    };
+    const list = discovery.list;
+    const resolve = discovery.resolve ?? resolveSerialEndpoint;
+    const stopGeneration = this.ownerStops.get(owner) ?? 0;
+    this.requireCapacity();
+    this.pendingDiscovery++;
+    try {
+      const endpoint = resolve(request.path);
+      const binding = bindSerialDiscovery(
+        endpoint,
+        await this.withEndpointDeadline(
+          list,
+          request.operationTimeoutMs ?? 5000,
+        ),
+        resolve,
+      );
+      if ((this.ownerStops.get(owner) ?? 0) !== stopGeneration)
+        throw new PlatformIOError(
+          "Serial discovery was stopped.",
+          "SERIAL_CLOSED",
+        );
+      // Transfer the reservation synchronously to start before another request can interleave.
+      this.pendingDiscovery--;
+      try {
+        return this.start(owner, {
+          ...request,
+          path: endpoint.canonicalPort,
+          resource: endpoint.resource,
+          additionalResources: binding.usbIdentity
+            ? [{ kind: "serial", identity: binding.usbIdentity }]
+            : [],
+          revalidateEndpoint: async () => binding.revalidate(await list()),
+        });
+      } finally {
+        this.pendingDiscovery++;
+      }
+    } finally {
+      this.pendingDiscovery--;
+    }
   }
 
   /** Authorize, acquire ownership, construct an unopened transport, revalidate, then open explicitly. */
@@ -216,15 +240,7 @@ export class SerialSessionManager {
       );
     const buffer = new SerialSessionBuffer(input.buffer);
     this.prune();
-    if (
-      [...this.sessions.values()].filter((session) =>
-        this.cleanupPending(session),
-      ).length >= 8
-    )
-      throw new PlatformIOError(
-        "Serial session capacity is full; close an owned session first.",
-        "SERIAL_SESSION_LIMIT",
-      );
+    this.requireCapacity();
     const session: Session = {
       id: randomUUID(),
       owner,
@@ -431,6 +447,8 @@ export class SerialSessionManager {
 
   /** Disconnect cleanup is scoped to one trusted client principal and never stops another owner's sessions. */
   async stopAll(owner: SerialSessionOwner): Promise<SerialSessionInfo[]> {
+    this.requireOwner(owner);
+    this.ownerStops.set(owner, (this.ownerStops.get(owner) ?? 0) + 1);
     return Promise.all(
       this.list(owner).map((session) => this.stop(owner, session.sessionId)),
     );
@@ -510,6 +528,21 @@ export class SerialSessionManager {
       );
     this.ensureNotStopped(session);
     guard();
+  }
+
+  /** Reserve capacity for discovery as well as already-created sessions. */
+  private requireCapacity(): void {
+    if (
+      this.pendingDiscovery +
+        [...this.sessions.values()].filter((session) =>
+          this.cleanupPending(session),
+        ).length >=
+      8
+    )
+      throw new PlatformIOError(
+        "Serial session capacity is full; close an owned session first.",
+        "SERIAL_SESSION_LIMIT",
+      );
   }
 
   private requireOwner(owner: SerialSessionOwner): void {

@@ -329,3 +329,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Hosted run 35473907622 for commit 39be2fa completed successfully: three OS quality jobs, three OS plugin jobs, production dependency audit, Linux CLI end-to-end, Chromium dashboard and Linux build/smoke. This verifies the stale frontend refresh across the tested hosts, not later unpushed changes or physical hardware acceptance.
 
 - Local verification of discovery-aware startup: TypeScript passed; full backend suite passed 67 files / 470 tests, with 2 files / 22 tests skipped. Skipped cases are not acceptance evidence. Output is retained in `.platformio-mcp/discovery-session-regression.log`. No physical device was opened.
+
+## Pending discovery ownership
+
+- Fixed initial discovery escaping owner-wide cleanup: each discovery captures an owner stop generation, checked before creating a session. Pending discovery now reserves bounded session capacity and releases its reservation on timeout/failure or transfers it synchronously to startup. Request fields and provider callbacks are captured before the first wait.
+- TypeScript and 34 session/policy tests passed, including cleanup followed by a late discovery result and eight stalled discoveries excluding a ninth startup until timeout. No hardware was opened.
