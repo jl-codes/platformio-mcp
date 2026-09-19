@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { decodeBacktrace, firmwareSizeReport } from "./tools/analysis.js";
 import { operationForCliCommand } from "./core/action-catalog.js";
 import {
   enrollProjectPolicy,
@@ -102,6 +103,8 @@ COMMANDS:
   agent-flash-monitor-verify --project-dir <dir> [--environment <env>] [--port <port|auto>] [--expect-all <csv>] [--reject-patterns <csv>] [--timeout <seconds>] [--stability-window <seconds>] [--auto-build <true|false>]
   agent-last-report --project-dir <dir>
   agent-board-report --project-dir <dir> --board <id>
+  decode-backtrace --project-dir <dir> --environment <env> <--text <value>|--text-file <path>> [--include-all-hex]
+  size-report --project-dir <dir> --environment <env> [--top <n>] [--filter <regex>]
   policy-status [--project-dir <dir>]
   policy-enroll --project-dir <dir>
   policy-revoke --project-dir <dir>
@@ -293,6 +296,39 @@ async function runPluginSubcommand(rawArgs: string[]) {
   });
 }
 
+/** Reads at most 1 MiB of regular crash-log input without trusting a prior file-size check. */
+function readCrashTextFile(file: string): string {
+  const descriptor = fs.openSync(file, "r");
+  try {
+    if (!fs.fstatSync(descriptor).isFile())
+      throw new PlatformIOError(
+        "Crash input must be a regular file.",
+        "ANALYSIS_INPUT_INVALID",
+      );
+    const buffer = Buffer.alloc(1024 * 1024 + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const count = fs.readSync(
+        descriptor,
+        buffer,
+        length,
+        buffer.length - length,
+        null,
+      );
+      if (!count) break;
+      length += count;
+    }
+    if (length > 1024 * 1024)
+      throw new PlatformIOError(
+        "Crash text exceeds 1 MiB.",
+        "ANALYSIS_INPUT_LIMIT",
+      );
+    return buffer.subarray(0, length).toString("utf8");
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
 async function runCliCommand(command: string, rawArgs: string[]) {
   const { options, positionals } = parseArgs(rawArgs);
   const jsonMode = Boolean(options.json);
@@ -315,6 +351,69 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           ? enrollProjectPolicy(project)
           : (revokeProjectPolicy(project), { revoked: true });
       printOutput(result, jsonMode);
+      return;
+    }
+    if (command === "decode-backtrace" || command === "size-report") {
+      const scope = {
+        projectDir: projectDirForPolicy,
+        environment: asString(options.environment),
+        approvalId: asString(options["approval-id"]),
+        expectedElfSha256: asString(options["expected-elf-sha256"]),
+      };
+      let parameters: Record<string, unknown>;
+      if (command === "decode-backtrace") {
+        const text = asString(options.text),
+          file = asString(options["text-file"]);
+        if ((text === undefined) === (file === undefined))
+          throw new PlatformIOError(
+            "Provide exactly one of --text or --text-file.",
+            "ANALYSIS_INPUT_INVALID",
+          );
+        parameters = {
+          ...scope,
+          text: file !== undefined ? readCrashTextFile(file) : text,
+          includeAllHex: asBoolean(options["include-all-hex"]),
+        };
+      } else
+        parameters = {
+          ...scope,
+          top:
+            options.top === undefined
+              ? undefined
+              : typeof options.top === "string"
+                ? Number(options.top)
+                : NaN,
+          filter: asString(options.filter),
+        };
+      const run = (args: Record<string, unknown>) =>
+        (command === "decode-backtrace" ? decodeBacktrace : firmwareSizeReport)(
+          args,
+          { actor: "user", actorClass: "interactive" },
+        );
+      let result;
+      try {
+        result = await run(parameters);
+      } catch (error) {
+        if (
+          !(error instanceof PlatformIOError) ||
+          error.code !== "APPROVAL_REQUIRED" ||
+          (jsonMode && approvalOpt !== true)
+        )
+          throw error;
+        const decision = error.context?.policyDecision as
+          | { reason: string; approvalId?: string }
+          | undefined;
+        if (!decision?.approvalId) throw error;
+        if (approvalOpt !== true && !(await promptApproval(decision.reason)))
+          throw new PlatformIOError(
+            "Action cancelled by user.",
+            "APPROVAL_DENIED",
+          );
+        if (!approveRequest(decision.approvalId)) throw error;
+        result = await run({ ...parameters, approvalId: decision.approvalId });
+      }
+      printOutput(result, jsonMode);
+      if (!result.ok) process.exitCode = 1;
       return;
     }
     let decision = await authorizeAction(actionName, policyArgs, {
@@ -767,6 +866,8 @@ async function runCliCommand(command: string, rawArgs: string[]) {
     }
   } catch (error) {
     const stageMap: Record<string, string> = {
+      "decode-backtrace": "analysis",
+      "size-report": "analysis",
       devices: "devices",
       boards: "boards",
       init: "init",
@@ -812,6 +913,8 @@ async function main() {
   const args = configurePolicyFileFromArgs(process.argv.slice(2));
   const command = args[0];
   const knownCommands = new Set([
+    "decode-backtrace",
+    "size-report",
     "devices",
     "boards",
     "init",

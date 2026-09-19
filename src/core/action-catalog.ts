@@ -223,6 +223,10 @@ export const actionRiskLevels: Record<string, PolicyRiskLevel> = {
 /** Resolves the existing CLI spelling to its concrete operation. */
 export function operationForCliCommand(command: string): string {
   switch (command) {
+    case "decode-backtrace":
+      return "decode_backtrace";
+    case "size-report":
+      return "size_report";
     case "devices":
       return "list_devices";
     case "boards":

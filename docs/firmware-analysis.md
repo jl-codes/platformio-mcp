@@ -19,4 +19,13 @@ node --import tsx scripts/verify-analysis-mcp.ts tests/fixtures/analysis/esp32s3
 
 The verifier uses MCP stdio for project configuration, fresh metadata/size checking and crash decoding. It does not substitute mocks or skip missing prerequisites.
 
-Reference-named Python compatibility aliases, session-based crash input, default-project/environment resolution, CLI commands, retained build/upload manifests and shared artifact locks are still pending. These two tools do not establish completion of the 40-tool compatibility plan or physical-device acceptance.
+Reference-named Python compatibility aliases, session-based crash input, default-project/environment resolution, retained build/upload manifests and shared artifact locks are still pending. These two tools do not establish completion of the 40-tool compatibility plan or physical-device acceptance.
+
+## CLI
+
+```text
+pio-agent decode-backtrace --project-dir <project> --environment <env> --text-file <crash-log> --json
+pio-agent size-report --project-dir <project> --environment <env> --top 25 --filter <regex> --json
+```
+
+Crash decoding accepts exactly one of `--text` or `--text-file`; file reads are bounded to 1 MiB. `--include-all-hex` enables additional address extraction. Both commands accept `--expected-elf-sha256` and `--approval-id`. JSON mode returns a structured approval error without prompting unless the operator explicitly supplies `--approve`; interactive mode uses the existing CLI confirmation. Approval retry occurs once with the same normalized request. This local operator surface is not a proof of human identity against an unrestricted same-user process.
