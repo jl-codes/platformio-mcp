@@ -137,3 +137,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - MCP/dashboard launch output, launch-session cookies and ordinary portal bearer tokens never carry this capability. Added an end-to-end API regression through getDashboardStatus, launch-ticket exchange, cookie authentication and both approval mutation routes, plus successful separately authorized approve/deny coverage.
 - Dashboard confirmation and the safety panel request the capability for each approval; it is added only to the approval request, never stored in browser persistence or carried into the execution retry. Local operator CLI approval remains supported. Same-user unrestricted process authority is explicitly outside this boundary.
 - Backend TypeScript and 18 API tests passed. UI build and focused capability/retry regression checks are recorded with this milestone. Remaining: queued-stage revalidation, exact device/artifact binding, administrative route review, full parity and distribution work.
+
+## Approval API lifecycle errors
+
+- Authorized dashboard attempts to revive terminal approvals return HTTP 409 / APPROVAL_TRANSITION_INVALID rather than a generic server failure. A record disappearing between lookup and mutation returns 404 without a success audit entry.
+- Verification: TypeScript passed; 26 API and approval-integrity tests passed, including the authorized denied-to-approved rejection path. Goal scope and remaining implementation/publication work are unchanged.

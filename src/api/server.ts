@@ -733,6 +733,10 @@ export function startPortalServer(defaultPort = 8080) {
         return;
       }
       const approved = approveRequest(id);
+      if (!approved) {
+        res.status(404).json({code:"APPROVAL_NOT_FOUND", error:"Approval no longer exists."});
+        return;
+      }
       appendAuditEvent({
         action: "dashboard_approve_request",
         status: "approved",
@@ -747,6 +751,10 @@ export function startPortalServer(defaultPort = 8080) {
       });
       res.json({ success: true, approval: approved });
     } catch (e: any) {
+      if (e?.code === "APPROVAL_TRANSITION_INVALID") {
+        res.status(409).json({code:e.code, error:e.message});
+        return;
+      }
       res.status(500).json({ error: e.message });
     }
   });
@@ -766,6 +774,10 @@ export function startPortalServer(defaultPort = 8080) {
         return;
       }
       const denied = denyRequest(id);
+      if (!denied) {
+        res.status(404).json({code:"APPROVAL_NOT_FOUND", error:"Approval no longer exists."});
+        return;
+      }
       appendAuditEvent({
         action: "dashboard_deny_request",
         status: "denied",
@@ -780,6 +792,10 @@ export function startPortalServer(defaultPort = 8080) {
       });
       res.json({ success: true, approval: denied });
     } catch (e: any) {
+      if (e?.code === "APPROVAL_TRANSITION_INVALID") {
+        res.status(409).json({code:e.code, error:e.message});
+        return;
+      }
       res.status(500).json({ error: e.message });
     }
   });

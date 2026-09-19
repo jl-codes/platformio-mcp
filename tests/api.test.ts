@@ -322,6 +322,18 @@ describe("Portal API Security & Telemetry Tailing", () => {
       expect(denyRes.body.approval.status).toBe("denied");
     });
 
+    it("reports terminal approval transitions as conflicts without changing state", async () => {
+      const {createApprovalRequest, denyRequest, getApproval} = await import("../src/core/policy/approvals.js");
+      const approval = createApprovalRequest({action:"upload_firmware", riskLevel:"high", reason:"terminal-state test", requestedBy:"agent"});
+      denyRequest(approval.id);
+      const response = await request(server).post(`/api/safety/approvals/${approval.id}/approve`)
+        .set("Authorization", `Bearer ${authToken}`)
+        .set("X-Pio-Approval-Token", "operator-test-capability-0123456789abcdef");
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe("APPROVAL_TRANSITION_INVALID");
+      expect(getApproval(approval.id)?.status).toBe("denied");
+    });
+
     it("reports plugin control state and preserves write budgets during cursor resets", async () => {
       const projectDir = fs.mkdtempSync(
         path.join(os.tmpdir(), "pio-dashboard-safety-"),
