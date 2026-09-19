@@ -1029,6 +1029,15 @@ export interface AgentGetLastReportResult {
  * Effective policy status payload returned by `get_policy_status`.
  */
 export interface PolicyStatusResult {
+  valid: boolean; // False means execution is blocked by invalid configuration
+  error?: { code: string; message: string }; // Safe repair diagnostic
+  digest?: string; // Identity of the effective policy and contributing files
+  sources: Array<{
+    kind: "builtin" | "project-profile" | "operator" | "project-override";
+    source: string;
+    present: boolean;
+    sha256?: string;
+  }>; // Ordered policy provenance, including absent optional files
   profile: string; // Active policy profile
   source: string; // Policy source path or descriptor
   allowedOperations: string[]; // Actions explicitly allowed

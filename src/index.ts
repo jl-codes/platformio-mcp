@@ -116,6 +116,7 @@ import { hardwareLockManager } from "./utils/lock-manager.js";
 import { killAllTrackedProcesses } from "./utils/process-manager.js";
 import { GLOBAL_LOCKS_DIR } from "./utils/paths.js";
 import fs from "node:fs";
+import { configurePolicyFileFromArgs } from "./core/policy/policy-sources.js";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { logDiagnostic as logDiag } from "./utils/logger.js";
@@ -2058,7 +2059,7 @@ async function main() {
   // Dispatches BEFORE the MCP server boots. The default behavior (no subcommand)
   // is preserved: start the MCP stdio server for AI agents.
   // ---------------------------------------------------------------------------
-  const cliArgs = process.argv.slice(2);
+  const cliArgs = configurePolicyFileFromArgs(process.argv.slice(2));
   const subcommand = cliArgs.find((a) => !a.startsWith("--"));
 
   if (cliArgs.includes("--help") || subcommand === "help") {

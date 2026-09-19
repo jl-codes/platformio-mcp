@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "method": "Read-only public registry metadata; no installation, publication or authenticated ownership check",
+  "entries": [
+    {
+      "registry": "npm",
+      "name": "platformio-mcp",
+      "normalizedName": "platformio-mcp",
+      "sourceUrl": "https://registry.npmjs.org/platformio-mcp/latest",
+      "status": "published_metadata_observed",
+      "version": "3.0.0",
+      "repository": {
+        "url": "git+https://github.com/jl-codes/platformio-mcp.git",
+        "type": "git"
+      },
+      "projectUrls": null,
+      "maintainers": [
+        "forkbomb"
+      ],
+      "publicationControlVerified": false,
+      "fetchedAtUtc": "2026-09-19T18:28:13.3748856Z"
+    },
+    {
+      "registry": "npm",
+      "name": "pio-agent",
+      "normalizedName": "pio-agent",
+      "sourceUrl": "https://registry.npmjs.org/pio-agent/latest",
+      "status": "published_metadata_observed",
+      "version": "3.0.0",
+      "repository": {
+        "url": "git+https://github.com/jl-codes/platformio-mcp.git",
+        "type": "git",
+        "directory": "packages/pio-agent"
+      },
+      "projectUrls": null,
+      "maintainers": [
+        "forkbomb"
+      ],
+      "publicationControlVerified": false,
+      "fetchedAtUtc": "2026-09-19T18:28:13.5888859Z"
+    },
+    {
+      "registry": "npm",
+      "name": "pio-mcp",
+      "normalizedName": "pio-mcp",
+      "sourceUrl": "https://registry.npmjs.org/pio-mcp/latest",
+      "status": "published_metadata_observed",
+      "version": "3.0.0",
+      "repository": {
+        "url": "git+https://github.com/jl-codes/platformio-mcp.git",
+        "type": "git",
+        "directory": "packages/pio-mcp"
+      },
+      "projectUrls": null,
+      "maintainers": [
+        "forkbomb"
+      ],
+      "publicationControlVerified": false,
+      "fetchedAtUtc": "2026-09-19T18:28:13.8021125Z"
+    },
+    {
+      "registry": "pypi",
+      "name": "platformio.mcp",
+      "normalizedName": "platformio-mcp",
+      "sourceUrl": "https://pypi.org/pypi/platformio.mcp/json",
+      "status": "published_metadata_observed",
+      "version": "0.2.0",
+      "repository": null,
+      "projectUrls": {
+        "Homepage": "https://github.com/powerdragonfire/platformio.mcp",
+        "Issues": "https://github.com/powerdragonfire/platformio.mcp/issues"
+      },
+      "maintainers": [
+        null
+      ],
+      "publicationControlVerified": false,
+      "fetchedAtUtc": "2026-09-19T18:28:13.9454223Z"
+    },
+    {
+      "registry": "pypi",
+      "name": "pio-agent-platformio",
+      "sourceUrl": "https://pypi.org/pypi/pio-agent-platformio/json",
+      "status": "lookup_failed",
+      "httpStatus": 404,
+      "availabilityConfirmed": false,
+      "error": "Response status code does not indicate success: 404 (Not Found).",
+      "fetchedAtUtc": "2026-09-19T18:28:14.2097222Z"
+    },
+    {
+      "registry": "pypi",
+      "name": "pio-agent",
+      "sourceUrl": "https://pypi.org/pypi/pio-agent/json",
+      "status": "lookup_failed",
+      "httpStatus": 404,
+      "availabilityConfirmed": false,
+      "error": "Response status code does not indicate success: 404 (Not Found).",
+      "fetchedAtUtc": "2026-09-19T18:28:14.4694117Z"
+    },
+    {
+      "registry": "pypi",
+      "name": "pio-mcp",
+      "sourceUrl": "https://pypi.org/pypi/pio-mcp/json",
+      "status": "lookup_failed",
+      "httpStatus": 404,
+      "availabilityConfirmed": false,
+      "error": "Response status code does not indicate success: 404 (Not Found).",
+      "fetchedAtUtc": "2026-09-19T18:28:14.7696065Z"
+    }
+  ]
+}

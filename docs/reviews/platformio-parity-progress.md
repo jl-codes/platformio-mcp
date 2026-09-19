@@ -1,0 +1,49 @@
+# Implementation evidence and remaining work
+
+Goal active. Branch: `codex/platformio-parity-permissions`.
+Product base: `40e12ccb8e85fcaf33b46c50b6d832665728e773`.
+Competitor contract: `a7b31021982f20b5406eaf80732899f8e75bd464` (40 tools).
+
+## Completed software work
+
+- Strict bounded YAML/JSON policy parsing; reject duplicate keys, aliases, unknown fields/actions/profiles and malformed booleans.
+- Launch-only `--policy-file` and `PIO_MCP_POLICY_FILE`; conflicting selectors fail rather than silently choosing one.
+- Policy lookup independent of writable cache fallback. Existing explicitly selected `PIO_MCP_DATA_DIR` remains supported.
+- Operator restrictions survive project overrides. Explicit empty permission lists remain empty.
+- Invalid configuration blocks operations while `get_policy_status` returns a repair diagnostic.
+- Valid status reports ordered source provenance, file hashes and effective-policy digest.
+
+These are partial S2 implementation changes, not completion of S0-S7 or the full policy security model.
+
+- Codex installer now resolves CODEX_HOME, uses TOML-aware field edits, preserves custom launchers/environment/permissions, rejects invalid files and remote transport conflicts, and replaces valid files atomically with cleanup on failure.
+
+## Verification
+
+- Baseline: 37 unit files, 157 tests passed before changes.
+- TypeScript compilation passed after changes.
+- Focused policy tests: 3 files, 26 tests passed (including 14 new strict-configuration cases).
+- Policy milestone: 38 files, 171 tests passed; evidence in `policy-unit.log`.
+- Installer/source-selection milestone: 40 files, 196 tests passed; evidence in `policy-installer-unit-verbose.log`. The preceding run had one unexpected Vitest worker exit (39 files/189 tests completed); the detailed rerun passed all tests. This intermittent failure remains recorded rather than hidden.
+- All 13 reference tool modules matched their pinned SHA-256 hashes. `scripts/capture-reference-contracts.py` produced and checked 40 input schemas, including resolved literal defaults. Output branch metadata is evidence only, not a complete output contract or behavioral acceptance.
+- Reference MIT license and attribution captured in THIRD-PARTY-NOTICES.md.
+- TOML parser 0.10.0 selected to retain the product's declared Node 18 compatibility; actual platform matrix execution remains pending.
+
+## Prerequisites observed on 2026-09-19
+
+- GitHub CLI authenticated as `jl-codes` with repository/workflow scopes.
+- Local npm authentication returned 401. Existing release workflow may support OIDC; verify trusted-publisher configuration before concluding npm deployment is blocked.
+- PlatformIO MCP read-only discovery: Core 6.1.16 on Windows, no connected devices returned.
+- Node 24.15.0; npm 11.12.1; Python 3.14.4.
+- Registry metadata is not proof of publishing authority. No distribution published yet; no PR created yet.
+
+## Next work
+
+1. Finish launch help and invalid-policy recovery cleanup. Policy source unit tests are implemented. Add project enrollment and scoped single-use approval grants; consolidate enforcement across entrypoints.
+2. Codex installer preservation and CODEX_HOME selection are implemented and fixture-tested; actual isolated-host acceptance remains pending. Host config remains host-enforced; do not reinterpret host approval/sandbox settings as hardware permission grants.
+3. Execute remaining S0-S7 items in the reviewed plan: shared action catalog, all 40 parity contracts/handlers, artifact identity, cross-install locks, bounded serial matching, debug/session lifecycle, Python runtime packaging and release channels.
+4. Preserve all existing tool/CLI/dashboard behavior and run required host/platform/hardware acceptance. Record unavailable prerequisites explicitly; do not substitute mocked tests for physical acceptance.
+5. Create the implementation PR, publish only project-controlled functional distributions through verified authorized workflows, and verify installed artifacts. Do not merge the PR without authorization.
+
+Namespace coverage is finite. Python package-name normalization makes the competitor's `platformio.mcp` equivalent to `platformio-mcp`; do not attempt to publish that occupied Python identity. Follow the checked-in namespace inventory and authenticate candidate ownership before publishing.
+
+

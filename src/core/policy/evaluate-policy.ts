@@ -1,9 +1,5 @@
 import path from "node:path";
-import {
-  actionRiskLevels,
-  defaultPolicy,
-  deniedActionPatterns,
-} from "./default-policy.js";
+import { actionRiskLevels, deniedActionPatterns } from "./default-policy.js";
 import {
   approveRequest,
   createApprovalRequest,
@@ -15,7 +11,11 @@ import {
   validateAutomationScope,
   type AutomationScopeInput,
 } from "./automation-policy.js";
-import { loadEffectivePolicyState } from "./load-policy.js";
+import {
+  loadEffectivePolicyState,
+  type EffectivePolicyState,
+} from "./load-policy.js";
+import { PolicyConfigError } from "./policy-schema.js";
 import type {
   PolicyDecision,
   PolicyEvaluationContext,
@@ -107,7 +107,19 @@ export async function evaluatePolicy(
 ): Promise<PolicyDecision> {
   const action = normalizeActionName(actionName);
   const riskLevel = riskForAction(action);
-  const effectivePolicy = loadEffectivePolicyState(context.workspaceDir);
+  let effectivePolicy: EffectivePolicyState;
+  try {
+    effectivePolicy = loadEffectivePolicyState(context.workspaceDir);
+  } catch (error) {
+    if (!(error instanceof PolicyConfigError)) throw error;
+    // Only the diagnostic endpoint can bypass invalid configuration; no execution occurs.
+    return decision(
+      action === "get_policy_status" ? "allow" : "deny",
+      error.message,
+      action,
+      riskLevel,
+    );
+  }
   const policy = effectivePolicy.policy;
   const auditContext = {
     workspaceDir: context.workspaceDir,
@@ -369,8 +381,7 @@ export async function evaluatePolicy(
     return needsApproval;
   }
 
-  const allowList =
-    policy.allow.length > 0 ? policy.allow : defaultPolicy.allow;
+  const allowList = policy.allow;
   const isAllowed = allowList.includes(action);
   const result = isAllowed
     ? decision(

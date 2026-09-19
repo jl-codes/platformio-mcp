@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from "node:fs";
+import { configurePolicyFileFromArgs } from "./core/policy/policy-sources.js";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { stdin as input, stdout as output } from "node:process";
@@ -107,6 +108,7 @@ COMMANDS:
   plugin validate [--require-runtime]
 
 GLOBAL FLAGS:
+  --policy-file <path>  Explicit operator policy (or PIO_MCP_POLICY_FILE)
   --json
   --approve
   --help
@@ -841,7 +843,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
+  const args = configurePolicyFileFromArgs(process.argv.slice(2));
   const command = args[0];
   const knownCommands = new Set([
     "devices",
