@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The CLI is the primary interface.** `pio-agent` (also `platformio-mcp`) is a
+  complete standalone adapter; nothing starts a long-lived process unless asked.
+  MCP is unchanged and fully supported, now behind an explicit `pio-agent serve`.
+  Bare invocation still starts the MCP server but prints a deprecation warning
+  on stderr; the installers now generate the `serve` form and no longer pass
+  `--open-dashboard-on-start`.
+- **`pio-agent dashboard` no longer boots the dashboard on demand.** It reports
+  whether one is running in any process and the URL; `pio-agent dashboard
+  --serve` starts it. Scripts that relied on the auto-boot must pass `--serve`.
+- `--background` on the CLI now genuinely returns immediately: the command
+  re-executes itself detached with a preassigned task id, and
+  `task-status <id>` reads the result. Previously it printed `running` and then
+  blocked for the whole task.
+- Commands that ran but failed (`build` with compiler errors, `test`) exit
+  non-zero; queries that answer "no" (`task-cancel` on a finished task,
+  `monitor-health` with nothing to assert) still exit 0.
+- `--version` is a global flag only when it leads, so `lib install <name>
+  --version 1.2.3` installs that version instead of printing the CLI version.
+  `--help` works after any command. An unknown leading flag is an error rather
+  than starting the MCP server.
+
+### Added
+
+- 17 CLI commands closing the gap with the MCP tools: `lib`, `project`, `logs`,
+  `board-info`, `clean`, `test`, `system-info`, `monitor-stop`, `task-cancel`,
+  `upload-fs`, plus `serve` and `dashboard --serve`.
+- `install_library` / `lib install` accept PlatformIO's canonical `owner/name`
+  identifier (`bblanchon/ArduinoJson`), and `validateSerialPort` accepts
+  `/dev/serial/by-id/...`, `/dev/serial/by-path/...` and `/dev/ttyAMA0`.
+
 ### Fixed
 
 - **Two processes could flash the same board.** The per-port claim was not a

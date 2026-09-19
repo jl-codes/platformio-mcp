@@ -65,15 +65,28 @@ export function runCliJson(args, options) {
     },
   );
   if (result.error) throw result.error;
+
+  // A command that ran but failed now exits non-zero while still printing a
+  // structured payload on stdout -- `build` with compiler errors, and any
+  // `target-resolve` that reports `status: "unavailable"` while a board
+  // re-enumerates its USB port after flashing. Parse that payload BEFORE
+  // deciding this is fatal, or the reattach retry loop below aborts on its
+  // first attempt, immediately after writing firmware to a real board.
+  const rawStdout = String(result.stdout ?? "").trim();
+  if (rawStdout) {
+    try {
+      return JSON.parse(rawStdout);
+    } catch {
+      // Not JSON; fall through to the status check below.
+    }
+  }
+
   if (result.status !== 0) {
     const stderr = String(result.stderr ?? "")
       .slice(-8192)
       .trim();
-    const stdout = String(result.stdout ?? "")
-      .slice(-8192)
-      .trim();
     throw new Error(
-      `CLI command '${args[0]}' failed with status ${result.status}: ${stderr || stdout || "no diagnostic output"}`,
+      `CLI command '${args[0]}' failed with status ${result.status}: ${stderr || rawStdout.slice(-8192) || "no diagnostic output"}`,
     );
   }
   try {

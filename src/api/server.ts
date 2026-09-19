@@ -58,7 +58,11 @@ import {
   runTests,
 } from "../tools/build.js";
 import { uploadFirmware, uploadFilesystem } from "../tools/upload.js";
-import { GLOBAL_LOCKS_DIR } from "../utils/paths.js";
+import {
+  GLOBAL_LOCKS_DIR,
+  SERVER_DATA_DIR,
+  ensureDir,
+} from "../utils/paths.js";
 import { addWorkspace } from "../utils/workspace-registry.js";
 import {
   killAllTrackedProcesses,
@@ -357,6 +361,102 @@ export async function getDashboardStatus(
  * @param defaultPort Optional static port configuration.
  * @returns The established application instances { app, httpServer, io }
  */
+/**
+ * Where a running portal advertises itself so OTHER processes can find it.
+ *
+ * `activePortalStatus` is an in-process object, so a one-shot `pio-agent
+ * dashboard` could never see a portal started by a different process and always
+ * reported "offline" -- which made the dashboard skill tell users to start a
+ * second one. The file is the cross-process half, verified by PID so a crashed
+ * portal does not leave a phantom "online".
+ */
+const PORTAL_STATE_FILE = path.join(SERVER_DATA_DIR, "portal.json");
+
+export interface PortalState {
+  pid: number;
+  host: string;
+  port: number;
+  startedAt: number;
+}
+
+function publishPortalState(host: string, port: number): void {
+  try {
+    ensureDir(SERVER_DATA_DIR);
+    const state: PortalState = {
+      pid: process.pid,
+      host,
+      port,
+      startedAt: Date.now(),
+    };
+    fs.writeFileSync(PORTAL_STATE_FILE, JSON.stringify(state, null, 2));
+  } catch {
+    // Advertising is best-effort; never fail a working server over it.
+  }
+}
+
+function clearPortalState(): void {
+  try {
+    const state = readPortalStateFile();
+    // Only clear our own advertisement.
+    if (!state || state.pid === process.pid) {
+      fs.rmSync(PORTAL_STATE_FILE, { force: true });
+    }
+  } catch {
+    // Best-effort.
+  }
+}
+
+function readPortalStateFile(): PortalState | null {
+  try {
+    const raw = JSON.parse(fs.readFileSync(PORTAL_STATE_FILE, "utf8"));
+    if (typeof raw?.pid !== "number" || typeof raw?.port !== "number")
+      return null;
+    return {
+      pid: raw.pid,
+      host: String(raw.host ?? "127.0.0.1"),
+      port: raw.port,
+      startedAt: Number(raw.startedAt ?? 0),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reports a portal running in ANY process, or null. Checks this process first,
+ * since that answer is authoritative, then the advertisement file -- discarding
+ * it when the advertising process is gone.
+ */
+export function findRunningPortal(): PortalState | null {
+  if (activePortalStatus.running) {
+    return {
+      pid: process.pid,
+      host: activePortalStatus.host,
+      port: activePortalStatus.port,
+      startedAt: Date.now(),
+    };
+  }
+
+  const state = readPortalStateFile();
+  if (!state) return null;
+
+  try {
+    process.kill(state.pid, 0);
+  } catch (error) {
+    // ESRCH means the advertiser died without cleaning up. EPERM means it
+    // exists under another user, which still counts as running.
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") {
+      try {
+        fs.rmSync(PORTAL_STATE_FILE, { force: true });
+      } catch {
+        // Best-effort.
+      }
+      return null;
+    }
+  }
+  return state;
+}
+
 export function startPortalServer(defaultPort = 8080) {
   const app = express();
   const httpServer = createServer(app);
@@ -1674,6 +1774,7 @@ export function startPortalServer(defaultPort = 8080) {
     httpServer.listen(port, portalHost, () => {
       activePortalStatus.running = true;
       activePortalStatus.port = (httpServer.address() as any)?.port || port;
+      publishPortalState(portalHost, activePortalStatus.port);
 
       console.error(`\n======================================================`);
       console.error(
@@ -1741,6 +1842,7 @@ export function startPortalServer(defaultPort = 8080) {
     activePortalStatus.running = false;
     activePortalStatus.port = 0;
     activePortalStatus.browserOpened = false;
+    clearPortalState();
   };
   const cleanup = () => {
     void close().finally(() => process.exit(0));

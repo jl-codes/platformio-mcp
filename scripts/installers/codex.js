@@ -10,7 +10,7 @@
  *
  *   [mcp_servers.<name>]
  *   command = "npx"
- *   args = ["-y", "platformio-mcp", "--open-dashboard-on-start"]
+ *   args = ["-y", "platformio-mcp", "serve"]
  *
  * Because Codex's config.toml is shared with other settings (model, sandbox,
  * approvals, etc.), we cannot simply rewrite the whole file. Instead, this
@@ -45,7 +45,7 @@ function renderTomlBlock() {
   return [
     `[mcp_servers.${BLOCK_KEY}]`,
     `command = "${command}"`,
-    `args = ["-y", "platformio-mcp", "--open-dashboard-on-start"]`,
+    `args = ["-y", "platformio-mcp", "serve"]`,
     "",
   ].join("\n");
 }

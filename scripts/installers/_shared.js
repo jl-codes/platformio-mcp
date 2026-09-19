@@ -22,7 +22,7 @@ export function mcpServerConfigBlock() {
   const command = process.platform === "win32" ? "npx.cmd" : "npx";
   return {
     command,
-    args: ["-y", "platformio-mcp", "--open-dashboard-on-start"],
+    args: ["-y", "platformio-mcp", "serve"],
   };
 }
 
