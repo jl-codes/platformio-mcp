@@ -76,3 +76,11 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Focused validation: 13 tests across crash parser and ELF identity passed; TypeScript validation passed. ELF tests use synthetic headers and are not real toolchain or physical acceptance evidence.
 - Reference toolchain.py pinned-source SHA-256: `cc7ad3a96fdb7227563d873728e18631ce321c77f7b5955873d1cf6728103ac3`.
 - These helpers are not advertised as completed tools. Next analysis work: trusted toolchain resolution, bounded subprocess execution, retained build/upload artifact manifests, real ELF fixtures, size/symbol accounting, canonical/compatibility adapters and physical crash acceptance.
+
+## Size-analysis parsing milestone
+
+- Added bounded GNU SysV section, Berkeley total and demangled nm symbol parsing, with source-file grouping and explicit static flash/RAM estimates.
+- Preserved code sections mapped at address zero instead of treating every zero-address section as debug data. Debug-named sections are excluded from the estimate.
+- Rejected inconsistent/multiple-image totals and unsafe numeric sizes. Source grouping respects path boundaries and does not misattribute sibling directories.
+- Validation: 18 analysis tests passed across size, crash and ELF identity modules; TypeScript and focused lint passed.
+- Remaining analysis acceptance is unchanged: these fixtures do not establish ELF load-segment accounting, partition capacity, real toolchain execution or physical firmware identity. The public size-report/decoder tools are not yet registered.
