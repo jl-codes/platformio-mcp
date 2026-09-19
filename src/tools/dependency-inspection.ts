@@ -1,4 +1,5 @@
 /** Authorized dependency inventory and optional build evidence, shared by future public adapters. */
+import { parseDependencyGraph } from "../core/dependency-graph.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -95,6 +96,7 @@ export async function inspectDependencies(
     },
   );
   check();
+  let graphEvidence: ReturnType<typeof parseDependencyGraph> | null = null;
   let build: {
     ok: boolean;
     exitCode: number;
@@ -125,6 +127,9 @@ export async function inspectDependencies(
           },
         );
         check();
+        graphEvidence = parseDependencyGraph(
+          `${result.stdout}\n${result.stderr}`,
+        );
         return {
           ok: result.exitCode === 0,
           exitCode: result.exitCode,
@@ -153,8 +158,18 @@ export async function inspectDependencies(
     inventoryComplete: inventory.complete,
     diagnostics: inventory.diagnostics,
     build,
-    graph: null,
-    graphStatus: "not_collected" as const,
+    ...dependencyGraphFields(graphEvidence),
     summary: `${selected.environment}: ${selected.declared.length} declarations, ${inventory.libraries.length} observed libraries; ${counts.error} errors, ${counts.warning} warnings, ${counts.info} notes.${inventory.complete ? "" : " Inventory evidence is incomplete."}`,
+  };
+}
+
+/** Preserve parser evidence independently of subprocess success and inventory findings. */
+function dependencyGraphFields(
+  evidence: ReturnType<typeof parseDependencyGraph> | null,
+) {
+  return {
+    graph: evidence?.graph ?? null,
+    graphStatus: evidence?.status ?? "not_collected",
+    recursionErrorObserved: evidence?.recursionErrorObserved ?? false,
   };
 }

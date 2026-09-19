@@ -488,3 +488,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Incomplete inventory prevents a successful report. Build evidence includes exit status, duration and bounded redacted tail. LDF graph is explicitly `not_collected`, so full reference parity is not claimed.
 - TypeScript compilation and 19 dependency tests pass, including real read-only policy, no implicit build, explicit build denial before subprocess execution and malformed inventory failure.
 - Service remains internal pending build graph parsing, public MCP/CLI/compatibility integration and broader acceptance. No actual PlatformIO build or deployment was performed.
+
+### Build dependency graph evidence
+
+- Optional dependency builds now parse bounded ASCII LDF trees, preserving nesting, versions and repeated names. Missing/partial graph evidence is distinct from process status; an isolated heading is unavailable, not a successful empty graph. RecursionError text is reported as an observation.
+- TypeScript compilation and six graph/service tests pass. Actual build-output acceptance, broader formatting variants, public tool integration and release gates remain open.
