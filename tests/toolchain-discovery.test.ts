@@ -1,3 +1,4 @@
+/** Registered toolchain discovery preserves canonical identity across filesystem aliases. */
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -28,7 +29,7 @@ const discover = (
   env: NodeJS.ProcessEnv = {},
 ) => discoverAnalysisToolchainRoots(compiler, info, project, env);
 it("selects only the registered package containing the compiler", async () =>
-  expect(await discover()).toEqual([pkg]));
+  expect(await discover()).toEqual([await fs.realpath(pkg)]));
 it("rejects mismatched package records", async () => {
   await fs.writeFile(
     path.join(pkg, ".piopm"),
@@ -46,7 +47,7 @@ it("requires explicit configuration for compilers outside host packages", async 
 it("uses explicitly configured operator roots without guessing a system installation", async () =>
   expect(
     await discover(null, { PIO_MCP_TOOLCHAIN_ROOTS: JSON.stringify([pkg]) }),
-  ).toEqual([pkg]));
+  ).toEqual([await fs.realpath(pkg)]));
 it.each(["", "[]", '["relative"]', "{}"])(
   "rejects malformed explicit configuration %s",
   async (value) =>
@@ -64,4 +65,21 @@ it("rejects project-owned roots including aliases", async () => {
 it("does not infer Core location from missing system info", async () =>
   await expect(discover({})).rejects.toThrow("Core directory"));
 
-it("rejects broad roots that contain the project",async()=>await expect(discover(undefined,{PIO_MCP_TOOLCHAIN_ROOTS:JSON.stringify([root])})).rejects.toThrow("project-owned"));
+it("rejects broad roots that contain the project", async () =>
+  await expect(
+    discover(undefined, { PIO_MCP_TOOLCHAIN_ROOTS: JSON.stringify([root]) }),
+  ).rejects.toThrow("project-owned"));
+
+it("canonicalizes registered Core and explicit package aliases", async () => {
+  const coreAlias = path.join(root, "core-alias");
+  const packageAlias = path.join(root, "package-alias");
+  await fs.symlink(core, coreAlias, "junction");
+  await fs.symlink(pkg, packageAlias, "junction");
+  const expected = [await fs.realpath(pkg)];
+  expect(await discover({ core_dir: { value: coreAlias } })).toEqual(expected);
+  expect(
+    await discover(null, {
+      PIO_MCP_TOOLCHAIN_ROOTS: JSON.stringify([packageAlias]),
+    }),
+  ).toEqual(expected);
+});

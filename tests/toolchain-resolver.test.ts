@@ -24,7 +24,9 @@ describe("trusted toolchain resolution", () => {
     const compiler = binaries(path.join(installed, "bin"));
     const resolved = await resolveAnalysisToolchain(compiler, [installed]);
     expect(resolved.addr2line).toBe(
-      path.join(installed, "bin", "arm-none-eabi-addr2line.exe"),
+      fs.realpathSync.native(
+        path.join(installed, "bin", "arm-none-eabi-addr2line.exe"),
+      ),
     );
   });
   it("rejects a sibling path with the same prefix", async () => {
@@ -49,5 +51,20 @@ describe("trusted toolchain resolution", () => {
     await expect(
       resolveAnalysisToolchain(path.join(root, "gcc"), []),
     ).rejects.toMatchObject({ code: "ANALYSIS_TOOLCHAIN_INVALID" });
+  });
+  it("returns canonical companions when the configured compiler and root are aliases", async () => {
+    const installed = path.join(root, "installed tools");
+    binaries(path.join(installed, "bin"));
+    const alias = path.join(root, "toolchain-alias");
+    fs.symlinkSync(installed, alias, "junction");
+    const resolved = await resolveAnalysisToolchain(
+      path.join(alias, "bin", "arm-none-eabi-gcc.exe"),
+      [alias],
+    );
+    expect(resolved.addr2line).toBe(
+      fs.realpathSync.native(
+        path.join(installed, "bin", "arm-none-eabi-addr2line.exe"),
+      ),
+    );
   });
 });

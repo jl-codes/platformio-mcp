@@ -125,7 +125,7 @@ it.each(["library", "platform", "tool"] as const)(
       [
         "install",
         "--project-dir",
-        fs.realpathSync(project),
+        fs.realpathSync.native(project),
         "--environment",
         "fixture",
         `--${kind}`,

@@ -168,7 +168,12 @@ it("allows computed config under read-only policy and uses the explicit project"
   ).toMatchObject({ ok: true, defaultEnvironments: ["secondary"] });
   expect(platformioExecutor.execute).toHaveBeenCalledWith(
     "project",
-    ["config", "--json-output", "--project-dir", fs.realpathSync(project)],
+    [
+      "config",
+      "--json-output",
+      "--project-dir",
+      fs.realpathSync.native(project),
+    ],
     expect.objectContaining({ timeout: 30000 }),
   );
 });
@@ -206,7 +211,7 @@ it("uses the structured metadata source for discovery and never executes a disco
       "metadata",
       "--json-output",
       "--project-dir",
-      fs.realpathSync(project),
+      fs.realpathSync.native(project),
       "--environment",
       "fixture",
     ],
