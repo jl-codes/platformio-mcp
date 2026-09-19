@@ -1,0 +1,111 @@
+/**
+ * Real policy-dispatcher integration for the owned serial session service.
+ * Provides PolicySerialSessionService with request-local approvals and existing permission-source resolution.
+ */
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash } from "node:crypto";
+import { dispatchAuthorizedAction } from "../action-dispatcher.js";
+import { createPolicyRevisionGuard } from "../policy/revision-guard.js";
+import { PolicyConfigError } from "../policy/policy-schema.js";
+import type { PolicyEvaluationContext } from "../policy/types.js";
+import { PlatformIOError } from "../../utils/errors.js";
+import {
+  SerialSessionManager,
+  type SerialSessionAuthorization,
+  type SerialSessionDependencies,
+} from "./session-manager.js";
+
+/** Trusted adapter context; only a scoped approval ID may originate in validated public arguments. */
+export interface SerialPolicyRequestContext {
+  approvalId?: string;
+  caller?: PolicyEvaluationContext;
+}
+const OPERATIONS = Object.freeze({
+  start: "serial_session_start",
+  read: "serial_session_read",
+  write: "serial_session_write",
+});
+
+/**
+ * Joins the service to existing operator/project policy, one-use approvals and policy revision checks.
+ * No host config file is treated as an implicit hardware grant. Public adapters still own authentication.
+ */
+export class PolicySerialSessionService {
+  readonly sessions: SerialSessionManager;
+  private readonly context = new AsyncLocalStorage<
+    Readonly<SerialPolicyRequestContext>
+  >();
+
+  /** Optional dependency injection supplies leases/transports only, never an authorization override. */
+  constructor(dependencies: Omit<SerialSessionDependencies, "authorize"> = {}) {
+    this.sessions = new SerialSessionManager({
+      ...dependencies,
+      authorize: (request) => this.authorize(request),
+    });
+  }
+
+  /** Keep approval/caller context isolated across overlapping client requests. */
+  run<T>(
+    context: SerialPolicyRequestContext,
+    execute: () => Promise<T>,
+  ): Promise<T> {
+    if (
+      context.approvalId !== undefined &&
+      (typeof context.approvalId !== "string" ||
+        context.approvalId.length > 256)
+    )
+      throw new PlatformIOError(
+        "Invalid serial approval identifier.",
+        "APPROVAL_SCOPE_INVALID",
+      );
+    return this.context.run(
+      Object.freeze({
+        approvalId: context.approvalId,
+        caller: Object.freeze({ ...context.caller }),
+      }),
+      execute,
+    );
+  }
+
+  private async authorize(
+    request: Readonly<SerialSessionAuthorization>,
+  ): Promise<() => void> {
+    const context = this.context.getStore();
+    if (!context)
+      throw new PlatformIOError(
+        "Serial operations require a trusted request context.",
+        "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED",
+      );
+    // Capture before asynchronous approval consumption, not after it: a changed policy cannot become the new baseline.
+    let check: (() => void) | undefined;
+    try {
+      check = createPolicyRevisionGuard(request.projectDir);
+    } catch (error) {
+      if (!(error instanceof PolicyConfigError)) throw error;
+      // Let the shared dispatcher report its normal invalid-policy denial below.
+    }
+    return dispatchAuthorizedAction(
+      OPERATIONS[request.operation],
+      { ...request, port: request.path, approvalId: context.approvalId },
+      {
+        ...context.caller,
+        workspaceDir: request.projectDir,
+        devicePort: request.path,
+        targetBindingDigest: createHash("sha256")
+          .update(
+            JSON.stringify([request.resource.kind, request.resource.identity]),
+          )
+          .digest("hex"),
+      },
+      async () => {
+        if (!check)
+          throw new PlatformIOError(
+            "Policy changed while authorizing serial operation.",
+            "POLICY_CHANGED",
+          );
+        check();
+        return check;
+      },
+    );
+  }
+}

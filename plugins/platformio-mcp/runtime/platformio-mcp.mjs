@@ -99131,12 +99131,23 @@ var MCP_ACTIONS = {
     openWorld: true
   }
 };
+var INTERNAL_ACTIONS = {
+  serial_session_start: {
+    ...MCP_ACTIONS.start_monitor,
+    policyAction: "start_monitor",
+    idempotent: false
+  },
+  serial_session_read: { ...READ, policyAction: "query_logs" },
+  serial_session_write: {
+    ...MCP_ACTIONS.upload_firmware,
+    policyAction: "upload_firmware"
+  }
+};
 var actionRiskLevels = {
   ...Object.fromEntries(
-    Object.entries(MCP_ACTIONS).map(([name, action]) => [
-      name,
-      action.riskLevel
-    ])
+    Object.entries({ ...MCP_ACTIONS, ...INTERNAL_ACTIONS }).map(
+      ([name, action]) => [name, action.riskLevel]
+    )
   ),
   erase_flash: "critical",
   run_shell_command: "critical",
@@ -99147,7 +99158,7 @@ function policyNamesForOperation(name) {
   let current = name;
   while (!names.includes(current)) {
     names.push(current);
-    const parent = Object.hasOwn(MCP_ACTIONS, current) ? MCP_ACTIONS[current].policyAction : void 0;
+    const parent = Object.hasOwn(MCP_ACTIONS, current) ? MCP_ACTIONS[current].policyAction : Object.hasOwn(INTERNAL_ACTIONS, current) ? INTERNAL_ACTIONS[current].policyAction : void 0;
     if (!parent || parent === current) return names;
     current = parent;
   }

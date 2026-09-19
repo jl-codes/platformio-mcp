@@ -281,13 +281,26 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
   },
 };
 
+/** Implemented internal service actions; these are not advertised as MCP tools. */
+export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  serial_session_start: {
+    ...MCP_ACTIONS.start_monitor,
+    policyAction: "start_monitor",
+    idempotent: false,
+  },
+  serial_session_read: { ...READ, policyAction: "query_logs" },
+  serial_session_write: {
+    ...MCP_ACTIONS.upload_firmware,
+    policyAction: "upload_firmware",
+  },
+};
+
 /** Risks for implemented actions plus reserved privileged operations. */
 export const actionRiskLevels: Record<string, PolicyRiskLevel> = {
   ...Object.fromEntries(
-    Object.entries(MCP_ACTIONS).map(([name, action]) => [
-      name,
-      action.riskLevel,
-    ]),
+    Object.entries({ ...MCP_ACTIONS, ...INTERNAL_ACTIONS }).map(
+      ([name, action]) => [name, action.riskLevel],
+    ),
   ),
   erase_flash: "critical",
   run_shell_command: "critical",
@@ -393,7 +406,9 @@ export function policyNamesForOperation(name: string): string[] {
     names.push(current);
     const parent = Object.hasOwn(MCP_ACTIONS, current)
       ? MCP_ACTIONS[current].policyAction
-      : undefined;
+      : Object.hasOwn(INTERNAL_ACTIONS, current)
+        ? INTERNAL_ACTIONS[current].policyAction
+        : undefined;
     if (!parent || parent === current) return names;
     current = parent;
   }
