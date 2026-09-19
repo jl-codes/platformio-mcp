@@ -13,7 +13,23 @@ export async function loadSerialBackend(): Promise<
     );
   try {
     const bundled = new URL("./native/serialport.cjs", import.meta.url);
-    if (fs.existsSync(bundled)) {
+    const nativeDirectory = new URL("./native/", import.meta.url);
+    if (
+      fs.existsSync(nativeDirectory) ||
+      new URL(import.meta.url).pathname.endsWith("/platformio-mcp.mjs")
+    ) {
+      if (!fs.existsSync(bundled))
+        throw new Error("Packaged serial backend is missing");
+      const target =
+        process.platform === "darwin"
+          ? "darwin-x64+arm64"
+          : `${process.platform}-${process.arch}`;
+      const prebuilds = new URL(`./prebuilds/${target}/`, import.meta.url);
+      if (
+        !fs.existsSync(prebuilds) ||
+        !fs.readdirSync(prebuilds).some((file) => file.endsWith(".node"))
+      )
+        throw new Error("Packaged native target is missing");
       const loaded = await import(bundled.href);
       const backend = loaded.default ?? loaded;
       if (

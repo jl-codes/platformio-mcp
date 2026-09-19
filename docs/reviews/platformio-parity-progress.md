@@ -401,3 +401,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Shared required-file contracts now make both plugin and npm validators require the serial backend, dependency manifest, primary licenses and binaries for Windows x64, macOS universal and glibc Linux x64/arm64. Plugin validation also requires those files to be present in the checksum inventory. Included the shared validator module in npm files so shipped validation remains executable.
 - Recompiled TypeScript, validated plugin and all three npm packages, and passed 14 plugin tests. Created a lifecycle-free development npm archive, extracted it outside the repository using safe tar extraction, and loaded native serial exports on Windows x64 without enumeration/opening. Exact archive SHA-256 is recorded in serial-native-package-windows-evidence.json. This is an unpublished development artifact, not release/physical acceptance.
+
+## Native package failure handling and hosted status
+
+- Native loading now treats the known plugin bundle location or an adjacent native directory as packaged mode. Missing bundled JavaScript, missing native directory or missing host prebuild directory fails explicitly; it never falls through to another installed serialport package. Tests install a sentinel fallback and verify it is not executed.
+- Hosted run 35475578886 at 1c9feb1 passed Windows and Ubuntu quality jobs. macOS failed during setup-node with DNS ENOTFOUND for api.github.com and nodejs.org, before tests; dependent plugin/E2E/browser/smoke jobs were skipped. This is unavailable hosted evidence, not a native-load test failure. The next push reruns the suite.
