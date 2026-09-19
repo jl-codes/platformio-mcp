@@ -344,3 +344,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - PolicySerialSessionService now shares one native discovery provider across requests and authorizes enumeration through the existing list_devices dispatcher. The canonical workspace overrides caller workspace metadata; absent trusted request context denies before backend loading. Native discovery retains its revision checks and concurrency bound. Open/write approval IDs are not forwarded to enumeration.
 - TypeScript and 18 policy/native-provider tests passed, including actual default inspection permission and explicit list_devices denial before loading. No device was enumerated or opened. Hosted PR run 35474147693 at 37870bc completed successfully across all jobs; later local commits require a fresh run.
+
+## Explicit discovery approval retries
+
+- Added a separate validated discoveryApprovalId to trusted serial request context. list_devices consumes only this grant; session/open/write approval IDs remain separate. This completes standalone native inspection approval retries without relaxing one-use semantics.
+- TypeScript and 19 policy/native-provider tests passed, including approval-required discovery, rejection of a grant in the session field, successful explicit inspection grant consumption and replay rejection before another native load. Startup composite authorization for repeated metadata verification remains open.

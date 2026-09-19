@@ -24,6 +24,7 @@ import {
 /** Trusted adapter context; only a scoped approval ID may originate in validated public arguments. */
 export interface SerialPolicyRequestContext {
   approvalId?: string;
+  discoveryApprovalId?: string; // Separate one-use list_devices grant.
   caller?: PolicyEvaluationContext;
 }
 const OPERATIONS = Object.freeze({
@@ -93,7 +94,7 @@ export class PolicySerialSessionService {
     }
     return dispatchAuthorizedAction(
       "list_devices",
-      { projectDir },
+      { projectDir, approvalId: context.discoveryApprovalId },
       { ...context.caller, workspaceDir: projectDir },
       async () => {
         if (!check)
@@ -112,18 +113,20 @@ export class PolicySerialSessionService {
     context: SerialPolicyRequestContext,
     execute: () => Promise<T>,
   ): Promise<T> {
-    if (
-      context.approvalId !== undefined &&
-      (typeof context.approvalId !== "string" ||
-        context.approvalId.length > 256)
-    )
-      throw new PlatformIOError(
-        "Invalid serial approval identifier.",
-        "APPROVAL_SCOPE_INVALID",
-      );
+    for (const id of [context.approvalId, context.discoveryApprovalId]) {
+      if (
+        id !== undefined &&
+        (typeof id !== "string" || !id || id.length > 256)
+      )
+        throw new PlatformIOError(
+          "Invalid serial approval identifier.",
+          "APPROVAL_SCOPE_INVALID",
+        );
+    }
     return this.context.run(
       Object.freeze({
         approvalId: context.approvalId,
+        discoveryApprovalId: context.discoveryApprovalId,
         caller: Object.freeze({ ...context.caller }),
       }),
       execute,

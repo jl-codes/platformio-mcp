@@ -288,3 +288,24 @@ it("authorizes native discovery with the real inspection policy before loading",
   ).rejects.toMatchObject({ code: "POLICY_DENIED" });
   expect(load).toHaveBeenCalledTimes(1);
 });
+
+it("consumes a separate one-use inspection approval and never reuses the session grant", async () => {
+  const f = fixture();
+  f.policy({
+    profile: "flash_requires_approval",
+    overrides: { approval_required: ["list_devices"] },
+  });
+  const load = vi.fn(async () => ({ list: async () => [{ path: "COM42" }] }));
+  const service = new PolicySerialSessionService({ discoveryLoad: load });
+  const enumerate = (discoveryApprovalId?: string, approvalId?: string) =>
+    service.run({ discoveryApprovalId, approvalId }, () =>
+      service.listSerialDevices(f.projectDir),
+    );
+  const id = await approval(enumerate());
+  approveRequest(id);
+  await approval(enumerate(undefined, id));
+  expect(load).not.toHaveBeenCalled();
+  await expect(enumerate(id)).resolves.toEqual([{ path: "COM42" }]);
+  await approval(enumerate(id));
+  expect(load).toHaveBeenCalledTimes(1);
+});
