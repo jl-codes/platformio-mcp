@@ -9,6 +9,7 @@
  */
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { validateSerialPort, validateBaudRate } from "../utils/validation.js";
@@ -107,6 +108,11 @@ function startWindowsPollingFallback(
   daemon.poller = setInterval(() => {
     emitNewLogBytes(port, daemon);
   }, 500);
+  // Same reason as the watcher unrefs: on Windows this poller IS the fs.watch
+  // fallback, and a ref'd interval keeps a one-shot CLI alive forever after it
+  // has printed its result. Long-lived hosts (MCP server, dashboard) hold their
+  // own references and are unaffected.
+  daemon.poller.unref();
 }
 
 /**
@@ -165,8 +171,56 @@ export async function stopMonitor(port: string, projectDir?: string) {
     `[Spooler Diagnostic] Triggering killPioMonitorByPort on ${port}...`,
     projectDir,
   );
-  await killPioMonitorByPort(port, projectDir);
+  // A flash or a new monitor stops whatever monitor holds the port first, and
+  // since claims are shared across processes that now reaches a monitor some
+  // OTHER session started. That pre-emption is deliberate (see the design
+  // doc), but it must not be silent: the session that loses its monitor gets
+  // no signal, so at least say who is being stopped, and from where.
+  const preempted = portSemaphoreManager.getClaim(port);
+  if (
+    preempted?.type === "monitor" &&
+    !(
+      preempted.owner_pid === process.pid &&
+      preempted.hostname === os.hostname()
+    )
+  ) {
+    console.error(
+      `[pio-agent] Stopping a monitor on ${port} started by another process ` +
+        `(PID ${preempted.owner_pid}` +
+        (preempted.monitor_pid
+          ? `, monitor PID ${preempted.monitor_pid}`
+          : "") +
+        `, workspace ${preempted.owner_workspace}) to take the port.`,
+    );
+  }
+
+  const killResult = await killPioMonitorByPort(port, projectDir);
   logDiag(`[Spooler Diagnostic] killPioMonitorByPort completed.`, projectDir);
+
+  // A monitor claim now carries `monitor_pid` -- the detached child that
+  // actually holds the UART -- so isClaimStale can answer definitively and a
+  // plain non-force release is enough: it clears the claim exactly when that
+  // child is gone. This is strictly better than the old force path, which
+  // relied on `proven` from killing a PID found in this host's own
+  // pidsFile/command-history and therefore said nothing about a claim
+  // published by a different host on shared storage.
+  //
+  // `force` remains only as a fallback for claims with no monitor_pid: those
+  // written before this field existed, or by a host that does not set it.
+  // There the old rule still applies -- proven kill AND same host.
+  try {
+    const survivingClaim = portSemaphoreManager.getClaim(port);
+    const hasMonitorPid = typeof survivingClaim?.monitor_pid === "number";
+    portSemaphoreManager.releasePort(port, {
+      force:
+        !hasMonitorPid &&
+        killResult.proven &&
+        survivingClaim?.hostname === os.hostname(),
+      expectedType: "monitor",
+    });
+  } catch {
+    // Best-effort; never fail stopMonitor over a claim release.
+  }
 }
 
 async function spawnPioMonitor(
@@ -203,6 +257,29 @@ async function spawnPioMonitor(
   );
 
   if (proc.pid) {
+    // The claim was taken before this child existed and records the LAUNCHER's
+    // pid. Under the CLI that process exits seconds from now while this child
+    // keeps the UART, so without this the claim would read stale and the next
+    // claimer would flash a port this monitor still holds.
+    const attached = portSemaphoreManager.attachMonitorPid(
+      targetPort,
+      proc.pid,
+    );
+    if (!attached) {
+      // Failing here is NOT benign. The comment this replaces claimed it
+      // "degrades to the old launcher-PID behaviour", but under the CLI the
+      // launcher is already exiting, so the claim immediately reads stale and
+      // the next claimer flashes a port this monitor still holds. Surface it
+      // loudly rather than leaving a monitor running behind an unusable claim.
+      logDiag(
+        `[Spooler] WARNING: could not record monitor PID ${proc.pid} on the ` +
+          `claim for ${targetPort}. The claim may read stale while this ` +
+          `monitor still holds the port. Stop it with ` +
+          `\`pio-agent monitor-stop --port ${targetPort}\`.`,
+        projectDir,
+      );
+    }
+
     // Record PID to workspace tracker
     const cliDesc = `pio device monitor ${monitorArgs.join(" ")}`;
     await registerPioMonitorPid(
@@ -336,6 +413,7 @@ export async function rehydrateMonitors(): Promise<void> {
                   } catch {}
                 }
               });
+              daemon.watcher.unref();
               daemon.watcher.on("error", () => {
                 // Ignore watcher errors on constrained environments.
               });
@@ -402,12 +480,6 @@ export async function startMonitor(
   // Relinquish previous bindings safely if re-invoked
   await stopMonitor(activePort, projectDir);
 
-  if (portSemaphoreManager.isPortClaimed(activePort))
-    throw new PlatformIOError(
-      `Port is currently locked: ${activePort}`,
-      "PORT_BUSY",
-    );
-
   const targetDir = getLogDir("monitor", projectDir);
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
@@ -456,6 +528,7 @@ export async function startMonitor(
         } catch {}
       }
     });
+    daemon.watcher.unref();
     daemon.watcher.on("error", () => {
       // Ignore watcher errors on constrained environments.
     });
