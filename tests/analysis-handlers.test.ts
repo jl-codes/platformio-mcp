@@ -135,3 +135,40 @@ it("rejects a requested artifact mismatch before analysis utilities", async () =
   ).rejects.toMatchObject({ code: "ANALYSIS_ELF_MISMATCH" });
   expect(runAnalysisProcess).not.toHaveBeenCalled();
 });
+
+it("stops between metadata and later stages when project policy changes", async () => {
+  const execute = vi
+    .mocked(platformioExecutor.execute)
+    .getMockImplementation()!;
+  vi.mocked(platformioExecutor.execute).mockImplementation(async (...args) => {
+    const result = await execute(...args);
+    fs.writeFileSync(
+      path.join(project, ".pio-mcp-policy.json"),
+      '{"profile":"read_only"}',
+    );
+    return result;
+  });
+  await expect(
+    firmwareSizeReport({ projectDir: project, environment: "fixture" }),
+  ).rejects.toMatchObject({ code: "POLICY_CHANGED" });
+  expect(platformioExecutor.executeWithJsonOutput).not.toHaveBeenCalled();
+  expect(runAnalysisProcess).not.toHaveBeenCalled();
+});
+it("does not return decoded output after policy changes during a utility call", async () => {
+  const execute = vi.mocked(runAnalysisProcess).getMockImplementation()!;
+  vi.mocked(runAnalysisProcess).mockImplementation(async (...args) => {
+    const result = await execute(...args);
+    fs.writeFileSync(
+      path.join(project, ".pio-mcp-policy.json"),
+      '{"profile":"read_only"}',
+    );
+    return result;
+  });
+  await expect(
+    decodeBacktrace({
+      projectDir: project,
+      environment: "fixture",
+      text: "PC: 0x08001234",
+    }),
+  ).rejects.toMatchObject({ code: "POLICY_CHANGED" });
+});

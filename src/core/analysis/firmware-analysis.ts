@@ -31,10 +31,12 @@ export interface FirmwareAnalysisContext {
   expectedElfSha256?: string;
   memoryEvidence?: ProgramMemoryEvidence;
   signal?: AbortSignal;
+  validatePolicy?: () => void;
 }
 
 /** Shares one process-execution deadline across every utility in a report. */
 function executionOptions(context: FirmwareAnalysisContext, deadline: number) {
+  context.validatePolicy?.();
   const timeoutMs = deadline - Date.now();
   if (timeoutMs <= 0)
     throw new PlatformIOError(
@@ -50,6 +52,7 @@ export async function decodeFirmwareCrash(
   text: string,
   includeAllHex = false,
 ) {
+  context.validatePolicy?.();
   const crash = extractCrash(text, includeAllHex);
   if (!crash.addresses.length)
     return { ok: false as const, error: "no_addresses", ...crash, frames: [] };
@@ -87,6 +90,7 @@ export async function decodeFirmwareCrash(
           inlined: symbol?.inlined ?? [],
         };
       });
+      context.validatePolicy?.();
       return {
         ok: frames.some((frame) => frame.resolved),
         environment: context.environment,
@@ -151,6 +155,7 @@ export async function reportFirmwareSize(
   top = 25,
   filter?: string,
 ) {
+  context.validatePolicy?.();
   if (!Number.isInteger(top) || top < 1 || top > 1000)
     throw new PlatformIOError(
       "Top-symbol count must be between 1 and 1000.",
@@ -214,6 +219,7 @@ export async function reportFirmwareSize(
         ? await filterSizeSymbols(parsedSymbols, filter, deadline)
         : parsedSymbols;
       const files = groupSymbolsByFile(symbols, context.projectDir);
+      context.validatePolicy?.();
       return {
         ok: true as const,
         environment: context.environment,

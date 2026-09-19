@@ -1,4 +1,5 @@
 /** Validated firmware analysis handlers shared by future MCP/CLI compatibility adapters. */
+import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
 import fs from "node:fs/promises";
 import { z } from "zod";
 import { getSystemInfo } from "./projects.js";
@@ -56,18 +57,21 @@ async function resolveContext(
   caller: PolicyEvaluationContext,
 ): Promise<FirmwareAnalysisContext> {
   const projectDir = await fs.realpath(input.projectDir);
+  const validatePolicy = createPolicyRevisionGuard(projectDir);
   const selected = {
     projectDir,
     environment: input.environment,
     approvalId: input.approvalId,
   };
   const metadata = await collectBuildMetadata(selected, caller);
+  validatePolicy();
   const systemInfo = await dispatchAuthorizedAction(
     "system_info",
     { projectDir },
     { ...caller, workspaceDir: projectDir },
     getSystemInfo,
   );
+  validatePolicy();
   const trustedToolchainRoots = await discoverAnalysisToolchainRoots(
     metadata.compilerPath,
     systemInfo,
@@ -82,6 +86,7 @@ async function resolveContext(
     ...metadata,
     trustedToolchainRoots,
     expectedElfSha256: identity.sha256,
+    validatePolicy,
   };
 }
 
@@ -102,6 +107,7 @@ export async function firmwareSizeReport(
 ) {
   const params = FirmwareSizeParamsSchema.parse(input);
   const context = await resolveContext(params, caller);
+  context.validatePolicy?.();
   context.memoryEvidence = await collectProgramMemory(
     {
       projectDir: context.projectDir,
