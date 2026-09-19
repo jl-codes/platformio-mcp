@@ -148,3 +148,9 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added bounded PlatformIO metadata parsing and context construction for the report engines. Multiple environments require explicit selection; unknown selections, malformed/oversized JSON and missing/relative/control-character paths are rejected. No newest-file or first-environment heuristic is used.
 - Context construction verifies the compiler companions against caller-supplied host installation roots before producing analysis context. These roots must remain host-derived, never accepted in public tool arguments; metadata generation remains a build-authorized operation because it can execute project scripts.
 - Verification: TypeScript and 23 metadata/report/resolver tests passed. These parser fixtures do not establish live PlatformIO metadata discovery. Pending integration: authorized metadata execution, package-root discovery, retained build/upload manifests, public tool adapters and remaining real-platform/physical acceptance.
+
+## Bounded serial regex execution
+
+- Added literal-by-default matching and explicit regex execution in a terminable worker, with input/pattern/line/memory/deadline and concurrent-worker bounds. Existing query_logs case-insensitive regex now uses this boundary; legacy assertion substring behavior is unchanged.
+- Added optional Python named-group/reference translation and explicit rejection of incompatible escape semantics. Documented the ECMAScript subset and typed failure behavior in serial-patterns.md.
+- Adversarial backtracking tests verify timeout, main-event-loop responsiveness, termination/recovery and concurrency limits. Session/capture compatibility adapter integration and physical serial acceptance remain outstanding.

@@ -8,6 +8,7 @@
  * - queryLogs: Pulls historical/grep'd records from the spool buffer safely.
  */
 
+import { matchBoundedLines } from "../core/bounded-pattern.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -540,12 +541,13 @@ export async function queryLogs(
 
   if (searchPattern) {
     try {
-      const regex = new RegExp(searchPattern, "i");
-      stitchedLines = stitchedLines.filter((line) => regex.test(line));
-    } catch {
+      const indices = await matchBoundedLines(stitchedLines, searchPattern, {mode:"regex", ignoreCase:true});
+      stitchedLines = indices.map(index => stitchedLines[index]);
+    } catch (error) {
       return {
         success: false,
-        content: `Invalid regex search pattern provided: ${searchPattern}`,
+        code: error instanceof PlatformIOError ? error.code : "PATTERN_WORKER_FAILED",
+        content: error instanceof Error ? error.message : "Pattern matching failed.",
       };
     }
   }
