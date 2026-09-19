@@ -91810,7 +91810,11 @@ var require_ip_address = __commonJS({
 // src/adapters/project-compat-registry.ts
 function withProjectCompatibility(base2) {
   const result = new Map(base2);
-  for (const canonical3 of ["project_envs", "project_metadata"]) {
+  for (const canonical3 of [
+    "project_envs",
+    "project_metadata",
+    "list_targets"
+  ]) {
     const name = `pio_${canonical3}`;
     const source = base2.get(canonical3);
     if (!source || result.has(name))
@@ -91825,7 +91829,7 @@ function withProjectCompatibility(base2) {
         description: "Optional scoped canonical approval identifier."
       }
     };
-    if (canonical3 === "project_metadata")
+    if (canonical3 !== "project_envs")
       properties.env = {
         anyOf: [{ type: "string" }, { type: "null" }],
         default: null
@@ -94084,6 +94088,7 @@ var scope = {
 };
 var schemas = {
   pio_project_envs: external_exports.object(scope).strict(),
+  pio_list_targets: external_exports.object({ ...scope, env: text2.nullable().optional() }).strict(),
   pio_project_metadata: external_exports.object({ ...scope, env: text2.nullable().optional() }).strict()
 };
 async function mapProjectCompatibilityRequest(name, input, defaults = {}) {
@@ -94099,7 +94104,7 @@ async function mapProjectCompatibilityRequest(name, input, defaults = {}) {
       "COMPAT_ARGUMENT_INVALID"
     );
   return {
-    action: name === "pio_project_envs" ? "project_envs" : "project_metadata",
+    action: name === "pio_project_envs" ? "project_envs" : name === "pio_list_targets" ? "list_targets" : "project_metadata",
     args: {
       projectDir: await resolveCompatibilityProject(
         parsed.data.project_dir,
@@ -94120,9 +94125,11 @@ function projectCompatibilityResult(result) {
   if (!result.ok)
     return {
       ...common,
-      error: "PROJECT_INSPECTION_FAILED",
+      error: "error" in result && result.error ? result.error : "PROJECT_INSPECTION_FAILED",
       output_tail: "outputTail" in result ? result.outputTail : ""
     };
+  if ("targets" in result && result.targets)
+    return { ...common, targets: result.targets };
   if ("defaultEnvironments" in result)
     return {
       ...common,
@@ -109755,7 +109762,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const packageCompatibility = name.startsWith("pio_pkg_");
   const projectCompatibility = [
     "pio_project_envs",
-    "pio_project_metadata"
+    "pio_project_metadata",
+    "pio_list_targets"
   ].includes(name);
   const compatibilityTool = packageCompatibility || projectCompatibility;
   const projectInspection = [
@@ -110560,7 +110568,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (commandRegistered)
       portalEvents.emitActivity(
         name,
-        name === "decode_backtrace" || name === "size_report" || name.startsWith("pkg_") || projectInspection ? { projectDir: args.projectDir, environment: args.environment } : args,
+        name === "decode_backtrace" || name === "size_report" || name.startsWith("pkg_") || compatibilityTool || projectInspection ? {
+          projectDir: compatibilityTool ? args.project_dir : args.projectDir,
+          environment: compatibilityTool ? args.env : args.environment
+        } : args,
         "error",
         activityId
       );

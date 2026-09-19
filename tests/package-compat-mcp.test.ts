@@ -52,7 +52,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 61 : 53);
+      expect(tools).toHaveLength(enabled ? 62 : 53);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -70,6 +70,12 @@ it.each([
         });
         expect(metadata.isError).toBe(true);
         expect(JSON.stringify(metadata)).toContain("POLICY_DENIED");
+        const targets = await client.callTool({
+          name: "pio_list_targets",
+          arguments: {},
+        });
+        expect(targets.isError).toBe(true);
+        expect(JSON.stringify(targets)).toContain("POLICY_DENIED");
         expect(tools.some((tool) => tool.name === "pio_project_envs")).toBe(
           true,
         );

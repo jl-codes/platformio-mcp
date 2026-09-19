@@ -6,7 +6,11 @@ export function withProjectCompatibility<TResult>(
   base: ReadonlyMap<string, RegisteredTool<TResult>>,
 ): ReadonlyMap<string, RegisteredTool<TResult>> {
   const result = new Map(base);
-  for (const canonical of ["project_envs", "project_metadata"]) {
+  for (const canonical of [
+    "project_envs",
+    "project_metadata",
+    "list_targets",
+  ]) {
     const name = `pio_${canonical}`;
     const source = base.get(canonical);
     if (!source || result.has(name))
@@ -21,7 +25,7 @@ export function withProjectCompatibility<TResult>(
         description: "Optional scoped canonical approval identifier.",
       },
     };
-    if (canonical === "project_metadata")
+    if (canonical !== "project_envs")
       properties.env = {
         anyOf: [{ type: "string" }, { type: "null" }],
         default: null,

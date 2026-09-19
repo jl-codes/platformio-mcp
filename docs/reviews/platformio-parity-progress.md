@@ -436,3 +436,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Metadata alias requires the same build permission as canonical metadata because project scripts/dependency installation may execute. Real stdio tests verify read-only denial through both entry points.
 - Verification: TypeScript compilation; 22 adapter/project/real-MCP tests; 14 plugin tests; plugin and all three npm archive validations. Bundled runtime rebuilt.
 - This covers eight advertised reference aliases, not full 40-tool acceptance. Reference error envelopes and exact result/default equivalence still require broader contract verification. No publication or hardware execution occurred.
+
+### Target discovery compatibility
+
+- Added opt-in `pio_list_targets` through canonical structured metadata discovery. Retains environment identity and reports missing inventory as failure; does not run listed targets. Nine aliases now advertise alongside all 53 canonical tools.
+- Compatibility error activity events retain only project/environment metadata rather than full caller arguments.
+- Verification: TypeScript compilation; 20 project/adapter/real-stdio tests including target alias read-only denial; 14 plugin tests; plugin and three npm archive validations. Runtime rebuilt. CI run 35476506906 for preceding pushed e84ad9e passed all ten jobs.
+- No deployment occurred. Full parity, hardware acceptance and release gates remain outstanding.

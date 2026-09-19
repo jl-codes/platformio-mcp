@@ -143,3 +143,36 @@ it("projects bounded metadata and preserves failure instead of inventing success
     output_tail: "failure",
   });
 });
+
+it("preserves target environment identity and unavailable-inventory failures", () => {
+  expect(
+    projectCompatibilityResult({
+      ok: true,
+      exitCode: 0,
+      projectDir: "/project",
+      summary: "targets",
+      targets: [
+        { name: "size", environment: "debug" },
+        { name: "size", environment: "release" },
+      ],
+      environments: ["debug", "release"],
+    }),
+  ).toMatchObject({
+    ok: true,
+    targets: [
+      { name: "size", environment: "debug" },
+      { name: "size", environment: "release" },
+    ],
+  });
+  expect(
+    projectCompatibilityResult({
+      ok: false,
+      exitCode: 0,
+      projectDir: "/project",
+      summary: "unavailable",
+      targets: [],
+      environments: ["debug"],
+      error: "TARGETS_UNAVAILABLE",
+    }),
+  ).toMatchObject({ ok: false, error: "TARGETS_UNAVAILABLE" });
+});

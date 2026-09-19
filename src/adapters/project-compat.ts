@@ -19,6 +19,9 @@ const scope = {
 };
 const schemas = {
   pio_project_envs: z.object(scope).strict(),
+  pio_list_targets: z
+    .object({ ...scope, env: text.nullable().optional() })
+    .strict(),
   pio_project_metadata: z
     .object({ ...scope, env: text.nullable().optional() })
     .strict(),
@@ -44,7 +47,9 @@ export async function mapProjectCompatibilityRequest(
     action:
       name === "pio_project_envs"
         ? ("project_envs" as const)
-        : ("project_metadata" as const),
+        : name === "pio_list_targets"
+          ? ("list_targets" as const)
+          : ("project_metadata" as const),
     args: {
       projectDir: await resolveCompatibilityProject(
         parsed.data.project_dir,
@@ -72,9 +77,14 @@ export function projectCompatibilityResult(
   if (!result.ok)
     return {
       ...common,
-      error: "PROJECT_INSPECTION_FAILED",
+      error:
+        "error" in result && result.error
+          ? result.error
+          : "PROJECT_INSPECTION_FAILED",
       output_tail: "outputTail" in result ? result.outputTail : "",
     };
+  if ("targets" in result && result.targets)
+    return { ...common, targets: result.targets };
   if ("defaultEnvironments" in result)
     return {
       ...common,

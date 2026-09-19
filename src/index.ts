@@ -1518,6 +1518,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const projectCompatibility = [
     "pio_project_envs",
     "pio_project_metadata",
+    "pio_list_targets",
   ].includes(name);
   const compatibilityTool = packageCompatibility || projectCompatibility;
   const projectInspection = [
@@ -2459,8 +2460,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         name === "decode_backtrace" ||
           name === "size_report" ||
           name.startsWith("pkg_") ||
+          compatibilityTool ||
           projectInspection
-          ? { projectDir: args.projectDir, environment: args.environment }
+          ? {
+              projectDir: compatibilityTool
+                ? args.project_dir
+                : args.projectDir,
+              environment: compatibilityTool ? args.env : args.environment,
+            }
           : args,
         "error",
         activityId,
