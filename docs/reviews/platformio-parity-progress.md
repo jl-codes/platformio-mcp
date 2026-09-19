@@ -187,3 +187,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Explicit operator PIO_MCP_TOOLCHAIN_ROOTS JSON configuration supports custom/native installations without accepting trust roots from public tool arguments. Invalid/empty/broad/project-owned roots fail closed; no arbitrary PATH fallback occurs.
 - Verification: TypeScript and 15 discovery/resolver tests passed. Current MCP system_info reported Core 6.1.16 at the installed host directory; real discovery plus companion resolution succeeded for ESP32-S3 GNU 8.4.0+2021r2-patch5. Package registration is not publisher-signature verification.
 - Analysis adapters still need to join host system-info collection, authorized metadata, toolchain discovery and report execution. Retained artifact/lock integration, compatibility/public registration and all remaining plan stages are open.
+
+## Integrated analysis handlers
+
+- Added strict decodeBacktrace and firmwareSizeReport handlers joining explicit environment validation, build-authorized fresh metadata, host system-info authorization, registered toolchain discovery, expected ELF hashing, board-memory collection and report engines.
+- Public handler inputs exclude compiler paths, toolchain roots and raw memory evidence. Unknown fields fail before processes run. Read-only policy blocks metadata scripts; mismatched expected artifacts block analysis utilities.
+- Verification: TypeScript and five handler integration tests passed with real policy/package/ELF validation and mocked external processes. Existing real GNU engine evidence remains separate from live collector acceptance.
+- These handlers are not yet publicly registered. Remaining analysis work includes composite authorization across collection stages, shared build/retained-artifact locks and manifests, canonical/compatibility MCP/CLI/result adapters, and actual end-to-end metadata/size-check acceptance. The rest of the 40-tool, physical acceptance and distribution scope remains open.
