@@ -450,3 +450,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - The new context-exclusion test caught the legacy formatter including arbitrary exception context; the compatibility boundary now uses only the message and an allowlisted policy projection, with bounded redaction. Canonical envelopes remain unchanged.
 - Verification: TypeScript compilation; 10 error/real-MCP tests; 14 plugin tests; plugin and three npm archive validations. Runtime rebuilt.
 - Full reference error-class equivalence, remaining tools and release gates remain open. No publication occurred.
+
+### Dependency audit analysis core
+
+- Added bounded pure analysis for observed dependency declarations/manifests: duplicate identities, unconstrained registry entries, missing/leftover heuristics, and iterative cycle detection. Input is bounded to 2048 declarations/libraries and 16384 graph edges.
+- Duplicate library names do not establish a winner or an unambiguous cycle edge. Version constraints are not described as exact reproducible pins. Manifest cycles do not claim an observed build recursion failure.
+- TypeScript compilation and four tests pass, including a 2000-node chain, self-cycle, duplicate identities and oversized graph rejection.
+- Not yet exposed: filesystem inventory, declaration/manifest parsing, optional authorized build/LDF evidence, canonical MCP/CLI registration and compatibility adapter remain required for PAR-07. No hardware or package execution/publication occurred.
