@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
 import { operationForCliCommand } from "./core/action-catalog.js";
+import {
+  enrollProjectPolicy,
+  revokeProjectPolicy,
+} from "./core/policy/project-enrollment.js";
 import fs from "node:fs";
 import { configurePolicyFileFromArgs } from "./core/policy/policy-sources.js";
 import path from "node:path";
@@ -99,6 +103,8 @@ COMMANDS:
   agent-last-report --project-dir <dir>
   agent-board-report --project-dir <dir> --board <id>
   policy-status [--project-dir <dir>]
+  policy-enroll --project-dir <dir>
+  policy-revoke --project-dir <dir>
   approvals [--status <pending|approved|denied|expired|consumed>] [--limit <n>]
   approval-status <approval-id> [--project-dir <dir>]
   pending-approvals [--project-dir <dir>] [--limit <n>]
@@ -299,6 +305,18 @@ async function runCliCommand(command: string, rawArgs: string[]) {
   };
 
   try {
+    // Operator administration stays local to the CLI, including recovery from invalid policy.
+    // This is not proof of human identity against a process with the same OS-user authority.
+    if (command === "policy-enroll" || command === "policy-revoke") {
+      const project = asString(options["project-dir"]);
+      if (!project) throw new Error(`${command} requires --project-dir`);
+      const result =
+        command === "policy-enroll"
+          ? enrollProjectPolicy(project)
+          : (revokeProjectPolicy(project), { revoked: true });
+      printOutput(result, jsonMode);
+      return;
+    }
     let decision = await authorizeAction(actionName, policyArgs, {
       workspaceDir: projectDirForPolicy,
       actor: "user",
@@ -812,6 +830,8 @@ async function main() {
     "agent-last-report",
     "agent-board-report",
     "policy-status",
+    "policy-enroll",
+    "policy-revoke",
     "approvals",
     "approval-status",
     "pending-approvals",

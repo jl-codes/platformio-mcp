@@ -115,3 +115,11 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - The shared runner rereads policy at execution and forces both --without-uploading and --without-testing under build_only, even when compileOnly is explicitly false. Malformed mode values and invalid policy fail before dispatch.
 - Verification: TypeScript passed; 10 tests across test-execution-mode and policy-profile passed, including exact process arguments, full-test regression, and no process on invalid configuration. These are mocked process-boundary checks, not physical acceptance.
 - Remaining: native/embedded target classification, hardware-test approval and device binding, queued-effect revalidation throughout other operations, and the broader plan's pending implementation/acceptance/publication stages.
+
+## Project policy enrollment
+
+- Added versioned enrollment bound to the real project path and normalized contents of both project policy sources. Records live outside the project in operator policy storage; path aliases into project storage are rejected.
+- Unenrolled project sources may restrict the built-in/operator baseline but cannot expand grants, remove required approvals, or disable mandatory safety switches. Explicitly enrolled lab_admin and lab_runner profiles retain their capabilities subject to operator ceilings.
+- Added local policy-enroll/policy-revoke CLI commands and policy-status enrollment provenance. Neither operation is exposed through MCP/dashboard. Same-user unrestricted process execution remains outside this API security boundary.
+- Validation: nine enrollment tests include real CLI subprocesses, content invalidation, revocation, normalized formatting, project copies, directory aliases, restrictive profiles, corrupt records and operator denies. Full backend rerun passed 51 files / 262 tests; the first run exposed two old fixture assumptions and an intermittent worker exit. Updated fixtures explicitly enroll intended lab privileges and distinguish security audit logs from execution ledgers. TypeScript passed.
+- Outstanding permission work still includes trusted dashboard approval capability separation, queued-stage policy revalidation, exact physical-device/artifact binding, administrative-route review and invalid-policy bounded cleanup. All remaining parity, packaging, PR and distribution work remains open.

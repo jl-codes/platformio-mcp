@@ -86,16 +86,18 @@ describe("strict policy configuration", () => {
   });
 
   it("preserves operator restrictions against project overrides", () => {
+    const project = path.join(root, "project");
+    fs.mkdirSync(project);
     fs.writeFileSync(
       path.join(root, "policy.yaml"),
       "allow: [build_project]\napproval_required: [upload_firmware]\ndeny: [erase_flash]\nrequire_workspace_boundary: true",
     );
-    fs.mkdirSync(path.join(root, ".pio-mcp-workspace"));
+    fs.mkdirSync(path.join(project, ".pio-mcp-workspace"));
     fs.writeFileSync(
-      path.join(root, ".pio-mcp-workspace", "policy.yaml"),
+      path.join(project, ".pio-mcp-workspace", "policy.yaml"),
       "allow: [build_project, upload_firmware, erase_flash]\napproval_required: []\ndeny: []\nrequire_workspace_boundary: false",
     );
-    const state = loadEffectivePolicyState(root);
+    const state = loadEffectivePolicyState(project);
     expect(state.policy.allow).not.toContain("erase_flash");
     expect(state.policy.deny).toContain("erase_flash");
     expect(state.policy.approval_required).toContain("upload_firmware");

@@ -5,6 +5,11 @@
  * - loadEffectivePolicyState: Resolves layers and preserves operator restrictions.
  * - loadEffectivePolicy: Returns the resolved policy for existing callers.
  */
+import {
+  projectEnrollmentIdentity,
+  isProjectEnrolled,
+  type ProjectPolicyDocuments,
+} from "./project-enrollment.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -32,6 +37,7 @@ export interface EffectivePolicyState {
   policy: PolicyConfig;
   sources: PolicySource[];
   digest: string;
+  projectEnrollment?: { enrolled: boolean; digest: string };
 }
 
 /** Applies only fields present in an already-validated override. */
@@ -141,7 +147,12 @@ export function loadEffectivePolicyState(
       present: true,
     },
   ];
-  let policy = resolvePolicyProfile({ profile });
+  const builtIn = resolvePolicyProfile({ profile });
+  const projectDocuments: ProjectPolicyDocuments = {
+    profile: null,
+    override: null,
+  };
+  let policy = builtIn;
   if (workspaceDir) {
     const source = path.join(
       path.resolve(workspaceDir),
@@ -158,6 +169,7 @@ export function loadEffectivePolicyState(
           source,
           "Project profile requires a valid profile name.",
         );
+      projectDocuments.profile = document.data;
       profile = document.data.profile;
       policy = resolvePolicyProfile(document.data);
     }
@@ -191,16 +203,31 @@ export function loadEffectivePolicyState(
           source,
           "Select a project profile in .pio-mcp-policy.json; this file contains overrides only.",
         );
+      projectDocuments.override = document;
       policy = mergePolicy(policy, document);
+    }
+  }
+  let projectEnrollment: EffectivePolicyState["projectEnrollment"];
+  if (
+    workspaceDir &&
+    (projectDocuments.profile !== null || projectDocuments.override !== null)
+  ) {
+    const identity = projectEnrollmentIdentity(workspaceDir, projectDocuments);
+    const enrolled = isProjectEnrolled(identity);
+    projectEnrollment = { enrolled, digest: identity.digest };
+    if (!enrolled) {
+      // Project documents may restrict the operator baseline immediately, never expand it.
+      const baseline = mergePolicy(builtIn, operator);
+      policy = applyOperatorCeiling(policy, baseline);
     }
   }
   policy = applyOperatorCeiling(policy, operator);
   const source = sources.filter((item) => item.present).at(-1)!.source;
   const digest = crypto
     .createHash("sha256")
-    .update(JSON.stringify({ profile, policy, sources }))
+    .update(JSON.stringify({ profile, policy, sources, projectEnrollment }))
     .digest("hex");
-  return { profile, source, policy, sources, digest };
+  return { profile, source, policy, sources, digest, projectEnrollment };
 }
 
 /** Returns the same validated policy used by the provenance-aware API. */

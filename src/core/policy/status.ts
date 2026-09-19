@@ -40,6 +40,7 @@ export function getPolicyStatus(workspaceDir?: string): PolicyStatusResult {
     valid: true,
     sources: state.sources,
     digest: state.digest,
+    projectEnrollment: state.projectEnrollment,
     profile: state.profile,
     source: state.source,
     allowedOperations: state.policy.allow,

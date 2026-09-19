@@ -1030,6 +1030,8 @@ export interface AgentGetLastReportResult {
  * Effective policy status payload returned by `get_policy_status`.
  */
 export interface PolicyStatusResult {
+  projectEnrollment?: { enrolled: boolean; digest: string }; // Exact project policy enrollment state
+
   valid: boolean; // False means execution is blocked by invalid configuration
   error?: { code: string; message: string }; // Safe repair diagnostic
   digest?: string; // Identity of the effective policy and contributing files

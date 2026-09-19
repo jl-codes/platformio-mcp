@@ -38,6 +38,15 @@ describe("stdio MCP policy boundary", () => {
     });
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result)).toContain("deny");
-    expect(fs.readdirSync(project)).toEqual([".pio-mcp-policy.json"]);
+    expect(
+      fs.existsSync(
+        path.join(
+          project,
+          ".pio-mcp-workspace",
+          "registry",
+          "command_history.json",
+        ),
+      ),
+    ).toBe(false);
   });
 });

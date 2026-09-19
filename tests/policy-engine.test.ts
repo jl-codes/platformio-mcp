@@ -1,3 +1,4 @@
+import { enrollProjectPolicy } from "../src/core/policy/project-enrollment.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -165,6 +166,7 @@ describe("Policy Engine", () => {
       fs.mkdirSync(path.join(projectDir, ".pio-mcp-workspace"), {
         recursive: true,
       });
+      enrollProjectPolicy(projectDir);
       const fingerprint = "f".repeat(64);
       fs.writeFileSync(
         path.join(projectDir, ".pio-mcp-workspace", "automation-policy.json"),

@@ -65,3 +65,18 @@ The dashboard asks the operator to approve a challenged operation and then retri
 The `build_only` profile forces PlatformIO test execution to include both `--without-uploading` and `--without-testing`. Skipping upload alone is insufficient because the testing stage can still open/reset a device. This rule is enforced in the shared runner at execution time, including direct internal callers and dashboard requests. `compileOnly: false` cannot override it.
 
 MCP `run_tests` and the dashboard command API also accept the optional boolean `compileOnly`; `true` requests this behavior under any profile. Omission preserves existing full-test behavior outside `build_only`. This stage restriction does not sandbox arbitrary project build scripts. Native-versus-embedded target classification and hardware-test approval binding remain separate implementation work.
+
+### Project enrollment
+
+Project permission increases require an operator record outside the project. Without a matching record, project policies can restrict the built-in/operator baseline but cannot remove its approvals, denies, or mandatory safety switches. A selected `lab_admin` profile therefore does not by itself grant unapproved uploads. `policy-status` reports `projectEnrollment.enrolled` and the normalized document digest.
+
+After reviewing both `.pio-mcp-policy.json` and `.pio-mcp-workspace/policy.yaml`, an operator can run:
+
+```text
+pio-agent policy-enroll --project-dir <absolute-project-path>
+pio-agent policy-revoke --project-dir <absolute-project-path>
+```
+
+Records live under the configured operator policy directory's `project-enrollments` folder, keyed by real project path. Enrollment binds both normalized policy documents. Changing a policy value or copying the project to another path requires new enrollment; formatting alone does not. Enrolled project policy still cannot weaken operator restrictions. Malformed records fail closed and can be revoked locally. Enrollment storage inside the project, including directory aliases, is rejected.
+
+These commands are local operator administration, not MCP tools or dashboard routes. They are not proof of human identity against an agent or script that already has unrestricted execution and write access as the operator's OS user. Protect this boundary with host/process permissions. Enrollment is not an OS sandbox for PlatformIO project scripts or package hooks.
