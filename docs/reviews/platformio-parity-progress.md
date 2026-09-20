@@ -2055,3 +2055,7 @@ Review found the new CLI initially called shared debugger services without the o
 ### Serial observation CLI coverage (2026-09-20)
 
 Added monitor-capture and memory-watch using the existing shared capture/memory schemas, canonical opening gates, lower read permissions, and owned cleanup. No cross-process session selector is accepted. Exported the existing schemas rather than duplicating their bounds/defaults. Added explicit stack-word-size validation before startup. Four focused parser/memory cases and TypeScript passed; rebuilt the plugin. No ports were opened and no smoke suite was run. Persistent serial interaction remains available through MCP.
+
+### CLI denial verification and Windows OTA integration timing (2026-09-20)
+
+Both real telemetry CLI commands returned PolicyDenied for an explicit start_monitor denial with --approve, before device work. Current CI run 35532207559 failed one Windows OTA integration case at Vitest's 5-second default. That case deliberately uses real private storage, whose Windows PowerShell ACL operation has its own 15-second deadline; transfer, reachability and build are mocked. The affected 11-case suite passed locally on Windows. Raised only that integration case's Windows test deadline to 20 seconds, preserving the real ACL check and product timeout; non-Windows remains 5 seconds. This is test-runner timing accommodation, not evidence of physical OTA acceptance.

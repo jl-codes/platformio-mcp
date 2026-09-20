@@ -84,6 +84,7 @@ afterEach(async () => {
   vi.unstubAllEnvs();
   await fs.rm(root, { recursive: true, force: true });
 });
+// Real Windows ACL provisioning has a 15-second process deadline; retain it in this integration case.
 it("builds without uploading, snapshots the selected image and reports transfer rather than runtime success", async () => {
   const result = await executeOtaUpload({
     projectDir: project,
@@ -108,7 +109,7 @@ it("builds without uploading, snapshots the selected image and reports transfer 
   const snapshot = mocks.transfer.mock.calls[0][0].image.path;
   await expect(fs.access(snapshot)).rejects.toMatchObject({ code: "ENOENT" });
   expect(JSON.stringify(result)).not.toContain('"private"');
-});
+}, process.platform === "win32" ? 20000 : 5000);
 it("build=false transfers existing image without invoking a build", async () => {
   await executeOtaUpload({
     projectDir: project,
