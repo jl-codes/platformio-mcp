@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "reason": null,
+  "backtrace_count": 5,
+  "register_count": 32,
+  "firmware_correspondence": {
+    "status": "prefix_matched",
+    "hashBits": 36
+  },
+  "core_sha256": "70f7a58dd41df35ee4f9c0749decd99f48f2f4833a60f493bdcc2ce5371d2966",
+  "stderr_present": true
+}

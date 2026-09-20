@@ -27,6 +27,7 @@ export function parseEspCoredumpReport(output: string) {
       if (description) reason = description[1].slice(0, 4096);
       else if (
         value.startsWith("Program received signal") ||
+        value.startsWith("Program terminated with signal") ||
         value.includes("panic'ed")
       )
         reason = value.slice(0, 4096);

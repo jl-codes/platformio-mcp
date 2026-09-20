@@ -9,6 +9,7 @@ export interface AnalysisProcessOptions {
   timeoutMs?: number;
   maxOutputBytes?: number;
   signal?: AbortSignal;
+  environment?: NodeJS.ProcessEnv; // Trusted caller overrides for offline utilities.
   allowedExitCodes?: readonly number[]; // Internal protocols may return structured errors on a known status.
 }
 /** Captured UTF-8 output; failed or truncated output is never reported as a successful analysis. */
@@ -82,7 +83,7 @@ export async function runAnalysisProcess(
         windowsHide: true,
         encoding: "utf8",
         killSignal: "SIGKILL",
-        env: { ...process.env, LC_ALL: "C", LANG: "C" },
+        env: { ...process.env, ...options.environment, LC_ALL: "C", LANG: "C" },
       },
       (error, stdout, stderr) => {
         if (!error) {
@@ -124,3 +125,4 @@ export async function runAnalysisProcess(
     );
   });
 }
+
