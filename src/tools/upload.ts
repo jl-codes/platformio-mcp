@@ -116,25 +116,9 @@ export async function uploadFilesystem(
               }
             }
 
-            let device = null;
-            for (let i = 0; i < 20; i++) {
-              await new Promise((resolve) => setTimeout(resolve, 500));
-              device = await getFirstDevice();
-              if (device) break;
-            }
-            if (device) {
-              await startMonitor(
-                device.port,
-                undefined,
-                validatedPath,
-                environment,
-                rootCommandId,
-              );
-            } else {
-              console.error(
-                `[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`,
-              );
-            }
+            console.error(
+              "[Spooler Diagnostic] Auto-monitor skipped: the uploaded device could not be uniquely identified. Select its port explicitly.",
+            );
           }
         : undefined,
     });
@@ -258,25 +242,9 @@ export async function uploadFirmware(
               }
             }
 
-            let device = null;
-            for (let i = 0; i < 20; i++) {
-              await new Promise((resolve) => setTimeout(resolve, 500));
-              device = await getFirstDevice();
-              if (device) break;
-            }
-            if (device) {
-              await startMonitor(
-                device.port,
-                undefined,
-                validatedPath,
-                environment,
-                rootCommandId,
-              );
-            } else {
-              console.error(
-                `[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`,
-              );
-            }
+            console.error(
+              "[Spooler Diagnostic] Auto-monitor skipped: the uploaded device could not be uniquely identified. Select its port explicitly.",
+            );
           }
         : undefined,
     });

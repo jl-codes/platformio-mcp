@@ -222,4 +222,16 @@ describe("Upload Tools", () => {
       expect(portSemaphoreManager.releasePort).not.toHaveBeenCalled();
     },
   );
+  it.each([uploadFirmware, uploadFilesystem])(
+    "never falls back to a different board after upload",
+    async (upload) => {
+      vi.mocked(devices.waitForDeviceByHwid).mockResolvedValueOnce(null);
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await upload(mockProjectDir, "COM1", "default", false, false, true);
+      await vi.mocked(spooler.executeWithSpooling).mock.calls[0][2]
+        .onSuccess!();
+      expect(devices.getFirstDevice).not.toHaveBeenCalled();
+      expect(monitor.startMonitor).not.toHaveBeenCalled();
+    },
+  );
 });

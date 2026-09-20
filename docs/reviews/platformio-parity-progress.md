@@ -939,3 +939,8 @@ Both firmware and filesystem uploads previously selected a port for locks/report
 
 Spooling operations with an active serial port now acquire the same canonical endpoint lease as direct serial sessions before spawning. Pending-child custody is persisted before launch and is not automatically recovered after coordinator death. Confirmed cleanup releases the lease; uncertain cleanup retains it. Local log descriptors/watchers now close even if persistent cleanup fails, and background cleanup errors are recorded instead of becoming unhandled rejections. TypeScript and 14 focused isolated lease/spooler checks passed; no device was opened. Plugin runtime rebuilt. This covers endpoint aliases during upload execution, not stable USB identity across re-enumeration, descendant containment, legacy monitor handoff or hardware acceptance. Those remain required.
 
+
+### Post-upload monitor identity correction
+
+Removed both first-device fallbacks after firmware/filesystem upload. Reconnect now requires exact VID:PID and nonempty SER tokens, rejects duplicate descriptors, and ignores transient location changes. This intentionally stops auto-monitoring devices lacking usable identity rather than silently attaching another board; explicit monitor selection remains available. TypeScript and 19 focused mocked discovery/upload checks passed. Plugin rebuilt. Full re-enumeration lease handoff and real device acceptance remain unproven.
+

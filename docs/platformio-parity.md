@@ -22,3 +22,8 @@ The canonical run_tests tool and dashboard command API also accept filter, ignor
 
 Use clean, check and test with --project-dir and optional --environment. Clean supports --full. Check supports --severity, --pattern, --tool, --skip-packages and --structured-report. Test supports --filter, --ignore, --compile-only, --without-uploading, --without-building, --upload-port, --verbose and --structured-report. All three support --background; structured test reports require foreground execution. Commands use the corresponding canonical permissions and shared executors. Reported execution failures set a nonzero CLI exit code.
 
+
+## Post-upload monitor selection
+
+Automatic monitoring follows only a unique exact USB VID:PID and SER identity from the uploaded board. A changed port or USB location can be followed, but matching only the device model, a serial-number prefix, or duplicated descriptors is insufficient. If the board has no usable serial metadata or cannot be uniquely rediscovered, upload success is retained and automatic monitoring is skipped with a diagnostic; select its monitor port explicitly. USB descriptors are discovery evidence, not cryptographic device authentication. The monitor no longer falls back to the first connected board.
+

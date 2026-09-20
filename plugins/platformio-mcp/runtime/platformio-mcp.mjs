@@ -15077,10 +15077,20 @@ async function findDeviceByHwid(hwid) {
   return devices.find((device) => device.hwid === hwid) || null;
 }
 async function waitForDeviceByHwid(hwid, timeoutMs = 5e3, logCallback) {
-  if (!hwid) return null;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 12e4)
+    throw new PlatformIOError("Invalid device discovery timeout.", "DEVICE_DISCOVERY_INVALID");
+  const identity = (value2) => {
+    if (typeof value2 !== "string" || value2.length > 4096) return void 0;
+    const tokens = value2.trim().split(/\s+/);
+    const usb = tokens.filter((token) => /^VID:PID=[0-9a-f]{4}:[0-9a-f]{4}$/i.test(token));
+    const serial = tokens.filter((token) => /^SER=\S+$/.test(token));
+    if (usb.length !== 1 || serial.length !== 1) return void 0;
+    return JSON.stringify([usb[0].toUpperCase(), serial[0]]);
+  };
+  const expected = identity(hwid);
+  if (!expected) return null;
   const pollIntervalMs = 500;
   const maxAttempts = Math.ceil(timeoutMs / pollIntervalMs);
-  const strictTokens = hwid.split(" ").filter((t) => t.includes("VID:PID") || t.includes("SER"));
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const devices = await listDevices();
     if (logCallback) {
@@ -15093,12 +15103,9 @@ async function waitForDeviceByHwid(hwid, timeoutMs = 5e3, logCallback) {
 `)
       );
     }
-    const matchedDevice = devices.find((device) => {
-      if (strictTokens.length > 0) {
-        return strictTokens.every((token) => device.hwid.includes(token));
-      }
-      return device.hwid === hwid;
-    });
+    const matches = devices.filter((device) => identity(device.hwid) === expected);
+    if (matches.length > 1) return null;
+    const matchedDevice = matches[0];
     if (matchedDevice && matchedDevice.port) {
       if (attempt > 1 || logCallback) {
         const msg = `[Device Discovery] Device rigidly matched on port ${matchedDevice.port} (HWID: ${matchedDevice.hwid}) after ${attempt * pollIntervalMs}ms.`;
@@ -15107,9 +15114,10 @@ async function waitForDeviceByHwid(hwid, timeoutMs = 5e3, logCallback) {
       }
       return matchedDevice.port;
     }
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    if (attempt < maxAttempts)
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
-  const timeoutMsg = `[Device Discovery] Timeout (${timeoutMs}ms) waiting for stable signature: ${strictTokens.join(" ")}`;
+  const timeoutMsg = `[Device Discovery] Timeout (${timeoutMs}ms) waiting for stable signature: ${expected}`;
   console.error(timeoutMsg);
   if (logCallback) logCallback(timeoutMsg + "\n");
   return null;
@@ -110677,25 +110685,9 @@ async function uploadFilesystem(projectDir, port, environment, verbose, backgrou
             return;
           }
         }
-        let device = null;
-        for (let i = 0; i < 20; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          device = await getFirstDevice2();
-          if (device) break;
-        }
-        if (device) {
-          await startMonitor(
-            device.port,
-            void 0,
-            validatedPath,
-            environment,
-            rootCommandId
-          );
-        } else {
-          console.error(
-            `[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`
-          );
-        }
+        console.error(
+          "[Spooler Diagnostic] Auto-monitor skipped: the uploaded device could not be uniquely identified. Select its port explicitly."
+        );
       } : void 0
     });
     if ("status" in uploadResult) {
@@ -110783,25 +110775,9 @@ async function uploadFirmware(projectDir, port, environment, verbose, background
             return;
           }
         }
-        let device = null;
-        for (let i = 0; i < 20; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          device = await getFirstDevice2();
-          if (device) break;
-        }
-        if (device) {
-          await startMonitor(
-            device.port,
-            void 0,
-            validatedPath,
-            environment,
-            rootCommandId
-          );
-        } else {
-          console.error(
-            `[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`
-          );
-        }
+        console.error(
+          "[Spooler Diagnostic] Auto-monitor skipped: the uploaded device could not be uniquely identified. Select its port explicitly."
+        );
       } : void 0
     });
     if ("status" in uploadResult) {
