@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
 import { beforeEach, afterEach, expect, it } from "vitest";
+import { captureEspUploadManifest } from "../src/core/analysis/esptool-upload-manifest.js";
 import {
   captureUploadManifest,
   type UploadManifestInput,
@@ -124,3 +125,39 @@ it.each(["image", "manifest", "elf"])(
     await expect(saved.verify()).rejects.toThrow();
   },
 );
+
+it("binds final argv to retained inputs and preserves all non-image arguments", async () => {
+  const argv = [
+    "python",
+    "esptool.py",
+    "--port",
+    "COM42",
+    "write_flash",
+    "-z",
+    "0x10000",
+    input.images[0].path,
+    "0x1000",
+    input.images[1].path,
+  ];
+  const saved = await captureEspUploadManifest(input, argv, archive);
+  expect(saved.manifest.uploadCommandSha256).toBe(
+    hash(Buffer.from(JSON.stringify(argv))),
+  );
+  expect(saved.arguments[7]).toBe(saved.manifest.images[1].archivePath);
+  expect(saved.arguments[9]).toBe(saved.manifest.images[0].archivePath);
+  expect(saved.arguments.slice(0, 7)).toEqual(argv.slice(0, 7));
+  saved.arguments[7] = "tampered";
+  expect(saved.arguments[7]).not.toBe("tampered");
+  await fs.rm(project, { recursive: true });
+  await saved.verify();
+});
+it("rejects a final uploader operand omitted from or inconsistent with the manifest", async () => {
+  const argv = ["esptool.py", "write_flash", "0x10000", input.images[0].path];
+  await expect(
+    captureEspUploadManifest(input, argv, archive),
+  ).rejects.toMatchObject({ code: "UPLOAD_MANIFEST_INVALID" });
+  argv.push("0x1000", input.images[0].path);
+  await expect(
+    captureEspUploadManifest(input, argv, archive),
+  ).rejects.toMatchObject({ code: "UPLOAD_MANIFEST_INVALID" });
+});

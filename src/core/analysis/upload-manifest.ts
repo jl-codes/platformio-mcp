@@ -23,6 +23,7 @@ const InputSchema = z
       })
       .strict(),
     buildSettingsSha256: HashSchema,
+    uploadCommandSha256: HashSchema.optional(),
     elf: z.object({ path: z.string().min(1), sha256: HashSchema }).strict(),
     images: z
       .array(
@@ -146,6 +147,9 @@ export async function captureUploadManifest(
       environment: args.environment,
       toolchain: args.toolchain,
       buildSettingsSha256: args.buildSettingsSha256,
+      ...(args.uploadCommandSha256
+        ? { uploadCommandSha256: args.uploadCommandSha256 }
+        : {}),
       elf: {
         sourcePath: elfSource.identity.path,
         archivePath: elfPath,
