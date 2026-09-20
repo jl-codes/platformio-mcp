@@ -7,7 +7,7 @@ import {
 } from "../src/adapters/device-compat.js";
 import type { RegisteredTool } from "../src/mcp/tool-registry.js";
 
-it("exposes all five lifecycle operations through the shared authorized handlers", async () => {
+it("exposes serial lifecycle and diagnostic operations through the shared authorized handlers", async () => {
   const base = new Map<string, RegisteredTool<unknown>>();
   for (const name of [
     "list_devices",

@@ -47,4 +47,6 @@ but requires build permission because metadata generation can execute scripts.
 without compatibility mode. They share the corresponding `pio_monitor_*` schemas,
 handlers, permission checks, and connection-bound ownership. Existing `start_monitor`,
 `query_logs`, `get_monitor_status`, and `stop_monitor` behavior is unchanged.
-The capture, memory-watch, and port-diagnosis adapters still require compatibility mode.
+`monitor_capture`, `memory_watch`, and `port_diagnose` also use the shared
+reference schemas and handlers in normal mode. Capture and memory collection retain
+separate opening/reading authorization; port diagnosis does not open the port.

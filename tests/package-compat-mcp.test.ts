@@ -53,7 +53,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 109 : 69);
+      expect(tools).toHaveLength(enabled ? 112 : 72);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -100,6 +100,17 @@ it.each([
         "serial_session_stop",
       ]) {
         expect(tools.some((tool) => tool.name === name)).toBe(true);
+      }
+      for (const name of ["monitor_capture", "memory_watch", "port_diagnose"]) {
+        expect(tools.some((tool) => tool.name === name)).toBe(true);
+        const invalid = await client.callTool({
+          name,
+          arguments: { unexpected: true },
+        });
+        expect(invalid.isError).toBe(true);
+        expect(invalid.structuredContent).toMatchObject({
+          details: { code: "COMPAT_ARGUMENT_INVALID" },
+        });
       }
       const ownedSessions = await client.callTool({
         name: "serial_session_list",

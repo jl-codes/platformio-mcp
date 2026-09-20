@@ -104469,7 +104469,7 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
     const info = projectCompatibilitySession(session2);
     return {
       ok: session2.state === "open",
-      summary: session2.state !== "open" ? `Monitor session ${info.session_id} is ${session2.state}; inspect its state before continuing.` : `Monitoring ${info.port} at ${info.baud} baud in session ${info.session_id}. Read with pio_monitor_read(session_id='${info.session_id}', cursor=0). Stop before flashing.`,
+      summary: session2.state !== "open" ? `Monitor session ${info.session_id} is ${session2.state}; inspect its state before continuing.` : `Monitoring ${info.port} at ${info.baud} baud in session ${info.session_id}. Read with serial_session_read(session_id='${info.session_id}', cursor=0). Stop before flashing.`,
       ...info
     };
   }
@@ -104624,7 +104624,10 @@ var OWNED_SERIAL_TOOLS = {
   serial_session_read: "pio_monitor_read",
   serial_session_write: "pio_monitor_write",
   serial_session_list: "pio_monitor_list",
-  serial_session_stop: "pio_monitor_stop"
+  serial_session_stop: "pio_monitor_stop",
+  monitor_capture: "pio_monitor_capture",
+  memory_watch: "pio_memory_watch",
+  port_diagnose: "pio_port_diagnose"
 };
 function withOwnedSerialTools(base2) {
   const reference = withDeviceCompatibility(base2);

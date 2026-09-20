@@ -1901,3 +1901,14 @@ read/write/stop requests. Fixed raw Zod failures being mislabeled INTERNAL_ERROR
 validation errors now omit request values. TypeScript and scoped lint passed.
 Capture, memory-watch, port diagnosis, reachability, physical acceptance, and publication
 remain incomplete; this change is not evidence of full parity or hardware execution.
+
+### 2026-09-20: normal-mode serial capture and diagnostics
+
+Added `monitor_capture`, `memory_watch`, and `port_diagnose` to the shared normal-mode
+serial registry. Schemas, handlers, opening/reading/discovery permissions, ownership,
+and cleanup semantics are identical to their reference aliases. Updated startup guidance
+to reference `serial_session_read`, which exists in both modes. Inventory is now 72
+normal tools or 112 with the same 40 opt-in reference names. All 21 affected registry,
+real stdio entrypoint/mode, legacy authorization, and plugin checks passed; TypeScript
+and scoped lint passed. No serial port was opened. Reachability, physical acceptance,
+and publication remain incomplete. The preceding CI runs were still in progress.
