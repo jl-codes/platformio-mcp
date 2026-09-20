@@ -16,16 +16,31 @@ import { parseDebugServerCommand } from "./debug-server-config.js";
 // Uses Core's configuration API, as in platformio-core v6.1.18 debug/cli.py.
 // Deliberately does not invoke _run, GDBClientProcess, or preload/upload helpers.
 const resolutionScript = String.raw`
-import contextlib, json, os, sys
+import contextlib, json, os, sys, tempfile
+from types import SimpleNamespace
 with contextlib.redirect_stdout(sys.stderr):
     from platformio.project.config import ProjectConfig
     from platformio.platform.factory import PlatformFactory
     from platformio.debug.config.factory import DebugConfigFactory
+    from platformio.debug.process.gdb import GDBClientProcess
     env = sys.argv[1]
     config = ProjectConfig.get_instance()
     config.validate(envs=[env])
     platform = PlatformFactory.from_env(env, autoinstall=True)
     debug = DebugConfigFactory.new(platform, config, env)
+    if sys.argv[2] == "no-load":
+        debug.load_cmds = []
+    elif sys.argv[2] != "load":
+        raise ValueError("invalid load mode")
+    # Reuse only the pure file-generation method, never construct/run a debug client.
+    with tempfile.TemporaryDirectory(prefix="pio-debug-init-") as directory:
+        script_path = os.path.join(directory, ".pioinit")
+        owner = SimpleNamespace(debug_config=debug, INIT_COMPLETED_BANNER=GDBClientProcess.INIT_COMPLETED_BANNER)
+        GDBClientProcess.generate_init_script(owner, script_path)
+        with open(script_path, "r", encoding="utf-8") as script_file:
+            generated_script = script_file.read(65537)
+        if len(generated_script) > 65536:
+            raise ValueError("initialization script limit")
     result = dict(
         environment=env,
         debuggerPath=debug.client_executable_path,
@@ -35,6 +50,7 @@ with contextlib.redirect_stdout(sys.stderr):
         port=debug.port,
         readyPattern=debug.server_ready_pattern,
         initScript=debug.reveal_patterns(debug.get_init_script("gdb")),
+        generatedInitScript=generated_script,
         initCommands=debug.reveal_patterns(list(debug.init_cmds or [])),
         extraCommands=debug.reveal_patterns(list(debug.extra_cmds or [])),
         loadCommands=debug.reveal_patterns(list(debug.load_cmds or [])),
@@ -58,6 +74,7 @@ const resolvedSchema = z
     port: z.string().max(1024).nullable(),
     readyPattern: z.string().max(4096).nullable(),
     initScript: boundedText,
+    generatedInitScript: boundedText,
     initCommands: commandList,
     extraCommands: commandList,
     loadCommands: commandList,
@@ -102,6 +119,7 @@ export interface DebugConfigurationResolution {
   systemInfo: unknown;
   approvalId?: string;
   timeoutMs?: number;
+  load?: boolean;
   signal?: AbortSignal;
   deadline?: number; // Trusted monotonic workflow deadline; grants bind the stable requested timeout.
 }
@@ -121,6 +139,12 @@ export async function resolveDebugConfiguration(
       "DEBUG_ENVIRONMENT_INVALID",
     );
   const timeoutMs = input.timeoutMs ?? 90000;
+  if (input.load !== undefined && typeof input.load !== "boolean")
+    throw new PlatformIOError(
+      "Invalid debugger load selection.",
+      "DEBUG_CONFIG_LIMIT_INVALID",
+    );
+  const load = input.load ?? true;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000)
     throw new PlatformIOError(
       "Debugger configuration timeout must be between 1 and 120000 ms.",
@@ -165,6 +189,7 @@ export async function resolveDebugConfiguration(
       environment: input.environment,
       executable,
       timeoutMs,
+      load,
       purpose: "debugger_configuration_resolution",
       approvalId: input.approvalId,
     },
@@ -182,7 +207,13 @@ export async function resolveDebugConfiguration(
         );
       const result = await runAnalysisProcess(
         executable,
-        ["-I", "-c", resolutionScript, input.environment],
+        [
+          "-I",
+          "-c",
+          resolutionScript,
+          input.environment,
+          load ? "load" : "no-load",
+        ],
         {
           cwd: projectDir,
           timeoutMs: executionTimeout,

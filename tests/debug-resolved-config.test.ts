@@ -26,6 +26,7 @@ function config() {
     port: ":3333",
     readyPattern: "Listening on port",
     initScript: "monitor init\n$LOAD_CMDS\n",
+    generatedInitScript: "monitor init\nload\n",
     initCommands: [],
     extraCommands: [],
     loadCommands: ["load"],
@@ -109,7 +110,7 @@ it("collects using isolated Python and bounded output with an explicit build pur
   expect((await resolveDebugConfiguration(input())).debugTool).toBe("esp-prog");
   expect(runAnalysisProcess).toHaveBeenCalledExactlyOnceWith(
     python,
-    ["-I", "-c", expect.any(String), "debug"],
+    ["-I", "-c", expect.any(String), "debug", "load"],
     expect.objectContaining({
       cwd: project,
       timeoutMs: 90000,
@@ -162,4 +163,24 @@ it("expired workflow deadline cannot launch the resolver", async () => {
     resolveDebugConfiguration({ ...input(), deadline: performance.now() - 1 }),
   ).rejects.toMatchObject({ code: "DEBUG_PREPARATION_TIMEOUT" });
   expect(runAnalysisProcess).not.toHaveBeenCalled();
+});
+
+it("passes load=false to Core initialization generation and retains its generated script", async () => {
+  const data = {
+    ...config(),
+    loadCommands: [],
+    generatedInitScript:
+      "define pio_reset_run_target\nmonitor reset\nend\nmonitor init\n",
+  };
+  vi.mocked(runAnalysisProcess).mockResolvedValue({
+    stdout: JSON.stringify(data),
+    stderr: "",
+  });
+  const result = await resolveDebugConfiguration({ ...input(), load: false });
+  expect(vi.mocked(runAnalysisProcess).mock.calls[0][1].slice(-2)).toEqual([
+    "debug",
+    "no-load",
+  ]);
+  expect(result.generatedInitScript).toBe(data.generatedInitScript);
+  expect(result.loadCommands).toEqual([]);
 });

@@ -69,6 +69,7 @@ beforeEach(() => {
     port: ":3333",
     readyPattern: null,
     initScript: "",
+    generatedInitScript: "",
     initCommands: [],
     extraCommands: [],
     loadCommands: ["load"],
@@ -150,4 +151,12 @@ it("refuses invalid public arguments before configuration or process execution",
     prepareDebuggerProject({ projectDir: project, environment: "--upload" }),
   ).rejects.toMatchObject({ code: "DEBUG_ARGUMENT_INVALID" });
   expect(collectDebugConfiguration).not.toHaveBeenCalled();
+});
+
+it("preserves load=false through backend and initialization resolution", async () => {
+  await prepareDebuggerProject({ projectDir: project, load: false });
+  expect(resolveDebugConfiguration).toHaveBeenCalledWith(
+    expect.objectContaining({ load: false }),
+    expect.any(Object),
+  );
 });

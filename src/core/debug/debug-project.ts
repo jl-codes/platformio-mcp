@@ -24,6 +24,7 @@ const preparationSchema = z
       .string()
       .regex(/^[a-zA-Z0-9_][a-zA-Z0-9_-]{0,49}$/)
       .optional(),
+    load: z.boolean().default(true),
     timeoutMs: z.number().int().min(1).max(600000).default(90000),
     configApprovalId: z.string().max(256).optional(),
     buildApprovalId: z.string().max(256).optional(),
@@ -123,6 +124,7 @@ export async function prepareDebuggerProject(
         environment: selected.environment,
         systemInfo,
         timeoutMs: Math.min(120000, args.timeoutMs),
+        load: args.load,
         deadline,
         signal,
         approvalId: args.resolutionApprovalId,
