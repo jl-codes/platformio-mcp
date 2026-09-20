@@ -94,3 +94,8 @@ PyPI treats `platformio.mcp`, `platformio-mcp`, and `platformio_mcp` as one [nor
 
 
 The npm packer, content validator and publication identity planner now share `npm-release-packages.mjs` and the namespace inventory. Adding an eligible alias no longer requires editing a fixed publication list. Existing npm names cannot be accidentally omitted. New aliases require `publicationControlVerified` and `namingEligibilityVerified` before `publishIntent` can activate them; these recorded assertions still require actual operator evidence and registry authentication. Candidate packages remain separate from publication until those conditions are met.
+
+
+### GHCR container candidates
+
+A non-root container definition and minimal context builder now cover the four requested repository names under `ghcr.io/jl-codes/`. Context preparation verifies the full Python release identity and includes only the two Linux canonical wheels and reviewed Docker sources. The base Python image index is digest-pinned; the wheel supplies Node. Docker's local Linux engine was unavailable on 2026-09-19, so no image build/run result is claimed. Native amd64/arm64 execution, fully locked Core dependencies, device behavior and GHCR authority/publication remain pending. See `distribution/container/README.md` for the exact scope and required Linux device mapping; the image does not grant hardware access or policy permissions.

@@ -172,11 +172,42 @@
       "packagePath": "packages/scoped-pio-agent",
       "reason": "Functional alias prepared; scope authority and registry similarity eligibility must be verified before publication.",
       "source": "https://github.com/jl-codes/platformio-mcp"
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/platformio-mcp",
+      "role": "candidate_container",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/platformio.mcp",
+      "role": "candidate_container",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/pio-mcp",
+      "role": "candidate_container",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/pio-agent",
+      "role": "candidate_container",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
     }
   ],
   "unsupportedChannels": [
     "Docker Hub",
-    "GHCR",
     "VS Code Marketplace",
     "Open VSX",
     "Homebrew",
