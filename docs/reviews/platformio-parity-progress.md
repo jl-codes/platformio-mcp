@@ -1275,3 +1275,9 @@ CI runs 35502231269 and 35502233612 both completed successfully on b17f2acb, inc
 Added a fixed, bounded Windows PnP metadata collector and parser. Only physical USB instance records with CM_DEVCAP_UNIQUEID and location metadata become serial-based identities; generated IDs and missing location data are counted as unidentified. Six parser cases, TypeScript and lint passed. A real metadata-only invocation on this Windows host returned windows_pnp, identified=5 and unidentified=3; this does not mean five debug probes were identified or prove hardware operation.
 
 Unique-ID capability basis: https://devblogs.microsoft.com/windows-music-dev/the-importance-of-including-a-unique-iserialnumber-in-your-usb-midi-devices/ . Public permission-gated discovery, backend-specific probe matching and macOS enumeration remain incomplete.
+
+### macOS USB parsing and authorized discovery dispatch
+
+Added bounded macOS system_profiler JSON parsing and a fixed native collector, then joined Windows/Linux/macOS inventory behind debugger_discover inheriting list_devices permission. Six parser/real-policy cases, TypeScript and lint passed. Native macOS discovery remains unverified.
+
+CI 35502553441 failed because the new probe-custody fixture used macOS's symlinked temporary path, which the lease store correctly rejects. The fixture now resolves the temporary root before constructing the lease store, matching existing lease tests. Its three focused cases pass locally; macOS confirmation awaits CI.

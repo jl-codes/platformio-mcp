@@ -7,7 +7,7 @@ import { DeviceLeaseStore } from "../src/core/devices/device-lease.js";
 import { acquireDebugProbeCustody } from "../src/core/devices/debug-probe-custody.js";
 let root: string;
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-probe-custody-"));
+  root = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "pio-probe-custody-"));
 });
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 const probe = {

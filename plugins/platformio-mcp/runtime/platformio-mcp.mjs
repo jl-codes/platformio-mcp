@@ -93702,6 +93702,7 @@ var INTERNAL_ACTIONS = {
   coredump_analyze: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
   esp_flash_read: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
   esp_flash_read_command: { ...MCP_ACTIONS.upload_firmware, policyAction: "run_shell_command", riskLevel: "critical", openWorld: true },
+  debugger_discover: { ...READ, policyAction: "list_devices" },
   debugger_inspect: { ...READ, policyAction: "query_logs" },
   debugger_mutate: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
   debugger_host_code: {
