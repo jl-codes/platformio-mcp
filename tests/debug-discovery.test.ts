@@ -41,7 +41,7 @@ it("uses the selected gdb_path even when the compiler belongs to a different pac
     compilerPath: compiler,
   });
   expect(await resolveDebuggerExecutable(gdb, [install], project)).toBe(
-    fs.realpathSync(gdb),
+    await fs.promises.realpath(gdb),
   );
 });
 it("rejects missing or relative debugger metadata without a PATH fallback", () => {
@@ -110,7 +110,7 @@ it("discovers a registered standalone debugger package from host Core metadata",
   );
   const info = { core_dir: { value: path.join(root, "core") } };
   expect(await discoverDebuggerRoots(executable, info, project, {})).toEqual([
-    fs.realpathSync(pkg),
+    await fs.promises.realpath(pkg),
   ]);
   fs.writeFileSync(
     record,
@@ -131,7 +131,7 @@ it("accepts an explicit operator installation without requiring Core metadata", 
     await discoverDebuggerRoots(gdb, null, project, {
       PIO_MCP_DEBUGGER_ROOTS: JSON.stringify([install]),
     }),
-  ).toEqual([fs.realpathSync(install)]);
+  ).toEqual([await fs.promises.realpath(install)]);
 });
 it("does not silently fall back when explicit debugger configuration is malformed", async () => {
   for (const value of ["", "[]", "{}", '["relative"]']) {

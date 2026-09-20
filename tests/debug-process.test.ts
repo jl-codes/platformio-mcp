@@ -77,7 +77,7 @@ it("initializes fixed arguments, routes permissions, and cleans up without targe
   const owner = await DebugProcess.start(f.options);
   expect(f.custody.prepareSpawn).toHaveBeenCalledOnce();
   expect(f.launch.mock.calls[0]).toEqual([
-    f.options.executable,
+    await fs.promises.realpath(f.options.executable),
     expect.arrayContaining(["-nx", "--interpreter=mi2"]),
     { cwd: project, shell: false, windowsHide: true, stdio: "pipe" },
   ]);
