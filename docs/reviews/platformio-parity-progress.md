@@ -1107,3 +1107,8 @@ Offline ELF-envelope loading now validates ELF32 core headers, chip/machine agre
 
 Added workspace-contained ELF selection, chip/ELF target checks, embedded hash correspondence and hash-verified ELF snapshots with permission revalidation around analysis. Dump bytes remain in memory; no raw dump is archived by this helper. Four focused cases passed for rebuild stability, wrong-target rejection, failure cleanup and revoked permission; lint and TypeScript passed. Both CI runs 35497993818 and 35497991890 passed at 48b5ef47. Optional analyzer execution, private staging/retention and public integration remain incomplete.
 
+
+### Pinned offline core conversion bridge
+
+Added a fixed Python program using esp-coredump==1.10.0 FileLoader only, with file/size checks, staging-confined intermediates and typed redacted errors. The bridge does not start GDB, select hardware or install dependencies. Added the explicit coredump Python extra. Two isolated Python bridge cases passed using a fake converter for version rejection and temporary output cleanup; lint and TypeScript passed. Real optional-package conversion, staging permissions, bounded process ownership, controlled debugger execution and public integration remain outstanding.
+
