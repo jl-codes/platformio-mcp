@@ -564,3 +564,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Connected bounded named value/name captures to report aggregation for explicit integer-byte custom metrics. Built-in observations with the same metric on the same line are replaced to avoid duplicate counts; metric cardinality is bounded to 256. Invalid/fractional/unsafe integers fail rather than being rounded.
 - TypeScript compilation and 16 capture/parser/report tests passed. Custom unit captures and exact span-overlap semantics remain incomplete, as do public serial/MCP/CLI integrations.
+
+### Custom telemetry units
+
+- Worker captures now retain an optional bounded unit group (16 characters). Report conversion supports reference byte/KiB/KB/MB factors and explicit word-size conversion; unknown units or words without size fail with MEMORY_UNIT_REQUIRED. No unit defaults to byte-valued custom telemetry as in the reference.
+- TypeScript compilation and 22 report/worker/lifecycle tests passed. Plugin and three npm archive validations passed after rebuilding the shared worker. Remaining format/overlap, serial and public integration work remains open.

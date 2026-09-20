@@ -182,7 +182,27 @@ export async function analyzeMemoryTelemetryPattern(
         "Custom telemetry requires nonnegative integer byte values.",
         "MEMORY_VALUE_INVALID",
       );
-    const value = Number(capture.value);
+    const unit = capture.unit?.toLowerCase() ?? "bytes";
+    const factors: Record<string, number> = {
+      b: 1,
+      byte: 1,
+      bytes: 1,
+      kib: 1024,
+      kb: 1024,
+      mb: 1024 * 1024,
+    };
+    const factor =
+      unit === "word" || unit === "words"
+        ? options.stackWordBytes
+        : Object.hasOwn(factors, unit)
+          ? factors[unit]
+          : undefined;
+    if (factor === undefined)
+      throw new PlatformIOError(
+        "Custom telemetry unit is unknown or needs an explicit word size.",
+        "MEMORY_UNIT_REQUIRED",
+      );
+    const value = Number(capture.value) * factor;
     if (!Number.isSafeInteger(value))
       throw new PlatformIOError(
         "Custom telemetry exceeds integer bounds.",

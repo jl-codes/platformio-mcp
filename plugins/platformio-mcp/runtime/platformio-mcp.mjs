@@ -22748,9 +22748,9 @@ try {
     let match;
     while((match=regex.exec(workerData.lines[index]))!==null) {
       if(match.groups.value!==undefined) {
-        const value=match.groups.value; const name=match.groups.name;
-        if(captures.length>=10000 || value.length>128 || (name!==undefined && name.length>128)) { parentPort.postMessage({limit:true}); return; }
-        captures.push({line:index,value,...(name!==undefined?{name}:{})});
+        const value=match.groups.value; const name=match.groups.name; const unit=match.groups.unit;
+        if(captures.length>=10000 || value.length>128 || (name!==undefined && name.length>128) || (unit!==undefined && unit.length>16)) { parentPort.postMessage({limit:true}); return; }
+        captures.push({line:index,value,...(name!==undefined?{name}:{}),...(unit!==undefined?{unit}:{})});
       }
       if(match[0].length===0) regex.lastIndex++;
     }

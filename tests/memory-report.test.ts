@@ -75,3 +75,24 @@ it("rejects custom values that would otherwise be coerced or rounded", async () 
     analyzeMemoryTelemetryPattern(["mem=1.5"], "mem=(?P<value>.+)"),
   ).rejects.toMatchObject({ code: "MEMORY_VALUE_INVALID" });
 });
+
+it("converts explicit custom units and requires word-size evidence", async () => {
+  const pattern = "mem=(?P<value>\\d+) (?P<unit>\\w+)";
+  expect(
+    (await analyzeMemoryTelemetryPattern(["mem=2 KiB"], pattern)).metrics.custom
+      .last,
+  ).toBe(2048);
+  expect(
+    (
+      await analyzeMemoryTelemetryPattern(["mem=2 words"], pattern, {
+        stackWordBytes: 4,
+      })
+    ).metrics.custom.last,
+  ).toBe(8);
+  await expect(
+    analyzeMemoryTelemetryPattern(["mem=2 words"], pattern),
+  ).rejects.toMatchObject({ code: "MEMORY_UNIT_REQUIRED" });
+  await expect(
+    analyzeMemoryTelemetryPattern(["mem=2 bananas"], pattern),
+  ).rejects.toMatchObject({ code: "MEMORY_UNIT_REQUIRED" });
+});
