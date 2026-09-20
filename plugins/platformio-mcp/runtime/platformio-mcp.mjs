@@ -101409,9 +101409,24 @@ async function retainElfSnapshot(snapshot, expectedSha256, archiveRoot = path31.
   }
 }
 async function sourceArchiveRoot(sourcePath, archiveRoot) {
-  const source = await fs27.realpath(sourcePath);
+  const source = await resolveSourceIdentityPath(sourcePath);
   const key = createHash7("sha256").update(source).digest("hex");
   return path31.join(archiveRoot, key);
+}
+async function resolveSourceIdentityPath(sourcePath) {
+  let ancestor = path31.resolve(sourcePath);
+  const missing = [];
+  for (; ; ) {
+    try {
+      return path31.join(await fs27.realpath(ancestor), ...missing.reverse());
+    } catch (error2) {
+      const parent = path31.dirname(ancestor);
+      if (error2.code !== "ENOENT" || parent === ancestor)
+        throw error2;
+      missing.push(path31.basename(ancestor));
+      ancestor = parent;
+    }
+  }
 }
 async function resolveRetainedElf(sourcePath, sha256, archiveRoot = path31.join(SERVER_DATA_DIR, "artifacts", "elf")) {
   if (!/^[a-f0-9]{64}$/i.test(sha256))

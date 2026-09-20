@@ -104,6 +104,7 @@ it("retains distinct content across rebuilds and reuses a verified archived hash
   const next = await retainElfSnapshot(file, second.sha256, archive);
   expect(await resolveRetainedElf(file, first.sha256, archive)).toBe(retained);
   fs.unlinkSync(file);
+  expect(await resolveRetainedElf(file, first.sha256, archive)).toBe(retained);
   expect(fs.readFileSync(retained)).toEqual(old);
   expect(fs.readFileSync(next)).toEqual(newer);
   expect(fs.readdirSync(path.dirname(retained)).sort()).toEqual(
@@ -173,4 +174,25 @@ it("returns the same canonical archive path through an aliased ancestor", async 
       path.join(actual, "archive"),
     ),
   ).toBe(retained);
+});
+
+it("recovers the exact source history after clean removes its build directory", async () => {
+  const build = path.join(root, "build", "esp");
+  fs.mkdirSync(build, { recursive: true });
+  const file = path.join(build, "firmware.elf");
+  fs.writeFileSync(file, header(94));
+  const identity = await readElfIdentity(file);
+  const archive = path.join(root, "archive");
+  const retained = await retainElfSnapshot(file, identity.sha256, archive);
+  fs.rmSync(path.join(root, "build"), { recursive: true });
+  expect(await resolveRetainedElf(file, identity.sha256, archive)).toBe(
+    retained,
+  );
+  await expect(
+    resolveRetainedElf(
+      path.join(root, "other", "firmware.elf"),
+      identity.sha256,
+      archive,
+    ),
+  ).rejects.toThrow();
 });

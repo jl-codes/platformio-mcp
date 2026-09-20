@@ -44,13 +44,13 @@ jobs:
       - name: Lint server sources
         run: npm run lint
 
-      - name: Run unit and component tests
-        run: npm run test:ci:unit
-
-      - name: Setup Python for native backend lifecycle verification
-        uses: actions/setup-python@v6
+      - name: Setup Python for unit tests and native backend verification
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
+
+      - name: Run unit and component tests
+        run: npm run test:ci:unit
 
       - name: Verify native debug backend descendant cleanup
         shell: bash

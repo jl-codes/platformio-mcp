@@ -59,9 +59,29 @@ async function sourceArchiveRoot(
   sourcePath: string,
   archiveRoot: string,
 ): Promise<string> {
-  const source = await fs.realpath(sourcePath);
+  const source = await resolveSourceIdentityPath(sourcePath);
   const key = createHash("sha256").update(source).digest("hex");
   return path.join(archiveRoot, key);
+}
+
+/** Recover the same canonical source scope after clean removes the ELF or build directories. */
+async function resolveSourceIdentityPath(sourcePath: string): Promise<string> {
+  let ancestor = path.resolve(sourcePath);
+  const missing: string[] = [];
+  for (;;) {
+    try {
+      return path.join(await fs.realpath(ancestor), ...missing.reverse());
+    } catch (error) {
+      const parent = path.dirname(ancestor);
+      if (
+        (error as NodeJS.ErrnoException).code !== "ENOENT" ||
+        parent === ancestor
+      )
+        throw error;
+      missing.push(path.basename(ancestor));
+      ancestor = parent;
+    }
+  }
 }
 
 /** Resolve an earlier ELF only from the history of the selected metadata source path. */

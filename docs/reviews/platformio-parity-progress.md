@@ -1695,3 +1695,12 @@ Validation: fifteen focused parser/artifact/transfer cases passed; TypeScript an
 The OTA adapter now accepts optional `elf_path` (canonical service `elfPath`) under the same scoped image-inspection grant, with that path included in authorization scope. It captures bounded workspace bytes, rejects a missing or mismatched embedded image hash, validates an ESP32-target ELF, and archives the exact matched bytes. Both upload grants include the selected ELF path/hash alongside the image identity. The public result reports the retained ELF and `embedded_hash_match`; this deliberately does not claim signed provenance, physical execution, or generic serial-uploader correspondence. Unsupported images without an explicit ELF retain existing unverified behavior. Matching failure releases the private image before transfer.
 
 Validation: 26 focused ELF retention, OTA service, transfer-policy and compatibility cases passed. Coverage includes decoding-artifact retention across rebuild, mismatch before transfer, absent identity, outside-workspace paths and incompatible ELF target. TypeScript and scoped lint passed; plugin rebuilt. Physical acceptance and complete serial uploader manifest/handoff remain outstanding.
+
+
+### Recover archived ELF after source cleanup; establish CI Python prerequisite
+
+Archived ELF lookup no longer requires the original file or build directory to survive. It canonicalizes through the nearest existing ancestor and retains the exact source-path hash scope; it does not search globally by content hash or follow unrelated histories. Tests now resolve the archived file after deletion and after entire build-directory removal, while rejecting a different missing source path.
+
+CI run 35518807967 exposed a Python subprocess startup timeout at the retained 10-second process bound (rather than the previously fixed harness deadline). Inspection found setup-python after the unit tests that invoke Python. CI now installs the existing selected Python 3.12 runtime before those tests, using the release workflow's pinned setup-python action. Converter assertions now report subprocess errors directly; neither the process bound nor behavior checks were relaxed. Hosted verification remains pending.
+
+Validation: seventeen focused archive, OTA ELF and converter tests passed; TypeScript and scoped lint passed, plugin rebuilt.

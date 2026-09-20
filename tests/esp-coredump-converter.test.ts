@@ -14,6 +14,7 @@ it("returns a typed error for an installed but unapproved converter version", ()
     ],
     { encoding: "utf8", timeout: 10000 },
   );
+  expect(result.error).toBeUndefined();
   expect(result.status).toBe(2);
   expect(JSON.parse(result.stdout)).toEqual({
     error: "COREDUMP_TOOL_VERSION_MISMATCH",
