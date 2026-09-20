@@ -1112,3 +1112,8 @@ Added workspace-contained ELF selection, chip/ELF target checks, embedded hash c
 
 Added a fixed Python program using esp-coredump==1.10.0 FileLoader only, with file/size checks, staging-confined intermediates and typed redacted errors. The bridge does not start GDB, select hardware or install dependencies. Added the explicit coredump Python extra. Two isolated Python bridge cases passed using a fake converter for version rejection and temporary output cleanup; lint and TypeScript passed. Real optional-package conversion, staging permissions, bounded process ownership, controlled debugger execution and public integration remain outstanding.
 
+
+### Private sensitive-analysis staging
+
+Added owner-only temporary directories before any sensitive writes: POSIX mode/owner checks and protected Windows ACLs granting only the current SID. Windows verification exposed an inherited PowerShell module-loading failure; the helper now uses .NET ACL APIs directly. The real Windows permissions/failure-cleanup regression, lint and TypeScript passed. Callers must terminate all consumers before returning. Converter integration, host matrix verification and sensitive retention policy remain incomplete.
+
