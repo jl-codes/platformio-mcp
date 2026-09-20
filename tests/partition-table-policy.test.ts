@@ -262,3 +262,57 @@ it("compares an explicit CSV with its metadata-selected built binary", async () 
     expect.objectContaining({ code: "offline_table_mismatch" }),
   );
 });
+
+it("discovers the selected ESP-IDF environment SDK configuration", async () => {
+  fs.writeFileSync(path.join(root, "partitions.csv"), "app,app,factory,,1M,");
+  fs.writeFileSync(
+    path.join(root, "sdkconfig.custom"),
+    "CONFIG_PARTITION_TABLE_OFFSET=0x10000\n",
+  );
+  vi.mocked(executeProjectInspection).mockResolvedValue({
+    ok: true,
+    defaultEnvironments: ["custom"],
+    envs: [
+      {
+        name: "custom",
+        framework: ["espidf"],
+        sdkconfigPath: null,
+        partitionTable: null,
+        partitionTableUploadOffset: null,
+        flashSize: null,
+        board: null,
+        mcu: null,
+      },
+    ],
+  } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>);
+  const result = await executePartitionTable({ projectDir: root });
+  expect(result).toMatchObject({ ok: true, table_offset: 0x10000 });
+  expect(result.sdkconfig_artifact?.path).toBe(
+    fs.realpathSync.native(path.join(root, "sdkconfig.custom")),
+  );
+});
+it("honors an explicit project SDK configuration path without falling back", async () => {
+  fs.writeFileSync(
+    path.join(root, "sdkconfig.custom"),
+    "CONFIG_PARTITION_TABLE_OFFSET=0x10000\n",
+  );
+  vi.mocked(executeProjectInspection).mockResolvedValue({
+    ok: true,
+    defaultEnvironments: ["custom"],
+    envs: [
+      {
+        name: "custom",
+        framework: ["espidf"],
+        sdkconfigPath: "missing.config",
+        partitionTable: null,
+        partitionTableUploadOffset: null,
+        flashSize: null,
+        board: null,
+        mcu: null,
+      },
+    ],
+  } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>);
+  await expect(
+    executePartitionTable({ projectDir: root }),
+  ).rejects.toMatchObject({ code: "ENOENT" });
+});

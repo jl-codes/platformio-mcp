@@ -1067,3 +1067,7 @@ CI 35496366805 passed for 49da3211. Reviewed official Core v6.1.16 package/comma
 ### Structured partition mismatch findings
 
 Device-erased and device-mismatch observations now add structured error issues/counts, and explicit CSV inspection with build metadata automatically compares the selected built binary. Added mocked device-report and full workflow regressions; three device cases and eleven workflow cases passed. CI 35496714588 exposed unused destructured values under ESLint; corrected variable use without changing lint policy. Targeted lint across all new partition/flash modules and TypeScript passed. Physical acceptance remains outstanding.
+
+### Existing ESP-IDF configuration discovery
+
+Added automatic discovery of sdkconfig.<environment> and the configured board_build.esp-idf.sdkconfig_path override, verified against platform-espressif32 v6.9.0 builder/frameworks/espidf.py. Explicit missing paths do not fall back; absent conventional files leave offset evidence unresolved. Twenty-five focused workflow/project cases, targeted lint and TypeScript passed. Framework package CSV selection and physical acceptance remain incomplete.

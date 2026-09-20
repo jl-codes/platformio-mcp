@@ -143,6 +143,7 @@ export function parseProjectEnvironments(output: string) {
       uploadPort: options.upload_port ?? null,
       uploadProtocol: options.upload_protocol ?? null,
       partitionTable: options["board_build.partitions"] ?? null,
+      sdkconfigPath: options["board_build.esp-idf.sdkconfig_path"] ?? null,
       partitionTableUploadOffset: options["board_upload.partition_table_offset"] ?? null,
       flashSize: options["board_upload.flash_size"] ?? null,
       mcu: options["board_build.mcu"] ?? null,

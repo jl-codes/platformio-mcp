@@ -112,13 +112,24 @@ export async function executePartitionTable(
           source: "explicit:tableOffset",
           offset: params.tableOffset,
         });
-      const sdkconfig = params.sdkconfigPath
-        ? await readPartitionArtifact(
+      const sdkconfigPath = params.sdkconfigPath ?? project?.sdkconfigPath;
+      let sdkconfig: Awaited<ReturnType<typeof readPartitionArtifact>> | null =
+        null;
+      if (sdkconfigPath) {
+        try {
+          sdkconfig = await readPartitionArtifact(
             projectDir,
-            params.sdkconfigPath,
+            sdkconfigPath,
             2 * 1024 * 1024,
-          )
-        : null;
+          );
+        } catch (error) {
+          const optionalMissing =
+            !params.sdkconfigPath &&
+            !project?.sdkconfigExplicit &&
+            (error as NodeJS.ErrnoException).code === "ENOENT";
+          if (!optionalMissing) throw error;
+        }
+      }
       if (sdkconfig) {
         let text: string;
         try {

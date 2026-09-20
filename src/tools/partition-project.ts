@@ -52,6 +52,34 @@ export async function resolveProjectPartitionInputs(
       "Invalid configured partition file.",
       "PARTITION_CONFIG_INVALID",
     );
+  const frameworks = Array.isArray(env.framework)
+    ? env.framework
+    : typeof env.framework === "string"
+      ? env.framework.split(",").map((value) => value.trim())
+      : [];
+  let sdkconfigPath: string | undefined;
+  const sdkconfigExplicit =
+    env.sdkconfigPath !== undefined && env.sdkconfigPath !== null;
+  if (sdkconfigExplicit) {
+    if (
+      typeof env.sdkconfigPath !== "string" ||
+      !env.sdkconfigPath ||
+      env.sdkconfigPath.length > 32768 ||
+      /\$|%[^%]+%/.test(env.sdkconfigPath)
+    )
+      throw new PlatformIOError(
+        "SDK configuration path must be resolved within the workspace.",
+        "PARTITION_CONFIG_INVALID",
+      );
+    sdkconfigPath = env.sdkconfigPath;
+  } else if (frameworks.includes("espidf")) {
+    if (!/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,49}$/.test(env.name))
+      throw new PlatformIOError(
+        "Invalid SDK configuration environment name.",
+        "PARTITION_CONFIG_INVALID",
+      );
+    sdkconfigPath = "sdkconfig." + env.name;
+  }
   let flashSize: number | undefined;
   if (env.flashSize !== null) {
     if (typeof env.flashSize !== "string" && typeof env.flashSize !== "number")
@@ -66,6 +94,8 @@ export async function resolveProjectPartitionInputs(
   }
   return {
     environment: env.name,
+    sdkconfigPath,
+    sdkconfigExplicit,
     tablePath: env.partitionTable ?? "partitions.csv",
     tableSource: env.partitionTable
       ? "board_build.partitions"
