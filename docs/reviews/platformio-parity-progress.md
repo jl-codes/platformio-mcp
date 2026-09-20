@@ -679,3 +679,7 @@ Removed the hardcoded MCP 1.0.0 version and unified CLI, MCP handshake and start
 ### Functional Python alias wheels
 
 Implemented pio-agent and pio-mcp alias distributions with exact canonical version dependencies, delegated PlatformIO extra and useful Python module entry points. The canonical package alone owns console scripts, avoiding overlapping installed command files. Both platform-independent alias wheels build successfully; direct artifact metadata inspection confirmed exact 3.0.0 dependency pins, module delegates and no conflicting entry-point files. No repeated runtime smoke tests were run. Publisher control, uvx installation and uninstall behavior remain acceptance requirements; nothing was published.
+
+### Release workflow assembles complete Python distribution set
+
+Added a release build job that assembles all five pinned platform wheels and both functional aliases, validates package versions/source commit/runtime hashes/alias pins and inventory coverage, and retains the artifacts. Existing release job now depends on that job and downloads its exact-run artifact set before upload/attachment. A Python release identity manifest records wheel SHA-256 hashes. YAML parsing and dependency inspection pass; the complete workflow has not been run and no host execution acceptance is inferred from cross-assembly. PyPI publication remains unwired pending verified authority and release acceptance. No runtime smoke tests or publication were performed this turn.
