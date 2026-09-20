@@ -14,6 +14,8 @@ import { collectDebugConfiguration } from "./debug-configuration.js";
 import { resolveDebugConfiguration } from "./debug-resolved-config.js";
 import {
   discoverDebuggerRoots,
+  discoverDebugBackendRoots,
+  resolveDebugBackendExecutable,
   resolveDebuggerExecutable,
 } from "./debug-discovery.js";
 
@@ -142,6 +144,22 @@ export async function prepareDebuggerProject(
       trustedDebuggerRoots,
       projectDir,
     );
+    let trustedBackendRoots: string[] | undefined;
+    if (configuration.server) {
+      trustedBackendRoots = await discoverDebugBackendRoots(
+        configuration.server.executable,
+        systemInfo,
+        projectDir,
+      );
+      configuration.server = {
+        ...configuration.server,
+        executable: await resolveDebugBackendExecutable(
+          configuration.server.executable,
+          trustedBackendRoots,
+          projectDir,
+        ),
+      };
+    }
     remaining();
     const identity = await dispatchAuthorizedAction(
       "get_project_config",
@@ -179,6 +197,7 @@ export async function prepareDebuggerProject(
       configuration,
       executable,
       trustedDebuggerRoots,
+      trustedBackendRoots,
       elfPath: identity.path,
       expectedElfSha256: identity.sha256,
       firmwareIdentity: identity,

@@ -5,6 +5,8 @@ import path from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import {
   discoverDebuggerRoots,
+  discoverDebugBackendRoots,
+  resolveDebugBackendExecutable,
   resolveDebuggerExecutable,
   selectDebugMetadata,
 } from "../src/core/debug/debug-discovery.js";
@@ -141,4 +143,60 @@ it("does not silently fall back when explicit debugger configuration is malforme
       }),
     ).rejects.toMatchObject({ code: "GDB_EXECUTABLE_UNTRUSTED" });
   }
+});
+
+it.each(["openocd", "JLinkGDBServerCL.exe", "ST-LINK_gdbserver", "st-util"])(
+  "accepts operator-installed backend %s with separate trust",
+  async (name) => {
+    const backend = path.join(install, name);
+    fs.writeFileSync(backend, "fixture");
+    expect(
+      await discoverDebugBackendRoots(backend, null, project, {
+        PIO_MCP_DEBUG_BACKEND_ROOTS: JSON.stringify([install]),
+      }),
+    ).toEqual([await fs.promises.realpath(install)]);
+    await expect(
+      discoverDebugBackendRoots(backend, null, project, {
+        PIO_MCP_DEBUGGER_ROOTS: JSON.stringify([install]),
+      }),
+    ).rejects.toMatchObject({ code: "DEBUG_BACKEND_EXECUTABLE_UNTRUSTED" });
+  },
+);
+it("rejects project backends and shell executables inside operator roots", async () => {
+  const local = path.join(project, "openocd");
+  const shell = path.join(install, "cmd.exe");
+  fs.writeFileSync(local, "fixture");
+  fs.writeFileSync(shell, "fixture");
+  for (const [candidate, roots] of [
+    [local, [project]],
+    [local, [root]],
+    [shell, [install]],
+  ] as const)
+    await expect(
+      resolveDebugBackendExecutable(candidate, roots, project),
+    ).rejects.toMatchObject({ code: "DEBUG_BACKEND_EXECUTABLE_UNTRUSTED" });
+});
+it("requires backend package registration to match the installed manifest", async () => {
+  const core = path.join(root, "core");
+  const pkg = path.join(core, "packages", "tool-openocd-esp32");
+  fs.mkdirSync(pkg, { recursive: true });
+  const backend = path.join(pkg, "openocd");
+  fs.writeFileSync(backend, "fixture");
+  const metadata = { name: "tool-openocd-esp32", version: "1.0" };
+  fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify(metadata));
+  fs.writeFileSync(
+    path.join(pkg, ".piopm"),
+    JSON.stringify({ ...metadata, type: "tool" }),
+  );
+  const info = { core_dir: { value: core } };
+  expect(await discoverDebugBackendRoots(backend, info, project, {})).toEqual([
+    await fs.promises.realpath(pkg),
+  ]);
+  fs.writeFileSync(
+    path.join(pkg, ".piopm"),
+    JSON.stringify({ ...metadata, version: "other", type: "tool" }),
+  );
+  await expect(
+    discoverDebugBackendRoots(backend, info, project, {}),
+  ).rejects.toMatchObject({ code: "DEBUG_BACKEND_EXECUTABLE_UNTRUSTED" });
 });

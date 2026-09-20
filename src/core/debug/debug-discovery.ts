@@ -35,6 +35,22 @@ export function selectDebugMetadata(
   return { ...selected, debuggerPath: path.normalize(value) };
 }
 
+/** Trust profiles are host constants, never request-controlled executable patterns. */
+const debuggerTrust = {
+  environmentKey: "PIO_MCP_DEBUGGER_ROOTS",
+  errorCode: "GDB_EXECUTABLE_UNTRUSTED",
+  executable: /^(?:[a-z0-9_]+-)*gdb(?:\.exe)?$/i,
+  package: /^(?:toolchain-|tool-.*gdb(?:-|$))/,
+};
+const backendTrust = {
+  environmentKey: "PIO_MCP_DEBUG_BACKEND_ROOTS",
+  errorCode: "DEBUG_BACKEND_EXECUTABLE_UNTRUSTED",
+  executable:
+    /^(?:openocd|JLinkGDBServerCL(?:Exe)?|JLinkGDBServer|st-util|ST-LINK_gdbserver)(?:\.exe)?$/i,
+  package: /^tool-(?:openocd|jlink|stlink|stm32duino)(?:-|$)/,
+};
+type DebugToolTrust = typeof debuggerTrust;
+
 function within(root: string, file: string): boolean {
   const relative = path.relative(root, file);
   return (
@@ -49,13 +65,41 @@ function within(root: string, file: string): boolean {
  * Validate an exact debugger executable against trusted host roots.
  * Paths and roots are resolved to prevent symlink escapes; project-owned roots never qualify.
  */
-export async function resolveDebuggerExecutable(
+export function resolveDebuggerExecutable(
   candidate: string,
   trustedRoots: readonly string[],
   projectDir: string,
 ): Promise<string> {
+  return resolveInstalledDebugExecutable(
+    candidate,
+    trustedRoots,
+    projectDir,
+    debuggerTrust,
+  );
+}
+
+/** Resolve a supported native probe backend within operator or registered package roots. */
+export function resolveDebugBackendExecutable(
+  candidate: string,
+  trustedRoots: readonly string[],
+  projectDir: string,
+): Promise<string> {
+  return resolveInstalledDebugExecutable(
+    candidate,
+    trustedRoots,
+    projectDir,
+    backendTrust,
+  );
+}
+
+async function resolveInstalledDebugExecutable(
+  candidate: string,
+  trustedRoots: readonly string[],
+  projectDir: string,
+  trust: DebugToolTrust,
+): Promise<string> {
   const invalid = (message: string): never => {
-    throw new PlatformIOError(message, "GDB_EXECUTABLE_UNTRUSTED");
+    throw new PlatformIOError(message, trust.errorCode);
   };
   if (
     !path.isAbsolute(candidate) ||
@@ -84,11 +128,11 @@ export async function resolveDebuggerExecutable(
   }
   if (
     !roots.some((root) => within(root, executable)) ||
-    !/^(?:[a-z0-9_]+-)*gdb(?:\.exe)?$/i.test(path.basename(executable)) ||
+    !trust.executable.test(path.basename(executable)) ||
     !(await fs.stat(executable)).isFile()
   )
     return invalid(
-      "Debugger is not a native GDB within the trusted installation.",
+      "Debug tool is not a supported native executable within the trusted installation.",
     );
   return executable;
 }
@@ -98,16 +142,48 @@ export async function resolveDebuggerExecutable(
  * A custom/native installation requires PIO_MCP_DEBUGGER_ROOTS in the server environment.
  * systemInfo must come from the host's authorized system-info call, never client arguments.
  */
-export async function discoverDebuggerRoots(
+export function discoverDebuggerRoots(
   debuggerPath: string,
   systemInfo: unknown,
   projectDir: string,
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<string[]> {
+  return discoverInstalledDebugRoots(
+    debuggerPath,
+    systemInfo,
+    projectDir,
+    environment,
+    debuggerTrust,
+  );
+}
+
+/** Discover registered native backend packages, with a separate operator override from GDB roots. */
+export function discoverDebugBackendRoots(
+  candidate: string,
+  systemInfo: unknown,
+  projectDir: string,
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<string[]> {
+  return discoverInstalledDebugRoots(
+    candidate,
+    systemInfo,
+    projectDir,
+    environment,
+    backendTrust,
+  );
+}
+
+async function discoverInstalledDebugRoots(
+  debuggerPath: string,
+  systemInfo: unknown,
+  projectDir: string,
+  environment: NodeJS.ProcessEnv,
+  trust: DebugToolTrust,
+): Promise<string[]> {
   const invalid = (message: string): never => {
-    throw new PlatformIOError(message, "GDB_EXECUTABLE_UNTRUSTED");
+    throw new PlatformIOError(message, trust.errorCode);
   };
-  const configured = environment.PIO_MCP_DEBUGGER_ROOTS;
+  const configured = environment[trust.environmentKey];
   if (configured !== undefined) {
     let roots: unknown;
     if (Buffer.byteLength(configured) > 65536)
@@ -115,7 +191,7 @@ export async function discoverDebuggerRoots(
     try {
       roots = JSON.parse(configured);
     } catch {
-      return invalid("PIO_MCP_DEBUGGER_ROOTS must be a JSON array.");
+      return invalid(trust.environmentKey + " must be a JSON array.");
     }
     if (
       !Array.isArray(roots) ||
@@ -126,7 +202,12 @@ export async function discoverDebuggerRoots(
       return invalid(
         "Configure between 1 and 32 absolute debugger installation roots.",
       );
-    await resolveDebuggerExecutable(debuggerPath, roots, projectDir);
+    await resolveInstalledDebugExecutable(
+      debuggerPath,
+      roots,
+      projectDir,
+      trust,
+    );
     return [
       ...new Set(
         await Promise.all(roots.map((root: string) => fs.realpath(root))),
@@ -176,10 +257,7 @@ export async function discoverDebuggerRoots(
     ]);
     if (
       typeof manifest.name !== "string" ||
-      !(
-        manifest.name.startsWith("toolchain-") ||
-        /^tool-.*gdb(?:-|$)/.test(manifest.name)
-      ) ||
+      !trust.package.test(manifest.name) ||
       typeof manifest.version !== "string" ||
       !manifest.version ||
       record.type !== "tool" ||
@@ -193,6 +271,6 @@ export async function discoverDebuggerRoots(
     if (error instanceof PlatformIOError) throw error;
     return invalid("Debugger package registration is missing or invalid.");
   }
-  await resolveDebuggerExecutable(executable, [root], projectDir);
+  await resolveInstalledDebugExecutable(executable, [root], projectDir, trust);
   return [root];
 }

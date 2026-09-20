@@ -9,6 +9,8 @@ import { collectDebugConfiguration } from "../src/core/debug/debug-configuration
 import { resolveDebugConfiguration } from "../src/core/debug/debug-resolved-config.js";
 import {
   discoverDebuggerRoots,
+  discoverDebugBackendRoots,
+  resolveDebugBackendExecutable,
   resolveDebuggerExecutable,
 } from "../src/core/debug/debug-discovery.js";
 import { prepareDebuggerProject } from "../src/core/debug/debug-project.js";
@@ -24,6 +26,8 @@ vi.mock("../src/core/debug/debug-resolved-config.js", () => ({
 }));
 vi.mock("../src/core/debug/debug-discovery.js", () => ({
   discoverDebuggerRoots: vi.fn(),
+  discoverDebugBackendRoots: vi.fn(),
+  resolveDebugBackendExecutable: vi.fn(),
   resolveDebuggerExecutable: vi.fn(),
 }));
 let root: string, project: string, elf: string;
@@ -160,4 +164,40 @@ it("preserves load=false through backend and initialization resolution", async (
     expect.objectContaining({ load: false }),
     expect.any(Object),
   );
+});
+
+it("validates and canonicalizes a resolved backend before returning prepared startup inputs", async () => {
+  const candidate = path.join(root, "package", "openocd");
+  const canonical = path.join(root, "native", "openocd");
+  resolved.server = {
+    executable: candidate,
+    cwd: root,
+    arguments: ["-f", "board.cfg"],
+  };
+  vi.mocked(discoverDebugBackendRoots).mockResolvedValue([
+    path.join(root, "native"),
+  ]);
+  vi.mocked(resolveDebugBackendExecutable).mockResolvedValue(canonical);
+  const result = await prepareDebuggerProject({ projectDir: project });
+  expect(discoverDebugBackendRoots).toHaveBeenCalledWith(
+    candidate,
+    { core_dir: { value: root } },
+    project,
+  );
+  expect(result.configuration.server?.executable).toBe(canonical);
+  expect(result.trustedBackendRoots).toEqual([path.join(root, "native")]);
+});
+it("stops preparation when a configured backend has no trusted installation", async () => {
+  resolved.server = {
+    executable: path.join(project, "openocd"),
+    cwd: project,
+    arguments: [],
+  };
+  vi.mocked(discoverDebugBackendRoots).mockRejectedValue(
+    new Error("untrusted backend"),
+  );
+  await expect(prepareDebuggerProject({ projectDir: project })).rejects.toThrow(
+    "untrusted backend",
+  );
+  expect(resolveDebugBackendExecutable).not.toHaveBeenCalled();
 });
