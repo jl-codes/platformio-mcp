@@ -36,3 +36,5 @@ The release workflow builds all three npm tarballs and checks names, versions, e
 ## MCP Registry identity
 
 `server.json` advertises the exact canonical npm version over stdio. `npm run registry:validate` verifies the official schema, repository identity, namespace inventory, npm `mcpName`, and package/version routing. The schema is pinned by upstream commit and SHA-256 in `distribution/mcp-schema-source.json`, with its upstream license preserved in `distribution/MCP-REGISTRY-LICENSE`. This is preparation only: a manifest cannot establish publisher authority or make the new runtime available before npm publication.
+
+Publication now reads the previously uploaded npm preflight manifest and rejects changes to its source commit, package set, versions, artifact paths, or hashes. It does not rewrite that record during publication. An unpublished entry may become identical during a retry, but an already verified entry may not disappear. GitHub release uploads no longer overwrite existing assets; a duplicate asset stops that upload instead of replacing published bytes. Safe identical-asset reuse for GitHub remains to be implemented.

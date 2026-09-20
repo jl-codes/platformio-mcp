@@ -99,7 +99,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
-            gh release upload "${{ github.ref_name }}" release-artifacts/* --clobber
+            gh release upload "${{ github.ref_name }}" release-artifacts/*
           else
             gh release create "${{ github.ref_name }}" release-artifacts/* --generate-notes --verify-tag
           fi
