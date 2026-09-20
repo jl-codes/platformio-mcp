@@ -1,6 +1,6 @@
 /** Fixed isolated PPK2 bridge: explicit modes, bounded sampling and reported cleanup outcomes. */
 export const PPK2_BRIDGE = String.raw`
-import contextlib, json, math, sys, threading, time
+import contextlib, json, math, os, sys, threading, time
 
 def validate(request):
     if not isinstance(request, dict) or set(request) != {"port", "mode", "voltageMv", "currentLimitMa", "seconds"}:
@@ -173,4 +173,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # The daemon owner-reader must not race buffered stdin finalization. All device cleanup ran above.
+    os._exit(0)
 `;

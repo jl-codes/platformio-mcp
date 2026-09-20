@@ -56,6 +56,12 @@ jobs:
         shell: bash
         run: npx tsx scripts/verify-windows-debug-supervisor.mts "$(python -c 'import sys; print(sys.executable)')"
 
+      - name: Verify PPK2 bridge and process cleanup without hardware
+        shell: bash
+        run: |
+          npx tsx scripts/verify-ppk2-bridge.mts "$(python -c 'import sys; print(sys.executable)')"
+          npx tsx scripts/verify-ppk2-process.mts "$(python -c 'import sys; print(sys.executable)')"
+
       - name: Validate distribution identity controls
         run: npm run test:namespaces
 
