@@ -147,9 +147,9 @@
       "sha256": "eead9115994f9ad9471cd607ead9aa5c3dbf460c878bafdde41b68b57679fefc"
     },
     {
-      "path": "web/assets/index-BkkxHhoR.js",
-      "bytes": 969741,
-      "sha256": "4b8a99a8643401c171005099d5fbde1fc1f38bdc811c45501cbaef25a18e6b1c"
+      "path": "web/assets/index-aWh4b5AA.js",
+      "bytes": 991223,
+      "sha256": "9fe6a951f1bbe6b9f53a2cdac1741cd9a34f3f329268466b703bf0067b80bdb1"
     },
     {
       "path": "web/assets/index-DE-4pUMU.css",
@@ -159,7 +159,7 @@
     {
       "path": "web/index.html",
       "bytes": 615,
-      "sha256": "e02af1c26b3e3ac008ecb8a75dfcac30b60ba788bd158507f04df1f41dee0233"
+      "sha256": "1a6740e4e045f272c3e0febe5ff23ee3cbc0fb50115c5a276da0729daf548caa"
     },
     {
       "path": "web/pio_agent.png",

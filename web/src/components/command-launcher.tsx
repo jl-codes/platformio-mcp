@@ -1,6 +1,7 @@
+/** Launch authorized dashboard commands with action-specific project and execution options. */
 import { dashboardActionFetch } from "../lib/dashboard-action";
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Switch, Button, message } from 'antd';
+import { Modal, Form, Select, Switch, InputNumber, message } from 'antd';
 import { CodeOutlined } from '@ant-design/icons';
 
 /**
@@ -84,9 +85,11 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
       const payload: any = { projectDir: activeWorkspace };
 
       if (values.environment) payload.environment = values.environment;
-      if (values.port) payload.port = values.port;
-      if (values.verbose !== undefined) payload.verbose = values.verbose;
-      if (values.start_monitor !== undefined) payload.start_monitor = values.start_monitor;
+      if (["upload_firmware", "upload_filesystem"].includes(values.action) && values.port) payload.port = values.port;
+      if (["build_project", "upload_firmware"].includes(values.action) && values.verbose !== undefined) payload.verbose = values.verbose;
+      if (values.action === "upload_firmware" && values.start_monitor !== undefined) payload.start_monitor = values.start_monitor;
+      if (values.action === "build_project" && values.jobs != null) payload.jobs = values.jobs;
+      if (values.action === "clean" && values.full !== undefined) payload.full = values.full;
 
       const res = await dashboardActionFetch(`${apiBase}${endpoint}`, {
         method: 'POST',
@@ -110,7 +113,7 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
     }
   };
 
-  const hasEnv = ['build_project', 'upload_firmware', 'upload_filesystem', 'run_tests', 'check_project'].includes(action);
+  const hasEnv = ['build_project', 'upload_firmware', 'upload_filesystem', 'run_tests', 'check_project', 'clean'].includes(action);
   const hasPort = ['upload_firmware', 'upload_filesystem'].includes(action);
   const hasVerbose = ['build_project', 'upload_firmware'].includes(action);
   const hasStartMonitor = ['upload_firmware'].includes(action);
@@ -149,6 +152,18 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
               {environments.length === 0 && <Select.Option value="">Auto-Detect / Default</Select.Option>}
               {environments.map(e => <Select.Option key={e} value={e}>{e}</Select.Option>)}
             </Select>
+          </Form.Item>
+        )}
+
+        {action === 'build_project' && (
+          <Form.Item name="jobs" label="Parallel build jobs" rules={[{ type: 'integer', min: 1, max: 1024 }]} extra="Leave empty to use PlatformIO's default.">
+            <InputNumber min={1} max={1024} step={1} placeholder="Default" style={{ width: '100%' }} />
+          </Form.Item>
+        )}
+
+        {action === 'clean' && (
+          <Form.Item name="full" label="Also remove downloaded dependencies" valuePropName="checked" preserve={false} extra="The next build may need to download dependencies again.">
+            <Switch />
           </Form.Item>
         )}
 

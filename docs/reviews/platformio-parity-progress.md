@@ -841,3 +841,8 @@ Added opt-in pio_build via canonical build_project authorization and shared impl
 
 Added optional jobs and forceExecution fields to build_project, and optional environment/full fields to clean_project, preserving existing required fields and omitted-option behavior. Shared build core forwards options under existing explicit/implicit locking. CLI build accepts --jobs and --force-execution; dashboard command API forwards build/cleanup options to shared executors. Runtime option validation rejects malformed booleans/counts before execution. These capabilities no longer require compatibility mode. TypeScript and six focused schema/core/executor checks passed; plugin rebuilt. No native command execution or distribution publication occurred.
 
+
+### Dashboard build and cleanup controls
+
+The launcher now exposes bounded parallel build jobs, environment selection for cleanup, and a labeled fullclean switch explaining dependency redownloads. The fullclean value resets when its control unmounts; outgoing job/full/port/verbose/monitor fields are restricted to applicable actions. Dashboard builds already execute in the background and bypass cached-result replay, so no redundant force control is shown. Frontend TypeScript and production build passed; plugin rebuilt with updated dashboard assets. Browser interaction/native execution acceptance remains separate. No smoke suite or publication was run.
+
