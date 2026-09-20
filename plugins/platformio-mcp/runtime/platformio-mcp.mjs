@@ -92659,7 +92659,7 @@ function withPowerCompatibility(base2, name2 = "pio_power_profile") {
   if (result.has(name2)) throw new Error(`Duplicate power tool: ${name2}`);
   result.set(name2, {
     name: name2,
-    description: "Collect bounded serial current samples or PPK2 meter windows. PPK2 requires explicit mode, voltage/current limits, meter port and DUT port plus configured PIO_MCP_PPK2_ENV. Source mode requires independent power permission. operation=list/cleanup inspects or retries this connection's retained meter cleanup. An owned serial trigger retains DUT custody through meter cleanup. Explicit multi-interface selection pins the observed interface set and retains whole-device exclusion; physical acceptance is pending.",
+    description: "Collect bounded serial current samples or PPK2 meter windows. PPK2 requires explicit mode, voltage/current limits, DUT port plus configured PIO_MCP_PPK2_ENV. An omitted meter port selects one matching PPK2 USB endpoint; ambiguous endpoints require explicit selection. Source mode requires independent power permission. operation=list/cleanup inspects or retries this connection's retained meter cleanup. An owned serial trigger retains DUT custody through meter cleanup. Explicit multi-interface selection pins the observed interface set and retains whole-device exclusion; physical acceptance is pending.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -95180,6 +95180,17 @@ function bindSerialDiscovery(endpoint, records, resolve, options = {}) {
 
 // src/core/power/power-serial-discovery.ts
 init_serial_endpoint();
+function selectPpk2Port(records, resolve = resolveSerialEndpoint) {
+  const candidates = records.filter(
+    (record2) => record2.vendorId?.toLowerCase() === "1915" && record2.productId?.toLowerCase() === "c00a"
+  );
+  if (candidates.length !== 1)
+    throw new PlatformIOError(
+      `${candidates.length} PPK2 endpoints found; select the meter port explicitly.`,
+      "POWER_DEVICE_SELECTION_REQUIRED"
+    );
+  return resolve(candidates[0].path).canonicalPort;
+}
 function bindPowerSerialDevice(port, records, enumerate, resolve = resolveSerialEndpoint) {
   const endpoint = resolve(port);
   const binding = bindSerialDiscovery(endpoint, records, resolve, {
@@ -95206,8 +95217,8 @@ function bindPowerSerialDevice(port, records, enumerate, resolve = resolveSerial
   };
 }
 async function withPowerSerialDiscovery(input, caller, execute3) {
-  const meter = resolveSerialEndpoint(input.meterPort), dut = resolveSerialEndpoint(input.dutPort);
-  if (meter.resource.identity === dut.resource.identity)
+  const meter = input.meterPort ? resolveSerialEndpoint(input.meterPort) : void 0, dut = resolveSerialEndpoint(input.dutPort);
+  if (meter?.resource.identity === dut.resource.identity)
     throw new PlatformIOError(
       "Meter and DUT ports must be distinct.",
       "POWER_BINDING_INVALID"
@@ -95217,7 +95228,8 @@ async function withPowerSerialDiscovery(input, caller, execute3) {
     "serial_startup_discovery",
     {
       projectDir,
-      meterPort: meter.canonicalPort,
+      meterPort: meter?.canonicalPort,
+      meterSelection: meter ? "explicit" : "unique_ppk2_usb_descriptor",
       dutPort: dut.canonicalPort,
       approvalId: input.approvalId,
       discoveryPurpose: "ppk2_meter_and_dut",
@@ -96973,7 +96985,7 @@ function projectPpk2PowerReport(report, input, analysisOptions = {}) {
 var Ppk2CompatibilitySchema = external_exports.object({
   source: external_exports.literal("ppk2"),
   project_dir: external_exports.string().min(1).max(32768).nullable().optional(),
-  port: external_exports.string().min(1).max(512),
+  port: external_exports.string().min(1).max(512).nullish(),
   dut_port: external_exports.string().min(1).max(512),
   mode: external_exports.enum(["ampere", "source"]),
   voltage_mv: external_exports.number().int().min(800).max(5e3),
@@ -97069,7 +97081,11 @@ var PowerMeterClient = class {
         const records = await read();
         this.assertOpen();
         guard();
-        const meter = bindPowerSerialDevice(params.port, records, read);
+        const meter = bindPowerSerialDevice(
+          params.port ?? selectPpk2Port(records),
+          records,
+          read
+        );
         const dut = bindPowerSerialDevice(params.dut_port, records, read);
         const request = {
           port: meter.port,

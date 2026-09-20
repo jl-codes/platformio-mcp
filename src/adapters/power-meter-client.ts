@@ -11,6 +11,7 @@ import type { PolicyEvaluationContext } from "../core/policy/types.js";
 import { resolvePpk2Environment } from "../core/power/ppk2-environment.js";
 import {
   bindPowerSerialDevice,
+  selectPpk2Port,
   withPowerSerialDiscovery,
 } from "../core/power/power-serial-discovery.js";
 import { AuthorizedPpk2Operation } from "../core/power/authorized-ppk2.js";
@@ -21,7 +22,7 @@ export const Ppk2CompatibilitySchema = z
   .object({
     source: z.literal("ppk2"),
     project_dir: z.string().min(1).max(32768).nullable().optional(),
-    port: z.string().min(1).max(512),
+    port: z.string().min(1).max(512).nullish(),
     dut_port: z.string().min(1).max(512),
     mode: z.enum(["ampere", "source"]),
     voltage_mv: z.number().int().min(800).max(5000),
@@ -144,7 +145,11 @@ export class PowerMeterClient {
         const records = await read();
         this.assertOpen();
         guard();
-        const meter = bindPowerSerialDevice(params.port, records, read);
+        const meter = bindPowerSerialDevice(
+          params.port ?? selectPpk2Port(records),
+          records,
+          read,
+        );
         const dut = bindPowerSerialDevice(params.dut_port, records, read);
         const request = {
           port: meter.port,

@@ -2,6 +2,7 @@
 import type { AuthorizedPpk2Options } from "../src/core/power/authorized-ppk2.js";
 import { beforeEach, expect, it, vi } from "vitest";
 const fixture = vi.hoisted(() => ({
+  selection: vi.fn(),
   collect: vi.fn(),
   cleanup: vi.fn(),
   pending: true,
@@ -14,6 +15,7 @@ vi.mock("../src/core/power/ppk2-environment.js", () => ({
   resolvePpk2Environment: async () => ({ pythonExecutable: "/host/python" }),
 }));
 vi.mock("../src/core/power/power-serial-discovery.js", () => ({
+  selectPpk2Port: fixture.selection,
   withPowerSerialDiscovery: async (
     _input: unknown,
     _caller: unknown,
@@ -175,4 +177,27 @@ it("transfers monitor custody to retained failed cleanup without releasing it at
   expect(error.context.cleanupPending).toBe(true);
   expect(hold.releaseAfterExit).not.toHaveBeenCalled();
   await client.cleanup(error.context.powerOperationId);
+});
+
+it("binds the discovered meter before authorizing or collecting", async () => {
+  fixture.selection.mockReturnValue("discovered-meter");
+  const client = new PowerMeterClient();
+  await client.run({ ...input, port: undefined }, {}, {});
+  expect(fixture.options.request.port).toBe("discovered-meter");
+  expect(fixture.options.meter.resources).toContainEqual({
+    kind: "serial",
+    identity: "discovered-meter",
+  });
+  await client.close();
+});
+it("never collects when automatic selection is ambiguous", async () => {
+  fixture.selection.mockImplementation(() => {
+    throw new PlatformIOError("select", "POWER_DEVICE_SELECTION_REQUIRED");
+  });
+  const client = new PowerMeterClient();
+  await expect(
+    client.run({ ...input, port: null }, {}, {}),
+  ).rejects.toMatchObject({ code: "POWER_DEVICE_SELECTION_REQUIRED" });
+  expect(fixture.collect).not.toHaveBeenCalled();
+  await client.close();
 });

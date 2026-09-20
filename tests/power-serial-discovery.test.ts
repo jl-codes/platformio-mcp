@@ -1,6 +1,9 @@
 /** Power bindings share serial exclusion identities and recheck them before startup. */
 import { expect, it, vi } from "vitest";
-import { bindPowerSerialDevice } from "../src/core/power/power-serial-discovery.js";
+import {
+  bindPowerSerialDevice,
+  selectPpk2Port,
+} from "../src/core/power/power-serial-discovery.js";
 import { resolveSerialEndpoint } from "../src/core/devices/serial-endpoint.js";
 import { bindSerialDiscovery } from "../src/core/devices/serial-discovery-binding.js";
 const resolve = (port: string) =>
@@ -79,4 +82,21 @@ it("pins an explicitly selected interface while retaining the same whole-device 
       expect.objectContaining({ code: "SERIAL_DEVICE_CHANGED" }),
     );
   }
+});
+
+it("selects exactly one PPK2 among unrelated USB devices", () => {
+  expect(
+    selectPpk2Port(
+      [record, { ...record, path: "COM9", productId: "0001" }],
+      resolve,
+    ),
+  ).toBe("COM42");
+  for (const records of [
+    [],
+    [{ ...record, productId: "0001" }],
+    [record, { ...record, path: "COM43" }],
+  ])
+    expect(() => selectPpk2Port(records, resolve)).toThrow(
+      expect.objectContaining({ code: "POWER_DEVICE_SELECTION_REQUIRED" }),
+    );
 });

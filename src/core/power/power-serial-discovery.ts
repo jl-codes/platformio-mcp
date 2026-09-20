@@ -12,6 +12,24 @@ import {
 import { resolveSerialEndpoint } from "../devices/serial-endpoint.js";
 import type { PowerCustodyBinding } from "./power-device-custody.js";
 
+/** Select one observed Nordic PPK2 endpoint; descriptors are discovery hints, never authentication. */
+export function selectPpk2Port(
+  records: readonly SerialDiscoveryRecord[],
+  resolve = resolveSerialEndpoint,
+): string {
+  const candidates = records.filter(
+    (record) =>
+      record.vendorId?.toLowerCase() === "1915" &&
+      record.productId?.toLowerCase() === "c00a",
+  );
+  if (candidates.length !== 1)
+    throw new PlatformIOError(
+      `${candidates.length} PPK2 endpoints found; select the meter port explicitly.`,
+      "POWER_DEVICE_SELECTION_REQUIRED",
+    );
+  return resolve(candidates[0]!.path).canonicalPort;
+}
+
 /** Bind an explicit port to host-observed USB metadata; this does not identify its model or prove DUT wiring. */
 export function bindPowerSerialDevice(
   port: string,
@@ -48,7 +66,7 @@ export function bindPowerSerialDevice(
 export async function withPowerSerialDiscovery<T>(
   input: {
     projectDir: string;
-    meterPort: string;
+    meterPort?: string | null;
     dutPort: string;
     approvalId?: string;
   },
@@ -58,9 +76,11 @@ export async function withPowerSerialDiscovery<T>(
   ) => Promise<T>,
 ) {
   // Endpoint normalization validates bounded port syntax without opening either device.
-  const meter = resolveSerialEndpoint(input.meterPort),
+  const meter = input.meterPort
+      ? resolveSerialEndpoint(input.meterPort)
+      : undefined,
     dut = resolveSerialEndpoint(input.dutPort);
-  if (meter.resource.identity === dut.resource.identity)
+  if (meter?.resource.identity === dut.resource.identity)
     throw new PlatformIOError(
       "Meter and DUT ports must be distinct.",
       "POWER_BINDING_INVALID",
@@ -70,7 +90,8 @@ export async function withPowerSerialDiscovery<T>(
     "serial_startup_discovery",
     {
       projectDir,
-      meterPort: meter.canonicalPort,
+      meterPort: meter?.canonicalPort,
+      meterSelection: meter ? "explicit" : "unique_ppk2_usb_descriptor",
       dutPort: dut.canonicalPort,
       approvalId: input.approvalId,
       discoveryPurpose: "ppk2_meter_and_dut",
