@@ -325,3 +325,54 @@ describe("redacted serial buffer", () => {
     ).toBeLessThanOrEqual(12);
   });
 });
+
+it("reference reads find a completed match beyond the response limit without advancing past returned lines", async () => {
+  const buffer = new SerialSessionBuffer();
+  put(buffer, "one\ntwo\nREADY\nafter\n");
+  expect(
+    await buffer.read({
+      referenceSemantics: true,
+      waitFor: "^READY$",
+      patternOptions: { mode: "regex" },
+      maxLines: 1,
+    }),
+  ).toMatchObject({
+    lines: ["one"],
+    cursor: 1,
+    matched: true,
+    matchedLine: 2,
+    moreAvailable: true,
+  });
+  expect(
+    await buffer.read({
+      referenceSemantics: true,
+      waitFor: "^READY$",
+      patternOptions: { mode: "regex" },
+      maxLines: 10,
+    }),
+  ).toMatchObject({
+    lines: ["one", "two", "READY"],
+    cursor: 3,
+    matchedLine: 2,
+    moreAvailable: true,
+  });
+});
+it("reference reads exclude partial lines from matching and retain eviction accounting", async () => {
+  const buffer = new SerialSessionBuffer({ maxLines: 2 });
+  put(buffer, "lost\nsecond\nthird\nREADY");
+  expect(
+    await buffer.read({
+      referenceSemantics: true,
+      waitFor: "READY",
+      patternOptions: { mode: "regex" },
+      maxLines: 10,
+    }),
+  ).toMatchObject({
+    lines: ["second", "third"],
+    cursor: 3,
+    droppedLines: 1,
+    matched: false,
+    matchedLine: null,
+    partial: "READY",
+  });
+});

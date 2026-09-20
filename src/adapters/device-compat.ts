@@ -62,6 +62,59 @@ export async function executeDeviceCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_monitor_read") {
+    const params = z
+      .object({
+        session_id: z.string().min(1).max(256),
+        cursor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+        max_lines: z.number().int().min(1).max(10000).default(200),
+        wait_for: z.string().max(4096).nullable().optional(),
+        timeout_s: z.number().finite().default(10),
+        approval_id: z.string().max(256).optional(),
+      })
+      .strict()
+      .parse(input);
+    return client.run(
+      { caller, approvalId: params.approval_id },
+      async (service, owner) => {
+        const result = await service.sessions.read(owner, params.session_id, {
+          cursor: params.cursor,
+          maxLines: params.max_lines,
+          timeoutMs: Math.round(
+            Math.max(0, Math.min(params.timeout_s, 120)) * 1000,
+          ),
+          waitFor: params.wait_for || undefined,
+          patternOptions: { mode: "regex", pythonNamedGroups: true },
+          referenceSemantics: true,
+        });
+        const closed = result.state !== "open";
+        let summary = params.wait_for
+          ? `pattern ${result.matched ? "matched" : `not matched within ${params.timeout_s}s`}; ${result.lines.length} new line(s). Next cursor ${result.cursor}.`
+          : `${result.lines.length} new line(s); next cursor ${result.cursor}.` +
+            (result.moreAvailable ? " More available, read again." : "");
+        if (result.droppedLines)
+          summary += ` ${result.droppedLines} older line(s) fell out of the buffer.`;
+        if (closed)
+          summary += ` Session closed${result.error ? `: ${result.error}` : ""}.`;
+        return {
+          ok: true,
+          summary,
+          session_id: params.session_id,
+          lines: result.lines,
+          cursor: result.cursor,
+          dropped_before_cursor: result.droppedLines,
+          more_available: result.moreAvailable,
+          matched: result.matched,
+          matched_line: result.matchedLine ?? null,
+          partial_line: result.partial,
+          closed,
+          error: result.error ?? null,
+          redaction_applied: result.redactionApplied,
+          truncated_bytes: result.totalTruncatedBytes,
+        };
+      },
+    );
+  }
   if (name === "pio_monitor_write") {
     const params = z
       .object({
@@ -201,6 +254,36 @@ export function withDeviceCompatibility<TResult>(
       additionalProperties: false,
     },
     handler: (args, context) => context.dispatch("pio_list_devices", args),
+  });
+  const readSource = base.get("query_logs");
+  if (!readSource || result.has("pio_monitor_read"))
+    throw new Error("Invalid serial read compatibility registry");
+  result.set("pio_monitor_read", {
+    ...readSource,
+    name: "pio_monitor_read",
+    policyAction: "serial_session_read",
+    annotations: { ...readSource.annotations, title: "Read Monitor" },
+    description:
+      "Read an owned monitor with cursors and bounded Python-compatible regex matching on completed lines. Maximum wait 120 seconds; response and storage byte limits apply.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        session_id: { type: "string", minLength: 1, maxLength: 256 },
+        cursor: { type: "integer", minimum: 0, default: 0 },
+        max_lines: {
+          type: "integer",
+          minimum: 1,
+          maximum: 10000,
+          default: 200,
+        },
+        wait_for: { type: ["string", "null"], maxLength: 4096 },
+        timeout_s: { type: "number", default: 10 },
+        approval_id: { type: "string", maxLength: 256 },
+      },
+      required: ["session_id"],
+      additionalProperties: false,
+    },
+    handler: (args, context) => context.dispatch("pio_monitor_read", args),
   });
   const writeSource = base.get("upload_firmware");
   if (!writeSource || result.has("pio_monitor_write"))

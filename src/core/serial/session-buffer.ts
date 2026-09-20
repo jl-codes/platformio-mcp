@@ -28,6 +28,7 @@ export interface SerialReadOptions {
     "mode" | "ignoreCase" | "pythonNamedGroups"
   >;
   signal?: AbortSignal;
+  referenceSemantics?: boolean; // Compatibility reads match completed lines before applying the response limit.
 }
 /** A consistent bounded view; terminal state and cursor loss are independent of read outcome. */
 export interface SerialBufferRead {
@@ -54,6 +55,7 @@ export interface SerialBufferRead {
     | "closed"
     | "cancelled";
   matched: boolean;
+  matchedLine?: number | null; // Absolute cursor of the first completed line matched by compatibility reads.
   receivedBytes: number;
   totalDroppedLines: number;
   totalDroppedBytes: number; // Evicted retained UTF-8 text, excluding line terminators.
@@ -271,6 +273,7 @@ export class SerialSessionBuffer {
    * deadline can extend the read deadline. Matcher failure remains an explicit error.
    */
   async read(options: SerialReadOptions = {}): Promise<SerialBufferRead> {
+    if (options.referenceSemantics) return this.readReference(options);
     const timeout = boundedInteger(
       options.timeoutMs ?? 0,
       0,
@@ -339,6 +342,97 @@ export class SerialSessionBuffer {
       if (remaining <= 0)
         return result(view, timeout > 0 ? "timeout" : view.readStatus);
       await this.waitForChange(revision, remaining, options.signal);
+    }
+  }
+
+  /** Match a stable bounded retained snapshot before limiting returned lines, as the reference API does. */
+  private async readReference(
+    options: SerialReadOptions,
+  ): Promise<SerialBufferRead> {
+    const timeout = boundedInteger(
+      options.timeoutMs ?? 0,
+      0,
+      120000,
+      "timeoutMs",
+    );
+    const deadline = performance.now() + timeout;
+    while (true) {
+      const revision = this.revision;
+      const view = this.snapshot(options);
+      const first = Math.max(options.cursor ?? 0, view.firstAvailableCursor);
+      // Copy a coherent view before yielding to the regex worker. Storage itself is capped at 8 MiB.
+      const rows: string[] = [];
+      for (
+        let offset = first - view.firstAvailableCursor;
+        offset < this.count;
+        offset++
+      ) {
+        rows.push(this.ring[(this.head + offset) % this.capacity]!.text);
+      }
+      let matchedLine: number | null = null;
+      if (options.waitFor && !options.signal?.aborted) {
+        for (let offset = 0; offset < rows.length; ) {
+          const start = offset;
+          let bytes = 0;
+          const batch: string[] = [];
+          while (
+            offset < rows.length &&
+            bytes + Buffer.byteLength(rows[offset]!) <= 1024 * 1024
+          ) {
+            const line = rows[offset++]!;
+            batch.push(line);
+            bytes += Buffer.byteLength(line);
+          }
+          const matches = await matchBoundedLines(batch, options.waitFor, {
+            ...options.patternOptions,
+            timeoutMs: 1000,
+          });
+          if (matches.length) {
+            matchedLine = first + start + matches[0]!;
+            break;
+          }
+          if (options.signal?.aborted) break;
+        }
+      }
+      const cancelled = !!options.signal?.aborted;
+      const matched = matchedLine !== null;
+      const expired = performance.now() >= deadline;
+      if (
+        cancelled ||
+        matched ||
+        view.state !== "open" ||
+        expired ||
+        (!options.waitFor && rows.length > 0)
+      ) {
+        const count = matched
+          ? Math.min(view.lines.length, matchedLine! - first + 1)
+          : view.lines.length;
+        const cursor = first + count;
+        return {
+          ...view,
+          lines: view.lines.slice(0, count),
+          lineTruncatedBytes: view.lineTruncatedBytes.slice(0, count),
+          cursor,
+          moreAvailable: view.moreAvailable || cursor < view.latestCursor,
+          matched,
+          matchedLine,
+          readStatus: cancelled
+            ? "cancelled"
+            : matched
+              ? "matched"
+              : view.state !== "open"
+                ? "closed"
+                : expired && timeout > 0
+                  ? "timeout"
+                  : view.readStatus,
+        };
+      }
+      if (revision !== this.revision) continue;
+      await this.waitForChange(
+        revision,
+        Math.max(0, deadline - performance.now()),
+        options.signal,
+      );
     }
   }
 
