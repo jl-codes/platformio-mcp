@@ -2067,3 +2067,7 @@ Added port-diagnose through the existing authorized diagnostics adapter and extr
 ### Shared-schema test integration (2026-09-20)
 
 CI run 35532658887 exposed a legacy complete module mock in flash-verification-compat.test.ts that omitted MonitorStartCompatibilitySchema after memory validation moved to a module-level shared export. Updated it to retain actual schema exports while mocking only monitor resolution. This preserves validation and hardware isolation. The affected flash and existing power partial-mock suites were rerun; no production behavior or release gate was weakened.
+
+### Published GitHub alias landing pages (2026-09-20)
+
+Verified the authenticated GitHub identity is jl-codes and the canonical repository grants ADMIN. Created six previously absent public, useful landing repositories for pio-mcp, platformio.mcp, pio-agent, platformiomcp, pioagent and flashagent. Each links to canonical source, installation documentation, releases and issues; no separate runtime or release stream is claimed. Verified repository ownership/public status and exact README bytes after publication, recording repository IDs and blob hashes in github-alias-publication.json. An initial text comparison differed because of Windows newline normalization; byte comparison verified the actual published content. Added the controlled identities to the namespace inventory. No npm, PyPI, GHCR or MCP runtime release was published, and final-release/hardware gates remain unchanged.

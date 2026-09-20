@@ -1,0 +1,60 @@
+{
+  "observedAt": "2026-09-20T19:42:34.626134+00:00",
+  "scope": "Official GitHub landing repositories only; not npm/PyPI ownership or runtime release publication.",
+  "repositories": [
+    {
+      "name": "jl-codes/pio-mcp",
+      "url": "https://github.com/jl-codes/pio-mcp",
+      "repositoryId": 1378715067,
+      "private": false,
+      "readmeBlobSha": "fc63b1099ac0581c64f8f69e20ce6a8610e10327",
+      "canonicalSource": "https://github.com/jl-codes/platformio-mcp",
+      "verifiedVia": "GitHub metadata and exact README bytes"
+    },
+    {
+      "name": "jl-codes/platformio.mcp",
+      "url": "https://github.com/jl-codes/platformio.mcp",
+      "repositoryId": 1378715115,
+      "private": false,
+      "readmeBlobSha": "980dfdb41f6f473f7f99c832bd8b4e8fb7f2f9e1",
+      "canonicalSource": "https://github.com/jl-codes/platformio-mcp",
+      "verifiedVia": "GitHub metadata and exact README bytes"
+    },
+    {
+      "name": "jl-codes/pio-agent",
+      "url": "https://github.com/jl-codes/pio-agent",
+      "repositoryId": 1378715164,
+      "private": false,
+      "readmeBlobSha": "919e3dd40077c9cf498c1b5a528c1cc6f719ba00",
+      "canonicalSource": "https://github.com/jl-codes/platformio-mcp",
+      "verifiedVia": "GitHub metadata and exact README bytes"
+    },
+    {
+      "name": "jl-codes/platformiomcp",
+      "url": "https://github.com/jl-codes/platformiomcp",
+      "repositoryId": 1378715205,
+      "private": false,
+      "readmeBlobSha": "cd7a1154c618733c3c37b49ae8f328b936fb8b20",
+      "canonicalSource": "https://github.com/jl-codes/platformio-mcp",
+      "verifiedVia": "GitHub metadata and exact README bytes"
+    },
+    {
+      "name": "jl-codes/pioagent",
+      "url": "https://github.com/jl-codes/pioagent",
+      "repositoryId": 1378715245,
+      "private": false,
+      "readmeBlobSha": "27fb4d1d4d28bb080fb624a68e41894393c1d70e",
+      "canonicalSource": "https://github.com/jl-codes/platformio-mcp",
+      "verifiedVia": "GitHub metadata and exact README bytes"
+    },
+    {
+      "name": "jl-codes/flashagent",
+      "url": "https://github.com/jl-codes/flashagent",
+      "repositoryId": 1378715300,
+      "private": false,
+      "readmeBlobSha": "dc88413341cadae2743bd2755f8c3dcb84d9911f",
+      "canonicalSource": "https://github.com/jl-codes/platformio-mcp",
+      "verifiedVia": "GitHub metadata and exact README bytes"
+    }
+  ]
+}

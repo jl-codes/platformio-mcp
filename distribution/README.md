@@ -38,3 +38,12 @@ optional backend dependencies, explicit installation steps, and implementation
 limits. It is a declaration, not an installed-dependency probe or a hardware
 acceptance certificate. npm ships the plugin runtime; Python staging copies the
 same runtime, and containers install those wheels.
+
+GitHub alias landing pages are now published under `jl-codes` for `pio-mcp`,
+`platformio.mcp`, `pio-agent`, `platformiomcp`, `pioagent`, and `flashagent`.
+Together with the canonical repository, these cover all seven requested names
+under this GitHub owner. Each page directs users to canonical source and
+installation instructions; none is a separate runtime release. Exact repository
+IDs and README blob hashes are recorded in
+`docs/reviews/github-alias-publication.json`. This does not reserve the same names
+under other GitHub owners or on package registries.

@@ -366,6 +366,60 @@
       "publishIntent": false,
       "source": "https://github.com/jl-codes/platformio-mcp",
       "reason": "Additional same-image alias candidate; eligibility, authority and public digest verification remain pending."
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/pio-mcp",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/platformio.mcp",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/pio-agent",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/platformiomcp",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/pioagent",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/flashagent",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
     }
   ],
   "unsupportedChannels": [
