@@ -33,25 +33,50 @@ const WORKER_SOURCE = `
 const {parentPort,workerData}=require('node:worker_threads');
 parentPort.once('message', () => {
 try {
-  const regex=new RegExp(workerData.pattern,workerData.ignoreCase?'i':'');
-  const indices=[];
-  for(let index=0;index<workerData.lines.length;index++) {
-    if(regex.test(workerData.lines[index])) indices.push(index);
+  const regex=new RegExp(workerData.pattern,(workerData.ignoreCase?'i':'')+(workerData.extract?'g':''));
+  if(workerData.extract) {
+    const probe=new RegExp('(?:'+workerData.pattern+')|').exec('');
+    if(!probe?.groups || !Object.hasOwn(probe.groups,'value')) throw new Error('missing value group');
   }
-  parentPort.postMessage({indices});
+  const indices=[]; const captures=[];
+  for(let index=0;index<workerData.lines.length;index++) {
+    if(!workerData.extract) { if(regex.test(workerData.lines[index])) indices.push(index); continue; }
+    regex.lastIndex=0;
+    let match;
+    while((match=regex.exec(workerData.lines[index]))!==null) {
+      if(match.groups.value!==undefined) {
+        const value=match.groups.value; const name=match.groups.name;
+        if(captures.length>=10000 || value.length>128 || (name!==undefined && name.length>128)) { parentPort.postMessage({limit:true}); return; }
+        captures.push({line:index,value,...(name!==undefined?{name}:{})});
+      }
+      if(match[0].length===0) regex.lastIndex++;
+    }
+  }
+  parentPort.postMessage({indices,captures});
 } catch {parentPort.postMessage({invalid:true});}
 });
 parentPort.postMessage({ready:true});
 `;
 
+/** Named capture evidence retained without raw line text. */
+export interface BoundedCapture {
+  line: number;
+  value: string;
+  name?: string;
+}
+interface PatternResult {
+  indices: number[];
+  captures: BoundedCapture[];
+}
 let activeRegexWorkers = 0;
 
 /** Returns matching line indices, failing explicitly on timeout rather than returning partial matches. */
-export async function matchBoundedLines(
+async function runBoundedPattern(
   lines: readonly string[],
   pattern: string,
   options: PatternOptions = {},
-): Promise<number[]> {
+  extract = false,
+): Promise<PatternResult> {
   if (
     typeof pattern !== "string" ||
     pattern.length > 4096 ||
@@ -75,11 +100,14 @@ export async function matchBoundedLines(
     );
   if ((options.mode ?? "literal") === "literal") {
     const needle = options.ignoreCase ? pattern.toLowerCase() : pattern;
-    return lines.flatMap((line, index) =>
-      (options.ignoreCase ? line.toLowerCase() : line).includes(needle)
-        ? [index]
-        : [],
-    );
+    return {
+      captures: [],
+      indices: lines.flatMap((line, index) =>
+        (options.ignoreCase ? line.toLowerCase() : line).includes(needle)
+          ? [index]
+          : [],
+      ),
+    };
   }
   const timeoutMs = options.timeoutMs ?? 1000;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2000)
@@ -100,6 +128,7 @@ export async function matchBoundedLines(
         lines,
         pattern: source,
         ignoreCase: options.ignoreCase ?? false,
+        extract,
       },
       resourceLimits: {
         maxOldGenerationSizeMb: 32,
@@ -111,7 +140,7 @@ export async function matchBoundedLines(
     let settled = false;
     let executing = false;
     let timer: ReturnType<typeof setTimeout>;
-    const finish = (error?: Error, indices?: number[]) => {
+    const finish = (error?: Error, result?: PatternResult) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -122,7 +151,7 @@ export async function matchBoundedLines(
         })
         .then(() => {
           if (error) reject(error);
-          else resolve(indices!);
+          else resolve(result!);
         }, reject);
     };
     timer = setTimeout(
@@ -137,7 +166,13 @@ export async function matchBoundedLines(
     );
     worker.on(
       "message",
-      (message: { ready?: boolean; invalid?: boolean; indices?: number[] }) => {
+      (message: {
+        ready?: boolean;
+        invalid?: boolean;
+        indices?: number[];
+        captures?: BoundedCapture[];
+        limit?: boolean;
+      }) => {
         if (settled) return;
         if (message.ready) {
           if (executing) return;
@@ -165,13 +200,18 @@ export async function matchBoundedLines(
             ),
           );
         finish(
-          message.invalid
+          message.limit
             ? new PlatformIOError(
-                "Invalid or unsupported regular expression.",
-                "PATTERN_INVALID",
+                "Named capture output exceeds limits.",
+                "PATTERN_OUTPUT_LIMIT",
               )
-            : undefined,
-          message.indices,
+            : message.invalid
+              ? new PlatformIOError(
+                  "Invalid or unsupported regular expression.",
+                  "PATTERN_INVALID",
+                )
+              : undefined,
+          { indices: message.indices ?? [], captures: message.captures ?? [] },
         );
       },
     );
@@ -190,4 +230,23 @@ export async function matchBoundedLines(
         );
     });
   });
+}
+
+/** Return matching line indices using the shared bounded execution worker. */
+export async function matchBoundedLines(
+  lines: readonly string[],
+  pattern: string,
+  options: PatternOptions = {},
+): Promise<number[]> {
+  return (await runBoundedPattern(lines, pattern, options)).indices;
+}
+/** Extract named value/name captures in the same bounded worker; never execute user regex on the server thread. */
+export async function extractBoundedCaptures(
+  lines: readonly string[],
+  pattern: string,
+  options: Omit<PatternOptions, "mode"> = {},
+): Promise<BoundedCapture[]> {
+  return (
+    await runBoundedPattern(lines, pattern, { ...options, mode: "regex" }, true)
+  ).captures;
 }

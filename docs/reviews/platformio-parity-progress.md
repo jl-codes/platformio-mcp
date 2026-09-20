@@ -553,3 +553,9 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Added report aggregation for parsed metrics/tasks with line-matched timestamps, 200 displayed samples, explicit truncation and unknown-unit counts. Stack thresholds apply only to byte-valued observations; fragmentation requires free/largest values from the same line. Task inventory is bounded to 256.
 - TypeScript compilation and 14 telemetry/report tests passed. Public serial capture, custom patterns and remaining format/compatibility acceptance remain open. No hardware execution or release publication occurred.
+
+### Bounded custom telemetry capture foundation
+
+- Extended the existing worker boundary to extract named value/name groups, preserving four-worker capacity, startup/execution deadlines and termination-before-resolution. Limits: 10000 captures and 128 characters per selected group. Missing value groups and oversized output fail explicitly. Literal/regex line matching retains its existing public contract.
+- TypeScript compilation and 14 matching/lifecycle/capture tests passed, including supported Python group translation and pathological expression timeout. Plugin and three npm archive validations passed after rebuilding shared-worker runtime.
+- Custom captures are not yet connected to memory reports; report merge/units and serial/public integration remain open.

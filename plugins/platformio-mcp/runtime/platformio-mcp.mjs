@@ -22596,7 +22596,7 @@ function regexSource(pattern, translate) {
   }
   return pattern.replace(/\(\?P<([A-Za-z_][A-Za-z0-9_]*)>/g, "(?<$1>").replace(/\(\?P=([A-Za-z_][A-Za-z0-9_]*)\)/g, "\\k<$1>");
 }
-async function matchBoundedLines(lines2, pattern, options = {}) {
+async function runBoundedPattern(lines2, pattern, options = {}, extract = false) {
   if (typeof pattern !== "string" || pattern.length > 4096 || lines2.length > 1e4 || lines2.some((line) => typeof line !== "string") || lines2.reduce((sum, line) => sum + Buffer.byteLength(line), 0) > 1024 * 1024) {
     throw new PlatformIOError(
       "Pattern matching is limited to 4096 pattern characters, 10000 lines and 1 MiB of input.",
@@ -22610,9 +22610,12 @@ async function matchBoundedLines(lines2, pattern, options = {}) {
     );
   if ((options.mode ?? "literal") === "literal") {
     const needle = options.ignoreCase ? pattern.toLowerCase() : pattern;
-    return lines2.flatMap(
-      (line, index) => (options.ignoreCase ? line.toLowerCase() : line).includes(needle) ? [index] : []
-    );
+    return {
+      captures: [],
+      indices: lines2.flatMap(
+        (line, index) => (options.ignoreCase ? line.toLowerCase() : line).includes(needle) ? [index] : []
+      )
+    };
   }
   const timeoutMs = options.timeoutMs ?? 1e3;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2e3)
@@ -22632,7 +22635,8 @@ async function matchBoundedLines(lines2, pattern, options = {}) {
       workerData: {
         lines: lines2,
         pattern: source,
-        ignoreCase: options.ignoreCase ?? false
+        ignoreCase: options.ignoreCase ?? false,
+        extract
       },
       resourceLimits: {
         maxOldGenerationSizeMb: 32,
@@ -22644,7 +22648,7 @@ async function matchBoundedLines(lines2, pattern, options = {}) {
     let settled = false;
     let executing = false;
     let timer;
-    const finish = (error2, indices) => {
+    const finish = (error2, result) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -22652,7 +22656,7 @@ async function matchBoundedLines(lines2, pattern, options = {}) {
         activeRegexWorkers--;
       }).then(() => {
         if (error2) reject(error2);
-        else resolve(indices);
+        else resolve(result);
       }, reject);
     };
     timer = setTimeout(
@@ -22692,11 +22696,14 @@ async function matchBoundedLines(lines2, pattern, options = {}) {
             )
           );
         finish(
-          message.invalid ? new PlatformIOError(
+          message.limit ? new PlatformIOError(
+            "Named capture output exceeds limits.",
+            "PATTERN_OUTPUT_LIMIT"
+          ) : message.invalid ? new PlatformIOError(
             "Invalid or unsupported regular expression.",
             "PATTERN_INVALID"
           ) : void 0,
-          message.indices
+          { indices: message.indices ?? [], captures: message.captures ?? [] }
         );
       }
     );
@@ -22717,6 +22724,9 @@ async function matchBoundedLines(lines2, pattern, options = {}) {
     });
   });
 }
+async function matchBoundedLines(lines2, pattern, options = {}) {
+  return (await runBoundedPattern(lines2, pattern, options)).indices;
+}
 var WORKER_SOURCE, activeRegexWorkers;
 var init_bounded_pattern = __esm({
   "src/core/bounded-pattern.ts"() {
@@ -22726,12 +22736,26 @@ var init_bounded_pattern = __esm({
 const {parentPort,workerData}=require('node:worker_threads');
 parentPort.once('message', () => {
 try {
-  const regex=new RegExp(workerData.pattern,workerData.ignoreCase?'i':'');
-  const indices=[];
-  for(let index=0;index<workerData.lines.length;index++) {
-    if(regex.test(workerData.lines[index])) indices.push(index);
+  const regex=new RegExp(workerData.pattern,(workerData.ignoreCase?'i':'')+(workerData.extract?'g':''));
+  if(workerData.extract) {
+    const probe=new RegExp('(?:'+workerData.pattern+')|').exec('');
+    if(!probe?.groups || !Object.hasOwn(probe.groups,'value')) throw new Error('missing value group');
   }
-  parentPort.postMessage({indices});
+  const indices=[]; const captures=[];
+  for(let index=0;index<workerData.lines.length;index++) {
+    if(!workerData.extract) { if(regex.test(workerData.lines[index])) indices.push(index); continue; }
+    regex.lastIndex=0;
+    let match;
+    while((match=regex.exec(workerData.lines[index]))!==null) {
+      if(match.groups.value!==undefined) {
+        const value=match.groups.value; const name=match.groups.name;
+        if(captures.length>=10000 || value.length>128 || (name!==undefined && name.length>128)) { parentPort.postMessage({limit:true}); return; }
+        captures.push({line:index,value,...(name!==undefined?{name}:{})});
+      }
+      if(match[0].length===0) regex.lastIndex++;
+    }
+  }
+  parentPort.postMessage({indices,captures});
 } catch {parentPort.postMessage({invalid:true});}
 });
 parentPort.postMessage({ready:true});
