@@ -7,7 +7,9 @@ import { DeviceLeaseStore } from "../src/core/devices/device-lease.js";
 import { ProcessCustodySequence } from "../src/core/devices/process-custody-sequence.js";
 
 it("keeps a real lease held between capture and upload, releasing it only after both close", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-sequence-"));
+  const root = fs.mkdtempSync(
+    path.join(fs.realpathSync(os.tmpdir()), "pio-sequence-"),
+  );
   try {
     const store = new DeviceLeaseStore({
       root,
