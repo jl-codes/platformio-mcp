@@ -34,6 +34,7 @@ export interface PreparedDebuggerStartup {
   trustedDebuggerRoots: readonly string[];
   target: Omit<DebugTargetSelection, "projectDir" | "sessionId">;
   approvalId?: string;
+  probeIdentity?: string; // Host-discovered physical resource, included in startup and approval identity.
   initialization?: {
     template: string;
     hostApprovalId?: string;
@@ -89,6 +90,7 @@ export function startPreparedDebugger(
         port: selection.target.port,
         load: selection.target.load,
         timeoutMs: selection.target.timeoutMs ?? 90000,
+        probeIdentity: selection.probeIdentity,
         backend: backendScope,
         initialization: initDescriptor,
         beforeLoadCommands: selection.target.beforeLoadCommands?.map((entry) =>
@@ -129,6 +131,7 @@ export function startPreparedDebugger(
         host: target.host,
         port: target.port,
         load: target.load,
+        probeIdentity: selection.probeIdentity,
         backend: backendScope,
         initialization: initDescriptor,
         approvalId: selection.approvalId,

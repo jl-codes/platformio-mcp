@@ -23,7 +23,10 @@ export async function acquireDebugProbeCustody(
         productId: selected.probe.productId,
         serialNumber: selected.probe.serialNumber,
       });
-      if (observed.resource.identity !== selected.resource.identity)
+      if (
+        observed.resource.identity !== selected.resource.identity ||
+        observed.probe.location !== selected.probe.location
+      )
         throw new PlatformIOError(
           "Selected debug probe changed before startup.",
           "DEBUG_PROBE_CHANGED",

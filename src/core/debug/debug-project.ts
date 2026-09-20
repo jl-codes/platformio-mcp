@@ -194,6 +194,7 @@ export async function prepareDebuggerProject(
     return {
       projectDir,
       environment: selected.environment,
+      load: args.load,
       configuration,
       executable,
       trustedDebuggerRoots,
