@@ -172,5 +172,10 @@ export async function resolveBuildPartitionInputs(
       "Selected partition binary is absent from the environment's flash images.",
       "PARTITION_METADATA_MISMATCH",
     );
-  return { tablePath: selected, offsetEvidence: evidence, environment };
+  return {
+    tablePath: selected,
+    offsetEvidence: evidence,
+    environment,
+    frameworkCandidates: entry.partitionFrameworkCandidates,
+  };
 }

@@ -370,7 +370,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
 
   try {
     if (command === "partition-table") {
-      const allowed = new Set(["json", "project-dir", "table-path", "format", "table-offset", "sdkconfig-path", "read-device", "port", "read-approval-id", "command-approval-id", "build-metadata", "metadata-approval-id", "environment", "config-approval-id", "flash-size", "firmware-path", "observed-table-path", "approval-id"]);
+      const allowed = new Set(["json", "project-dir", "table-path", "format", "table-offset", "sdkconfig-path", "read-device", "port", "read-approval-id", "command-approval-id", "build-metadata", "metadata-approval-id", "system-approval-id", "environment", "config-approval-id", "flash-size", "firmware-path", "observed-table-path", "approval-id"]);
       if (positionals.length || Object.keys(options).some((key) => !allowed.has(key)))
         throw new PlatformIOError("Unknown partition inspection argument.", "PARTITION_INPUT_INVALID");
       if (options["read-device"] !== undefined && ![true, false, "true", "false"].includes(options["read-device"]))
@@ -390,7 +390,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         sdkconfigPath: asString(options["sdkconfig-path"]),
         readDevice: asBoolean(options["read-device"]) ?? false, port: asString(options.port),
         readApprovalId: asString(options["read-approval-id"]), commandApprovalId: asString(options["command-approval-id"]),
-        buildMetadata: asBoolean(options["build-metadata"]) ?? false, metadataApprovalId: asString(options["metadata-approval-id"]),
+        buildMetadata: asBoolean(options["build-metadata"]) ?? false, metadataApprovalId: asString(options["metadata-approval-id"]), systemApprovalId: asString(options["system-approval-id"]),
         environment: asString(options.environment), configApprovalId: asString(options["config-approval-id"]),
         flashSize: numberOption("flash-size"), firmwarePath: asString(options["firmware-path"]),
         observedTablePath: asString(options["observed-table-path"]), approvalId: asString(options["approval-id"]),

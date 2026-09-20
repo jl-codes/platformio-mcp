@@ -1071,3 +1071,7 @@ Device-erased and device-mismatch observations now add structured error issues/c
 ### Existing ESP-IDF configuration discovery
 
 Added automatic discovery of sdkconfig.<environment> and the configured board_build.esp-idf.sdkconfig_path override, verified against platform-espressif32 v6.9.0 builder/frameworks/espidf.py. Explicit missing paths do not fall back; absent conventional files leave offset evidence unresolved. Twenty-five focused workflow/project cases, targeted lint and TypeScript passed. Framework package CSV selection and physical acceptance remain incomplete.
+
+### Registered framework CSV integration
+
+Added framework candidates from the complete selected build include inventory (independent of display truncation), registered host-package validation, bounded CSV reads and canonical workflow integration. Configured project files take precedence; external framework files require matching package manifest/registration under the host Core packages directory and separate system-info authorization. Framework CSVs automatically compare with the metadata-selected built binary. Five package-boundary cases and twelve project-inspection cases passed; the fourteen-case workflow suite passed after fixing its new comparison-source provenance assertion. Targeted lint and TypeScript passed. CI 35496859998 passed at ce2b2620. Framework default-table inference, physical acceptance and remaining parity remain unfinished.

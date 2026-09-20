@@ -3,6 +3,7 @@
  * Provides parseProjectEnvironments and parseProjectMetadata using PlatformIO's resolved JSON.
  */
 import { z } from "zod";
+import { partitionFrameworkCandidates } from "./esp-partition-framework.js";
 import { PlatformIOError } from "../utils/errors.js";
 import { redactSecretsInText } from "./policy/redact.js";
 
@@ -220,6 +221,7 @@ export function parseProjectMetadata(output: string, environment?: string) {
           buildType: item.build_type ?? null,
           defines: item.defines ?? [],
           includeDirs: item.includes?.build?.slice(0, 40) ?? [],
+          partitionFrameworkCandidates: partitionFrameworkCandidates(item.includes?.build ?? []),
           includeDirCount: item.includes?.build?.length ?? 0,
           toolchainIncludeDirCount: item.includes?.toolchain?.length ?? 0,
           librarySourceDirs: item.libsource_dirs ?? [],

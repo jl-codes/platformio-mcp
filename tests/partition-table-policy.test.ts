@@ -8,6 +8,8 @@ import { executeProjectInspection } from "../src/tools/project-inspection.js";
 vi.mock("../src/tools/project-inspection.js", () => ({
   executeProjectInspection: vi.fn(),
 }));
+import { getSystemInfo } from "../src/tools/projects.js";
+vi.mock("../src/tools/projects.js", () => ({ getSystemInfo: vi.fn() }));
 let root: string;
 let state: string;
 beforeEach(() => {
@@ -315,4 +317,69 @@ it("honors an explicit project SDK configuration path without falling back", asy
   await expect(
     executePartitionTable({ projectDir: root }),
   ).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+it("inspects the configured CSV in the selected registered framework", async () => {
+  const pkg = path.join(state, "packages", "framework-arduinoespressif32");
+  const csv = path.join(pkg, "tools", "partitions", "custom.csv");
+  fs.mkdirSync(path.dirname(csv), { recursive: true });
+  fs.writeFileSync(csv, "app,app,factory,0x20000,1M,");
+  fs.writeFileSync(
+    path.join(pkg, "package.json"),
+    JSON.stringify({ name: "framework-arduinoespressif32", version: "1" }),
+  );
+  fs.writeFileSync(
+    path.join(pkg, ".piopm"),
+    JSON.stringify({
+      name: "framework-arduinoespressif32",
+      version: "1",
+      type: "tool",
+    }),
+  );
+  const table = path.join(root, "partitions.bin");
+  const bytes = Buffer.alloc(96, 255);
+  bytes.writeUInt16LE(0x50aa, 0);
+  bytes[2] = 0;
+  bytes[3] = 0;
+  bytes.writeUInt32LE(0x20000, 4);
+  bytes.writeUInt32LE(0x100000, 8);
+  bytes.fill(0, 12, 32);
+  bytes.write("app", 12, "utf8");
+  fs.writeFileSync(table, bytes);
+  vi.mocked(getSystemInfo).mockResolvedValue({ core_dir: { value: state } });
+  vi.mocked(executeProjectInspection)
+    .mockResolvedValueOnce({
+      ok: true,
+      defaultEnvironments: ["custom"],
+      envs: [
+        {
+          name: "custom",
+          partitionTable: "custom.csv",
+          partitionTableUploadOffset: null,
+          flashSize: null,
+          board: null,
+          mcu: null,
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>)
+    .mockResolvedValueOnce({
+      ok: true,
+      envs: {
+        custom: {
+          partitionFrameworkCandidates: [pkg],
+          extra: { flash_images: [{ path: table, offset: "0x10000" }] },
+        },
+      },
+    } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>);
+  const result = await executePartitionTable({
+    projectDir: root,
+    buildMetadata: true,
+  });
+  expect(result).toMatchObject({
+    ok: true,
+    table_source: "board_build.partitions (registered framework)",
+    comparison_source: "build_binary",
+    comparison: [],
+  });
+  expect(result.artifacts.table.path).toBe(fs.realpathSync.native(csv));
 });

@@ -3,6 +3,8 @@
  * Explicit artifact paths and table offsets avoid hidden compilation or framework guesses.
  */
 import fs from "node:fs/promises";
+import { getSystemInfo } from "./projects.js";
+import { resolveFrameworkPartitionCsv } from "../core/esp-partition-framework.js";
 import { readEspFlash } from "../core/esp-flash-read.js";
 import { parseEspPartitionBinary } from "../core/esp-partitions.js";
 import {
@@ -42,6 +44,7 @@ export const PartitionTableSchema = z
     configApprovalId: z.string().max(256).optional(),
     buildMetadata: z.boolean().default(false),
     metadataApprovalId: z.string().max(256).optional(),
+    systemApprovalId: z.string().max(256).optional(),
     format: z.enum(["csv", "binary"]).default("csv"),
     tableOffset: z.number().int().min(0).max(0xfffff000).optional(),
     sdkconfigPath: z.string().min(1).max(32768).optional(),
@@ -71,6 +74,7 @@ export async function executePartitionTable(
   const {
     configApprovalId,
     metadataApprovalId,
+    systemApprovalId,
     readApprovalId,
     commandApprovalId,
     ...operation
@@ -147,10 +151,56 @@ export async function executePartitionTable(
       }
       const location = resolvePartitionOffset(evidence, project?.uploadOffset);
       guard();
+      let tablePath =
+        params.tablePath ?? build?.tablePath ?? project!.tablePath;
+      let format =
+        !params.tablePath && build ? ("binary" as const) : params.format;
+      let trustedTableRoot: string | undefined;
+      let framework: Awaited<
+        ReturnType<typeof resolveFrameworkPartitionCsv>
+      > | null = null;
+      let tableSource = params.tablePath
+        ? "explicit:tablePath"
+        : build
+          ? "metadata:extra.flash_images"
+          : project!.tableSource;
+      if (
+        !params.tablePath &&
+        build &&
+        project?.tableSource === "board_build.partitions"
+      ) {
+        try {
+          await readPartitionArtifact(projectDir, project.tablePath, 65536);
+          tablePath = project.tablePath;
+          format = "csv";
+          tableSource = project.tableSource;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          const system = await dispatchAuthorizedAction(
+            "system_info",
+            { projectDir, approvalId: systemApprovalId },
+            { ...caller, workspaceDir: projectDir },
+            getSystemInfo,
+          );
+          guard();
+          framework = await resolveFrameworkPartitionCsv(
+            project.tablePath,
+            build.frameworkCandidates ?? [],
+            system,
+            projectDir,
+          );
+          trustedTableRoot = framework.root;
+          tablePath = framework.tablePath;
+          format = "csv";
+          tableSource = "board_build.partitions (registered framework)";
+        }
+      }
+      guard();
       const result = await inspectEspPartitionArtifacts({
         workspaceDir: projectDir,
-        tablePath: params.tablePath ?? build?.tablePath ?? project!.tablePath,
-        format: !params.tablePath && build ? "binary" : params.format,
+        tablePath,
+        format,
+        trustedTableRoot,
         layout: {
           tableOffset: location.tableOffset,
           flashSize: params.flashSize ?? project?.flashSize,
@@ -158,9 +208,7 @@ export async function executePartitionTable(
         firmwarePath: params.firmwarePath,
         observedTablePath:
           params.observedTablePath ??
-          (params.tablePath && params.format === "csv" && build
-            ? build.tablePath
-            : undefined),
+          (format === "csv" && build ? build.tablePath : undefined),
       });
       guard();
       let device: {
@@ -237,19 +285,17 @@ export async function executePartitionTable(
         device,
         comparison_source:
           !params.observedTablePath &&
-          params.tablePath &&
-          params.format === "csv" &&
+          format === "csv" &&
           build
             ? "build_binary"
             : publicResult.comparison_source,
         issues,
         error_count: errorCount,
         environment: project?.environment ?? null,
-        table_source: params.tablePath
-          ? "explicit:tablePath"
-          : build
-            ? "metadata:extra.flash_images"
-            : project!.tableSource,
+        table_source: tableSource,
+        framework_package: framework
+          ? { name: framework.packageName, version: framework.packageVersion }
+          : null,
         board: project?.board ?? null,
         mcu: project?.mcu ?? null,
         offset_evidence: location.evidence,

@@ -89,6 +89,7 @@ export async function readPartitionArtifact(
 /** Inspect explicit offline artifacts; no metadata command, build, download or device access occurs. */
 export async function inspectEspPartitionArtifacts(input: {
   workspaceDir: string;
+  trustedTableRoot?: string; // Internal registered-package root; never a public request field.
   tablePath: string;
   format: "csv" | "binary";
   layout: EspPartitionLayout;
@@ -97,7 +98,7 @@ export async function inspectEspPartitionArtifacts(input: {
 }) {
   const root = await fs.realpath(input.workspaceDir);
   const table = await readPartitionArtifact(
-    root,
+    input.trustedTableRoot ? await fs.realpath(input.trustedTableRoot) : root,
     input.tablePath,
     input.format === "csv" ? 65536 : 4096,
   );

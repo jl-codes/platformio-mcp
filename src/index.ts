@@ -316,6 +316,7 @@ const toolDefinitions: ToolDefinition[] = [
         commandApprovalId: { type: "string", maxLength: 256 },
         buildMetadata: { type: "boolean", default: false, description: "Generate build metadata under build permission; may execute project scripts." },
         metadataApprovalId: { type: "string", maxLength: 256 },
+        systemApprovalId: { type: "string", maxLength: 256 },
         flashSize: { type: "integer", minimum: 1, maximum: 4294967296 },
         firmwarePath: { type: "string", minLength: 1, maxLength: 32768 },
         observedTablePath: { type: "string", minLength: 1, maxLength: 32768 },
