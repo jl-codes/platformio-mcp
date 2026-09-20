@@ -1,12 +1,13 @@
-/** Opt-in debugger tools share the connection-owned service and conservative effect annotations. */
+/** Canonical and opt-in debugger names share schemas and connection-owned execution. */
 import type { RegisteredTool } from "../mcp/tool-registry.js";
 
 const approval = { type: "string", minLength: 1, maxLength: 256 };
 const session = { type: "string", format: "uuid" };
 const timeout = { type: "number", minimum: 0.001, maximum: 600, default: 30 };
-/** Extend compatibility mode only; these schemas never expose executable or custody capabilities. */
+/** Register canonical names or reference aliases; schemas never expose executable or custody capabilities. */
 export function withDebugCompatibility<TResult>(
   base: ReadonlyMap<string, RegisteredTool<TResult>>,
+  canonical = false,
 ): ReadonlyMap<string, RegisteredTool<TResult>> {
   const result = new Map(base);
   const definitions = [
@@ -81,28 +82,28 @@ export function withDebugCompatibility<TResult>(
     },
   ];
   for (const definition of definitions) {
-    if (result.has(definition.name))
-      throw new Error(`Duplicate compatibility tool: ${definition.name}`);
+    const name = canonical ? definition.name.slice(4) : definition.name;
+    if (result.has(name)) throw new Error(`Duplicate debugger tool: ${name}`);
     const readOnly = definition.name === "pio_debug_list";
-    result.set(definition.name, {
-      name: definition.name,
+    result.set(name, {
+      name,
       description: definition.description,
       inputSchema: {
         type: "object",
         additionalProperties: false,
         required: definition.required,
-        properties: definition.properties,
+        properties: { ...definition.properties, request_approval_id: approval },
       },
       policyAction: readOnly ? "query_logs" : "run_shell_command",
       riskLevel: readOnly ? "low" : "critical",
       annotations: {
-        title: definition.name,
+        title: name,
         readOnlyHint: readOnly,
         destructiveHint: !readOnly,
         idempotentHint: readOnly,
         openWorldHint: !readOnly,
       },
-      handler: (args, context) => context.dispatch(definition.name, args),
+      handler: (args, context) => context.dispatch(name, args),
     });
   }
   return result;

@@ -93033,6 +93033,14 @@ var INTERNAL_ACTIONS = {
   coredump_analyze: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
   esp_flash_read: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
   esp_flash_read_command: { ...MCP_ACTIONS.upload_firmware, policyAction: "run_shell_command", riskLevel: "critical", openWorld: true },
+  debug_start: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command", riskLevel: "critical", openWorld: true },
+  pio_debug_start: { ...MCP_ACTIONS.run_target, policyAction: "debug_start", riskLevel: "critical", openWorld: true },
+  debug_cmd: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command", riskLevel: "critical", openWorld: true },
+  pio_debug_cmd: { ...MCP_ACTIONS.run_target, policyAction: "debug_cmd", riskLevel: "critical", openWorld: true },
+  debug_list: { ...READ, policyAction: "query_logs" },
+  pio_debug_list: { ...READ, policyAction: "debug_list" },
+  debug_stop: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command", riskLevel: "critical", openWorld: true },
+  pio_debug_stop: { ...MCP_ACTIONS.run_target, policyAction: "debug_stop", riskLevel: "critical", openWorld: true },
   debugger_discover: { ...READ, policyAction: "list_devices" },
   debugger_inspect: { ...READ, policyAction: "query_logs" },
   debugger_mutate: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
@@ -107384,6 +107392,16 @@ var DebugCompatibilityClient = class {
       this.pending.delete(operation);
     }
   }
+  /** Resolve policy scope from this connection's owned session, never a request-provided project. */
+  projectForSession(id) {
+    const session2 = this.sessions.list().find((entry) => entry.session_id === id);
+    if (!session2)
+      throw new PlatformIOError(
+        "Owned debugger session not found.",
+        "DEBUG_SESSION_NOT_FOUND"
+      );
+    return session2.project_dir;
+  }
   /** Route commands through the same connection owner used by startup. */
   execute(name2, input, caller = {}) {
     return executeDebugSessionCompatibility(name2, input, this.sessions, caller);
@@ -107399,11 +107417,62 @@ var DebugCompatibilityClient = class {
   }
 };
 
+// src/adapters/debug-tool-dispatch.ts
+init_zod();
+init_errors2();
+var operations = {
+  debug_start: "pio_debug_start",
+  pio_debug_start: "pio_debug_start",
+  debug_cmd: "pio_debug_cmd",
+  pio_debug_cmd: "pio_debug_cmd",
+  debug_list: "pio_debug_list",
+  pio_debug_list: "pio_debug_list",
+  debug_stop: "pio_debug_stop",
+  pio_debug_stop: "pio_debug_stop"
+};
+function isDebugToolName(name2) {
+  return Object.hasOwn(operations, name2);
+}
+function parseRequest(operation, input) {
+  try {
+    const { request_approval_id, ...raw } = external_exports.record(external_exports.unknown()).parse(input);
+    const approvalId2 = external_exports.string().min(1).max(256).optional().parse(request_approval_id);
+    const params = operation === "pio_debug_start" ? DebugStartCompatibilitySchema.parse(raw) : operation === "pio_debug_cmd" ? DebugCommandCompatibilitySchema.parse(raw) : operation === "pio_debug_stop" ? DebugStopCompatibilitySchema.parse(raw) : DebugListCompatibilitySchema.parse(raw);
+    return { params, approvalId: approvalId2 };
+  } catch (error2) {
+    if (error2 instanceof external_exports.ZodError)
+      throw new PlatformIOError(
+        "Invalid debugger arguments.",
+        "COMPAT_ARGUMENT_INVALID"
+      );
+    throw error2;
+  }
+}
+async function executeDebugTool(client, name2, input, defaults, caller) {
+  const operation = operations[name2];
+  const { params, approvalId: approvalId2 } = parseRequest(operation, input);
+  if (operation === "pio_debug_stop" && "process_only" in params && params.process_only)
+    return client.execute(operation, params, caller);
+  const projectDir = operation === "pio_debug_start" ? await resolveCompatibilityProject(
+    "project_dir" in params ? external_exports.string().nullish().parse(params.project_dir) : void 0,
+    defaults
+  ) : "session_id" in params ? client.projectForSession(external_exports.string().uuid().parse(params.session_id)) : caller.workspaceDir;
+  const scope5 = Object.fromEntries(
+    Object.entries(params).filter(([key]) => !key.endsWith("approval_id"))
+  );
+  return dispatchAuthorizedAction(
+    name2,
+    { ...scope5, projectDir, approvalId: approvalId2 },
+    { ...caller, workspaceDir: projectDir },
+    async () => operation === "pio_debug_start" ? client.start(params, defaults, caller) : client.execute(operation, params, caller)
+  );
+}
+
 // src/adapters/debug-compat-registry.ts
 var approval2 = { type: "string", minLength: 1, maxLength: 256 };
 var session = { type: "string", format: "uuid" };
 var timeout2 = { type: "number", minimum: 1e-3, maximum: 600, default: 30 };
-function withDebugCompatibility(base2) {
+function withDebugCompatibility(base2, canonical3 = false) {
   const result = new Map(base2);
   const definitions = [
     {
@@ -107473,28 +107542,28 @@ function withDebugCompatibility(base2) {
     }
   ];
   for (const definition of definitions) {
-    if (result.has(definition.name))
-      throw new Error(`Duplicate compatibility tool: ${definition.name}`);
+    const name2 = canonical3 ? definition.name.slice(4) : definition.name;
+    if (result.has(name2)) throw new Error(`Duplicate debugger tool: ${name2}`);
     const readOnly = definition.name === "pio_debug_list";
-    result.set(definition.name, {
-      name: definition.name,
+    result.set(name2, {
+      name: name2,
       description: definition.description,
       inputSchema: {
         type: "object",
         additionalProperties: false,
         required: definition.required,
-        properties: definition.properties
+        properties: { ...definition.properties, request_approval_id: approval2 }
       },
       policyAction: readOnly ? "query_logs" : "run_shell_command",
       riskLevel: readOnly ? "low" : "critical",
       annotations: {
-        title: definition.name,
+        title: name2,
         readOnlyHint: readOnly,
         destructiveHint: !readOnly,
         idempotentHint: readOnly,
         openWorldHint: !readOnly
       },
-      handler: (args, context) => context.dispatch(definition.name, args)
+      handler: (args, context) => context.dispatch(name2, args)
     });
   }
   return result;
@@ -128211,7 +128280,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name2
   );
-  const debugCompatibility = ["pio_debug_start", "pio_debug_cmd", "pio_debug_list", "pio_debug_stop"].includes(name2);
+  const debugCompatibility = isDebugToolName(name2);
   const compatibilityTool = name2 === "power_profile" || name2 === "pio_power_profile" || debugCompatibility || packageCompatibility || projectCompatibility || name2 === "pio_run_target" || name2 === "pio_upload" || name2 === "pio_flash_and_verify" || name2 === "pio_upload_ota" || name2 === "pio_partition_table" || name2 === "pio_coredump" || name2 === "pio_system_info" || dependencyCompatibility || boardCompatibility || deviceCompatibility;
   const projectInspection = [
     "project_envs",
@@ -128254,7 +128323,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const result = await mcpContext.run(
         { activityId, targetProjectDir },
         () => registeredTool.handler(args, {
-          dispatch: async (tool, parameters) => tool === "power_profile" || tool === "pio_power_profile" ? executePowerCompatibility(serialClient, powerClient, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, tool) : tool === "pio_debug_start" ? debugClient.start(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller) : tool === "pio_debug_cmd" || tool === "pio_debug_list" || tool === "pio_debug_stop" ? debugClient.execute(tool, parameters, caller) : tool === "coredump" ? executeCoredump(parameters, caller, onAuthorized) : tool === "partition_table" ? executePartitionTable(parameters, caller, onAuthorized) : tool === "run_target" ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized) : tool === "pio_coredump" ? executeCoredumpCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_partition_table" ? executePartitionCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_system_info" ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload_ota" ? executeOtaCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_flash_and_verify" ? executeFlashVerificationCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload" ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_run_target" ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (deviceCompatibility ? executeDeviceCompatibility.bind(null, serialClient) : boardCompatibility ? executeBoardCompatibility : dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
+          dispatch: async (tool, parameters) => tool === "power_profile" || tool === "pio_power_profile" ? executePowerCompatibility(serialClient, powerClient, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, tool) : isDebugToolName(tool) ? executeDebugTool(debugClient, tool, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller) : tool === "coredump" ? executeCoredump(parameters, caller, onAuthorized) : tool === "partition_table" ? executePartitionTable(parameters, caller, onAuthorized) : tool === "run_target" ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized) : tool === "pio_coredump" ? executeCoredumpCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_partition_table" ? executePartitionCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_system_info" ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload_ota" ? executeOtaCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_flash_and_verify" ? executeFlashVerificationCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload" ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_run_target" ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (deviceCompatibility ? executeDeviceCompatibility.bind(null, serialClient) : boardCompatibility ? executeBoardCompatibility : dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
             tool,
             parameters,
             {
@@ -129078,7 +129147,7 @@ ENV VARS:
 async function main() {
   const compatibility = parseCompatibilityLaunch(process.argv.slice(2));
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
-  toolRegistry = withPowerCompatibility(toolRegistry, "power_profile");
+  toolRegistry = withDebugCompatibility(withPowerCompatibility(toolRegistry, "power_profile"), true);
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
     toolRegistry = withPowerCompatibility(withDebugCompatibility(withDependencyCompatibility(

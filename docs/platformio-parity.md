@@ -92,7 +92,7 @@ For private managed storage, device requests can select retainDump: true (CLI --
 
 The opt-in pio_coredump tool now resolves project/environment/serial selection, saves captures by default in private managed storage, and supports out_path plus optional analysis. Missing ELF output preserves the capture with analysis=null; unconfigured analysis tools are reported without claiming analysis ran. Explicit output remains workspace-contained and never replaces an existing file. Metadata execution, partition inspection, device reads, exports and analyzer execution retain separate scoped permissions; table_config_approval_id and elf_metadata_approval_id avoid reusing a consumed selection grant.
 
-The inventory is now 58 canonical tools plus 40 compatibility tools (98 with compatibility enabled). Registration and offline checks do not prove full PAR-05 parity: physical capture, remaining reference result details and the wider acceptance gates remain outstanding.
+The inventory is now 62 canonical tools plus 40 compatibility tools (102 with compatibility enabled). Registration and offline checks do not prove full PAR-05 parity: physical capture, remaining reference result details and the wider acceptance gates remain outstanding.
 
 
 ## Flash and boot verification
@@ -127,7 +127,7 @@ Startup approvals are separate for preparation, discovery, host code and target 
 
 Native supervisors require empty owned process groups/Windows jobs for both GDB and its backend before releasing probe custody. Optional host verification can impose an additional check. This proves closure of owned process handles, not that another application cannot open the probe afterward; privileged project/debugger code is not an OS sandbox. Failed or uncertain cleanup retains a recoverable session.
 
-Registration is not full debugger acceptance: physical ESP/Cortex probe evidence, remaining backend bindings, response parity details, endpoint-conflict handling and complete CLI/dashboard integration remain outstanding. All 40 reference tool names are now registered in compatibility mode (98 total tools, including 58 canonical tools). This is registration coverage, not full behavioral or physical acceptance. No release has been published.
+Registration is not full debugger acceptance: physical ESP/Cortex probe evidence, remaining backend bindings, response parity details, endpoint-conflict handling and complete CLI/dashboard integration remain outstanding. All 40 reference tool names are now registered in compatibility mode (102 total tools, including 62 canonical tools). This is registration coverage, not full behavioral or physical acceptance. No release has been published.
 
 ### Power execution permissions (implementation in progress)
 
@@ -152,3 +152,6 @@ Profile collection honors the canonical `power_profile` and its `start_monitor` 
 Debugger command replies include `result_fields`, preserving the bounded, ordered GDB/MI fields (including repeated names) alongside `console`. Variable, stack and register inspections can return structured fields without console text. Startup now returns `stopped`, `running` and `closed` from the owned session's latest observation; unknown state is null rather than inferred from successful initialization.
 
 Debugger start/list/stop responses include `debug_tool` from the resolved PlatformIO configuration (null when unspecified) and `uptime_s` measured from launch admission with a monotonic clock. Failed cleanup retains this metadata with the owned session. These fields do not imply physical target or probe acceptance.
+
+
+The canonical debugger names `debug_start`, `debug_cmd`, `debug_stop`, and `debug_list` are available without compatibility mode. Their `pio_*` aliases share the same connection-owned sessions and inherit canonical deny/approval rules. `request_approval_id` authorizes the complete public request; it does not replace preparation, host-code or target-effect approvals. Start, command and normal stop retain the conservative `run_shell_command` public boundary, including inspection commands; actual commands still pass their classified lower-level permission checks. Listing uses `query_logs`. Process-only cleanup remains available after policy changes and does not authorize target commands. Session policy scope is read from the owned session rather than caller-selected project fields.

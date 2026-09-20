@@ -109,7 +109,7 @@ describe("schema compatibility comparator", () => {
 describe("stdio MCP policy boundary", () => {
   it("keeps all 42 existing tool declarations available", async () => {
     const listed = await harness.client.listTools();
-    expect(listed.tools).toHaveLength(57);
+    expect(listed.tools).toHaveLength(62);
   });
   it("preserves every pinned upstream tool input contract", async () => {
     const baseline = JSON.parse(

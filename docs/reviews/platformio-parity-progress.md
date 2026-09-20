@@ -1633,3 +1633,8 @@ Run 35515777379 succeeded on ef52feb65e89cc1dab063ebfa79f57b1e9acdc28: complete 
 ### Unambiguous PPK2 environment isolation
 
 Virtual-environment validation now rejects duplicate include-system-site-packages entries instead of accepting any false line even when Python could read another true entry. Seven focused environment cases and TypeScript passed. This does not replace actual PPK2 physical acceptance.
+
+
+### Canonical debugger availability and alias policy inheritance
+
+Added the planned debug_start/debug_cmd/debug_stop/debug_list names to normal mode, retaining reference aliases in compatibility mode. Both name sets share connection-owned sessions. A public-name boundary now enforces canonical and alias deny/approval rules before calling the debugger implementation, with request_approval_id distinct from lower-level grants. All command-capable public operations retain run_shell_command classification; listing uses query_logs. Process-only owned cleanup bypasses new target authorization. Session scope comes from ownership, and validation retains COMPAT_ARGUMENT_INVALID. Normal/compatibility tool totals are 62/102. Prior CI failures on 25398f54 were two stale live-tool count assertions (57 versus the newly added power tool); those now reflect the complete canonical set while pinned legacy schema checks remain intact. Full debugger backend/physical/CLI/dashboard acceptance remains incomplete.

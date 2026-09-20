@@ -3,6 +3,7 @@ import { withPowerCompatibility } from "./adapters/power-compat-registry.js";
 import { executePowerCompatibility } from "./adapters/power-compat.js";
 import { PowerMeterClient } from "./adapters/power-meter-client.js";
 import { DebugCompatibilityClient } from "./adapters/debug-compat.js";
+import { executeDebugTool, isDebugToolName } from "./adapters/debug-tool-dispatch.js";
 import { withDebugCompatibility } from "./adapters/debug-compat-registry.js";
 import { executeOtaCompatibility } from "./adapters/ota-compat.js";
 import { executeFlashVerificationCompatibility } from "./adapters/flash-verification-compat.js";
@@ -1689,7 +1690,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name,
   );
-  const debugCompatibility = ["pio_debug_start", "pio_debug_cmd", "pio_debug_list", "pio_debug_stop"].includes(name);
+  const debugCompatibility = isDebugToolName(name);
   const compatibilityTool =
     name === "power_profile" || name === "pio_power_profile" ||
     debugCompatibility ||
@@ -1763,10 +1764,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             dispatch: async (tool, parameters) =>
               tool === "power_profile" || tool === "pio_power_profile"
                 ? executePowerCompatibility(serialClient, powerClient, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, tool)
-                : tool === "pio_debug_start"
-                ? debugClient.start(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller)
-                : tool === "pio_debug_cmd" || tool === "pio_debug_list" || tool === "pio_debug_stop"
-                ? debugClient.execute(tool, parameters, caller)
+                : isDebugToolName(tool)
+                ? executeDebugTool(debugClient, tool, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller)
                 : tool === "coredump"
                 ? executeCoredump(parameters, caller, onAuthorized)
                 : tool === "partition_table"
@@ -2765,7 +2764,7 @@ async function main() {
   // ---------------------------------------------------------------------------
   const compatibility = parseCompatibilityLaunch(process.argv.slice(2));
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
-  toolRegistry = withPowerCompatibility(toolRegistry, "power_profile");
+  toolRegistry = withDebugCompatibility(withPowerCompatibility(toolRegistry, "power_profile"), true);
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
     toolRegistry = withPowerCompatibility(withDebugCompatibility(withDependencyCompatibility(

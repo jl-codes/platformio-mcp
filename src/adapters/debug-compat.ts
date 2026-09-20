@@ -183,6 +183,19 @@ export class DebugCompatibilityClient {
     }
   }
 
+  /** Resolve policy scope from this connection's owned session, never a request-provided project. */
+  projectForSession(id: string): string {
+    const session = this.sessions
+      .list()
+      .find((entry) => entry.session_id === id);
+    if (!session)
+      throw new PlatformIOError(
+        "Owned debugger session not found.",
+        "DEBUG_SESSION_NOT_FOUND",
+      );
+    return session.project_dir;
+  }
+
   /** Route commands through the same connection owner used by startup. */
   execute(
     name: "pio_debug_cmd" | "pio_debug_list" | "pio_debug_stop",
