@@ -41,7 +41,7 @@ function input() {
   };
 }
 beforeEach(() => {
-  root = fs.realpathSync(
+  root = fs.realpathSync.native(
     fs.mkdtempSync(path.join(os.tmpdir(), "pio-debug-resolved-")),
   );
   project = path.join(root, "project");

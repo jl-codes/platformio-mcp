@@ -41,7 +41,7 @@ function writeElf(file: string) {
   fs.writeFileSync(file, bytes);
 }
 beforeEach(() => {
-  root = fs.realpathSync(
+  root = fs.realpathSync.native(
     fs.mkdtempSync(path.join(os.tmpdir(), "pio-debug-project-")),
   );
   project = path.join(root, "project");

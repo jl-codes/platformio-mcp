@@ -25,7 +25,7 @@ const configuration = JSON.stringify([
 ]);
 let project: string;
 beforeEach(() => {
-  project = fs.realpathSync(
+  project = fs.realpathSync.native(
     fs.mkdtempSync(path.join(os.tmpdir(), "pio-debug-config-")),
   );
   vi.mocked(platformioExecutor.execute).mockReset();
