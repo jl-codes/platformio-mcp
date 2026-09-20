@@ -27,3 +27,16 @@ test("publication preserves preflight source and exact artifact identity", () =>
  assert.throws(() => verifyReleasePlan(original, {...current, entries:[]}));
  assert.throws(() => verifyReleasePlan(current, original));
 });
+
+
+test("namespace inventory preserves existing names and keeps unverified candidates out of publication", async () => {
+ const {npmReleasePackages}=await import("../scripts/npm-release-packages.mjs");
+ const {fileURLToPath}=await import("node:url");
+ const root=fileURLToPath(new URL("..",import.meta.url));
+ const released=npmReleasePackages(root);
+ assert.deepEqual(released.map(item=>item.name).sort(),["pio-agent","pio-mcp","platformio-mcp"]);
+ const candidates=npmReleasePackages(root,{includeCandidates:true}).filter(item=>!item.publishIntent);
+ assert.equal(candidates.length,4);
+ assert.ok(candidates.some(item=>item.name==="@forkbomb/platformio.mcp"));
+ assert.ok(candidates.every(item=>item.filename.startsWith("forkbomb-") && item.version===released[0].version));
+});

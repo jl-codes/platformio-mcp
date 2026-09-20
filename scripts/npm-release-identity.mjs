@@ -5,6 +5,7 @@ import {createHash} from "node:crypto";
 import {execFileSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 import path from "node:path";
+import {npmReleasePackages} from "./npm-release-packages.mjs";
 export function assessPublishedArtifact(status, metadata, expected) {
   if (status === 404) return "unpublished";
   if (status !== 200) throw new Error(`Cannot verify ${expected.name}: registry returned ${status}`);
@@ -13,12 +14,10 @@ export function assessPublishedArtifact(status, metadata, expected) {
   return "identical";
 }
 export async function planNpmRelease(root, artifacts, fetcher = fetch) {
-  const canonical = JSON.parse(readFileSync(path.join(root,"package.json"),"utf8"));
   const entries = [];
-  for (const name of ["platformio-mcp","pio-mcp","pio-agent"]) {
-    const manifest = name === "platformio-mcp" ? canonical : JSON.parse(readFileSync(path.join(root,"packages",name,"package.json"),"utf8"));
-    if (manifest.name !== name || manifest.version !== canonical.version || (name !== "platformio-mcp" && manifest.dependencies?.["platformio-mcp"] !== canonical.version)) throw new Error("Release package names, versions, or exact alias pins differ");
-    const file = path.resolve(artifacts, `${name}-${manifest.version}.tgz`);
+  for (const manifest of npmReleasePackages(root)) {
+    const name = manifest.name;
+    const file = path.resolve(artifacts, manifest.filename);
     const integrity = "sha512-" + createHash("sha512").update(readFileSync(file)).digest("base64");
     const expected = {name, version: manifest.version, integrity, file};
     const response = await fetcher(`https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(manifest.version)}`, {signal: AbortSignal.timeout(15000), redirect: "error"});

@@ -182,14 +182,7 @@ jobs:
 
       - name: Build npm tarball
         run: |
-          version="$(node -p "require('./package.json').version")"
-          mkdir -p release-artifacts
-          npm pack
-          npm pack ./packages/pio-mcp
-          npm pack ./packages/pio-agent
-          mv "platformio-mcp-${version}.tgz" release-artifacts/
-          mv "pio-mcp-${version}.tgz" release-artifacts/
-          mv "pio-agent-${version}.tgz" release-artifacts/
+          npm run package:release
           cp plugins/platformio-mcp/runtime/inventory.json release-artifacts/plugin-runtime-inventory.json
           cp server.json release-artifacts/server.json
           cp .namespace-audit/report.json release-artifacts/namespace-observations.json

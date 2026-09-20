@@ -8,6 +8,7 @@
  * - Rejection of mutable workspace state, logs, credentials, and test artifacts.
  */
 
+import { npmReleasePackages } from "./npm-release-packages.mjs";
 import { SERIAL_RUNTIME_FILES } from "./serial-runtime-contract.mjs";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -17,7 +18,7 @@ import { fileURLToPath } from "node:url";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Thin npm packages that expose supported names for the canonical CLI. */
-const COMPATIBILITY_PACKAGES = ["pio-mcp", "pio-agent"];
+const COMPATIBILITY_PACKAGES = npmReleasePackages(REPO_ROOT, {includeCandidates:true}).filter(item => item.name !== "platformio-mcp");
 
 /** Files that make the published server and Codex plugin usable. */
 const REQUIRED_FILES = [
@@ -203,12 +204,11 @@ const report = inspectPackage(".");
 const paths = validateReport(report, packageJson, REQUIRED_FILES);
 scanPackedText(REPO_ROOT, paths);
 
-const compatibilityResults = COMPATIBILITY_PACKAGES.map((packageName) => {
-  const packageRoot = resolve(REPO_ROOT, "packages", packageName);
+const compatibilityResults = COMPATIBILITY_PACKAGES.map(({name:packageName, directory:packageRoot, packagePath}) => {
   const compatibilityPackageJson = readJson(
-    `packages/${packageName}/package.json`,
+    `${packagePath}/package.json`,
   );
-  const compatibilityReport = inspectPackage(`./packages/${packageName}`);
+  const compatibilityReport = inspectPackage(`./${packagePath}`);
   const compatibilityPaths = validateReport(
     compatibilityReport,
     compatibilityPackageJson,

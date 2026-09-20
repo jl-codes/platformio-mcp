@@ -53,7 +53,8 @@
     "prepublishOnly": "npm run build && npm run plugin:build && npm run plugin:validate && npm run plugin:test && npm run smoke-test && npm run package:validate",
     "test:python-runtime": "node --test tests/python-runtime.test.mjs",
     "test:parity:acceptance": "node scripts/validate-parity-acceptance.mjs",
-    "package:aliases": "node scripts/pack-npm-alias-candidates.mjs"
+    "package:aliases": "node scripts/pack-npm-alias-candidates.mjs",
+    "package:release": "node scripts/pack-npm-release.mjs"
   },
   "keywords": [
     "mcp",

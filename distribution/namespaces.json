@@ -9,21 +9,24 @@
       "name": "platformio-mcp",
       "role": "canonical",
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "publishIntent": true
+      "publishIntent": true,
+      "packagePath": "."
     },
     {
       "registry": "npm",
       "name": "pio-agent",
       "role": "functional_alias",
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "publishIntent": true
+      "publishIntent": true,
+      "packagePath": "packages/pio-agent"
     },
     {
       "registry": "npm",
       "name": "pio-mcp",
       "role": "functional_alias",
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "publishIntent": true
+      "publishIntent": true,
+      "packagePath": "packages/pio-mcp"
     },
     {
       "registry": "npm",
