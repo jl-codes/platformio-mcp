@@ -591,3 +591,7 @@ Adapted reference stack HWM/headroom/remaining, function-call, task free-space a
 ### Custom memory match precedence
 
 The bounded worker now retains match offsets. Memory parsing excludes only overlapping built-in matches, preserving disjoint measurements on the same line even when metric names coincide. ANSI color removal uses consistent coordinates for custom and built-in matches. TypeScript compilation and 32 worker/parser/report tests pass; rebuilt plugin validates and npm package validation passes (556 canonical package files). This remains internal functionality; public memory tools and complete reference output acceptance are not yet delivered.
+
+### One-shot memory collection lifecycle
+
+Added an internal transient memory collector using policy-backed discovery/start and owned session reads. Shared capture-schema validation and already-aborted requests reject before startup. Both successful collection and parser failure stop the owned session; cleanup-pending state prevents a successful/completed claim. Tests exercise real session management and native mock streams, verifying both physical mock closure and rejected startup. TypeScript checking and 31 memory/session tests pass. Public MCP/CLI wiring, composite approval semantics, legacy shared ownership migration and hardware acceptance remain incomplete.

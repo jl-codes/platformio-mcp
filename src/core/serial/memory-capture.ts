@@ -13,6 +13,24 @@ import {
   type MemoryReportOptions,
 } from "../memory-report.js";
 
+/** Shared validation before either existing-session collection or one-shot port startup. */
+export const MemoryCaptureSchema = z
+  .object({
+    seconds: z.number().finite().min(0).max(300).default(15),
+    maxLines: z.number().int().min(1).max(10000).default(5000),
+    cursor: z.number().int().nonnegative().default(0),
+    pattern: z.string().max(4096).optional(),
+    stackUnit: z.enum(["bytes", "words"]).optional(),
+    stackWordBytes: z.number().int().min(1).max(16).optional(),
+    stackWarnBytes: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(1024 * 1024 * 1024)
+      .optional(),
+  })
+  .strict();
+
 /** Collect completed lines only; every page and the final result pass through session read authorization. */
 export async function captureSessionMemory(
   manager: Pick<SerialSessionManager, "read">,
@@ -29,23 +47,7 @@ export async function captureSessionMemory(
   } = {},
   signal?: AbortSignal,
 ) {
-  const args = z
-    .object({
-      seconds: z.number().finite().min(0).max(300).default(15),
-      maxLines: z.number().int().min(1).max(10000).default(5000),
-      cursor: z.number().int().nonnegative().default(0),
-      pattern: z.string().max(4096).optional(),
-      stackUnit: z.enum(["bytes", "words"]).optional(),
-      stackWordBytes: z.number().int().min(1).max(16).optional(),
-      stackWarnBytes: z
-        .number()
-        .int()
-        .nonnegative()
-        .max(1024 * 1024 * 1024)
-        .optional(),
-    })
-    .strict()
-    .parse(input);
+  const args = MemoryCaptureSchema.parse(input);
   const started = performance.now();
   const deadline = started + args.seconds * 1000;
   const lines: string[] = [];

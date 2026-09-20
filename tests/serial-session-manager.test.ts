@@ -1,4 +1,5 @@
 /** Session ownership, policy boundaries and lease cleanup with maintained mock streams, never hardware. */
+import { captureTransientMemory } from "../src/core/serial/transient-memory-capture.js";
 import { captureSessionMemory } from "../src/core/serial/memory-capture.js";
 import fs from "node:fs";
 import os from "node:os";
@@ -692,4 +693,64 @@ it("collects memory from a real owned manager and rejects a different owner", as
       seconds: 0,
     }),
   ).toMatchObject({ ok: true, state: "stopped" });
+});
+
+it("closes one-shot memory sessions after successful analysis and parser failure", async () => {
+  const f = fixture();
+  const service = {
+    sessions: f.manager,
+    startWithDiscovery: async () => {
+      const started = await f.manager.start(f.owner, f.request());
+      await f.manager.write(
+        f.owner,
+        started.sessionId,
+        Buffer.from("Free heap: 1234\n"),
+      );
+      return started;
+    },
+  };
+  const result = await captureTransientMemory(service, f.owner, f.request(), {
+    seconds: 0.05,
+  });
+  expect(result).toMatchObject({
+    ok: true,
+    cleanupPending: false,
+    state: "stopped",
+    metrics: { free_heap: { last: 1234 } },
+  });
+  await expect(
+    captureTransientMemory(service, f.owner, f.request(), {
+      seconds: 0.05,
+      pattern: "[",
+    }),
+  ).rejects.toMatchObject({
+    code: "PATTERN_INVALID",
+    context: { cleanupPending: false },
+  });
+  expect(
+    f.manager
+      .list(f.owner)
+      .every(
+        (session) => session.state === "stopped" && !session.cleanupPending,
+      ),
+  ).toBe(true);
+  expect([...f.ports.values()].every((port) => !port.isOpen)).toBe(true);
+});
+it("rejects invalid and already-cancelled memory captures before startup", async () => {
+  const f = fixture();
+  const startWithDiscovery = vi.fn();
+  const service = { sessions: f.manager, startWithDiscovery };
+  await expect(
+    captureTransientMemory(service, f.owner, f.request(), { seconds: -1 }),
+  ).rejects.toThrow();
+  await expect(
+    captureTransientMemory(
+      service,
+      f.owner,
+      f.request(),
+      {},
+      AbortSignal.abort(),
+    ),
+  ).rejects.toMatchObject({ code: "SERIAL_CANCELLED" });
+  expect(startWithDiscovery).not.toHaveBeenCalled();
 });
