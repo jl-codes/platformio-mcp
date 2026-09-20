@@ -25,10 +25,10 @@ export function validateConfigReport(report) {
   if (!report.success || !Array.isArray(suites) || suites.length !== 1 ||
       !suites[0].name.replaceAll("\\", "/").endsWith("/" + testPath)) throw new Error("Unexpected installer test report");
   const assertions = suites[0].assertionResults;
-  if (!Array.isArray(assertions) || assertions.length < 17 || assertions.some(item => item.status !== "passed") ||
+  if (!Array.isArray(assertions) || assertions.length !== 17 || assertions.some(item => item.status !== "passed") ||
       report.numFailedTests !== 0 || report.numPendingTests !== 0 || report.numTodoTests !== 0 ||
       report.numPassedTests !== assertions.length || report.numTotalTests !== assertions.length ||
-      requiredCases.some(name => !assertions.some(item => item.title?.startsWith(name)))) throw new Error("Installer coverage is missing, skipped, or failed");
+      requiredCases.some((name, index) => assertions.filter(item => item.title?.startsWith(name)).length !== (index === 0 ? 8 : index === 4 ? 3 : 1))) throw new Error("Installer coverage is missing, skipped, or failed");
   return assertions.length;
 }
 

@@ -1948,3 +1948,13 @@ controls are forwarded through the same schema. Thirteen focused parser/policy-m
 checks and one real CLI denial case passed; the latter confirms --approve cannot
 bypass configured denial before PlatformIO/network execution. TypeScript and scoped
 lint passed; bundled plugin regenerated. No hardware or network probe was performed.
+
+### 2026-09-20: real POL-05 evidence producer
+
+Added a manually dispatched installer acceptance producer emitting only POL-05, with
+clean-checkout/revision checks, actual Vitest JSON results, scenario-count enforcement,
+source/output artifacts and hashes. The producer ran successfully on 7075a492 with all
+17 actual installer cases passing; its packet is local under .platformio-mcp and is
+source-bound, not final-release acceptance. Synthetic report rejection checks passed
+and are included in test:namespaces. The full acceptance validator remains unchanged;
+other requirement packets and physical/publisher prerequisites are still missing.

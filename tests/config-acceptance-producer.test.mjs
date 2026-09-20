@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { validateConfigReport } from "../scripts/produce-config-acceptance.mjs";
 const titles = ["supports valid alternate representations:", "preserves permissions, comments, multiline values and separated environment tables", "preserves custom launchers and their permission selectors", "retains runtime policy and compatibility selectors", "leaves invalid files byte-for-byte unchanged:", "leaves the original intact and cleans temporary files if replacement fails", "does not overwrite a remote server with a conflicting local transport", "uses CODEX_HOME and rejects explicitly empty paths"];
 function fixture() {
-  const assertionResults = [...titles, ...Array(9).fill("supports valid alternate representations: fixture")].map(title => ({ title, status: "passed" }));
+  const assertionResults = [...titles, ...Array(7).fill("supports valid alternate representations: fixture"), ...Array(2).fill("leaves invalid files byte-for-byte unchanged: fixture")].map(title => ({ title, status: "passed" }));
   return { success: true, numPassedTests: 17, numTotalTests: 17, numFailedTests: 0, numPendingTests: 0, numTodoTests: 0, testResults: [{ name: "/checkout/tests/codex-config-installer.test.ts", assertionResults }] };
 }
 test("accepts complete report shape and rejects wrong suite, omissions, skips and inconsistent counts", () => {

@@ -43,7 +43,7 @@
     "plugin:build": "npm run plugin:sync && npm run build:ui && tsc && node scripts/build-codex-plugin.mjs",
     "plugin:validate": "node scripts/validate-codex-plugin.mjs --require-runtime",
     "plugin:test": "vitest run tests/codex-plugin-manifest.test.ts tests/codex-plugin-launcher.test.ts tests/codex-plugin-skills.test.ts",
-    "test:namespaces": "node --test tests/parity-evidence-download.test.mjs tests/parity-acceptance-collector.test.mjs tests/namespace-audit.test.mjs tests/npm-release-identity.test.mjs tests/mcp-registry-identity.test.mjs tests/github-release-assets.test.mjs",
+    "test:namespaces": "node --test tests/config-acceptance-producer.test.mjs tests/parity-evidence-download.test.mjs tests/parity-acceptance-collector.test.mjs tests/namespace-audit.test.mjs tests/npm-release-identity.test.mjs tests/mcp-registry-identity.test.mjs tests/github-release-assets.test.mjs",
     "registry:validate": "node scripts/validate-mcp-registry.mjs",
     "namespace:audit": "node scripts/audit-namespaces.mjs docs/reviews/platformio-namespace-observations.json",
     "package:validate": "node scripts/validate-npm-package.mjs",
