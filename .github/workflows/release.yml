@@ -15,6 +15,12 @@ on:
         default: false
         type: boolean
 
+      publish_mcp_registry:
+        description: Publish the exact npm-backed descriptor to the official MCP Registry
+        required: true
+        default: false
+        type: boolean
+
 permissions:
   actions: read
   contents: write
@@ -115,7 +121,7 @@ jobs:
           package-manager-cache: false
 
       - name: Verify release tag matches package version
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_npm || inputs.publish_pypi
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_npm || inputs.publish_pypi || inputs.publish_mcp_registry
         run: |
           expected_ref="refs/tags/v$(node -p "require('./package.json').version")"
           if [ "$GITHUB_REF" != "$expected_ref" ]; then
@@ -253,4 +259,54 @@ jobs:
         with:
           name: pypi-publication-preflight
           path: pypi-staging/preflight.json
+          if-no-files-found: warn
+
+  publish_mcp_registry:
+    name: Publish verified MCP Registry descriptor
+    needs: build_release
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_mcp_registry
+    runs-on: ubuntu-latest
+    environment: mcp-registry
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.15.0
+          package-manager-cache: false
+      - name: Require configured registry publication protection
+        env:
+          REGISTRY_VERIFIED: ${{ vars.MCP_REGISTRY_PUBLISHER_VERIFIED }}
+        run: test "$REGISTRY_VERIFIED" = 'io.github.jl-codes/platformio-mcp'
+      - name: Install locked validation dependencies
+        run: npm ci --ignore-scripts
+      - name: Download this run's immutable release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --name platformio-mcp-release --dir release-artifacts
+      - name: Verify npm artifact identity and check for conflicting registry version
+        id: preflight
+        run: node scripts/mcp-release-identity.mjs
+      - name: Install checksum-pinned official publisher
+        if: steps.preflight.outputs.publish == 'true'
+        run: |
+          curl --fail --location --max-time 60 --max-filesize 67108864 --output "$RUNNER_TEMP/mcp-publisher.tar.gz" https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  $RUNNER_TEMP/mcp-publisher.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/mcp-publisher.tar.gz" -C "$RUNNER_TEMP" mcp-publisher
+      - name: Authenticate through GitHub OIDC and publish
+        if: steps.preflight.outputs.publish == 'true'
+        run: |
+          "$RUNNER_TEMP/mcp-publisher" login github-oidc
+          "$RUNNER_TEMP/mcp-publisher" publish release-artifacts/server.json
+      - name: Verify published descriptor
+        run: node scripts/mcp-release-identity.mjs --verify
+      - name: Retain descriptor publication evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mcp-registry-publication
+          path: release-artifacts/mcp-publication-*.json
           if-no-files-found: warn
