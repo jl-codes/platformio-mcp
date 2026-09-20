@@ -102,3 +102,11 @@ A non-root container definition and minimal context builder now cover the four r
 
 
 Container dependency locking is now implemented: uv 0.10.12 resolved matching Linux amd64/arm64 Python 3.11 locks for PlatformIO Core 6.1.16 and 21 dependencies. Image builds require pinned binary-wheel hashes. The release workflow now builds on native Linux runners after Python host acceptance, checks the installed image version without network access, and retains Docker archives, archive SHA-256 values, image inspection and source identities. These jobs have not run yet; GHCR publication and hardware acceptance are still not established.
+
+## Current merge-readiness audit
+
+The PR is conflict-free but remains incomplete against the full pinned plan. Compatibility mode exposes 76 tools (54 canonical plus 22 opt-in aliases); this does not establish all 40 reference contracts. Public serial, memory-watch, port-diagnostics and backtrace adapters are now implemented. Remaining functionality includes size-report compatibility, full artifact/upload identity integration, shared legacy serial custody, named-target execution, debugger, OTA, coredump/partition, power, and remaining quality/workflow parity.
+
+All seven explicit name targets are tracked: platformio-mcp, pio-mcp, platformio.mcp, pio-agent, platformiomcp, pioagent, flashagent. Functional npm and Python candidates and a seven-alias GHCR publisher are prepared. Ten Python wheels are now planned (five native canonical plus five aliases). Publisher jobs for npm, PyPI, MCP Registry and GHCR are gated; no new release has been published. Registry-specific collisions and third-party names remain excluded. The earlier table describes historical evidence; the namespace inventory and current progress record provide the updated scope.
+
+Publication blockers verified during this audit: local npm authentication returned 401; repository environments and publisher variables were absent; version remains the already-published 3.0.0. Full same-commit acceptance, native/hardware evidence and actual registry publication are not complete. Green CI alone cannot certify full plan completion.

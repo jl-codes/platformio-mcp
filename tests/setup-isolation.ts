@@ -11,15 +11,25 @@ const isolatedData = fs.mkdtempSync(
 );
 process.env.PIO_MCP_DATA_DIR = isolatedData;
 delete process.env.PIO_MCP_POLICY_FILE;
-afterAll(() => {
-  if (originalData === undefined) delete process.env.PIO_MCP_DATA_DIR;
-  else process.env.PIO_MCP_DATA_DIR = originalData;
-  if (originalPolicy === undefined) delete process.env.PIO_MCP_POLICY_FILE;
-  else process.env.PIO_MCP_POLICY_FILE = originalPolicy;
-  fs.rmSync(isolatedData, {
-    recursive: true,
-    force: true,
-    maxRetries: 3,
-    retryDelay: 50,
-  });
+afterAll(async () => {
+  // Yield during retries so pending diagnostic writes can finish on Windows.
+  // Keep those writes isolated until cleanup completes, including on failure.
+  const target = path.resolve(isolatedData);
+  const tempRoot = path.resolve(os.tmpdir()) + path.sep;
+  if (!target.startsWith(tempRoot) || !path.basename(target).startsWith("pio-test-authority-")) {
+    throw new Error("Refusing cleanup outside the isolated test directory");
+  }
+  try {
+    await fs.promises.rm(target, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
+  } finally {
+    if (originalData === undefined) delete process.env.PIO_MCP_DATA_DIR;
+    else process.env.PIO_MCP_DATA_DIR = originalData;
+    if (originalPolicy === undefined) delete process.env.PIO_MCP_POLICY_FILE;
+    else process.env.PIO_MCP_POLICY_FILE = originalPolicy;
+  }
 });
