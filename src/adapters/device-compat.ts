@@ -385,6 +385,30 @@ export async function executeDeviceCompatibility(
   );
 }
 
+/** Canonical owned-session tools share the reference schemas and execution path. */
+export const OWNED_SERIAL_TOOLS = {
+  serial_session_start: "pio_monitor_start",
+  serial_session_read: "pio_monitor_read",
+  serial_session_write: "pio_monitor_write",
+  serial_session_list: "pio_monitor_list",
+  serial_session_stop: "pio_monitor_stop",
+} as const;
+
+/** Expose owned sessions without replacing the legacy monitor implementation. */
+export function withOwnedSerialTools<TResult>(
+  base: ReadonlyMap<string, RegisteredTool<TResult>>,
+) {
+  const reference = withDeviceCompatibility(base);
+  const result = new Map(base);
+  for (const [name, alias] of Object.entries(OWNED_SERIAL_TOOLS)) {
+    if (result.has(name))
+      throw new Error(`Duplicate owned serial tool: ${name}`);
+    const source = reference.get(alias)!;
+    result.set(name, { ...source, name });
+  }
+  return result;
+}
+
 /** Add the explicitly enabled alias without changing canonical discovery metadata. */
 export function withDeviceCompatibility<TResult>(
   base: ReadonlyMap<string, RegisteredTool<TResult>>,

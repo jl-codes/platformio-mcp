@@ -21,6 +21,8 @@ import { registerShutdownTask } from "./utils/shutdown-coordinator.js";
 import {
   executeDeviceCompatibility,
   withDeviceCompatibility,
+  withOwnedSerialTools,
+  OWNED_SERIAL_TOOLS,
 } from "./adapters/device-compat.js";
 import { SerialClientContext } from "./adapters/serial-client.js";
 import { readRuntimeVersion } from "./utils/runtime-version.js";
@@ -1688,7 +1690,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_list_targets",
   ].includes(name);
   const dependencyCompatibility = name === "pio_deps_check";
-  const deviceCompatibility = ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop", "pio_monitor_write", "pio_monitor_read", "pio_monitor_start", "pio_monitor_capture", "pio_memory_watch", "pio_port_diagnose", "pio_decode_backtrace", "pio_size_report"].includes(name);
+  const deviceCompatibility = Object.hasOwn(OWNED_SERIAL_TOOLS, name) || ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop", "pio_monitor_write", "pio_monitor_read", "pio_monitor_start", "pio_monitor_capture", "pio_memory_watch", "pio_port_diagnose", "pio_decode_backtrace", "pio_size_report"].includes(name);
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name,
   );
@@ -2766,6 +2768,7 @@ async function main() {
   // ---------------------------------------------------------------------------
   const compatibility = parseCompatibilityLaunch(process.argv.slice(2));
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
+  toolRegistry = withOwnedSerialTools(toolRegistry);
   toolRegistry = withFlashVerificationTools(withOtaTools(withDebugCompatibility(withPowerCompatibility(toolRegistry, "power_profile"), true)));
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;

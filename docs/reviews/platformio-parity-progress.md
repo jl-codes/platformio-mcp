@@ -1890,3 +1890,14 @@ Eleven focused registry/options checks passed, followed by thirteen real-policy 
 Added canonical flash_verification over the same retained upload/fresh monitor implementation as pio_flash_and_verify; the existing agent_flash_monitor_verify remains unchanged. Extracted one shared registry definition and added missing advertised resume_id, manifest_approval_id and system_approval_id fields. This fixes a schema gap that could prevent clients from sending the implemented resume controls. Normal mode now lists 64 tools; compatibility mode lists 104 including all 40 reference aliases.
 
 A focused registry check compares advertised field names with every accepted schema field. Four real stdio entrypoint/mode cases confirmed normal-mode listing and dispatch, including rejection of invalid resume IDs through the intended handler. TypeScript and scoped lint pass; plugin rebuilt. CI runs 35527948640/35527946768 still cover the preceding 9b15cb5e batch. No physical flash or publication occurred.
+
+### 2026-09-20: normal-mode owned serial lifecycle
+
+Added five normal-mode owned serial tools sharing reference handlers and schemas,
+without replacing legacy monitor declarations. Registry inventory is now 69 normal
+or 109 compatibility tools, including the same 40 reference names. Real stdio checks
+cover all entrypoint/mode combinations, listing owned sessions and rejecting invalid
+read/write/stop requests. Fixed raw Zod failures being mislabeled INTERNAL_ERROR;
+validation errors now omit request values. TypeScript and scoped lint passed.
+Capture, memory-watch, port diagnosis, reachability, physical acceptance, and publication
+remain incomplete; this change is not evidence of full parity or hardware execution.

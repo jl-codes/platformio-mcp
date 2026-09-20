@@ -1,5 +1,6 @@
 /** Compact error contracts must preserve denial/approval semantics without disclosing unrelated context. */
 import { expect, it } from "vitest";
+import { z } from "zod";
 import { compatibilityErrorResult } from "../src/adapters/compatibility-error.js";
 import {
   PlatformIOError,
@@ -103,4 +104,16 @@ it("preserves both preflight grants without copying arbitrary context", () => {
     },
   });
   expect(JSON.stringify(result)).not.toContain("private-");
+});
+
+it("reports raw schema failures without echoing input values", () => {
+  const parsed = z.enum(["permitted"]).safeParse("private-payload");
+  expect(parsed.success).toBe(false);
+  if (parsed.success) throw new Error("Expected schema rejection");
+  const result = compatibilityErrorResult(parsed.error);
+  expect(result.structuredContent).toMatchObject({
+    error: "ValueError",
+    details: { code: "COMPAT_ARGUMENT_INVALID" },
+  });
+  expect(JSON.stringify(result)).not.toContain("private-payload");
 });

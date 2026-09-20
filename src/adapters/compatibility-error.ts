@@ -17,9 +17,12 @@ export function compatibilityErrorResult(error: unknown) {
       ? (error as Record<string, unknown>)
       : {};
   const code =
-    typeof record.code === "string" && /^[A-Z0-9_]{1,128}$/.test(record.code)
-      ? record.code
-      : "INTERNAL_ERROR";
+    error instanceof z.ZodError
+      ? "COMPAT_ARGUMENT_INVALID"
+      : typeof record.code === "string" &&
+          /^[A-Z0-9_]{1,128}$/.test(record.code)
+        ? record.code
+        : "INTERNAL_ERROR";
   const names: Record<string, string> = {
     POLICY_DENIED: "policy_denied",
     APPROVAL_REQUIRED: "approval_required",
@@ -73,9 +76,11 @@ export function compatibilityErrorResult(error: unknown) {
     ok: false as const,
     error: names[code] ?? code,
     summary: redactSecretsInText(
-      typeof record.message === "string"
-        ? record.message
-        : "Compatibility operation failed.",
+      error instanceof z.ZodError
+        ? "Compatibility arguments do not match the tool schema."
+        : typeof record.message === "string"
+          ? record.message
+          : "Compatibility operation failed.",
     ).slice(0, 8192),
     log_path: null,
     ...(resume?.success

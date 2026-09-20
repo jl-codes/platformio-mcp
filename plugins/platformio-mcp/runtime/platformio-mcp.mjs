@@ -104619,6 +104619,24 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
     )
   );
 }
+var OWNED_SERIAL_TOOLS = {
+  serial_session_start: "pio_monitor_start",
+  serial_session_read: "pio_monitor_read",
+  serial_session_write: "pio_monitor_write",
+  serial_session_list: "pio_monitor_list",
+  serial_session_stop: "pio_monitor_stop"
+};
+function withOwnedSerialTools(base2) {
+  const reference = withDeviceCompatibility(base2);
+  const result = new Map(base2);
+  for (const [name2, alias] of Object.entries(OWNED_SERIAL_TOOLS)) {
+    if (result.has(name2))
+      throw new Error(`Duplicate owned serial tool: ${name2}`);
+    const source = reference.get(alias);
+    result.set(name2, { ...source, name: name2 });
+  }
+  return result;
+}
 function withDeviceCompatibility(base2) {
   const source = base2.get("list_devices");
   if (!source || base2.has("pio_list_devices"))
@@ -115872,7 +115890,7 @@ var decisionSchema = external_exports.object({
 });
 function compatibilityErrorResult(error2) {
   const record2 = error2 && typeof error2 === "object" ? error2 : {};
-  const code = typeof record2.code === "string" && /^[A-Z0-9_]{1,128}$/.test(record2.code) ? record2.code : "INTERNAL_ERROR";
+  const code = error2 instanceof external_exports.ZodError ? "COMPAT_ARGUMENT_INVALID" : typeof record2.code === "string" && /^[A-Z0-9_]{1,128}$/.test(record2.code) ? record2.code : "INTERNAL_ERROR";
   const names = {
     POLICY_DENIED: "policy_denied",
     APPROVAL_REQUIRED: "approval_required",
@@ -115909,7 +115927,7 @@ function compatibilityErrorResult(error2) {
     ok: false,
     error: names[code] ?? code,
     summary: redactSecretsInText(
-      typeof record2.message === "string" ? record2.message : "Compatibility operation failed."
+      error2 instanceof external_exports.ZodError ? "Compatibility arguments do not match the tool schema." : typeof record2.message === "string" ? record2.message : "Compatibility operation failed."
     ).slice(0, 8192),
     log_path: null,
     ...resume?.success ? {
@@ -130635,7 +130653,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_list_targets"
   ].includes(name2);
   const dependencyCompatibility = name2 === "pio_deps_check";
-  const deviceCompatibility = ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop", "pio_monitor_write", "pio_monitor_read", "pio_monitor_start", "pio_monitor_capture", "pio_memory_watch", "pio_port_diagnose", "pio_decode_backtrace", "pio_size_report"].includes(name2);
+  const deviceCompatibility = Object.hasOwn(OWNED_SERIAL_TOOLS, name2) || ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop", "pio_monitor_write", "pio_monitor_read", "pio_monitor_start", "pio_monitor_capture", "pio_memory_watch", "pio_port_diagnose", "pio_decode_backtrace", "pio_size_report"].includes(name2);
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name2
   );
@@ -131506,6 +131524,7 @@ ENV VARS:
 async function main() {
   const compatibility = parseCompatibilityLaunch(process.argv.slice(2));
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
+  toolRegistry = withOwnedSerialTools(toolRegistry);
   toolRegistry = withFlashVerificationTools(withOtaTools(withDebugCompatibility(withPowerCompatibility(toolRegistry, "power_profile"), true)));
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;

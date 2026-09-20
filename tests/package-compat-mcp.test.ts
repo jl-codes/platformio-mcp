@@ -53,7 +53,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 104 : 64);
+      expect(tools).toHaveLength(enabled ? 109 : 69);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -91,6 +91,31 @@ it.each([
         "pio_debug_stop",
       ]) {
         expect(tools.some((tool) => tool.name === name)).toBe(enabled);
+      }
+      for (const name of [
+        "serial_session_start",
+        "serial_session_read",
+        "serial_session_write",
+        "serial_session_list",
+        "serial_session_stop",
+      ]) {
+        expect(tools.some((tool) => tool.name === name)).toBe(true);
+      }
+      const ownedSessions = await client.callTool({
+        name: "serial_session_list",
+        arguments: {},
+      });
+      expect(ownedSessions.isError).not.toBe(true);
+      for (const name of [
+        "serial_session_read",
+        "serial_session_write",
+        "serial_session_stop",
+      ]) {
+        const invalid = await client.callTool({ name, arguments: {} });
+        expect(invalid.isError).toBe(true);
+        expect(invalid.structuredContent).toMatchObject({
+          details: { code: "COMPAT_ARGUMENT_INVALID" },
+        });
       }
       const flashDefinition = tools.find(
         (tool) => tool.name === "flash_verification",

@@ -39,3 +39,12 @@ tables. It preserves environment identity when multiple environments expose the
 same target. An unavailable inventory returns `TARGETS_UNAVAILABLE`; it is not
 reported as an empty successful list. This inspection does not execute a target,
 but requires build permission because metadata generation can execute scripts.
+
+### Owned serial sessions in normal mode
+
+`serial_session_start`, `serial_session_read`, `serial_session_write`,
+`serial_session_list`, and `serial_session_stop` expose the owned-session lifecycle
+without compatibility mode. They share the corresponding `pio_monitor_*` schemas,
+handlers, permission checks, and connection-bound ownership. Existing `start_monitor`,
+`query_logs`, `get_monitor_status`, and `stop_monitor` behavior is unchanged.
+The capture, memory-watch, and port-diagnosis adapters still require compatibility mode.
