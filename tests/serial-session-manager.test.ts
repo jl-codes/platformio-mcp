@@ -920,3 +920,125 @@ it("joins actual monitor custody to meter custody and releases both after stoppe
   for (const resource of [meterResource, ...hold.resources])
     expect(f.leases.status(resource).status).toBe("unclaimed");
 });
+
+describe("upload to monitor custody", () => {
+  it("retains every scope before, during and after upload until monitor closure", async () => {
+    const f = fixture();
+    const request = {
+      ...f.request(),
+      additionalResources: [
+        { kind: "serial" as const, identity: "usb-upload-device" },
+      ],
+    };
+    const assertHeld = () => {
+      for (const resource of [request.resource, ...request.additionalResources])
+        expect(() => f.leases.acquire(resource)).toThrow(
+          expect.objectContaining({
+            code: expect.stringMatching(/^DEVICE_(BUSY|HANDOFF_PENDING)$/),
+          }),
+        );
+    };
+    const started = await f.manager.start(
+      f.owner,
+      request,
+      async ({ custody }) => {
+        assertHeld();
+        expect(f.transport).not.toHaveBeenCalled();
+        await custody.prepareSpawn();
+        assertHeld();
+        custody.releaseAfterExit();
+        assertHeld();
+        expect(f.transport).not.toHaveBeenCalled();
+      },
+    );
+    assertHeld();
+    expect(started.state).toBe("open");
+    await f.manager.stop(f.owner, started.sessionId);
+    for (const resource of [request.resource, ...request.additionalResources])
+      f.leases.release(f.leases.acquire(resource));
+  });
+
+  it("does not run an uploader when monitor authorization denies startup", async () => {
+    const f = fixture(async () => {
+      throw new PlatformIOError("Denied", "POLICY_DENIED");
+    });
+    const beforeOpen = vi.fn();
+    await expect(
+      f.manager.start(f.owner, f.request(), beforeOpen),
+    ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+    expect(beforeOpen).not.toHaveBeenCalled();
+    expect(f.transport).not.toHaveBeenCalled();
+  });
+
+  it("keeps an uncertain uploader owned through stop and releases only after later closure proof", async () => {
+    const f = fixture();
+    const request = f.request();
+    let release!: () => void;
+    await expect(
+      f.manager.start(f.owner, request, async ({ custody }) => {
+        await custody.prepareSpawn();
+        release = custody.releaseAfterExit;
+      }),
+    ).rejects.toMatchObject({
+      code: "DEVICE_CLEANUP_PENDING",
+      context: { cleanupPending: true },
+    });
+    const [session] = f.manager.list(f.owner);
+    expect(f.transport).not.toHaveBeenCalled();
+    expect(
+      (await f.manager.stop(f.owner, session.sessionId)).cleanupPending,
+    ).toBe(true);
+    expect(() => f.leases.acquire(request.resource)).toThrow();
+    release();
+    expect(f.manager.list(f.owner)[0].cleanupPending).toBe(false);
+    f.leases.release(f.leases.acquire(request.resource));
+  });
+
+  it("signals stop to the uploader without freeing its pending process lease", async () => {
+    const f = fixture();
+    const request = f.request();
+    await expect(
+      f.manager.start(
+        f.owner,
+        request,
+        async ({ custody, sessionId, signal }) => {
+          await custody.prepareSpawn();
+          expect(
+            (await f.manager.stop(f.owner, sessionId)).cleanupPending,
+          ).toBe(true);
+          expect(signal.aborted).toBe(true);
+          expect(() => f.leases.acquire(request.resource)).toThrow();
+          custody.releaseAfterExit();
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: "SERIAL_CLOSED",
+      context: { cleanupPending: false },
+    });
+    expect(f.transport).not.toHaveBeenCalled();
+    f.leases.release(f.leases.acquire(request.resource));
+  });
+
+  it("retains retryable custody when clearing the uploader handoff fails", async () => {
+    const f = fixture();
+    const request = f.request();
+    let release!: () => void;
+    const cancel = vi
+      .spyOn(f.leases, "cancelHandoff")
+      .mockImplementationOnce(() => {
+        throw new Error("lease storage unavailable");
+      });
+    await expect(
+      f.manager.start(f.owner, request, async ({ custody }) => {
+        await custody.prepareSpawn();
+        release = custody.releaseAfterExit;
+        release();
+      }),
+    ).rejects.toMatchObject({ context: { cleanupPending: true } });
+    expect(f.transport).not.toHaveBeenCalled();
+    expect(() => f.leases.acquire(request.resource)).toThrow();
+    release();
+    expect(cancel).toHaveBeenCalledTimes(2);
+    expect(f.manager.list(f.owner)[0].cleanupPending).toBe(false);
+  });
+});

@@ -98993,7 +98993,7 @@ var SerialSessionManager = class {
         );
       this.pendingDiscovery--;
       try {
-        return this.start(owner, prepared);
+        return this.start(owner, prepared, discovery.beforeOpen);
       } finally {
         this.pendingDiscovery++;
       }
@@ -99002,7 +99002,7 @@ var SerialSessionManager = class {
     }
   }
   /** Authorize, acquire ownership, construct an unopened transport, revalidate, then open explicitly. */
-  async start(owner, input) {
+  async start(owner, input, beforeOpen) {
     this.requireActiveOwner(owner);
     validateDirectSerialOptions(input);
     if (!path23.isAbsolute(input.projectDir))
@@ -99073,6 +99073,11 @@ var SerialSessionManager = class {
         ...additionalResources
       ].sort((a, b) => a.identity.localeCompare(b.identity)))
         session2.leases.push(this.leases.acquire(resource));
+      if (beforeOpen) {
+        await this.runBeforeOpen(session2, beforeOpen, guard);
+        this.ensureNotStopped(session2);
+        guard();
+      }
       session2.transport = await this.makeTransport(
         session2.request,
         (bytes) => session2.buffer.append(bytes)
@@ -99235,6 +99240,7 @@ var SerialSessionManager = class {
   async stop(owner, id) {
     const session2 = this.requireSession(owner, id);
     session2.stopRequested = true;
+    session2.beforeOpenAbort?.abort();
     session2.powerHold?.abort.abort();
     session2.buffer.close("stopped");
     if (session2.transport) {
@@ -99298,6 +99304,57 @@ var SerialSessionManager = class {
     this.requireOwner(owner);
     this.disconnectedOwners.add(owner);
     return this.stopAll(owner);
+  }
+  /** Keep all scopes continuously owned until the uploader proves closure and serial startup takes over. */
+  async runBeforeOpen(session2, beforeOpen, guard) {
+    const abort = new AbortController();
+    session2.beforeOpenAbort = abort;
+    let active = true;
+    let prepared = false;
+    let released = false;
+    const custody = {
+      prepareSpawn: async () => {
+        if (!active || prepared || released)
+          throw new PlatformIOError(
+            "Upload custody is no longer available.",
+            "SERIAL_CLOSED"
+          );
+        prepared = true;
+        await this.checkEndpoint(session2, guard);
+        if (!active || released)
+          throw new PlatformIOError(
+            "Upload custody is no longer available.",
+            "SERIAL_CLOSED"
+          );
+        session2.externalProcessPending = true;
+        for (const lease of session2.leases) this.leases.beginHandoff(lease);
+      },
+      releaseAfterExit: () => {
+        if (released) return;
+        if (session2.externalProcessPending) {
+          for (const lease of session2.leases) this.leases.cancelHandoff(lease);
+          session2.externalProcessPending = false;
+        }
+        released = true;
+        this.releaseLease(session2);
+      }
+    };
+    try {
+      await beforeOpen({
+        sessionId: session2.id,
+        signal: abort.signal,
+        custody
+      });
+      if (session2.externalProcessPending)
+        throw new PlatformIOError(
+          "Upload process closure is unconfirmed.",
+          "DEVICE_CLEANUP_PENDING",
+          { cleanupPending: true }
+        );
+    } finally {
+      active = false;
+      session2.beforeOpenAbort = void 0;
+    }
   }
   async authorize(session2, operation, bytes) {
     const request = session2.request;
@@ -99398,7 +99455,8 @@ var SerialSessionManager = class {
       throw new PlatformIOError("Serial session was stopped.", "SERIAL_CLOSED");
   }
   releaseLease(session2) {
-    if (!session2.confirmedClosed || session2.powerHold) return;
+    if (!session2.confirmedClosed || session2.powerHold || session2.externalProcessPending)
+      return;
     const pending = [];
     for (const lease of session2.leases) {
       try {

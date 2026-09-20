@@ -11,6 +11,7 @@ import {
   type SerialDiscoveryRecord,
 } from "../devices/serial-discovery-binding.js";
 import { resolveSerialEndpoint } from "../devices/serial-endpoint.js";
+import type { ProcessDeviceCustody } from "../devices/process-device-custody.js";
 import { PlatformIOError } from "../../utils/errors.js";
 import {
   DeviceLeaseStore,
@@ -90,6 +91,15 @@ export interface SerialPowerHold {
   prepareSpawn(): Promise<void>;
   releaseAfterExit(): void;
 }
+/**
+ * Trusted hook retains the future monitor's leases; its caller must separately authorize upload effects.
+ * Monitor startup permission and this custody capability do not grant firmware execution permission.
+ */
+export type SerialBeforeOpen = (input: {
+  sessionId: string;
+  signal: AbortSignal;
+  custody: ProcessDeviceCustody;
+}) => Promise<void>;
 interface Session {
   id: string;
   owner: SerialSessionOwner;
@@ -104,6 +114,8 @@ interface Session {
   leases: DeviceLease[];
   cleanupError?: string;
   powerHold?: { abort: AbortController };
+  beforeOpenAbort?: AbortController;
+  externalProcessPending?: boolean;
 }
 
 /**
@@ -177,6 +189,7 @@ export class SerialSessionManager {
       resolve?: typeof resolveSerialEndpoint;
       /** Trusted composite authorization hook; completes before lease acquisition or transport construction. */
       beforeStart?: (request: Readonly<SerialSessionRequest>) => Promise<void>;
+      beforeOpen?: SerialBeforeOpen; // Host-owned upload; cannot be supplied by public request JSON.
     },
   ): Promise<SerialSessionInfo> {
     this.requireActiveOwner(owner);
@@ -238,7 +251,7 @@ export class SerialSessionManager {
       // Transfer the reservation synchronously to start before another request can interleave.
       this.pendingDiscovery--;
       try {
-        return this.start(owner, prepared);
+        return this.start(owner, prepared, discovery.beforeOpen);
       } finally {
         this.pendingDiscovery++;
       }
@@ -251,6 +264,7 @@ export class SerialSessionManager {
   async start(
     owner: SerialSessionOwner,
     input: SerialSessionRequest,
+    beforeOpen?: SerialBeforeOpen,
   ): Promise<SerialSessionInfo> {
     this.requireActiveOwner(owner);
     validateDirectSerialOptions(input);
@@ -334,6 +348,11 @@ export class SerialSessionManager {
         ...additionalResources,
       ].sort((a, b) => a.identity.localeCompare(b.identity)))
         session.leases.push(this.leases.acquire(resource));
+      if (beforeOpen) {
+        await this.runBeforeOpen(session, beforeOpen, guard);
+        this.ensureNotStopped(session);
+        guard();
+      }
       session.transport = await this.makeTransport(session.request, (bytes) =>
         session.buffer.append(bytes),
       );
@@ -524,6 +543,7 @@ export class SerialSessionManager {
   ): Promise<SerialSessionInfo> {
     const session = this.requireSession(owner, id);
     session.stopRequested = true;
+    session.beforeOpenAbort?.abort();
     session.powerHold?.abort.abort();
     session.buffer.close("stopped");
     if (session.transport) {
@@ -606,6 +626,63 @@ export class SerialSessionManager {
     this.requireOwner(owner);
     this.disconnectedOwners.add(owner);
     return this.stopAll(owner);
+  }
+
+  /** Keep all scopes continuously owned until the uploader proves closure and serial startup takes over. */
+  private async runBeforeOpen(
+    session: Session,
+    beforeOpen: SerialBeforeOpen,
+    guard: () => void,
+  ): Promise<void> {
+    const abort = new AbortController();
+    session.beforeOpenAbort = abort;
+    let active = true;
+    let prepared = false;
+    let released = false;
+    const custody: ProcessDeviceCustody = {
+      prepareSpawn: async () => {
+        if (!active || prepared || released)
+          throw new PlatformIOError(
+            "Upload custody is no longer available.",
+            "SERIAL_CLOSED",
+          );
+        prepared = true;
+        await this.checkEndpoint(session, guard);
+        if (!active || released)
+          throw new PlatformIOError(
+            "Upload custody is no longer available.",
+            "SERIAL_CLOSED",
+          );
+        session.externalProcessPending = true;
+        for (const lease of session.leases) this.leases.beginHandoff(lease);
+      },
+      releaseAfterExit: () => {
+        if (released) return;
+        // The trusted process owner calls this only after proving no child exists.
+        if (session.externalProcessPending) {
+          for (const lease of session.leases) this.leases.cancelHandoff(lease);
+          session.externalProcessPending = false;
+        }
+        released = true;
+        this.releaseLease(session);
+      },
+    };
+    try {
+      await beforeOpen({
+        sessionId: session.id,
+        signal: abort.signal,
+        custody,
+      });
+      if (session.externalProcessPending)
+        throw new PlatformIOError(
+          "Upload process closure is unconfirmed.",
+          "DEVICE_CLEANUP_PENDING",
+          { cleanupPending: true },
+        );
+    } finally {
+      active = false;
+      session.beforeOpenAbort = undefined;
+    }
   }
 
   private async authorize(
@@ -734,7 +811,12 @@ export class SerialSessionManager {
   }
 
   private releaseLease(session: Session): void {
-    if (!session.confirmedClosed || session.powerHold) return;
+    if (
+      !session.confirmedClosed ||
+      session.powerHold ||
+      session.externalProcessPending
+    )
+      return;
     const pending: DeviceLease[] = [];
     for (const lease of session.leases) {
       try {
