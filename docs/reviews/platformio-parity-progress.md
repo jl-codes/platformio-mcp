@@ -1925,3 +1925,15 @@ paths, no shell/PATH search, 4.5-second execution limit, and 8-KiB output bound 
 All 23 focused reachability/composition cases passed with mocked network execution;
 TypeScript and scoped lint passed. No physical OTA or ICMP acceptance is claimed.
 Both CI runs 35528338157 and 35528335701 passed on preceding revision 79b8f1d1.
+
+### 2026-09-20: distribution handoff correction
+
+Reconciled DISTRIBUTION_READINESS with release.yml, python-release-packages.py, the
+namespace inventory, and retained native build evidence. The publisher selector currently
+returns exactly pio-agent-platformio,pio-agent,pio-mcp; the other four Python aliases
+are built but not authorized for publication. Instructions now derive the publisher
+marker from that selector after per-name verification instead of freezing a three-name
+setup that would omit future enabled aliases. Corrected stale 76-tool, ten-wheel,
+seven-container, not-yet-run, and unfinished-collector claims. No authority markers,
+environments, publish flags, or release gates changed. This was a documentation-only
+correction against existing evidence; no smoke tests were run.
