@@ -929,3 +929,8 @@ The existing buildTarget engine now accepts explicit uploadPort, bounded timeout
 
 Added the planned target-effects service: exact known targets map to build, cleanup, firmware upload, filesystem upload or erase permissions; unknown/composed names require privileged host-code permission. The shared dispatcher binds the actual target into request arguments and respects concrete/category denials. Restricted read_only/build_only/monitor_only profiles now explicitly deny erase_flash and run_shell_command instead of permitting an approval escalation. TypeScript and 35 focused target/profile/engine checks passed; plugin runtime rebuilt. This authorization service is internal; PAR-35 public routing and physical custody/artifact/session integration remain incomplete.
 
+
+### Upload destination and custody correction
+
+Both firmware and filesystem uploads previously selected a port for locks/reporting but omitted --upload-port from the actual command. They now pass that same selected destination explicitly, including the existing device-resolution path. Typed PlatformIO errors now survive both wrappers, preserving cleanupPending and retained log evidence. TypeScript and nine focused mocked upload checks passed; plugin runtime rebuilt. Shared device leases, owned monitor handling, immutable artifact binding and physical upload evidence remain incomplete.
+

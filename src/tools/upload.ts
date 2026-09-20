@@ -81,6 +81,7 @@ export async function uploadFilesystem(
 
     const uploadArgs: string[] = ["run", "--target", "uploadfs"];
     if (environment) uploadArgs.push("--environment", environment);
+    uploadArgs.push("--upload-port", activePort);
 
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Filesystem Upload");
@@ -158,13 +159,7 @@ export async function uploadFilesystem(
       diagnostic,
     };
   } catch (error) {
-    if (error instanceof PlatformIOError) {
-      throw new UploadError(`Filesystem upload failed: ${error.message}`, {
-        projectDir,
-        port,
-        environment,
-      });
-    }
+    if (error instanceof PlatformIOError) throw error;
     throw new UploadError(`Failed to upload filesystem: ${error}`, {
       projectDir,
       port,
@@ -228,6 +223,7 @@ export async function uploadFirmware(
 
     const uploadArgs: string[] = ["run", "--target", "upload"];
     if (environment) uploadArgs.push("--environment", environment);
+    uploadArgs.push("--upload-port", activePort);
 
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Firmware Upload");
@@ -305,13 +301,7 @@ export async function uploadFirmware(
       diagnostic,
     };
   } catch (error) {
-    if (error instanceof PlatformIOError) {
-      throw new UploadError(`Upload failed: ${error.message}`, {
-        projectDir,
-        port,
-        environment,
-      });
-    }
+    if (error instanceof PlatformIOError) throw error;
     throw new UploadError(`Failed to upload firmware: ${error}`, {
       projectDir,
       port,
