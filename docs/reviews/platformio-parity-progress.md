@@ -806,3 +806,8 @@ The compatibility initializer now requests the reference's 600-second timeout th
 ### Retained size-check logs
 
 Unified initialization and size-check output retention in a bounded, redacted command-log writer with unique filenames and restrictive file creation permissions. Authorized `checkprogsize` results now retain stdout/stderr for both success and nonzero exit status, and size reports expose that actual log path. ELF/environment identity checks remain in place before report construction. TypeScript and the existing focused build-context checks passed; plugin rebuilt. Native command execution and full final-revision acceptance remain separate.
+
+### Canonical Python publisher inventory enforcement
+
+The Python publisher resolver now requires one exact canonical PyPI identity with an enabled boolean publication flag and canonical role. Missing, disabled, duplicate normalized, misspelled and excluded identities fail before publisher selection. Two focused regression checks passed, covering six invalid inventory cases; the current selected publishers remain pio-agent-platformio, pio-agent and pio-mcp. All six functional Python alias sources remain buildable candidates; this change does not enable or claim publication. PR accounting was refreshed to 78 compatibility-visible tools, eight npm aliases, six Python aliases and ten GHCR names.
+

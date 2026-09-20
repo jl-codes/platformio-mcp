@@ -42,6 +42,14 @@ def aliases(root=ROOT):
 
 def publishers(root=ROOT):
     """Candidates can be built and validated without silently enabling publication."""
+    inventory = json.loads((Path(root) / "distribution/namespaces.json").read_text())
+    canonical = [entry for entry in inventory["entries"]
+                 if entry.get("registry") == "pypi"
+                 and re.sub(r"[-_.]+", "-", entry.get("name", "")).lower() == CANONICAL]
+    if len(canonical) != 1 or canonical[0].get("name") != CANONICAL:
+        raise ValueError("Python publication requires exactly one canonical inventory identity")
+    if canonical[0].get("role") not in ("canonical", "candidate_canonical") or canonical[0].get("publishIntent") is not True:
+        raise ValueError("Canonical Python publication is not enabled in the inventory")
     return [CANONICAL, *[item["name"] for item in aliases(root) if item.get("publishIntent")]]
 
 
