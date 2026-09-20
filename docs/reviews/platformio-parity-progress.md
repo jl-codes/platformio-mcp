@@ -909,3 +909,8 @@ Added optional suite filters, upload/build stage switches, explicit upload port 
 
 Added clean/check/test command registration, help, canonical operation mapping and validated option forwarding through shared locks/executors. Structured foreground reports and compile-only safeguards are available from CLI without enabling compatibility names. Failures reported by completed commands set exit code 1. Initial targeted checks exposed missing known-command registration; corrected it before final verification. TypeScript and three specifically selected CLI permission-denial checks passed (other cases intentionally not run); plugin rebuilt. No native PlatformIO or hardware commands were executed. Device custody and final-release acceptance remain pending.
 
+
+### Schema compatibility comparison correction
+
+The contract comparator now treats properties and definition dictionaries as name-to-schema maps, allowing new optional inputs named after schema keywords (such as pattern). Existing property schemas and required fields remain protected. Three focused checks passed: all 42 pinned input contracts, additive keyword-named properties, and rejection of new restrictions. Five unrelated cases were skipped. CI run 35490494177 was confirmed completed with failure before this correction; no final-revision green CI or complete parity is claimed.
+

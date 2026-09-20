@@ -73,9 +73,38 @@ function preservesSchema(actual: any, baseline: any, location: string): void {
       );
       continue;
     }
+    // Property names are data, even when named after JSON Schema keywords.
+    if (["properties", "$defs", "definitions"].includes(key)) {
+      expect(actual[key], `${location}.${key}`).toBeTypeOf("object");
+      for (const [name, schema] of Object.entries(value as Record<string, unknown>)) {
+        preservesSchema(actual[key][name], schema, `${location}.${key}.${name}`);
+      }
+      continue;
+    }
     preservesSchema(actual[key], value, `${location}.${key}`);
   }
 }
+
+describe("schema compatibility comparator", () => {
+  it("allows optional properties named after schema keywords", () => {
+    const baseline = { type: "object", properties: { description: { type: "string" } } };
+    const actual = {
+      ...baseline,
+      properties: { ...baseline.properties, pattern: { type: "string", minLength: 1 } },
+    };
+    expect(() => preservesSchema(actual, baseline, "tool")).not.toThrow();
+    expect(() => preservesSchema({ ...actual, required: ["pattern"] }, baseline, "tool")).toThrow();
+    expect(() => preservesSchema({
+      ...actual,
+      properties: { ...actual.properties, description: { type: "number" } },
+    }, baseline, "tool")).toThrow();
+  });
+  it("rejects new constraints on existing input properties", () => {
+    const baseline = { type: "object", properties: { name: { type: "string" } } };
+    const actual = { type: "object", properties: { name: { type: "string", pattern: "^[a-z]+$" } } };
+    expect(() => preservesSchema(actual, baseline, "tool")).toThrow();
+  });
+});
 
 describe("stdio MCP policy boundary", () => {
   it("keeps all 42 existing tool declarations available", async () => {
