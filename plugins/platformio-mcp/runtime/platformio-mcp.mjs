@@ -13864,24 +13864,24 @@ var init_validation = __esm({
 });
 
 // src/utils/command-registry.ts
-import fs23 from "node:fs";
-import path27 from "node:path";
+import fs10 from "node:fs";
+import path15 from "node:path";
 function getRegistryFilePath(projectDir) {
   const baseDir = projectDir || SERVER_DATA_DIR;
   if (!projectDir) ensureGlobalDirs();
-  const dir = path27.join(baseDir, WORKSPACE_DIR, "registry");
-  if (!fs23.existsSync(dir)) fs23.mkdirSync(dir, { recursive: true });
-  return path27.join(dir, REGISTRY_FILE2);
+  const dir = path15.join(baseDir, WORKSPACE_DIR, "registry");
+  if (!fs10.existsSync(dir)) fs10.mkdirSync(dir, { recursive: true });
+  return path15.join(dir, REGISTRY_FILE2);
 }
 async function registerCommand(record2, projectDir) {
   const file = getRegistryFilePath(projectDir);
-  if (!fs23.existsSync(file)) fs23.writeFileSync(file, "[]");
+  if (!fs10.existsSync(file)) fs10.writeFileSync(file, "[]");
   try {
     const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let history = [];
       try {
-        history = JSON.parse(fs23.readFileSync(file, "utf8"));
+        history = JSON.parse(fs10.readFileSync(file, "utf8"));
       } catch {
       }
       const existingIndex = history.findIndex((cmd) => cmd.id === record2.id);
@@ -13899,7 +13899,7 @@ async function registerCommand(record2, projectDir) {
           history = history.slice(-MAX_HISTORY_ITEMS);
         }
       }
-      fs23.writeFileSync(file, JSON.stringify(history, null, 2));
+      fs10.writeFileSync(file, JSON.stringify(history, null, 2));
       portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
     } finally {
       await release();
@@ -13910,19 +13910,19 @@ async function registerCommand(record2, projectDir) {
 }
 async function updateCommandStatus(id, updates, projectDir) {
   const file = getRegistryFilePath(projectDir);
-  if (!fs23.existsSync(file)) return;
+  if (!fs10.existsSync(file)) return;
   try {
     const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let history = [];
       try {
-        history = JSON.parse(fs23.readFileSync(file, "utf8"));
+        history = JSON.parse(fs10.readFileSync(file, "utf8"));
       } catch {
       }
       const index = history.findIndex((cmd) => cmd.id === id);
       if (index !== -1) {
         history[index] = { ...history[index], ...updates };
-        fs23.writeFileSync(file, JSON.stringify(history, null, 2));
+        fs10.writeFileSync(file, JSON.stringify(history, null, 2));
         portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
       }
     } finally {
@@ -13934,13 +13934,13 @@ async function updateCommandStatus(id, updates, projectDir) {
 }
 async function updateTaskStatus(commandId, taskId, updates, projectDir) {
   const file = getRegistryFilePath(projectDir);
-  if (!fs23.existsSync(file)) return;
+  if (!fs10.existsSync(file)) return;
   try {
     const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let history = [];
       try {
-        history = JSON.parse(fs23.readFileSync(file, "utf8"));
+        history = JSON.parse(fs10.readFileSync(file, "utf8"));
       } catch {
       }
       const cmdIndex = history.findIndex((cmd) => cmd.id === commandId);
@@ -13961,7 +13961,7 @@ async function updateTaskStatus(commandId, taskId, updates, projectDir) {
           } else if (anyRunning) cmd.status = "running";
           else if (allSuccess) cmd.status = "success";
           else cmd.status = "terminated";
-          fs23.writeFileSync(file, JSON.stringify(history, null, 2));
+          fs10.writeFileSync(file, JSON.stringify(history, null, 2));
           portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
         }
       }
@@ -13974,9 +13974,9 @@ async function updateTaskStatus(commandId, taskId, updates, projectDir) {
 }
 function getCommandHistory(projectDir) {
   const file = getRegistryFilePath(projectDir);
-  if (!fs23.existsSync(file)) return [];
+  if (!fs10.existsSync(file)) return [];
   try {
-    return JSON.parse(fs23.readFileSync(file, "utf8"));
+    return JSON.parse(fs10.readFileSync(file, "utf8"));
   } catch {
     return [];
   }
@@ -14022,18 +14022,18 @@ var init_mcp_context = __esm({
 });
 
 // src/platformio.ts
-import { execFile as execFile3, spawn } from "node:child_process";
-import fs24 from "node:fs";
-import os5 from "node:os";
-import path28 from "node:path";
+import { execFile, spawn } from "node:child_process";
+import fs11 from "node:fs";
+import os3 from "node:os";
+import path16 from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "url";
-import crypto8 from "node:crypto";
+import crypto7 from "node:crypto";
 import { execSync } from "node:child_process";
 async function execPioCommand(args, options = {}) {
   const timeout = options.timeout ?? DEFAULT_TIMEOUT;
   const runWrappedProcess = (binary) => {
     return new Promise((resolve, reject) => {
-      const child = execFile3(
+      const child = execFile(
         binary,
         args,
         {
@@ -14155,19 +14155,19 @@ async function getPlatformIOVersion() {
 }
 function resolvePioPath() {
   try {
-    const whichCmd = os5.platform() === "win32" ? "where pio" : "command -v pio";
+    const whichCmd = os3.platform() === "win32" ? "where pio" : "command -v pio";
     const out = execSync(whichCmd, { stdio: "pipe" }).toString().trim();
     if (out) {
       const paths = out.split("\n").map((p) => p.trim()).filter((p) => p.length > 0);
       for (const p of paths) {
-        if (fs24.existsSync(p)) return p;
+        if (fs11.existsSync(p)) return p;
       }
     }
   } catch {
   }
-  if (os5.platform() === "win32") {
-    const winCandidate = path28.join(os5.homedir(), ".platformio", "penv", "Scripts", "pio.exe");
-    if (fs24.existsSync(winCandidate)) return winCandidate;
+  if (os3.platform() === "win32") {
+    const winCandidate = path16.join(os3.homedir(), ".platformio", "penv", "Scripts", "pio.exe");
+    if (fs11.existsSync(winCandidate)) return winCandidate;
     return "pio";
   }
   const candidates = [
@@ -14175,10 +14175,10 @@ function resolvePioPath() {
     "/opt/homebrew/bin/pio",
     "/usr/bin/pio",
     "/bin/pio",
-    path28.join(os5.homedir(), ".platformio", "penv", "bin", "pio")
+    path16.join(os3.homedir(), ".platformio", "penv", "bin", "pio")
   ];
   for (const c of candidates) {
-    if (fs24.existsSync(c)) return c;
+    if (fs11.existsSync(c)) return c;
   }
   return "pio";
 }
@@ -14191,7 +14191,7 @@ var init_platformio = __esm({
     init_mcp_context();
     init_errors2();
     __filename2 = fileURLToPath2(import.meta.url);
-    __dirname3 = path28.dirname(__filename2);
+    __dirname3 = path16.dirname(__filename2);
     DEFAULT_TIMEOUT = 3e5;
     PlatformIOExecutor = class {
       constructor() {
@@ -14211,7 +14211,7 @@ var init_platformio = __esm({
         const targetProjectDir = ctx?.targetProjectDir || options?.cwd;
         let taskId = void 0;
         if (commandId) {
-          taskId = crypto8.randomUUID();
+          taskId = crypto7.randomUUID();
           try {
             await registerCommand({
               id: commandId,
@@ -14308,7 +14308,7 @@ var init_platformio = __esm({
         };
         if (options.useFakeTty && process.platform !== "win32") {
           const absolutePio = resolvePioPath();
-          const proxyScriptPath = path28.join(
+          const proxyScriptPath = path16.join(
             __dirname3,
             "..",
             "src",
@@ -14320,10 +14320,10 @@ var init_platformio = __esm({
         }
         const fullCmd = `${pioBinary} ${pioArgs.join(" ")}`;
         try {
-          const logDir = path28.join(__dirname3, "..", "logs");
-          if (!fs24.existsSync(logDir)) fs24.mkdirSync(logDir, { recursive: true });
-          await fs24.promises.appendFile(
-            path28.join(logDir, "mcp-internal.log"),
+          const logDir = path16.join(__dirname3, "..", "logs");
+          if (!fs11.existsSync(logDir)) fs11.mkdirSync(logDir, { recursive: true });
+          await fs11.promises.appendFile(
+            path16.join(logDir, "mcp-internal.log"),
             `[${(/* @__PURE__ */ new Date()).toISOString()}] [Spooler Executor] Spawning: ${fullCmd}
 `
           );
@@ -14344,14 +14344,14 @@ var init_platformio = __esm({
 });
 
 // src/utils/build-cache.ts
-import fs25 from "node:fs";
-import path29 from "node:path";
-import crypto9 from "node:crypto";
+import fs12 from "node:fs";
+import path17 from "node:path";
+import crypto8 from "node:crypto";
 function hashFile(absPath) {
   try {
-    const buf = fs25.readFileSync(absPath);
+    const buf = fs12.readFileSync(absPath);
     return {
-      sha256: crypto9.createHash("sha256").update(buf).digest("hex"),
+      sha256: crypto8.createHash("sha256").update(buf).digest("hex"),
       size: buf.byteLength
     };
   } catch {
@@ -14362,13 +14362,13 @@ function walkAndHash(rootDir, relPrefix) {
   const out = [];
   let entries;
   try {
-    entries = fs25.readdirSync(rootDir, { withFileTypes: true });
+    entries = fs12.readdirSync(rootDir, { withFileTypes: true });
   } catch {
     return out;
   }
   for (const entry of entries) {
-    const absPath = path29.join(rootDir, entry.name);
-    const relPath = path29.posix.join(relPrefix, entry.name);
+    const absPath = path17.join(rootDir, entry.name);
+    const relPath = path17.posix.join(relPrefix, entry.name);
     if (entry.isDirectory()) {
       out.push(...walkAndHash(absPath, relPath));
     } else if (entry.isFile()) {
@@ -14381,29 +14381,29 @@ function walkAndHash(rootDir, relPrefix) {
 function computeProjectHash(projectDir, environment) {
   const components = [`schema:${CACHE_SCHEMA}`, `env:${environment}`];
   for (const file of TRACKED_FILES) {
-    const abs = path29.join(projectDir, file);
+    const abs = path17.join(projectDir, file);
     const h = hashFile(abs);
     if (h) components.push(`${file}|${h.size}|${h.sha256}`);
     else components.push(`${file}|missing`);
   }
   const collected = [];
   for (const dir of TRACKED_DIRS) {
-    const abs = path29.join(projectDir, dir);
-    if (fs25.existsSync(abs)) collected.push(...walkAndHash(abs, dir));
+    const abs = path17.join(projectDir, dir);
+    if (fs12.existsSync(abs)) collected.push(...walkAndHash(abs, dir));
   }
   collected.sort((a, b) => a.rel.localeCompare(b.rel));
   for (const f of collected) {
     components.push(`${f.rel}|${f.size}|${f.sha256}`);
   }
-  return crypto9.createHash("sha256").update(components.join("\n")).digest("hex");
+  return crypto8.createHash("sha256").update(components.join("\n")).digest("hex");
 }
 function cacheFilePath(projectDir) {
-  return path29.join(projectDir, ".pio", ".mcp-build-cache.json");
+  return path17.join(projectDir, ".pio", ".mcp-build-cache.json");
 }
 function readCache(projectDir) {
   const file = cacheFilePath(projectDir);
   try {
-    const raw = fs25.readFileSync(file, "utf8");
+    const raw = fs12.readFileSync(file, "utf8");
     const parsed = JSON.parse(raw);
     if (!parsed || parsed.schema !== CACHE_SCHEMA) return null;
     if (typeof parsed.inputsHash !== "string") return null;
@@ -14415,9 +14415,9 @@ function readCache(projectDir) {
 function writeCache(projectDir, entry) {
   try {
     const file = cacheFilePath(projectDir);
-    fs25.mkdirSync(path29.dirname(file), { recursive: true });
+    fs12.mkdirSync(path17.dirname(file), { recursive: true });
     const full = { schema: CACHE_SCHEMA, ...entry };
-    fs25.writeFileSync(file, JSON.stringify(full, null, 2));
+    fs12.writeFileSync(file, JSON.stringify(full, null, 2));
   } catch {
   }
 }
@@ -14427,20 +14427,20 @@ function lookupBuildCache(projectDir, environment) {
   if (!entry) return { hit: false, inputsHash };
   if (entry.environment !== environment) return { hit: false, inputsHash };
   if (entry.inputsHash !== inputsHash) return { hit: false, inputsHash };
-  if (entry.firmwarePath && !fs25.existsSync(entry.firmwarePath)) {
+  if (entry.firmwarePath && !fs12.existsSync(entry.firmwarePath)) {
     return { hit: false, inputsHash };
   }
   return { hit: true, entry, inputsHash };
 }
 function findFirmwareArtifact(projectDir, environment) {
-  const buildDir = path29.join(projectDir, ".pio", "build", environment);
-  if (!fs25.existsSync(buildDir)) return void 0;
+  const buildDir = path17.join(projectDir, ".pio", "build", environment);
+  if (!fs12.existsSync(buildDir)) return void 0;
   const candidates = ["firmware.bin", "firmware.elf", "firmware.hex", "program"];
   let best;
   for (const name2 of candidates) {
-    const p = path29.join(buildDir, name2);
+    const p = path17.join(buildDir, name2);
     try {
-      const st = fs25.statSync(p);
+      const st = fs12.statSync(p);
       if (!best || st.mtimeMs > best.mtimeMs) {
         best = { path: p, mtimeMs: st.mtimeMs };
       }
@@ -14451,7 +14451,7 @@ function findFirmwareArtifact(projectDir, environment) {
 }
 function invalidateBuildCache(projectDir) {
   try {
-    fs25.unlinkSync(cacheFilePath(projectDir));
+    fs12.unlinkSync(cacheFilePath(projectDir));
   } catch {
   }
 }
@@ -14920,8 +14920,8 @@ var init_hardware_maps = __esm({
 });
 
 // src/utils/semaphore.ts
-import fs26 from "node:fs";
-import path30 from "node:path";
+import fs13 from "node:fs";
+import path18 from "node:path";
 var SemaphoreManager, portSemaphoreManager;
 var init_semaphore = __esm({
   "src/utils/semaphore.ts"() {
@@ -14940,7 +14940,7 @@ var init_semaphore = __esm({
       }
       getLockFilePath(port) {
         const id = sanitizePortName(port);
-        return path30.join(GLOBAL_LOCKS_DIR, `${id}.json`);
+        return path18.join(GLOBAL_LOCKS_DIR, `${id}.json`);
       }
       /**
        * Claims a physical port by creating a lock file.
@@ -14957,15 +14957,15 @@ var init_semaphore = __esm({
             timestamp: Date.now()
           }
         }, null, 2);
-        fs26.writeFileSync(filePath, content);
+        fs13.writeFileSync(filePath, content);
       }
       /**
        * Releases a claim by removing the lock file.
        */
       releasePort(port) {
         const filePath = this.getLockFilePath(port);
-        if (fs26.existsSync(filePath)) {
-          fs26.unlinkSync(filePath);
+        if (fs13.existsSync(filePath)) {
+          fs13.unlinkSync(filePath);
         }
       }
       /**
@@ -14973,16 +14973,16 @@ var init_semaphore = __esm({
        */
       isPortClaimed(port) {
         const filePath = this.getLockFilePath(port);
-        return fs26.existsSync(filePath);
+        return fs13.existsSync(filePath);
       }
       /**
        * Retrieves the current claim payload for a port, if it exists.
        */
       getClaim(port) {
         const filePath = this.getLockFilePath(port);
-        if (fs26.existsSync(filePath)) {
+        if (fs13.existsSync(filePath)) {
           try {
-            const content = fs26.readFileSync(filePath, "utf-8");
+            const content = fs13.readFileSync(filePath, "utf-8");
             const parsed = JSON.parse(content);
             return parsed.current_claim || parsed;
           } catch {
@@ -15143,8 +15143,8 @@ __export(projects_exports, {
   isValidProject: () => isValidProject
 });
 import { mkdir } from "fs/promises";
-import fs27 from "node:fs";
-import path31 from "path";
+import fs14 from "node:fs";
+import path19 from "path";
 async function initProject(config2, execution = {}) {
   const timeoutMs = external_exports.number().int().min(1).max(6e5).default(12e4).parse(execution.timeoutMs);
   if (!validateBoardId(config2.board)) {
@@ -15223,7 +15223,7 @@ async function initProject(config2, execution = {}) {
 async function isValidProject(projectDir) {
   try {
     const validatedPath = validateProjectPath(projectDir);
-    const platformioIniPath = path31.join(validatedPath, "platformio.ini");
+    const platformioIniPath = path19.join(validatedPath, "platformio.ini");
     return await checkDirectoryExists(platformioIniPath);
   } catch {
     return false;
@@ -15263,25 +15263,25 @@ async function getSystemInfo() {
   }
 }
 function listSourceFiles(projectDir) {
-  const root = path31.join(projectDir, "src");
+  const root = path19.join(projectDir, "src");
   const out = [];
   function walk(dir, rel) {
     if (out.length >= MAX_SRC_FILES) return;
     let entries;
     try {
-      entries = fs27.readdirSync(dir, { withFileTypes: true });
+      entries = fs14.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
       if (out.length >= MAX_SRC_FILES) return;
-      const abs = path31.join(dir, entry.name);
+      const abs = path19.join(dir, entry.name);
       const relPath = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) walk(abs, relPath);
       else if (entry.isFile()) out.push(`src/${relPath}`);
     }
   }
-  if (fs27.existsSync(root)) walk(root, "");
+  if (fs14.existsSync(root)) walk(root, "");
   return out;
 }
 function parsePlatformioIni(iniText) {
@@ -15323,17 +15323,17 @@ function parsePlatformioIni(iniText) {
   return { environments, libDeps };
 }
 function inferLastBuild(projectDir) {
-  const logFile = path31.join(
+  const logFile = path19.join(
     projectDir,
     ".pio-mcp-workspace",
     "logs",
     "build",
     "latest-build.log"
   );
-  if (!fs27.existsSync(logFile)) return void 0;
+  if (!fs14.existsSync(logFile)) return void 0;
   let tail = "";
   try {
-    const buf = fs27.readFileSync(logFile);
+    const buf = fs14.readFileSync(logFile);
     tail = buf.slice(Math.max(0, buf.length - 4096)).toString("utf8");
   } catch {
     return { status: "unknown", logPath: logFile };
@@ -15386,8 +15386,8 @@ function buildContextNextSteps(ctx) {
 }
 async function getProjectContext(projectDir, includeBuildHistory) {
   const validatedPath = validateProjectPath(projectDir);
-  const iniPath = path31.join(validatedPath, "platformio.ini");
-  const hasPlatformioIni = fs27.existsSync(iniPath);
+  const iniPath = path19.join(validatedPath, "platformio.ini");
+  const hasPlatformioIni = fs14.existsSync(iniPath);
   let connectedDevices;
   try {
     const { listDevices: listDevices2 } = await Promise.resolve().then(() => (init_devices(), devices_exports));
@@ -15404,7 +15404,7 @@ async function getProjectContext(projectDir, includeBuildHistory) {
   let libDeps;
   if (hasPlatformioIni) {
     try {
-      const text7 = fs27.readFileSync(iniPath, "utf8");
+      const text7 = fs14.readFileSync(iniPath, "utf8");
       const parsed = parsePlatformioIni(text7);
       environments = parsed.environments;
       libDeps = parsed.libDeps;
@@ -15459,8 +15459,8 @@ var init_projects = __esm({
 });
 
 // src/core/devices/serial-endpoint.ts
-import fs29 from "node:fs";
-import path33 from "node:path";
+import fs18 from "node:fs";
+import path23 from "node:path";
 function validatePort(port) {
   if (typeof port !== "string" || !port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
     throw new PlatformIOError(
@@ -15471,9 +15471,9 @@ function validatePort(port) {
 function resolveSerialEndpoint(port, options = {}) {
   validatePort(port);
   const platform2 = options.platform ?? process.platform;
-  const realpath = options.realpath ?? fs29.realpathSync.native;
+  const realpath = options.realpath ?? fs18.realpathSync.native;
   const stat = options.stat ?? ((target) => {
-    const metadata = fs29.statSync(target, { bigint: true });
+    const metadata = fs18.statSync(target, { bigint: true });
     return {
       characterDevice: metadata.isCharacterDevice(),
       deviceNumber: metadata.rdev
@@ -15502,7 +15502,7 @@ function resolveSerialEndpoint(port, options = {}) {
         "Serial endpoint identity is unavailable on this platform.",
         "SERIAL_ENDPOINT_UNSUPPORTED"
       );
-    if (!path33.posix.isAbsolute(port) || !path33.posix.normalize(port).startsWith("/dev/"))
+    if (!path23.posix.isAbsolute(port) || !path23.posix.normalize(port).startsWith("/dev/"))
       throw new PlatformIOError(
         "Unix serial endpoints must resolve within /dev.",
         "SERIAL_ENDPOINT_INVALID"
@@ -15512,7 +15512,7 @@ function resolveSerialEndpoint(port, options = {}) {
     try {
       canonicalPort = realpath(port);
       validatePort(canonicalPort);
-      if (!path33.posix.isAbsolute(canonicalPort) || !path33.posix.normalize(canonicalPort).startsWith("/dev/"))
+      if (!path23.posix.isAbsolute(canonicalPort) || !path23.posix.normalize(canonicalPort).startsWith("/dev/"))
         throw new PlatformIOError(
           "Serial alias resolves outside /dev.",
           "SERIAL_ENDPOINT_INVALID"
@@ -15585,8 +15585,8 @@ var init_serial_endpoint = __esm({
 });
 
 // src/core/devices/process-identity.ts
-import fs30 from "node:fs";
-import path34 from "node:path";
+import fs19 from "node:fs";
+import path24 from "node:path";
 import { execFileSync } from "node:child_process";
 function linuxStartToken(stat, bootId, pid) {
   const end = stat.lastIndexOf(")");
@@ -15609,16 +15609,16 @@ function inspectProcessIdentity(pid) {
     let startToken;
     if (process.platform === "linux") {
       startToken = linuxStartToken(
-        fs30.readFileSync(`/proc/${pid}/stat`, "utf8"),
-        fs30.readFileSync("/proc/sys/kernel/random/boot_id", "utf8"),
+        fs19.readFileSync(`/proc/${pid}/stat`, "utf8"),
+        fs19.readFileSync("/proc/sys/kernel/random/boot_id", "utf8"),
         pid
       );
     } else if (process.platform === "win32") {
       const systemRoot = process.env.SystemRoot;
-      if (!systemRoot || !path34.isAbsolute(systemRoot))
+      if (!systemRoot || !path24.isAbsolute(systemRoot))
         return { status: "unknown" };
       startToken = execFileSync(
-        path34.join(
+        path24.join(
           systemRoot,
           "System32",
           "WindowsPowerShell",
@@ -15688,13 +15688,13 @@ var init_process_identity = __esm({
 });
 
 // src/core/devices/device-lease.ts
-import fs31 from "node:fs";
-import os6 from "node:os";
-import path35 from "node:path";
-import { createHash as createHash6, randomUUID as randomUUID3 } from "node:crypto";
+import fs20 from "node:fs";
+import os5 from "node:os";
+import path25 from "node:path";
+import { createHash as createHash3, randomUUID as randomUUID2 } from "node:crypto";
 function stableDeviceLeaseRoot() {
-  return path35.join(
-    os6.userInfo().homedir,
+  return path25.join(
+    os5.userInfo().homedir,
     ".platformio-mcp",
     "device-leases-v1"
   );
@@ -15705,7 +15705,7 @@ function resourceKey(resource) {
       "Invalid physical resource identity.",
       "DEVICE_IDENTITY_INVALID"
     );
-  return createHash6("sha256").update(JSON.stringify([resource.kind, resource.identity])).digest("hex");
+  return createHash3("sha256").update(JSON.stringify([resource.kind, resource.identity])).digest("hex");
 }
 function validProcessIdentity(value2) {
   return !!value2 && Number.isSafeInteger(value2.pid) && value2.pid >= 1 && value2.pid <= 2147483647 && ["win32", "linux", "darwin"].includes(value2.platform) && typeof value2.startToken === "string" && value2.startToken.length > 0 && value2.startToken.length <= 256;
@@ -15727,7 +15727,7 @@ var init_device_lease = __esm({
       owner;
       /** Construct a store; no file is created or device opened until acquisition. */
       constructor(options = {}) {
-        this.root = path35.resolve(options.root ?? stableDeviceLeaseRoot());
+        this.root = path25.resolve(options.root ?? stableDeviceLeaseRoot());
         this.inspect = options.inspect ?? inspectProcessIdentity;
       }
       /** Inspect persisted ownership without releasing or recovering it; acquisition must still be atomic. */
@@ -15781,7 +15781,7 @@ var init_device_lease = __esm({
             version: 1,
             resource: { kind: resource.kind, identity: resource.identity },
             owner: { ...owner },
-            nonce: randomUUID3(),
+            nonce: randomUUID2(),
             acquiredAt: (/* @__PURE__ */ new Date()).toISOString()
           };
           this.writeRecord(key, record2);
@@ -15837,7 +15837,7 @@ var init_device_lease = __esm({
             ...current,
             owner: { ...target },
             handoffPending: void 0,
-            nonce: randomUUID3()
+            nonce: randomUUID2()
           };
           this.writeRecord(key, transferred);
           this.held.delete(lease);
@@ -15868,7 +15868,7 @@ var init_device_lease = __esm({
               "Transferred child exit is not confirmed.",
               "DEVICE_OWNER_UNKNOWN"
             );
-          fs31.unlinkSync(path35.join(this.root, `${key}.json`));
+          fs20.unlinkSync(path25.join(this.root, `${key}.json`));
           this.transfers.delete(ticket);
         });
       }
@@ -15891,7 +15891,7 @@ var init_device_lease = __esm({
               "Lease transfer ticket is stale or belongs to another process.",
               "DEVICE_TRANSFER_INVALID"
             );
-          const adopted = { ...current, nonce: randomUUID3() };
+          const adopted = { ...current, nonce: randomUUID2() };
           this.writeRecord(key, adopted);
           return this.createHandle(adopted);
         });
@@ -15907,7 +15907,7 @@ var init_device_lease = __esm({
               "Cannot release unresolved child custody.",
               "DEVICE_HANDOFF_PENDING"
             );
-          fs31.unlinkSync(path35.join(this.root, `${key}.json`));
+          fs20.unlinkSync(path25.join(this.root, `${key}.json`));
           this.held.delete(lease);
         });
       }
@@ -15950,23 +15950,23 @@ var init_device_lease = __esm({
       }
       /** Refuse symlinked/non-directory components instead of silently splitting the global lock domain. */
       ensureRoot() {
-        const parsed = path35.parse(this.root);
+        const parsed = path25.parse(this.root);
         let current = parsed.root;
-        for (const part of this.root.slice(parsed.root.length).split(path35.sep).filter(Boolean)) {
-          current = path35.join(current, part);
+        for (const part of this.root.slice(parsed.root.length).split(path25.sep).filter(Boolean)) {
+          current = path25.join(current, part);
           try {
-            fs31.mkdirSync(current, { mode: 448 });
+            fs20.mkdirSync(current, { mode: 448 });
           } catch (error2) {
             if (error2.code !== "EEXIST") throw error2;
           }
-          const stat = fs31.lstatSync(current);
+          const stat = fs20.lstatSync(current);
           if (!stat.isDirectory() || stat.isSymbolicLink())
             throw new PlatformIOError(
               "Device lease directory must not contain symlinks.",
               "DEVICE_LEASE_PATH_INVALID"
             );
         }
-        const rootStat = fs31.statSync(this.root);
+        const rootStat = fs20.statSync(this.root);
         if (process.platform !== "win32" && (rootStat.uid !== process.getuid?.() || (rootStat.mode & 18) !== 0))
           throw new PlatformIOError(
             "Device lease directory must be owned by this user and not writable by others.",
@@ -15975,9 +15975,9 @@ var init_device_lease = __esm({
       }
       withGate(key, action) {
         this.ensureRoot();
-        const gate = path35.join(this.root, `${key}.gate`);
+        const gate = path25.join(this.root, `${key}.gate`);
         try {
-          fs31.mkdirSync(gate, { mode: 448 });
+          fs20.mkdirSync(gate, { mode: 448 });
         } catch (error2) {
           if (error2.code === "EEXIST")
             throw new PlatformIOError(
@@ -15989,14 +15989,14 @@ var init_device_lease = __esm({
         try {
           return action();
         } finally {
-          fs31.rmdirSync(gate);
+          fs20.rmdirSync(gate);
         }
       }
       readRecord(key) {
-        const file = path35.join(this.root, `${key}.json`);
+        const file = path25.join(this.root, `${key}.json`);
         let stat;
         try {
-          stat = fs31.lstatSync(file);
+          stat = fs20.lstatSync(file);
         } catch (error2) {
           if (error2.code === "ENOENT") return void 0;
           throw error2;
@@ -16007,7 +16007,7 @@ var init_device_lease = __esm({
             "DEVICE_LEASE_CORRUPT"
           );
         try {
-          const record2 = JSON.parse(fs31.readFileSync(file, "utf8"));
+          const record2 = JSON.parse(fs20.readFileSync(file, "utf8"));
           if (record2.version !== 1 || record2.handoffPending !== void 0 && record2.handoffPending !== true || resourceKey(record2.resource) !== key || !validProcessIdentity(record2.owner) || typeof record2.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(record2.nonce) || typeof record2.acquiredAt !== "string" || !Number.isFinite(Date.parse(record2.acquiredAt)))
             throw new Error("Invalid lease schema");
           return record2;
@@ -16019,19 +16019,19 @@ var init_device_lease = __esm({
         }
       }
       writeRecord(key, record2) {
-        const temporary = path35.join(this.root, `${key}.${record2.nonce}.tmp`);
+        const temporary = path25.join(this.root, `${key}.${record2.nonce}.tmp`);
         let fd;
         try {
-          fd = fs31.openSync(temporary, "wx", 384);
-          fs31.writeFileSync(fd, JSON.stringify(record2), "utf8");
-          fs31.fsyncSync(fd);
-          fs31.closeSync(fd);
+          fd = fs20.openSync(temporary, "wx", 384);
+          fs20.writeFileSync(fd, JSON.stringify(record2), "utf8");
+          fs20.fsyncSync(fd);
+          fs20.closeSync(fd);
           fd = void 0;
-          fs31.renameSync(temporary, path35.join(this.root, `${key}.json`));
+          fs20.renameSync(temporary, path25.join(this.root, `${key}.json`));
         } finally {
-          if (fd !== void 0) fs31.closeSync(fd);
+          if (fd !== void 0) fs20.closeSync(fd);
           try {
-            fs31.unlinkSync(temporary);
+            fs20.unlinkSync(temporary);
           } catch (error2) {
             if (error2.code !== "ENOENT") throw error2;
           }
@@ -16276,16 +16276,16 @@ var require_tree_kill = __commonJS({
 });
 
 // src/utils/logger.ts
-import fs32 from "node:fs";
-import path36 from "node:path";
+import fs21 from "node:fs";
+import path26 from "node:path";
 async function logDiagnostic(msg, _projectDir) {
   ensureGlobalDirs();
-  const diagLog = path36.join(SERVER_DATA_DIR, "server.log");
+  const diagLog = path26.join(SERVER_DATA_DIR, "server.log");
   const timestamp = (/* @__PURE__ */ new Date()).toISOString();
   const line = `[${timestamp}] ${msg}
 `;
   try {
-    await fs32.promises.appendFile(diagLog, line);
+    await fs21.promises.appendFile(diagLog, line);
   } catch {
   }
   console.error(msg);
@@ -16298,59 +16298,59 @@ var init_logger = __esm({
 });
 
 // src/utils/process-manager.ts
-import fs33 from "node:fs";
+import fs22 from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
-import os7 from "node:os";
-import path37 from "node:path";
+import os6 from "node:os";
+import path27 from "node:path";
 import { execSync as execSync2 } from "node:child_process";
-import crypto10 from "node:crypto";
+import crypto9 from "node:crypto";
 function getPidsFilePath(projectDir, file = SERIAL_PIDS_FILE) {
   if (file === SERIAL_PIDS_FILE) {
     ensureGlobalDirs();
-    const dir = path37.join(SERVER_DATA_DIR, "serial_monitors");
-    if (!fs33.existsSync(dir)) fs33.mkdirSync(dir, { recursive: true });
-    return path37.join(dir, file);
+    const dir = path27.join(SERVER_DATA_DIR, "serial_monitors");
+    if (!fs22.existsSync(dir)) fs22.mkdirSync(dir, { recursive: true });
+    return path27.join(dir, file);
   } else if (file === BUILD_PIDS_FILE) {
     const baseDir2 = projectDir || SERVER_DATA_DIR;
     if (!projectDir) ensureGlobalDirs();
-    const dir = path37.join(baseDir2, WORKSPACE_DIR2, "tasks");
-    if (!fs33.existsSync(dir)) fs33.mkdirSync(dir, { recursive: true });
-    return path37.join(dir, file);
+    const dir = path27.join(baseDir2, WORKSPACE_DIR2, "tasks");
+    if (!fs22.existsSync(dir)) fs22.mkdirSync(dir, { recursive: true });
+    return path27.join(dir, file);
   }
   const baseDir = projectDir || SERVER_DATA_DIR;
   if (!projectDir) ensureGlobalDirs();
-  return path37.join(baseDir, WORKSPACE_DIR2, LOCKS_DIR, file);
+  return path27.join(baseDir, WORKSPACE_DIR2, LOCKS_DIR, file);
 }
 function readMonitorIdentities(pidsFile) {
   const file = pidsFile + ".identities.json";
-  if (!fs33.existsSync(file)) return {};
-  if (fs33.statSync(file).size > 1024 * 1024)
+  if (!fs22.existsSync(file)) return {};
+  if (fs22.statSync(file).size > 1024 * 1024)
     throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
-  const value2 = JSON.parse(fs33.readFileSync(file, "utf8"));
+  const value2 = JSON.parse(fs22.readFileSync(file, "utf8"));
   if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
     throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
   return value2;
 }
 async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFile, taskId, commandDesc) {
   const pidsFile = getPidsFilePath(projectDir);
-  const dir = path37.dirname(pidsFile);
-  if (!fs33.existsSync(dir)) fs33.mkdirSync(dir, { recursive: true });
-  if (!fs33.existsSync(pidsFile)) fs33.writeFileSync(pidsFile, "{}");
+  const dir = path27.dirname(pidsFile);
+  if (!fs22.existsSync(dir)) fs22.mkdirSync(dir, { recursive: true });
+  if (!fs22.existsSync(pidsFile)) fs22.writeFileSync(pidsFile, "{}");
   try {
     const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let pids = {};
       try {
-        pids = JSON.parse(fs33.readFileSync(pidsFile, "utf8"));
+        pids = JSON.parse(fs22.readFileSync(pidsFile, "utf8"));
       } catch {
       }
       const identities = readMonitorIdentities(pidsFile);
       const observed = inspectProcessIdentity(pid);
       if (observed.status === "running") identities[port] = observed.identity;
       else delete identities[port];
-      fs33.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+      fs22.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
       pids[port] = pid;
-      fs33.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+      fs22.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
     } finally {
       await release();
     }
@@ -16358,8 +16358,8 @@ async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFi
     throw new Error(`Registry contention timeout: ${e.message}`);
   }
   try {
-    const commandId = rootCommandId || crypto10.randomUUID();
-    const effectiveTaskId = taskId || crypto10.randomUUID();
+    const commandId = rootCommandId || crypto9.randomUUID();
+    const effectiveTaskId = taskId || crypto9.randomUUID();
     await registerCommand({
       id: commandId,
       commandDesc: `PIO Serial Monitor: ${port}`,
@@ -16381,17 +16381,17 @@ async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFi
 }
 async function unregisterPioMonitorPid(port, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (fs33.existsSync(pidsFile)) {
+  if (fs22.existsSync(pidsFile)) {
     try {
       const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
       try {
-        const pids = JSON.parse(fs33.readFileSync(pidsFile, "utf8"));
+        const pids = JSON.parse(fs22.readFileSync(pidsFile, "utf8"));
         if (pids[port]) {
           delete pids[port];
           const identities = readMonitorIdentities(pidsFile);
           delete identities[port];
-          fs33.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-          fs33.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+          fs22.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+          fs22.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
         }
       } finally {
         await release();
@@ -16417,11 +16417,11 @@ async function unregisterPioMonitorPid(port, projectDir) {
 }
 async function killPioMonitorByPort(port, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (!fs33.existsSync(pidsFile)) return false;
+  if (!fs22.existsSync(pidsFile)) return false;
   let stoppedPid;
   const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
   try {
-    const pids = JSON.parse(fs33.readFileSync(pidsFile, "utf8"));
+    const pids = JSON.parse(fs22.readFileSync(pidsFile, "utf8"));
     const pid = pids[port];
     if (!pid) return false;
     stoppedPid = pid;
@@ -16445,8 +16445,8 @@ async function killPioMonitorByPort(port, projectDir) {
     delete pids[port];
     const identities = readMonitorIdentities(pidsFile);
     delete identities[port];
-    fs33.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-    fs33.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    fs22.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+    fs22.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
   } finally {
     await release();
   }
@@ -16462,7 +16462,7 @@ async function killPioMonitorByPort(port, projectDir) {
 function isPidAlive(pid) {
   try {
     process.kill(pid, 0);
-    if (os7.platform() !== "win32") {
+    if (os6.platform() !== "win32") {
       try {
         const stdout = execSync2(`ps -p ${pid} -o command=`, { encoding: "utf8" }).toLowerCase();
         if (!stdout.includes("platformio") && !stdout.includes("pio") && !stdout.includes("python")) {
@@ -16486,18 +16486,18 @@ function isPidAlive(pid) {
 }
 function getActiveMonitorPids(projectDir) {
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (!fs33.existsSync(pidsFile)) return {};
+  if (!fs22.existsSync(pidsFile)) return {};
   try {
-    return JSON.parse(fs33.readFileSync(pidsFile, "utf8"));
+    return JSON.parse(fs22.readFileSync(pidsFile, "utf8"));
   } catch {
     return {};
   }
 }
 function isBuildActive(projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs33.existsSync(pidsFile)) return false;
+  if (!fs22.existsSync(pidsFile)) return false;
   try {
-    const pids = JSON.parse(fs33.readFileSync(pidsFile, "utf8"));
+    const pids = JSON.parse(fs22.readFileSync(pidsFile, "utf8"));
     for (const key of Object.keys(pids)) {
       if (pids[key]?.type === "build" || key === "build") {
         const targetPid = key === "build" ? pids[key] : Number(key);
@@ -16510,19 +16510,19 @@ function isBuildActive(projectDir) {
 }
 async function registerBuildPid(pid, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  const dir = path37.dirname(pidsFile);
-  if (!fs33.existsSync(dir)) fs33.mkdirSync(dir, { recursive: true });
-  if (!fs33.existsSync(pidsFile)) fs33.writeFileSync(pidsFile, "{}");
+  const dir = path27.dirname(pidsFile);
+  if (!fs22.existsSync(dir)) fs22.mkdirSync(dir, { recursive: true });
+  if (!fs22.existsSync(pidsFile)) fs22.writeFileSync(pidsFile, "{}");
   try {
     const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let pids = {};
       try {
-        pids = JSON.parse(fs33.readFileSync(pidsFile, "utf8"));
+        pids = JSON.parse(fs22.readFileSync(pidsFile, "utf8"));
       } catch {
       }
       pids[pid.toString()] = { type: "build", started: Date.now() };
-      fs33.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+      fs22.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
     } finally {
       await release();
     }
@@ -16532,11 +16532,11 @@ async function registerBuildPid(pid, projectDir) {
 }
 async function unregisterBuildPid(projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs33.existsSync(pidsFile)) return;
+  if (!fs22.existsSync(pidsFile)) return;
   try {
     const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
-      const pids = JSON.parse(fs33.readFileSync(pidsFile, "utf8"));
+      const pids = JSON.parse(fs22.readFileSync(pidsFile, "utf8"));
       let changed = false;
       for (const key of Object.keys(pids)) {
         if (pids[key]?.type === "build" || key === "build") {
@@ -16545,7 +16545,7 @@ async function unregisterBuildPid(projectDir) {
         }
       }
       if (changed) {
-        fs33.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+        fs22.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
       }
     } finally {
       await release();
@@ -16556,14 +16556,14 @@ async function unregisterBuildPid(projectDir) {
 }
 async function unregisterBuildPidValue(pid, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs33.existsSync(pidsFile)) return;
+  if (!fs22.existsSync(pidsFile)) return;
   const release = await import_proper_lockfile5.default.lock(pidsFile, {
     retries: { retries: 5, minTimeout: 50, maxTimeout: 200 }
   });
   try {
-    const pids = JSON.parse(fs33.readFileSync(pidsFile, "utf8"));
+    const pids = JSON.parse(fs22.readFileSync(pidsFile, "utf8"));
     delete pids[String(pid)];
-    fs33.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    fs22.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
   } finally {
     await release();
   }
@@ -16573,9 +16573,9 @@ async function killTrackedTaskProcess(task, projectDir) {
   const monitorPids = getActiveMonitorPids(projectDir);
   const buildPidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
   let buildPids = {};
-  if (fs33.existsSync(buildPidsFile)) {
+  if (fs22.existsSync(buildPidsFile)) {
     try {
-      buildPids = JSON.parse(fs33.readFileSync(buildPidsFile, "utf8"));
+      buildPids = JSON.parse(fs22.readFileSync(buildPidsFile, "utf8"));
     } catch {
       buildPids = {};
     }
@@ -16607,9 +16607,9 @@ async function killAllTrackedProcesses(projectDir) {
   const tasks = [];
   for (const file of [SERIAL_PIDS_FILE, BUILD_PIDS_FILE]) {
     const pidsFile = getPidsFilePath(projectDir, file);
-    if (fs33.existsSync(pidsFile)) {
+    if (fs22.existsSync(pidsFile)) {
       try {
-        const pids = JSON.parse(fs33.readFileSync(pidsFile, "utf8"));
+        const pids = JSON.parse(fs22.readFileSync(pidsFile, "utf8"));
         for (const key of Object.keys(pids)) {
           let targetPid;
           if (file === BUILD_PIDS_FILE) {
@@ -16627,7 +16627,7 @@ async function killAllTrackedProcesses(projectDir) {
             tasks.push(p);
           }
         }
-        fs33.unlinkSync(pidsFile);
+        fs22.unlinkSync(pidsFile);
       } catch {
       }
     }
@@ -16683,16 +16683,16 @@ var init_process_manager = __esm({
 });
 
 // src/utils/tail.ts
-import fs34 from "node:fs";
+import fs23 from "node:fs";
 async function tailFileBounded(filePath, maxBytes = 1024 * 1024) {
-  if (!fs34.existsSync(filePath)) {
+  if (!fs23.existsSync(filePath)) {
     return [];
   }
-  const stat = await fs34.promises.stat(filePath);
+  const stat = await fs23.promises.stat(filePath);
   if (stat.size === 0) return [];
   const sizeToRead = Math.min(stat.size, maxBytes);
   const startPos = stat.size - sizeToRead;
-  const stream = fs34.createReadStream(filePath, { start: startPos, encoding: "utf8" });
+  const stream = fs23.createReadStream(filePath, { start: startPos, encoding: "utf8" });
   let content = "";
   for await (const chunk of stream) {
     content += chunk;
@@ -16706,26 +16706,26 @@ var init_tail = __esm({
 });
 
 // src/utils/spooler.ts
-import fs35 from "node:fs";
-import path38 from "node:path";
-import crypto11 from "node:crypto";
+import fs24 from "node:fs";
+import path28 from "node:path";
+import crypto10 from "node:crypto";
 function getLogDir(verb, projectDir) {
   const baseDir = projectDir || SERVER_DATA_DIR;
   if (!projectDir) ensureGlobalDirs();
-  return path38.join(baseDir, WORKSPACE_DIR3, "logs", verb);
+  return path28.join(baseDir, WORKSPACE_DIR3, "logs", verb);
 }
 function rotateLogs(targetDir, prefix, maxHistory = 30) {
-  if (!fs35.existsSync(targetDir)) return;
-  const files = fs35.readdirSync(targetDir).filter((f) => f.startsWith(prefix) && f.endsWith(".log")).map((f) => ({
+  if (!fs24.existsSync(targetDir)) return;
+  const files = fs24.readdirSync(targetDir).filter((f) => f.startsWith(prefix) && f.endsWith(".log")).map((f) => ({
     name: f,
-    path: path38.join(targetDir, f),
-    ctime: fs35.statSync(path38.join(targetDir, f)).ctime.getTime()
+    path: path28.join(targetDir, f),
+    ctime: fs24.statSync(path28.join(targetDir, f)).ctime.getTime()
   })).sort((a, b) => b.ctime - a.ctime);
   if (files.length > maxHistory) {
     const toDelete = files.slice(maxHistory);
     for (const f of toDelete) {
       try {
-        fs35.unlinkSync(f.path);
+        fs24.unlinkSync(f.path);
       } catch {
       }
     }
@@ -16733,33 +16733,33 @@ function rotateLogs(targetDir, prefix, maxHistory = 30) {
 }
 function rotateSpoolerStreams(verb, projectDir) {
   const targetDir = getLogDir(verb, projectDir);
-  if (!fs35.existsSync(targetDir)) {
-    fs35.mkdirSync(targetDir, { recursive: true });
+  if (!fs24.existsSync(targetDir)) {
+    fs24.mkdirSync(targetDir, { recursive: true });
   }
   rotateLogs(targetDir, `${verb}-`, 30);
   const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-  const shortHash = crypto11.randomBytes(4).toString("hex");
-  const logFile = path38.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
-  const latestLog = path38.join(targetDir, `latest-${verb}.log`);
+  const shortHash = crypto10.randomBytes(4).toString("hex");
+  const logFile = path28.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
+  const latestLog = path28.join(targetDir, `latest-${verb}.log`);
   return { logFile, latestLog };
 }
 function ensureLatestLogPointer(logFile, latestLog) {
   try {
-    if (fs35.existsSync(latestLog)) fs35.unlinkSync(latestLog);
+    if (fs24.existsSync(latestLog)) fs24.unlinkSync(latestLog);
   } catch {
   }
   try {
-    fs35.symlinkSync(logFile, latestLog);
+    fs24.symlinkSync(logFile, latestLog);
     return { mirrorLatest: false };
   } catch {
   }
   try {
-    fs35.linkSync(logFile, latestLog);
+    fs24.linkSync(logFile, latestLog);
     return { mirrorLatest: false };
   } catch {
   }
   try {
-    fs35.writeFileSync(latestLog, "");
+    fs24.writeFileSync(latestLog, "");
     return { mirrorLatest: true };
   } catch {
   }
@@ -16772,7 +16772,7 @@ async function executeWithSpooling(command, args, options) {
   }
   const verb = options.artifactType || "build";
   const { logFile, latestLog } = rotateSpoolerStreams(verb, projectArea);
-  const outFd = fs35.openSync(logFile, "a");
+  const outFd = fs24.openSync(logFile, "a");
   let proc;
   let deviceCustody;
   try {
@@ -16788,7 +16788,7 @@ async function executeWithSpooling(command, args, options) {
     });
   } catch (error2) {
     try {
-      fs35.closeSync(outFd);
+      fs24.closeSync(outFd);
     } catch {
     }
     deviceCustody?.releaseAfterExit();
@@ -16805,8 +16805,8 @@ async function executeWithSpooling(command, args, options) {
   void completion.catch(() => {
   });
   const ctx = mcpContext.getStore();
-  const commandId = options.rootCommandId || ctx?.activityId || crypto11.randomUUID();
-  const taskId = crypto11.randomUUID();
+  const commandId = options.rootCommandId || ctx?.activityId || crypto10.randomUUID();
+  const taskId = crypto10.randomUUID();
   const artType = options.artifactType || "build";
   const targetProjectArea = projectArea || ctx?.targetProjectDir;
   try {
@@ -16845,7 +16845,7 @@ async function executeWithSpooling(command, args, options) {
       }
     } finally {
       try {
-        fs35.closeSync(outFd);
+        fs24.closeSync(outFd);
       } catch {
       }
     }
@@ -16860,18 +16860,18 @@ async function executeWithSpooling(command, args, options) {
   let watcher = null;
   portalEvents.clearTaskLog(targetProjectArea || "global", taskId, [logFile]);
   try {
-    watcher = fs35.watch(logFile, (eventType) => {
+    watcher = fs24.watch(logFile, (eventType) => {
       if (eventType === "change") {
         try {
-          const stat = fs35.statSync(logFile);
+          const stat = fs24.statSync(logFile);
           if (stat.size > fileOffset) {
-            const stream = fs35.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
+            const stream = fs24.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on("data", (chunk) => {
               const text7 = chunk.toString();
               portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text7);
               if (latestPointer.mirrorLatest) {
                 try {
-                  fs35.appendFileSync(latestLog, text7);
+                  fs24.appendFileSync(latestLog, text7);
                 } catch {
                 }
               }
@@ -16888,25 +16888,25 @@ async function executeWithSpooling(command, args, options) {
   }
   const closeOutput = () => {
     try {
-      fs35.closeSync(outFd);
+      fs24.closeSync(outFd);
     } catch {
     }
     if (watcher) {
       let fd;
       try {
-        const size = fs35.statSync(logFile).size;
+        const size = fs24.statSync(logFile).size;
         if (size > fileOffset) {
           const start = Math.max(fileOffset, size - 512 * 1024);
           const buffer = Buffer.alloc(size - start);
-          fd = fs35.openSync(logFile, "r");
-          const bytes = fs35.readSync(fd, buffer, 0, buffer.length, start);
+          fd = fs24.openSync(logFile, "r");
+          const bytes = fs24.readSync(fd, buffer, 0, buffer.length, start);
           portalEvents.emitTaskLog(targetProjectArea || "global", taskId, buffer.subarray(0, bytes).toString());
         }
       } catch {
       } finally {
         if (fd !== void 0) {
           try {
-            fs35.closeSync(fd);
+            fs24.closeSync(fd);
           } catch {
           }
         }
@@ -17027,18 +17027,18 @@ function spoolLargeDataset(toolName, data, targetDir, threshold = 2e3) {
   const stringified = JSON.stringify(data, null, 2);
   if (stringified.length > threshold) {
     const cacheDir = getLogDir(toolName, targetDir);
-    if (!fs35.existsSync(cacheDir)) {
-      fs35.mkdirSync(cacheDir, { recursive: true });
+    if (!fs24.existsSync(cacheDir)) {
+      fs24.mkdirSync(cacheDir, { recursive: true });
     }
     rotateLogs(cacheDir, `${toolName}-`, 30);
     const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-    const shortHash = crypto11.randomBytes(4).toString("hex");
-    const cacheFile = path38.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
-    const latestFile = path38.join(cacheDir, `latest-${toolName}.json`);
-    fs35.writeFileSync(cacheFile, stringified, "utf-8");
+    const shortHash = crypto10.randomBytes(4).toString("hex");
+    const cacheFile = path28.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
+    const latestFile = path28.join(cacheDir, `latest-${toolName}.json`);
+    fs24.writeFileSync(cacheFile, stringified, "utf-8");
     try {
-      if (fs35.existsSync(latestFile)) fs35.unlinkSync(latestFile);
-      fs35.symlinkSync(cacheFile, latestFile);
+      if (fs24.existsSync(latestFile)) fs24.unlinkSync(latestFile);
+      fs24.symlinkSync(cacheFile, latestFile);
     } catch {
     }
     return `Payload too large for context window. Full dataset successfully spooled to disk at ${cacheFile}. Please use your grep_search or view_file tools to query this file.`;
@@ -92644,7 +92644,7 @@ var require_ip_address = __commonJS({
 // src/tools/coredump.ts
 init_zod();
 init_errors2();
-import fs22 from "node:fs/promises";
+import fs38 from "node:fs/promises";
 
 // src/core/action-catalog.ts
 var READ = {
@@ -94635,90 +94635,23 @@ function createPolicyRevisionGuard(workspaceDir) {
   };
 }
 
-// src/core/analysis/esp-coredump-artifact.ts
-import fs11 from "node:fs/promises";
-
-// src/core/analysis/esp-coredump-firmware.ts
+// src/tools/coredump-device.ts
+init_zod();
 init_errors2();
-function readEspCoredumpFirmwareIdentity(payload, version2) {
-  const bytes = Buffer.from(payload);
-  const invalid4 = (message) => {
-    throw new PlatformIOError(message, "COREDUMP_ELF_INVALID");
-  };
-  if (bytes.length < 52 || bytes.length > 16 * 1024 * 1024 || bytes.subarray(0, 7).toString("hex") !== "7f454c46010101")
-    return invalid4("Expected a bounded ELF32 little-endian core dump.");
-  if (bytes.readUInt16LE(16) !== 4 || bytes.readUInt32LE(20) !== 1 || bytes.readUInt16LE(40) !== 52)
-    return invalid4("Invalid core-dump ELF header.");
-  const machine = bytes.readUInt16LE(18);
-  const chip = version2 >>> 16;
-  const expectedMachine = [0, 2, 9].includes(chip) ? 94 : [5, 12, 13, 16, 18].includes(chip) ? 243 : null;
-  if (machine !== expectedMachine)
-    return invalid4("Core-dump ELF machine does not match its chip.");
-  const table = bytes.readUInt32LE(28), count2 = bytes.readUInt16LE(44);
-  if (!count2 || count2 > 4096 || bytes.readUInt16LE(42) !== 32 || table < 52 || table + count2 * 32 > bytes.length)
-    return invalid4("Invalid core-dump program-header table.");
-  let hash = null;
-  let notes = 0;
-  const ranges = [];
-  for (let index = 0; index < count2; index++) {
-    const header = table + index * 32;
-    const type = bytes.readUInt32LE(header), offset2 = bytes.readUInt32LE(header + 4), size = bytes.readUInt32LE(header + 16);
-    if (offset2 + size > bytes.length)
-      return invalid4("Core-dump segment extends outside the ELF.");
-    if (type !== 4 || !size) continue;
-    if (offset2 < table + count2 * 32 || ranges.some(([start, end]) => offset2 < end && offset2 + size > start))
-      return invalid4("Core-dump note segments overlap headers or each other.");
-    ranges.push([offset2, offset2 + size]);
-    let cursor = offset2;
-    while (cursor < offset2 + size) {
-      if (++notes > 4096 || cursor + 12 > offset2 + size)
-        return invalid4("Truncated or excessive core-dump notes.");
-      const nameSize = bytes.readUInt32LE(cursor), descSize = bytes.readUInt32LE(cursor + 4), noteType = bytes.readUInt32LE(cursor + 8);
-      const nameStart = cursor + 12, descStart = nameStart + Math.ceil(nameSize / 4) * 4;
-      const end = descStart + Math.ceil(descSize / 4) * 4;
-      if (end > offset2 + size)
-        return invalid4("Core-dump note exceeds its segment.");
-      const name2 = bytes.subarray(nameStart, nameStart + nameSize).toString("latin1").split("\0")[0];
-      if (name2 === "ESP_CORE_DUMP_INFO" && noteType === 8266) {
-        if (hash !== null || descSize < 68 || bytes.readUInt32LE(descStart) !== version2)
-          return invalid4(
-            "Duplicate, truncated or inconsistent ESP firmware identity note."
-          );
-        const rawHash = bytes.subarray(descStart + 4, descStart + 68);
-        const zero = rawHash.indexOf(0);
-        const prefix = rawHash.subarray(0, zero < 0 ? 64 : zero).toString("latin1");
-        if (!/^[a-fA-F0-9]{1,64}$/.test(prefix) || zero >= 0 && rawHash.subarray(zero).some((value2) => value2 !== 0))
-          return invalid4("Invalid ESP firmware hash prefix.");
-        hash = prefix.toLowerCase();
-      }
-      cursor = end;
-    }
-  }
-  return { elfSha256Prefix: hash, hashBits: (hash?.length ?? 0) * 4, machine };
-}
-function matchEspCoredumpFirmware(identity, elfSha256) {
-  if (!/^[a-f0-9]{64}$/i.test(elfSha256))
-    throw new PlatformIOError(
-      "Expected ELF identity must be SHA-256.",
-      "COREDUMP_IDENTITY_INVALID"
-    );
-  if (!identity.elfSha256Prefix)
-    return { status: "unavailable", hashBits: 0 };
-  if (!elfSha256.toLowerCase().startsWith(identity.elfSha256Prefix))
-    throw new PlatformIOError(
-      "Selected ELF does not match the firmware identity in the dump.",
-      "COREDUMP_ELF_MISMATCH"
-    );
-  return {
-    status: identity.hashBits === 256 ? "matched" : "prefix_matched",
-    hashBits: identity.hashBits
-  };
-}
+
+// src/tools/partition-table.ts
+init_projects();
+import fs27 from "node:fs/promises";
+import path31 from "node:path";
+
+// src/core/esp-partition-framework.ts
+import fs16 from "node:fs/promises";
+import path21 from "node:path";
 
 // src/core/esp-partition-artifacts.ts
 init_errors2();
-import fs10 from "node:fs/promises";
-import path15 from "node:path";
+import fs15 from "node:fs/promises";
+import path20 from "node:path";
 import { createHash as createHash2 } from "node:crypto";
 
 // src/core/esp-partitions.ts
@@ -95100,18 +95033,18 @@ function reportEspPartitions(parts, layout, firmwareSize) {
 
 // src/core/esp-partition-artifacts.ts
 function contained(root, target) {
-  const relative = path15.relative(root, target);
-  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path15.sep) && !path15.isAbsolute(relative);
+  const relative = path20.relative(root, target);
+  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path20.sep) && !path20.isAbsolute(relative);
 }
 async function readPartitionArtifact(root, requested, limit) {
-  const lexical = path15.resolve(root, requested);
-  const canonical3 = await fs10.realpath(lexical);
+  const lexical = path20.resolve(root, requested);
+  const canonical3 = await fs15.realpath(lexical);
   if (!contained(root, canonical3))
     throw new PlatformIOError(
       "Partition artifact is outside the authorized workspace.",
       "PARTITION_ARTIFACT_OUTSIDE_WORKSPACE"
     );
-  const handle = await fs10.open(canonical3, "r");
+  const handle = await fs15.open(canonical3, "r");
   try {
     const before = await handle.stat();
     if (!before.isFile() || before.size > limit)
@@ -95127,8 +95060,8 @@ async function readPartitionArtifact(root, requested, limit) {
       used += read.bytesRead;
     }
     const after = await handle.stat();
-    const current = await fs10.stat(canonical3);
-    const resolved = await fs10.realpath(lexical);
+    const current = await fs15.stat(canonical3);
+    const resolved = await fs15.realpath(lexical);
     if (used !== before.size || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || before.ino !== current.ino || before.dev !== current.dev || current.size !== after.size || current.mtimeMs !== after.mtimeMs || resolved !== canonical3)
       throw new PlatformIOError(
         "Partition artifact changed during inspection; retry with a stable copy.",
@@ -95148,9 +95081,9 @@ async function readPartitionArtifact(root, requested, limit) {
   }
 }
 async function inspectEspPartitionArtifacts(input) {
-  const root = await fs10.realpath(input.workspaceDir);
+  const root = await fs15.realpath(input.workspaceDir);
   const table = await readPartitionArtifact(
-    input.trustedTableRoot ? await fs10.realpath(input.trustedTableRoot) : root,
+    input.trustedTableRoot ? await fs15.realpath(input.trustedTableRoot) : root,
     input.tablePath,
     input.format === "csv" ? 65536 : 4096
   );
@@ -95191,1317 +95124,11 @@ async function inspectEspPartitionArtifacts(input) {
   };
 }
 
-// src/core/analysis/esp-coredump-artifact.ts
-init_errors2();
-
-// src/core/analysis/esp-coredump-input.ts
-init_errors2();
-import { createHash as createHash3, timingSafeEqual } from "node:crypto";
-var MAX_DUMP_BYTES = 16 * 1024 * 1024;
-var chips = {
-  0: "esp32",
-  2: "esp32s2",
-  9: "esp32s3",
-  5: "esp32c3",
-  12: "esp32c2",
-  13: "esp32c6",
-  16: "esp32h2",
-  18: "esp32p4"
-};
-var versions = {
-  2: { header: 20, checksum: "crc32", payload: "binary" },
-  3: { header: 24, checksum: "crc32", payload: "binary" },
-  256: { header: 20, checksum: "crc32", payload: "elf" },
-  257: { header: 20, checksum: "sha256", payload: "elf" },
-  258: { header: 24, checksum: "crc32", payload: "elf" },
-  259: { header: 24, checksum: "sha256", payload: "elf" }
-};
-var crcTable = Uint32Array.from({ length: 256 }, (_, value2) => {
-  let crc = value2;
-  for (let bit = 0; bit < 8; bit++)
-    crc = crc >>> 1 ^ (crc & 1 ? 3988292384 : 0);
-  return crc >>> 0;
-});
-function crc32(bytes) {
-  let crc = 4294967295;
-  for (const byte of bytes) crc = crc >>> 8 ^ crcTable[(crc ^ byte) & 255];
-  return (crc ^ 4294967295) >>> 0;
-}
-function inspectRawEspCoredump(input, encrypted = false) {
-  if (encrypted)
-    throw new PlatformIOError(
-      "Encrypted core dumps require a supported decryption workflow.",
-      "COREDUMP_ENCRYPTED"
-    );
-  if (input.byteLength > MAX_DUMP_BYTES)
-    throw new PlatformIOError(
-      "Core dump exceeds 16 MiB.",
-      "COREDUMP_INPUT_LIMIT"
-    );
-  if (!input.byteLength || input.every((byte) => byte === 255))
-    throw new PlatformIOError(
-      "No core dump is present in the supplied bytes.",
-      "COREDUMP_EMPTY"
-    );
-  if (input.byteLength < 16)
-    throw new PlatformIOError(
-      "Core dump header is truncated.",
-      "COREDUMP_TRUNCATED"
-    );
-  const bytes = Buffer.from(input);
-  const length = bytes.readUInt32LE(0);
-  if (!length)
-    throw new PlatformIOError(
-      "Core dump length is zero; no recorded crash is available.",
-      "COREDUMP_EMPTY"
-    );
-  const version2 = bytes.readUInt32LE(4), format = versions[version2 & 65535], chip = chips[version2 >>> 16];
-  if (!format || !chip)
-    throw new PlatformIOError(
-      "Unsupported raw core-dump version or chip; do not infer plaintext from unknown bytes.",
-      "COREDUMP_FORMAT_UNSUPPORTED"
-    );
-  const checksumLength = format.checksum === "sha256" ? 32 : 4;
-  if (length < format.header + checksumLength || length > bytes.length || length > MAX_DUMP_BYTES)
-    throw new PlatformIOError(
-      "Declared core-dump length is outside the supplied input.",
-      "COREDUMP_LENGTH_INVALID"
-    );
-  const payload = bytes.subarray(0, length - checksumLength);
-  const checksum = bytes.subarray(length - checksumLength, length);
-  const valid = format.checksum === "sha256" ? timingSafeEqual(createHash3("sha256").update(payload).digest(), checksum) : crc32(payload) === checksum.readUInt32LE(0);
-  if (!valid)
-    throw new PlatformIOError(
-      "Core-dump checksum does not match its declared bytes.",
-      "COREDUMP_CHECKSUM_MISMATCH"
-    );
-  if (format.payload === "elf" && (length - format.header - checksumLength < 4 || !bytes.subarray(format.header, format.header + 4).equals(Buffer.from([127, 69, 76, 70]))))
-    throw new PlatformIOError(
-      "Core-dump payload does not contain the declared ELF format.",
-      "COREDUMP_PAYLOAD_INVALID"
-    );
-  return {
-    bytes: bytes.subarray(0, length),
-    identity: {
-      sha256: createHash3("sha256").update(bytes.subarray(0, length)).digest("hex"),
-      input_sha256: createHash3("sha256").update(bytes).digest("hex"),
-      length,
-      input_length: bytes.length,
-      trailing_bytes: bytes.length - length,
-      version: version2,
-      chip,
-      payload_format: format.payload,
-      checksum: format.checksum,
-      task_count: bytes.readUInt32LE(8),
-      tcb_size: bytes.readUInt32LE(12),
-      segment_count: bytes.readUInt32LE(16),
-      chip_revision: format.header === 24 ? bytes.readUInt32LE(20) : null
-    }
-  };
-}
-function decodeEspCoredumpBase64(text7) {
-  if (Buffer.byteLength(text7, "utf8") > Math.ceil(MAX_DUMP_BYTES / 3) * 4 + 65536)
-    throw new PlatformIOError(
-      "Encoded core dump exceeds the input limit.",
-      "COREDUMP_INPUT_LIMIT"
-    );
-  const decodeChunk = (compact2) => {
-    if (!compact2 || compact2.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(compact2))
-      throw new PlatformIOError(
-        "Invalid base64 core dump.",
-        "COREDUMP_BASE64_INVALID"
-      );
-    const decoded2 = Buffer.from(compact2, "base64");
-    if (decoded2.toString("base64") !== compact2)
-      throw new PlatformIOError(
-        "Non-canonical base64 core dump.",
-        "COREDUMP_BASE64_INVALID"
-      );
-    return decoded2;
-  };
-  const compact = text7.replace(/[ \t\r\n]/g, "");
-  let decoded;
-  if (/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) {
-    decoded = decodeChunk(compact);
-  } else {
-    const lines2 = text7.split(/\r?\n/).map((line) => line.replace(/[ \t]/g, "")).filter(Boolean);
-    if (lines2.length > 65536)
-      throw new PlatformIOError(
-        "Too many encoded core-dump lines.",
-        "COREDUMP_INPUT_LIMIT"
-      );
-    const chunks = lines2.map(decodeChunk);
-    const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
-    if (length > MAX_DUMP_BYTES)
-      throw new PlatformIOError(
-        "Decoded core dump exceeds 16 MiB.",
-        "COREDUMP_INPUT_LIMIT"
-      );
-    decoded = Buffer.concat(chunks, length);
-  }
-  if (decoded.length > MAX_DUMP_BYTES)
-    throw new PlatformIOError(
-      "Decoded core dump exceeds 16 MiB.",
-      "COREDUMP_INPUT_LIMIT"
-    );
-  return decoded;
-}
-
-// src/core/analysis/esp-coredump-artifact.ts
-async function readEspCoredumpArtifact(input) {
-  if (input.format !== "raw" && input.format !== "base64")
-    throw new PlatformIOError(
-      "Unsupported core-dump input encoding.",
-      "COREDUMP_FORMAT_UNSUPPORTED"
-    );
-  if (input.expectedInputSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(input.expectedInputSha256))
-    throw new PlatformIOError(
-      "Expected core-dump input hash must be SHA-256.",
-      "COREDUMP_IDENTITY_INVALID"
-    );
-  const root = await fs11.realpath(input.workspaceDir);
-  const limit = input.format === "raw" ? 16 * 1024 * 1024 : Math.ceil(16 * 1024 * 1024 / 3) * 4 + 65536;
-  const artifact = await readPartitionArtifact(root, input.dumpPath, limit);
-  if (input.expectedInputSha256 && artifact.identity.sha256 !== input.expectedInputSha256.toLowerCase())
-    throw new PlatformIOError(
-      "Core-dump file does not match the selected artifact.",
-      "COREDUMP_IDENTITY_MISMATCH"
-    );
-  let bytes = artifact.content;
-  if (input.format === "base64") {
-    let text7;
-    try {
-      text7 = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    } catch {
-      throw new PlatformIOError(
-        "Encoded core dump is not valid UTF-8.",
-        "COREDUMP_BASE64_INVALID"
-      );
-    }
-    bytes = decodeEspCoredumpBase64(text7);
-  }
-  return {
-    ...inspectEspCoredumpContent(bytes, input.encrypted),
-    source: { ...artifact.identity, format: input.format }
-  };
-}
-function inspectEspCoredumpContent(bytes, encrypted = false) {
-  const inspected = inspectRawEspCoredump(bytes, encrypted);
-  const formatVersion = inspected.identity.version & 65535;
-  const headerSize = formatVersion === 258 || formatVersion === 259 ? 24 : 20;
-  const checksumSize = inspected.identity.checksum === "sha256" ? 32 : 4;
-  const firmwareIdentity = inspected.identity.payload_format === "elf" ? readEspCoredumpFirmwareIdentity(
-    inspected.bytes.subarray(
-      headerSize,
-      inspected.bytes.length - checksumSize
-    ),
-    inspected.identity.version
-  ) : null;
-  return {
-    bytes: inspected.bytes,
-    identity: inspected.identity,
-    firmwareIdentity
-  };
-}
-function inspectCapturedEspCoredump(bytes, expectedInputSha256, encrypted = false) {
-  const dump = inspectEspCoredumpContent(bytes, encrypted);
-  if (expectedInputSha256 !== void 0 && (!/^[a-fA-F0-9]{64}$/.test(expectedInputSha256) || dump.identity.input_sha256 !== expectedInputSha256.toLowerCase()))
-    throw new PlatformIOError(
-      "Captured dump does not match the selected input identity.",
-      "COREDUMP_IDENTITY_MISMATCH"
-    );
-  return {
-    ...dump,
-    source: {
-      path: null,
-      size: bytes.byteLength,
-      sha256: dump.identity.input_sha256,
-      format: "raw"
-    }
-  };
-}
-
-// src/core/analysis/esp-coredump-debugger.ts
-init_errors2();
-import fs20 from "node:fs/promises";
-import path25 from "node:path";
-
-// src/core/debug/debug-discovery.ts
-init_errors2();
-import fs13 from "node:fs/promises";
-import path18 from "node:path";
-
-// src/core/analysis/build-metadata.ts
-init_errors2();
-import path17 from "node:path";
-
-// src/core/analysis/toolchain-resolver.ts
-init_errors2();
-import fs12 from "node:fs/promises";
-import path16 from "node:path";
-function contained2(root, candidate) {
-  const relative = path16.relative(root, candidate);
-  return relative !== "" && relative !== ".." && !relative.startsWith(`..${path16.sep}`) && !path16.isAbsolute(relative);
-}
-async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
-  if (!path16.isAbsolute(compilerPath) || !trustedRoots.length || trustedRoots.some((root2) => !path16.isAbsolute(root2)))
-    throw new PlatformIOError(
-      "Analysis needs explicit absolute compiler and trusted-root paths.",
-      "ANALYSIS_TOOLCHAIN_INVALID"
-    );
-  const compiler = await fs12.realpath(compilerPath);
-  const roots = [
-    ...new Set(
-      await Promise.all(trustedRoots.map((root2) => fs12.realpath(root2)))
-    )
-  ];
-  const matches = roots.filter((root2) => contained2(root2, compiler));
-  if (!matches.length)
-    throw new PlatformIOError(
-      "Compiler is outside the trusted toolchain roots.",
-      "ANALYSIS_TOOLCHAIN_UNTRUSTED"
-    );
-  const root = matches.sort((a, b) => b.length - a.length)[0];
-  const name2 = path16.basename(compiler);
-  const match = name2.match(
-    /^((?:[a-z0-9_]+-)*)(?:gcc|g\+\+|cc|c\+\+)(\.exe)?$/i
-  );
-  if (!match || !(await fs12.stat(compiler)).isFile())
-    throw new PlatformIOError(
-      "Expected a native GNU-compatible compiler path.",
-      "ANALYSIS_TOOLCHAIN_INVALID"
-    );
-  const companion = async (tool) => {
-    let candidate;
-    try {
-      candidate = await fs12.realpath(
-        path16.join(
-          path16.dirname(compiler),
-          `${match[1]}${tool}${match[2] ?? ""}`
-        )
-      );
-    } catch {
-      throw new PlatformIOError(
-        `The selected toolchain is missing ${tool}.`,
-        "ANALYSIS_TOOL_UNAVAILABLE"
-      );
-    }
-    if (!contained2(root, candidate) || !(await fs12.stat(candidate)).isFile())
-      throw new PlatformIOError(
-        `The ${tool} utility escapes the selected toolchain root.`,
-        "ANALYSIS_TOOLCHAIN_UNTRUSTED"
-      );
-    return candidate;
-  };
-  const [addr2line, size, nm] = await Promise.all([
-    companion("addr2line"),
-    companion("size"),
-    companion("nm")
-  ]);
-  return { compiler, root, addr2line, size, nm };
-}
-
-// src/core/analysis/build-metadata.ts
-function selectBuildMetadata(output, environment) {
-  const invalid4 = (message) => {
-    throw new PlatformIOError(message, "ANALYSIS_METADATA_INVALID");
-  };
-  if (Buffer.byteLength(output) > 10 * 1024 * 1024)
-    invalid4("Project metadata exceeds 10 MiB.");
-  let parsed;
-  try {
-    parsed = JSON.parse(output);
-  } catch {
-    return invalid4("Project metadata is not valid JSON.");
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-    invalid4("Expected metadata keyed by environment.");
-  const records = parsed;
-  const names = Object.keys(records);
-  if (!names.length || names.length > 256)
-    invalid4("Expected between 1 and 256 build environments.");
-  if (environment !== void 0 && (!environment || environment.length > 256 || /[\x00-\x1f]/.test(environment)))
-    invalid4("Invalid selected environment.");
-  if (environment === void 0 && names.length !== 1)
-    throw new PlatformIOError(
-      "Select an explicit environment for analysis; project metadata contains multiple environments.",
-      "ANALYSIS_ENVIRONMENT_REQUIRED"
-    );
-  const selected = environment ?? names[0];
-  if (!Object.hasOwn(records, selected))
-    invalid4("Selected environment is absent from project metadata.");
-  const entry = records[selected];
-  if (!entry || typeof entry !== "object" || Array.isArray(entry))
-    invalid4("Selected environment metadata is not an object.");
-  const fields = entry;
-  const absolutePath = (field2) => {
-    const value2 = fields[field2];
-    if (typeof value2 !== "string" || !value2 || value2.length > 32768 || /[\x00-\x1f]/.test(value2) || !path17.isAbsolute(value2))
-      return invalid4(`Metadata ${field2} must be an absolute native path.`);
-    return path17.normalize(value2);
-  };
-  return {
-    environment: selected,
-    compilerPath: absolutePath("cc_path"),
-    elfPath: absolutePath("prog_path")
-  };
-}
-
-// src/core/debug/debug-discovery.ts
-function within(root, file) {
-  const relative = path18.relative(root, file);
-  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path18.sep) && !path18.isAbsolute(relative);
-}
-async function resolveDebuggerExecutable(candidate, trustedRoots, projectDir) {
-  const invalid4 = (message) => {
-    throw new PlatformIOError(message, "GDB_EXECUTABLE_UNTRUSTED");
-  };
-  if (!path18.isAbsolute(candidate) || !path18.isAbsolute(projectDir) || trustedRoots.length < 1 || trustedRoots.length > 32 || trustedRoots.some((root) => !path18.isAbsolute(root)))
-    return invalid4("Debugger requires absolute host installation roots.");
-  const [executable, project, roots] = await Promise.all([
-    fs13.realpath(candidate),
-    fs13.realpath(projectDir),
-    Promise.all(trustedRoots.map((root) => fs13.realpath(root)))
-  ]);
-  for (const root of roots) {
-    if (root === path18.parse(root).root || root === project || within(project, root) || within(root, project) || !(await fs13.stat(root)).isDirectory())
-      return invalid4(
-        "Debugger installation roots cannot contain or belong to the project."
-      );
-  }
-  if (!roots.some((root) => within(root, executable)) || !/^(?:[a-z0-9_]+-)*gdb(?:\.exe)?$/i.test(path18.basename(executable)) || !(await fs13.stat(executable)).isFile())
-    return invalid4(
-      "Debugger is not a native GDB within the trusted installation."
-    );
-  return executable;
-}
-async function discoverDebuggerRoots(debuggerPath, systemInfo, projectDir, environment = process.env) {
-  const invalid4 = (message) => {
-    throw new PlatformIOError(message, "GDB_EXECUTABLE_UNTRUSTED");
-  };
-  const configured = environment.PIO_MCP_DEBUGGER_ROOTS;
-  if (configured !== void 0) {
-    let roots;
-    if (Buffer.byteLength(configured) > 65536)
-      return invalid4("Debugger root configuration exceeds 64 KiB.");
-    try {
-      roots = JSON.parse(configured);
-    } catch {
-      return invalid4("PIO_MCP_DEBUGGER_ROOTS must be a JSON array.");
-    }
-    if (!Array.isArray(roots) || roots.length < 1 || roots.length > 32 || roots.some((root2) => typeof root2 !== "string" || !path18.isAbsolute(root2)))
-      return invalid4(
-        "Configure between 1 and 32 absolute debugger installation roots."
-      );
-    await resolveDebuggerExecutable(debuggerPath, roots, projectDir);
-    return [
-      ...new Set(
-        await Promise.all(roots.map((root2) => fs13.realpath(root2)))
-      )
-    ];
-  }
-  const core = systemInfo?.core_dir?.value;
-  if (typeof core !== "string" || !path18.isAbsolute(core))
-    return invalid4(
-      "PlatformIO system info did not identify an absolute Core directory."
-    );
-  const packages = await fs13.realpath(path18.join(core, "packages"));
-  const executable = await fs13.realpath(debuggerPath);
-  if (!within(packages, executable))
-    return invalid4(
-      "Debugger is outside registered host packages; configure an operator root."
-    );
-  const folder = path18.relative(packages, executable).split(path18.sep)[0];
-  const root = await fs13.realpath(path18.join(packages, folder));
-  if (!within(packages, root))
-    return invalid4("Debugger package escapes the Core installation.");
-  const readRecord = async (file) => {
-    const handle = await fs13.open(file, "r");
-    try {
-      const stat = await handle.stat();
-      if (!stat.isFile() || stat.size > 65536)
-        return invalid4("Invalid debugger package record.");
-      const bytes = Buffer.alloc(65537);
-      const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
-      if (bytesRead > 65536)
-        return invalid4("Debugger package record exceeds 64 KiB.");
-      const value2 = JSON.parse(
-        bytes.subarray(0, bytesRead).toString("utf8")
-      );
-      if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
-        return invalid4("Invalid debugger package record.");
-      return value2;
-    } finally {
-      await handle.close();
-    }
-  };
-  try {
-    const [manifest, record2] = await Promise.all([
-      readRecord(path18.join(root, "package.json")),
-      readRecord(path18.join(root, ".piopm"))
-    ]);
-    if (typeof manifest.name !== "string" || !(manifest.name.startsWith("toolchain-") || /^tool-.*gdb(?:-|$)/.test(manifest.name)) || typeof manifest.version !== "string" || !manifest.version || record2.type !== "tool" || record2.name !== manifest.name || record2.version !== manifest.version)
-      return invalid4(
-        "Debugger package registration does not match its manifest."
-      );
-  } catch (error2) {
-    if (error2 instanceof PlatformIOError) throw error2;
-    return invalid4("Debugger package registration is missing or invalid.");
-  }
-  await resolveDebuggerExecutable(executable, [root], projectDir);
-  return [root];
-}
-
-// src/core/analysis/analysis-process.ts
-init_errors2();
-import { execFile } from "node:child_process";
-import path19 from "node:path";
-async function runAnalysisProcess(executable, args, options = {}) {
-  const timeout = options.timeoutMs ?? 3e4;
-  const maxBuffer = options.maxOutputBytes ?? 16 * 1024 * 1024;
-  if (!path19.isAbsolute(executable) || /\.(?:cmd|bat|ps1|sh)$/i.test(executable))
-    throw new PlatformIOError(
-      "Analysis requires an absolute native executable path.",
-      "ANALYSIS_EXECUTABLE_INVALID"
-    );
-  if (!Number.isInteger(timeout) || timeout < 1 || timeout > 12e4 || !Number.isInteger(maxBuffer) || maxBuffer < 1 || maxBuffer > 32 * 1024 * 1024)
-    throw new PlatformIOError(
-      "Analysis process limits are invalid.",
-      "ANALYSIS_LIMIT_INVALID"
-    );
-  if (args.length > 8192 || args.some((arg) => typeof arg !== "string" || arg.includes("\0")) || args.reduce((total, arg) => total + Buffer.byteLength(arg), 0) > 256 * 1024)
-    throw new PlatformIOError(
-      "Analysis argument list is invalid or too large.",
-      "ANALYSIS_ARGUMENT_INVALID"
-    );
-  if (options.allowedExitCodes?.some(
-    (code) => !Number.isInteger(code) || code < 0 || code > 255
-  ))
-    throw new PlatformIOError(
-      "Invalid allowed exit code.",
-      "ANALYSIS_LIMIT_INVALID"
-    );
-  if (options.signal?.aborted)
-    throw new PlatformIOError("Analysis was cancelled.", "ANALYSIS_CANCELLED");
-  return new Promise((resolve, reject) => {
-    execFile(
-      executable,
-      [...args],
-      {
-        cwd: options.cwd,
-        timeout,
-        maxBuffer,
-        signal: options.signal,
-        shell: false,
-        windowsHide: true,
-        encoding: "utf8",
-        killSignal: "SIGKILL",
-        env: { ...process.env, ...options.environment, LC_ALL: "C", LANG: "C" }
-      },
-      (error2, stdout, stderr) => {
-        if (!error2) {
-          resolve({ stdout, stderr });
-          return;
-        }
-        const code = error2.code;
-        if (typeof code === "number" && !error2.killed && !options.signal?.aborted && options.allowedExitCodes?.includes(code)) {
-          resolve({ stdout, stderr, exitCode: code });
-          return;
-        }
-        const failure = options.signal?.aborted || error2.name === "AbortError" ? "ANALYSIS_CANCELLED" : code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" ? "ANALYSIS_OUTPUT_LIMIT" : error2.killed ? "ANALYSIS_TIMEOUT" : code === "ENOENT" || code === "EACCES" ? "ANALYSIS_TOOL_UNAVAILABLE" : "ANALYSIS_TOOL_FAILED";
-        reject(
-          new PlatformIOError(
-            `Analysis utility failed (${failure}).`,
-            failure,
-            {
-              executable: path19.basename(executable),
-              exitCode: typeof code === "number" ? code : void 0
-            }
-          )
-        );
-      }
-    );
-  });
-}
-
-// src/core/analysis/esp-coredump-analysis.ts
-init_errors2();
-import fs17 from "node:fs/promises";
-import path22 from "node:path";
-
-// src/core/analysis/elf-identity.ts
-init_errors2();
-import fs14 from "node:fs/promises";
-import crypto7 from "node:crypto";
-async function readElfIdentity(elfPath, expectedSha256) {
-  if (expectedSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(expectedSha256))
-    throw new PlatformIOError(
-      "Expected ELF hash must be SHA-256.",
-      "ANALYSIS_ELF_INVALID"
-    );
-  const resolved = await fs14.realpath(elfPath);
-  const file = await fs14.open(resolved, "r");
-  try {
-    const before = await file.stat();
-    if (!before.isFile() || before.size < 52)
-      throw new PlatformIOError(
-        "Expected a regular ELF file with a complete header.",
-        "ANALYSIS_ELF_INVALID"
-      );
-    if (before.size > 256 * 1024 * 1024)
-      throw new PlatformIOError("ELF exceeds 256 MiB.", "ANALYSIS_INPUT_LIMIT");
-    const header = Buffer.alloc(Math.min(64, before.size));
-    const { bytesRead } = await file.read(header, 0, header.length, 0);
-    if (bytesRead !== header.length || header.subarray(0, 4).toString("hex") !== "7f454c46" || ![1, 2].includes(header[4]) || ![1, 2].includes(header[5]) || header[6] !== 1)
-      throw new PlatformIOError(
-        "Invalid or unsupported ELF header.",
-        "ANALYSIS_ELF_INVALID"
-      );
-    const bits = header[4] === 1 ? 32 : 64;
-    const byteOrder = header[5] === 1 ? "little" : "big";
-    if (bits === 64 && bytesRead < 64)
-      throw new PlatformIOError(
-        "Truncated ELF64 header.",
-        "ANALYSIS_ELF_INVALID"
-      );
-    const u16 = (offset2) => byteOrder === "little" ? header.readUInt16LE(offset2) : header.readUInt16BE(offset2);
-    const version2 = byteOrder === "little" ? header.readUInt32LE(20) : header.readUInt32BE(20);
-    const type = u16(16);
-    if (version2 !== 1 || u16(bits === 32 ? 40 : 52) !== (bits === 32 ? 52 : 64) || ![2, 3].includes(type))
-      throw new PlatformIOError(
-        "ELF must be a supported executable or shared image.",
-        "ANALYSIS_ELF_INVALID"
-      );
-    const machine = u16(18);
-    const architectures = {
-      3: "x86",
-      40: "arm",
-      62: "x86_64",
-      94: "xtensa",
-      183: "aarch64",
-      243: "riscv"
-    };
-    const hash = crypto7.createHash("sha256");
-    const chunk = Buffer.alloc(64 * 1024);
-    let position = 0;
-    while (position < before.size) {
-      const read = await file.read(
-        chunk,
-        0,
-        Math.min(chunk.length, before.size - position),
-        position
-      );
-      if (!read.bytesRead)
-        throw new PlatformIOError(
-          "ELF changed while reading.",
-          "ANALYSIS_ELF_CHANGED"
-        );
-      hash.update(chunk.subarray(0, read.bytesRead));
-      position += read.bytesRead;
-    }
-    const after = await file.stat();
-    if (after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs)
-      throw new PlatformIOError(
-        "ELF changed while reading.",
-        "ANALYSIS_ELF_CHANGED"
-      );
-    const sha256 = hash.digest("hex");
-    if (expectedSha256 && sha256 !== expectedSha256.toLowerCase())
-      throw new PlatformIOError(
-        "ELF does not match the selected firmware artifact.",
-        "ANALYSIS_ELF_MISMATCH"
-      );
-    return {
-      path: resolved,
-      sha256,
-      size: before.size,
-      bits,
-      byteOrder,
-      machine,
-      architecture: architectures[machine] ?? "unknown",
-      type: type === 2 ? "executable" : "shared"
-    };
-  } finally {
-    await file.close();
-  }
-}
-
-// src/core/analysis/elf-snapshot.ts
-import fs16 from "node:fs/promises";
-
-// src/core/analysis/elf-archive.ts
-init_paths();
-init_errors2();
-import fs15 from "node:fs/promises";
-import { constants as constants2 } from "node:fs";
-import path20 from "node:path";
-import { createHash as createHash4, randomUUID } from "node:crypto";
-async function retainElfSnapshot(snapshot, expectedSha256, archiveRoot = path20.join(SERVER_DATA_DIR, "artifacts", "elf"), sourcePath = snapshot) {
-  const identity = await readElfIdentity(snapshot, expectedSha256);
-  archiveRoot = await sourceArchiveRoot(sourcePath, archiveRoot);
-  await fs15.mkdir(archiveRoot, { recursive: true, mode: 448 });
-  const rootState = await fs15.lstat(archiveRoot);
-  if (!rootState.isDirectory() || rootState.isSymbolicLink())
-    throw new PlatformIOError(
-      "ELF archive must be an owned directory.",
-      "ANALYSIS_ARCHIVE_INVALID"
-    );
-  const root = await fs15.realpath(archiveRoot);
-  const destination = path20.join(root, identity.sha256 + ".elf");
-  const temporary = path20.join(root, "." + randomUUID() + ".tmp");
-  try {
-    await fs15.copyFile(identity.path, temporary, constants2.COPYFILE_EXCL);
-    await fs15.chmod(temporary, 384);
-    await readElfIdentity(temporary, identity.sha256);
-    try {
-      await fs15.link(temporary, destination);
-    } catch (error2) {
-      if (error2.code !== "EEXIST") throw error2;
-    }
-    const stored = await fs15.lstat(destination);
-    if (!stored.isFile() || stored.isSymbolicLink())
-      throw new PlatformIOError(
-        "Invalid retained ELF object.",
-        "ANALYSIS_ARCHIVE_INVALID"
-      );
-    await readElfIdentity(destination, identity.sha256);
-    return destination;
-  } finally {
-    await fs15.unlink(temporary).catch((error2) => {
-      if (error2.code !== "ENOENT") throw error2;
-    });
-  }
-}
-async function sourceArchiveRoot(sourcePath, archiveRoot) {
-  const source = await fs15.realpath(sourcePath);
-  const key = createHash4("sha256").update(source).digest("hex");
-  return path20.join(archiveRoot, key);
-}
-async function resolveRetainedElf(sourcePath, sha256, archiveRoot = path20.join(SERVER_DATA_DIR, "artifacts", "elf")) {
-  if (!/^[a-f0-9]{64}$/i.test(sha256))
-    throw new PlatformIOError(
-      "Invalid retained ELF hash.",
-      "ANALYSIS_ELF_INVALID"
-    );
-  const root = await sourceArchiveRoot(sourcePath, archiveRoot);
-  const rootState = await fs15.lstat(root);
-  if (!rootState.isDirectory() || rootState.isSymbolicLink())
-    throw new PlatformIOError(
-      "Invalid retained ELF directory.",
-      "ANALYSIS_ARCHIVE_INVALID"
-    );
-  const canonicalRoot = await fs15.realpath(root);
-  const file = path20.join(canonicalRoot, sha256.toLowerCase() + ".elf");
-  const entry = await fs15.lstat(file);
-  if (!entry.isFile() || entry.isSymbolicLink())
-    throw new PlatformIOError(
-      "Invalid retained ELF object.",
-      "ANALYSIS_ARCHIVE_INVALID"
-    );
-  await readElfIdentity(file, sha256);
-  return file;
-}
-
-// src/core/analysis/elf-snapshot.ts
-import os3 from "node:os";
-import path21 from "node:path";
-async function withElfSnapshot(elfPath, expectedSha256, analyze, sourcePath = elfPath) {
-  const identity = await readElfIdentity(elfPath, expectedSha256);
-  const directory = await fs16.mkdtemp(
-    path21.join(os3.tmpdir(), "pio-elf-analysis-")
-  );
-  try {
-    await fs16.chmod(directory, 448);
-    const snapshot = path21.join(directory, "firmware.elf");
-    await fs16.copyFile(identity.path, snapshot);
-    await readElfIdentity(snapshot, identity.sha256);
-    const archivePath = await retainElfSnapshot(
-      snapshot,
-      identity.sha256,
-      void 0,
-      sourcePath
-    );
-    return await analyze(snapshot, { ...identity, archivePath });
-  } finally {
-    await fs16.rm(directory, { recursive: true, force: true });
-  }
-}
-
-// src/core/analysis/esp-coredump-analysis.ts
-async function withEspCoredumpArtifacts(input, analyze, capturedBytes) {
-  input.validatePolicy();
-  const root = await fs17.realpath(input.workspaceDir);
-  const elf = await fs17.realpath(path22.resolve(root, input.elfPath));
-  const relative = path22.relative(root, elf);
-  if (!relative || relative === ".." || relative.startsWith(".." + path22.sep) || path22.isAbsolute(relative))
-    throw new PlatformIOError(
-      "Selected ELF is outside the authorized workspace.",
-      "COREDUMP_ELF_OUTSIDE_WORKSPACE"
-    );
-  const dump = capturedBytes === void 0 ? await readEspCoredumpArtifact({ ...input, workspaceDir: root }) : inspectCapturedEspCoredump(
-    capturedBytes,
-    input.expectedInputSha256,
-    input.encrypted
-  );
-  const identity = await readElfIdentity(elf, input.expectedElfSha256);
-  const machine = ["esp32", "esp32s2", "esp32s3"].includes(dump.identity.chip) ? 94 : 243;
-  if (identity.machine !== machine || identity.bits !== 32 || identity.byteOrder !== "little")
-    throw new PlatformIOError(
-      "Selected ELF target does not match the core-dump chip.",
-      "COREDUMP_ELF_TARGET_MISMATCH"
-    );
-  const correspondence = dump.firmwareIdentity ? matchEspCoredumpFirmware(dump.firmwareIdentity, identity.sha256) : { status: "unavailable", hashBits: 0 };
-  input.validatePolicy();
-  return withElfSnapshot(
-    elf,
-    identity.sha256,
-    async (snapshot, stableIdentity) => {
-      input.validatePolicy();
-      const result = await analyze({
-        dump,
-        elfPath: snapshot,
-        elfIdentity: stableIdentity,
-        correspondence
-      });
-      input.validatePolicy();
-      return result;
-    }
-  );
-}
-
-// src/core/analysis/esp-coredump-conversion.ts
-init_errors2();
-import fs19 from "node:fs/promises";
-import path24 from "node:path";
-import { createHash as createHash5 } from "node:crypto";
-
-// src/core/analysis/private-analysis-directory.ts
-init_errors2();
-import fs18 from "node:fs/promises";
-import os4 from "node:os";
-import path23 from "node:path";
-import { execFile as execFile2 } from "node:child_process";
-import { promisify } from "node:util";
-var execute = promisify(execFile2);
-var WINDOWS_PRIVATE_ACL = String.raw`
-$ErrorActionPreference = 'Stop'
-$target = $env:PIO_PRIVATE_ANALYSIS_DIRECTORY
-$sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
-$acl = New-Object System.Security.AccessControl.DirectorySecurity
-$acl.SetOwner($sid)
-$acl.SetAccessRuleProtection($true, $false)
-$rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')
-$acl.AddAccessRule($rule)
-[System.IO.Directory]::SetAccessControl($target, $acl)
-$actual = [System.IO.Directory]::GetAccessControl($target)
-if (-not $actual.AreAccessRulesProtected) { throw 'Unprotected analysis directory' }
-$rules = $actual.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])
-if ($rules.Count -ne 1 -or $rules[0].IdentityReference.Value -ne $sid.Value -or $rules[0].AccessControlType -ne 'Allow' -or $rules[0].FileSystemRights -ne 'FullControl') { throw 'Unexpected analysis ACL' }
-`;
-async function createPrivateAnalysisDirectory() {
-  const directory = await fs18.mkdtemp(
-    path23.join(os4.tmpdir(), "pio-private-analysis-")
-  );
-  try {
-    try {
-      if (process.platform === "win32") {
-        const systemRoot = process.env.SystemRoot;
-        if (!systemRoot || !path23.isAbsolute(systemRoot))
-          throw new Error("Windows system root unavailable");
-        await execute(
-          path23.join(
-            systemRoot,
-            "System32",
-            "WindowsPowerShell",
-            "v1.0",
-            "powershell.exe"
-          ),
-          [
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-EncodedCommand",
-            Buffer.from(WINDOWS_PRIVATE_ACL, "utf16le").toString("base64")
-          ],
-          {
-            windowsHide: true,
-            timeout: 15e3,
-            maxBuffer: 16384,
-            env: { ...process.env, PIO_PRIVATE_ANALYSIS_DIRECTORY: directory }
-          }
-        );
-      } else {
-        await fs18.chmod(directory, 448);
-        const permissions = await fs18.stat(directory);
-        if ((permissions.mode & 511) !== 448 || process.getuid && permissions.uid !== process.getuid())
-          throw new Error("Unexpected analysis directory owner or permissions");
-      }
-    } catch {
-      throw new PlatformIOError(
-        "Cannot establish private analysis storage.",
-        "ANALYSIS_PRIVATE_STORAGE_UNAVAILABLE"
-      );
-    }
-    return directory;
-  } catch (error2) {
-    await fs18.rm(directory, { recursive: true, force: true });
-    throw error2;
-  }
-}
-async function withPrivateAnalysisDirectory(use) {
-  const directory = await createPrivateAnalysisDirectory();
-  try {
-    return await use(directory);
-  } finally {
-    await fs18.rm(directory, { recursive: true, force: true });
-  }
-}
-
-// src/core/analysis/esp-coredump-converter.ts
-var ESP_COREDUMP_VERSION = "1.10.0";
-var ESP_COREDUMP_CONVERTER = String.raw`
-import importlib.metadata
-import json
-import logging
-import os
-from pathlib import Path
-import sys
-import tempfile
-
-
-def main():
-    if importlib.metadata.version("esp-coredump") != "1.10.0":
-        raise ValueError("COREDUMP_TOOL_VERSION_MISMATCH")
-    if len(sys.argv) != 5:
-        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
-    raw, elf, staging = [Path(value) for value in sys.argv[1:4]]
-    machine = int(sys.argv[4])
-    if machine not in (94, 243):
-        raise ValueError("COREDUMP_ELF_TARGET_MISMATCH")
-    if not all(value.is_absolute() for value in (raw, elf, staging)):
-        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
-    staging = staging.resolve(strict=True)
-    raw = raw.resolve(strict=True)
-    elf = elf.resolve(strict=True)
-    if raw.parent != staging or not raw.is_file() or not elf.is_file():
-        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
-    if raw.stat().st_size > 16 * 1024 * 1024 or elf.stat().st_size > 256 * 1024 * 1024:
-        raise ValueError("COREDUMP_INPUT_LIMIT")
-    logging.disable(logging.CRITICAL)
-    from esp_coredump.corefile.loader import ESPCoreDumpFileLoader
-
-    class StagedLoader(ESPCoreDumpFileLoader):
-        def _create_temp_file(self):
-            descriptor, name = tempfile.mkstemp(prefix="converted-", suffix=".elf", dir=staging)
-            os.close(descriptor)
-            self.temp_files.append(name)
-            return name
-
-    loader = None
-    keep = None
-    try:
-        loader = StagedLoader(str(raw), is_b64=False)
-        loader.create_corefile(exe_name=str(elf), e_machine=machine)
-        output = Path(loader.core_elf_file).resolve(strict=True)
-        if output.parent != staging or not output.is_file() or output.stat().st_size > 32 * 1024 * 1024:
-            raise ValueError("COREDUMP_CONVERSION_INVALID")
-        with output.open("rb") as stream:
-            if stream.read(7) != bytes.fromhex("7f454c46010101"):
-                raise ValueError("COREDUMP_CONVERSION_INVALID")
-        keep = output
-        print(json.dumps({"core_path": str(output), "converter_version": "1.10.0"}))
-    finally:
-        if loader is not None:
-            for name in loader.temp_files:
-                candidate = Path(name)
-                if candidate.parent == staging and candidate != keep:
-                    candidate.unlink(missing_ok=True)
-
-
-try:
-    main()
-except importlib.metadata.PackageNotFoundError:
-    print(json.dumps({"error": "COREDUMP_TOOL_UNAVAILABLE"}))
-    sys.exit(2)
-except Exception as error:
-    code = str(error)
-    if code not in {
-        "COREDUMP_TOOL_VERSION_MISMATCH", "COREDUMP_CONVERTER_ARGUMENTS",
-        "COREDUMP_ELF_TARGET_MISMATCH", "COREDUMP_INPUT_LIMIT", "COREDUMP_CONVERSION_INVALID"
-    }:
-        code = "COREDUMP_CONVERSION_FAILED"
-    print(json.dumps({"error": code}))
-    sys.exit(2)
-`;
-
-// src/core/analysis/esp-coredump-conversion.ts
-async function withConvertedEspCoredump(artifacts, options, use) {
-  options.validatePolicy();
-  if (createHash5("sha256").update(artifacts.dump.bytes).digest("hex") !== artifacts.dump.identity.sha256)
-    throw new PlatformIOError(
-      "Core-dump bytes changed before conversion.",
-      "COREDUMP_IDENTITY_MISMATCH"
-    );
-  return withPrivateAnalysisDirectory(async (directory) => {
-    const raw = path24.join(directory, "dump.raw");
-    await fs19.writeFile(raw, artifacts.dump.bytes, { flag: "wx", mode: 384 });
-    options.validatePolicy();
-    const result = await runAnalysisProcess(
-      options.pythonExecutable,
-      [
-        "-I",
-        "-c",
-        ESP_COREDUMP_CONVERTER,
-        raw,
-        artifacts.elfPath,
-        directory,
-        String(artifacts.elfIdentity.machine)
-      ],
-      {
-        cwd: directory,
-        signal: options.signal,
-        timeoutMs: 6e4,
-        maxOutputBytes: 65536,
-        allowedExitCodes: [2]
-      }
-    );
-    let response;
-    try {
-      response = JSON.parse(result.stdout);
-    } catch {
-      throw new PlatformIOError(
-        "Converter returned an invalid response.",
-        "COREDUMP_CONVERSION_INVALID"
-      );
-    }
-    if (!response || typeof response !== "object")
-      throw new PlatformIOError(
-        "Converter returned an invalid response.",
-        "COREDUMP_CONVERSION_INVALID"
-      );
-    const report = response;
-    const errors = /* @__PURE__ */ new Set([
-      "COREDUMP_TOOL_UNAVAILABLE",
-      "COREDUMP_TOOL_VERSION_MISMATCH",
-      "COREDUMP_CONVERTER_ARGUMENTS",
-      "COREDUMP_ELF_TARGET_MISMATCH",
-      "COREDUMP_INPUT_LIMIT",
-      "COREDUMP_CONVERSION_INVALID",
-      "COREDUMP_CONVERSION_FAILED"
-    ]);
-    if (typeof report.error === "string" && errors.has(report.error))
-      throw new PlatformIOError(
-        "Optional core-dump conversion did not complete.",
-        report.error
-      );
-    if (result.exitCode || report.converter_version !== ESP_COREDUMP_VERSION || typeof report.core_path !== "string")
-      throw new PlatformIOError(
-        "Converter returned an invalid result.",
-        "COREDUMP_CONVERSION_INVALID"
-      );
-    const core = await readPartitionArtifact(
-      await fs19.realpath(directory),
-      report.core_path,
-      32 * 1024 * 1024
-    );
-    if (core.content.length < 52 || core.content.subarray(0, 7).toString("hex") !== "7f454c46010101" || core.content.readUInt16LE(16) !== 4 || core.content.readUInt16LE(18) !== artifacts.elfIdentity.machine)
-      throw new PlatformIOError(
-        "Converter output is not the expected core ELF.",
-        "COREDUMP_CONVERSION_INVALID"
-      );
-    options.validatePolicy();
-    const value2 = await use(core.identity.path, core.identity.sha256);
-    options.validatePolicy();
-    return value2;
-  });
-}
-
-// src/core/analysis/esp-coredump-report.ts
-init_errors2();
-init_redact();
-function parseEspCoredumpReport(output) {
-  if (Buffer.byteLength(output, "utf8") > 4 * 1024 * 1024)
-    throw new PlatformIOError(
-      "Core-dump analyzer output exceeds 4 MiB.",
-      "COREDUMP_OUTPUT_LIMIT"
-    );
-  const cleaned = redactSecretsInText(output);
-  const backtrace = [];
-  const registers = /* @__PURE__ */ Object.create(null);
-  let crashedTask = null, reason = null;
-  let section = null;
-  let truncated = false;
-  for (const line of cleaned.split(/\r?\n/)) {
-    const value2 = line.trim();
-    const task = /^Crashed task(?: handle)?:\s*(.*)$/.exec(value2);
-    if (task) crashedTask = task[1].slice(0, 4096);
-    if (reason === null) {
-      const description = /^(?:Panic reason|Exception cause):\s*(.*)$/.exec(
-        value2
-      );
-      if (description) reason = description[1].slice(0, 4096);
-      else if (value2.startsWith("Program received signal") || value2.startsWith("Program terminated with signal") || value2.includes("panic'ed"))
-        reason = value2.slice(0, 4096);
-    }
-    const heading = /^={2,}\s*(.*?)\s*={2,}$/.exec(value2);
-    if (heading) {
-      const title = heading[1].toUpperCase();
-      section = title === "CURRENT THREAD STACK" ? "stack" : title === "CURRENT THREAD REGISTERS" ? "registers" : null;
-      continue;
-    }
-    if (section === "stack" && /^#[0-9]+\s/.test(value2)) {
-      if (backtrace.length < 256) backtrace.push(value2.slice(0, 4096));
-      else truncated = true;
-    }
-    if (section === "registers") {
-      const register = /^([A-Za-z][A-Za-z0-9_]{0,63})\s+(.+)$/.exec(value2);
-      if (register) {
-        if (Object.keys(registers).length < 128 || Object.hasOwn(registers, register[1]))
-          registers[register[1]] = register[2].slice(0, 4096);
-        else truncated = true;
-      }
-    }
-    if (value2.length > 4096) truncated = true;
-  }
-  return {
-    crashed_task: crashedTask,
-    reason,
-    backtrace,
-    registers,
-    output: cleaned.slice(-12e3),
-    truncated: truncated || cleaned.length > 12e3
-  };
-}
-
-// src/core/analysis/esp-coredump-debugger.ts
-function gdbFile(file) {
-  if (!path25.isAbsolute(file) || /[\x00-\x1f\x7f]/.test(file))
-    throw new PlatformIOError(
-      "Invalid core-analysis artifact path.",
-      "COREDUMP_PATH_INVALID"
-    );
-  return JSON.stringify(file.replace(/\\/g, "/"));
-}
-async function analyzeEspCoredump(input, options, capturedBytes) {
-  input.validatePolicy();
-  options.validatePolicy();
-  const debuggerExecutable = await resolveDebuggerExecutable(
-    options.debuggerExecutable,
-    options.trustedDebuggerRoots,
-    input.workspaceDir
-  );
-  return withEspCoredumpArtifacts(
-    input,
-    async (artifacts) => withConvertedEspCoredump(
-      artifacts,
-      options,
-      async (corePath, coreSha256) => {
-        const script = path25.join(path25.dirname(corePath), "report.gdb");
-        const coreName = path25.basename(corePath);
-        if (!/^[a-zA-Z0-9_.-]+$/.test(coreName))
-          throw new PlatformIOError(
-            "Invalid converted core filename.",
-            "COREDUMP_PATH_INVALID"
-          );
-        const commands = [
-          "set auto-load off",
-          "set may-call-functions off",
-          "set auto-solib-add off",
-          "set pagination off",
-          "set confirm off",
-          "set print elements 128",
-          "file " + gdbFile(artifacts.elfPath),
-          "core-file " + coreName,
-          "echo ==================== CURRENT THREAD REGISTERS ====================\\n",
-          "info registers",
-          "echo ==================== CURRENT THREAD STACK ====================\\n",
-          "backtrace 256",
-          "echo ==================== THREADS INFO ====================\\n",
-          "info threads"
-        ];
-        await fs20.writeFile(script, commands.join("\n") + "\n", {
-          flag: "wx",
-          mode: 384
-        });
-        options.validatePolicy();
-        const output = await runAnalysisProcess(
-          debuggerExecutable,
-          [
-            "-nx",
-            "-nh",
-            "--batch",
-            "--quiet",
-            "-iex",
-            "set auto-load off",
-            "-iex",
-            "set may-call-functions off",
-            "-x",
-            script
-          ],
-          {
-            cwd: path25.dirname(corePath),
-            signal: options.signal,
-            timeoutMs: 6e4,
-            maxOutputBytes: 4 * 1024 * 1024,
-            environment: { DEBUGINFOD_URLS: "" }
-          }
-        );
-        options.validatePolicy();
-        const report = parseEspCoredumpReport(output.stdout);
-        return {
-          ok: true,
-          ...report,
-          dump: {
-            source: artifacts.dump.source,
-            identity: artifacts.dump.identity
-          },
-          elf: artifacts.elfIdentity,
-          firmware_correspondence: artifacts.correspondence,
-          core_sha256: coreSha256,
-          debugger: debuggerExecutable,
-          stderr_present: output.stderr.length > 0
-        };
-      }
-    ),
-    capturedBytes
-  );
-}
-
-// src/core/analysis/esp-coredump-tools.ts
-init_errors2();
-import fs21 from "node:fs/promises";
-import path26 from "node:path";
-async function resolveEspCoredumpTools(projectDir, environment = process.env) {
-  const python = environment.PIO_MCP_COREDUMP_PYTHON;
-  const debuggerPath = environment.PIO_MCP_COREDUMP_GDB;
-  if (!python || !debuggerPath)
-    throw new PlatformIOError(
-      "Configure PIO_MCP_COREDUMP_PYTHON and PIO_MCP_COREDUMP_GDB in the server environment; install the optional coredump dependencies explicitly.",
-      "COREDUMP_TOOLS_UNCONFIGURED"
-    );
-  if ([python, debuggerPath].some(
-    (value2) => !path26.isAbsolute(value2) || value2.length > 32768 || /[\x00-\x1f\x7f]/.test(value2)
-  ) || /\.(?:cmd|bat|ps1|sh)$/i.test(python))
-    throw new PlatformIOError(
-      "Core-dump tools require absolute native executable paths.",
-      "COREDUMP_TOOLS_INVALID"
-    );
-  const project = await fs21.realpath(projectDir);
-  const executable = await fs21.realpath(python);
-  const relative = path26.relative(project, executable);
-  if (!relative || relative !== ".." && !relative.startsWith(".." + path26.sep) && !path26.isAbsolute(relative) || !(await fs21.stat(executable)).isFile())
-    throw new PlatformIOError(
-      "The configured Python interpreter must be installed outside the workspace.",
-      "COREDUMP_TOOLS_INVALID"
-    );
-  const roots = await discoverDebuggerRoots(
-    debuggerPath,
-    null,
-    project,
-    environment
-  );
-  const debuggerExecutable = await resolveDebuggerExecutable(
-    debuggerPath,
-    roots,
-    project
-  );
-  return {
-    pythonExecutable: executable,
-    debuggerExecutable,
-    trustedDebuggerRoots: roots
-  };
-}
-
-// src/tools/coredump.ts
-var CoredumpSchema = external_exports.object({
-  projectDir: external_exports.string().min(1).max(32768),
-  dumpPath: external_exports.string().min(1).max(32768),
-  format: external_exports.enum(["raw", "base64"]).default("raw"),
-  analyze: external_exports.boolean().default(true),
-  elfPath: external_exports.string().min(1).max(32768).optional(),
-  expectedInputSha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
-  expectedElfSha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
-  encrypted: external_exports.boolean().default(false),
-  approvalId: external_exports.string().max(256).optional(),
-  commandApprovalId: external_exports.string().max(256).optional()
-}).strict().refine(
-  (value2) => !value2.analyze || !!value2.elfPath,
-  "An explicit ELF is required for analysis."
-);
-async function executeCoredump(input, caller = {}, onAuthorized) {
-  const request = CoredumpSchema.parse(input);
-  const projectDir = await fs22.realpath(request.projectDir);
-  const { commandApprovalId, ...operation } = request;
-  const args = { ...operation, projectDir };
-  const commandArgs = { ...args, approvalId: commandApprovalId };
-  const context = { ...caller, workspaceDir: projectDir };
-  const stages = [
-    ["coredump_inspect", args]
-  ];
-  if (request.analyze) stages.push(["coredump_analyze", commandArgs]);
-  for (const [name2, parameters] of stages) {
-    const plan = await planAction(name2, parameters, context);
-    if (plan.status !== "ready")
-      throw new PlatformIOError(
-        plan.reason,
-        plan.status === "requires_approval" ? "APPROVAL_REQUIRED" : "POLICY_DENIED",
-        { policyDecision: plan }
-      );
-  }
-  return dispatchAuthorizedAction(
-    "coredump_inspect",
-    args,
-    context,
-    async () => {
-      const validatePolicy = createPolicyRevisionGuard(projectDir);
-      await onAuthorized?.();
-      validatePolicy();
-      const selection = { ...request, workspaceDir: projectDir };
-      if (!request.analyze) {
-        const artifact = await readEspCoredumpArtifact(selection);
-        validatePolicy();
-        return {
-          ok: true,
-          analyzed: false,
-          source: artifact.source,
-          identity: artifact.identity,
-          firmwareIdentity: artifact.firmwareIdentity
-        };
-      }
-      return dispatchAuthorizedAction(
-        "coredump_analyze",
-        commandArgs,
-        context,
-        async () => {
-          validatePolicy();
-          const tools = await resolveEspCoredumpTools(projectDir);
-          const result = await analyzeEspCoredump(
-            { ...selection, elfPath: request.elfPath, validatePolicy },
-            { ...tools, validatePolicy }
-          );
-          validatePolicy();
-          return { ...result, analyzed: true };
-        }
-      );
-    }
-  );
-}
-
-// src/adapters/partition-compat.ts
-init_zod();
-
-// src/tools/partition-table.ts
-init_projects();
-import fs38 from "node:fs/promises";
-import path41 from "node:path";
-
 // src/core/esp-partition-framework.ts
-import fs28 from "node:fs/promises";
-import path32 from "node:path";
 init_errors2();
-function within2(root, target) {
-  const relative = path32.relative(root, target);
-  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path32.sep) && !path32.isAbsolute(relative);
+function within(root, target) {
+  const relative = path21.relative(root, target);
+  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path21.sep) && !path21.isAbsolute(relative);
 }
 function partitionFrameworkCandidates(includes) {
   const candidates = /* @__PURE__ */ new Set();
@@ -96510,7 +95137,7 @@ function partitionFrameworkCandidates(includes) {
     const match = /^(.*\/framework-(?:arduinoespressif32|espidf)(?:@[^/]+)?)(?:\/|$)/.exec(
       normalized
     );
-    if (match) candidates.add(path32.normalize(match[1]));
+    if (match) candidates.add(path21.normalize(match[1]));
   }
   if (candidates.size > 32)
     throw new PlatformIOError(
@@ -96520,20 +95147,20 @@ function partitionFrameworkCandidates(includes) {
   return [...candidates];
 }
 async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, projectDir) {
-  if (!filename || filename !== path32.basename(filename) || !/\.csv$/i.test(filename) || filename.length > 256 || /[\x00-\x1f\x7f]/.test(filename))
+  if (!filename || filename !== path21.basename(filename) || !/\.csv$/i.test(filename) || filename.length > 256 || /[\x00-\x1f\x7f]/.test(filename))
     throw new PlatformIOError(
       "Framework lookup requires one CSV filename.",
       "PARTITION_FRAMEWORK_INVALID"
     );
   const core = systemInfo?.core_dir?.value;
-  if (typeof core !== "string" || !path32.isAbsolute(core))
+  if (typeof core !== "string" || !path21.isAbsolute(core))
     throw new PlatformIOError(
       "Host Core package location is unavailable.",
       "PARTITION_FRAMEWORK_UNTRUSTED"
     );
-  const packages = await fs28.realpath(path32.join(core, "packages"));
-  const project = await fs28.realpath(projectDir);
-  if (packages === project || within2(project, packages) || within2(packages, project))
+  const packages = await fs16.realpath(path21.join(core, "packages"));
+  const project = await fs16.realpath(projectDir);
+  if (packages === project || within(project, packages) || within(packages, project))
     throw new PlatformIOError(
       "Framework installation overlaps the project workspace.",
       "PARTITION_FRAMEWORK_UNTRUSTED"
@@ -96545,8 +95172,8 @@ async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, pr
     );
   const found = [];
   for (const candidate of new Set(candidates)) {
-    const root = await fs28.realpath(candidate);
-    if (!within2(packages, root) || path32.relative(packages, root).split(path32.sep).length !== 1)
+    const root = await fs16.realpath(candidate);
+    if (!within(packages, root) || path21.relative(packages, root).split(path21.sep).length !== 1)
       throw new PlatformIOError(
         "Framework is outside registered host packages.",
         "PARTITION_FRAMEWORK_UNTRUSTED"
@@ -96574,7 +95201,7 @@ async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, pr
         "Framework registration does not match its manifest.",
         "PARTITION_FRAMEWORK_UNTRUSTED"
       );
-    const relative = path32.join(
+    const relative = path21.join(
       manifest.name === "framework-espidf" ? "components/partition_table" : "tools/partitions",
       filename
     );
@@ -96602,15 +95229,99 @@ async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, pr
 }
 
 // src/core/esp-flash-read.ts
-import fs36 from "node:fs/promises";
+import fs25 from "node:fs/promises";
+
+// src/core/analysis/private-analysis-directory.ts
+init_errors2();
+import fs17 from "node:fs/promises";
+import os4 from "node:os";
+import path22 from "node:path";
+import { execFile as execFile2 } from "node:child_process";
+import { promisify } from "node:util";
+var execute = promisify(execFile2);
+var WINDOWS_PRIVATE_ACL = String.raw`
+$ErrorActionPreference = 'Stop'
+$target = $env:PIO_PRIVATE_ANALYSIS_DIRECTORY
+$sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+$acl = New-Object System.Security.AccessControl.DirectorySecurity
+$acl.SetOwner($sid)
+$acl.SetAccessRuleProtection($true, $false)
+$rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')
+$acl.AddAccessRule($rule)
+[System.IO.Directory]::SetAccessControl($target, $acl)
+$actual = [System.IO.Directory]::GetAccessControl($target)
+if (-not $actual.AreAccessRulesProtected) { throw 'Unprotected analysis directory' }
+$rules = $actual.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])
+if ($rules.Count -ne 1 -or $rules[0].IdentityReference.Value -ne $sid.Value -or $rules[0].AccessControlType -ne 'Allow' -or $rules[0].FileSystemRights -ne 'FullControl') { throw 'Unexpected analysis ACL' }
+`;
+async function createPrivateAnalysisDirectory() {
+  const directory = await fs17.mkdtemp(
+    path22.join(os4.tmpdir(), "pio-private-analysis-")
+  );
+  try {
+    try {
+      if (process.platform === "win32") {
+        const systemRoot = process.env.SystemRoot;
+        if (!systemRoot || !path22.isAbsolute(systemRoot))
+          throw new Error("Windows system root unavailable");
+        await execute(
+          path22.join(
+            systemRoot,
+            "System32",
+            "WindowsPowerShell",
+            "v1.0",
+            "powershell.exe"
+          ),
+          [
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-EncodedCommand",
+            Buffer.from(WINDOWS_PRIVATE_ACL, "utf16le").toString("base64")
+          ],
+          {
+            windowsHide: true,
+            timeout: 15e3,
+            maxBuffer: 16384,
+            env: { ...process.env, PIO_PRIVATE_ANALYSIS_DIRECTORY: directory }
+          }
+        );
+      } else {
+        await fs17.chmod(directory, 448);
+        const permissions = await fs17.stat(directory);
+        if ((permissions.mode & 511) !== 448 || process.getuid && permissions.uid !== process.getuid())
+          throw new Error("Unexpected analysis directory owner or permissions");
+      }
+    } catch {
+      throw new PlatformIOError(
+        "Cannot establish private analysis storage.",
+        "ANALYSIS_PRIVATE_STORAGE_UNAVAILABLE"
+      );
+    }
+    return directory;
+  } catch (error2) {
+    await fs17.rm(directory, { recursive: true, force: true });
+    throw error2;
+  }
+}
+async function withPrivateAnalysisDirectory(use) {
+  const directory = await createPrivateAnalysisDirectory();
+  try {
+    return await use(directory);
+  } finally {
+    await fs17.rm(directory, { recursive: true, force: true });
+  }
+}
+
+// src/core/esp-flash-read.ts
 init_zod();
-import path39 from "node:path";
+import path29 from "node:path";
 init_serial_endpoint();
 
 // src/utils/lock-manager.ts
 init_errors2();
 init_events();
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID } from "node:crypto";
 var QueueEnforcementError = class extends PlatformIOError {
   constructor(message, context) {
     super(message, "QUEUE_ENFORCEMENT_FAILED", context);
@@ -96699,7 +95410,7 @@ var HardwareLockManager = class _HardwareLockManager {
    * Grabs the lock implicitly, awaits the job, then releases it.
    */
   async withImplicitLock(action) {
-    const implicitSessionId = `__IMPLICIT_${randomUUID2()}__`;
+    const implicitSessionId = `__IMPLICIT_${randomUUID()}__`;
     this.acquireLock(implicitSessionId, "Implicit Tool Execution");
     let cleanupPending = false;
     try {
@@ -96731,7 +95442,7 @@ var schema = external_exports.object({
 );
 async function readEspFlash(input, caller = {}) {
   const request = schema.parse(input);
-  const projectDir = await fs36.realpath(request.projectDir);
+  const projectDir = await fs25.realpath(request.projectDir);
   const { commandApprovalId, ...operation } = request;
   const args = { ...operation, projectDir };
   const context = { ...caller, workspaceDir: projectDir };
@@ -96761,7 +95472,7 @@ async function readEspFlash(input, caller = {}) {
           guard();
           endpoint.revalidate();
           const temporary = await createPrivateAnalysisDirectory();
-          const output = path39.join(temporary, "flash.bin");
+          const output = path29.join(temporary, "flash.bin");
           let retain = false;
           try {
             guard();
@@ -96798,7 +95509,7 @@ async function readEspFlash(input, caller = {}) {
                 }
               );
             const artifact = await readPartitionArtifact(
-              await fs36.realpath(temporary),
+              await fs25.realpath(temporary),
               output,
               request.length
             );
@@ -96821,7 +95532,7 @@ async function readEspFlash(input, caller = {}) {
             throw error2;
           } finally {
             if (!retain)
-              await fs36.rm(temporary, { recursive: true, force: true });
+              await fs25.rm(temporary, { recursive: true, force: true });
           }
         });
       }
@@ -96830,7 +95541,7 @@ async function readEspFlash(input, caller = {}) {
 }
 
 // src/tools/partition-project.ts
-import path40 from "node:path";
+import path30 from "node:path";
 
 // src/tools/boards.ts
 init_zod();
@@ -97001,7 +95712,7 @@ function resolvePartitionOffset(evidence, configuredUploadOffset) {
 // src/tools/project-inspection.ts
 init_zod();
 init_platformio();
-import fs37 from "node:fs/promises";
+import fs26 from "node:fs/promises";
 
 // src/core/project-inspection.ts
 init_zod();
@@ -97228,7 +95939,7 @@ async function executeProjectInspection(action, input, caller = {}, onAuthorized
       "UNKNOWN_ACTION"
     );
   const parsed = action === "project_envs" ? envSchema.parse(input) : metadataSchema2.parse(input);
-  const projectDir = await fs37.realpath(parsed.projectDir);
+  const projectDir = await fs26.realpath(parsed.projectDir);
   const params = { ...parsed, projectDir };
   const environment = "environment" in parsed ? parsed.environment : void 0;
   return dispatchAuthorizedAction(
@@ -97383,13 +96094,13 @@ async function resolveBuildPartitionInputs(projectDir, environment, caller, appr
       "PARTITION_METADATA_INVALID"
     );
   const normalize = (value2) => {
-    const resolved = path40.resolve(projectDir, value2);
+    const resolved = path30.resolve(projectDir, value2);
     return process.platform === "win32" ? resolved.toLowerCase() : resolved;
   };
   let selected = selectedTablePath;
   if (!selected) {
     const candidates = images.filter(
-      (image) => image && typeof image.path === "string" && path40.basename(image.path).toLowerCase() === "partitions.bin"
+      (image) => image && typeof image.path === "string" && path30.basename(image.path).toLowerCase() === "partitions.bin"
     );
     if (candidates.length !== 1)
       throw new PlatformIOError(
@@ -97467,7 +96178,7 @@ var PartitionTableSchema = external_exports.object({
 );
 async function executePartitionTable(input, caller = {}, onAuthorized) {
   const params = PartitionTableSchema.parse(input);
-  const projectDir = await fs38.realpath(params.projectDir);
+  const projectDir = await fs27.realpath(params.projectDir);
   const {
     configApprovalId,
     metadataApprovalId,
@@ -97572,17 +96283,17 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
       }
       guard();
       let firmwarePath = params.firmwarePath;
-      if (!firmwarePath && build && path41.basename(build.tablePath).toLowerCase() === "partitions.bin") {
+      if (!firmwarePath && build && path31.basename(build.tablePath).toLowerCase() === "partitions.bin") {
         try {
-          const candidate = await fs38.realpath(
-            path41.resolve(
+          const candidate = await fs27.realpath(
+            path31.resolve(
               projectDir,
-              path41.dirname(build.tablePath),
+              path31.dirname(build.tablePath),
               "firmware.bin"
             )
           );
-          const relative = path41.relative(projectDir, candidate);
-          if (relative && relative !== ".." && !relative.startsWith(".." + path41.sep) && !path41.isAbsolute(relative) && (await fs38.stat(candidate)).isFile())
+          const relative = path31.relative(projectDir, candidate);
+          if (relative && relative !== ".." && !relative.startsWith(".." + path31.sep) && !path31.isAbsolute(relative) && (await fs27.stat(candidate)).isFile())
             firmwarePath = candidate;
         } catch (error2) {
           if (error2.code !== "ENOENT") throw error2;
@@ -97689,6 +96400,1479 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
     }
   );
 }
+
+// src/core/analysis/esp-coredump-input.ts
+init_errors2();
+import { createHash as createHash4, timingSafeEqual } from "node:crypto";
+var MAX_DUMP_BYTES = 16 * 1024 * 1024;
+var chips = {
+  0: "esp32",
+  2: "esp32s2",
+  9: "esp32s3",
+  5: "esp32c3",
+  12: "esp32c2",
+  13: "esp32c6",
+  16: "esp32h2",
+  18: "esp32p4"
+};
+var versions = {
+  2: { header: 20, checksum: "crc32", payload: "binary" },
+  3: { header: 24, checksum: "crc32", payload: "binary" },
+  256: { header: 20, checksum: "crc32", payload: "elf" },
+  257: { header: 20, checksum: "sha256", payload: "elf" },
+  258: { header: 24, checksum: "crc32", payload: "elf" },
+  259: { header: 24, checksum: "sha256", payload: "elf" }
+};
+var crcTable = Uint32Array.from({ length: 256 }, (_, value2) => {
+  let crc = value2;
+  for (let bit = 0; bit < 8; bit++)
+    crc = crc >>> 1 ^ (crc & 1 ? 3988292384 : 0);
+  return crc >>> 0;
+});
+function crc32(bytes) {
+  let crc = 4294967295;
+  for (const byte of bytes) crc = crc >>> 8 ^ crcTable[(crc ^ byte) & 255];
+  return (crc ^ 4294967295) >>> 0;
+}
+function inspectRawEspCoredump(input, encrypted = false) {
+  if (encrypted)
+    throw new PlatformIOError(
+      "Encrypted core dumps require a supported decryption workflow.",
+      "COREDUMP_ENCRYPTED"
+    );
+  if (input.byteLength > MAX_DUMP_BYTES)
+    throw new PlatformIOError(
+      "Core dump exceeds 16 MiB.",
+      "COREDUMP_INPUT_LIMIT"
+    );
+  if (!input.byteLength || input.every((byte) => byte === 255))
+    throw new PlatformIOError(
+      "No core dump is present in the supplied bytes.",
+      "COREDUMP_EMPTY"
+    );
+  if (input.byteLength < 16)
+    throw new PlatformIOError(
+      "Core dump header is truncated.",
+      "COREDUMP_TRUNCATED"
+    );
+  const bytes = Buffer.from(input);
+  const length = bytes.readUInt32LE(0);
+  if (!length)
+    throw new PlatformIOError(
+      "Core dump length is zero; no recorded crash is available.",
+      "COREDUMP_EMPTY"
+    );
+  const version2 = bytes.readUInt32LE(4), format = versions[version2 & 65535], chip = chips[version2 >>> 16];
+  if (!format || !chip)
+    throw new PlatformIOError(
+      "Unsupported raw core-dump version or chip; do not infer plaintext from unknown bytes.",
+      "COREDUMP_FORMAT_UNSUPPORTED"
+    );
+  const checksumLength = format.checksum === "sha256" ? 32 : 4;
+  if (length < format.header + checksumLength || length > bytes.length || length > MAX_DUMP_BYTES)
+    throw new PlatformIOError(
+      "Declared core-dump length is outside the supplied input.",
+      "COREDUMP_LENGTH_INVALID"
+    );
+  const payload = bytes.subarray(0, length - checksumLength);
+  const checksum = bytes.subarray(length - checksumLength, length);
+  const valid = format.checksum === "sha256" ? timingSafeEqual(createHash4("sha256").update(payload).digest(), checksum) : crc32(payload) === checksum.readUInt32LE(0);
+  if (!valid)
+    throw new PlatformIOError(
+      "Core-dump checksum does not match its declared bytes.",
+      "COREDUMP_CHECKSUM_MISMATCH"
+    );
+  if (format.payload === "elf" && (length - format.header - checksumLength < 4 || !bytes.subarray(format.header, format.header + 4).equals(Buffer.from([127, 69, 76, 70]))))
+    throw new PlatformIOError(
+      "Core-dump payload does not contain the declared ELF format.",
+      "COREDUMP_PAYLOAD_INVALID"
+    );
+  return {
+    bytes: bytes.subarray(0, length),
+    identity: {
+      sha256: createHash4("sha256").update(bytes.subarray(0, length)).digest("hex"),
+      input_sha256: createHash4("sha256").update(bytes).digest("hex"),
+      length,
+      input_length: bytes.length,
+      trailing_bytes: bytes.length - length,
+      version: version2,
+      chip,
+      payload_format: format.payload,
+      checksum: format.checksum,
+      task_count: bytes.readUInt32LE(8),
+      tcb_size: bytes.readUInt32LE(12),
+      segment_count: bytes.readUInt32LE(16),
+      chip_revision: format.header === 24 ? bytes.readUInt32LE(20) : null
+    }
+  };
+}
+function decodeEspCoredumpBase64(text7) {
+  if (Buffer.byteLength(text7, "utf8") > Math.ceil(MAX_DUMP_BYTES / 3) * 4 + 65536)
+    throw new PlatformIOError(
+      "Encoded core dump exceeds the input limit.",
+      "COREDUMP_INPUT_LIMIT"
+    );
+  const decodeChunk = (compact2) => {
+    if (!compact2 || compact2.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(compact2))
+      throw new PlatformIOError(
+        "Invalid base64 core dump.",
+        "COREDUMP_BASE64_INVALID"
+      );
+    const decoded2 = Buffer.from(compact2, "base64");
+    if (decoded2.toString("base64") !== compact2)
+      throw new PlatformIOError(
+        "Non-canonical base64 core dump.",
+        "COREDUMP_BASE64_INVALID"
+      );
+    return decoded2;
+  };
+  const compact = text7.replace(/[ \t\r\n]/g, "");
+  let decoded;
+  if (/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) {
+    decoded = decodeChunk(compact);
+  } else {
+    const lines2 = text7.split(/\r?\n/).map((line) => line.replace(/[ \t]/g, "")).filter(Boolean);
+    if (lines2.length > 65536)
+      throw new PlatformIOError(
+        "Too many encoded core-dump lines.",
+        "COREDUMP_INPUT_LIMIT"
+      );
+    const chunks = lines2.map(decodeChunk);
+    const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
+    if (length > MAX_DUMP_BYTES)
+      throw new PlatformIOError(
+        "Decoded core dump exceeds 16 MiB.",
+        "COREDUMP_INPUT_LIMIT"
+      );
+    decoded = Buffer.concat(chunks, length);
+  }
+  if (decoded.length > MAX_DUMP_BYTES)
+    throw new PlatformIOError(
+      "Decoded core dump exceeds 16 MiB.",
+      "COREDUMP_INPUT_LIMIT"
+    );
+  return decoded;
+}
+
+// src/core/analysis/esp-coredump-read.ts
+init_errors2();
+async function readEspCoredumpPartition(input, caller = {}) {
+  const partition = input.partition;
+  if (partition.type !== 1 || partition.subtype !== 3 || !Number.isInteger(partition.offset) || partition.offset < 0 || partition.offset % 4096 || !Number.isInteger(partition.size) || partition.size < 24 || partition.size > 16 * 1024 * 1024 || partition.offset + partition.size > 4294967296 || !Number.isInteger(partition.flags) || partition.flags < 0 || partition.flags > 65535)
+    throw new PlatformIOError(
+      "Select a valid bounded core-dump partition from the effective table.",
+      "COREDUMP_PARTITION_INVALID"
+    );
+  if (partition.flags & 1)
+    throw new PlatformIOError(
+      "Encrypted core-dump partitions require a supported decryption workflow.",
+      "COREDUMP_ENCRYPTED"
+    );
+  const result = await readEspFlash(
+    {
+      projectDir: input.projectDir,
+      port: input.port,
+      offset: partition.offset,
+      length: partition.size,
+      approvalId: input.approvalId,
+      commandApprovalId: input.commandApprovalId
+    },
+    caller
+  );
+  const source = {
+    port: result.port,
+    offset: result.offset,
+    length: result.length,
+    sha256: result.sha256,
+    logPath: result.logPath,
+    partition: partition.name
+  };
+  try {
+    const dump = inspectRawEspCoredump(result.bytes);
+    return {
+      present: true,
+      bytes: result.bytes,
+      identity: dump.identity,
+      source
+    };
+  } catch (error2) {
+    if (error2 instanceof PlatformIOError && error2.code === "COREDUMP_EMPTY")
+      return { present: false, source };
+    throw error2;
+  }
+}
+
+// src/tools/coredump-device.ts
+var destinationSchema = external_exports.object({
+  port: external_exports.string().min(1).max(512),
+  partitionName: external_exports.string().min(1).max(16).optional(),
+  approvalId: external_exports.string().max(256).optional(),
+  commandApprovalId: external_exports.string().max(256).optional()
+}).strict();
+async function acquireProjectCoredump(tableInput, destinationInput, caller = {}) {
+  const table = PartitionTableSchema.parse(tableInput);
+  const destination = destinationSchema.parse(destinationInput);
+  if (table.readDevice)
+    throw new PlatformIOError(
+      "Core acquisition uses project-table inspection; request live table comparison separately.",
+      "COREDUMP_TABLE_INPUT_INVALID"
+    );
+  const report = await executePartitionTable(table, caller);
+  const guard = createPolicyRevisionGuard(table.projectDir);
+  guard();
+  if (!report.ok || report.error_count || (report.comparison?.length ?? 0) > 0)
+    throw new PlatformIOError(
+      "Resolve partition layout errors before reading a core dump.",
+      "COREDUMP_LAYOUT_INVALID"
+    );
+  const candidates = report.partitions.filter(
+    (partition) => partition.type === "data" && partition.subtype === "coredump" && (!destination.partitionName || partition.name === destination.partitionName)
+  );
+  if (candidates.length !== 1)
+    throw new PlatformIOError(
+      candidates.length ? "Select an explicit core-dump partition name." : "No matching core-dump partition exists in the effective layout.",
+      candidates.length ? "COREDUMP_PARTITION_AMBIGUOUS" : "COREDUMP_PARTITION_MISSING"
+    );
+  const selected = candidates[0];
+  if (selected.unknown_flags)
+    throw new PlatformIOError(
+      "Core-dump partition has unsupported flags.",
+      "COREDUMP_PARTITION_INVALID"
+    );
+  const result = await readEspCoredumpPartition(
+    {
+      projectDir: table.projectDir,
+      ...destination,
+      partition: {
+        name: selected.name,
+        type: 1,
+        subtype: 3,
+        offset: selected.offset,
+        size: selected.size,
+        flags: (selected.flags.includes("encrypted") ? 1 : 0) | (selected.flags.includes("readonly") ? 2 : 0)
+      }
+    },
+    caller
+  );
+  guard();
+  return {
+    ...result,
+    layout: {
+      table: report.artifacts.table,
+      table_offset: report.table_offset,
+      environment: report.environment,
+      table_source: report.table_source,
+      evidence: report.evidence
+    }
+  };
+}
+
+// src/core/analysis/esp-coredump-artifact.ts
+import fs28 from "node:fs/promises";
+
+// src/core/analysis/esp-coredump-firmware.ts
+init_errors2();
+function readEspCoredumpFirmwareIdentity(payload, version2) {
+  const bytes = Buffer.from(payload);
+  const invalid4 = (message) => {
+    throw new PlatformIOError(message, "COREDUMP_ELF_INVALID");
+  };
+  if (bytes.length < 52 || bytes.length > 16 * 1024 * 1024 || bytes.subarray(0, 7).toString("hex") !== "7f454c46010101")
+    return invalid4("Expected a bounded ELF32 little-endian core dump.");
+  if (bytes.readUInt16LE(16) !== 4 || bytes.readUInt32LE(20) !== 1 || bytes.readUInt16LE(40) !== 52)
+    return invalid4("Invalid core-dump ELF header.");
+  const machine = bytes.readUInt16LE(18);
+  const chip = version2 >>> 16;
+  const expectedMachine = [0, 2, 9].includes(chip) ? 94 : [5, 12, 13, 16, 18].includes(chip) ? 243 : null;
+  if (machine !== expectedMachine)
+    return invalid4("Core-dump ELF machine does not match its chip.");
+  const table = bytes.readUInt32LE(28), count2 = bytes.readUInt16LE(44);
+  if (!count2 || count2 > 4096 || bytes.readUInt16LE(42) !== 32 || table < 52 || table + count2 * 32 > bytes.length)
+    return invalid4("Invalid core-dump program-header table.");
+  let hash = null;
+  let notes = 0;
+  const ranges = [];
+  for (let index = 0; index < count2; index++) {
+    const header = table + index * 32;
+    const type = bytes.readUInt32LE(header), offset2 = bytes.readUInt32LE(header + 4), size = bytes.readUInt32LE(header + 16);
+    if (offset2 + size > bytes.length)
+      return invalid4("Core-dump segment extends outside the ELF.");
+    if (type !== 4 || !size) continue;
+    if (offset2 < table + count2 * 32 || ranges.some(([start, end]) => offset2 < end && offset2 + size > start))
+      return invalid4("Core-dump note segments overlap headers or each other.");
+    ranges.push([offset2, offset2 + size]);
+    let cursor = offset2;
+    while (cursor < offset2 + size) {
+      if (++notes > 4096 || cursor + 12 > offset2 + size)
+        return invalid4("Truncated or excessive core-dump notes.");
+      const nameSize = bytes.readUInt32LE(cursor), descSize = bytes.readUInt32LE(cursor + 4), noteType = bytes.readUInt32LE(cursor + 8);
+      const nameStart = cursor + 12, descStart = nameStart + Math.ceil(nameSize / 4) * 4;
+      const end = descStart + Math.ceil(descSize / 4) * 4;
+      if (end > offset2 + size)
+        return invalid4("Core-dump note exceeds its segment.");
+      const name2 = bytes.subarray(nameStart, nameStart + nameSize).toString("latin1").split("\0")[0];
+      if (name2 === "ESP_CORE_DUMP_INFO" && noteType === 8266) {
+        if (hash !== null || descSize < 68 || bytes.readUInt32LE(descStart) !== version2)
+          return invalid4(
+            "Duplicate, truncated or inconsistent ESP firmware identity note."
+          );
+        const rawHash = bytes.subarray(descStart + 4, descStart + 68);
+        const zero = rawHash.indexOf(0);
+        const prefix = rawHash.subarray(0, zero < 0 ? 64 : zero).toString("latin1");
+        if (!/^[a-fA-F0-9]{1,64}$/.test(prefix) || zero >= 0 && rawHash.subarray(zero).some((value2) => value2 !== 0))
+          return invalid4("Invalid ESP firmware hash prefix.");
+        hash = prefix.toLowerCase();
+      }
+      cursor = end;
+    }
+  }
+  return { elfSha256Prefix: hash, hashBits: (hash?.length ?? 0) * 4, machine };
+}
+function matchEspCoredumpFirmware(identity, elfSha256) {
+  if (!/^[a-f0-9]{64}$/i.test(elfSha256))
+    throw new PlatformIOError(
+      "Expected ELF identity must be SHA-256.",
+      "COREDUMP_IDENTITY_INVALID"
+    );
+  if (!identity.elfSha256Prefix)
+    return { status: "unavailable", hashBits: 0 };
+  if (!elfSha256.toLowerCase().startsWith(identity.elfSha256Prefix))
+    throw new PlatformIOError(
+      "Selected ELF does not match the firmware identity in the dump.",
+      "COREDUMP_ELF_MISMATCH"
+    );
+  return {
+    status: identity.hashBits === 256 ? "matched" : "prefix_matched",
+    hashBits: identity.hashBits
+  };
+}
+
+// src/core/analysis/esp-coredump-artifact.ts
+init_errors2();
+async function readEspCoredumpArtifact(input) {
+  if (input.format !== "raw" && input.format !== "base64")
+    throw new PlatformIOError(
+      "Unsupported core-dump input encoding.",
+      "COREDUMP_FORMAT_UNSUPPORTED"
+    );
+  if (input.expectedInputSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(input.expectedInputSha256))
+    throw new PlatformIOError(
+      "Expected core-dump input hash must be SHA-256.",
+      "COREDUMP_IDENTITY_INVALID"
+    );
+  const root = await fs28.realpath(input.workspaceDir);
+  const limit = input.format === "raw" ? 16 * 1024 * 1024 : Math.ceil(16 * 1024 * 1024 / 3) * 4 + 65536;
+  const artifact = await readPartitionArtifact(root, input.dumpPath, limit);
+  if (input.expectedInputSha256 && artifact.identity.sha256 !== input.expectedInputSha256.toLowerCase())
+    throw new PlatformIOError(
+      "Core-dump file does not match the selected artifact.",
+      "COREDUMP_IDENTITY_MISMATCH"
+    );
+  let bytes = artifact.content;
+  if (input.format === "base64") {
+    let text7;
+    try {
+      text7 = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      throw new PlatformIOError(
+        "Encoded core dump is not valid UTF-8.",
+        "COREDUMP_BASE64_INVALID"
+      );
+    }
+    bytes = decodeEspCoredumpBase64(text7);
+  }
+  return {
+    ...inspectEspCoredumpContent(bytes, input.encrypted),
+    source: { ...artifact.identity, format: input.format }
+  };
+}
+function inspectEspCoredumpContent(bytes, encrypted = false) {
+  const inspected = inspectRawEspCoredump(bytes, encrypted);
+  const formatVersion = inspected.identity.version & 65535;
+  const headerSize = formatVersion === 258 || formatVersion === 259 ? 24 : 20;
+  const checksumSize = inspected.identity.checksum === "sha256" ? 32 : 4;
+  const firmwareIdentity = inspected.identity.payload_format === "elf" ? readEspCoredumpFirmwareIdentity(
+    inspected.bytes.subarray(
+      headerSize,
+      inspected.bytes.length - checksumSize
+    ),
+    inspected.identity.version
+  ) : null;
+  return {
+    bytes: inspected.bytes,
+    identity: inspected.identity,
+    firmwareIdentity
+  };
+}
+function inspectCapturedEspCoredump(bytes, expectedInputSha256, encrypted = false) {
+  const dump = inspectEspCoredumpContent(bytes, encrypted);
+  if (expectedInputSha256 !== void 0 && (!/^[a-fA-F0-9]{64}$/.test(expectedInputSha256) || dump.identity.input_sha256 !== expectedInputSha256.toLowerCase()))
+    throw new PlatformIOError(
+      "Captured dump does not match the selected input identity.",
+      "COREDUMP_IDENTITY_MISMATCH"
+    );
+  return {
+    ...dump,
+    source: {
+      path: null,
+      size: bytes.byteLength,
+      sha256: dump.identity.input_sha256,
+      format: "raw"
+    }
+  };
+}
+
+// src/core/analysis/esp-coredump-debugger.ts
+init_errors2();
+import fs36 from "node:fs/promises";
+import path40 from "node:path";
+
+// src/core/debug/debug-discovery.ts
+init_errors2();
+import fs30 from "node:fs/promises";
+import path34 from "node:path";
+
+// src/core/analysis/build-metadata.ts
+init_errors2();
+import path33 from "node:path";
+
+// src/core/analysis/toolchain-resolver.ts
+init_errors2();
+import fs29 from "node:fs/promises";
+import path32 from "node:path";
+function contained2(root, candidate) {
+  const relative = path32.relative(root, candidate);
+  return relative !== "" && relative !== ".." && !relative.startsWith(`..${path32.sep}`) && !path32.isAbsolute(relative);
+}
+async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
+  if (!path32.isAbsolute(compilerPath) || !trustedRoots.length || trustedRoots.some((root2) => !path32.isAbsolute(root2)))
+    throw new PlatformIOError(
+      "Analysis needs explicit absolute compiler and trusted-root paths.",
+      "ANALYSIS_TOOLCHAIN_INVALID"
+    );
+  const compiler = await fs29.realpath(compilerPath);
+  const roots = [
+    ...new Set(
+      await Promise.all(trustedRoots.map((root2) => fs29.realpath(root2)))
+    )
+  ];
+  const matches = roots.filter((root2) => contained2(root2, compiler));
+  if (!matches.length)
+    throw new PlatformIOError(
+      "Compiler is outside the trusted toolchain roots.",
+      "ANALYSIS_TOOLCHAIN_UNTRUSTED"
+    );
+  const root = matches.sort((a, b) => b.length - a.length)[0];
+  const name2 = path32.basename(compiler);
+  const match = name2.match(
+    /^((?:[a-z0-9_]+-)*)(?:gcc|g\+\+|cc|c\+\+)(\.exe)?$/i
+  );
+  if (!match || !(await fs29.stat(compiler)).isFile())
+    throw new PlatformIOError(
+      "Expected a native GNU-compatible compiler path.",
+      "ANALYSIS_TOOLCHAIN_INVALID"
+    );
+  const companion = async (tool) => {
+    let candidate;
+    try {
+      candidate = await fs29.realpath(
+        path32.join(
+          path32.dirname(compiler),
+          `${match[1]}${tool}${match[2] ?? ""}`
+        )
+      );
+    } catch {
+      throw new PlatformIOError(
+        `The selected toolchain is missing ${tool}.`,
+        "ANALYSIS_TOOL_UNAVAILABLE"
+      );
+    }
+    if (!contained2(root, candidate) || !(await fs29.stat(candidate)).isFile())
+      throw new PlatformIOError(
+        `The ${tool} utility escapes the selected toolchain root.`,
+        "ANALYSIS_TOOLCHAIN_UNTRUSTED"
+      );
+    return candidate;
+  };
+  const [addr2line, size, nm] = await Promise.all([
+    companion("addr2line"),
+    companion("size"),
+    companion("nm")
+  ]);
+  return { compiler, root, addr2line, size, nm };
+}
+
+// src/core/analysis/build-metadata.ts
+function selectBuildMetadata(output, environment) {
+  const invalid4 = (message) => {
+    throw new PlatformIOError(message, "ANALYSIS_METADATA_INVALID");
+  };
+  if (Buffer.byteLength(output) > 10 * 1024 * 1024)
+    invalid4("Project metadata exceeds 10 MiB.");
+  let parsed;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    return invalid4("Project metadata is not valid JSON.");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    invalid4("Expected metadata keyed by environment.");
+  const records = parsed;
+  const names = Object.keys(records);
+  if (!names.length || names.length > 256)
+    invalid4("Expected between 1 and 256 build environments.");
+  if (environment !== void 0 && (!environment || environment.length > 256 || /[\x00-\x1f]/.test(environment)))
+    invalid4("Invalid selected environment.");
+  if (environment === void 0 && names.length !== 1)
+    throw new PlatformIOError(
+      "Select an explicit environment for analysis; project metadata contains multiple environments.",
+      "ANALYSIS_ENVIRONMENT_REQUIRED"
+    );
+  const selected = environment ?? names[0];
+  if (!Object.hasOwn(records, selected))
+    invalid4("Selected environment is absent from project metadata.");
+  const entry = records[selected];
+  if (!entry || typeof entry !== "object" || Array.isArray(entry))
+    invalid4("Selected environment metadata is not an object.");
+  const fields = entry;
+  const absolutePath = (field2) => {
+    const value2 = fields[field2];
+    if (typeof value2 !== "string" || !value2 || value2.length > 32768 || /[\x00-\x1f]/.test(value2) || !path33.isAbsolute(value2))
+      return invalid4(`Metadata ${field2} must be an absolute native path.`);
+    return path33.normalize(value2);
+  };
+  return {
+    environment: selected,
+    compilerPath: absolutePath("cc_path"),
+    elfPath: absolutePath("prog_path")
+  };
+}
+
+// src/core/debug/debug-discovery.ts
+function within2(root, file) {
+  const relative = path34.relative(root, file);
+  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path34.sep) && !path34.isAbsolute(relative);
+}
+async function resolveDebuggerExecutable(candidate, trustedRoots, projectDir) {
+  const invalid4 = (message) => {
+    throw new PlatformIOError(message, "GDB_EXECUTABLE_UNTRUSTED");
+  };
+  if (!path34.isAbsolute(candidate) || !path34.isAbsolute(projectDir) || trustedRoots.length < 1 || trustedRoots.length > 32 || trustedRoots.some((root) => !path34.isAbsolute(root)))
+    return invalid4("Debugger requires absolute host installation roots.");
+  const [executable, project, roots] = await Promise.all([
+    fs30.realpath(candidate),
+    fs30.realpath(projectDir),
+    Promise.all(trustedRoots.map((root) => fs30.realpath(root)))
+  ]);
+  for (const root of roots) {
+    if (root === path34.parse(root).root || root === project || within2(project, root) || within2(root, project) || !(await fs30.stat(root)).isDirectory())
+      return invalid4(
+        "Debugger installation roots cannot contain or belong to the project."
+      );
+  }
+  if (!roots.some((root) => within2(root, executable)) || !/^(?:[a-z0-9_]+-)*gdb(?:\.exe)?$/i.test(path34.basename(executable)) || !(await fs30.stat(executable)).isFile())
+    return invalid4(
+      "Debugger is not a native GDB within the trusted installation."
+    );
+  return executable;
+}
+async function discoverDebuggerRoots(debuggerPath, systemInfo, projectDir, environment = process.env) {
+  const invalid4 = (message) => {
+    throw new PlatformIOError(message, "GDB_EXECUTABLE_UNTRUSTED");
+  };
+  const configured = environment.PIO_MCP_DEBUGGER_ROOTS;
+  if (configured !== void 0) {
+    let roots;
+    if (Buffer.byteLength(configured) > 65536)
+      return invalid4("Debugger root configuration exceeds 64 KiB.");
+    try {
+      roots = JSON.parse(configured);
+    } catch {
+      return invalid4("PIO_MCP_DEBUGGER_ROOTS must be a JSON array.");
+    }
+    if (!Array.isArray(roots) || roots.length < 1 || roots.length > 32 || roots.some((root2) => typeof root2 !== "string" || !path34.isAbsolute(root2)))
+      return invalid4(
+        "Configure between 1 and 32 absolute debugger installation roots."
+      );
+    await resolveDebuggerExecutable(debuggerPath, roots, projectDir);
+    return [
+      ...new Set(
+        await Promise.all(roots.map((root2) => fs30.realpath(root2)))
+      )
+    ];
+  }
+  const core = systemInfo?.core_dir?.value;
+  if (typeof core !== "string" || !path34.isAbsolute(core))
+    return invalid4(
+      "PlatformIO system info did not identify an absolute Core directory."
+    );
+  const packages = await fs30.realpath(path34.join(core, "packages"));
+  const executable = await fs30.realpath(debuggerPath);
+  if (!within2(packages, executable))
+    return invalid4(
+      "Debugger is outside registered host packages; configure an operator root."
+    );
+  const folder = path34.relative(packages, executable).split(path34.sep)[0];
+  const root = await fs30.realpath(path34.join(packages, folder));
+  if (!within2(packages, root))
+    return invalid4("Debugger package escapes the Core installation.");
+  const readRecord = async (file) => {
+    const handle = await fs30.open(file, "r");
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size > 65536)
+        return invalid4("Invalid debugger package record.");
+      const bytes = Buffer.alloc(65537);
+      const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
+      if (bytesRead > 65536)
+        return invalid4("Debugger package record exceeds 64 KiB.");
+      const value2 = JSON.parse(
+        bytes.subarray(0, bytesRead).toString("utf8")
+      );
+      if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
+        return invalid4("Invalid debugger package record.");
+      return value2;
+    } finally {
+      await handle.close();
+    }
+  };
+  try {
+    const [manifest, record2] = await Promise.all([
+      readRecord(path34.join(root, "package.json")),
+      readRecord(path34.join(root, ".piopm"))
+    ]);
+    if (typeof manifest.name !== "string" || !(manifest.name.startsWith("toolchain-") || /^tool-.*gdb(?:-|$)/.test(manifest.name)) || typeof manifest.version !== "string" || !manifest.version || record2.type !== "tool" || record2.name !== manifest.name || record2.version !== manifest.version)
+      return invalid4(
+        "Debugger package registration does not match its manifest."
+      );
+  } catch (error2) {
+    if (error2 instanceof PlatformIOError) throw error2;
+    return invalid4("Debugger package registration is missing or invalid.");
+  }
+  await resolveDebuggerExecutable(executable, [root], projectDir);
+  return [root];
+}
+
+// src/core/analysis/analysis-process.ts
+init_errors2();
+import { execFile as execFile3 } from "node:child_process";
+import path35 from "node:path";
+async function runAnalysisProcess(executable, args, options = {}) {
+  const timeout = options.timeoutMs ?? 3e4;
+  const maxBuffer = options.maxOutputBytes ?? 16 * 1024 * 1024;
+  if (!path35.isAbsolute(executable) || /\.(?:cmd|bat|ps1|sh)$/i.test(executable))
+    throw new PlatformIOError(
+      "Analysis requires an absolute native executable path.",
+      "ANALYSIS_EXECUTABLE_INVALID"
+    );
+  if (!Number.isInteger(timeout) || timeout < 1 || timeout > 12e4 || !Number.isInteger(maxBuffer) || maxBuffer < 1 || maxBuffer > 32 * 1024 * 1024)
+    throw new PlatformIOError(
+      "Analysis process limits are invalid.",
+      "ANALYSIS_LIMIT_INVALID"
+    );
+  if (args.length > 8192 || args.some((arg) => typeof arg !== "string" || arg.includes("\0")) || args.reduce((total, arg) => total + Buffer.byteLength(arg), 0) > 256 * 1024)
+    throw new PlatformIOError(
+      "Analysis argument list is invalid or too large.",
+      "ANALYSIS_ARGUMENT_INVALID"
+    );
+  if (options.allowedExitCodes?.some(
+    (code) => !Number.isInteger(code) || code < 0 || code > 255
+  ))
+    throw new PlatformIOError(
+      "Invalid allowed exit code.",
+      "ANALYSIS_LIMIT_INVALID"
+    );
+  if (options.signal?.aborted)
+    throw new PlatformIOError("Analysis was cancelled.", "ANALYSIS_CANCELLED");
+  return new Promise((resolve, reject) => {
+    execFile3(
+      executable,
+      [...args],
+      {
+        cwd: options.cwd,
+        timeout,
+        maxBuffer,
+        signal: options.signal,
+        shell: false,
+        windowsHide: true,
+        encoding: "utf8",
+        killSignal: "SIGKILL",
+        env: { ...process.env, ...options.environment, LC_ALL: "C", LANG: "C" }
+      },
+      (error2, stdout, stderr) => {
+        if (!error2) {
+          resolve({ stdout, stderr });
+          return;
+        }
+        const code = error2.code;
+        if (typeof code === "number" && !error2.killed && !options.signal?.aborted && options.allowedExitCodes?.includes(code)) {
+          resolve({ stdout, stderr, exitCode: code });
+          return;
+        }
+        const failure = options.signal?.aborted || error2.name === "AbortError" ? "ANALYSIS_CANCELLED" : code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" ? "ANALYSIS_OUTPUT_LIMIT" : error2.killed ? "ANALYSIS_TIMEOUT" : code === "ENOENT" || code === "EACCES" ? "ANALYSIS_TOOL_UNAVAILABLE" : "ANALYSIS_TOOL_FAILED";
+        reject(
+          new PlatformIOError(
+            `Analysis utility failed (${failure}).`,
+            failure,
+            {
+              executable: path35.basename(executable),
+              exitCode: typeof code === "number" ? code : void 0
+            }
+          )
+        );
+      }
+    );
+  });
+}
+
+// src/core/analysis/esp-coredump-analysis.ts
+init_errors2();
+import fs34 from "node:fs/promises";
+import path38 from "node:path";
+
+// src/core/analysis/elf-identity.ts
+init_errors2();
+import fs31 from "node:fs/promises";
+import crypto11 from "node:crypto";
+async function readElfIdentity(elfPath, expectedSha256) {
+  if (expectedSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(expectedSha256))
+    throw new PlatformIOError(
+      "Expected ELF hash must be SHA-256.",
+      "ANALYSIS_ELF_INVALID"
+    );
+  const resolved = await fs31.realpath(elfPath);
+  const file = await fs31.open(resolved, "r");
+  try {
+    const before = await file.stat();
+    if (!before.isFile() || before.size < 52)
+      throw new PlatformIOError(
+        "Expected a regular ELF file with a complete header.",
+        "ANALYSIS_ELF_INVALID"
+      );
+    if (before.size > 256 * 1024 * 1024)
+      throw new PlatformIOError("ELF exceeds 256 MiB.", "ANALYSIS_INPUT_LIMIT");
+    const header = Buffer.alloc(Math.min(64, before.size));
+    const { bytesRead } = await file.read(header, 0, header.length, 0);
+    if (bytesRead !== header.length || header.subarray(0, 4).toString("hex") !== "7f454c46" || ![1, 2].includes(header[4]) || ![1, 2].includes(header[5]) || header[6] !== 1)
+      throw new PlatformIOError(
+        "Invalid or unsupported ELF header.",
+        "ANALYSIS_ELF_INVALID"
+      );
+    const bits = header[4] === 1 ? 32 : 64;
+    const byteOrder = header[5] === 1 ? "little" : "big";
+    if (bits === 64 && bytesRead < 64)
+      throw new PlatformIOError(
+        "Truncated ELF64 header.",
+        "ANALYSIS_ELF_INVALID"
+      );
+    const u16 = (offset2) => byteOrder === "little" ? header.readUInt16LE(offset2) : header.readUInt16BE(offset2);
+    const version2 = byteOrder === "little" ? header.readUInt32LE(20) : header.readUInt32BE(20);
+    const type = u16(16);
+    if (version2 !== 1 || u16(bits === 32 ? 40 : 52) !== (bits === 32 ? 52 : 64) || ![2, 3].includes(type))
+      throw new PlatformIOError(
+        "ELF must be a supported executable or shared image.",
+        "ANALYSIS_ELF_INVALID"
+      );
+    const machine = u16(18);
+    const architectures = {
+      3: "x86",
+      40: "arm",
+      62: "x86_64",
+      94: "xtensa",
+      183: "aarch64",
+      243: "riscv"
+    };
+    const hash = crypto11.createHash("sha256");
+    const chunk = Buffer.alloc(64 * 1024);
+    let position = 0;
+    while (position < before.size) {
+      const read = await file.read(
+        chunk,
+        0,
+        Math.min(chunk.length, before.size - position),
+        position
+      );
+      if (!read.bytesRead)
+        throw new PlatformIOError(
+          "ELF changed while reading.",
+          "ANALYSIS_ELF_CHANGED"
+        );
+      hash.update(chunk.subarray(0, read.bytesRead));
+      position += read.bytesRead;
+    }
+    const after = await file.stat();
+    if (after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs)
+      throw new PlatformIOError(
+        "ELF changed while reading.",
+        "ANALYSIS_ELF_CHANGED"
+      );
+    const sha256 = hash.digest("hex");
+    if (expectedSha256 && sha256 !== expectedSha256.toLowerCase())
+      throw new PlatformIOError(
+        "ELF does not match the selected firmware artifact.",
+        "ANALYSIS_ELF_MISMATCH"
+      );
+    return {
+      path: resolved,
+      sha256,
+      size: before.size,
+      bits,
+      byteOrder,
+      machine,
+      architecture: architectures[machine] ?? "unknown",
+      type: type === 2 ? "executable" : "shared"
+    };
+  } finally {
+    await file.close();
+  }
+}
+
+// src/core/analysis/elf-snapshot.ts
+import fs33 from "node:fs/promises";
+
+// src/core/analysis/elf-archive.ts
+init_paths();
+init_errors2();
+import fs32 from "node:fs/promises";
+import { constants as constants2 } from "node:fs";
+import path36 from "node:path";
+import { createHash as createHash5, randomUUID as randomUUID3 } from "node:crypto";
+async function retainElfSnapshot(snapshot, expectedSha256, archiveRoot = path36.join(SERVER_DATA_DIR, "artifacts", "elf"), sourcePath = snapshot) {
+  const identity = await readElfIdentity(snapshot, expectedSha256);
+  archiveRoot = await sourceArchiveRoot(sourcePath, archiveRoot);
+  await fs32.mkdir(archiveRoot, { recursive: true, mode: 448 });
+  const rootState = await fs32.lstat(archiveRoot);
+  if (!rootState.isDirectory() || rootState.isSymbolicLink())
+    throw new PlatformIOError(
+      "ELF archive must be an owned directory.",
+      "ANALYSIS_ARCHIVE_INVALID"
+    );
+  const root = await fs32.realpath(archiveRoot);
+  const destination = path36.join(root, identity.sha256 + ".elf");
+  const temporary = path36.join(root, "." + randomUUID3() + ".tmp");
+  try {
+    await fs32.copyFile(identity.path, temporary, constants2.COPYFILE_EXCL);
+    await fs32.chmod(temporary, 384);
+    await readElfIdentity(temporary, identity.sha256);
+    try {
+      await fs32.link(temporary, destination);
+    } catch (error2) {
+      if (error2.code !== "EEXIST") throw error2;
+    }
+    const stored = await fs32.lstat(destination);
+    if (!stored.isFile() || stored.isSymbolicLink())
+      throw new PlatformIOError(
+        "Invalid retained ELF object.",
+        "ANALYSIS_ARCHIVE_INVALID"
+      );
+    await readElfIdentity(destination, identity.sha256);
+    return destination;
+  } finally {
+    await fs32.unlink(temporary).catch((error2) => {
+      if (error2.code !== "ENOENT") throw error2;
+    });
+  }
+}
+async function sourceArchiveRoot(sourcePath, archiveRoot) {
+  const source = await fs32.realpath(sourcePath);
+  const key = createHash5("sha256").update(source).digest("hex");
+  return path36.join(archiveRoot, key);
+}
+async function resolveRetainedElf(sourcePath, sha256, archiveRoot = path36.join(SERVER_DATA_DIR, "artifacts", "elf")) {
+  if (!/^[a-f0-9]{64}$/i.test(sha256))
+    throw new PlatformIOError(
+      "Invalid retained ELF hash.",
+      "ANALYSIS_ELF_INVALID"
+    );
+  const root = await sourceArchiveRoot(sourcePath, archiveRoot);
+  const rootState = await fs32.lstat(root);
+  if (!rootState.isDirectory() || rootState.isSymbolicLink())
+    throw new PlatformIOError(
+      "Invalid retained ELF directory.",
+      "ANALYSIS_ARCHIVE_INVALID"
+    );
+  const canonicalRoot = await fs32.realpath(root);
+  const file = path36.join(canonicalRoot, sha256.toLowerCase() + ".elf");
+  const entry = await fs32.lstat(file);
+  if (!entry.isFile() || entry.isSymbolicLink())
+    throw new PlatformIOError(
+      "Invalid retained ELF object.",
+      "ANALYSIS_ARCHIVE_INVALID"
+    );
+  await readElfIdentity(file, sha256);
+  return file;
+}
+
+// src/core/analysis/elf-snapshot.ts
+import os7 from "node:os";
+import path37 from "node:path";
+async function withElfSnapshot(elfPath, expectedSha256, analyze, sourcePath = elfPath) {
+  const identity = await readElfIdentity(elfPath, expectedSha256);
+  const directory = await fs33.mkdtemp(
+    path37.join(os7.tmpdir(), "pio-elf-analysis-")
+  );
+  try {
+    await fs33.chmod(directory, 448);
+    const snapshot = path37.join(directory, "firmware.elf");
+    await fs33.copyFile(identity.path, snapshot);
+    await readElfIdentity(snapshot, identity.sha256);
+    const archivePath = await retainElfSnapshot(
+      snapshot,
+      identity.sha256,
+      void 0,
+      sourcePath
+    );
+    return await analyze(snapshot, { ...identity, archivePath });
+  } finally {
+    await fs33.rm(directory, { recursive: true, force: true });
+  }
+}
+
+// src/core/analysis/esp-coredump-analysis.ts
+async function withEspCoredumpArtifacts(input, analyze, capturedBytes) {
+  input.validatePolicy();
+  const root = await fs34.realpath(input.workspaceDir);
+  const elf = await fs34.realpath(path38.resolve(root, input.elfPath));
+  const relative = path38.relative(root, elf);
+  if (!relative || relative === ".." || relative.startsWith(".." + path38.sep) || path38.isAbsolute(relative))
+    throw new PlatformIOError(
+      "Selected ELF is outside the authorized workspace.",
+      "COREDUMP_ELF_OUTSIDE_WORKSPACE"
+    );
+  const dump = capturedBytes === void 0 ? await readEspCoredumpArtifact({ ...input, workspaceDir: root }) : inspectCapturedEspCoredump(
+    capturedBytes,
+    input.expectedInputSha256,
+    input.encrypted
+  );
+  const identity = await readElfIdentity(elf, input.expectedElfSha256);
+  const machine = ["esp32", "esp32s2", "esp32s3"].includes(dump.identity.chip) ? 94 : 243;
+  if (identity.machine !== machine || identity.bits !== 32 || identity.byteOrder !== "little")
+    throw new PlatformIOError(
+      "Selected ELF target does not match the core-dump chip.",
+      "COREDUMP_ELF_TARGET_MISMATCH"
+    );
+  const correspondence = dump.firmwareIdentity ? matchEspCoredumpFirmware(dump.firmwareIdentity, identity.sha256) : { status: "unavailable", hashBits: 0 };
+  input.validatePolicy();
+  return withElfSnapshot(
+    elf,
+    identity.sha256,
+    async (snapshot, stableIdentity) => {
+      input.validatePolicy();
+      const result = await analyze({
+        dump,
+        elfPath: snapshot,
+        elfIdentity: stableIdentity,
+        correspondence
+      });
+      input.validatePolicy();
+      return result;
+    }
+  );
+}
+
+// src/core/analysis/esp-coredump-conversion.ts
+init_errors2();
+import fs35 from "node:fs/promises";
+import path39 from "node:path";
+import { createHash as createHash6 } from "node:crypto";
+
+// src/core/analysis/esp-coredump-converter.ts
+var ESP_COREDUMP_VERSION = "1.10.0";
+var ESP_COREDUMP_CONVERTER = String.raw`
+import importlib.metadata
+import json
+import logging
+import os
+from pathlib import Path
+import sys
+import tempfile
+
+
+def main():
+    if importlib.metadata.version("esp-coredump") != "1.10.0":
+        raise ValueError("COREDUMP_TOOL_VERSION_MISMATCH")
+    if len(sys.argv) != 5:
+        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
+    raw, elf, staging = [Path(value) for value in sys.argv[1:4]]
+    machine = int(sys.argv[4])
+    if machine not in (94, 243):
+        raise ValueError("COREDUMP_ELF_TARGET_MISMATCH")
+    if not all(value.is_absolute() for value in (raw, elf, staging)):
+        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
+    staging = staging.resolve(strict=True)
+    raw = raw.resolve(strict=True)
+    elf = elf.resolve(strict=True)
+    if raw.parent != staging or not raw.is_file() or not elf.is_file():
+        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
+    if raw.stat().st_size > 16 * 1024 * 1024 or elf.stat().st_size > 256 * 1024 * 1024:
+        raise ValueError("COREDUMP_INPUT_LIMIT")
+    logging.disable(logging.CRITICAL)
+    from esp_coredump.corefile.loader import ESPCoreDumpFileLoader
+
+    class StagedLoader(ESPCoreDumpFileLoader):
+        def _create_temp_file(self):
+            descriptor, name = tempfile.mkstemp(prefix="converted-", suffix=".elf", dir=staging)
+            os.close(descriptor)
+            self.temp_files.append(name)
+            return name
+
+    loader = None
+    keep = None
+    try:
+        loader = StagedLoader(str(raw), is_b64=False)
+        loader.create_corefile(exe_name=str(elf), e_machine=machine)
+        output = Path(loader.core_elf_file).resolve(strict=True)
+        if output.parent != staging or not output.is_file() or output.stat().st_size > 32 * 1024 * 1024:
+            raise ValueError("COREDUMP_CONVERSION_INVALID")
+        with output.open("rb") as stream:
+            if stream.read(7) != bytes.fromhex("7f454c46010101"):
+                raise ValueError("COREDUMP_CONVERSION_INVALID")
+        keep = output
+        print(json.dumps({"core_path": str(output), "converter_version": "1.10.0"}))
+    finally:
+        if loader is not None:
+            for name in loader.temp_files:
+                candidate = Path(name)
+                if candidate.parent == staging and candidate != keep:
+                    candidate.unlink(missing_ok=True)
+
+
+try:
+    main()
+except importlib.metadata.PackageNotFoundError:
+    print(json.dumps({"error": "COREDUMP_TOOL_UNAVAILABLE"}))
+    sys.exit(2)
+except Exception as error:
+    code = str(error)
+    if code not in {
+        "COREDUMP_TOOL_VERSION_MISMATCH", "COREDUMP_CONVERTER_ARGUMENTS",
+        "COREDUMP_ELF_TARGET_MISMATCH", "COREDUMP_INPUT_LIMIT", "COREDUMP_CONVERSION_INVALID"
+    }:
+        code = "COREDUMP_CONVERSION_FAILED"
+    print(json.dumps({"error": code}))
+    sys.exit(2)
+`;
+
+// src/core/analysis/esp-coredump-conversion.ts
+async function withConvertedEspCoredump(artifacts, options, use) {
+  options.validatePolicy();
+  if (createHash6("sha256").update(artifacts.dump.bytes).digest("hex") !== artifacts.dump.identity.sha256)
+    throw new PlatformIOError(
+      "Core-dump bytes changed before conversion.",
+      "COREDUMP_IDENTITY_MISMATCH"
+    );
+  return withPrivateAnalysisDirectory(async (directory) => {
+    const raw = path39.join(directory, "dump.raw");
+    await fs35.writeFile(raw, artifacts.dump.bytes, { flag: "wx", mode: 384 });
+    options.validatePolicy();
+    const result = await runAnalysisProcess(
+      options.pythonExecutable,
+      [
+        "-I",
+        "-c",
+        ESP_COREDUMP_CONVERTER,
+        raw,
+        artifacts.elfPath,
+        directory,
+        String(artifacts.elfIdentity.machine)
+      ],
+      {
+        cwd: directory,
+        signal: options.signal,
+        timeoutMs: 6e4,
+        maxOutputBytes: 65536,
+        allowedExitCodes: [2]
+      }
+    );
+    let response;
+    try {
+      response = JSON.parse(result.stdout);
+    } catch {
+      throw new PlatformIOError(
+        "Converter returned an invalid response.",
+        "COREDUMP_CONVERSION_INVALID"
+      );
+    }
+    if (!response || typeof response !== "object")
+      throw new PlatformIOError(
+        "Converter returned an invalid response.",
+        "COREDUMP_CONVERSION_INVALID"
+      );
+    const report = response;
+    const errors = /* @__PURE__ */ new Set([
+      "COREDUMP_TOOL_UNAVAILABLE",
+      "COREDUMP_TOOL_VERSION_MISMATCH",
+      "COREDUMP_CONVERTER_ARGUMENTS",
+      "COREDUMP_ELF_TARGET_MISMATCH",
+      "COREDUMP_INPUT_LIMIT",
+      "COREDUMP_CONVERSION_INVALID",
+      "COREDUMP_CONVERSION_FAILED"
+    ]);
+    if (typeof report.error === "string" && errors.has(report.error))
+      throw new PlatformIOError(
+        "Optional core-dump conversion did not complete.",
+        report.error
+      );
+    if (result.exitCode || report.converter_version !== ESP_COREDUMP_VERSION || typeof report.core_path !== "string")
+      throw new PlatformIOError(
+        "Converter returned an invalid result.",
+        "COREDUMP_CONVERSION_INVALID"
+      );
+    const core = await readPartitionArtifact(
+      await fs35.realpath(directory),
+      report.core_path,
+      32 * 1024 * 1024
+    );
+    if (core.content.length < 52 || core.content.subarray(0, 7).toString("hex") !== "7f454c46010101" || core.content.readUInt16LE(16) !== 4 || core.content.readUInt16LE(18) !== artifacts.elfIdentity.machine)
+      throw new PlatformIOError(
+        "Converter output is not the expected core ELF.",
+        "COREDUMP_CONVERSION_INVALID"
+      );
+    options.validatePolicy();
+    const value2 = await use(core.identity.path, core.identity.sha256);
+    options.validatePolicy();
+    return value2;
+  });
+}
+
+// src/core/analysis/esp-coredump-report.ts
+init_errors2();
+init_redact();
+function parseEspCoredumpReport(output) {
+  if (Buffer.byteLength(output, "utf8") > 4 * 1024 * 1024)
+    throw new PlatformIOError(
+      "Core-dump analyzer output exceeds 4 MiB.",
+      "COREDUMP_OUTPUT_LIMIT"
+    );
+  const cleaned = redactSecretsInText(output);
+  const backtrace = [];
+  const registers = /* @__PURE__ */ Object.create(null);
+  let crashedTask = null, reason = null;
+  let section = null;
+  let truncated = false;
+  for (const line of cleaned.split(/\r?\n/)) {
+    const value2 = line.trim();
+    const task = /^Crashed task(?: handle)?:\s*(.*)$/.exec(value2);
+    if (task) crashedTask = task[1].slice(0, 4096);
+    if (reason === null) {
+      const description = /^(?:Panic reason|Exception cause):\s*(.*)$/.exec(
+        value2
+      );
+      if (description) reason = description[1].slice(0, 4096);
+      else if (value2.startsWith("Program received signal") || value2.startsWith("Program terminated with signal") || value2.includes("panic'ed"))
+        reason = value2.slice(0, 4096);
+    }
+    const heading = /^={2,}\s*(.*?)\s*={2,}$/.exec(value2);
+    if (heading) {
+      const title = heading[1].toUpperCase();
+      section = title === "CURRENT THREAD STACK" ? "stack" : title === "CURRENT THREAD REGISTERS" ? "registers" : null;
+      continue;
+    }
+    if (section === "stack" && /^#[0-9]+\s/.test(value2)) {
+      if (backtrace.length < 256) backtrace.push(value2.slice(0, 4096));
+      else truncated = true;
+    }
+    if (section === "registers") {
+      const register = /^([A-Za-z][A-Za-z0-9_]{0,63})\s+(.+)$/.exec(value2);
+      if (register) {
+        if (Object.keys(registers).length < 128 || Object.hasOwn(registers, register[1]))
+          registers[register[1]] = register[2].slice(0, 4096);
+        else truncated = true;
+      }
+    }
+    if (value2.length > 4096) truncated = true;
+  }
+  return {
+    crashed_task: crashedTask,
+    reason,
+    backtrace,
+    registers,
+    output: cleaned.slice(-12e3),
+    truncated: truncated || cleaned.length > 12e3
+  };
+}
+
+// src/core/analysis/esp-coredump-debugger.ts
+function gdbFile(file) {
+  if (!path40.isAbsolute(file) || /[\x00-\x1f\x7f]/.test(file))
+    throw new PlatformIOError(
+      "Invalid core-analysis artifact path.",
+      "COREDUMP_PATH_INVALID"
+    );
+  return JSON.stringify(file.replace(/\\/g, "/"));
+}
+async function analyzeEspCoredump(input, options, capturedBytes) {
+  input.validatePolicy();
+  options.validatePolicy();
+  const debuggerExecutable = await resolveDebuggerExecutable(
+    options.debuggerExecutable,
+    options.trustedDebuggerRoots,
+    input.workspaceDir
+  );
+  return withEspCoredumpArtifacts(
+    input,
+    async (artifacts) => withConvertedEspCoredump(
+      artifacts,
+      options,
+      async (corePath, coreSha256) => {
+        const script = path40.join(path40.dirname(corePath), "report.gdb");
+        const coreName = path40.basename(corePath);
+        if (!/^[a-zA-Z0-9_.-]+$/.test(coreName))
+          throw new PlatformIOError(
+            "Invalid converted core filename.",
+            "COREDUMP_PATH_INVALID"
+          );
+        const commands = [
+          "set auto-load off",
+          "set may-call-functions off",
+          "set auto-solib-add off",
+          "set pagination off",
+          "set confirm off",
+          "set print elements 128",
+          "file " + gdbFile(artifacts.elfPath),
+          "core-file " + coreName,
+          "echo ==================== CURRENT THREAD REGISTERS ====================\\n",
+          "info registers",
+          "echo ==================== CURRENT THREAD STACK ====================\\n",
+          "backtrace 256",
+          "echo ==================== THREADS INFO ====================\\n",
+          "info threads"
+        ];
+        await fs36.writeFile(script, commands.join("\n") + "\n", {
+          flag: "wx",
+          mode: 384
+        });
+        options.validatePolicy();
+        const output = await runAnalysisProcess(
+          debuggerExecutable,
+          [
+            "-nx",
+            "-nh",
+            "--batch",
+            "--quiet",
+            "-iex",
+            "set auto-load off",
+            "-iex",
+            "set may-call-functions off",
+            "-x",
+            script
+          ],
+          {
+            cwd: path40.dirname(corePath),
+            signal: options.signal,
+            timeoutMs: 6e4,
+            maxOutputBytes: 4 * 1024 * 1024,
+            environment: { DEBUGINFOD_URLS: "" }
+          }
+        );
+        options.validatePolicy();
+        const report = parseEspCoredumpReport(output.stdout);
+        return {
+          ok: true,
+          ...report,
+          dump: {
+            source: artifacts.dump.source,
+            identity: artifacts.dump.identity
+          },
+          elf: artifacts.elfIdentity,
+          firmware_correspondence: artifacts.correspondence,
+          core_sha256: coreSha256,
+          debugger: debuggerExecutable,
+          stderr_present: output.stderr.length > 0
+        };
+      }
+    ),
+    capturedBytes
+  );
+}
+
+// src/core/analysis/esp-coredump-tools.ts
+init_errors2();
+import fs37 from "node:fs/promises";
+import path41 from "node:path";
+async function resolveEspCoredumpTools(projectDir, environment = process.env) {
+  const python = environment.PIO_MCP_COREDUMP_PYTHON;
+  const debuggerPath = environment.PIO_MCP_COREDUMP_GDB;
+  if (!python || !debuggerPath)
+    throw new PlatformIOError(
+      "Configure PIO_MCP_COREDUMP_PYTHON and PIO_MCP_COREDUMP_GDB in the server environment; install the optional coredump dependencies explicitly.",
+      "COREDUMP_TOOLS_UNCONFIGURED"
+    );
+  if ([python, debuggerPath].some(
+    (value2) => !path41.isAbsolute(value2) || value2.length > 32768 || /[\x00-\x1f\x7f]/.test(value2)
+  ) || /\.(?:cmd|bat|ps1|sh)$/i.test(python))
+    throw new PlatformIOError(
+      "Core-dump tools require absolute native executable paths.",
+      "COREDUMP_TOOLS_INVALID"
+    );
+  const project = await fs37.realpath(projectDir);
+  const executable = await fs37.realpath(python);
+  const relative = path41.relative(project, executable);
+  if (!relative || relative !== ".." && !relative.startsWith(".." + path41.sep) && !path41.isAbsolute(relative) || !(await fs37.stat(executable)).isFile())
+    throw new PlatformIOError(
+      "The configured Python interpreter must be installed outside the workspace.",
+      "COREDUMP_TOOLS_INVALID"
+    );
+  const roots = await discoverDebuggerRoots(
+    debuggerPath,
+    null,
+    project,
+    environment
+  );
+  const debuggerExecutable = await resolveDebuggerExecutable(
+    debuggerPath,
+    roots,
+    project
+  );
+  return {
+    pythonExecutable: executable,
+    debuggerExecutable,
+    trustedDebuggerRoots: roots
+  };
+}
+
+// src/tools/coredump.ts
+var CoredumpSchema = external_exports.object({
+  projectDir: external_exports.string().min(1).max(32768),
+  dumpPath: external_exports.string().min(1).max(32768).optional(),
+  device: external_exports.object({
+    port: external_exports.string().min(1).max(512),
+    partitionName: external_exports.string().min(1).max(16).optional(),
+    table: PartitionTableSchema,
+    approvalId: external_exports.string().max(256).optional(),
+    commandApprovalId: external_exports.string().max(256).optional()
+  }).strict().optional(),
+  format: external_exports.enum(["raw", "base64"]).default("raw"),
+  analyze: external_exports.boolean().default(true),
+  elfPath: external_exports.string().min(1).max(32768).optional(),
+  expectedInputSha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
+  expectedElfSha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
+  encrypted: external_exports.boolean().default(false),
+  approvalId: external_exports.string().max(256).optional(),
+  commandApprovalId: external_exports.string().max(256).optional()
+}).strict().refine(
+  (value2) => Boolean(value2.dumpPath) !== Boolean(value2.device),
+  "Select exactly one dump file or device acquisition."
+).refine(
+  (value2) => !value2.device || value2.format === "raw" && !value2.encrypted && !value2.device.table.readDevice,
+  "Device capture requires raw unencrypted input and an offline project table."
+).refine(
+  (value2) => !value2.analyze || !!value2.elfPath,
+  "An explicit ELF is required for analysis."
+);
+async function executeCoredump(input, caller = {}, onAuthorized) {
+  const request = CoredumpSchema.parse(input);
+  const projectDir = await fs38.realpath(request.projectDir);
+  if (request.device && await fs38.realpath(request.device.table.projectDir) !== projectDir)
+    throw new PlatformIOError(
+      "Partition inspection must use the same authorized project.",
+      "COREDUMP_TABLE_INPUT_INVALID"
+    );
+  const { commandApprovalId, ...operation } = request;
+  const stripGrants = (value2) => {
+    if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
+      return value2;
+    return Object.fromEntries(
+      Object.entries(value2).filter(([key]) => key !== "approvalId" && !key.endsWith("ApprovalId")).map(([key, nested]) => [key, stripGrants(nested)])
+    );
+  };
+  const args = {
+    ...operation,
+    device: stripGrants(operation.device),
+    projectDir
+  };
+  const commandArgs = { ...args, approvalId: commandApprovalId };
+  const context = { ...caller, workspaceDir: projectDir };
+  const stages = [
+    ["coredump_inspect", args]
+  ];
+  if (request.analyze) stages.push(["coredump_analyze", commandArgs]);
+  for (const [name2, parameters] of stages) {
+    const plan = await planAction(name2, parameters, context);
+    if (plan.status !== "ready")
+      throw new PlatformIOError(
+        plan.reason,
+        plan.status === "requires_approval" ? "APPROVAL_REQUIRED" : "POLICY_DENIED",
+        { policyDecision: plan }
+      );
+  }
+  return dispatchAuthorizedAction(
+    "coredump_inspect",
+    args,
+    context,
+    async () => {
+      const validatePolicy = createPolicyRevisionGuard(projectDir);
+      await onAuthorized?.();
+      validatePolicy();
+      const selection = {
+        ...request,
+        workspaceDir: projectDir,
+        dumpPath: request.dumpPath ?? ""
+      };
+      const execute3 = async () => {
+        validatePolicy();
+        const tools = request.analyze ? await resolveEspCoredumpTools(projectDir) : null;
+        const capture = request.device ? await acquireProjectCoredump(
+          request.device.table,
+          {
+            port: request.device.port,
+            partitionName: request.device.partitionName,
+            approvalId: request.device.approvalId,
+            commandApprovalId: request.device.commandApprovalId
+          },
+          caller
+        ) : null;
+        validatePolicy();
+        if (capture && !capture.present)
+          return {
+            ok: false,
+            analyzed: false,
+            error: "no_coredump",
+            acquisition: capture.source,
+            layout: capture.layout
+          };
+        const capturedBytes = capture?.present ? capture.bytes : void 0;
+        if (!request.analyze) {
+          const artifact = capturedBytes ? inspectCapturedEspCoredump(
+            capturedBytes,
+            request.expectedInputSha256
+          ) : await readEspCoredumpArtifact(selection);
+          validatePolicy();
+          return {
+            ok: true,
+            analyzed: false,
+            source: artifact.source,
+            identity: artifact.identity,
+            firmwareIdentity: artifact.firmwareIdentity,
+            acquisition: capture?.source ?? null,
+            layout: capture?.layout ?? null
+          };
+        }
+        const result = await analyzeEspCoredump(
+          { ...selection, elfPath: request.elfPath, validatePolicy },
+          { ...tools, validatePolicy },
+          capturedBytes
+        );
+        validatePolicy();
+        return {
+          ...result,
+          analyzed: true,
+          acquisition: capture?.source ?? null,
+          layout: capture?.layout ?? null
+        };
+      };
+      return request.analyze ? dispatchAuthorizedAction(
+        "coredump_analyze",
+        commandArgs,
+        context,
+        execute3
+      ) : execute3();
+    }
+  );
+}
+
+// src/adapters/partition-compat.ts
+init_zod();
 
 // src/tools/run-target.ts
 init_zod();
@@ -118312,7 +118496,7 @@ var toolDefinitions = [
       additionalProperties: false
     }
   },
-  { name: "coredump", description: "Inspect an explicit offline ESP core dump, optionally producing a backtrace/register report against an explicit ELF. Analysis requires separately authorized host tools; no live device access.", inputSchema: { "type": "object", "required": ["projectDir", "dumpPath"], "additionalProperties": false, "properties": { "projectDir": { "type": "string", "minLength": 1, "maxLength": 32768 }, "dumpPath": { "type": "string", "minLength": 1, "maxLength": 32768 }, "elfPath": { "type": "string", "minLength": 1, "maxLength": 32768 }, "expectedInputSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }, "expectedElfSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }, "approvalId": { "type": "string", "maxLength": 256 }, "commandApprovalId": { "type": "string", "maxLength": 256 }, "format": { "type": "string", "enum": ["raw", "base64"], "default": "raw" }, "analyze": { "type": "boolean", "default": true }, "encrypted": { "type": "boolean", "default": false } } } },
+  { name: "coredump", description: "Inspect an ESP core dump from a file or explicitly authorized device partition read, optionally analyzing it against an explicit ELF. Device reads can reset hardware and require separate device and host-command grants.", inputSchema: { "type": "object", "required": ["projectDir"], "additionalProperties": false, "properties": { "projectDir": { "type": "string", "minLength": 1, "maxLength": 32768 }, "dumpPath": { "type": "string", "minLength": 1, "maxLength": 32768 }, "elfPath": { "type": "string", "minLength": 1, "maxLength": 32768 }, "expectedInputSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }, "expectedElfSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }, "approvalId": { "type": "string", "maxLength": 256 }, "commandApprovalId": { "type": "string", "maxLength": 256 }, "format": { "type": "string", "enum": ["raw", "base64"], "default": "raw" }, "analyze": { "type": "boolean", "default": true }, "encrypted": { "type": "boolean", "default": false }, "device": { "type": "object", "required": ["port", "table"], "additionalProperties": false, "properties": { "port": { "type": "string", "minLength": 1, "maxLength": 512 }, "partitionName": { "type": "string", "minLength": 1, "maxLength": 16 }, "table": { "type": "object", "required": ["projectDir"], "additionalProperties": false, "properties": { "projectDir": { "type": "string", "minLength": 1 }, "tablePath": { "type": "string", "minLength": 1 }, "format": { "type": "string", "enum": ["csv", "binary"], "default": "csv" }, "tableOffset": { "type": "integer", "minimum": 0, "maximum": 4294963200 }, "environment": { "type": "string" }, "sdkconfigPath": { "type": "string" }, "flashSize": { "type": "integer", "minimum": 1, "maximum": 4294967296 }, "buildMetadata": { "type": "boolean", "default": false }, "approvalId": { "type": "string", "maxLength": 256 }, "configApprovalId": { "type": "string", "maxLength": 256 }, "metadataApprovalId": { "type": "string", "maxLength": 256 }, "systemApprovalId": { "type": "string", "maxLength": 256 }, "boardApprovalId": { "type": "string", "maxLength": 256 } } }, "approvalId": { "type": "string", "maxLength": 256 }, "commandApprovalId": { "type": "string", "maxLength": 256 } } } }, "oneOf": [{ "required": ["dumpPath"], "not": { "required": ["device"] } }, { "required": ["device"], "not": { "required": ["dumpPath"] } }] } },
   {
     name: "partition_table",
     description: "Inspect ESP partition artifacts and firmware fit. Optional buildMetadata requires build permission and can execute project scripts. Optional readDevice resets/reads an explicitly selected serial device with separate permissions.",
@@ -119650,7 +119834,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const response2 = createToolResult({
         success: result.ok,
         status: result.ok ? "completed" : "failed",
-        summary: name2 === "coredump" ? "Offline core-dump inspection completed." : name2 === "partition_table" || name2 === "run_target" || name2 === "deps_check" || name2.startsWith("pkg_") || compatibilityTool || projectInspection ? result.summary : name2 === "size_report" ? "Firmware size report completed." : result.ok ? "Crash addresses decoded against the selected ELF." : "No crash addresses resolved against the selected ELF.",
+        summary: name2 === "coredump" ? result.ok ? "Core-dump inspection completed." : "No recorded core dump is present." : name2 === "partition_table" || name2 === "run_target" || name2 === "deps_check" || name2.startsWith("pkg_") || compatibilityTool || projectInspection ? result.summary : name2 === "size_report" ? "Firmware size report completed." : result.ok ? "Crash addresses decoded against the selected ELF." : "No crash addresses resolved against the selected ELF.",
         data: result
       });
       await updateCommandStatus(

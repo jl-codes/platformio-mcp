@@ -67,3 +67,33 @@ it.each(["coredump", "coredump_inspect", "get_project_config"])(
     ).rejects.toMatchObject({ code: "POLICY_DENIED" });
   },
 );
+it("requires device-read permission even when analysis is disabled", async () => {
+  fs.writeFileSync(
+    path.join(root, "partitions.csv"),
+    "app,app,factory,0x10000,1M,\ncrash,data,coredump,0x310000,64K,\n",
+  );
+  await expect(
+    executeCoredump({
+      projectDir: root,
+      analyze: false,
+      device: {
+        port: "never-open-this-port",
+        table: {
+          projectDir: root,
+          tablePath: "partitions.csv",
+          tableOffset: 0x8000,
+        },
+      },
+    }),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+});
+it("rejects requests mixing a dump file with live acquisition", async () => {
+  await expect(
+    executeCoredump({
+      projectDir: root,
+      dumpPath: "absent.raw",
+      analyze: false,
+      device: { port: "port", table: { projectDir: root } },
+    }),
+  ).rejects.toThrow("Select exactly one");
+});

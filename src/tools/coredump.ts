@@ -8,7 +8,12 @@ import {
 } from "../core/action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
 import type { PolicyEvaluationContext } from "../core/policy/types.js";
-import { readEspCoredumpArtifact } from "../core/analysis/esp-coredump-artifact.js";
+import { acquireProjectCoredump } from "./coredump-device.js";
+import { PartitionTableSchema } from "./partition-table.js";
+import {
+  inspectCapturedEspCoredump,
+  readEspCoredumpArtifact,
+} from "../core/analysis/esp-coredump-artifact.js";
 import { analyzeEspCoredump } from "../core/analysis/esp-coredump-debugger.js";
 import { resolveEspCoredumpTools } from "../core/analysis/esp-coredump-tools.js";
 
@@ -16,7 +21,17 @@ import { resolveEspCoredumpTools } from "../core/analysis/esp-coredump-tools.js"
 export const CoredumpSchema = z
   .object({
     projectDir: z.string().min(1).max(32768),
-    dumpPath: z.string().min(1).max(32768),
+    dumpPath: z.string().min(1).max(32768).optional(),
+    device: z
+      .object({
+        port: z.string().min(1).max(512),
+        partitionName: z.string().min(1).max(16).optional(),
+        table: PartitionTableSchema,
+        approvalId: z.string().max(256).optional(),
+        commandApprovalId: z.string().max(256).optional(),
+      })
+      .strict()
+      .optional(),
     format: z.enum(["raw", "base64"]).default("raw"),
     analyze: z.boolean().default(true),
     elfPath: z.string().min(1).max(32768).optional(),
@@ -34,6 +49,18 @@ export const CoredumpSchema = z
   })
   .strict()
   .refine(
+    (value) => Boolean(value.dumpPath) !== Boolean(value.device),
+    "Select exactly one dump file or device acquisition.",
+  )
+  .refine(
+    (value) =>
+      !value.device ||
+      (value.format === "raw" &&
+        !value.encrypted &&
+        !value.device.table.readDevice),
+    "Device capture requires raw unencrypted input and an offline project table.",
+  )
+  .refine(
     (value) => !value.analyze || !!value.elfPath,
     "An explicit ELF is required for analysis.",
   );
@@ -46,8 +73,29 @@ export async function executeCoredump(
 ) {
   const request = CoredumpSchema.parse(input);
   const projectDir = await fs.realpath(request.projectDir);
+  if (
+    request.device &&
+    (await fs.realpath(request.device.table.projectDir)) !== projectDir
+  )
+    throw new PlatformIOError(
+      "Partition inspection must use the same authorized project.",
+      "COREDUMP_TABLE_INPUT_INVALID",
+    );
   const { commandApprovalId, ...operation } = request;
-  const args = { ...operation, projectDir };
+  const stripGrants = (value: unknown): unknown => {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return value;
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => key !== "approvalId" && !key.endsWith("ApprovalId"))
+        .map(([key, nested]) => [key, stripGrants(nested)]),
+    );
+  };
+  const args = {
+    ...operation,
+    device: stripGrants(operation.device),
+    projectDir,
+  };
   const commandArgs = { ...args, approvalId: commandApprovalId };
   const context = { ...caller, workspaceDir: projectDir };
   const stages: Array<[string, Record<string, unknown>]> = [
@@ -71,35 +119,79 @@ export async function executeCoredump(
     context,
     async () => {
       const validatePolicy = createPolicyRevisionGuard(projectDir);
-    await onAuthorized?.();
+      await onAuthorized?.();
       validatePolicy();
-      const selection = { ...request, workspaceDir: projectDir };
-      if (!request.analyze) {
-        const artifact = await readEspCoredumpArtifact(selection);
+      const selection = {
+        ...request,
+        workspaceDir: projectDir,
+        dumpPath: request.dumpPath ?? "",
+      };
+      const execute = async () => {
+        validatePolicy();
+        const tools = request.analyze
+          ? await resolveEspCoredumpTools(projectDir)
+          : null;
+        const capture = request.device
+          ? await acquireProjectCoredump(
+              request.device.table,
+              {
+                port: request.device.port,
+                partitionName: request.device.partitionName,
+                approvalId: request.device.approvalId,
+                commandApprovalId: request.device.commandApprovalId,
+              },
+              caller,
+            )
+          : null;
+        validatePolicy();
+        if (capture && !capture.present)
+          return {
+            ok: false as const,
+            analyzed: false as const,
+            error: "no_coredump",
+            acquisition: capture.source,
+            layout: capture.layout,
+          };
+        const capturedBytes = capture?.present ? capture.bytes : undefined;
+        if (!request.analyze) {
+          const artifact = capturedBytes
+            ? inspectCapturedEspCoredump(
+                capturedBytes,
+                request.expectedInputSha256,
+              )
+            : await readEspCoredumpArtifact(selection);
+          validatePolicy();
+          return {
+            ok: true as const,
+            analyzed: false as const,
+            source: artifact.source,
+            identity: artifact.identity,
+            firmwareIdentity: artifact.firmwareIdentity,
+            acquisition: capture?.source ?? null,
+            layout: capture?.layout ?? null,
+          };
+        }
+        const result = await analyzeEspCoredump(
+          { ...selection, elfPath: request.elfPath!, validatePolicy },
+          { ...tools!, validatePolicy },
+          capturedBytes,
+        );
         validatePolicy();
         return {
-          ok: true as const,
-          analyzed: false as const,
-          source: artifact.source,
-          identity: artifact.identity,
-          firmwareIdentity: artifact.firmwareIdentity,
+          ...result,
+          analyzed: true as const,
+          acquisition: capture?.source ?? null,
+          layout: capture?.layout ?? null,
         };
-      }
-      return dispatchAuthorizedAction(
-        "coredump_analyze",
-        commandArgs,
-        context,
-        async () => {
-          validatePolicy();
-          const tools = await resolveEspCoredumpTools(projectDir);
-          const result = await analyzeEspCoredump(
-            { ...selection, elfPath: request.elfPath!, validatePolicy },
-            { ...tools, validatePolicy },
-          );
-          validatePolicy();
-          return { ...result, analyzed: true as const };
-        },
-      );
+      };
+      return request.analyze
+        ? dispatchAuthorizedAction(
+            "coredump_analyze",
+            commandArgs,
+            context,
+            execute,
+          )
+        : execute();
     },
   );
 }

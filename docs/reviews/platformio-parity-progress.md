@@ -1163,3 +1163,8 @@ Corrected coredump_inspect to inherit the public coredump policy identity before
 
 Unified decoded-file and device-capture envelope/firmware-note validation. Internal captures can now use the same stable ELF and private converter/GDB report path without creating a dump file in the project. Full partition input identity is preserved separately from trimmed dump identity; capture sources have null file paths. Fifteen focused analysis/artifact/acquisition cases passed, including absent workspace dump files and mismatching capture identities; lint and TypeScript passed. Plugin runtime refreshed. Public device adapter and physical acquisition acceptance remain unfinished.
 
+
+### MCP device core acquisition integration
+
+MCP coredump now selects exactly one offline dump or explicit device/table acquisition. The shared handler validates same-project table scope, preserves nested grant-independent parent request identity, resolves analysis tools before capture, keeps raw bytes internal and returns explicit empty-crash results. Ten focused real policy/partition checks passed; TypeScript and targeted lint passed with existing index warnings. Plugin runtime refreshed. CLI device options, reference adapter, output retention and physical acceptance remain incomplete.
+
