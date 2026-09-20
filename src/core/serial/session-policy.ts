@@ -3,6 +3,7 @@
  * Provides PolicySerialSessionService with request-local approvals and existing permission-source resolution.
  */
 import { captureSessionMemory, MemoryCaptureSchema } from "./memory-capture.js";
+import { captureTransientMemory } from "./transient-memory-capture.js";
 import { performance } from "node:perf_hooks";
 import { resolveSerialEndpoint } from "../devices/serial-endpoint.js";
 import { validateDirectSerialOptions } from "./serial-transport.js";
@@ -14,7 +15,7 @@ import {
 } from "../devices/native-serial-discovery.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
-import { dispatchAuthorizedAction } from "../action-dispatcher.js";
+import { dispatchAuthorizedAction, planAction } from "../action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../policy/revision-guard.js";
 import { PolicyConfigError } from "../policy/policy-schema.js";
 import type { PolicyEvaluationContext } from "../policy/types.js";
@@ -46,6 +47,35 @@ const OPERATIONS = Object.freeze({
  */
 export class PolicySerialSessionService {
   readonly sessions: SerialSessionManager;
+  private readonly transientMemoryScope = new AsyncLocalStorage<{
+    input: ReturnType<typeof MemoryCaptureSchema.parse>;
+    active: boolean;
+    binding?: string;
+    guard?: () => void;
+  }>();
+
+  /** Plan opening and reading against stable device identity before opening a one-shot capture. */
+  async captureMemoryOnce(
+    owner: SerialSessionOwner,
+    request: Parameters<PolicySerialSessionService["startWithDiscovery"]>[1],
+    input: Parameters<typeof captureSessionMemory>[3] = {},
+    signal?: AbortSignal,
+  ) {
+    const scope = { input: MemoryCaptureSchema.parse(input), active: true };
+    return this.transientMemoryScope.run(scope, async () => {
+      try {
+        return await captureTransientMemory(
+          this,
+          owner,
+          request,
+          scope.input,
+          signal,
+        );
+      } finally {
+        scope.active = false;
+      }
+    });
+  }
   private readonly memoryReadScope = new AsyncLocalStorage<{
     sessionId: string;
     input: ReturnType<typeof MemoryCaptureSchema.parse>;
@@ -303,33 +333,88 @@ export class PolicySerialSessionService {
       if (!(error instanceof PolicyConfigError)) throw error;
       // Let the shared dispatcher report its normal invalid-policy denial below.
     }
+    const transient = this.transientMemoryScope.getStore();
+    if (transient && !transient.active)
+      throw new PlatformIOError(
+        "Transient memory scope expired.",
+        "SERIAL_CAPTURE_SCOPE_INVALID",
+      );
+    transient?.guard?.();
+    const {
+      sessionId: _sessionId,
+      operation: _operation,
+      ...deviceRequest
+    } = request;
+    const binding = JSON.stringify(deviceRequest);
+    if (
+      transient &&
+      request.operation === "read" &&
+      transient.binding !== binding
+    )
+      throw new PlatformIOError(
+        "Transient memory device identity changed.",
+        "SERIAL_CAPTURE_SCOPE_INVALID",
+      );
+    const authorizationArgs: Record<string, unknown> = {
+      ...request,
+      port: request.path,
+      approvalId:
+        request.operation === "read"
+          ? (context.readApprovalId ?? context.approvalId)
+          : context.approvalId,
+      ...(scopedRead ? { memoryCapture: scope.input } : {}),
+    };
+    if (transient) {
+      delete authorizationArgs.sessionId;
+      authorizationArgs.memoryCapture = transient.input;
+      authorizationArgs.purpose = "one_shot_memory";
+    }
+    const caller = {
+      ...context.caller,
+      workspaceDir: request.projectDir,
+      devicePort: request.path,
+      targetBindingDigest: createHash("sha256")
+        .update(
+          JSON.stringify([
+            [request.resource.kind, request.resource.identity],
+            ...(request.additionalResources ?? []).map((resource) => [
+              resource.kind,
+              resource.identity,
+            ]),
+          ]),
+        )
+        .digest("hex"),
+    };
+    if (transient && request.operation === "start") {
+      const opening = await planAction(
+        OPERATIONS.start,
+        authorizationArgs,
+        caller,
+      );
+      const reading = await planAction(
+        OPERATIONS.read,
+        {
+          ...authorizationArgs,
+          operation: "read",
+          approvalId: context.readApprovalId,
+        },
+        caller,
+      );
+      const decisions = { opening, reading };
+      if (opening.status !== "ready" || reading.status !== "ready")
+        throw new PlatformIOError(
+          "One-shot memory capture needs opening and reading permissions before startup.",
+          opening.status === "deny" || reading.status === "deny"
+            ? "POLICY_DENIED"
+            : "APPROVAL_REQUIRED",
+          { decisions },
+        );
+      transient.binding = binding;
+    }
     return dispatchAuthorizedAction(
       OPERATIONS[request.operation],
-      {
-        ...request,
-        port: request.path,
-        approvalId:
-          request.operation === "read"
-            ? (context.readApprovalId ?? context.approvalId)
-            : context.approvalId,
-        ...(scopedRead ? { memoryCapture: scope.input } : {}),
-      },
-      {
-        ...context.caller,
-        workspaceDir: request.projectDir,
-        devicePort: request.path,
-        targetBindingDigest: createHash("sha256")
-          .update(
-            JSON.stringify([
-              [request.resource.kind, request.resource.identity],
-              ...(request.additionalResources ?? []).map((resource) => [
-                resource.kind,
-                resource.identity,
-              ]),
-            ]),
-          )
-          .digest("hex"),
-      },
+      authorizationArgs,
+      caller,
       async () => {
         if (!check)
           throw new PlatformIOError(
@@ -337,6 +422,7 @@ export class PolicySerialSessionService {
             "POLICY_CHANGED",
           );
         check();
+        if (transient && request.operation === "start") transient.guard = check;
         if (scopedRead) {
           const revision = check;
           const guard = () => {

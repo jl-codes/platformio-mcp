@@ -12,7 +12,7 @@ import {
   type createDirectSerialTransport,
 } from "../src/core/serial/serial-transport.js";
 import { DeviceLeaseStore } from "../src/core/devices/device-lease.js";
-import { approveRequest } from "../src/core/policy/approvals.js";
+import { approveRequest, getApproval } from "../src/core/policy/approvals.js";
 import { authorizeAction } from "../src/core/action-dispatcher.js";
 import {
   MCP_ACTIONS,
@@ -462,4 +462,101 @@ it("keeps explicit read grants separate from opening grants", async () => {
   approveRequest(readId);
   expect(await capture(readId)).toMatchObject({ ok: true });
   await approval(capture(readId));
+});
+
+it("plans one-shot open/read grants before transport construction and retries against stable identity", async () => {
+  const f = fixture({
+    discoveryLoad: async () => ({
+      list: async () => [
+        {
+          path: "COM42",
+          vendorId: "10c4",
+          productId: "ea60",
+          serialNumber: "fixture",
+        },
+      ],
+    }),
+    resolveEndpoint: (port) =>
+      resolveSerialEndpoint(port, { platform: "win32" }),
+  });
+  f.policy({
+    profile: "monitor_only",
+    overrides: {
+      approval_required: ["serial_session_start", "serial_session_read"],
+    },
+  });
+  const run = (approvalId?: string, readApprovalId?: string, seconds = 0) =>
+    f.service.run({ approvalId, readApprovalId }, () =>
+      f.service.captureMemoryOnce(
+        f.owner,
+        { projectDir: f.projectDir, path: "COM42", baudRate: 115200 },
+        { seconds },
+      ),
+    );
+  let decisions: {
+    opening: { approvalId: string };
+    reading: { approvalId: string };
+  };
+  try {
+    await run();
+    throw new Error("Expected challenge");
+  } catch (error) {
+    expect(error).toMatchObject({ code: "APPROVAL_REQUIRED" });
+    decisions = (error as { context: { decisions: typeof decisions } }).context
+      .decisions;
+  }
+  expect(f.transport).not.toHaveBeenCalled();
+  const openId = decisions!.opening.approvalId;
+  const readId = decisions!.reading.approvalId;
+  approveRequest(openId);
+  await expect(run(openId)).rejects.toMatchObject({
+    code: "APPROVAL_REQUIRED",
+  });
+  expect(getApproval(openId)?.status).toBe("approved");
+  approveRequest(readId);
+  await expect(run(openId, readId, 1)).rejects.toMatchObject({
+    code: "APPROVAL_REQUIRED",
+  });
+  expect(f.transport).not.toHaveBeenCalled();
+  expect(await run(openId, readId)).toMatchObject({
+    ok: true,
+    cleanupPending: false,
+    state: "stopped",
+  });
+  expect(getApproval(openId)?.status).toBe("consumed");
+  expect(getApproval(readId)?.status).toBe("consumed");
+  await expect(run(openId, readId)).rejects.toMatchObject({
+    code: "APPROVAL_REQUIRED",
+  });
+  expect(f.transport).toHaveBeenCalledOnce();
+});
+
+it("keeps the opening policy revision through one-shot read authorization", async () => {
+  const f = fixture({
+    discoveryLoad: async () => ({ list: async () => [{ path: "COM42" }] }),
+    resolveEndpoint: (port) =>
+      resolveSerialEndpoint(port, { platform: "win32" }),
+  });
+  f.policy({ profile: "monitor_only" });
+  const collect = f.service.captureMemory.bind(f.service);
+  vi.spyOn(f.service, "captureMemory").mockImplementation(async (...args) => {
+    f.policy({
+      profile: "monitor_only",
+      overrides: { deny: ["serial_session_write"] },
+    });
+    return collect(...args);
+  });
+  await expect(
+    f.service.run({}, () =>
+      f.service.captureMemoryOnce(
+        f.owner,
+        { projectDir: f.projectDir, path: "COM42", baudRate: 115200 },
+        { seconds: 0 },
+      ),
+    ),
+  ).rejects.toMatchObject({
+    code: "POLICY_CHANGED",
+    context: { cleanupPending: false },
+  });
+  expect(f.ports.get("COM42")!.isOpen).toBe(false);
 });
