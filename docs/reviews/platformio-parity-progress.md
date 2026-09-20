@@ -531,3 +531,9 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added repository-owned ESP32-S3 build-only fixture with AuditParent/AuditChild manifests and headers. Real MCP canonical build and compatibility inspection succeeded on Windows. Evidence: `dependency-populated-mcp-windows-evidence.json`.
 - Observed printed graph contains AuditParent 1.2.3 as a root. Normal Core output did not expose its transitive child; documentation explicitly limits graph completeness to parsing the printed tree. No hardware was accessed.
 - Prior pushed 78098466 CI runs 35477876325/35477873538 succeeded. Remaining cross-platform/hardware and full reference acceptance/release gates remain open.
+
+### Memory telemetry statistics foundation
+
+- Added bounded byte-valued statistics with sample-order trends, explicit insufficient-sample status, actual timestamp regression for per-second rates, and paired fragmentation hints. No session-uptime-derived rate or confirmed leak claim is produced.
+- TypeScript compilation and four tests pass, including irregular timing, missing/duplicate timestamps, thresholds, limits and inconsistent fragmentation observations.
+- This is an internal analysis foundation. Reference telemetry formats, explicit stack word/byte conversion, bounded custom patterns, serial ownership/capture and public MCP/CLI/reference integration remain required.
