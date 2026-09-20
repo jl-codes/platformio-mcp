@@ -1968,3 +1968,14 @@ versions and exact dependencies, plugin manifest, and MCP Registry descriptor to
 synchronization, MCP descriptor validation, and plugin validation passed. No tag,
 release, authority flag, or publication was created; eligibility must be rechecked at
 publication, and all final-revision acceptance gates remain required.
+
+### 2026-09-20: complete requested scoped npm candidate packages
+
+Added functional @forkbomb/platformiomcp and @forkbomb/pioagent wrappers, each with
+its own command, license, README, and exact platformio-mcp@3.1.0 dependency. Inventory
+roles changed from watch to candidate_alias, preserving publishIntent=false and the
+existing authority/unknown-eligibility distinction. Ten npm aliases now synchronize;
+eight are candidates and two are existing published alias identities. Both new
+candidate tarballs packed successfully, and four publication identity/inventory checks
+passed. Coverage regenerated from existing observations without registry claims.
+Both CI runs 35529268929 and 35529266740 passed on preceding 2644a28e.

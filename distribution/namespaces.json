@@ -326,18 +326,22 @@
     {
       "registry": "npm",
       "name": "@forkbomb/platformiomcp",
-      "role": "watch",
+      "role": "candidate_alias",
       "publishIntent": false,
       "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
-      "publicationControlVerified": true
+      "publicationControlVerified": true,
+      "packagePath": "packages/scoped-platformiomcp",
+      "source": "https://github.com/jl-codes/platformio-mcp"
     },
     {
       "registry": "npm",
       "name": "@forkbomb/pioagent",
-      "role": "watch",
+      "role": "candidate_alias",
       "publishIntent": false,
       "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
-      "publicationControlVerified": true
+      "publicationControlVerified": true,
+      "packagePath": "packages/scoped-pioagent",
+      "source": "https://github.com/jl-codes/platformio-mcp"
     },
     {
       "registry": "ghcr",

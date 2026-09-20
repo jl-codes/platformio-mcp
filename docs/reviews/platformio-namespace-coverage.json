@@ -586,7 +586,7 @@
       "scopedAlternatives": [
         {
           "name": "@forkbomb/platformiomcp",
-          "role": "watch",
+          "role": "candidate_alias",
           "publishIntent": false,
           "authorityVerified": true,
           "namingEligibilityVerified": false,
@@ -718,7 +718,7 @@
       "scopedAlternatives": [
         {
           "name": "@forkbomb/pioagent",
-          "role": "watch",
+          "role": "candidate_alias",
           "publishIntent": false,
           "authorityVerified": true,
           "namingEligibilityVerified": false,

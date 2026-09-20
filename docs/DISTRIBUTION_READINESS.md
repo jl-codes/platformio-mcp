@@ -143,3 +143,10 @@ directory. It establishes only installer configuration behavior, not physical ha
 real host runtime integration, publication, or the full acceptance catalog. Run it at
 the final release commit; its successful run ID can then be combined with disjoint
 producer runs by **Assemble parity acceptance**.
+
+All seven requested families now have functional scoped npm candidate sources:
+`@forkbomb/platformio-mcp`, `@forkbomb/pio-mcp`, `@forkbomb/platformio.mcp`,
+`@forkbomb/pio-agent`, `@forkbomb/platformiomcp`, `@forkbomb/pioagent`, and
+`@forkbomb/flashagent`. These are prepared packages, not published names or a claim
+that npm will permit every same-scope punctuation variant. The two existing unscoped
+aliases and unscoped flashagent candidate bring the wrapper source count to ten.
