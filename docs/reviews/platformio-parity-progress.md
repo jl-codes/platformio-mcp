@@ -2100,3 +2100,7 @@ CI run 35533859317 timed out the dependency CLI case at five seconds while it se
 
 - Added a native-gate procedure for initialized installed-launcher SIGINT/SIGTERM routing on POSIX with stdin left open, bounded wait, exact server-version checking, and owned process-group failure cleanup. Windows console-control behavior is explicitly not verified.
 - Python syntax and diff checks passed on the current Windows host. Actual POSIX installed-wheel execution is pending; no passing signal evidence or hardware acceptance is claimed. Historical five-host reports remain unchanged.
+
+### 2026-09-20: Native installed-wheel signal results
+
+Run 35536115719 completed all five native installed-wheel jobs successfully on source 1aae2a11e056a4242ad54a4c8ee032ee868a599d. Downloaded and inspected the actual reports: both SIGINT and SIGTERM shut down initialized 3.1.0 servers with exit code zero and stdin still open on Linux x64/arm64 and macOS x64/arm64. Windows explicitly records signals as not_verified. Complete source-bound reports and downloaded-file hashes are retained in native-python-signal-evidence.json. Container jobs were still running at capture; all publication inputs are false. This does not certify active hardware cleanup, minimum OS, full parity, Windows console behavior or deployment.
