@@ -1296,3 +1296,12 @@ Added an owned-session boot capture to the existing serial policy service. It va
 Verification: 35 focused tests passed across `verification-capture.test.ts` and `serial-session-policy.test.ts`, including delayed crash, one-use approval replay, policy revocation and confirmed mock-port cleanup. Typecheck and changed-file lint passed; bundled plugin rebuilt. No physical device was opened.
 
 Current remote CI at 06457d5c: run 35502805630 passed completely; duplicate run 35502807217 failed only because four sequential CLI process launches shared one five-second test budget on Windows. Split those independent checks into four tests with unchanged assertions and default per-test budgets. Await CI confirmation; no repeated local smoke suite run. Local scoped probe discovery commit 80db9822 is included in this push. No release published and no parity-completion claim.
+
+
+### 2026-09-20 — Upload and fresh verification composition
+
+Added `executeFlashVerification` as the resolved-input orchestration boundary using the existing upload executor and serial policy service. It validates expressions and plans startup discovery/open/read permissions before upload, leaves open/read grants unconsumed during planning, stops only the requesting connection's selected monitor after upload authorization, skips capture after failed upload, and checks the policy revision between stages. Actual monitor startup must match the preflight request/device identity; replacement USB descriptors are rejected before transport construction. Endpoint-only discovery remains explicitly weaker. Results explicitly say `identity_unverified`; this does not prove which immutable firmware was flashed.
+
+32 focused orchestration and real serial-policy tests passed, including reuse of exact preflight grants after upload and rejection of device replacement. Typecheck/lint passed and the shared plugin runtime was rebuilt. The public reference adapter/registration, crash decode composition, immutable upload manifest/lease handoff, and physical acceptance remain incomplete; no additional public tool is claimed here.
+
+Both prior-head CI runs (35503371353 and 35503369571 at f7f07d38) succeeded, including Windows after splitting the four independent CLI checks. New-head CI remains pending after push. No publishing occurred.

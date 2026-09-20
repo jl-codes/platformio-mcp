@@ -11,6 +11,8 @@ import { captureSessionMemory, MemoryCaptureSchema } from "./memory-capture.js";
 import { captureTransientMemory } from "./transient-memory-capture.js";
 import { z } from "zod";
 import { performance } from "node:perf_hooks";
+import { bindSerialDiscovery } from "../devices/serial-discovery-binding.js";
+import { SerialSessionBuffer } from "./session-buffer.js";
 import { resolveSerialEndpoint } from "../devices/serial-endpoint.js";
 import { validateDirectSerialOptions } from "./serial-transport.js";
 import fs from "node:fs";
@@ -69,6 +71,7 @@ export class PolicySerialSessionService {
       | ReturnType<typeof VerificationCaptureSchema.parse>;
     purpose: "one_shot_memory" | "one_shot_monitor" | "boot_verification";
     readGuard?: () => void;
+    expectedDeviceBinding?: string;
     expiresAt?: number;
     active: boolean;
     binding?: string;
@@ -151,15 +154,104 @@ export class PolicySerialSessionService {
       }
     });
   }
+  /** Resolve and plan boot opening/reading before upload, without consuming either hardware grant or opening a port. */
+  async preflightVerificationCapture(
+    owner: SerialSessionOwner,
+    input: Parameters<PolicySerialSessionService["startWithDiscovery"]>[1],
+    options: z.input<typeof VerificationCaptureSchema> = {},
+    startupDiscoveryApprovalId?: string,
+  ) {
+    const checkOwner = this.sessions.createStartupGuard(owner);
+    validateDirectSerialOptions(input);
+    // Use the same storage validation/defaults as actual startup before any discovery.
+    new SerialSessionBuffer(input.buffer);
+    const args = await validateVerificationCapture(options);
+    if (!path.isAbsolute(input.projectDir))
+      throw new PlatformIOError(
+        "Serial project must be absolute.",
+        "SERIAL_PROJECT_INVALID",
+      );
+    const projectDir = fs.realpathSync.native(input.projectDir);
+    const guard = createPolicyRevisionGuard(projectDir);
+    const discoveryPlan = await planAction(
+      "serial_startup_discovery",
+      {
+        ...input,
+        projectDir,
+        buffer: input.buffer ? { ...input.buffer } : undefined,
+        snapshots: 4,
+        approvalId: startupDiscoveryApprovalId,
+      },
+      { ...this.context.getStore()?.caller, workspaceDir: projectDir },
+    );
+    if (discoveryPlan.status !== "ready")
+      throw new PlatformIOError(
+        discoveryPlan.reason,
+        discoveryPlan.status === "deny" ? "POLICY_DENIED" : "APPROVAL_REQUIRED",
+        { policyDecision: discoveryPlan },
+      );
+    guard();
+    const endpoint = this.resolveEndpoint(input.path);
+    const binding = bindSerialDiscovery(
+      endpoint,
+      await this.listSerialDevices(projectDir),
+      this.resolveEndpoint,
+    );
+    checkOwner();
+    guard();
+    const request: SerialSessionAuthorization = {
+      operation: "start",
+      projectDir,
+      path: endpoint.canonicalPort,
+      baudRate: input.baudRate,
+      operationTimeoutMs: input.operationTimeoutMs ?? 5000,
+      resource: endpoint.resource,
+      ...(binding.usbIdentity
+        ? {
+            additionalResources: [
+              { kind: "serial" as const, identity: binding.usbIdentity },
+            ],
+          }
+        : {}),
+      bufferLimits: {
+        maxLines: input.buffer?.maxLines ?? 5000,
+        maxBytes: input.buffer?.maxBytes ?? 1048576,
+        maxLineBytes:
+          input.buffer?.maxLineBytes ??
+          Math.min(16384, input.buffer?.maxBytes ?? 1048576),
+      },
+    };
+    const scope = {
+      input: args,
+      purpose: "boot_verification" as const,
+      active: true,
+    };
+    try {
+      await this.transientMemoryScope.run(scope, () =>
+        this.authorize(request, true),
+      );
+      checkOwner();
+      guard();
+      return {
+        port: endpoint.canonicalPort,
+        identityBasis: binding.identityBasis,
+        deviceBinding: verificationDeviceBinding(request),
+      };
+    } finally {
+      scope.active = false;
+    }
+  }
   /** Open a fresh boot capture, bind all pages to one bounded read grant, and always close its owned port. */
   async captureVerificationOnce(
     owner: SerialSessionOwner,
     request: Parameters<PolicySerialSessionService["startWithDiscovery"]>[1],
     input: z.input<typeof VerificationCaptureSchema> = {},
     signal?: AbortSignal,
+    expectedDeviceBinding?: string,
   ) {
     const args = await validateVerificationCapture(input);
     const scope = {
+      expectedDeviceBinding,
       input: args,
       purpose: "boot_verification" as const,
       active: true,
@@ -485,6 +577,7 @@ export class PolicySerialSessionService {
 
   private async authorize(
     request: Readonly<SerialSessionAuthorization>,
+    planOnly = false,
   ): Promise<() => void> {
     const context = this.context.getStore();
     if (!context)
@@ -535,6 +628,15 @@ export class PolicySerialSessionService {
       ),
     );
     const binding = JSON.stringify(deviceRequest);
+    if (
+      transient?.expectedDeviceBinding &&
+      verificationDeviceBinding(request) !== transient.expectedDeviceBinding
+    )
+      throw new PlatformIOError(
+        "The verification device changed after preflight.",
+        "SERIAL_DEVICE_CHANGED",
+      );
+
     if (
       transient &&
       request.operation === "read" &&
@@ -614,6 +716,19 @@ export class PolicySerialSessionService {
         );
       transient.binding = binding;
     }
+    if (planOnly) {
+      if (
+        transient?.purpose !== "boot_verification" ||
+        request.operation !== "start" ||
+        !check
+      )
+        throw new PlatformIOError(
+          "Invalid verification preflight context.",
+          "SERIAL_CAPTURE_SCOPE_INVALID",
+        );
+      check();
+      return check;
+    }
     return dispatchAuthorizedAction(
       OPERATIONS[request.operation],
       authorizationArgs,
@@ -655,4 +770,29 @@ export class PolicySerialSessionService {
       },
     );
   }
+}
+
+/** Stable internal request identity independent of object insertion order or generated session IDs. */
+function verificationDeviceBinding(
+  request: Readonly<SerialSessionAuthorization>,
+): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        request.projectDir,
+        request.path,
+        request.baudRate,
+        request.operationTimeoutMs,
+        request.resource.kind,
+        request.resource.identity,
+        (request.additionalResources ?? []).map((resource) => [
+          resource.kind,
+          resource.identity,
+        ]),
+        request.bufferLimits.maxLines,
+        request.bufferLimits.maxBytes,
+        request.bufferLimits.maxLineBytes,
+      ]),
+    )
+    .digest("hex");
 }

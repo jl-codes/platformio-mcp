@@ -764,3 +764,108 @@ it("closes boot capture when policy changes before final evidence disclosure", a
     expect.objectContaining({ state: "stopped", cleanupPending: false }),
   ]);
 });
+
+it("preflights boot capture without consuming grants and uses those exact grants after upload", async () => {
+  const f = fixture({
+    discoveryLoad: async () => ({
+      list: async () => [
+        {
+          path: "COM42",
+          vendorId: "10c4",
+          productId: "ea60",
+          serialNumber: "fixture",
+        },
+      ],
+    }),
+    resolveEndpoint: (port) =>
+      resolveSerialEndpoint(port, { platform: "win32" }),
+  });
+  f.policy({
+    profile: "monitor_only",
+    overrides: {
+      approval_required: ["serial_session_start", "serial_session_read"],
+    },
+  });
+  const request = {
+    projectDir: f.projectDir,
+    path: "COM42",
+    baudRate: 115200,
+    buffer: { maxLines: 700 },
+  };
+  const options = { timeoutSeconds: 0, settleSeconds: 0 };
+  const preflight = (approvalId?: string, readApprovalId?: string) =>
+    f.service.run({ approvalId, readApprovalId }, () =>
+      f.service.preflightVerificationCapture(f.owner, request, options),
+    );
+  let decisions!: {
+    opening: { approvalId: string };
+    reading: { approvalId: string };
+  };
+  try {
+    await preflight();
+    throw new Error("Expected approval");
+  } catch (error) {
+    expect(error).toMatchObject({ code: "APPROVAL_REQUIRED" });
+    decisions = (error as { context: { decisions: typeof decisions } }).context
+      .decisions;
+  }
+  const approvalId = decisions.opening.approvalId,
+    readApprovalId = decisions.reading.approvalId;
+  approveRequest(approvalId);
+  approveRequest(readApprovalId);
+  await expect(preflight(approvalId, readApprovalId)).resolves.toMatchObject({
+    port: "COM42",
+    identityBasis: "usb-descriptor",
+  });
+  expect(getApproval(approvalId)?.status).toBe("approved");
+  expect(getApproval(readApprovalId)?.status).toBe("approved");
+  expect(f.transport).not.toHaveBeenCalled();
+  const selected = await preflight(approvalId, readApprovalId);
+  const result = await f.service.run({ approvalId, readApprovalId }, () =>
+    f.service.captureVerificationOnce(
+      f.owner,
+      request,
+      options,
+      undefined,
+      selected.deviceBinding,
+    ),
+  );
+  expect(result).toMatchObject({ verdict: "timeout", cleanupPending: false });
+  expect(getApproval(approvalId)?.status).toBe("consumed");
+  expect(getApproval(readApprovalId)?.status).toBe("consumed");
+});
+
+it("rejects a replaced USB device between verification preflight and monitor startup", async () => {
+  let serialNumber = "original";
+  const f = fixture({
+    discoveryLoad: async () => ({
+      list: async () => [
+        { path: "COM42", vendorId: "10c4", productId: "ea60", serialNumber },
+      ],
+    }),
+    resolveEndpoint: (port) =>
+      resolveSerialEndpoint(port, { platform: "win32" }),
+  });
+  f.policy({ profile: "monitor_only" });
+  const request = { projectDir: f.projectDir, path: "COM42", baudRate: 115200 };
+  const options = { timeoutSeconds: 0 };
+  const selected = await f.service.run({}, () =>
+    f.service.preflightVerificationCapture(f.owner, request, options),
+  );
+  serialNumber = "replacement";
+  await expect(
+    f.service.run({}, () =>
+      f.service.captureVerificationOnce(
+        f.owner,
+        request,
+        options,
+        undefined,
+        selected.deviceBinding,
+      ),
+    ),
+  ).rejects.toMatchObject({
+    code: "SERIAL_DEVICE_CHANGED",
+    context: { cleanupPending: false },
+  });
+  expect(f.transport).not.toHaveBeenCalled();
+});

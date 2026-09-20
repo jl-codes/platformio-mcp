@@ -100182,8 +100182,527 @@ async function captureTransientMemory(service, owner, request, input = {}, signa
 
 // src/core/serial/session-policy.ts
 init_zod();
-init_serial_endpoint();
 import { performance as performance6 } from "node:perf_hooks";
+
+// src/core/devices/serial-discovery-binding.ts
+init_errors();
+import { createHash as createHash10 } from "node:crypto";
+function descriptor(record2) {
+  for (const field2 of [
+    record2.path,
+    record2.vendorId,
+    record2.productId,
+    record2.serialNumber
+  ]) {
+    if (field2 !== void 0 && (typeof field2 !== "string" || field2.length > 512 || /[\x00-\x1f\x7f]/.test(field2)))
+      throw new PlatformIOError(
+        "Invalid serial discovery metadata.",
+        "SERIAL_DISCOVERY_INVALID"
+      );
+  }
+  if (!record2.path)
+    throw new PlatformIOError(
+      "Missing serial discovery path.",
+      "SERIAL_DISCOVERY_INVALID"
+    );
+  for (const id of [record2.vendorId, record2.productId]) {
+    if (id !== void 0 && !/^[0-9a-f]{4}$/i.test(id))
+      throw new PlatformIOError(
+        "Invalid USB identifier.",
+        "SERIAL_DISCOVERY_INVALID"
+      );
+  }
+  if (!record2.vendorId || !record2.productId || !record2.serialNumber)
+    return void 0;
+  return createHash10("sha256").update(
+    JSON.stringify([
+      record2.vendorId.toLowerCase(),
+      record2.productId.toLowerCase(),
+      record2.serialNumber
+    ])
+  ).digest("hex");
+}
+function bindSerialDiscovery(endpoint, records, resolve) {
+  const inspect = (snapshot) => {
+    if (!Array.isArray(snapshot) || snapshot.length > 1024)
+      throw new PlatformIOError(
+        "Invalid serial discovery snapshot.",
+        "SERIAL_DISCOVERY_INVALID"
+      );
+    const normalized = snapshot.map((record2) => {
+      if (!record2 || typeof record2 !== "object")
+        throw new PlatformIOError(
+          "Invalid serial discovery entry.",
+          "SERIAL_DISCOVERY_INVALID"
+        );
+      const usb2 = descriptor(record2);
+      return { endpoint: resolve(record2.path).resource.identity, usb: usb2 };
+    });
+    const matches = normalized.filter(
+      (record2) => record2.endpoint === endpoint.resource.identity
+    );
+    if (!matches.length)
+      throw new PlatformIOError(
+        "Selected serial endpoint is absent from discovery.",
+        "SERIAL_DEVICE_UNAVAILABLE"
+      );
+    const identities = new Set(matches.map((record2) => record2.usb));
+    if (identities.size !== 1)
+      throw new PlatformIOError(
+        "Conflicting discovery metadata for the selected endpoint.",
+        "SERIAL_DEVICE_AMBIGUOUS"
+      );
+    const usb = matches[0].usb;
+    if (usb && normalized.some(
+      (record2) => record2.usb === usb && record2.endpoint !== endpoint.resource.identity
+    ))
+      throw new PlatformIOError(
+        "USB identity is shared by multiple endpoints.",
+        "SERIAL_DEVICE_AMBIGUOUS"
+      );
+    return usb;
+  };
+  endpoint.revalidate();
+  const expected = inspect(records);
+  return Object.freeze({
+    endpointIdentity: endpoint.resource.identity,
+    usbIdentity: expected === void 0 ? void 0 : `usb:${expected}`,
+    identityBasis: expected === void 0 ? "endpoint-only" : "usb-descriptor",
+    revalidate(snapshot) {
+      endpoint.revalidate();
+      if (inspect(snapshot) !== expected)
+        throw new PlatformIOError(
+          "Serial discovery identity changed; select and authorize again.",
+          "SERIAL_DEVICE_CHANGED"
+        );
+    }
+  });
+}
+
+// src/core/serial/serial-redaction.ts
+init_redact();
+init_errors();
+var marker = "[REDACTED_SECRET]";
+var begin = /-----BEGIN ((?:RSA |EC |OPENSSH )?PRIVATE KEY|CERTIFICATE)-----/i;
+var SerialStreamRedactor = class {
+  window = "";
+  block;
+  sensitiveLine = false;
+  /** Observe one decoded character, including characters omitted from the retained line prefix. */
+  observe(character) {
+    this.window = (this.window + character).slice(-80);
+    if (this.block) {
+      this.sensitiveLine = true;
+      if (this.window.toUpperCase().endsWith(`-----END ${this.block}-----`))
+        this.block = void 0;
+    } else {
+      const start = begin.exec(this.window);
+      if (start && start.index + start[0].length === this.window.length) {
+        this.block = start[1].toUpperCase();
+        this.sensitiveLine = true;
+      }
+    }
+  }
+  /** Render a retained prefix; previews do not alter the scanner's state. */
+  preview(prefix) {
+    if (!prefix) return "";
+    return this.sensitiveLine || this.block ? marker : redactSecretsInText(prefix);
+  }
+  /** Commit framing after the completed line has been rendered. */
+  nextLine() {
+    this.window = "";
+    this.sensitiveLine = !!this.block;
+  }
+};
+
+// src/core/serial/session-buffer.ts
+init_errors();
+init_bounded_pattern();
+import { StringDecoder } from "node:string_decoder";
+import { performance as performance4 } from "node:perf_hooks";
+function boundedInteger(value2, min, max, field2) {
+  if (!Number.isSafeInteger(value2) || value2 < min || value2 > max)
+    throw new PlatformIOError(
+      `Invalid serial ${field2}; expected ${min} through ${max}.`,
+      "SERIAL_BUFFER_ARGUMENT_INVALID"
+    );
+  return value2;
+}
+var SerialSessionBuffer = class {
+  capacity;
+  byteCapacity;
+  lineCapacity;
+  ring;
+  redactor;
+  redactionClipped = false;
+  decoder = new StringDecoder("utf8");
+  waiters = /* @__PURE__ */ new Set();
+  head = 0;
+  count = 0;
+  storedBytes = 0;
+  nextCursor = 0;
+  partial = "";
+  partialBytes = 0;
+  partialLost = 0;
+  previousCr = false;
+  revision = 0;
+  received = 0;
+  droppedLines = 0;
+  droppedBytes = 0;
+  truncatedBytes = 0;
+  state = "open";
+  error;
+  /** Construct storage limits; even empty lines consume one bounded ring entry. */
+  constructor(limits = {}, redact = false) {
+    if (redact) this.redactor = new SerialStreamRedactor();
+    this.capacity = boundedInteger(
+      limits.maxLines ?? 5e3,
+      1,
+      1e4,
+      "maxLines"
+    );
+    this.byteCapacity = boundedInteger(
+      limits.maxBytes ?? 1024 * 1024,
+      4,
+      8 * 1024 * 1024,
+      "maxBytes"
+    );
+    this.lineCapacity = boundedInteger(
+      limits.maxLineBytes ?? Math.min(16384, this.byteCapacity),
+      4,
+      Math.min(65536, this.byteCapacity),
+      "maxLineBytes"
+    );
+    this.ring = new Array(this.capacity);
+  }
+  /** Append at most 1 MiB of transport bytes; late data after closure is ignored. */
+  append(chunk) {
+    if (this.state !== "open") return false;
+    if (!Buffer.isBuffer(chunk) || chunk.length > 1024 * 1024)
+      throw new PlatformIOError(
+        "Serial chunks must be buffers no larger than 1 MiB.",
+        "SERIAL_BUFFER_INPUT_LIMIT"
+      );
+    if (!chunk.length) return true;
+    if (this.received > Number.MAX_SAFE_INTEGER - chunk.length)
+      throw new PlatformIOError(
+        "Serial byte counter exhausted.",
+        "SERIAL_BUFFER_COUNTER_LIMIT"
+      );
+    this.received += chunk.length;
+    this.acceptText(this.decoder.write(chunk));
+    this.changed();
+    return true;
+  }
+  /** Close once, retaining buffered data and flushing an incomplete final UTF-8 code point. */
+  close(state = "stopped", error2) {
+    if (this.state !== "open") return;
+    if (!["stopped", "disconnected", "error"].includes(state) || error2 !== void 0 && (typeof error2 !== "string" || error2.length > 4096))
+      throw new PlatformIOError(
+        "Invalid serial close state or error text.",
+        "SERIAL_BUFFER_ARGUMENT_INVALID"
+      );
+    this.acceptText(this.decoder.end());
+    this.state = state;
+    this.error = error2;
+    this.changed();
+  }
+  /** Return bounded accounting only; no retained serial content is disclosed. */
+  metadata() {
+    return {
+      linesBuffered: this.count,
+      nextCursor: this.nextCursor,
+      bytesReceived: this.received,
+      state: this.state
+    };
+  }
+  /** Snapshot without waiting; no cursor is advanced beyond the data actually returned. */
+  snapshot(options = {}) {
+    const requested = boundedInteger(
+      options.cursor ?? 0,
+      0,
+      this.nextCursor,
+      "cursor"
+    );
+    const limit = boundedInteger(
+      options.maxLines ?? 500,
+      1,
+      1e4,
+      "read maxLines"
+    );
+    const byteLimit = boundedInteger(
+      options.maxBytes ?? Math.max(65536, this.lineCapacity),
+      this.lineCapacity,
+      1024 * 1024,
+      "read maxBytes"
+    );
+    const first = this.count ? this.ring[this.head].cursor : this.nextCursor;
+    let cursor = Math.max(first, requested), bytes = 0;
+    const lines2 = [], lineTruncatedBytes = [];
+    for (let offset2 = cursor - first; offset2 < this.count && lines2.length < limit; offset2++) {
+      const row = this.ring[(this.head + offset2) % this.capacity];
+      if (bytes + row.bytes > byteLimit) break;
+      lines2.push(row.text);
+      lineTruncatedBytes.push(row.truncatedBytes);
+      bytes += row.bytes;
+      cursor = row.cursor + 1;
+    }
+    const renderedPartial = this.filterText(this.partial);
+    const renderedPartialBytes = Buffer.byteLength(renderedPartial);
+    const unreadLines = cursor < this.nextCursor;
+    const showPartial = !unreadLines && lines2.length < limit && bytes + renderedPartialBytes <= byteLimit;
+    const moreAvailable = unreadLines || !showPartial && this.partialBytes > 0;
+    return {
+      redactionApplied: !!this.redactor,
+      redactionOutputMayBeTruncated: this.redactionClipped,
+      lines: lines2,
+      lineTruncatedBytes,
+      cursor,
+      firstAvailableCursor: first,
+      latestCursor: this.nextCursor,
+      cursorStatus: requested < first ? "stale" : "current",
+      droppedLines: Math.max(0, first - requested),
+      moreAvailable,
+      partial: showPartial ? renderedPartial : "",
+      partialCursor: this.nextCursor,
+      partialTruncatedBytes: showPartial ? this.partialLost : 0,
+      state: this.state,
+      error: this.error,
+      readStatus: this.state === "open" ? lines2.length || showPartial && this.partial.length ? "ready" : "empty" : "closed",
+      matched: false,
+      receivedBytes: this.received,
+      totalDroppedLines: this.droppedLines,
+      totalDroppedBytes: this.droppedBytes,
+      totalTruncatedBytes: this.truncatedBytes
+    };
+  }
+  /**
+   * Read available text or wait for data/pattern, closure, cancellation or a bounded deadline.
+   * A full response page returns immediately so callers can advance rather than lose unseen lines.
+   * Regex evaluation uses the existing terminable worker; its separate 1-second execution
+   * deadline can extend the read deadline. Matcher failure remains an explicit error.
+   */
+  async read(options = {}) {
+    if (options.referenceSemantics) return this.readReference(options);
+    const timeout = boundedInteger(
+      options.timeoutMs ?? 0,
+      0,
+      12e4,
+      "timeoutMs"
+    );
+    const deadline = performance4.now() + timeout;
+    const result = (view, status, matched = false) => ({
+      ...view,
+      state: this.state,
+      error: this.error,
+      readStatus: status,
+      matched
+    });
+    while (true) {
+      const revision = this.revision;
+      const view = this.snapshot(options);
+      if (options.signal?.aborted) return result(view, "cancelled");
+      let matched = false;
+      if (options.waitFor !== void 0) {
+        const inputs = view.partial ? [...view.lines, view.partial] : view.lines;
+        matched = (await matchBoundedLines(inputs, options.waitFor, {
+          ...options.patternOptions,
+          timeoutMs: 1e3
+        })).length > 0;
+      }
+      if (options.signal?.aborted) return result(view, "cancelled");
+      if (matched)
+        return result(
+          {
+            ...view,
+            moreAvailable: view.moreAvailable || view.cursor < this.nextCursor || this.revision !== revision && this.partial !== view.partial
+          },
+          "matched",
+          true
+        );
+      if (this.revision !== revision) {
+        if (performance4.now() >= deadline)
+          return result(
+            this.snapshot(options),
+            this.state === "open" ? "timeout" : "closed"
+          );
+        continue;
+      }
+      if (this.state !== "open") return result(view, "closed");
+      if (view.moreAvailable || view.lines.length >= (options.maxLines ?? 500) || options.waitFor === void 0 && (view.lines.length > 0 || view.partial.length > 0))
+        return result(view, "ready");
+      const remaining = deadline - performance4.now();
+      if (remaining <= 0)
+        return result(view, timeout > 0 ? "timeout" : view.readStatus);
+      await this.waitForChange(revision, remaining, options.signal);
+    }
+  }
+  /** Match a stable bounded retained snapshot before limiting returned lines, as the reference API does. */
+  async readReference(options) {
+    const timeout = boundedInteger(
+      options.timeoutMs ?? 0,
+      0,
+      12e4,
+      "timeoutMs"
+    );
+    const deadline = performance4.now() + timeout;
+    while (true) {
+      const revision = this.revision;
+      const view = this.snapshot(options);
+      const first = Math.max(options.cursor ?? 0, view.firstAvailableCursor);
+      const rows = [];
+      for (let offset2 = first - view.firstAvailableCursor; offset2 < this.count; offset2++) {
+        rows.push(this.ring[(this.head + offset2) % this.capacity].text);
+      }
+      let matchedLine = null;
+      if (options.waitFor && !options.signal?.aborted) {
+        for (let offset2 = 0; offset2 < rows.length; ) {
+          const start = offset2;
+          let bytes = 0;
+          const batch = [];
+          while (offset2 < rows.length && bytes + Buffer.byteLength(rows[offset2]) <= 1024 * 1024) {
+            const line = rows[offset2++];
+            batch.push(line);
+            bytes += Buffer.byteLength(line);
+          }
+          const matches = await matchBoundedLines(batch, options.waitFor, {
+            ...options.patternOptions,
+            timeoutMs: 1e3
+          });
+          if (matches.length) {
+            matchedLine = first + start + matches[0];
+            break;
+          }
+          if (options.signal?.aborted) break;
+        }
+      }
+      const cancelled = !!options.signal?.aborted;
+      const matched = matchedLine !== null;
+      const expired = performance4.now() >= deadline;
+      if (cancelled || matched || view.state !== "open" || expired || !options.waitFor && rows.length > 0) {
+        const count2 = matched ? Math.min(view.lines.length, matchedLine - first + 1) : view.lines.length;
+        const cursor = first + count2;
+        return {
+          ...view,
+          lines: view.lines.slice(0, count2),
+          lineTruncatedBytes: view.lineTruncatedBytes.slice(0, count2),
+          cursor,
+          moreAvailable: view.moreAvailable || cursor < view.latestCursor,
+          matched,
+          matchedLine,
+          readStatus: cancelled ? "cancelled" : matched ? "matched" : view.state !== "open" ? "closed" : expired && timeout > 0 ? "timeout" : view.readStatus
+        };
+      }
+      if (revision !== this.revision) continue;
+      await this.waitForChange(
+        revision,
+        Math.max(0, deadline - performance4.now()),
+        options.signal
+      );
+    }
+  }
+  /** Frame CRLF or bare CR/LF once, retaining only a whole-code-point prefix of long lines. */
+  acceptText(text7) {
+    for (const character of text7) {
+      if (character === "\n" && this.previousCr) {
+        this.previousCr = false;
+        continue;
+      }
+      this.previousCr = false;
+      if (character === "\r" || character === "\n") {
+        this.finishLine();
+        this.previousCr = character === "\r";
+        continue;
+      }
+      this.redactor?.observe(character);
+      const bytes = Buffer.byteLength(character);
+      if (this.partialLost || this.partialBytes + bytes > this.lineCapacity) {
+        this.partialLost += bytes;
+        this.truncatedBytes += bytes;
+      } else {
+        this.partial += character;
+        this.partialBytes += bytes;
+      }
+      while (this.count && this.storedBytes + this.partialBytes > this.byteCapacity)
+        this.evict();
+    }
+  }
+  finishLine() {
+    if (this.nextCursor === Number.MAX_SAFE_INTEGER)
+      throw new PlatformIOError(
+        "Serial line cursor exhausted.",
+        "SERIAL_BUFFER_COUNTER_LIMIT"
+      );
+    const text7 = this.filterText(this.partial);
+    const bytes = Buffer.byteLength(text7);
+    while (this.count && (this.count === this.capacity || this.storedBytes + bytes > this.byteCapacity))
+      this.evict();
+    this.ring[(this.head + this.count) % this.capacity] = {
+      text: text7,
+      bytes,
+      truncatedBytes: this.partialLost,
+      cursor: this.nextCursor++
+    };
+    this.count++;
+    this.storedBytes += bytes;
+    this.redactor?.nextLine();
+    this.partial = "";
+    this.partialBytes = 0;
+    this.partialLost = 0;
+  }
+  /** Apply filtering before response/storage budgeting; never split a UTF-8 code point. */
+  filterText(text7) {
+    if (!this.redactor) return text7;
+    const filtered = this.redactor.preview(text7);
+    if (Buffer.byteLength(filtered) <= this.lineCapacity) return filtered;
+    this.redactionClipped = true;
+    let prefix = "", bytes = 0;
+    for (const character of filtered) {
+      const size = Buffer.byteLength(character);
+      if (bytes + size > this.lineCapacity) break;
+      prefix += character;
+      bytes += size;
+    }
+    return prefix;
+  }
+  evict() {
+    const removed = this.ring[this.head];
+    this.ring[this.head] = void 0;
+    this.head = (this.head + 1) % this.capacity;
+    this.count--;
+    this.storedBytes -= removed.bytes;
+    this.droppedBytes += removed.bytes;
+    this.droppedLines++;
+  }
+  changed() {
+    this.revision++;
+    for (const notify of [...this.waiters]) notify();
+  }
+  /** Install the waiter before rechecking revision to avoid a lost arrival during async matching. */
+  waitForChange(revision, timeout, signal) {
+    if (this.waiters.size >= 32)
+      throw new PlatformIOError(
+        "Too many pending serial readers.",
+        "SERIAL_READ_BUSY"
+      );
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        this.waiters.delete(done);
+        signal?.removeEventListener("abort", done);
+        resolve();
+      };
+      const timer = setTimeout(done, timeout);
+      this.waiters.add(done);
+      signal?.addEventListener("abort", done, { once: true });
+      if (this.revision !== revision || this.state !== "open" || signal?.aborted)
+        done();
+    });
+  }
+};
+
+// src/core/serial/session-policy.ts
+init_serial_endpoint();
 
 // src/core/serial/serial-backend.ts
 init_errors();
@@ -100666,530 +101185,9 @@ import fs47 from "node:fs";
 import path49 from "node:path";
 import { createHash as createHash11, randomUUID as randomUUID4 } from "node:crypto";
 import { performance as performance5 } from "node:perf_hooks";
-
-// src/core/devices/serial-discovery-binding.ts
-init_errors();
-import { createHash as createHash10 } from "node:crypto";
-function descriptor(record2) {
-  for (const field2 of [
-    record2.path,
-    record2.vendorId,
-    record2.productId,
-    record2.serialNumber
-  ]) {
-    if (field2 !== void 0 && (typeof field2 !== "string" || field2.length > 512 || /[\x00-\x1f\x7f]/.test(field2)))
-      throw new PlatformIOError(
-        "Invalid serial discovery metadata.",
-        "SERIAL_DISCOVERY_INVALID"
-      );
-  }
-  if (!record2.path)
-    throw new PlatformIOError(
-      "Missing serial discovery path.",
-      "SERIAL_DISCOVERY_INVALID"
-    );
-  for (const id of [record2.vendorId, record2.productId]) {
-    if (id !== void 0 && !/^[0-9a-f]{4}$/i.test(id))
-      throw new PlatformIOError(
-        "Invalid USB identifier.",
-        "SERIAL_DISCOVERY_INVALID"
-      );
-  }
-  if (!record2.vendorId || !record2.productId || !record2.serialNumber)
-    return void 0;
-  return createHash10("sha256").update(
-    JSON.stringify([
-      record2.vendorId.toLowerCase(),
-      record2.productId.toLowerCase(),
-      record2.serialNumber
-    ])
-  ).digest("hex");
-}
-function bindSerialDiscovery(endpoint, records, resolve) {
-  const inspect = (snapshot) => {
-    if (!Array.isArray(snapshot) || snapshot.length > 1024)
-      throw new PlatformIOError(
-        "Invalid serial discovery snapshot.",
-        "SERIAL_DISCOVERY_INVALID"
-      );
-    const normalized = snapshot.map((record2) => {
-      if (!record2 || typeof record2 !== "object")
-        throw new PlatformIOError(
-          "Invalid serial discovery entry.",
-          "SERIAL_DISCOVERY_INVALID"
-        );
-      const usb2 = descriptor(record2);
-      return { endpoint: resolve(record2.path).resource.identity, usb: usb2 };
-    });
-    const matches = normalized.filter(
-      (record2) => record2.endpoint === endpoint.resource.identity
-    );
-    if (!matches.length)
-      throw new PlatformIOError(
-        "Selected serial endpoint is absent from discovery.",
-        "SERIAL_DEVICE_UNAVAILABLE"
-      );
-    const identities = new Set(matches.map((record2) => record2.usb));
-    if (identities.size !== 1)
-      throw new PlatformIOError(
-        "Conflicting discovery metadata for the selected endpoint.",
-        "SERIAL_DEVICE_AMBIGUOUS"
-      );
-    const usb = matches[0].usb;
-    if (usb && normalized.some(
-      (record2) => record2.usb === usb && record2.endpoint !== endpoint.resource.identity
-    ))
-      throw new PlatformIOError(
-        "USB identity is shared by multiple endpoints.",
-        "SERIAL_DEVICE_AMBIGUOUS"
-      );
-    return usb;
-  };
-  endpoint.revalidate();
-  const expected = inspect(records);
-  return Object.freeze({
-    endpointIdentity: endpoint.resource.identity,
-    usbIdentity: expected === void 0 ? void 0 : `usb:${expected}`,
-    identityBasis: expected === void 0 ? "endpoint-only" : "usb-descriptor",
-    revalidate(snapshot) {
-      endpoint.revalidate();
-      if (inspect(snapshot) !== expected)
-        throw new PlatformIOError(
-          "Serial discovery identity changed; select and authorize again.",
-          "SERIAL_DEVICE_CHANGED"
-        );
-    }
-  });
-}
-
-// src/core/serial/session-manager.ts
 init_serial_endpoint();
 init_errors();
 init_device_lease();
-
-// src/core/serial/serial-redaction.ts
-init_redact();
-init_errors();
-var marker = "[REDACTED_SECRET]";
-var begin = /-----BEGIN ((?:RSA |EC |OPENSSH )?PRIVATE KEY|CERTIFICATE)-----/i;
-var SerialStreamRedactor = class {
-  window = "";
-  block;
-  sensitiveLine = false;
-  /** Observe one decoded character, including characters omitted from the retained line prefix. */
-  observe(character) {
-    this.window = (this.window + character).slice(-80);
-    if (this.block) {
-      this.sensitiveLine = true;
-      if (this.window.toUpperCase().endsWith(`-----END ${this.block}-----`))
-        this.block = void 0;
-    } else {
-      const start = begin.exec(this.window);
-      if (start && start.index + start[0].length === this.window.length) {
-        this.block = start[1].toUpperCase();
-        this.sensitiveLine = true;
-      }
-    }
-  }
-  /** Render a retained prefix; previews do not alter the scanner's state. */
-  preview(prefix) {
-    if (!prefix) return "";
-    return this.sensitiveLine || this.block ? marker : redactSecretsInText(prefix);
-  }
-  /** Commit framing after the completed line has been rendered. */
-  nextLine() {
-    this.window = "";
-    this.sensitiveLine = !!this.block;
-  }
-};
-
-// src/core/serial/session-buffer.ts
-init_errors();
-init_bounded_pattern();
-import { StringDecoder } from "node:string_decoder";
-import { performance as performance4 } from "node:perf_hooks";
-function boundedInteger(value2, min, max, field2) {
-  if (!Number.isSafeInteger(value2) || value2 < min || value2 > max)
-    throw new PlatformIOError(
-      `Invalid serial ${field2}; expected ${min} through ${max}.`,
-      "SERIAL_BUFFER_ARGUMENT_INVALID"
-    );
-  return value2;
-}
-var SerialSessionBuffer = class {
-  capacity;
-  byteCapacity;
-  lineCapacity;
-  ring;
-  redactor;
-  redactionClipped = false;
-  decoder = new StringDecoder("utf8");
-  waiters = /* @__PURE__ */ new Set();
-  head = 0;
-  count = 0;
-  storedBytes = 0;
-  nextCursor = 0;
-  partial = "";
-  partialBytes = 0;
-  partialLost = 0;
-  previousCr = false;
-  revision = 0;
-  received = 0;
-  droppedLines = 0;
-  droppedBytes = 0;
-  truncatedBytes = 0;
-  state = "open";
-  error;
-  /** Construct storage limits; even empty lines consume one bounded ring entry. */
-  constructor(limits = {}, redact = false) {
-    if (redact) this.redactor = new SerialStreamRedactor();
-    this.capacity = boundedInteger(
-      limits.maxLines ?? 5e3,
-      1,
-      1e4,
-      "maxLines"
-    );
-    this.byteCapacity = boundedInteger(
-      limits.maxBytes ?? 1024 * 1024,
-      4,
-      8 * 1024 * 1024,
-      "maxBytes"
-    );
-    this.lineCapacity = boundedInteger(
-      limits.maxLineBytes ?? Math.min(16384, this.byteCapacity),
-      4,
-      Math.min(65536, this.byteCapacity),
-      "maxLineBytes"
-    );
-    this.ring = new Array(this.capacity);
-  }
-  /** Append at most 1 MiB of transport bytes; late data after closure is ignored. */
-  append(chunk) {
-    if (this.state !== "open") return false;
-    if (!Buffer.isBuffer(chunk) || chunk.length > 1024 * 1024)
-      throw new PlatformIOError(
-        "Serial chunks must be buffers no larger than 1 MiB.",
-        "SERIAL_BUFFER_INPUT_LIMIT"
-      );
-    if (!chunk.length) return true;
-    if (this.received > Number.MAX_SAFE_INTEGER - chunk.length)
-      throw new PlatformIOError(
-        "Serial byte counter exhausted.",
-        "SERIAL_BUFFER_COUNTER_LIMIT"
-      );
-    this.received += chunk.length;
-    this.acceptText(this.decoder.write(chunk));
-    this.changed();
-    return true;
-  }
-  /** Close once, retaining buffered data and flushing an incomplete final UTF-8 code point. */
-  close(state = "stopped", error2) {
-    if (this.state !== "open") return;
-    if (!["stopped", "disconnected", "error"].includes(state) || error2 !== void 0 && (typeof error2 !== "string" || error2.length > 4096))
-      throw new PlatformIOError(
-        "Invalid serial close state or error text.",
-        "SERIAL_BUFFER_ARGUMENT_INVALID"
-      );
-    this.acceptText(this.decoder.end());
-    this.state = state;
-    this.error = error2;
-    this.changed();
-  }
-  /** Return bounded accounting only; no retained serial content is disclosed. */
-  metadata() {
-    return {
-      linesBuffered: this.count,
-      nextCursor: this.nextCursor,
-      bytesReceived: this.received,
-      state: this.state
-    };
-  }
-  /** Snapshot without waiting; no cursor is advanced beyond the data actually returned. */
-  snapshot(options = {}) {
-    const requested = boundedInteger(
-      options.cursor ?? 0,
-      0,
-      this.nextCursor,
-      "cursor"
-    );
-    const limit = boundedInteger(
-      options.maxLines ?? 500,
-      1,
-      1e4,
-      "read maxLines"
-    );
-    const byteLimit = boundedInteger(
-      options.maxBytes ?? Math.max(65536, this.lineCapacity),
-      this.lineCapacity,
-      1024 * 1024,
-      "read maxBytes"
-    );
-    const first = this.count ? this.ring[this.head].cursor : this.nextCursor;
-    let cursor = Math.max(first, requested), bytes = 0;
-    const lines2 = [], lineTruncatedBytes = [];
-    for (let offset2 = cursor - first; offset2 < this.count && lines2.length < limit; offset2++) {
-      const row = this.ring[(this.head + offset2) % this.capacity];
-      if (bytes + row.bytes > byteLimit) break;
-      lines2.push(row.text);
-      lineTruncatedBytes.push(row.truncatedBytes);
-      bytes += row.bytes;
-      cursor = row.cursor + 1;
-    }
-    const renderedPartial = this.filterText(this.partial);
-    const renderedPartialBytes = Buffer.byteLength(renderedPartial);
-    const unreadLines = cursor < this.nextCursor;
-    const showPartial = !unreadLines && lines2.length < limit && bytes + renderedPartialBytes <= byteLimit;
-    const moreAvailable = unreadLines || !showPartial && this.partialBytes > 0;
-    return {
-      redactionApplied: !!this.redactor,
-      redactionOutputMayBeTruncated: this.redactionClipped,
-      lines: lines2,
-      lineTruncatedBytes,
-      cursor,
-      firstAvailableCursor: first,
-      latestCursor: this.nextCursor,
-      cursorStatus: requested < first ? "stale" : "current",
-      droppedLines: Math.max(0, first - requested),
-      moreAvailable,
-      partial: showPartial ? renderedPartial : "",
-      partialCursor: this.nextCursor,
-      partialTruncatedBytes: showPartial ? this.partialLost : 0,
-      state: this.state,
-      error: this.error,
-      readStatus: this.state === "open" ? lines2.length || showPartial && this.partial.length ? "ready" : "empty" : "closed",
-      matched: false,
-      receivedBytes: this.received,
-      totalDroppedLines: this.droppedLines,
-      totalDroppedBytes: this.droppedBytes,
-      totalTruncatedBytes: this.truncatedBytes
-    };
-  }
-  /**
-   * Read available text or wait for data/pattern, closure, cancellation or a bounded deadline.
-   * A full response page returns immediately so callers can advance rather than lose unseen lines.
-   * Regex evaluation uses the existing terminable worker; its separate 1-second execution
-   * deadline can extend the read deadline. Matcher failure remains an explicit error.
-   */
-  async read(options = {}) {
-    if (options.referenceSemantics) return this.readReference(options);
-    const timeout = boundedInteger(
-      options.timeoutMs ?? 0,
-      0,
-      12e4,
-      "timeoutMs"
-    );
-    const deadline = performance4.now() + timeout;
-    const result = (view, status, matched = false) => ({
-      ...view,
-      state: this.state,
-      error: this.error,
-      readStatus: status,
-      matched
-    });
-    while (true) {
-      const revision = this.revision;
-      const view = this.snapshot(options);
-      if (options.signal?.aborted) return result(view, "cancelled");
-      let matched = false;
-      if (options.waitFor !== void 0) {
-        const inputs = view.partial ? [...view.lines, view.partial] : view.lines;
-        matched = (await matchBoundedLines(inputs, options.waitFor, {
-          ...options.patternOptions,
-          timeoutMs: 1e3
-        })).length > 0;
-      }
-      if (options.signal?.aborted) return result(view, "cancelled");
-      if (matched)
-        return result(
-          {
-            ...view,
-            moreAvailable: view.moreAvailable || view.cursor < this.nextCursor || this.revision !== revision && this.partial !== view.partial
-          },
-          "matched",
-          true
-        );
-      if (this.revision !== revision) {
-        if (performance4.now() >= deadline)
-          return result(
-            this.snapshot(options),
-            this.state === "open" ? "timeout" : "closed"
-          );
-        continue;
-      }
-      if (this.state !== "open") return result(view, "closed");
-      if (view.moreAvailable || view.lines.length >= (options.maxLines ?? 500) || options.waitFor === void 0 && (view.lines.length > 0 || view.partial.length > 0))
-        return result(view, "ready");
-      const remaining = deadline - performance4.now();
-      if (remaining <= 0)
-        return result(view, timeout > 0 ? "timeout" : view.readStatus);
-      await this.waitForChange(revision, remaining, options.signal);
-    }
-  }
-  /** Match a stable bounded retained snapshot before limiting returned lines, as the reference API does. */
-  async readReference(options) {
-    const timeout = boundedInteger(
-      options.timeoutMs ?? 0,
-      0,
-      12e4,
-      "timeoutMs"
-    );
-    const deadline = performance4.now() + timeout;
-    while (true) {
-      const revision = this.revision;
-      const view = this.snapshot(options);
-      const first = Math.max(options.cursor ?? 0, view.firstAvailableCursor);
-      const rows = [];
-      for (let offset2 = first - view.firstAvailableCursor; offset2 < this.count; offset2++) {
-        rows.push(this.ring[(this.head + offset2) % this.capacity].text);
-      }
-      let matchedLine = null;
-      if (options.waitFor && !options.signal?.aborted) {
-        for (let offset2 = 0; offset2 < rows.length; ) {
-          const start = offset2;
-          let bytes = 0;
-          const batch = [];
-          while (offset2 < rows.length && bytes + Buffer.byteLength(rows[offset2]) <= 1024 * 1024) {
-            const line = rows[offset2++];
-            batch.push(line);
-            bytes += Buffer.byteLength(line);
-          }
-          const matches = await matchBoundedLines(batch, options.waitFor, {
-            ...options.patternOptions,
-            timeoutMs: 1e3
-          });
-          if (matches.length) {
-            matchedLine = first + start + matches[0];
-            break;
-          }
-          if (options.signal?.aborted) break;
-        }
-      }
-      const cancelled = !!options.signal?.aborted;
-      const matched = matchedLine !== null;
-      const expired = performance4.now() >= deadline;
-      if (cancelled || matched || view.state !== "open" || expired || !options.waitFor && rows.length > 0) {
-        const count2 = matched ? Math.min(view.lines.length, matchedLine - first + 1) : view.lines.length;
-        const cursor = first + count2;
-        return {
-          ...view,
-          lines: view.lines.slice(0, count2),
-          lineTruncatedBytes: view.lineTruncatedBytes.slice(0, count2),
-          cursor,
-          moreAvailable: view.moreAvailable || cursor < view.latestCursor,
-          matched,
-          matchedLine,
-          readStatus: cancelled ? "cancelled" : matched ? "matched" : view.state !== "open" ? "closed" : expired && timeout > 0 ? "timeout" : view.readStatus
-        };
-      }
-      if (revision !== this.revision) continue;
-      await this.waitForChange(
-        revision,
-        Math.max(0, deadline - performance4.now()),
-        options.signal
-      );
-    }
-  }
-  /** Frame CRLF or bare CR/LF once, retaining only a whole-code-point prefix of long lines. */
-  acceptText(text7) {
-    for (const character of text7) {
-      if (character === "\n" && this.previousCr) {
-        this.previousCr = false;
-        continue;
-      }
-      this.previousCr = false;
-      if (character === "\r" || character === "\n") {
-        this.finishLine();
-        this.previousCr = character === "\r";
-        continue;
-      }
-      this.redactor?.observe(character);
-      const bytes = Buffer.byteLength(character);
-      if (this.partialLost || this.partialBytes + bytes > this.lineCapacity) {
-        this.partialLost += bytes;
-        this.truncatedBytes += bytes;
-      } else {
-        this.partial += character;
-        this.partialBytes += bytes;
-      }
-      while (this.count && this.storedBytes + this.partialBytes > this.byteCapacity)
-        this.evict();
-    }
-  }
-  finishLine() {
-    if (this.nextCursor === Number.MAX_SAFE_INTEGER)
-      throw new PlatformIOError(
-        "Serial line cursor exhausted.",
-        "SERIAL_BUFFER_COUNTER_LIMIT"
-      );
-    const text7 = this.filterText(this.partial);
-    const bytes = Buffer.byteLength(text7);
-    while (this.count && (this.count === this.capacity || this.storedBytes + bytes > this.byteCapacity))
-      this.evict();
-    this.ring[(this.head + this.count) % this.capacity] = {
-      text: text7,
-      bytes,
-      truncatedBytes: this.partialLost,
-      cursor: this.nextCursor++
-    };
-    this.count++;
-    this.storedBytes += bytes;
-    this.redactor?.nextLine();
-    this.partial = "";
-    this.partialBytes = 0;
-    this.partialLost = 0;
-  }
-  /** Apply filtering before response/storage budgeting; never split a UTF-8 code point. */
-  filterText(text7) {
-    if (!this.redactor) return text7;
-    const filtered = this.redactor.preview(text7);
-    if (Buffer.byteLength(filtered) <= this.lineCapacity) return filtered;
-    this.redactionClipped = true;
-    let prefix = "", bytes = 0;
-    for (const character of filtered) {
-      const size = Buffer.byteLength(character);
-      if (bytes + size > this.lineCapacity) break;
-      prefix += character;
-      bytes += size;
-    }
-    return prefix;
-  }
-  evict() {
-    const removed = this.ring[this.head];
-    this.ring[this.head] = void 0;
-    this.head = (this.head + 1) % this.capacity;
-    this.count--;
-    this.storedBytes -= removed.bytes;
-    this.droppedBytes += removed.bytes;
-    this.droppedLines++;
-  }
-  changed() {
-    this.revision++;
-    for (const notify of [...this.waiters]) notify();
-  }
-  /** Install the waiter before rechecking revision to avoid a lost arrival during async matching. */
-  waitForChange(revision, timeout, signal) {
-    if (this.waiters.size >= 32)
-      throw new PlatformIOError(
-        "Too many pending serial readers.",
-        "SERIAL_READ_BUSY"
-      );
-    return new Promise((resolve) => {
-      const done = () => {
-        clearTimeout(timer);
-        this.waiters.delete(done);
-        signal?.removeEventListener("abort", done);
-        resolve();
-      };
-      const timer = setTimeout(done, timeout);
-      this.waiters.add(done);
-      signal?.addEventListener("abort", done, { once: true });
-      if (this.revision !== revision || this.state !== "open" || signal?.aborted)
-        done();
-    });
-  }
-};
-
-// src/core/serial/session-manager.ts
 var SerialSessionManager = class {
   /** Require authorization at construction; there is no permissive default hook. */
   constructor(dependencies) {
@@ -101746,10 +101744,89 @@ var PolicySerialSessionService = class {
       }
     });
   }
+  /** Resolve and plan boot opening/reading before upload, without consuming either hardware grant or opening a port. */
+  async preflightVerificationCapture(owner, input, options = {}, startupDiscoveryApprovalId) {
+    const checkOwner = this.sessions.createStartupGuard(owner);
+    validateDirectSerialOptions(input);
+    new SerialSessionBuffer(input.buffer);
+    const args = await validateVerificationCapture(options);
+    if (!path50.isAbsolute(input.projectDir))
+      throw new PlatformIOError(
+        "Serial project must be absolute.",
+        "SERIAL_PROJECT_INVALID"
+      );
+    const projectDir = fs48.realpathSync.native(input.projectDir);
+    const guard = createPolicyRevisionGuard(projectDir);
+    const discoveryPlan = await planAction(
+      "serial_startup_discovery",
+      {
+        ...input,
+        projectDir,
+        buffer: input.buffer ? { ...input.buffer } : void 0,
+        snapshots: 4,
+        approvalId: startupDiscoveryApprovalId
+      },
+      { ...this.context.getStore()?.caller, workspaceDir: projectDir }
+    );
+    if (discoveryPlan.status !== "ready")
+      throw new PlatformIOError(
+        discoveryPlan.reason,
+        discoveryPlan.status === "deny" ? "POLICY_DENIED" : "APPROVAL_REQUIRED",
+        { policyDecision: discoveryPlan }
+      );
+    guard();
+    const endpoint = this.resolveEndpoint(input.path);
+    const binding = bindSerialDiscovery(
+      endpoint,
+      await this.listSerialDevices(projectDir),
+      this.resolveEndpoint
+    );
+    checkOwner();
+    guard();
+    const request = {
+      operation: "start",
+      projectDir,
+      path: endpoint.canonicalPort,
+      baudRate: input.baudRate,
+      operationTimeoutMs: input.operationTimeoutMs ?? 5e3,
+      resource: endpoint.resource,
+      ...binding.usbIdentity ? {
+        additionalResources: [
+          { kind: "serial", identity: binding.usbIdentity }
+        ]
+      } : {},
+      bufferLimits: {
+        maxLines: input.buffer?.maxLines ?? 5e3,
+        maxBytes: input.buffer?.maxBytes ?? 1048576,
+        maxLineBytes: input.buffer?.maxLineBytes ?? Math.min(16384, input.buffer?.maxBytes ?? 1048576)
+      }
+    };
+    const scope5 = {
+      input: args,
+      purpose: "boot_verification",
+      active: true
+    };
+    try {
+      await this.transientMemoryScope.run(
+        scope5,
+        () => this.authorize(request, true)
+      );
+      checkOwner();
+      guard();
+      return {
+        port: endpoint.canonicalPort,
+        identityBasis: binding.identityBasis,
+        deviceBinding: verificationDeviceBinding(request)
+      };
+    } finally {
+      scope5.active = false;
+    }
+  }
   /** Open a fresh boot capture, bind all pages to one bounded read grant, and always close its owned port. */
-  async captureVerificationOnce(owner, request, input = {}, signal) {
+  async captureVerificationOnce(owner, request, input = {}, signal, expectedDeviceBinding) {
     const args = await validateVerificationCapture(input);
     const scope5 = {
+      expectedDeviceBinding,
       input: args,
       purpose: "boot_verification",
       active: true,
@@ -102013,7 +102090,7 @@ var PolicySerialSessionService = class {
       execute3
     );
   }
-  async authorize(request) {
+  async authorize(request, planOnly = false) {
     const context = this.context.getStore();
     if (!context)
       throw new PlatformIOError(
@@ -102053,6 +102130,11 @@ var PolicySerialSessionService = class {
       )
     );
     const binding = JSON.stringify(deviceRequest);
+    if (transient?.expectedDeviceBinding && verificationDeviceBinding(request) !== transient.expectedDeviceBinding)
+      throw new PlatformIOError(
+        "The verification device changed after preflight.",
+        "SERIAL_DEVICE_CHANGED"
+      );
     if (transient && request.operation === "read" && transient.binding !== binding)
       throw new PlatformIOError(
         "Transient memory device identity changed.",
@@ -102111,6 +102193,15 @@ var PolicySerialSessionService = class {
         );
       transient.binding = binding;
     }
+    if (planOnly) {
+      if (transient?.purpose !== "boot_verification" || request.operation !== "start" || !check2)
+        throw new PlatformIOError(
+          "Invalid verification preflight context.",
+          "SERIAL_CAPTURE_SCOPE_INVALID"
+        );
+      check2();
+      return check2;
+    }
     return dispatchAuthorizedAction(
       OPERATIONS[request.operation],
       authorizationArgs,
@@ -102150,6 +102241,25 @@ var PolicySerialSessionService = class {
     );
   }
 };
+function verificationDeviceBinding(request) {
+  return createHash12("sha256").update(
+    JSON.stringify([
+      request.projectDir,
+      request.path,
+      request.baudRate,
+      request.operationTimeoutMs,
+      request.resource.kind,
+      request.resource.identity,
+      (request.additionalResources ?? []).map((resource) => [
+        resource.kind,
+        resource.identity
+      ]),
+      request.bufferLimits.maxLines,
+      request.bufferLimits.maxBytes,
+      request.bufferLimits.maxLineBytes
+    ])
+  ).digest("hex");
+}
 
 // src/adapters/monitor-start-compat.ts
 init_devices2();
