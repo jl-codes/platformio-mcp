@@ -1800,3 +1800,17 @@ A real benign Windows child returned exit code 7 and its exact expected output w
 confirmed cleanup; see upload-process-windows-evidence.json. This executed no hardware.
 Focused sequence, retained execution and supervisor regressions pass. Public workflow
 selection, approval/resume binding and automatic crash decoding remain to be connected.
+
+### Connection-owned upload approval/resume
+
+`PendingUploadStore` now retains up to eight captures per connection for fifteen
+minutes and binds canonical upload authorization to the manifest hash, destination
+and opaque resume ID. Approval retries reuse retained bytes instead of rebuilding.
+A captured operation is consumed before execution, rejects concurrent replay and
+rechecks artifacts and policy revision after authorization. Disconnect aborts owned
+execution, awaits completion, and retains failed cleanup capabilities for retry.
+`SerialClientContext` now owns this store and includes it in disconnect cleanup.
+Eight focused approval/resume and connection lifecycle checks pass; TypeScript and
+scoped lint pass; the plugin runtime is refreshed. Public flash requests still need
+the staging/resume fields and selected-tool metadata connection. No release or
+physical upload has been performed by these changes.

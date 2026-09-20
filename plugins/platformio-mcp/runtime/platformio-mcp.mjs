@@ -113328,6 +113328,151 @@ function registerShutdownTask(task) {
   return shutdown.register(task);
 }
 
+// src/core/analysis/pending-upload-store.ts
+import { randomUUID as randomUUID9 } from "node:crypto";
+
+// src/core/analysis/retained-upload-execution.ts
+init_errors2();
+
+// src/core/analysis/esptool-upload-command.ts
+init_errors2();
+
+// src/core/analysis/esptool-upload-inputs.ts
+init_errors2();
+
+// src/core/analysis/retained-upload-execution.ts
+var UploadCleanupFailure = class extends PlatformIOError {
+  #cleanup;
+  constructor(cleanup) {
+    super("Uploader cleanup remains pending.", "UPLOAD_CLEANUP_PENDING", {
+      cleanupPending: true
+    });
+    this.#cleanup = cleanup;
+  }
+  /** Retry process-tree cleanup and custody release; never expose this capability in public JSON. */
+  cleanupProcess() {
+    return this.#cleanup();
+  }
+};
+
+// src/core/analysis/pending-upload-store.ts
+init_errors2();
+var PendingUploadStore = class {
+  constructor(now = () => performance.now()) {
+    this.now = now;
+  }
+  now;
+  records = /* @__PURE__ */ new Map();
+  closed = false;
+  inFlight = /* @__PURE__ */ new Set();
+  cleanupOwners = /* @__PURE__ */ new Set();
+  /** Retain a bounded pending operation after capture; this does not acquire upload authorization. */
+  stage(retained, scope5, guard, execute3) {
+    this.prune();
+    const selected = { ...scope5 };
+    const manifest = retained.manifest;
+    if (this.closed || this.records.size + this.cleanupOwners.size >= 8)
+      throw new PlatformIOError(
+        "Pending upload capacity is unavailable.",
+        "UPLOAD_RESUME_UNAVAILABLE"
+      );
+    if (manifest.projectDir !== selected.projectDir || manifest.environment !== selected.environment || !selected.uploadPort || !/^[a-f0-9]{64}$/.test(retained.sha256))
+      throw new PlatformIOError(
+        "Pending upload scope differs from captured firmware.",
+        "UPLOAD_CAPTURE_CONTEXT_CHANGED"
+      );
+    guard();
+    const resumeId = randomUUID9();
+    this.records.set(resumeId, {
+      retained,
+      scope: selected,
+      guard,
+      execute: execute3,
+      abort: new AbortController(),
+      expiresAt: this.now() + 15 * 60 * 1e3,
+      state: "pending"
+    });
+    return { resumeId, manifestSha256: retained.sha256 };
+  }
+  /** Authorize and consume the original captured upload exactly once; denied approvals remain resumable. */
+  resume(resumeId, scope5, approvalId2, caller) {
+    const attempt = this.resumePending(resumeId, scope5, approvalId2, caller);
+    this.inFlight.add(attempt);
+    void attempt.finally(() => this.inFlight.delete(attempt)).catch(() => {
+    });
+    return attempt;
+  }
+  async resumePending(resumeId, scope5, approvalId2, caller) {
+    this.prune();
+    const record2 = this.records.get(resumeId);
+    if (this.closed || !record2 || record2.state !== "pending" || record2.scope.projectDir !== scope5.projectDir || record2.scope.environment !== scope5.environment || record2.scope.uploadPort !== scope5.uploadPort)
+      throw new PlatformIOError(
+        "Pending upload is missing, busy or belongs to another destination.",
+        "UPLOAD_RESUME_UNAVAILABLE"
+      );
+    record2.guard();
+    record2.state = "authorizing";
+    try {
+      return await dispatchAuthorizedAction(
+        "upload_firmware",
+        {
+          ...record2.scope,
+          purpose: "retained_upload",
+          resumeId,
+          manifestSha256: record2.retained.sha256,
+          approvalId: approvalId2
+        },
+        { ...caller, workspaceDir: record2.scope.projectDir },
+        async () => {
+          if (this.closed || this.records.get(resumeId) !== record2 || record2.abort.signal.aborted || this.now() >= record2.expiresAt)
+            throw new PlatformIOError(
+              "Pending upload expired or disconnected before execution.",
+              "UPLOAD_RESUME_UNAVAILABLE"
+            );
+          record2.guard();
+          record2.state = "executing";
+          await record2.retained.verify();
+          record2.guard();
+          if (record2.abort.signal.aborted)
+            throw new PlatformIOError(
+              "Pending upload disconnected before execution.",
+              "UPLOAD_RESUME_UNAVAILABLE"
+            );
+          return record2.execute(record2.abort.signal);
+        }
+      );
+    } catch (error2) {
+      if (error2 instanceof UploadCleanupFailure) this.cleanupOwners.add(error2);
+      throw error2;
+    } finally {
+      const current = this.records.get(resumeId);
+      if (current === record2) {
+        if (current.state === "executing") this.records.delete(resumeId);
+        else current.state = "pending";
+      }
+    }
+  }
+  /** Disconnect invalidates pending IDs and cancels executing callbacks through their owned signal. */
+  async close() {
+    this.closed = true;
+    for (const record2 of this.records.values()) record2.abort.abort();
+    this.records.clear();
+    await Promise.allSettled([...this.inFlight]);
+    for (const owner of this.cleanupOwners) {
+      await owner.cleanupProcess();
+      this.cleanupOwners.delete(owner);
+    }
+  }
+  prune() {
+    for (const [id, record2] of this.records) {
+      if (record2.state !== "executing" && this.now() >= record2.expiresAt) {
+        record2.abort.abort();
+        this.records.delete(id);
+      }
+    }
+  }
+};
+
 // src/adapters/serial-client.ts
 init_errors2();
 var SerialClientContext = class {
@@ -113336,6 +113481,8 @@ var SerialClientContext = class {
     this.owner = service.sessions.createOwner();
   }
   service;
+  /** Host-only retained upload approvals and cleanup belong to this connection. */
+  pendingUploads = new PendingUploadStore();
   owner;
   closed = false;
   closing;
@@ -113358,7 +113505,10 @@ var SerialClientContext = class {
   close() {
     this.closed = true;
     if (!this.closing) {
-      this.closing = this.service.sessions.disconnectOwner(this.owner).finally(() => {
+      this.closing = Promise.all([
+        this.pendingUploads.close(),
+        this.service.sessions.disconnectOwner(this.owner)
+      ]).then(([, sessions]) => sessions).finally(() => {
         this.closing = void 0;
       });
     }

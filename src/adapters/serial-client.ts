@@ -10,10 +10,16 @@ import type {
   SerialSessionInfo,
   SerialSessionOwner,
 } from "../core/serial/session-manager.js";
+import { PendingUploadStore } from "../core/analysis/pending-upload-store.js";
+import type { executeRetainedEspUpload } from "../core/analysis/retained-upload-execution.js";
 import { PlatformIOError } from "../utils/errors.js";
 
 /** One instance belongs to one authenticated connection, never to a caller-supplied session ID. */
 export class SerialClientContext {
+  /** Host-only retained upload approvals and cleanup belong to this connection. */
+  readonly pendingUploads = new PendingUploadStore<
+    Awaited<ReturnType<typeof executeRetainedEspUpload>>
+  >();
   private readonly owner: SerialSessionOwner;
   private closed = false;
   private closing?: Promise<SerialSessionInfo[]>;
@@ -47,8 +53,11 @@ export class SerialClientContext {
   close(): Promise<SerialSessionInfo[]> {
     this.closed = true;
     if (!this.closing) {
-      this.closing = this.service.sessions
-        .disconnectOwner(this.owner)
+      this.closing = Promise.all([
+        this.pendingUploads.close(),
+        this.service.sessions.disconnectOwner(this.owner),
+      ])
+        .then(([, sessions]) => sessions)
         .finally(() => {
           this.closing = undefined;
         });

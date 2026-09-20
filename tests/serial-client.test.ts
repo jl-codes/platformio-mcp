@@ -56,3 +56,32 @@ it("does not deliver an in-flight result after disconnect", async () => {
   deliver("private result");
   await expect(result).rejects.toMatchObject({ code: "SERIAL_CLOSED" });
 });
+
+it("waits for pending upload cleanup before reporting connection closure", async () => {
+  const service = {
+    sessions: {
+      createOwner: () => ({ id: "owned" }),
+      disconnectOwner: async () => [],
+    },
+  } as unknown as PolicySerialSessionService;
+  const client = new SerialClientContext(service);
+  let release!: () => void;
+  const uploadCleanup = vi
+    .spyOn(client.pendingUploads, "close")
+    .mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+  let closed = false;
+  const result = client.close().then(() => {
+    closed = true;
+  });
+  await Promise.resolve();
+  expect(uploadCleanup).toHaveBeenCalledOnce();
+  expect(closed).toBe(false);
+  release();
+  await result;
+  expect(closed).toBe(true);
+});
