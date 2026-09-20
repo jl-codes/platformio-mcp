@@ -13,7 +13,11 @@ import fs from "node:fs";
 import path from "path";
 import { z } from "zod";
 import { platformioExecutor } from "../platformio.js";
-import type { ProjectContext, ProjectInitResult } from "../types.js";
+import type {
+  ProjectContext,
+  ProjectInitResult,
+  CommandResult,
+} from "../types.js";
 import {
   validateBoardId,
   validateFramework,
@@ -32,13 +36,26 @@ import {
  * @param config - The initialization scheme, requiring at least board and projectDir.
  * @returns Status string denoting success and generated filesystem paths.
  */
-export async function initProject(config: {
-  board: string;
-  framework?: string;
-  projectDir: string;
-  platformOptions?: Record<string, string>;
-  projectOptions?: string[]; // Ordered PlatformIO options, preserving repeated keys.
-}): Promise<ProjectInitResult> {
+export async function initProject(
+  config: {
+    board: string;
+    framework?: string;
+    projectDir: string;
+    platformOptions?: Record<string, string>;
+    projectOptions?: string[]; // Ordered PlatformIO options, preserving repeated keys.
+  },
+  execution: {
+    timeoutMs?: number;
+    onResult?: (result: CommandResult) => Promise<void>;
+  } = {},
+): Promise<ProjectInitResult> {
+  const timeoutMs = z
+    .number()
+    .int()
+    .min(1)
+    .max(600000)
+    .default(120000)
+    .parse(execution.timeoutMs);
   // Validate inputs
   if (!validateBoardId(config.board)) {
     throw new ProjectInitError(`Invalid board ID: ${config.board}`, {
@@ -52,10 +69,21 @@ export async function initProject(config: {
     });
   }
 
-  const projectOptions = z.array(z.string().min(1).max(4096).refine(
-    value => !value.includes("\0") && /^[a-zA-Z0-9_.-]+\s*=/.test(value),
-    "Project options must be key=value strings without NUL bytes",
-  )).max(128).default([]).parse(config.projectOptions);
+  const projectOptions = z
+    .array(
+      z
+        .string()
+        .min(1)
+        .max(4096)
+        .refine(
+          (value) =>
+            !value.includes("\0") && /^[a-zA-Z0-9_.-]+\s*=/.test(value),
+          "Project options must be key=value strings without NUL bytes",
+        ),
+    )
+    .max(128)
+    .default([])
+    .parse(config.projectOptions);
   if (Buffer.byteLength(projectOptions.join(""), "utf8") > 65536) {
     throw new ProjectInitError("Project options exceed 64 KiB");
   }
@@ -97,14 +125,16 @@ export async function initProject(config: {
     // Execute init command in the project directory
     const result = await platformioExecutor.execute("project", args.slice(1), {
       cwd: projectPath,
-      timeout: 120000,
+      timeout: timeoutMs,
     });
 
+    await execution.onResult?.(result);
     if (result.exitCode !== 0) {
       throw new ProjectInitError(
         `Failed to initialize project: ${result.stderr}`,
         {
           board: config.board,
+          stdout: result.stdout,
           stderr: result.stderr,
           exitCode: result.exitCode,
         },
@@ -149,9 +179,7 @@ export async function isValidProject(projectDir: string): Promise<boolean> {
  * @param projectDir - Validated platform path to retrieve configuration from.
  * @returns Nested map tree of raw string config block keys and variables.
  */
-export async function getProjectConfig(
-  projectDir: string,
-): Promise<any> {
+export async function getProjectConfig(projectDir: string): Promise<any> {
   const validatedPath = validateProjectPath(projectDir);
 
   try {
@@ -162,7 +190,7 @@ export async function getProjectConfig(
       {
         cwd: validatedPath,
         timeout: 30000,
-      }
+      },
     );
     return result;
   } catch (error) {
@@ -184,7 +212,7 @@ export async function getSystemInfo(): Promise<any> {
       "system",
       ["info", "--json-output"],
       z.any(),
-      { timeout: 30000 }
+      { timeout: 30000 },
     );
     return result;
   } catch (error) {
@@ -449,7 +477,9 @@ export async function getProjectContext(
 
   const sourceFiles = listSourceFiles(validatedPath);
 
-  const lastBuild = includeBuildHistory ? inferLastBuild(validatedPath) : undefined;
+  const lastBuild = includeBuildHistory
+    ? inferLastBuild(validatedPath)
+    : undefined;
 
   const partial: Partial<ProjectContext> = {
     projectDir: validatedPath,

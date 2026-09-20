@@ -57,3 +57,11 @@ it("rejects invalid options before creating the destination or invoking Platform
   expect(fs.existsSync(projectDir)).toBe(false);
   expect(execute).not.toHaveBeenCalled();
 });
+it("supports the compatibility timeout and reports execution output to trusted logging", async () => {
+  const result = { exitCode: 0, stdout: "created", stderr: "" };
+  execute.mockResolvedValue(result);
+  const onResult = vi.fn(async () => {});
+  await initProject({ board: "esp32dev", projectDir: destination() }, { timeoutMs: 600000, onResult });
+  expect(execute.mock.calls[0][2].timeout).toBe(600000);
+  expect(onResult).toHaveBeenCalledWith(result);
+});

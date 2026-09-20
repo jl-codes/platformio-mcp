@@ -1,4 +1,6 @@
 /** Authorized reference project initialization with bounded configuration disclosure. */
+import crypto from "node:crypto";
+import { SERVER_DATA_DIR } from "../utils/paths.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -9,7 +11,7 @@ import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
 import { redactSecretsInText } from "../core/policy/redact.js";
 import type { PolicyEvaluationContext } from "../core/policy/types.js";
 import type { CompatibilityProjectDefaults } from "./compatibility-project.js";
-import { PlatformIOError } from "../utils/errors.js";
+import { PlatformIOError, ProjectInitError } from "../utils/errors.js";
 
 /** Authorize initialization and returned configuration separately before creating the destination. */
 export async function executeInitCompatibility(
@@ -66,7 +68,53 @@ export async function executeInitCompatibility(
           const guard = createPolicyRevisionGuard(projectDir);
           await onAuthorized?.();
           guard();
-          const result = await initProject(config);
+          let logPath: string | null = null;
+          let result;
+          try {
+            result = await initProject(config, {
+              timeoutMs: 600000,
+              onResult: async (execution) => {
+                guard();
+                const directory = path.join(
+                  SERVER_DATA_DIR,
+                  "initialization-logs",
+                );
+                await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+                logPath = path.join(directory, `${crypto.randomUUID()}.log`);
+                const output = redactSecretsInText(
+                  execution.stdout + "\n" + execution.stderr,
+                );
+                if (Buffer.byteLength(output) > 16 * 1024 * 1024)
+                  throw new PlatformIOError(
+                    "Initialization log exceeds its bound.",
+                    "COMPAT_RESULT_LIMIT",
+                  );
+                await fs.writeFile(logPath, output, {
+                  flag: "wx",
+                  mode: 0o600,
+                });
+              },
+            });
+          } catch (error) {
+            guard();
+            if (
+              error instanceof ProjectInitError &&
+              typeof error.context?.exitCode === "number"
+            ) {
+              return {
+                ok: false,
+                error: "init_failed",
+                summary: `pio project init failed (exit ${error.context.exitCode}).`,
+                output: redactSecretsInText(
+                  String(error.context.stdout ?? "") +
+                    "\n" +
+                    String(error.context.stderr ?? ""),
+                ).slice(-2000),
+                log_path: logPath,
+              };
+            }
+            throw error;
+          }
           guard();
           const root = await fs.realpath(result.path);
           let ini = "";
@@ -125,7 +173,7 @@ export async function executeInitCompatibility(
             layout: items
               .map((item) => item.name + (item.isDirectory() ? "/" : ""))
               .sort(),
-            log_path: null,
+            log_path: logPath,
           };
         },
       ),

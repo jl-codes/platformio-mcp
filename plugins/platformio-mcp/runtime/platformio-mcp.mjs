@@ -15121,7 +15121,8 @@ __export(projects_exports, {
 import { mkdir } from "fs/promises";
 import fs10 from "node:fs";
 import path13 from "path";
-async function initProject(config2) {
+async function initProject(config2, execution = {}) {
+  const timeoutMs = external_exports.number().int().min(1).max(6e5).default(12e4).parse(execution.timeoutMs);
   if (!validateBoardId(config2.board)) {
     throw new ProjectInitError(`Invalid board ID: ${config2.board}`, {
       board: config2.board
@@ -15132,10 +15133,12 @@ async function initProject(config2) {
       framework: config2.framework
     });
   }
-  const projectOptions = external_exports.array(external_exports.string().min(1).max(4096).refine(
-    (value2) => !value2.includes("\0") && /^[a-zA-Z0-9_.-]+\s*=/.test(value2),
-    "Project options must be key=value strings without NUL bytes"
-  )).max(128).default([]).parse(config2.projectOptions);
+  const projectOptions = external_exports.array(
+    external_exports.string().min(1).max(4096).refine(
+      (value2) => !value2.includes("\0") && /^[a-zA-Z0-9_.-]+\s*=/.test(value2),
+      "Project options must be key=value strings without NUL bytes"
+    )
+  ).max(128).default([]).parse(config2.projectOptions);
   if (Buffer.byteLength(projectOptions.join(""), "utf8") > 65536) {
     throw new ProjectInitError("Project options exceed 64 KiB");
   }
@@ -15164,13 +15167,15 @@ async function initProject(config2) {
     for (const option of projectOptions) args.push("--project-option", option);
     const result = await platformioExecutor.execute("project", args.slice(1), {
       cwd: projectPath,
-      timeout: 12e4
+      timeout: timeoutMs
     });
+    await execution.onResult?.(result);
     if (result.exitCode !== 0) {
       throw new ProjectInitError(
         `Failed to initialize project: ${result.stderr}`,
         {
           board: config2.board,
+          stdout: result.stdout,
           stderr: result.stderr,
           exitCode: result.exitCode
         }
@@ -23111,7 +23116,7 @@ import { setTimeout as delay2 } from "node:timers/promises";
 import os8 from "node:os";
 import path42 from "node:path";
 import { execSync as execSync2 } from "node:child_process";
-import crypto12 from "node:crypto";
+import crypto13 from "node:crypto";
 function getPidsFilePath(projectDir, file = SERIAL_PIDS_FILE) {
   if (file === SERIAL_PIDS_FILE) {
     ensureGlobalDirs();
@@ -23166,8 +23171,8 @@ async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFi
     throw new Error(`Registry contention timeout: ${e.message}`);
   }
   try {
-    const commandId = rootCommandId || crypto12.randomUUID();
-    const effectiveTaskId = taskId || crypto12.randomUUID();
+    const commandId = rootCommandId || crypto13.randomUUID();
+    const effectiveTaskId = taskId || crypto13.randomUUID();
     await registerCommand({
       id: commandId,
       commandDesc: `PIO Serial Monitor: ${port}`,
@@ -23516,7 +23521,7 @@ var init_tail = __esm({
 // src/utils/spooler.ts
 import fs38 from "node:fs";
 import path43 from "node:path";
-import crypto13 from "node:crypto";
+import crypto14 from "node:crypto";
 function getLogDir(verb, projectDir) {
   const baseDir = projectDir || SERVER_DATA_DIR;
   if (!projectDir) ensureGlobalDirs();
@@ -23546,7 +23551,7 @@ function rotateSpoolerStreams(verb, projectDir) {
   }
   rotateLogs(targetDir, `${verb}-`, 30);
   const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-  const shortHash = crypto13.randomBytes(4).toString("hex");
+  const shortHash = crypto14.randomBytes(4).toString("hex");
   const logFile = path43.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
   const latestLog = path43.join(targetDir, `latest-${verb}.log`);
   return { logFile, latestLog };
@@ -23587,8 +23592,8 @@ async function executeWithSpooling(command, args, options) {
     detached: false
   });
   const ctx = mcpContext.getStore();
-  const commandId = options.rootCommandId || ctx?.activityId || crypto13.randomUUID();
-  const taskId = crypto13.randomUUID();
+  const commandId = options.rootCommandId || ctx?.activityId || crypto14.randomUUID();
+  const taskId = crypto14.randomUUID();
   const artType = options.artifactType || "build";
   const targetProjectArea = projectArea || ctx?.targetProjectDir;
   if (proc.pid) {
@@ -23790,7 +23795,7 @@ function spoolLargeDataset(toolName, data, targetDir, threshold = 2e3) {
     }
     rotateLogs(cacheDir, `${toolName}-`, 30);
     const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-    const shortHash = crypto13.randomBytes(4).toString("hex");
+    const shortHash = crypto14.randomBytes(4).toString("hex");
     const cacheFile = path43.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
     const latestFile = path43.join(cacheDir, `latest-${toolName}.json`);
     fs38.writeFileSync(cacheFile, stringified, "utf-8");
@@ -23823,7 +23828,7 @@ var init_spooler = __esm({
 });
 
 // src/core/target-resolution.ts
-import crypto15 from "node:crypto";
+import crypto16 from "node:crypto";
 import fs40 from "node:fs";
 import path45 from "node:path";
 function parseTargetEnvironments(iniText) {
@@ -23862,10 +23867,10 @@ function fingerprintDevice(device) {
     device.detectedBoard ?? "UNKNOWN_BOARD",
     device.description || "UNKNOWN_DEVICE"
   ].join("|").toLowerCase();
-  return crypto15.createHash("sha256").update(identity).digest("hex");
+  return crypto16.createHash("sha256").update(identity).digest("hex");
 }
 function createBindingDigest(fields) {
-  return crypto15.createHash("sha256").update(
+  return crypto16.createHash("sha256").update(
     [
       fields.projectDir,
       fields.environment,
@@ -24126,7 +24131,7 @@ __export(monitor_exports, {
 });
 import fs41 from "node:fs";
 import path46 from "node:path";
-import crypto16 from "node:crypto";
+import crypto17 from "node:crypto";
 function getSpoolerStates() {
   const clean = {};
   for (const [port, daemon] of Object.entries(activeDaemons)) {
@@ -24300,7 +24305,7 @@ async function rehydrateMonitors() {
             } catch {
             }
             if (!restoredTaskId) {
-              restoredTaskId = crypto16.randomUUID();
+              restoredTaskId = crypto17.randomUUID();
             }
             const daemon = {
               baudRate: 115200,
@@ -24397,7 +24402,7 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
   }
   const { logFile } = rotateSpoolerStreams("monitor", projectDir);
   portSemaphoreManager.claimPort(activePort, "Monitor Daemon");
-  const monitorTaskId = crypto16.randomUUID();
+  const monitorTaskId = crypto17.randomUUID();
   const daemon = {
     baudRate: baud,
     environment,
@@ -24508,7 +24513,7 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
 function encodeMonitorCursor(logPath, offset) {
   const payload = {
     version: 1,
-    logHash: crypto16.createHash("sha256").update(path46.resolve(logPath)).digest("hex"),
+    logHash: crypto17.createHash("sha256").update(path46.resolve(logPath)).digest("hex"),
     offset
   };
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
@@ -24518,7 +24523,7 @@ function decodeMonitorCursor(cursor, logPath) {
     const payload = JSON.parse(
       Buffer.from(cursor, "base64url").toString("utf8")
     );
-    const expectedHash = crypto16.createHash("sha256").update(path46.resolve(logPath)).digest("hex");
+    const expectedHash = crypto17.createHash("sha256").update(path46.resolve(logPath)).digest("hex");
     if (payload.version !== 1 || payload.logHash !== expectedHash || !Number.isSafeInteger(payload.offset) || (payload.offset ?? -1) < 0) {
       throw new Error("invalid cursor");
     }
@@ -24640,7 +24645,7 @@ async function captureSerialWindow(input) {
       "OVERLAPPING_RUN"
     );
   }
-  const leaseId = crypto16.randomUUID();
+  const leaseId = crypto17.randomUUID();
   captureLeases.set(selectedPort, {
     leaseId,
     acquiredAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -43914,14 +43919,14 @@ var require_etag = __commonJS({
   "node_modules/etag/index.js"(exports, module) {
     "use strict";
     module.exports = etag;
-    var crypto21 = __require("crypto");
+    var crypto22 = __require("crypto");
     var Stats = __require("fs").Stats;
     var toString = Object.prototype.toString;
     function entitytag(entity) {
       if (entity.length === 0) {
         return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"';
       }
-      var hash = crypto21.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
+      var hash = crypto22.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
       var len = typeof entity === "string" ? Buffer.byteLength(entity, "utf8") : entity.length;
       return '"' + len.toString(16) + "-" + hash + '"';
     }
@@ -56964,17 +56969,17 @@ var require_content_disposition = __commonJS({
 // node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "node_modules/cookie-signature/index.js"(exports) {
-    var crypto21 = __require("crypto");
+    var crypto22 = __require("crypto");
     exports.sign = function(val, secret) {
       if ("string" != typeof val) throw new TypeError("Cookie value must be provided as a string.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
-      return val + "." + crypto21.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
+      return val + "." + crypto22.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
     };
     exports.unsign = function(input, secret) {
       if ("string" != typeof input) throw new TypeError("Signed cookie string must be provided.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
       var tentativeValue = input.slice(0, input.lastIndexOf(".")), expectedInput = exports.sign(tentativeValue, secret), expectedBuffer = Buffer.from(expectedInput), inputBuffer = Buffer.from(input);
-      return expectedBuffer.length === inputBuffer.length && crypto21.timingSafeEqual(expectedBuffer, inputBuffer) ? tentativeValue : false;
+      return expectedBuffer.length === inputBuffer.length && crypto22.timingSafeEqual(expectedBuffer, inputBuffer) ? tentativeValue : false;
     };
   }
 });
@@ -77034,7 +77039,7 @@ var require_base64id = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.base64id = void 0;
-    var crypto21 = __require("crypto");
+    var crypto22 = __require("crypto");
     var Base64Id = function() {
     };
     Base64Id.prototype.getRandomBytes = function(bytes) {
@@ -77042,12 +77047,12 @@ var require_base64id = __commonJS({
       var self = this;
       bytes = bytes || 12;
       if (bytes > BUFFER_SIZE) {
-        return crypto21.randomBytes(bytes);
+        return crypto22.randomBytes(bytes);
       }
       var bytesInBuffer = Math.floor(BUFFER_SIZE / bytes);
       var threshold = Math.floor(bytesInBuffer * 0.85);
       if (!threshold) {
-        return crypto21.randomBytes(bytes);
+        return crypto22.randomBytes(bytes);
       }
       if (this.bytesBufferIndex == null) {
         this.bytesBufferIndex = -1;
@@ -77059,14 +77064,14 @@ var require_base64id = __commonJS({
       if (this.bytesBufferIndex == -1 || this.bytesBufferIndex > threshold) {
         if (!this.isGeneratingBytes) {
           this.isGeneratingBytes = true;
-          crypto21.randomBytes(BUFFER_SIZE, function(err, bytes2) {
+          crypto22.randomBytes(BUFFER_SIZE, function(err, bytes2) {
             self.bytesBuffer = bytes2;
             self.bytesBufferIndex = 0;
             self.isGeneratingBytes = false;
           });
         }
         if (this.bytesBufferIndex == -1) {
-          return crypto21.randomBytes(bytes);
+          return crypto22.randomBytes(bytes);
         }
       }
       var result = this.bytesBuffer.slice(bytes * this.bytesBufferIndex, bytes * (this.bytesBufferIndex + 1));
@@ -77080,7 +77085,7 @@ var require_base64id = __commonJS({
       }
       this.sequenceNumber = this.sequenceNumber + 1 | 0;
       rand.writeInt32BE(this.sequenceNumber, 11);
-      if (crypto21.randomBytes) {
+      if (crypto22.randomBytes) {
         this.getRandomBytes(12).copy(rand);
       } else {
         [0, 4, 8].forEach(function(i) {
@@ -85640,7 +85645,7 @@ var require_typed_events = __commonJS({
 // node_modules/base64id/lib/base64id.js
 var require_base64id2 = __commonJS({
   "node_modules/base64id/lib/base64id.js"(exports, module) {
-    var crypto21 = __require("crypto");
+    var crypto22 = __require("crypto");
     var Base64Id = function() {
     };
     Base64Id.prototype.getRandomBytes = function(bytes) {
@@ -85648,12 +85653,12 @@ var require_base64id2 = __commonJS({
       var self = this;
       bytes = bytes || 12;
       if (bytes > BUFFER_SIZE) {
-        return crypto21.randomBytes(bytes);
+        return crypto22.randomBytes(bytes);
       }
       var bytesInBuffer = parseInt(BUFFER_SIZE / bytes);
       var threshold = parseInt(bytesInBuffer * 0.85);
       if (!threshold) {
-        return crypto21.randomBytes(bytes);
+        return crypto22.randomBytes(bytes);
       }
       if (this.bytesBufferIndex == null) {
         this.bytesBufferIndex = -1;
@@ -85665,14 +85670,14 @@ var require_base64id2 = __commonJS({
       if (this.bytesBufferIndex == -1 || this.bytesBufferIndex > threshold) {
         if (!this.isGeneratingBytes) {
           this.isGeneratingBytes = true;
-          crypto21.randomBytes(BUFFER_SIZE, function(err, bytes2) {
+          crypto22.randomBytes(BUFFER_SIZE, function(err, bytes2) {
             self.bytesBuffer = bytes2;
             self.bytesBufferIndex = 0;
             self.isGeneratingBytes = false;
           });
         }
         if (this.bytesBufferIndex == -1) {
-          return crypto21.randomBytes(bytes);
+          return crypto22.randomBytes(bytes);
         }
       }
       var result = this.bytesBuffer.slice(bytes * this.bytesBufferIndex, bytes * (this.bytesBufferIndex + 1));
@@ -85686,7 +85691,7 @@ var require_base64id2 = __commonJS({
       }
       this.sequenceNumber = this.sequenceNumber + 1 | 0;
       rand.writeInt32BE(this.sequenceNumber, 11);
-      if (crypto21.randomBytes) {
+      if (crypto22.randomBytes) {
         this.getRandomBytes(12).copy(rand);
       } else {
         [0, 4, 8].forEach(function(i) {
@@ -100801,8 +100806,10 @@ function withProjectCompatibility(base2) {
 }
 
 // src/adapters/init-compat.ts
+init_paths();
 init_zod();
 init_projects();
+import crypto11 from "node:crypto";
 import fs33 from "node:fs/promises";
 import path38 from "node:path";
 import os7 from "node:os";
@@ -100845,7 +100852,48 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
         const guard = createPolicyRevisionGuard(projectDir);
         await onAuthorized?.();
         guard();
-        const result = await initProject(config2);
+        let logPath = null;
+        let result;
+        try {
+          result = await initProject(config2, {
+            timeoutMs: 6e5,
+            onResult: async (execution) => {
+              guard();
+              const directory = path38.join(
+                SERVER_DATA_DIR,
+                "initialization-logs"
+              );
+              await fs33.mkdir(directory, { recursive: true, mode: 448 });
+              logPath = path38.join(directory, `${crypto11.randomUUID()}.log`);
+              const output = redactSecretsInText(
+                execution.stdout + "\n" + execution.stderr
+              );
+              if (Buffer.byteLength(output) > 16 * 1024 * 1024)
+                throw new PlatformIOError(
+                  "Initialization log exceeds its bound.",
+                  "COMPAT_RESULT_LIMIT"
+                );
+              await fs33.writeFile(logPath, output, {
+                flag: "wx",
+                mode: 384
+              });
+            }
+          });
+        } catch (error2) {
+          guard();
+          if (error2 instanceof ProjectInitError && typeof error2.context?.exitCode === "number") {
+            return {
+              ok: false,
+              error: "init_failed",
+              summary: `pio project init failed (exit ${error2.context.exitCode}).`,
+              output: redactSecretsInText(
+                String(error2.context.stdout ?? "") + "\n" + String(error2.context.stderr ?? "")
+              ).slice(-2e3),
+              log_path: logPath
+            };
+          }
+          throw error2;
+        }
         guard();
         const root = await fs33.realpath(result.path);
         let ini = "";
@@ -100900,7 +100948,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
           project_dir: root,
           platformio_ini: ini,
           layout: items.map((item) => item.name + (item.isDirectory() ? "/" : "")).sort(),
-          log_path: null
+          log_path: logPath
         };
       }
     )
@@ -101137,7 +101185,7 @@ init_platformio();
 init_errors2();
 import fs34 from "node:fs/promises";
 import path40 from "node:path";
-import crypto11 from "node:crypto";
+import crypto12 from "node:crypto";
 init_redact();
 
 // src/core/package-config.ts
@@ -101416,7 +101464,7 @@ async function retainOutput(projectDir, output) {
         "PACKAGE_LOG_PATH_INVALID"
       );
   }
-  const file = path40.join(dir, `packages-${crypto11.randomUUID()}.log`);
+  const file = path40.join(dir, `packages-${crypto12.randomUUID()}.log`);
   await fs34.writeFile(file, output, { flag: "wx", mode: 384 });
   const completed = [];
   for (const entry of await fs34.readdir(dir, { withFileTypes: true })) {
@@ -101532,7 +101580,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
             "PACKAGE_CONFIG_CONFLICT"
           );
         if (merged !== after) {
-          const temp = `${configPath}.${crypto11.randomUUID()}.tmp`;
+          const temp = `${configPath}.${crypto12.randomUUID()}.tmp`;
           try {
             await fs34.writeFile(temp, merged, {
               flag: "wx",
@@ -101551,7 +101599,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
           after = merged;
         }
       }
-      const digest = (text6) => text6 === null ? null : crypto11.createHash("sha256").update(text6).digest("hex");
+      const digest = (text6) => text6 === null ? null : crypto12.createHash("sha256").update(text6).digest("hex");
       validatePolicy();
       const detail = action === "pkg_search" ? parsePackageSearch(safeOutput(result.stdout)) : action === "pkg_list" ? parsePackageList(safeOutput(result.stdout)) : void 0;
       const parsedOk = !detail || detail.parseStatus === "complete";
@@ -108804,7 +108852,7 @@ init_logger();
 init_redact();
 import fs39 from "node:fs";
 import path44 from "node:path";
-import crypto14 from "node:crypto";
+import crypto15 from "node:crypto";
 
 // src/core/diagnostics/matchers.ts
 var buildMatchers = [
@@ -109046,7 +109094,7 @@ function diagnoseSerialLog(logText, opts) {
 // src/tools/build.ts
 init_command_registry();
 async function buildProject(projectDir, environment, verbose, background) {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto14.randomUUID();
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto15.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
   if (environment && !validateEnvironmentName(environment)) {
     throw new BuildError(`Invalid environment name: ${environment}`, {
@@ -109166,7 +109214,7 @@ async function buildProject(projectDir, environment, verbose, background) {
   }
 }
 async function checkProject(projectDir, environment, background) {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto14.randomUUID();
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto15.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
   if (environment && !validateEnvironmentName(environment)) {
     throw new BuildError(`Invalid environment name: ${environment}`, { environment });
@@ -109204,7 +109252,7 @@ async function checkProject(projectDir, environment, background) {
   }
 }
 async function runTests(projectDir, environment, background, compileOnly) {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto14.randomUUID();
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto15.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
   if (environment && !validateEnvironmentName(environment)) {
     throw new BuildError(`Invalid environment name: ${environment}`, { environment });
@@ -109248,7 +109296,7 @@ async function runTests(projectDir, environment, background, compileOnly) {
   }
 }
 async function cleanProject(projectDir, background) {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto14.randomUUID();
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto15.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
   invalidateBuildCache(validatedPath);
   try {
@@ -109404,9 +109452,9 @@ init_errors2();
 init_monitor();
 init_semaphore();
 init_redact();
-import crypto17 from "node:crypto";
+import crypto18 from "node:crypto";
 async function uploadFilesystem(projectDir, port, environment, verbose, background, startMonitorAfter, maxRunDurationSeconds) {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto17.randomUUID();
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto18.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
   if (environment && !validateEnvironmentName(environment)) {
     throw new UploadError(`Invalid environment name: ${environment}`, {
@@ -109517,7 +109565,7 @@ async function uploadFilesystem(projectDir, port, environment, verbose, backgrou
   }
 }
 async function uploadFirmware(projectDir, port, environment, verbose, background, startMonitorAfter, maxRunDurationSeconds) {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto17.randomUUID();
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto18.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
   if (environment && !validateEnvironmentName(environment)) {
     throw new UploadError(`Invalid environment name: ${environment}`, {
@@ -110914,7 +110962,7 @@ init_events();
 init_monitor();
 init_devices();
 import { fileURLToPath as fileURLToPath4 } from "url";
-import crypto18 from "node:crypto";
+import crypto19 from "node:crypto";
 import { exec } from "child_process";
 
 // node_modules/open/index.js
@@ -111728,7 +111776,7 @@ function resolveDashboardWebRoot(environment = process.env, moduleDirectory = __
   const configuredPath = environment.PIO_MCP_WEB_DIST?.trim();
   return configuredPath ? path48.resolve(configuredPath) : path48.join(moduleDirectory, "..", "..", "web", "dist");
 }
-var PORTAL_AUTH_TOKEN = crypto18.randomUUID();
+var PORTAL_AUTH_TOKEN = crypto19.randomUUID();
 var DASHBOARD_SESSION_COOKIE = "pio_mcp_session";
 var LAUNCH_TICKET_TTL_MS = 6e4;
 var DASHBOARD_SESSION_TTL_MS = 8 * 60 * 60 * 1e3;
@@ -111787,7 +111835,7 @@ function issueLaunchTicket(projectDir) {
   for (const [ticket2, value2] of launchTickets) {
     if (value2.expiresAt <= now) launchTickets.delete(ticket2);
   }
-  const ticket = crypto18.randomBytes(32).toString("base64url");
+  const ticket = crypto19.randomBytes(32).toString("base64url");
   const expiresAt = now + LAUNCH_TICKET_TTL_MS;
   launchTickets.set(ticket, { expiresAt, projectDir });
   return { ticket, expiresAt: new Date(expiresAt).toISOString() };
@@ -111885,7 +111933,7 @@ function startPortalServer(defaultPort = 8080) {
     const supplied = req.headers["x-pio-approval-token"];
     const expected = approvalCapability ? Buffer.from(approvalCapability) : void 0;
     const candidate = typeof supplied === "string" ? Buffer.from(supplied) : void 0;
-    if (!expected || !candidate || expected.length !== candidate.length || !crypto18.timingSafeEqual(expected, candidate)) {
+    if (!expected || !candidate || expected.length !== candidate.length || !crypto19.timingSafeEqual(expected, candidate)) {
       res.status(403).json({ code: "OPERATOR_APPROVAL_REQUIRED", error: "Approval changes require the separately configured operator capability. Use the local approve/deny CLI or provide the operator capability; dashboard access alone is insufficient." });
       return false;
     }
@@ -111934,7 +111982,7 @@ function startPortalServer(defaultPort = 8080) {
       res.status(401).send("Dashboard launch ticket is invalid or expired.");
       return;
     }
-    const sessionId = crypto18.randomBytes(32).toString("base64url");
+    const sessionId = crypto19.randomBytes(32).toString("base64url");
     dashboardSessions.set(sessionId, Date.now() + DASHBOARD_SESSION_TTL_MS);
     res.cookie(DASHBOARD_SESSION_COOKIE, sessionId, {
       httpOnly: true,
@@ -112255,7 +112303,7 @@ function startPortalServer(defaultPort = 8080) {
       res.status(400).json({ error: "Missing projectDir parameter" });
       return;
     }
-    const activityId = crypto18.randomUUID();
+    const activityId = crypto19.randomUUID();
     let registered = false;
     try {
       const result = await dispatchAuthorizedAction(
@@ -112584,7 +112632,7 @@ function startPortalServer(defaultPort = 8080) {
             );
           }
         }
-        const reqSessionId = crypto18.randomUUID();
+        const reqSessionId = crypto19.randomUUID();
         hardwareLockManager.acquireLock(
           reqSessionId,
           "Installing Library: " + library
@@ -112617,7 +112665,7 @@ function startPortalServer(defaultPort = 8080) {
             );
           }
         }
-        const reqSessionId = crypto18.randomUUID();
+        const reqSessionId = crypto19.randomUUID();
         hardwareLockManager.acquireLock(
           reqSessionId,
           "Uninstalling Library: " + library
@@ -112943,7 +112991,7 @@ init_devices2();
 // src/core/monitor-health.ts
 init_redact();
 init_errors2();
-import crypto19 from "node:crypto";
+import crypto20 from "node:crypto";
 var MAX_PATTERN_LENGTH = 128;
 var MAX_EVIDENCE_BYTES = 8192;
 function compileBoundedPattern(pattern) {
@@ -112994,7 +113042,7 @@ function evaluateMonitorHealth(input) {
   else if (expectedMarkers.length === 0 && rejectedPatterns.length === 0) {
     status = "inconclusive";
   } else status = "healthy";
-  const digest = crypto19.createHash("sha256").update(
+  const digest = crypto20.createHash("sha256").update(
     JSON.stringify({
       status,
       matchedExpectations: [...matchedExpectations].sort(),
@@ -114027,7 +114075,7 @@ init_logger();
 init_events();
 import path51 from "node:path";
 import { execSync as execSync4 } from "node:child_process";
-import crypto20 from "node:crypto";
+import crypto21 from "node:crypto";
 init_target_resolution();
 
 // src/mcp/tool-result.ts
@@ -115456,7 +115504,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   ].includes(name2);
   const args = request.params.arguments || {};
   const registeredTool = getRegisteredTool(toolRegistry, name2);
-  const activityId = crypto20.randomUUID();
+  const activityId = crypto21.randomUUID();
   const targetProjectDir = compatibilityTool ? args.project_dir || compatibilityProjectDir || process.cwd() : args.projectDir || portalEvents.getLastKnownWorkspace();
   let commandRegistered = false;
   try {

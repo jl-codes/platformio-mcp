@@ -798,3 +798,7 @@ Extended the shared project initializer to accept a bounded ordered `projectOpti
 ### Public initialization compatibility
 
 Added `pio_project_init` (78 compatibility-visible tools, 54 canonical). The adapter binds ordered options to canonical initialization authorization and separately authorizes configuration disclosure before invoking the initializer. It supports explicit/home-relative paths, bounded INI output with existing secret redaction, and a bounded visible layout. TypeScript and two permission-denial checks passed; plugin rebuilt. No actual PlatformIO operation was executed locally. Remaining exact-contract gaps include retained initialization logs, reference timeout/failure output semantics, and native project-init acceptance.
+
+### Initialization timeout and logs
+
+The compatibility initializer now requests the reference's 600-second timeout through a trusted execution option; canonical callers retain 120 seconds. Completed command output is written to a uniquely named, bounded, redacted initialization log with restrictive creation permissions. Nonzero command results project `init_failed`, exit-specific summary, bounded redacted output and log path. Missing-executable/timeout exceptions remain explicit errors through the shared wrapper. TypeScript and focused initializer/permission checks passed, including the timeout/output callback. Native execution and persisted-log acceptance remain unverified locally.
