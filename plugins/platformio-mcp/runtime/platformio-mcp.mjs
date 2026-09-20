@@ -17211,9 +17211,9 @@ async function executeWithSpooling(command, args, options) {
   }
   return { exitCode, finalOutput, fullLogPath: logFile };
 }
-function spoolLargeDataset(toolName, data, targetDir, threshold = 2e3) {
+function spoolLargeDataset(toolName, data, targetDir, threshold2 = 2e3) {
   const stringified = JSON.stringify(data, null, 2);
-  if (stringified.length > threshold) {
+  if (stringified.length > threshold2) {
     const cacheDir = getLogDir(toolName, targetDir);
     if (!fs38.existsSync(cacheDir)) {
       fs38.mkdirSync(cacheDir, { recursive: true });
@@ -42081,11 +42081,11 @@ var require_sign = __commonJS({
   "node_modules/math-intrinsics/sign.js"(exports, module) {
     "use strict";
     var $isNaN = require_isNaN();
-    module.exports = function sign(number3) {
-      if ($isNaN(number3) || number3 === 0) {
-        return number3;
+    module.exports = function sign(number4) {
+      if ($isNaN(number4) || number4 === 0) {
+        return number4;
       }
-      return number3 < 0 ? -1 : 1;
+      return number4 < 0 ? -1 : 1;
     };
   }
 });
@@ -42665,8 +42665,8 @@ var require_get_intrinsic = __commonJS({
         throw new $SyntaxError("invalid intrinsic syntax, expected opening `%`");
       }
       var result = [];
-      $replace(string3, rePropName, function(match, number3, quote, subString) {
-        result[result.length] = quote ? $replace(subString, reEscapeChar, "$1") : number3 || match;
+      $replace(string3, rePropName, function(match, number4, quote, subString) {
+        result[result.length] = quote ? $replace(subString, reEscapeChar, "$1") : number4 || match;
       });
       return result;
     };
@@ -77652,8 +77652,8 @@ var require_base64id = __commonJS({
         return crypto22.randomBytes(bytes);
       }
       var bytesInBuffer = Math.floor(BUFFER_SIZE / bytes);
-      var threshold = Math.floor(bytesInBuffer * 0.85);
-      if (!threshold) {
+      var threshold2 = Math.floor(bytesInBuffer * 0.85);
+      if (!threshold2) {
         return crypto22.randomBytes(bytes);
       }
       if (this.bytesBufferIndex == null) {
@@ -77663,7 +77663,7 @@ var require_base64id = __commonJS({
         this.bytesBuffer = null;
         this.bytesBufferIndex = -1;
       }
-      if (this.bytesBufferIndex == -1 || this.bytesBufferIndex > threshold) {
+      if (this.bytesBufferIndex == -1 || this.bytesBufferIndex > threshold2) {
         if (!this.isGeneratingBytes) {
           this.isGeneratingBytes = true;
           crypto22.randomBytes(BUFFER_SIZE, function(err, bytes2) {
@@ -86258,8 +86258,8 @@ var require_base64id2 = __commonJS({
         return crypto22.randomBytes(bytes);
       }
       var bytesInBuffer = parseInt(BUFFER_SIZE / bytes);
-      var threshold = parseInt(bytesInBuffer * 0.85);
-      if (!threshold) {
+      var threshold2 = parseInt(bytesInBuffer * 0.85);
+      if (!threshold2) {
         return crypto22.randomBytes(bytes);
       }
       if (this.bytesBufferIndex == null) {
@@ -86269,7 +86269,7 @@ var require_base64id2 = __commonJS({
         this.bytesBuffer = null;
         this.bytesBufferIndex = -1;
       }
-      if (this.bytesBufferIndex == -1 || this.bytesBufferIndex > threshold) {
+      if (this.bytesBufferIndex == -1 || this.bytesBufferIndex > threshold2) {
         if (!this.isGeneratingBytes) {
           this.isGeneratingBytes = true;
           crypto22.randomBytes(BUFFER_SIZE, function(err, bytes2) {
@@ -88526,15 +88526,15 @@ var require_in_memory_adapter = __commonJS({
         this.packets = [];
         this.maxDisconnectionDuration = nsp.server.opts.connectionStateRecovery.maxDisconnectionDuration;
         const timer = setInterval(() => {
-          const threshold = Date.now() - this.maxDisconnectionDuration;
+          const threshold2 = Date.now() - this.maxDisconnectionDuration;
           this.sessions.forEach((session2, sessionId2) => {
-            const hasExpired = session2.disconnectedAt < threshold;
+            const hasExpired = session2.disconnectedAt < threshold2;
             if (hasExpired) {
               this.sessions.delete(sessionId2);
             }
           });
           for (let i = this.packets.length - 1; i >= 0; i--) {
-            const hasExpired = this.packets[i].emittedAt < threshold;
+            const hasExpired = this.packets[i].emittedAt < threshold2;
             if (hasExpired) {
               this.packets.splice(0, i + 1);
               break;
@@ -90426,8 +90426,8 @@ var require_common2 = __commonJS({
         }
       }
     }
-    function numberToPaddedHex(number3) {
-      return number3.toString(16).padStart(2, "0");
+    function numberToPaddedHex(number4) {
+      return number4.toString(16).padStart(2, "0");
     }
     function stringToPaddedHex(numberString) {
       return numberToPaddedHex(parseInt(numberString, 10));
@@ -91310,12 +91310,12 @@ var require_ipv6 = __commonJS({
         throw new Error("Assertion failed.");
       }
     }
-    function addCommas(number3) {
+    function addCommas(number4) {
       const r = /(\d+)(\d{3})/;
-      while (r.test(number3)) {
-        number3 = number3.replace(r, "$1,$2");
+      while (r.test(number4)) {
+        number4 = number4.replace(r, "$1,$2");
       }
-      return number3;
+      return number4;
     }
     function spanLeadingZeroes4(n) {
       n = n.replace(/^(0{1,})([1-9]+)$/, '<span class="parse-error">$1</span>$2');
@@ -103912,10 +103912,302 @@ async function captureSessionVerification(manager, owner, sessionId2, input = {}
   };
 }
 
-// src/core/serial/memory-capture.ts
+// src/core/serial/power-capture.ts
 init_zod();
 import { performance as performance3 } from "node:perf_hooks";
 import { setTimeout as delay4 } from "node:timers/promises";
+
+// src/core/power/power-analysis.ts
+init_zod();
+init_errors2();
+var observationSchema = external_exports.object({
+  currentMa: external_exports.number().finite().min(-1e9).max(1e9),
+  elapsedSeconds: external_exports.number().finite().min(0).max(86400)
+}).strict();
+var optionsSchema = external_exports.object({
+  voltageMv: external_exports.number().finite().positive().max(1e9).nullable().default(null),
+  buckets: external_exports.number().int().min(0).max(1e3).default(20),
+  sleepThresholdMa: external_exports.number().finite().min(-1e9).max(1e9).optional(),
+  provenance: external_exports.enum([
+    "firmware_estimate",
+    "external_meter",
+    "unspecified_serial"
+  ])
+}).strict();
+function rounded(value2, digits) {
+  return Number(value2.toFixed(digits));
+}
+function average(values) {
+  return values.reduce((sum, value2) => sum + value2 / values.length, 0);
+}
+function nearestEven(value2) {
+  const floor = Math.floor(value2), fraction = value2 - floor;
+  return fraction === 0.5 ? floor + floor % 2 : Math.round(value2);
+}
+function threshold(values, sorted) {
+  const count2 = sorted.length, low = sorted[0], high = sorted[count2 - 1];
+  const median = count2 % 2 ? sorted[(count2 - 1) / 2] : (sorted[count2 / 2 - 1] + sorted[count2 / 2]) / 2;
+  const fallback = { value: median, source: "auto_median" };
+  if (high <= low || count2 < 4) return fallback;
+  const width = (high - low) / 50;
+  const bins = Array(50).fill(0);
+  for (const value2 of values)
+    bins[Math.min(Math.floor((value2 - low) / width), 49)]++;
+  const modes = bins.map((size, index) => ({ size, index })).filter(({ size, index }) => {
+    const left = bins[index - 1] ?? -1, right = bins[index + 1] ?? -1;
+    return size > 0 && size >= left && size >= right && (size > left || size > right);
+  }).sort((a, b) => b.size - a.size || b.index - a.index);
+  if (modes.length < 2) return fallback;
+  const first = Math.min(modes[0].index, modes[1].index), second = Math.max(modes[0].index, modes[1].index);
+  if (second - first < 3) return fallback;
+  const valley = Math.min(...bins.slice(first + 1, second));
+  const lowCenter = low + (first + 0.5) * width, highCenter = low + (second + 0.5) * width;
+  if (valley > Math.min(modes[0].size, modes[1].size) / 2 || lowCenter > 0 && highCenter < 2 * lowCenter)
+    return fallback;
+  return {
+    value: (lowCenter + highCenter) / 2,
+    source: "auto_bimodal"
+  };
+}
+function analyzePowerObservations(input, options) {
+  const parsed = external_exports.array(observationSchema).min(1).max(12e4).safeParse(input);
+  const settings = optionsSchema.safeParse(options);
+  if (!parsed.success || !settings.success)
+    throw new PlatformIOError(
+      "Invalid power observations or analysis options.",
+      "POWER_ANALYSIS_INVALID"
+    );
+  const samples = parsed.data, args = settings.data;
+  for (let i = 1; i < samples.length; i++)
+    if (samples[i].elapsedSeconds < samples[i - 1].elapsedSeconds)
+      throw new PlatformIOError(
+        "Power observation timestamps must be monotonic.",
+        "POWER_TIMING_INVALID"
+      );
+  const values = samples.map((sample) => sample.currentMa);
+  const ordered = [...values].sort((a, b) => a - b);
+  const mean = average(values), first = samples[0].elapsedSeconds;
+  const duration4 = samples.at(-1).elapsedSeconds - first;
+  const selected = args.sleepThresholdMa === void 0 ? threshold(values, ordered) : { value: args.sleepThresholdMa, source: "argument" };
+  const sleeping = values.filter((value2) => value2 <= selected.value), active = values.filter((value2) => value2 > selected.value);
+  const buckets = Array.from({ length: args.buckets }, () => ({
+    sum: 0,
+    count: 0
+  }));
+  if (args.buckets)
+    for (const sample of samples) {
+      const index = duration4 > 0 ? Math.min(
+        Math.floor(
+          (sample.elapsedSeconds - first) / duration4 * args.buckets
+        ),
+        args.buckets - 1
+      ) : 0;
+      buckets[index].sum += sample.currentMa;
+      buckets[index].count++;
+    }
+  const hours = duration4 / 3600;
+  const estimate = mean > 0 ? 1e3 / mean : null;
+  return {
+    average_ma: rounded(mean, 4),
+    min_ma: rounded(ordered[0], 4),
+    max_ma: rounded(ordered.at(-1), 4),
+    p95_ma: rounded(ordered[nearestEven(0.95 * (values.length - 1))], 4),
+    sample_count: values.length,
+    duration_s: rounded(duration4, 3),
+    voltage_mv: args.voltageMv,
+    charge_uah: rounded(mean * hours * 1e3, 3),
+    energy_mwh: args.voltageMv === null ? null : rounded(mean * args.voltageMv / 1e3 * hours, 4),
+    threshold_ma: rounded(selected.value, 4),
+    threshold_source: selected.source,
+    sleep_fraction: rounded(sleeping.length / values.length, 4),
+    sleep_avg_ma: sleeping.length ? rounded(average(sleeping), 4) : null,
+    active_avg_ma: active.length ? rounded(average(active), 4) : null,
+    timeline: buckets.map((bucket, index) => ({
+      t_s: rounded(first + index * duration4 / args.buckets, 3),
+      avg_ma: bucket.count ? rounded(bucket.sum / bucket.count, 4) : null
+    })),
+    battery_1000mah_hours: estimate !== null && Number.isFinite(estimate) ? rounded(estimate, 1) : null,
+    provenance: args.provenance,
+    duration_basis: "first_to_last_observation",
+    energy_method: "sample_mean_estimate",
+    sleep_fraction_basis: "sample_count",
+    battery_estimate_basis: "ideal_capacity_at_observed_average_excludes_losses"
+  };
+}
+
+// src/core/power/power-parser.ts
+init_bounded_pattern();
+init_errors2();
+var DEFAULT_PATTERN = String.raw`(?<value>-?\d+(?:\.\d+)?)\s*(?<unit>[uµ]A|mA|A)?(?![\w.])(?:.*?(?<voltage>-?\d+(?:\.\d+)?)\s*(?<vunit>mV|V)(?![\w.]))?`;
+var CURRENT_SCALE = {
+  uA: 1e-3,
+  \u00B5A: 1e-3,
+  mA: 1,
+  A: 1e3
+};
+function number(value2) {
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value2) || !Number.isFinite(Number(value2)))
+    throw new PlatformIOError(
+      "Power pattern captured an invalid numeric value.",
+      "POWER_VALUE_INVALID"
+    );
+  return Number(value2);
+}
+async function parsePowerLines(lines2, pattern) {
+  const captures = await extractBoundedCaptures(
+    lines2,
+    pattern || DEFAULT_PATTERN,
+    { pythonNamedGroups: true }
+  );
+  const samples = [];
+  const matched = /* @__PURE__ */ new Set();
+  for (const capture of captures) {
+    if (matched.has(capture.line)) continue;
+    const unit = capture.unit || "mA";
+    if (!Object.hasOwn(CURRENT_SCALE, unit))
+      throw new PlatformIOError(
+        "Current unit must be uA, \xB5A, mA or A.",
+        "POWER_UNIT_INVALID"
+      );
+    const currentMa = number(capture.value) * CURRENT_SCALE[unit];
+    let voltageMv = null;
+    if (capture.voltage !== void 0) {
+      const voltageUnit = capture.vunit || "V";
+      if (!["V", "mV"].includes(voltageUnit))
+        throw new PlatformIOError(
+          "Voltage unit must be V or mV.",
+          "POWER_UNIT_INVALID"
+        );
+      voltageMv = number(capture.voltage) * (voltageUnit === "V" ? 1e3 : 1);
+      if (!Number.isFinite(voltageMv) || voltageMv <= 0 || voltageMv > 1e9)
+        throw new PlatformIOError(
+          "Power voltage is outside analysis bounds.",
+          "POWER_VALUE_INVALID"
+        );
+    }
+    if (!Number.isFinite(currentMa) || Math.abs(currentMa) > 1e9)
+      throw new PlatformIOError(
+        "Power current is outside analysis bounds.",
+        "POWER_VALUE_INVALID"
+      );
+    samples.push({ line: capture.line, currentMa, voltageMv });
+    matched.add(capture.line);
+  }
+  return {
+    samples,
+    unparsedLines: lines2.reduce(
+      (count2, line, index) => count2 + (!matched.has(index) && line.trim() ? 1 : 0),
+      0
+    )
+  };
+}
+
+// src/core/serial/power-capture.ts
+var PowerCaptureSchema = external_exports.object({
+  seconds: external_exports.number().finite().positive().max(600).default(10),
+  maxLines: external_exports.number().int().min(1).max(1e4).default(1e4),
+  cursor: external_exports.number().int().nonnegative().default(0),
+  pattern: external_exports.string().max(4096).optional(),
+  voltageMv: external_exports.number().finite().positive().max(1e9).optional(),
+  buckets: external_exports.number().int().min(0).max(1e3).default(20),
+  sleepThresholdMa: external_exports.number().finite().min(-1e9).max(1e9).optional(),
+  provenance: external_exports.enum(["firmware_estimate", "external_meter", "unspecified_serial"]).default("unspecified_serial")
+}).strict();
+async function validatePowerCapture(input = {}) {
+  const args = PowerCaptureSchema.parse(input);
+  await parsePowerLines([], args.pattern);
+  return args;
+}
+async function captureSessionPower(manager, owner, sessionId2, input = {}, signal) {
+  const args = await validatePowerCapture(input);
+  const started = performance3.now(), deadline = started + args.seconds * 1e3;
+  const samples = [], volts = [];
+  let cursor = args.cursor, bytes = 0, lineCount = 0, unparsed = 0, dropped = 0, truncated = 0;
+  let limit = false, redacted = false, redactionClipped = false;
+  let last;
+  do {
+    last = await manager.read(owner, sessionId2, {
+      cursor,
+      maxLines: Math.min(500, args.maxLines - lineCount),
+      maxBytes: 65536,
+      timeoutMs: Math.min(
+        250,
+        Math.max(0, Math.ceil(deadline - performance3.now()))
+      ),
+      signal
+    });
+    const elapsedSeconds = (performance3.now() - started) / 1e3;
+    dropped += last.droppedLines;
+    redacted ||= last.redactionApplied;
+    redactionClipped ||= last.redactionOutputMayBeTruncated;
+    const lines2 = [];
+    for (let index = 0; index < last.lines.length; index++) {
+      const size = Buffer.byteLength(last.lines[index]);
+      if (bytes + size > 1024 * 1024) {
+        limit = true;
+        break;
+      }
+      lines2.push(last.lines[index]);
+      bytes += size;
+      truncated += last.lineTruncatedBytes[index] ?? 0;
+    }
+    cursor = last.cursor - last.lines.length + lines2.length;
+    lineCount += lines2.length;
+    const parsed = await parsePowerLines(lines2, args.pattern);
+    unparsed += parsed.unparsedLines;
+    for (const sample of parsed.samples) {
+      samples.push({ currentMa: sample.currentMa, elapsedSeconds });
+      if (sample.voltageMv !== null) volts.push(sample.voltageMv);
+    }
+    limit ||= lineCount >= args.maxLines || bytes >= 1024 * 1024;
+    if (limit || last.readStatus === "cancelled" || signal?.aborted || last.state !== "open" || performance3.now() >= deadline)
+      break;
+    if (!lines2.length) await delay4(1);
+  } while (true);
+  const final = await manager.read(owner, sessionId2, {
+    cursor,
+    maxLines: 1,
+    maxBytes: 65536,
+    timeoutMs: 0
+  });
+  const cancelled = last.readStatus === "cancelled" || signal?.aborted === true;
+  const portError = final.error ?? last.error ?? null;
+  const complete = !limit && !cancelled && !portError && !dropped && !truncated && !redactionClipped && last.state === "open" && final.state === "open";
+  const voltageMv = args.voltageMv ?? (volts.length ? volts.reduce((sum, value2) => sum + value2 / volts.length, 0) : null);
+  const analysis = samples.length ? analyzePowerObservations(samples, {
+    voltageMv,
+    buckets: args.buckets,
+    sleepThresholdMa: args.sleepThresholdMa,
+    provenance: args.provenance
+  }) : null;
+  return {
+    ok: complete && samples.length > 0,
+    summary: samples.length ? `${samples.length} serial current observations collected; energy and battery life are sample-mean estimates.` : "No current readings captured; check meter output, baud and pattern.",
+    analysis,
+    sessionId: sessionId2,
+    cursor,
+    lineCount,
+    unparsedLines: unparsed,
+    collectionDurationSeconds: (performance3.now() - started) / 1e3,
+    timingBasis: "host_read_observation",
+    voltageSource: args.voltageMv !== void 0 ? "argument" : volts.length ? "serial_mean" : "unknown",
+    state: final.state,
+    portError,
+    cancelled,
+    limitReached: limit,
+    droppedLines: dropped,
+    truncatedBytes: truncated,
+    partialLineOmitted: !!last.partial,
+    redactionApplied: redacted,
+    redactionOutputMayBeTruncated: redactionClipped,
+    collectionComplete: complete
+  };
+}
+
+// src/core/serial/memory-capture.ts
+init_zod();
+import { performance as performance4 } from "node:perf_hooks";
+import { setTimeout as delay5 } from "node:timers/promises";
 
 // src/core/memory-report.ts
 init_bounded_pattern();
@@ -104154,8 +104446,8 @@ function memoryMetricStatistics(metric, input) {
   }
   const slope = denominator ? numerator / denominator : 0;
   const change = slope * (n - 1);
-  const threshold = Math.max(256, mean * 0.01);
-  const verdict = n < 3 ? "insufficient_samples" : Math.abs(change) > threshold ? change > 0 ? "growing" : "shrinking" : "stable";
+  const threshold2 = Math.max(256, mean * 0.01);
+  const verdict = n < 3 ? "insufficient_samples" : Math.abs(change) > threshold2 ? change > 0 ? "growing" : "shrinking" : "stable";
   const times = samples.map((sample) => sample.elapsedSeconds);
   const timed = times.every(
     (time3, index) => time3 !== void 0 && (index === 0 || time3 > times[index - 1])
@@ -104375,7 +104667,7 @@ var MemoryCaptureSchema = external_exports.object({
 }).strict();
 async function captureSessionMemory(manager, owner, sessionId2, input = {}, signal) {
   const args = MemoryCaptureSchema.parse(input);
-  const started = performance3.now();
+  const started = performance4.now();
   const deadline = started + args.seconds * 1e3;
   const lines2 = [];
   let bytes = 0, cursor = args.cursor, droppedLines = 0, truncatedBytes = 0;
@@ -104383,7 +104675,7 @@ async function captureSessionMemory(manager, owner, sessionId2, input = {}, sign
   let last;
   let limitReached = false;
   do {
-    const remaining = Math.max(0, deadline - performance3.now());
+    const remaining = Math.max(0, deadline - performance4.now());
     last = await manager.read(owner, sessionId2, {
       cursor,
       maxLines: Math.min(500, args.maxLines - lines2.length),
@@ -104410,9 +104702,9 @@ async function captureSessionMemory(manager, owner, sessionId2, input = {}, sign
     cursor = last.cursor - last.lines.length + accepted;
     if (lines2.length >= args.maxLines || bytes >= 1024 * 1024)
       limitReached = true;
-    if (limitReached || last.readStatus === "cancelled" || last.state !== "open" && !last.moreAvailable || performance3.now() >= deadline && !last.moreAvailable)
+    if (limitReached || last.readStatus === "cancelled" || last.state !== "open" && !last.moreAvailable || performance4.now() >= deadline && !last.moreAvailable)
       break;
-    if (last.lines.length === 0) await delay4(1);
+    if (last.lines.length === 0) await delay5(1);
   } while (true);
   const options = {
     stackUnit: args.stackUnit,
@@ -104434,7 +104726,7 @@ async function captureSessionMemory(manager, owner, sessionId2, input = {}, sign
     ok: !portError && !cancelled && !terminalError,
     sessionId: sessionId2,
     cursor,
-    durationSeconds: (performance3.now() - started) / 1e3,
+    durationSeconds: (performance4.now() - started) / 1e3,
     portError,
     state: final.state,
     cancelled,
@@ -104492,7 +104784,7 @@ async function captureTransientMemory(service, owner, request, input = {}, signa
 
 // src/core/serial/session-policy.ts
 init_zod();
-import { performance as performance6 } from "node:perf_hooks";
+import { performance as performance7 } from "node:perf_hooks";
 
 // src/core/devices/serial-discovery-binding.ts
 init_errors2();
@@ -104629,7 +104921,7 @@ var SerialStreamRedactor = class {
 init_errors2();
 init_bounded_pattern();
 import { StringDecoder as StringDecoder4 } from "node:string_decoder";
-import { performance as performance4 } from "node:perf_hooks";
+import { performance as performance5 } from "node:perf_hooks";
 function boundedInteger(value2, min, max, field3) {
   if (!Number.isSafeInteger(value2) || value2 < min || value2 > max)
     throw new PlatformIOError(
@@ -104800,7 +105092,7 @@ var SerialSessionBuffer = class {
       12e4,
       "timeoutMs"
     );
-    const deadline = performance4.now() + timeout3;
+    const deadline = performance5.now() + timeout3;
     const result = (view, status, matched = false) => ({
       ...view,
       state: this.state,
@@ -104831,7 +105123,7 @@ var SerialSessionBuffer = class {
           true
         );
       if (this.revision !== revision) {
-        if (performance4.now() >= deadline)
+        if (performance5.now() >= deadline)
           return result(
             this.snapshot(options),
             this.state === "open" ? "timeout" : "closed"
@@ -104841,7 +105133,7 @@ var SerialSessionBuffer = class {
       if (this.state !== "open") return result(view, "closed");
       if (view.moreAvailable || view.lines.length >= (options.maxLines ?? 500) || options.waitFor === void 0 && (view.lines.length > 0 || view.partial.length > 0))
         return result(view, "ready");
-      const remaining = deadline - performance4.now();
+      const remaining = deadline - performance5.now();
       if (remaining <= 0)
         return result(view, timeout3 > 0 ? "timeout" : view.readStatus);
       await this.waitForChange(revision, remaining, options.signal);
@@ -104855,7 +105147,7 @@ var SerialSessionBuffer = class {
       12e4,
       "timeoutMs"
     );
-    const deadline = performance4.now() + timeout3;
+    const deadline = performance5.now() + timeout3;
     while (true) {
       const revision = this.revision;
       const view = this.snapshot(options);
@@ -104888,7 +105180,7 @@ var SerialSessionBuffer = class {
       }
       const cancelled = !!options.signal?.aborted;
       const matched = matchedLine !== null;
-      const expired = performance4.now() >= deadline;
+      const expired = performance5.now() >= deadline;
       if (cancelled || matched || view.state !== "open" || expired || !options.waitFor && rows.length > 0) {
         const count2 = matched ? Math.min(view.lines.length, matchedLine - first + 1) : view.lines.length;
         const cursor = first + count2;
@@ -104906,7 +105198,7 @@ var SerialSessionBuffer = class {
       if (revision !== this.revision) continue;
       await this.waitForChange(
         revision,
-        Math.max(0, deadline - performance4.now()),
+        Math.max(0, deadline - performance5.now()),
         options.signal
       );
     }
@@ -105494,7 +105786,7 @@ init_errors2();
 import fs48 from "node:fs";
 import path61 from "node:path";
 import { createHash as createHash9, randomUUID as randomUUID6 } from "node:crypto";
-import { performance as performance5 } from "node:perf_hooks";
+import { performance as performance6 } from "node:perf_hooks";
 init_serial_endpoint();
 init_errors2();
 init_device_lease();
@@ -105947,7 +106239,7 @@ var SerialSessionManager = class {
   }
   markEnded(session2) {
     if (!this.cleanupPending(session2)) {
-      session2.endedAt ??= performance5.now();
+      session2.endedAt ??= performance6.now();
       this.prune();
     }
   }
@@ -105971,7 +106263,7 @@ var SerialSessionManager = class {
     const completed = [...this.sessions.values()].filter((session2) => session2.endedAt !== void 0).sort((a, b) => a.endedAt - b.endedAt);
     for (let index = 0; index < completed.length; index++) {
       const session2 = completed[index];
-      if (performance5.now() - session2.endedAt > 6e5 || index < completed.length - 16)
+      if (performance6.now() - session2.endedAt > 6e5 || index < completed.length - 16)
         this.sessions.delete(session2.id);
     }
   }
@@ -105991,6 +106283,57 @@ var MonitorCaptureSchema = external_exports.object({
 var PolicySerialSessionService = class {
   sessions;
   transientMemoryScope = new AsyncLocalStorage2();
+  /** Preauthorize meter opening/reading, then close only this operation's session on every outcome. */
+  async capturePowerOnce(owner, request, input = {}, signal) {
+    const args = await validatePowerCapture(input);
+    if (signal?.aborted)
+      throw new PlatformIOError(
+        "Power collection cancelled before startup.",
+        "SERIAL_CANCELLED"
+      );
+    const scope5 = {
+      input: args,
+      purpose: "one_shot_power",
+      active: true
+    };
+    return this.transientMemoryScope.run(scope5, async () => {
+      try {
+        const started = await this.startWithDiscovery(owner, request);
+        let report;
+        try {
+          report = await this.capturePower(
+            owner,
+            started.sessionId,
+            args,
+            signal
+          );
+        } catch (error2) {
+          const stopped2 = await this.sessions.stop(owner, started.sessionId);
+          throw new PlatformIOError(
+            error2 instanceof Error ? error2.message : "Power capture failed.",
+            error2 instanceof PlatformIOError ? error2.code : "POWER_CAPTURE_FAILED",
+            {
+              ...error2 instanceof PlatformIOError ? error2.context : {},
+              sessionId: started.sessionId,
+              cleanupPending: stopped2.cleanupPending
+            }
+          );
+        }
+        const stopped = await this.sessions.stop(owner, started.sessionId);
+        return {
+          ...report,
+          ok: report.ok && !stopped.cleanupPending,
+          collectionComplete: report.collectionComplete && !stopped.cleanupPending,
+          cleanupPending: stopped.cleanupPending,
+          state: stopped.state,
+          port: started.path,
+          baud: started.baudRate
+        };
+      } finally {
+        scope5.active = false;
+      }
+    });
+  }
   /** Plan opening and reading against stable device identity before opening a one-shot capture. */
   async captureMemoryOnce(owner, request, input = {}, signal) {
     const scope5 = {
@@ -106140,7 +106483,7 @@ var PolicySerialSessionService = class {
       input: args,
       purpose: "boot_verification",
       active: true,
-      expiresAt: performance6.now() + (args.timeoutSeconds + args.settleSeconds + 30) * 1e3
+      expiresAt: performance7.now() + (args.timeoutSeconds + args.settleSeconds + 30) * 1e3
     };
     return this.transientMemoryScope.run(scope5, async () => {
       try {
@@ -106182,6 +106525,30 @@ var PolicySerialSessionService = class {
     });
   }
   memoryReadScope = new AsyncLocalStorage2();
+  /** Consume one scoped meter-read grant and retain policy revision checks through final disclosure. */
+  async capturePower(owner, sessionId2, input = {}, signal) {
+    const args = PowerCaptureSchema.parse(input);
+    const scope5 = {
+      sessionId: sessionId2,
+      input: args,
+      kind: "power",
+      active: true,
+      expiresAt: performance7.now() + args.seconds * 1e3 + 3e4
+    };
+    return this.memoryReadScope.run(scope5, async () => {
+      try {
+        return await captureSessionPower(
+          this.sessions,
+          owner,
+          sessionId2,
+          args,
+          signal
+        );
+      } finally {
+        scope5.active = false;
+      }
+    });
+  }
   /** Authorize one bounded capture, retaining revision checks on every page and final disclosure. */
   async captureMemory(owner, sessionId2, input = {}, signal) {
     const args = MemoryCaptureSchema.parse(input);
@@ -106189,7 +106556,7 @@ var PolicySerialSessionService = class {
       sessionId: sessionId2,
       input: args,
       active: true,
-      expiresAt: performance6.now() + 315e3
+      expiresAt: performance7.now() + 315e3
     };
     return this.memoryReadScope.run(scope5, async () => {
       try {
@@ -106254,7 +106621,7 @@ var PolicySerialSessionService = class {
           projectDir: request.projectDir,
           remaining: 4,
           active: true,
-          expiresAt: performance6.now() + 3e4,
+          expiresAt: performance7.now() + 3e4,
           guard
         };
         try {
@@ -106341,7 +106708,7 @@ var PolicySerialSessionService = class {
     const batch = this.discoveryBatch.getStore();
     if (batch) {
       const guard = () => {
-        if (!batch.active || batch.projectDir !== projectDir || performance6.now() > batch.expiresAt)
+        if (!batch.active || batch.projectDir !== projectDir || performance7.now() > batch.expiresAt)
           throw new PlatformIOError(
             "Startup discovery scope expired.",
             "SERIAL_DISCOVERY_SCOPE_INVALID"
@@ -106410,7 +106777,7 @@ var PolicySerialSessionService = class {
     const scope5 = this.memoryReadScope.getStore();
     const scopedRead = scope5 && request.operation === "read" && request.sessionId === scope5.sessionId;
     const checkScope = () => {
-      if (scopedRead && (!scope5.active || performance6.now() > scope5.expiresAt))
+      if (scopedRead && (!scope5.active || performance7.now() > scope5.expiresAt))
         throw new PlatformIOError(
           "Memory capture authorization scope expired.",
           "SERIAL_CAPTURE_SCOPE_INVALID"
@@ -106428,7 +106795,7 @@ var PolicySerialSessionService = class {
       if (!(error2 instanceof PolicyConfigError)) throw error2;
     }
     const transient = this.transientMemoryScope.getStore();
-    if (transient && (!transient.active || transient.expiresAt !== void 0 && performance6.now() > transient.expiresAt))
+    if (transient && (!transient.active || transient.expiresAt !== void 0 && performance7.now() > transient.expiresAt))
       throw new PlatformIOError(
         "Transient memory scope expired.",
         "SERIAL_CAPTURE_SCOPE_INVALID"
@@ -106458,11 +106825,13 @@ var PolicySerialSessionService = class {
       ...request,
       port: request.path,
       approvalId: request.operation === "read" ? context.readApprovalId ?? context.approvalId : context.approvalId,
-      ...scopedRead ? { memoryCapture: scope5.input } : {}
+      ...scopedRead ? {
+        [scope5.kind === "power" ? "powerCapture" : "memoryCapture"]: scope5.input
+      } : {}
     };
     if (transient) {
       delete authorizationArgs.sessionId;
-      authorizationArgs[transient.purpose === "one_shot_memory" ? "memoryCapture" : transient.purpose === "boot_verification" ? "bootVerification" : "monitorCapture"] = transient.input;
+      authorizationArgs[transient.purpose === "one_shot_power" ? "powerCapture" : transient.purpose === "one_shot_memory" ? "memoryCapture" : transient.purpose === "boot_verification" ? "bootVerification" : "monitorCapture"] = transient.input;
       authorizationArgs.purpose = transient.purpose;
     }
     const caller = {
@@ -106527,7 +106896,7 @@ var PolicySerialSessionService = class {
         if (transient?.purpose === "boot_verification" && request.operation === "read") {
           const revision = check2;
           const guard = () => {
-            if (!transient.active || performance6.now() > transient.expiresAt)
+            if (!transient.active || performance7.now() > transient.expiresAt)
               throw new PlatformIOError(
                 "Boot verification scope expired.",
                 "SERIAL_CAPTURE_SCOPE_INVALID"
@@ -111444,7 +111813,7 @@ var listSchema = external_exports.object({
 }).strict();
 var infoSchema = external_exports.object({ board_id: text4.min(1), approval_id: text4.optional() }).strict();
 function compactCompatibilityBoard(board) {
-  const rounded = (value2, divisor) => {
+  const rounded2 = (value2, divisor) => {
     if (!value2) return null;
     const scaled = value2 / divisor * 10;
     const lower = Math.floor(scaled);
@@ -111455,9 +111824,9 @@ function compactCompatibilityBoard(board) {
     name: board.name,
     platform: board.platform,
     mcu: board.mcu,
-    cpu_mhz: rounded(board.fcpu, 1e6),
-    ram_kb: rounded(board.ram, 1024),
-    flash_kb: rounded(board.rom, 1024),
+    cpu_mhz: rounded2(board.fcpu, 1e6),
+    ram_kb: rounded2(board.ram, 1024),
+    flash_kb: rounded2(board.rom, 1024),
     frameworks: board.frameworks ?? [],
     vendor: board.vendor ?? null
   };
@@ -113975,7 +114344,7 @@ var string = (params) => {
   return new RegExp(`^${regex}$`);
 };
 var integer = /^\d+$/;
-var number = /^-?\d+(?:\.\d+)?/i;
+var number2 = /^-?\d+(?:\.\d+)?/i;
 var boolean = /true|false/i;
 var _null = /null/i;
 var lowercase = /^[^A-Z]*$/;
@@ -114795,7 +115164,7 @@ var $ZodJWT = /* @__PURE__ */ $constructor("$ZodJWT", (inst, def) => {
 });
 var $ZodNumber = /* @__PURE__ */ $constructor("$ZodNumber", (inst, def) => {
   $ZodType.init(inst, def);
-  inst._zod.pattern = inst._zod.bag.pattern ?? number;
+  inst._zod.pattern = inst._zod.bag.pattern ?? number2;
   inst._zod.parse = (payload, _ctx) => {
     if (def.coerce)
       try {
@@ -116624,7 +116993,7 @@ var ZodNumber2 = /* @__PURE__ */ $constructor("ZodNumber", (inst, def) => {
   inst.isFinite = true;
   inst.format = bag.format ?? null;
 });
-function number2(params) {
+function number3(params) {
   return _number(ZodNumber2, params);
 }
 var ZodNumberFormat = /* @__PURE__ */ $constructor("ZodNumberFormat", (inst, def) => {
@@ -117016,20 +117385,20 @@ var SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION, "2025-06-18", "2025-
 var RELATED_TASK_META_KEY = "io.modelcontextprotocol/related-task";
 var JSONRPC_VERSION = "2.0";
 var AssertObjectSchema = custom2((v) => v !== null && (typeof v === "object" || typeof v === "function"));
-var ProgressTokenSchema = union([string2(), number2().int()]);
+var ProgressTokenSchema = union([string2(), number3().int()]);
 var CursorSchema = string2();
 var TaskCreationParamsSchema = looseObject({
   /**
    * Requested duration in milliseconds to retain task from creation.
    */
-  ttl: number2().optional(),
+  ttl: number3().optional(),
   /**
    * Time in milliseconds to wait between task status requests.
    */
-  pollInterval: number2().optional()
+  pollInterval: number3().optional()
 });
 var TaskMetadataSchema = object2({
-  ttl: number2().optional()
+  ttl: number3().optional()
 });
 var RelatedTaskMetadataSchema = object2({
   taskId: string2()
@@ -117084,7 +117453,7 @@ var ResultSchema = looseObject({
    */
   _meta: RequestMetaSchema.optional()
 });
-var RequestIdSchema = union([string2(), number2().int()]);
+var RequestIdSchema = union([string2(), number3().int()]);
 var JSONRPCRequestSchema = object2({
   jsonrpc: literal(JSONRPC_VERSION),
   id: RequestIdSchema,
@@ -117120,7 +117489,7 @@ var JSONRPCErrorResponseSchema = object2({
     /**
      * The error type that occurred.
      */
-    code: number2().int(),
+    code: number3().int(),
     /**
      * A short description of the error. The message SHOULD be limited to a concise single sentence.
      */
@@ -117419,11 +117788,11 @@ var ProgressSchema = object2({
   /**
    * The progress thus far. This should increase every time progress is made, even if the total is unknown.
    */
-  progress: number2(),
+  progress: number3(),
   /**
    * Total number of items to process (or total progress required), if known.
    */
-  total: optional(number2()),
+  total: optional(number3()),
   /**
    * An optional message describing the current progress.
    */
@@ -117466,7 +117835,7 @@ var TaskSchema = object2({
    * Time in milliseconds to keep task results available after completion.
    * If null, the task has unlimited lifetime until manually cleaned up.
    */
-  ttl: union([number2(), _null3()]),
+  ttl: union([number3(), _null3()]),
   /**
    * ISO 8601 timestamp when the task was created.
    */
@@ -117475,7 +117844,7 @@ var TaskSchema = object2({
    * ISO 8601 timestamp when the task was last updated.
    */
   lastUpdatedAt: string2(),
-  pollInterval: optional(number2()),
+  pollInterval: optional(number3()),
   /**
    * Optional diagnostic message for failed tasks or other status information.
    */
@@ -117560,7 +117929,7 @@ var AnnotationsSchema = object2({
   /**
    * Importance hint for the resource, from 0 (least) to 1 (most).
    */
-  priority: number2().min(0).max(1).optional(),
+  priority: number3().min(0).max(1).optional(),
   /**
    * ISO 8601 timestamp for the most recent modification.
    */
@@ -117588,7 +117957,7 @@ var ResourceSchema = object2({
    *
    * This can be used by Hosts to display file sizes and estimate context window usage.
    */
-  size: optional(number2()),
+  size: optional(number3()),
   /**
    * Optional annotations for the client.
    */
@@ -118011,7 +118380,7 @@ var ListChangedOptionsBaseSchema = object2({
    *
    * @default 300
    */
-  debounceMs: number2().int().nonnegative().default(300)
+  debounceMs: number3().int().nonnegative().default(300)
 });
 var LoggingLevelSchema = _enum(["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"]);
 var SetLevelRequestParamsSchema = BaseRequestParamsSchema.extend({
@@ -118056,15 +118425,15 @@ var ModelPreferencesSchema = object2({
   /**
    * How much to prioritize cost when selecting a model.
    */
-  costPriority: number2().min(0).max(1).optional(),
+  costPriority: number3().min(0).max(1).optional(),
   /**
    * How much to prioritize sampling speed (latency) when selecting a model.
    */
-  speedPriority: number2().min(0).max(1).optional(),
+  speedPriority: number3().min(0).max(1).optional(),
   /**
    * How much to prioritize intelligence and capabilities when selecting a model.
    */
-  intelligencePriority: number2().min(0).max(1).optional()
+  intelligencePriority: number3().min(0).max(1).optional()
 });
 var ToolChoiceSchema = object2({
   /**
@@ -118122,13 +118491,13 @@ var CreateMessageRequestParamsSchema = TaskAugmentedRequestParamsSchema.extend({
    * declares ClientCapabilities.sampling.context. These values may be removed in future spec releases.
    */
   includeContext: _enum(["none", "thisServer", "allServers"]).optional(),
-  temperature: number2().optional(),
+  temperature: number3().optional(),
   /**
    * The requested maximum number of tokens to sample (to prevent runaway completions).
    *
    * The client MAY choose to sample fewer tokens than the requested maximum.
    */
-  maxTokens: number2().int(),
+  maxTokens: number3().int(),
   stopSequences: array(string2()).optional(),
   /**
    * Optional metadata to pass through to the LLM provider. The format of this metadata is provider-specific.
@@ -118205,8 +118574,8 @@ var StringSchemaSchema = object2({
   type: literal("string"),
   title: string2().optional(),
   description: string2().optional(),
-  minLength: number2().optional(),
-  maxLength: number2().optional(),
+  minLength: number3().optional(),
+  maxLength: number3().optional(),
   format: _enum(["email", "uri", "date", "date-time"]).optional(),
   default: string2().optional()
 });
@@ -118214,9 +118583,9 @@ var NumberSchemaSchema = object2({
   type: _enum(["number", "integer"]),
   title: string2().optional(),
   description: string2().optional(),
-  minimum: number2().optional(),
-  maximum: number2().optional(),
-  default: number2().optional()
+  minimum: number3().optional(),
+  maximum: number3().optional(),
+  default: number3().optional()
 });
 var UntitledSingleSelectEnumSchemaSchema = object2({
   type: literal("string"),
@@ -118248,8 +118617,8 @@ var UntitledMultiSelectEnumSchemaSchema = object2({
   type: literal("array"),
   title: string2().optional(),
   description: string2().optional(),
-  minItems: number2().optional(),
-  maxItems: number2().optional(),
+  minItems: number3().optional(),
+  maxItems: number3().optional(),
   items: object2({
     type: literal("string"),
     enum: array(string2())
@@ -118260,8 +118629,8 @@ var TitledMultiSelectEnumSchemaSchema = object2({
   type: literal("array"),
   title: string2().optional(),
   description: string2().optional(),
-  minItems: number2().optional(),
-  maxItems: number2().optional(),
+  minItems: number3().optional(),
+  maxItems: number3().optional(),
   items: object2({
     anyOf: array(object2({
       const: string2(),
@@ -118342,7 +118711,7 @@ var ElicitResultSchema = ResultSchema.extend({
    * Per MCP spec, content is "typically omitted" for decline/cancel actions.
    * We normalize null to undefined for leniency while maintaining type compatibility.
    */
-  content: preprocess((val) => val === null ? void 0 : val, record(string2(), union([string2(), number2(), boolean2(), array(string2())])).optional())
+  content: preprocess((val) => val === null ? void 0 : val, record(string2(), union([string2(), number3(), boolean2(), array(string2())])).optional())
 });
 var ResourceTemplateReferenceSchema = object2({
   type: literal("ref/resource"),
@@ -118393,7 +118762,7 @@ var CompleteResultSchema = ResultSchema.extend({
     /**
      * The total number of completion options available. This can exceed the number of values actually sent in the response.
      */
-    total: optional(number2().int()),
+    total: optional(number3().int()),
     /**
      * Indicates whether there are additional completion options beyond those provided in the current response, even if the exact total is unknown.
      */
@@ -123762,9 +124131,9 @@ function decideMonitorNotification(input) {
     };
   }
   if (failure) {
-    const threshold = Math.min(10, Math.max(1, input.failureThreshold ?? 1));
-    const thresholdReached = input.health.consecutiveFailures === threshold;
-    const changedAfterThreshold = input.health.consecutiveFailures > threshold && input.health.changed && !initial;
+    const threshold2 = Math.min(10, Math.max(1, input.failureThreshold ?? 1));
+    const thresholdReached = input.health.consecutiveFailures === threshold2;
+    const changedAfterThreshold = input.health.consecutiveFailures > threshold2 && input.health.changed && !initial;
     return thresholdReached || changedAfterThreshold ? { shouldNotify: true, notificationReason: "failure" } : { shouldNotify: false };
   }
   if (initial) {

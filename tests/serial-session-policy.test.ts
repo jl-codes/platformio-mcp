@@ -869,3 +869,77 @@ it("rejects a replaced USB device between verification preflight and monitor sta
   });
   expect(f.transport).not.toHaveBeenCalled();
 });
+
+it("binds one-shot power opening/read grants and closes the owned meter session", async () => {
+  const f = fixture({
+    discoveryLoad: async () => ({
+      list: async () => [
+        {
+          path: "COM42",
+          vendorId: "10c4",
+          productId: "ea60",
+          serialNumber: "meter",
+        },
+      ],
+    }),
+    resolveEndpoint: (port) =>
+      resolveSerialEndpoint(port, { platform: "win32" }),
+  });
+  f.policy({
+    profile: "monitor_only",
+    overrides: {
+      approval_required: ["serial_session_start", "serial_session_read"],
+    },
+  });
+  const run = (approvalId?: string, readApprovalId?: string, seconds = 0.001) =>
+    f.service.run({ approvalId, readApprovalId }, () =>
+      f.service.capturePowerOnce(
+        f.owner,
+        { projectDir: f.projectDir, path: "COM42", baudRate: 115200 },
+        { seconds },
+      ),
+    );
+  let decisions:
+    | { opening: { approvalId: string }; reading: { approvalId: string } }
+    | undefined;
+  try {
+    await run();
+  } catch (error) {
+    expect(error).toMatchObject({ code: "APPROVAL_REQUIRED" });
+    decisions = (error as { context: { decisions: typeof decisions } }).context
+      .decisions;
+  }
+  expect(decisions).toBeDefined();
+  expect(f.transport).not.toHaveBeenCalled();
+  const openId = decisions!.opening.approvalId,
+    readId = decisions!.reading.approvalId;
+  approveRequest(openId);
+  approveRequest(readId);
+  await expect(run(openId, readId, 2)).rejects.toMatchObject({
+    code: "APPROVAL_REQUIRED",
+  });
+  expect(f.transport).not.toHaveBeenCalled();
+  expect(await run(openId, readId)).toMatchObject({
+    ok: false,
+    analysis: null,
+    cleanupPending: false,
+    state: "stopped",
+  });
+  expect(getApproval(openId)?.status).toBe("consumed");
+  expect(getApproval(readId)?.status).toBe("consumed");
+  expect(f.transport).toHaveBeenCalledOnce();
+  await expect(run(openId, readId)).rejects.toMatchObject({
+    code: "APPROVAL_REQUIRED",
+  });
+});
+it("rejects an invalid power pattern before opening any port", async () => {
+  const f = fixture();
+  await expect(
+    f.service.capturePowerOnce(
+      f.owner,
+      { projectDir: f.projectDir, path: "COM42", baudRate: 115200 },
+      { pattern: "(" },
+    ),
+  ).rejects.toMatchObject({ code: "PATTERN_INVALID" });
+  expect(f.transport).not.toHaveBeenCalled();
+});

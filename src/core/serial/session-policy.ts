@@ -7,6 +7,11 @@ import {
   VerificationCaptureSchema,
   validateVerificationCapture,
 } from "./verification-capture.js";
+import {
+  captureSessionPower,
+  PowerCaptureSchema,
+  validatePowerCapture,
+} from "./power-capture.js";
 import { captureSessionMemory, MemoryCaptureSchema } from "./memory-capture.js";
 import { captureTransientMemory } from "./transient-memory-capture.js";
 import { z } from "zod";
@@ -68,8 +73,13 @@ export class PolicySerialSessionService {
     input:
       | ReturnType<typeof MemoryCaptureSchema.parse>
       | ReturnType<typeof MonitorCaptureSchema.parse>
-      | ReturnType<typeof VerificationCaptureSchema.parse>;
-    purpose: "one_shot_memory" | "one_shot_monitor" | "boot_verification";
+      | ReturnType<typeof VerificationCaptureSchema.parse>
+      | ReturnType<typeof PowerCaptureSchema.parse>;
+    purpose:
+      | "one_shot_memory"
+      | "one_shot_monitor"
+      | "boot_verification"
+      | "one_shot_power";
     readGuard?: () => void;
     expectedDeviceBinding?: string;
     expiresAt?: number;
@@ -77,6 +87,66 @@ export class PolicySerialSessionService {
     binding?: string;
     guard?: () => void;
   }>();
+
+  /** Preauthorize meter opening/reading, then close only this operation's session on every outcome. */
+  async capturePowerOnce(
+    owner: SerialSessionOwner,
+    request: Parameters<PolicySerialSessionService["startWithDiscovery"]>[1],
+    input: z.input<typeof PowerCaptureSchema> = {},
+    signal?: AbortSignal,
+  ) {
+    const args = await validatePowerCapture(input);
+    if (signal?.aborted)
+      throw new PlatformIOError(
+        "Power collection cancelled before startup.",
+        "SERIAL_CANCELLED",
+      );
+    const scope = {
+      input: args,
+      purpose: "one_shot_power" as const,
+      active: true,
+    };
+    return this.transientMemoryScope.run(scope, async () => {
+      try {
+        const started = await this.startWithDiscovery(owner, request);
+        let report: Awaited<ReturnType<typeof captureSessionPower>>;
+        try {
+          report = await this.capturePower(
+            owner,
+            started.sessionId,
+            args,
+            signal,
+          );
+        } catch (error) {
+          const stopped = await this.sessions.stop(owner, started.sessionId);
+          throw new PlatformIOError(
+            error instanceof Error ? error.message : "Power capture failed.",
+            error instanceof PlatformIOError
+              ? error.code
+              : "POWER_CAPTURE_FAILED",
+            {
+              ...(error instanceof PlatformIOError ? error.context : {}),
+              sessionId: started.sessionId,
+              cleanupPending: stopped.cleanupPending,
+            },
+          );
+        }
+        const stopped = await this.sessions.stop(owner, started.sessionId);
+        return {
+          ...report,
+          ok: report.ok && !stopped.cleanupPending,
+          collectionComplete:
+            report.collectionComplete && !stopped.cleanupPending,
+          cleanupPending: stopped.cleanupPending,
+          state: stopped.state,
+          port: started.path,
+          baud: started.baudRate,
+        };
+      } finally {
+        scope.active = false;
+      }
+    });
+  }
 
   /** Plan opening and reading against stable device identity before opening a one-shot capture. */
   async captureMemoryOnce(
@@ -307,11 +377,44 @@ export class PolicySerialSessionService {
   }
   private readonly memoryReadScope = new AsyncLocalStorage<{
     sessionId: string;
-    input: ReturnType<typeof MemoryCaptureSchema.parse>;
+    input:
+      | ReturnType<typeof MemoryCaptureSchema.parse>
+      | ReturnType<typeof PowerCaptureSchema.parse>;
+    kind?: "power";
     active: boolean;
     expiresAt: number;
     guard?: () => void;
   }>();
+
+  /** Consume one scoped meter-read grant and retain policy revision checks through final disclosure. */
+  async capturePower(
+    owner: SerialSessionOwner,
+    sessionId: string,
+    input: z.input<typeof PowerCaptureSchema> = {},
+    signal?: AbortSignal,
+  ) {
+    const args = PowerCaptureSchema.parse(input);
+    const scope = {
+      sessionId,
+      input: args,
+      kind: "power" as const,
+      active: true,
+      expiresAt: performance.now() + args.seconds * 1000 + 30000,
+    };
+    return this.memoryReadScope.run(scope, async () => {
+      try {
+        return await captureSessionPower(
+          this.sessions,
+          owner,
+          sessionId,
+          args,
+          signal,
+        );
+      } finally {
+        scope.active = false;
+      }
+    });
+  }
 
   /** Authorize one bounded capture, retaining revision checks on every page and final disclosure. */
   async captureMemory(
@@ -661,16 +764,23 @@ export class PolicySerialSessionService {
         request.operation === "read"
           ? (context.readApprovalId ?? context.approvalId)
           : context.approvalId,
-      ...(scopedRead ? { memoryCapture: scope.input } : {}),
+      ...(scopedRead
+        ? {
+            [scope.kind === "power" ? "powerCapture" : "memoryCapture"]:
+              scope.input,
+          }
+        : {}),
     };
     if (transient) {
       delete authorizationArgs.sessionId;
       authorizationArgs[
-        transient.purpose === "one_shot_memory"
-          ? "memoryCapture"
-          : transient.purpose === "boot_verification"
-            ? "bootVerification"
-            : "monitorCapture"
+        transient.purpose === "one_shot_power"
+          ? "powerCapture"
+          : transient.purpose === "one_shot_memory"
+            ? "memoryCapture"
+            : transient.purpose === "boot_verification"
+              ? "bootVerification"
+              : "monitorCapture"
       ] = transient.input;
       authorizationArgs.purpose = transient.purpose;
     }
