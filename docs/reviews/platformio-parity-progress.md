@@ -2112,3 +2112,7 @@ Release artifact run 35536115719 completed successfully on source 1aae2a11e056a4
 ### 2026-09-20: Debugger instruction stepping and watchpoint coverage
 
 Added stepi/si, nexti/ni and their exact MI forms, plus rwatch/awatch, to the shared debugger classifier. All require target-mutation permission; step commands wait for asynchronous stops, and watchpoint expressions retain existing injection/call restrictions. Official GDB/MI execution and breakpoint documentation verified the mappings. Fifty-four focused classifier/policy tests and TypeScript passed; plugin rebuilt. No physical debugger was operated, and backend custody/physical acceptance remain incomplete.
+
+### 2026-09-20: Independent debugger supervision prerequisite
+
+Prepared debugger startup can now receive a host-resolved supervisor independently of a local backend command. The chosen interpreter participates in session request identity and host-code approval scope, is forwarded to the existing supervised GDB owner, and conflicting explicit/local-backend interpreters are rejected. Twelve focused startup orchestration tests and TypeScript passed; plugin rebuilt. This is groundwork for externally managed backends, not an exposed remote connection path or completed remote/pipe custody. No debugger or hardware process was launched by the mocked orchestration tests.

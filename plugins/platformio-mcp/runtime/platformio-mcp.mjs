@@ -110730,6 +110730,12 @@ function startPreparedDebugger(sessions, selection, caller = {}) {
       );
     return duration4;
   };
+  const supervisorPython = selection.supervisorPython ?? selection.backend?.options.pythonExecutable;
+  if (selection.supervisorPython && selection.backend && selection.supervisorPython !== selection.backend.options.pythonExecutable)
+    throw new PlatformIOError(
+      "Conflicting debugger supervisor selection.",
+      "DEBUG_SUPERVISOR_CONFLICT"
+    );
   const backendScope = selection.backend ? {
     command: selection.backend.options.command,
     pythonExecutable: selection.backend.options.pythonExecutable,
@@ -110751,6 +110757,7 @@ function startPreparedDebugger(sessions, selection, caller = {}) {
       projectDir: selection.projectDir,
       environment: selection.environment,
       executable: selection.executable,
+      supervisorPython,
       roots: selection.trustedDebuggerRoots,
       elfPath: selection.elfPath,
       expectedElfSha256: selection.expectedElfSha256,
@@ -110821,6 +110828,7 @@ function startPreparedDebugger(sessions, selection, caller = {}) {
         port: target.port,
         load: target.load,
         probeIdentity: selection.probeIdentity,
+        supervisorPython,
         backend: backendScope,
         initialization: initDescriptor,
         approvalId: selection.approvalId
@@ -110860,7 +110868,7 @@ function startPreparedDebugger(sessions, selection, caller = {}) {
               elfPath: elf.path,
               startupTimeoutMs: target.timeoutMs,
               startupDeadline: deadline,
-              supervisorPython: selection.backend?.options.pythonExecutable
+              supervisorPython
             };
             const process9 = selection.backend ? await startDebuggerWithBackend(
               {

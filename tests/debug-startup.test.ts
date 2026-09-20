@@ -373,3 +373,14 @@ it("passes the same overall deadline through GDB startup and target attachment",
   );
   await sessions.stop(id);
 });
+
+it("retains supervised GDB ownership without launching a local backend", async () => {
+  const { selection } = fixture();
+  const supervisorPython = path.join(root, "host-python");
+  const sessions = new DebugClientSessions();
+  await startPreparedDebugger(sessions, { ...selection, supervisorPython });
+  expect(DebugProcess.start).toHaveBeenCalledWith(
+    expect.objectContaining({ supervisorPython }),
+  );
+  await sessions.close();
+});

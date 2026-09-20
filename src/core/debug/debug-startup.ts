@@ -38,6 +38,7 @@ export interface PreparedDebuggerStartup {
   expectedElfSha256: string;
   executable: string;
   trustedDebuggerRoots: readonly string[];
+  supervisorPython?: string; // Host-resolved supervisor for externally managed backends.
   target: Omit<DebugTargetSelection, "projectDir" | "sessionId">;
   approvalId?: string;
   probeIdentity?: string; // Host-discovered physical resource, included in startup and approval identity.
@@ -76,6 +77,17 @@ export function startPreparedDebugger(
       );
     return duration;
   };
+  const supervisorPython =
+    selection.supervisorPython ?? selection.backend?.options.pythonExecutable;
+  if (
+    selection.supervisorPython &&
+    selection.backend &&
+    selection.supervisorPython !== selection.backend.options.pythonExecutable
+  )
+    throw new PlatformIOError(
+      "Conflicting debugger supervisor selection.",
+      "DEBUG_SUPERVISOR_CONFLICT",
+    );
   const backendScope = selection.backend
     ? {
         command: selection.backend.options.command,
@@ -102,6 +114,7 @@ export function startPreparedDebugger(
         projectDir: selection.projectDir,
         environment: selection.environment,
         executable: selection.executable,
+        supervisorPython,
         roots: selection.trustedDebuggerRoots,
         elfPath: selection.elfPath,
         expectedElfSha256: selection.expectedElfSha256,
@@ -173,6 +186,7 @@ export function startPreparedDebugger(
         port: target.port,
         load: target.load,
         probeIdentity: selection.probeIdentity,
+        supervisorPython,
         backend: backendScope,
         initialization: initDescriptor,
         approvalId: selection.approvalId,
@@ -213,7 +227,7 @@ export function startPreparedDebugger(
               elfPath: elf.path,
               startupTimeoutMs: target.timeoutMs,
               startupDeadline: deadline,
-              supervisorPython: selection.backend?.options.pythonExecutable,
+              supervisorPython,
             };
             const process = selection.backend
               ? await startDebuggerWithBackend(
