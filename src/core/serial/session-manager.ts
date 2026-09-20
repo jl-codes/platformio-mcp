@@ -250,7 +250,8 @@ export class SerialSessionManager {
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID",
       );
-    const projectDir = fs.realpathSync(input.projectDir);
+    // Match authorization and listing, including native Windows path casing.
+    const projectDir = fs.realpathSync.native(input.projectDir);
     if (!fs.statSync(projectDir).isDirectory())
       throw new PlatformIOError(
         "Serial project directory is not a directory.",

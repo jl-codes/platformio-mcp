@@ -96183,7 +96183,7 @@ var SerialSessionManager = class {
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
-    const projectDir = fs18.realpathSync(input.projectDir);
+    const projectDir = fs18.realpathSync.native(input.projectDir);
     if (!fs18.statSync(projectDir).isDirectory())
       throw new PlatformIOError(
         "Serial project directory is not a directory.",
