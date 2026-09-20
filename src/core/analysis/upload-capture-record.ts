@@ -5,6 +5,10 @@ import { z } from "zod";
 import { readPartitionArtifact } from "../esp-partition-artifacts.js";
 import { PlatformIOError } from "../../utils/errors.js";
 import { captureEspUploadManifest } from "./esptool-upload-manifest.js";
+import {
+  validateEspUploadCommand,
+  type EspUploadCommandContext,
+} from "./esptool-upload-command.js";
 import type { UploadManifestInput } from "./upload-manifest.js";
 
 const FileSchema = z
@@ -61,13 +65,14 @@ export interface UploadCaptureContext {
   environment: string;
   compiler: string;
   toolchain: UploadManifestInput["toolchain"];
+  uploader: EspUploadCommandContext;
   trustedImageRoots?: readonly string[];
 }
 
 /**
  * Consume a private capture record without trusting it to choose the workspace or package roots.
- * The returned command is still untrusted: its executable, port and options require launcher validation
- * and manifest-bound authorization before execution. This function never starts an uploader.
+ * The command is checked against host-selected tool and device identities. Manifest-bound authorization
+ * and immediate artifact revalidation are still required before execution. This function never starts an uploader.
  */
 export async function retainUploadCapture(
   recordPath: string,
@@ -77,6 +82,7 @@ export async function retainUploadCapture(
   const selected = {
     ...context,
     toolchain: { ...context.toolchain },
+    uploader: { ...context.uploader },
     trustedImageRoots: [...(context.trustedImageRoots ?? [])],
   };
   const root = await fs.realpath(selected.captureDirectory);
@@ -118,6 +124,7 @@ export async function retainUploadCapture(
       "Upload capture exceeds artifact limits.",
       "UPLOAD_CAPTURE_INVALID",
     );
+  await validateEspUploadCommand(record.argv, selected.uploader);
   return captureEspUploadManifest(
     {
       projectDir: project,

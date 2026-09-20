@@ -1762,6 +1762,9 @@ The host can now consume the bounded private SCons capture record through
 the exact argv image operands through the existing manifest archive. Toolchain
 identity and allowed package roots come from host context, not record fields.
 Focused regression confirms context rejection creates no archive and accepted
-retention survives source removal. This adapter does not validate the executable,
-port or options, grant permission, launch an uploader, or establish hardware parity;
-those live workflow connections remain required.
+retention survives source removal. Capture ingestion now requires host-selected native interpreter and esptool paths,
+chip and port, and rejects a different executable/script/device, duplicate global
+options, unsupported reset settings and non-write commands before creating an archive.
+It does not grant permission, launch an uploader, or establish hardware parity;
+those live workflow connections remain required. The focused command and manifest
+regressions pass (21 cases), as do TypeScript and scoped lint checks.

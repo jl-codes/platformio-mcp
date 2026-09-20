@@ -183,9 +183,17 @@ it("binds a capture record to host context before retaining its exact upload ope
   const captureDirectory = path.join(root, "capture");
   await fs.mkdir(captureDirectory);
   const recordPath = path.join(captureDirectory, "selection.json");
+  const pythonPath = process.execPath;
+  const esptoolPath = path.join(root, "esptool.py");
+  await fs.writeFile(esptoolPath, "# fixture only");
+  const uploader = { pythonPath, esptoolPath, chip: "esp32", port: "COM7" };
   const argv = [
-    "python",
-    "esptool.py",
+    pythonPath,
+    esptoolPath,
+    "--chip",
+    "esp32",
+    "--port",
+    "COM7",
     "write_flash",
     ...input.images.flatMap((image) => [String(image.offset), image.path]),
   ];
@@ -213,6 +221,7 @@ it("binds a capture record to host context before retaining its exact upload ope
     environment: input.environment,
     compiler: record.compiler,
     toolchain: input.toolchain,
+    uploader,
   };
   await expect(
     retainUploadCapture(
