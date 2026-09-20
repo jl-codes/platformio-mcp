@@ -36,6 +36,7 @@ it("waits for every safeguard acknowledgement before loading symbols", async () 
     "-gdb-set pagination off",
     "-gdb-set confirm off",
     "-file-exec-and-symbols " + JSON.stringify(elf),
+    "-gdb-version",
   ]);
   await expect(initializeGdbInspection(session, elf)).rejects.toMatchObject({
     code: "GDB_INIT_REUSED",
@@ -99,7 +100,34 @@ it("quotes the complete absolute ELF path as one MI argument", async () => {
     );
   });
   await initializeGdbInspection(session, tricky);
-  expect(lines.at(-1)?.trim()).toBe(
+  expect(lines.at(-2)?.trim()).toBe(
     "5-file-exec-and-symbols " + JSON.stringify(tricky),
   );
 });
+
+it.each(["banner", "unsupported", "missing"])(
+  "reports observed version metadata: %s",
+  async (kind) => {
+    const session = new GdbMiSession(async (line) => {
+      const token = /^(\d+)/.exec(line)![1];
+      const version = line.includes("-gdb-version");
+      queueMicrotask(() => {
+        if (version && kind === "banner")
+          session.accept(Buffer.from('~"GNU gdb (fixture) 14.2\\n"\n'));
+        session.accept(
+          Buffer.from(
+            token +
+              (version && kind === "unsupported"
+                ? '^error,msg="unsupported"\n'
+                : "^done\n"),
+          ),
+        );
+      });
+    });
+    const result = await initializeGdbInspection(session, elf);
+    expect(result.gdbVersion).toBe(
+      kind === "banner" ? "GNU gdb (fixture) 14.2" : null,
+    );
+    expect(session.state().failed).toBe(false);
+  },
+);

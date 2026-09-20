@@ -170,6 +170,7 @@ export class DebugCompatibilityClient {
         uptime_s: state?.uptime_s ?? null,
         command: state?.command ?? null,
         init_script: state?.init_script ?? null,
+        gdb_version: state?.gdb_version ?? null,
         stopped: normalizeDebuggerStop(state?.lastStop),
         running: state?.running ?? null,
         closed: state?.closed ?? null,

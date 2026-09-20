@@ -156,6 +156,7 @@ export async function executeDebugSessionCompatibility(
     project_dir: info?.project_dir,
     env: info?.env,
     debug_tool: info?.debug_tool ?? null,
+    gdb_version: info?.gdb_version ?? null,
     uptime_s: info
       ? info.uptime_s + Math.max(0, (performance.now() - stoppingAt) / 1000)
       : null,

@@ -31,7 +31,7 @@ export async function initializeGdbInspection(
   session: GdbMiSession,
   elfPath: string,
   timeoutMs = 30000,
-): Promise<void> {
+): Promise<{ gdbVersion: string | null }> {
   if (attempted.has(session))
     throw new PlatformIOError(
       "Debugger initialization already attempted.",
@@ -53,12 +53,14 @@ export async function initializeGdbInspection(
   const deadline = performance.now() + timeoutMs;
   // Repeat the early command-line settings over MI: an unsupported GDB setting
   // must fail closed, even if GDB merely printed an error while parsing -iex.
+  let gdbVersion: string | null = null;
   const commands = [
     "-gdb-set auto-load off",
     "-gdb-set may-call-functions off",
     "-gdb-set pagination off",
     "-gdb-set confirm off",
     "-file-exec-and-symbols " + JSON.stringify(elfPath),
+    "-gdb-version",
   ];
   try {
     for (const command of commands) {
@@ -69,13 +71,29 @@ export async function initializeGdbInspection(
           "GDB_INIT_TIMEOUT",
         );
       const result = await session.execute(command, remaining);
+      if (
+        command === "-gdb-version" &&
+        !result.timedOut &&
+        !result.closed &&
+        result.result?.class === "error"
+      )
+        continue;
       if (result.timedOut || result.closed || result.result?.class !== "done")
         throw new PlatformIOError(
           "Debugger rejected or did not finish controlled initialization.",
           "GDB_INIT_FAILED",
           { resultClass: result.result?.class, timedOut: result.timedOut },
         );
+      if (command === "-gdb-version" && !result.truncated) {
+        const banner = result.console
+          .join("")
+          .split(/\r?\n/)
+          .find((line) => /^GNU gdb(?:\s|$)/.test(line));
+        if (banner && banner.length <= 1024 && !/[\x00-\x1f\x7f]/.test(banner))
+          gdbVersion = banner;
+      }
     }
+    return { gdbVersion };
   } catch (error) {
     session.invalidate(error);
     throw new PlatformIOError(

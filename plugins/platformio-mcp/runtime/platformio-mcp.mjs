@@ -105995,12 +105995,14 @@ async function initializeGdbInspection(session2, elfPath, timeoutMs = 3e4) {
     );
   attempted.add(session2);
   const deadline = performance.now() + timeoutMs;
+  let gdbVersion = null;
   const commands = [
     "-gdb-set auto-load off",
     "-gdb-set may-call-functions off",
     "-gdb-set pagination off",
     "-gdb-set confirm off",
-    "-file-exec-and-symbols " + JSON.stringify(elfPath)
+    "-file-exec-and-symbols " + JSON.stringify(elfPath),
+    "-gdb-version"
   ];
   try {
     for (const command of commands) {
@@ -106011,13 +106013,21 @@ async function initializeGdbInspection(session2, elfPath, timeoutMs = 3e4) {
           "GDB_INIT_TIMEOUT"
         );
       const result = await session2.execute(command, remaining);
+      if (command === "-gdb-version" && !result.timedOut && !result.closed && result.result?.class === "error")
+        continue;
       if (result.timedOut || result.closed || result.result?.class !== "done")
         throw new PlatformIOError(
           "Debugger rejected or did not finish controlled initialization.",
           "GDB_INIT_FAILED",
           { resultClass: result.result?.class, timedOut: result.timedOut }
         );
+      if (command === "-gdb-version" && !result.truncated) {
+        const banner = result.console.join("").split(/\r?\n/).find((line) => /^GNU gdb(?:\s|$)/.test(line));
+        if (banner && banner.length <= 1024 && !/[\x00-\x1f\x7f]/.test(banner))
+          gdbVersion = banner;
+      }
     }
+    return { gdbVersion };
   } catch (error2) {
     session2.invalidate(error2);
     throw new PlatformIOError(
@@ -106453,6 +106463,7 @@ var DebugProcess = class _DebugProcess {
   transport;
   decoder = new StringDecoder5("utf8");
   stderr = "";
+  gdbVersion = null;
   closed = false;
   released = false;
   releaseAttempt;
@@ -106503,11 +106514,12 @@ var DebugProcess = class _DebugProcess {
     try {
       if (child instanceof SupervisedDebugChild)
         await child.supervisor.waitStarted(options.startupTimeoutMs);
-      await initializeGdbInspection(
+      const initialized = await initializeGdbInspection(
         owner.transport,
         options.elfPath,
         options.startupTimeoutMs
       );
+      owner.gdbVersion = initialized.gdbVersion;
       return owner;
     } catch (error2) {
       await owner.cleanupProcess().catch(() => {
@@ -106562,7 +106574,8 @@ var DebugProcess = class _DebugProcess {
       cleanupPending: !this.released,
       stderr: this.stderr,
       command: [this.executable, ...GDB_STARTUP_ARGS],
-      init_script: null
+      init_script: null,
+      gdb_version: this.gdbVersion
     };
   }
   /** Kill only the owned child, then require independent proof before releasing device custody. */
@@ -107539,6 +107552,7 @@ async function executeDebugSessionCompatibility(name2, input, sessions, caller =
     project_dir: info?.project_dir,
     env: info?.env,
     debug_tool: info?.debug_tool ?? null,
+    gdb_version: info?.gdb_version ?? null,
     uptime_s: info ? info.uptime_s + Math.max(0, (performance.now() - stoppingAt) / 1e3) : null,
     cleanup_pending: false,
     reset_run_acknowledged: !args.process_only,
@@ -107666,6 +107680,7 @@ var DebugCompatibilityClient = class {
         uptime_s: state?.uptime_s ?? null,
         command: state?.command ?? null,
         init_script: state?.init_script ?? null,
+        gdb_version: state?.gdb_version ?? null,
         stopped: normalizeDebuggerStop(state?.lastStop),
         running: state?.running ?? null,
         closed: state?.closed ?? null,

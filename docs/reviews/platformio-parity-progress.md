@@ -1667,3 +1667,10 @@ Validation: 18 focused discovery and power-custody cases passed, including share
 Debugger startup and owned-session listings now expose `command` from the resolved executable and actual fixed GDB argument vector, plus `init_script` from the retained initialization artifact. Script ownership wrappers preserve this path until confirmed cleanup, and command arrays are fresh snapshots rather than mutable internal state. Alternate host-owned implementations without this metadata return null in startup responses. This reports the actual directly supervised GDB launch, not a reconstructed PlatformIO CLI invocation. Version-banner reporting remains outstanding.
 
 Validation: 38 focused process, initialization, compatibility and connection-ownership cases passed; TypeScript and scoped lint passed. The plugin was rebuilt. No debugger hardware was accessed.
+
+
+### Observed debugger version reporting
+
+Controlled initialization now requests `-gdb-version` from the same supervised MI transport, within its existing total initialization deadline, after safeguards and symbol loading. A bounded, nontruncated GNU GDB banner is retained in process state and exposed through startup, owned listings and stop responses. Missing or unsupported version information remains null; timeout or process closure retains normal initialization-failure cleanup. No additional executable or target command is introduced. The command is specified by the [official GDB MI documentation](https://www.sourceware.org/gdb/current/onlinedocs/gdb.html/GDB_002fMI-Miscellaneous-Commands.html).
+
+Validation: 33 focused initialization/process/compatibility cases passed, including banner, absent output and unsupported-query behavior; TypeScript and scoped lint passed. The plugin was rebuilt. Physical debugger/backend acceptance remains outstanding.

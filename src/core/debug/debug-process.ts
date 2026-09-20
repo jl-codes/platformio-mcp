@@ -56,6 +56,7 @@ export type DebugProcessState = ReturnType<GdbMiSession["state"]> & {
   stderr: string;
   command?: string[];
   init_script?: string | null;
+  gdb_version?: string | null;
 };
 
 /** One owned debugger process; process-only cleanup never sends resume/reset/quit commands. */
@@ -63,6 +64,7 @@ export class DebugProcess {
   private readonly transport: GdbMiSession;
   private readonly decoder = new StringDecoder("utf8");
   private stderr = "";
+  private gdbVersion: string | null = null;
   private closed = false;
   private released = false;
   private releaseAttempt?: Promise<boolean>;
@@ -165,11 +167,12 @@ export class DebugProcess {
     try {
       if (child instanceof SupervisedDebugChild)
         await child.supervisor.waitStarted(options.startupTimeoutMs);
-      await initializeGdbInspection(
+      const initialized = await initializeGdbInspection(
         owner.transport,
         options.elfPath,
         options.startupTimeoutMs,
       );
+      owner.gdbVersion = initialized.gdbVersion;
       return owner;
     } catch (error) {
       await owner.cleanupProcess().catch(() => {});
@@ -245,6 +248,7 @@ export class DebugProcess {
       stderr: this.stderr,
       command: [this.executable, ...GDB_STARTUP_ARGS],
       init_script: null,
+      gdb_version: this.gdbVersion,
     };
   }
 
