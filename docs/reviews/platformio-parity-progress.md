@@ -719,3 +719,7 @@ Implemented reference device rows, likely-board/noise hints, stable likely-first
 ### Authorized owned session listing
 
 Added internal serial_session_list mapped to get_monitor_status permission and PolicySerialSessionService.listSessions. It validates the owner capability before consuming approvals, requires trusted request context, resolves one canonical project, checks policy revision around disclosure and filters snapshots by both owner and project. Only metadata is returned. TypeScript passes; the two new targeted policy/isolation checks pass using mock transports (22 unrelated cases were not rerun). Rebuilt the plugin payload for the action catalog change. Public caller/session lifecycle wiring and complete pio_list_devices/monitor aliases remain outstanding; no physical hardware or broad smoke run occurred.
+
+### Per-connection serial ownership wired to MCP lifecycle
+
+Added SerialClientContext with a manager-issued owner capability, request-local policy context, rejection of requests/results after disconnect, coalesced cleanup and retryable unconfirmed closure. The MCP stdio server now creates one context per connection and invokes owned cleanup on close without discarding pending device ownership. TypeScript/targeted lint and two mocked lifecycle checks pass; the plugin payload was rebuilt. Public monitor operations are still not advertised pending shared legacy custody and adapter completion. No native hardware or broad smoke test ran.

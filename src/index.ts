@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { SerialClientContext } from "./adapters/serial-client.js";
 import { readRuntimeVersion } from "./utils/runtime-version.js";
 
 /**
@@ -1532,6 +1533,24 @@ const toolDefinitions: ToolDefinition[] = [
     },
   },
 ];
+
+// stdio serves one trusted client connection; owner capabilities never come from tool arguments.
+const serialClient = new SerialClientContext();
+server.onclose = () => {
+  void serialClient
+    .close()
+    .then((sessions) => {
+      if (sessions.some((session) => session.cleanupPending))
+        logDiag(
+          "Serial disconnect cleanup remains pending; device ownership is retained.",
+        );
+    })
+    .catch(() =>
+      logDiag(
+        "Serial disconnect cleanup failed; device ownership is retained.",
+      ),
+    );
+};
 
 let toolRegistry = createToolRegistry<any>(toolDefinitions);
 let compatibilityProjectDir: string | undefined;
