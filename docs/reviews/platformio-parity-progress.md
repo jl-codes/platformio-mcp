@@ -836,3 +836,8 @@ Foreground spooler failures now carry their log path and explicit cleanup state.
 
 Added opt-in pio_build via canonical build_project authorization and shared implicit locking. Jobs/verbosity bind to the authorized request. Trusted executor options support jobs, timeout and completed-output observation; compatibility invokes a fresh foreground build with the reference twenty-minute timeout while canonical callers retain caching/background/default timeout behavior. Build and cleanup share bounded redacted output collection, diagnostics, memory, port errors and confirmed-timeout projection. Job counts are restricted to integers 1..1024 as an explicit resource bound. Compatibility surface is now 80 tools (54 canonical, 26 aliases). TypeScript and 22 focused build/clean/cache checks passed after correcting a mock export; plugin rebuilt. Native builds, complete artifact identity/upload integration and final-revision acceptance remain unfinished. No distributions published.
 
+
+### Canonical access to new build and cleanup options
+
+Added optional jobs and forceExecution fields to build_project, and optional environment/full fields to clean_project, preserving existing required fields and omitted-option behavior. Shared build core forwards options under existing explicit/implicit locking. CLI build accepts --jobs and --force-execution; dashboard command API forwards build/cleanup options to shared executors. Runtime option validation rejects malformed booleans/counts before execution. These capabilities no longer require compatibility mode. TypeScript and six focused schema/core/executor checks passed; plugin rebuilt. No native command execution or distribution publication occurred.
+

@@ -1030,8 +1030,8 @@ export function startPortalServer(defaultPort = 8080) {
       req.body.projectDir,
       req.body,
       async () => {
-        const { projectDir, environment, verbose } = req.body;
-        return await buildProject(projectDir, environment, verbose, true);
+        const { projectDir, environment, verbose, jobs, forceExecution } = req.body;
+        return await buildProject(projectDir, environment, verbose, true, { jobs, forceExecution });
       },
       res,
     );
@@ -1170,8 +1170,8 @@ export function startPortalServer(defaultPort = 8080) {
       req.body.projectDir,
       req.body,
       async () => {
-        const { projectDir } = req.body;
-        return await cleanProject(projectDir, true);
+        const { projectDir, environment, full } = req.body;
+        return await cleanProject(projectDir, true, { environment, full });
       },
       res,
     );

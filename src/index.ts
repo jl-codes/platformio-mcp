@@ -643,6 +643,8 @@ const toolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        jobs: { type: "integer", minimum: 1, maximum: 1024, description: "Optional parallel build jobs" },
+        forceExecution: { type: "boolean", description: "Run a fresh build even when inputs match the cache" },
         projectDir: {
           type: "string",
           description:
@@ -677,6 +679,8 @@ const toolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        environment: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,50}$", description: "Optional environment to clean" },
+        full: { type: "boolean", description: "Also remove downloaded build dependencies using fullclean" },
         projectDir: {
           type: "string",
           description:
@@ -1856,6 +1860,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   projectDir: params.projectDir,
                   environment: params.environment,
                   verbose: params.verbose,
+                  jobs: params.jobs,
+                  forceExecution: params.forceExecution,
                   background: params.background,
                   sessionId: params.sessionId,
                 });
@@ -1874,7 +1880,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 const params = CleanProjectParamsSchema.parse(args);
 
                 const executeTask = () =>
-                  cleanProject(params.projectDir, params.background);
+                  cleanProject(params.projectDir, params.background, { environment: params.environment, full: params.full });
                 const result = params.sessionId
                   ? (hardwareLockManager.requireLock(params.sessionId),
                     await executeTask())

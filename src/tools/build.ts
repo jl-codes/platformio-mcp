@@ -75,6 +75,8 @@ export async function buildProject(
     });
   }
 
+  if (execution.forceExecution !== undefined && typeof execution.forceExecution !== "boolean")
+    throw new BuildError("Build forceExecution must be a boolean", { projectDir });
   if (execution.jobs !== undefined && (!Number.isSafeInteger(execution.jobs) || execution.jobs < 1 || execution.jobs > 1024))
     throw new BuildError("Build jobs must be an integer between 1 and 1024", { projectDir });
   if (execution.timeoutMs !== undefined && (!Number.isInteger(execution.timeoutMs) || execution.timeoutMs < 1 || execution.timeoutMs > 3600000))

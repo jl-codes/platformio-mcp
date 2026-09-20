@@ -441,6 +441,8 @@ export const SystemInfoParamsSchema = z.object({});
 
 // Build project parameters
 export const BuildProjectParamsSchema = z.object({
+  jobs: z.number().int().min(1).max(1024).optional().describe("Parallel build jobs"),
+  forceExecution: z.boolean().optional().describe("Run the build even when cached inputs match"),
   projectDir: z
     .string()
     .min(1)
@@ -469,6 +471,8 @@ export const BuildProjectParamsSchema = z.object({
 
 // Clean project parameters
 export const CleanProjectParamsSchema = z.object({
+  environment: z.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).optional().describe("Environment to clean"),
+  full: z.boolean().optional().describe("Also remove downloaded build dependencies with fullclean"),
   projectDir: z
     .string()
     .min(1)

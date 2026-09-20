@@ -97,7 +97,7 @@ COMMANDS:
   devices
   boards --filter <value>
   init --board <id> --project-dir <dir> [--framework <name>]
-  build --project-dir <dir> [--environment <env>] [--background] [--verbose]
+  build --project-dir <dir> [--environment <env>] [--jobs <count>] [--force-execution] [--background] [--verbose]
   flash --project-dir <dir> [--port <port|auto>] [--environment <env>] [--background] [--start-monitor]
   monitor [--project-dir <dir>] [--port <port|auto>] [--environment <env>] [--timeout <seconds>] [--expect <text>] [--background]
   target-resolve --project-dir <dir> [--environment <env>] [--port <port>] [--binding-ttl <seconds>]
@@ -666,6 +666,8 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           projectDir: asString(options["project-dir"]),
           environment: asString(options.environment),
           verbose: asBoolean(options.verbose),
+          jobs: asNumber(options.jobs),
+          forceExecution: asBoolean(options["force-execution"]),
           background: asBoolean(options.background),
         });
         const result = await buildProjectCore(params);

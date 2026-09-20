@@ -14576,6 +14576,8 @@ var init_types2 = __esm({
     });
     SystemInfoParamsSchema = external_exports.object({});
     BuildProjectParamsSchema = external_exports.object({
+      jobs: external_exports.number().int().min(1).max(1024).optional().describe("Parallel build jobs"),
+      forceExecution: external_exports.boolean().optional().describe("Run the build even when cached inputs match"),
       projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
       environment: external_exports.string().optional().describe("Specific environment to build (from platformio.ini)"),
       sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
@@ -14587,6 +14589,8 @@ var init_types2 = __esm({
       )
     });
     CleanProjectParamsSchema = external_exports.object({
+      environment: external_exports.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).optional().describe("Environment to clean"),
+      full: external_exports.boolean().optional().describe("Also remove downloaded build dependencies with fullclean"),
       projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
       sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
       background: external_exports.boolean().optional().describe(
@@ -101141,6 +101145,8 @@ async function buildProject(projectDir, environment, verbose, background, execut
       environment
     });
   }
+  if (execution.forceExecution !== void 0 && typeof execution.forceExecution !== "boolean")
+    throw new BuildError("Build forceExecution must be a boolean", { projectDir });
   if (execution.jobs !== void 0 && (!Number.isSafeInteger(execution.jobs) || execution.jobs < 1 || execution.jobs > 1024))
     throw new BuildError("Build jobs must be an integer between 1 and 1024", { projectDir });
   if (execution.timeoutMs !== void 0 && (!Number.isInteger(execution.timeoutMs) || execution.timeoutMs < 1 || execution.timeoutMs > 36e5))
@@ -110180,7 +110186,8 @@ async function buildProjectCore(input) {
     input.projectDir,
     input.environment,
     input.verbose,
-    input.background
+    input.background,
+    { jobs: input.jobs, forceExecution: input.forceExecution }
   );
   if (input.sessionId) {
     hardwareLockManager.requireLock(input.sessionId);
@@ -112757,8 +112764,8 @@ function startPortalServer(defaultPort = 8080) {
       req.body.projectDir,
       req.body,
       async () => {
-        const { projectDir, environment, verbose } = req.body;
-        return await buildProject(projectDir, environment, verbose, true);
+        const { projectDir, environment, verbose, jobs, forceExecution } = req.body;
+        return await buildProject(projectDir, environment, verbose, true, { jobs, forceExecution });
       },
       res
     );
@@ -112849,8 +112856,8 @@ function startPortalServer(defaultPort = 8080) {
       req.body.projectDir,
       req.body,
       async () => {
-        const { projectDir } = req.body;
-        return await cleanProject(projectDir, true);
+        const { projectDir, environment, full } = req.body;
+        return await cleanProject(projectDir, true, { environment, full });
       },
       res
     );
@@ -115008,6 +115015,8 @@ var toolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
+        jobs: { type: "integer", minimum: 1, maximum: 1024, description: "Optional parallel build jobs" },
+        forceExecution: { type: "boolean", description: "Run a fresh build even when inputs match the cache" },
         projectDir: {
           type: "string",
           description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
@@ -115038,6 +115047,8 @@ var toolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
+        environment: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,50}$", description: "Optional environment to clean" },
+        full: { type: "boolean", description: "Also remove downloaded build dependencies using fullclean" },
         projectDir: {
           type: "string",
           description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
@@ -116073,6 +116084,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 projectDir: params.projectDir,
                 environment: params.environment,
                 verbose: params.verbose,
+                jobs: params.jobs,
+                forceExecution: params.forceExecution,
                 background: params.background,
                 sessionId: params.sessionId
               });
@@ -116087,7 +116100,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "clean_project": {
               const params = CleanProjectParamsSchema.parse(args2);
-              const executeTask = () => cleanProject(params.projectDir, params.background);
+              const executeTask = () => cleanProject(params.projectDir, params.background, { environment: params.environment, full: params.full });
               const result = params.sessionId ? (hardwareLockManager.requireLock(params.sessionId), await executeTask()) : await hardwareLockManager.withImplicitLock(executeTask);
               return {
                 content: [
