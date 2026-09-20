@@ -699,6 +699,12 @@ it("closes one-shot memory sessions after successful analysis and parser failure
   const f = fixture();
   const service = {
     sessions: f.manager,
+    captureMemory: (
+      owner: typeof f.owner,
+      id: string,
+      input: Parameters<typeof captureSessionMemory>[3],
+      signal?: AbortSignal,
+    ) => captureSessionMemory(f.manager, owner, id, input, signal),
     startWithDiscovery: async () => {
       const started = await f.manager.start(f.owner, f.request());
       await f.manager.write(
@@ -739,7 +745,11 @@ it("closes one-shot memory sessions after successful analysis and parser failure
 it("rejects invalid and already-cancelled memory captures before startup", async () => {
   const f = fixture();
   const startWithDiscovery = vi.fn();
-  const service = { sessions: f.manager, startWithDiscovery };
+  const service = {
+    sessions: f.manager,
+    startWithDiscovery,
+    captureMemory: vi.fn(),
+  };
   await expect(
     captureTransientMemory(service, f.owner, f.request(), { seconds: -1 }),
   ).rejects.toThrow();

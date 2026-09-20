@@ -595,3 +595,7 @@ The bounded worker now retains match offsets. Memory parsing excludes only overl
 ### One-shot memory collection lifecycle
 
 Added an internal transient memory collector using policy-backed discovery/start and owned session reads. Shared capture-schema validation and already-aborted requests reject before startup. Both successful collection and parser failure stop the owned session; cleanup-pending state prevents a successful/completed claim. Tests exercise real session management and native mock streams, verifying both physical mock closure and rejected startup. TypeScript checking and 31 memory/session tests pass. Public MCP/CLI wiring, composite approval semantics, legacy shared ownership migration and hardware acceptance remain incomplete.
+
+### Bounded memory-read approval scope
+
+Policy-backed memory capture binds validated capture parameters to the first read approval, then retains that revision guard only for the matching session within the fixed collector call. Every page and final disclosure checks scope lifetime and policy revision; the scope closes in finally. A later capture needs a fresh approval, and changed limits cannot consume the original grant. Transient capture now uses this path. TypeScript checking and 46 real policy/session tests pass, including mid-capture policy revocation. Separate startup/discovery/read grants and public adapter orchestration remain to be completed.

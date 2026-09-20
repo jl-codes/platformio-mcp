@@ -6,7 +6,10 @@ import type { SerialSessionOwner } from "./session-manager.js";
 
 /** Open only after validating capture options, then stop the owned session on every collection outcome. */
 export async function captureTransientMemory(
-  service: Pick<PolicySerialSessionService, "startWithDiscovery" | "sessions">,
+  service: Pick<
+    PolicySerialSessionService,
+    "startWithDiscovery" | "sessions" | "captureMemory"
+  >,
   owner: SerialSessionOwner,
   request: Parameters<PolicySerialSessionService["startWithDiscovery"]>[1],
   input: Parameters<typeof captureSessionMemory>[3] = {},
@@ -21,8 +24,7 @@ export async function captureTransientMemory(
   const started = await service.startWithDiscovery(owner, request);
   let report: Awaited<ReturnType<typeof captureSessionMemory>>;
   try {
-    report = await captureSessionMemory(
-      service.sessions,
+    report = await service.captureMemory(
       owner,
       started.sessionId,
       args,

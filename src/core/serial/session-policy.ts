@@ -2,6 +2,7 @@
  * Real policy-dispatcher integration for the owned serial session service.
  * Provides PolicySerialSessionService with request-local approvals and existing permission-source resolution.
  */
+import { captureSessionMemory, MemoryCaptureSchema } from "./memory-capture.js";
 import { performance } from "node:perf_hooks";
 import { resolveSerialEndpoint } from "../devices/serial-endpoint.js";
 import { validateDirectSerialOptions } from "./serial-transport.js";
@@ -44,6 +45,42 @@ const OPERATIONS = Object.freeze({
  */
 export class PolicySerialSessionService {
   readonly sessions: SerialSessionManager;
+  private readonly memoryReadScope = new AsyncLocalStorage<{
+    sessionId: string;
+    input: ReturnType<typeof MemoryCaptureSchema.parse>;
+    active: boolean;
+    expiresAt: number;
+    guard?: () => void;
+  }>();
+
+  /** Authorize one bounded capture, retaining revision checks on every page and final disclosure. */
+  async captureMemory(
+    owner: SerialSessionOwner,
+    sessionId: string,
+    input: Parameters<typeof captureSessionMemory>[3] = {},
+    signal?: AbortSignal,
+  ) {
+    const args = MemoryCaptureSchema.parse(input);
+    const scope = {
+      sessionId,
+      input: args,
+      active: true,
+      expiresAt: performance.now() + 315000,
+    };
+    return this.memoryReadScope.run(scope, async () => {
+      try {
+        return await captureSessionMemory(
+          this.sessions,
+          owner,
+          sessionId,
+          args,
+          signal,
+        );
+      } finally {
+        scope.active = false;
+      }
+    });
+  }
   private readonly discovery: NativeSerialDiscovery;
   private readonly discoveryBatch = new AsyncLocalStorage<{
     projectDir: string;
@@ -235,6 +272,23 @@ export class PolicySerialSessionService {
         "Serial operations require a trusted request context.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED",
       );
+    const scope = this.memoryReadScope.getStore();
+    const scopedRead =
+      scope &&
+      request.operation === "read" &&
+      request.sessionId === scope.sessionId;
+    const checkScope = () => {
+      if (scopedRead && (!scope.active || performance.now() > scope.expiresAt))
+        throw new PlatformIOError(
+          "Memory capture authorization scope expired.",
+          "SERIAL_CAPTURE_SCOPE_INVALID",
+        );
+    };
+    checkScope();
+    if (scopedRead && scope.guard) {
+      scope.guard();
+      return scope.guard;
+    }
     // Capture before asynchronous approval consumption, not after it: a changed policy cannot become the new baseline.
     let check: (() => void) | undefined;
     try {
@@ -245,7 +299,12 @@ export class PolicySerialSessionService {
     }
     return dispatchAuthorizedAction(
       OPERATIONS[request.operation],
-      { ...request, port: request.path, approvalId: context.approvalId },
+      {
+        ...request,
+        port: request.path,
+        approvalId: context.approvalId,
+        ...(scopedRead ? { memoryCapture: scope.input } : {}),
+      },
       {
         ...context.caller,
         workspaceDir: request.projectDir,
@@ -269,6 +328,15 @@ export class PolicySerialSessionService {
             "POLICY_CHANGED",
           );
         check();
+        if (scopedRead) {
+          const revision = check;
+          const guard = () => {
+            checkScope();
+            revision();
+          };
+          scope.guard = guard;
+          return guard;
+        }
         return check;
       },
     );

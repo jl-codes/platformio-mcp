@@ -396,3 +396,44 @@ it("does not accept a standalone enumeration grant for composite startup", async
   );
   expect(list).not.toHaveBeenCalled();
 });
+
+it("uses one exact capture approval across pages but never for a later capture", async () => {
+  const f = fixture();
+  f.policy({
+    profile: "monitor_only",
+    overrides: { approval_required: ["serial_session_read"] },
+  });
+  const started = await f.service.run({}, () =>
+    f.service.sessions.start(f.owner, f.request),
+  );
+  f.ports.get(f.request.path)!.port!.emitData("Free heap: 1000\n");
+  const capture = (approvalId?: string, maxLines = 5000) =>
+    f.service.run({ approvalId }, () =>
+      f.service.captureMemory(f.owner, started.sessionId, {
+        seconds: 0.01,
+        maxLines,
+      }),
+    );
+  const id = await approval(capture());
+  approveRequest(id);
+  await approval(capture(id, 1));
+  expect(await capture(id)).toMatchObject({ ok: true });
+  await approval(capture(id));
+});
+
+it("revokes a scoped memory capture when policy changes during collection", async () => {
+  const f = fixture();
+  f.policy({ profile: "monitor_only" });
+  const started = await f.service.run({}, () =>
+    f.service.sessions.start(f.owner, f.request),
+  );
+  const pending = f.service.run({}, () =>
+    f.service.captureMemory(f.owner, started.sessionId, { seconds: 0.1 }),
+  );
+  const assertion = expect(pending).rejects.toMatchObject({
+    code: "POLICY_CHANGED",
+  });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  f.policy({ profile: "read_only" });
+  await assertion;
+});
