@@ -140,22 +140,52 @@ export function decodeEspCoredumpBase64(text: string): Buffer {
       "Encoded core dump exceeds the input limit.",
       "COREDUMP_INPUT_LIMIT",
     );
+  const decodeChunk = (compact: string): Buffer => {
+    if (
+      !compact ||
+      compact.length % 4 ||
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(compact)
+    )
+      throw new PlatformIOError(
+        "Invalid base64 core dump.",
+        "COREDUMP_BASE64_INVALID",
+      );
+    const decoded = Buffer.from(compact, "base64");
+    if (decoded.toString("base64") !== compact)
+      throw new PlatformIOError(
+        "Non-canonical base64 core dump.",
+        "COREDUMP_BASE64_INVALID",
+      );
+    return decoded;
+  };
   const compact = text.replace(/[ \t\r\n]/g, "");
-  if (!compact || compact.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(compact))
-    throw new PlatformIOError(
-      "Invalid base64 core dump.",
-      "COREDUMP_BASE64_INVALID",
-    );
-  const decoded = Buffer.from(compact, "base64");
+  let decoded: Buffer;
+  if (/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) {
+    decoded = decodeChunk(compact);
+  } else {
+    // ESP serial output can encode each line independently, including its own padding.
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.replace(/[ \t]/g, ""))
+      .filter(Boolean);
+    if (lines.length > 65536)
+      throw new PlatformIOError(
+        "Too many encoded core-dump lines.",
+        "COREDUMP_INPUT_LIMIT",
+      );
+    const chunks = lines.map(decodeChunk);
+    const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
+    if (length > MAX_DUMP_BYTES)
+      throw new PlatformIOError(
+        "Decoded core dump exceeds 16 MiB.",
+        "COREDUMP_INPUT_LIMIT",
+      );
+    decoded = Buffer.concat(chunks, length);
+  }
   if (decoded.length > MAX_DUMP_BYTES)
     throw new PlatformIOError(
       "Decoded core dump exceeds 16 MiB.",
       "COREDUMP_INPUT_LIMIT",
-    );
-  if (decoded.toString("base64") !== compact)
-    throw new PlatformIOError(
-      "Non-canonical base64 core dump.",
-      "COREDUMP_BASE64_INVALID",
     );
   return decoded;
 }

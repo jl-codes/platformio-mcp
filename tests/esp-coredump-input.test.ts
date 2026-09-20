@@ -64,3 +64,9 @@ it("decodes line-wrapped base64 but rejects ignored garbage and nonzero padding 
   expect(() => decodeEspCoredumpBase64("Zg==!")).toThrow();
   expect(() => decodeEspCoredumpBase64("Zh==")).toThrow();
 });
+it("accepts independently padded ESP serial lines but not concatenated padding on one line", () => {
+  const first = crc.subarray(0, 20).toString("base64");
+  const second = crc.subarray(20).toString("base64");
+  expect(decodeEspCoredumpBase64(first + "\r\n" + second)).toEqual(crc);
+  expect(() => decodeEspCoredumpBase64(first + second)).toThrow();
+});

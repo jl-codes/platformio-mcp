@@ -1122,3 +1122,8 @@ Added owner-only temporary directories before any sensitive writes: POSIX mode/o
 
 Connected the pinned converter program to owner-only staging, isolated Python invocation, a 60-second deadline, 64 KiB output bound, structured known errors and workspace-contained core ELF validation. Raw input hashes are rechecked before staging; files are removed after the consumer returns or fails. Nine focused process/orchestration cases passed; lint and TypeScript passed. Process tests use real Node children and conversion orchestration substitutes the optional converter; actual esp-coredump and debugger acceptance remain outstanding. CI 35498314271 and 35498312360 passed at 3513e535.
 
+
+### Real pinned converter validation
+
+Ran the actual esp-coredump 1.10.0 file converter on official v1.10.0 ESP32, ESP32-C3 and ESP32-P4 base64/ELF fixtures from tests/ and tests/test_apps/built_apps/. All three converted successfully through private staging on Windows/Python 3.14.4. Exact input, ELF and output hashes are recorded in esp-coredump-conversion-results.json; fixture files are not redistributed. Each fixture embeds a 36-bit ELF hash prefix, accurately reported as partial correspondence. Real validation exposed independently padded base64 lines (now supported with strict per-line decoding) and missing distutils on modern Python (fixed by adding setuptools==84.0.0 to the optional extra). Eight focused decoding regressions passed. This proves file conversion on one host, not physical hardware, debugger reports, all dump formats or public-tool acceptance.
+

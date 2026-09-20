@@ -19,7 +19,7 @@ pio-mcp = "pio_agent_launcher.__main__:main"
 
 [project.optional-dependencies]
 platformio = ["platformio==6.1.16"]
-coredump = ["esp-coredump==1.10.0"]
+coredump = ["esp-coredump==1.10.0", "setuptools==84.0.0"]
 
 [tool.setuptools]
 packages = ["pio_agent_launcher"]
@@ -28,4 +28,5 @@ include-package-data = false
 
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}
+
 

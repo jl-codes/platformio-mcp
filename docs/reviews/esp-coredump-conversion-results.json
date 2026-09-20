@@ -1,0 +1,35 @@
+[
+  {
+    "chip": "esp32",
+    "correspondence": {
+      "status": "prefix_matched",
+      "hashBits": 36
+    },
+    "input": "7fca578643c8f1d99a70a2a20ec7cd3ba2ee46726ae8067583ef47faf7b9adcc",
+    "elf": "1b43c5e74f2da1385fb132b85a6e12c9c2371755843792612b7e95da9a7f33dd",
+    "core_sha256": "4d4ad407a7f9aac38c9ea4fdb6068d99a84ad0421aa4decd9739ce3ce65eb994",
+    "size": 9432
+  },
+  {
+    "chip": "esp32c3",
+    "correspondence": {
+      "status": "prefix_matched",
+      "hashBits": 36
+    },
+    "input": "99e6079ae0673615e789d11e44d71f9ba05402b25915ed91fb859964f328a9fe",
+    "elf": "7d946a8e8cd5e4196dca452f6aaea74a9569861d45e7861eb1a11c063d042472",
+    "core_sha256": "70f7a58dd41df35ee4f9c0749decd99f48f2f4833a60f493bdcc2ce5371d2966",
+    "size": 3260
+  },
+  {
+    "chip": "esp32p4",
+    "correspondence": {
+      "status": "prefix_matched",
+      "hashBits": 36
+    },
+    "input": "b15587c89b022f0654c0ad83caef63ea1b7c4e237b307a7e4131829ee574a2d2",
+    "elf": "f2df9a0058126efdc8a78363bf332efe5ad95dfba773c8599104e8d4522b5b66",
+    "core_sha256": "8906ede9242157553a2a95a4fc4a62ad10d60c7e7a1524dd7d8f7cf30bbc7fd1",
+    "size": 6104
+  }
+]
