@@ -9,7 +9,7 @@ export function createUploadCaptureScript(recordPath: string): string {
       "Capture record path must be host-resolved.",
       "UPLOAD_MANIFEST_INVALID",
     );
-  return String.raw`import hashlib, json, os, stat, shlex
+  return String.raw`import hashlib, json, os, stat, shlex, re
 from pathlib import Path
 Import("env")
 _RECORD = json.loads(${JSON.stringify(JSON.stringify(recordPath))})
@@ -103,22 +103,29 @@ def _capture_upload(target, source, env):
         image = _artifact(env.subst(str(pair[1])), 64 * 1024 * 1024)
         image.update(offset=int(env.subst(str(pair[0])), 0), role="data")
         images.append(image)
+    command = env.subst(_ORIGINAL, target=target, source=source)
+    argv = _split_command(command)
     image = _artifact(source[0].get_abspath(), 64 * 1024 * 1024)
-    image.update(offset=int(env.subst("$ESP32_APP_OFFSET"), 0), role="application")
+    offsets = []
+    for index in range(1, len(argv)):
+        if re.fullmatch(r"(?:0[xX][0-9a-fA-F]+|0|[1-9][0-9]*)", argv[index - 1]) and os.path.normcase(str(Path(argv[index]).resolve())) == os.path.normcase(image["path"]):
+            offsets.append(int(argv[index - 1], 16 if argv[index - 1].lower().startswith("0x") else 10))
+    if len(offsets) != 1:
+        raise ValueError("UPLOAD_CAPTURE_UNSUPPORTED")
+    image.update(offset=offsets[0], role="application")
     images.append(image)
     if sum(item["size"] for item in images) > 128 * 1024 * 1024:
         raise ValueError("UPLOAD_CAPTURE_LIMIT")
     if any(item["offset"] < 0 or item["offset"] + item["size"] > 0x100000000 for item in images):
         raise ValueError("UPLOAD_CAPTURE_LIMIT")
     settings = json.dumps(env.GetProjectOptions(), sort_keys=True, default=str, separators=(",", ":"))
-    command = env.subst(_ORIGINAL, target=target, source=source)
     compiler = env.WhereIs(env.subst("$CC"))
     if not compiler:
         raise ValueError("UPLOAD_CAPTURE_COMPILER_UNRESOLVED")
     record = {
         "schemaVersion": 1, "captureOnly": True,
         "commandLine": command,
-        "argv": _split_command(command),
+        "argv": argv,
         "projectDir": str(Path(env.subst("$PROJECT_DIR")).resolve(strict=True)),
         "environment": env.subst("$PIOENV"),
         "compiler": str(Path(compiler).resolve(strict=True)),

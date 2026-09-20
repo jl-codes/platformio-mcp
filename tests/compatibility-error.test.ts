@@ -54,3 +54,53 @@ it("bounds and redacts diagnostics and maps absent PlatformIO", () => {
       .structuredContent.error,
   ).toBe("pio_not_found");
 });
+
+it("returns a bounded upload resume reference without exposing private execution context", () => {
+  const resumeId = "a466f2da-7160-4a31-a197-1d0f4229a07d";
+  const result = compatibilityErrorResult(
+    new PlatformIOError("Approve retained firmware", "APPROVAL_REQUIRED", {
+      resumeId,
+      manifestSha256: "a".repeat(64),
+      custody: "private-custody",
+    }),
+  );
+  expect(result.structuredContent).toMatchObject({
+    resume_id: resumeId,
+    manifest_sha256: "a".repeat(64),
+  });
+  expect(JSON.stringify(result)).not.toContain("private-custody");
+});
+
+it("preserves both preflight grants without copying arbitrary context", () => {
+  const decision = {
+    status: "requires_approval",
+    reason: "password=private-value",
+    action: "serial_session_start",
+    riskLevel: "medium",
+    timestamp: "2026-09-20",
+    approvalId: "opening",
+    extra: "private-extra",
+  };
+  const result = compatibilityErrorResult(
+    new PlatformIOError("preflight", "APPROVAL_REQUIRED", {
+      decisions: {
+        opening: decision,
+        reading: {
+          ...decision,
+          action: "serial_session_read",
+          approvalId: "reading",
+        },
+        extra: "private-extra",
+      },
+    }),
+  );
+  expect(result.structuredContent).toMatchObject({
+    details: {
+      decisions: {
+        opening: { approvalId: "opening" },
+        reading: { approvalId: "reading" },
+      },
+    },
+  });
+  expect(JSON.stringify(result)).not.toContain("private-");
+});

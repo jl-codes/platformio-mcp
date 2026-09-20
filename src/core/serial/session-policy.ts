@@ -232,7 +232,7 @@ export class PolicySerialSessionService {
     input: Parameters<PolicySerialSessionService["startWithDiscovery"]>[1],
     options: z.input<typeof VerificationCaptureSchema> = {},
     startupDiscoveryApprovalId?: string,
-    beforeUpload = false,
+    beforeUpload: boolean | 2 = false,
   ) {
     const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
@@ -252,7 +252,7 @@ export class PolicySerialSessionService {
         ...input,
         projectDir,
         buffer: input.buffer ? { ...input.buffer } : undefined,
-        snapshots: beforeUpload ? 5 : 4,
+        snapshots: beforeUpload === 2 ? 6 : beforeUpload ? 5 : 4,
         approvalId: startupDiscoveryApprovalId,
       },
       { ...this.context.getStore()?.caller, workspaceDir: projectDir },
@@ -331,7 +331,9 @@ export class PolicySerialSessionService {
       active: true,
       expiresAt:
         performance.now() +
-        (args.timeoutSeconds + args.settleSeconds + (beforeOpen ? 240 : 30)) *
+        (args.timeoutSeconds +
+          args.settleSeconds +
+          (beforeOpen ? 240 * (beforeOpen.discoverySnapshots ?? 1) : 30)) *
           1000,
     };
     return this.transientMemoryScope.run(scope, async () => {
@@ -526,7 +528,8 @@ export class PolicySerialSessionService {
     >,
     beforeOpen?: SerialBeforeOpen,
   ) {
-    const snapshots = beforeOpen ? 5 : 4;
+    const snapshots =
+      4 + (beforeOpen ? (beforeOpen.discoverySnapshots ?? 1) : 0);
     const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
     if (!path.isAbsolute(input.projectDir))
@@ -557,7 +560,11 @@ export class PolicySerialSessionService {
           projectDir: request.projectDir,
           remaining: snapshots,
           active: true,
-          expiresAt: performance.now() + (beforeOpen ? 240000 : 30000),
+          expiresAt:
+            performance.now() +
+            (beforeOpen
+              ? 240000 * (beforeOpen.discoverySnapshots ?? 1)
+              : 30000),
           guard,
         };
         try {

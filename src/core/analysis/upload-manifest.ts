@@ -55,9 +55,12 @@ export type UploadManifestInput = z.input<typeof InputSchema>;
  */
 export async function captureUploadManifest(
   input: UploadManifestInput,
-  archiveRoot = path.join(SERVER_DATA_DIR, "artifacts", "upload"),
+  archiveRoot?: string,
   trustedImageRoots: readonly string[] = [], // Host-verified registered package roots, never MCP arguments.
 ) {
+  const elfArchiveRoot =
+    archiveRoot === undefined ? undefined : path.join(archiveRoot, "elf");
+  archiveRoot ??= path.join(SERVER_DATA_DIR, "artifacts", "upload");
   const args = InputSchema.parse(input);
   const selectedRoots = [...trustedImageRoots];
   if (
@@ -100,7 +103,7 @@ export async function captureUploadManifest(
     const elfPath = await retainElfSnapshot(
       elfSnapshot,
       args.elf.sha256,
-      path.join(archiveRoot, "elf"),
+      elfArchiveRoot,
       elfSource.identity.path,
     );
     const images: Array<{

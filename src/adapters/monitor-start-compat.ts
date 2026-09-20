@@ -53,6 +53,7 @@ export async function resolveMonitorRequest(
   let port = params.port || undefined;
   let baud = params.baud || undefined;
   let environment = params.env || undefined;
+  let uploadSelection: { platform: unknown; protocol: unknown } | undefined;
   if (useConfig) {
     const report = await executeProjectInspection(
       "project_envs",
@@ -68,6 +69,10 @@ export async function resolveMonitorRequest(
       report.defaultEnvironments[0] ||
       (report.envs.length === 1 ? report.envs[0].name : undefined);
     const selected = report.envs.find((item) => item.name === environment);
+    uploadSelection = {
+      platform: selected?.platform,
+      protocol: selected?.uploadProtocol,
+    };
     if (environment && !selected)
       throw new PlatformIOError(
         "Monitor environment does not exist.",
@@ -121,7 +126,7 @@ export async function resolveMonitorRequest(
     baudRate: baud ?? 115200,
     buffer: { maxLines: params.max_lines },
   };
-  return { params, request, environment };
+  return { params, request, environment, uploadSelection };
 }
 
 /** Resolve defaults and open one persistent owned monitor. */

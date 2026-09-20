@@ -169,3 +169,11 @@ PPK2 trigger capture begins only after fresh owned monitor output matches. The m
 
 
 Power-profile trigger waits use the requested `seconds` unless `trigger_seconds` is supplied. No-sample responses use `error: no_samples`; incomplete PPK2 windows and current-limit trips retain separate diagnostics. Collection timing and provenance qualifiers remain explicit.
+
+### Retained flash approvals and identity
+
+For selected espressif32/espressif8266 environments using esptool, flash verification captures the actual uploader arguments, archives the firmware and ELF, and executes the retained images under continuous device custody. Other upload protocols keep their existing execution path. `upload_manifest` and `upload_manifest_sha256` identify the captured upload; `firmware_identity` describes ELF/image correspondence, not cryptographic proof of the running device's firmware.
+
+An MCP approval response can include `resume_id` and `manifest_sha256`. Resume on the same connection with `resume_id` and `manifest_approval_id`; the retained operation remains bound to the original project, environment, port and discovered device identity. A new connection cannot recover that pending upload. `system_approval_id` separately authorizes installed-tool discovery. Preflight errors preserve opening and reading approval decisions under `details.decisions`.
+
+Interactive `pio-agent flash-verify` requests each required approval in the same CLI invocation. `--approve` explicitly approves those requests for that invocation; it does not override policy denials. `--approve=false` disables prompting. `--json` does not prompt unless `--approve` is explicitly supplied. This keeps captured firmware alive through approval without replaying the whole workflow. `--resume-id`, `--manifest-approval-id` and `--system-approval-id` map to the corresponding request fields; a resume ID from a previous CLI process cannot be reused.

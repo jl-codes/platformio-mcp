@@ -11,12 +11,13 @@ export interface PendingUploadScope {
   projectDir: string;
   environment: string;
   uploadPort: string;
+  deviceBinding?: string; // Host-discovered physical scope when available; never an authorization token.
 }
-interface PendingUpload<T> {
+interface PendingUpload<T, Context> {
   retained: Awaited<ReturnType<typeof retainUploadCapture>>;
   scope: PendingUploadScope;
   guard: () => void;
-  execute: (signal: AbortSignal) => Promise<T>;
+  execute: (signal: AbortSignal, context?: Context) => Promise<T>;
   abort: AbortController;
   expiresAt: number;
   state: "pending" | "authorizing" | "executing";
@@ -27,8 +28,8 @@ interface PendingUpload<T> {
  * Resumption does not rebuild: permission is bound to the retained manifest, destination and opaque
  * resume ID. Only the captured host callback may execute; a supplied ID is never an upload grant.
  */
-export class PendingUploadStore<T> {
-  private readonly records = new Map<string, PendingUpload<T>>();
+export class PendingUploadStore<T, Context = void> {
+  private readonly records = new Map<string, PendingUpload<T, Context>>();
   private closed = false;
   private readonly inFlight = new Set<Promise<T>>();
   private readonly cleanupOwners = new Set<UploadCleanupFailure>();
@@ -40,7 +41,7 @@ export class PendingUploadStore<T> {
     retained: Awaited<ReturnType<typeof retainUploadCapture>>,
     scope: PendingUploadScope,
     guard: () => void,
-    execute: (signal: AbortSignal) => Promise<T>,
+    execute: (signal: AbortSignal, context?: Context) => Promise<T>,
   ) {
     this.prune();
     const selected = { ...scope };
@@ -80,8 +81,15 @@ export class PendingUploadStore<T> {
     scope: PendingUploadScope,
     approvalId: string | undefined,
     caller: PolicyEvaluationContext,
+    executionContext?: Context,
   ): Promise<T> {
-    const attempt = this.resumePending(resumeId, scope, approvalId, caller);
+    const attempt = this.resumePending(
+      resumeId,
+      scope,
+      approvalId,
+      caller,
+      executionContext,
+    );
     this.inFlight.add(attempt);
     void attempt.finally(() => this.inFlight.delete(attempt)).catch(() => {});
     return attempt;
@@ -92,6 +100,7 @@ export class PendingUploadStore<T> {
     scope: PendingUploadScope,
     approvalId: string | undefined,
     caller: PolicyEvaluationContext,
+    executionContext?: Context,
   ): Promise<T> {
     this.prune();
     const record = this.records.get(resumeId);
@@ -101,7 +110,8 @@ export class PendingUploadStore<T> {
       record.state !== "pending" ||
       record.scope.projectDir !== scope.projectDir ||
       record.scope.environment !== scope.environment ||
-      record.scope.uploadPort !== scope.uploadPort
+      record.scope.uploadPort !== scope.uploadPort ||
+      record.scope.deviceBinding !== scope.deviceBinding
     )
       throw new PlatformIOError(
         "Pending upload is missing, busy or belongs to another destination.",
@@ -140,7 +150,7 @@ export class PendingUploadStore<T> {
               "Pending upload disconnected before execution.",
               "UPLOAD_RESUME_UNAVAILABLE",
             );
-          return record.execute(record.abort.signal);
+          return record.execute(record.abort.signal, executionContext);
         },
       );
     } catch (error) {
@@ -153,6 +163,11 @@ export class PendingUploadStore<T> {
         else current.state = "pending";
       }
     }
+  }
+
+  /** Keep an outer workflow's cleanup owner when final lease release needs a later retry. */
+  retainCleanup(owner: UploadCleanupFailure): void {
+    this.cleanupOwners.add(owner);
   }
 
   /** Disconnect invalidates pending IDs and cancels executing callbacks through their owned signal. */

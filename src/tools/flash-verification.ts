@@ -1,4 +1,6 @@
 /** Compose authorized upload and fresh owned boot capture for an already resolved project/environment. */
+import { executeManifestUpload } from "./manifest-upload.js";
+import type { SerialBeforeOpen } from "../core/serial/session-manager.js";
 import type { PolicySerialSessionService } from "../core/serial/session-policy.js";
 import { z } from "zod";
 import {
@@ -26,6 +28,10 @@ export const FlashVerificationSchema = z
     baudRate: z.number().int().min(1).max(4000000),
     stopOpenSessions: z.boolean().default(false),
     verification: VerificationCaptureSchema.default({}),
+    retainFirmware: z.boolean().default(false),
+    resumeId: z.string().uuid().optional(),
+    manifestApprovalId: z.string().max(256).optional(),
+    systemApprovalId: z.string().max(256).optional(),
     workflowApprovalId: z.string().max(256).optional(),
     uploadApprovalId: z.string().max(256).optional(),
     openApprovalId: z.string().max(256).optional(),
@@ -53,6 +59,8 @@ export async function executeFlashVerification(
     baudRate: args.baudRate,
     stopOpenSessions: args.stopOpenSessions,
     verification: args.verification,
+    retainFirmware: args.retainFirmware,
+    resumeId: args.resumeId,
     approvalId: args.workflowApprovalId,
   };
   const workflowContext = { ...caller, workspaceDir: args.projectDir };
@@ -86,7 +94,7 @@ export async function executeFlashVerification(
         request,
         args.verification,
         args.discoveryApprovalId,
-        true,
+        args.retainFirmware ? 2 : true,
       ),
   );
   guard();
@@ -97,6 +105,9 @@ export async function executeFlashVerification(
     async () => {
       guard();
       let uploadSeconds = 0;
+      let retainedUpload:
+        | Awaited<ReturnType<typeof executeManifestUpload>>
+        | undefined;
       let report:
         | Awaited<
             ReturnType<PolicySerialSessionService["captureVerificationOnce"]>
@@ -162,29 +173,36 @@ export async function executeFlashVerification(
                   args.verification,
                   undefined,
                   selection.deviceBinding,
-                  async (held) => {
-                    guard();
-                    const started = performance.now();
-                    let ok: boolean;
-                    try {
-                      const sameEndpoint =
-                        resolveSerialEndpoint(args.uploadPort).resource
-                          .identity === monitorEndpoint.resource.identity;
-                      ok = await runUpload(
-                        sameEndpoint
-                          ? { ...held, path: args.monitorPort }
-                          : undefined,
-                      );
-                    } finally {
-                      uploadSeconds = (performance.now() - started) / 1000;
-                    }
-                    guard();
-                    if (!ok)
-                      throw new PlatformIOError(
-                        "Upload failed; do not open the verification monitor.",
-                        "VERIFICATION_UPLOAD_FAILED",
-                      );
-                  },
+                  Object.assign(
+                    async (held: Parameters<SerialBeforeOpen>[0]) => {
+                      guard();
+                      const started = performance.now();
+                      let ok: boolean;
+                      try {
+                        const sameEndpoint =
+                          resolveSerialEndpoint(args.uploadPort).resource
+                            .identity === monitorEndpoint.resource.identity;
+                        ok = await runUpload(
+                          sameEndpoint
+                            ? { ...held, path: args.monitorPort }
+                            : undefined,
+                        );
+                      } finally {
+                        uploadSeconds = (performance.now() - started) / 1000;
+                      }
+                      guard();
+                      if (!ok)
+                        throw new PlatformIOError(
+                          "Upload failed; do not open the verification monitor.",
+                          "VERIFICATION_UPLOAD_FAILED",
+                        );
+                    },
+                    {
+                      discoverySnapshots: args.retainFirmware
+                        ? (2 as const)
+                        : (1 as const),
+                    },
+                  ),
                 ),
             );
           } catch (error) {
@@ -197,6 +215,27 @@ export async function executeFlashVerification(
               throw error;
           }
         },
+        args.retainFirmware
+          ? async (execution) => {
+              retainedUpload = await executeManifestUpload(
+                {
+                  ...execution,
+                  deviceBinding:
+                    resolveSerialEndpoint(args.uploadPort).resource.identity ===
+                    monitorEndpoint.resource.identity
+                      ? selection.deviceBinding
+                      : undefined,
+                },
+                client,
+                caller,
+                {
+                  resumeId: args.resumeId,
+                  manifestApprovalId: args.manifestApprovalId,
+                  systemApprovalId: args.systemApprovalId,
+                },
+              );
+            }
+          : undefined,
       );
       guard();
       if (!upload.ok)
@@ -219,7 +258,15 @@ export async function executeFlashVerification(
         ...report,
         upload,
         upload_s: uploadSeconds,
-        firmware_identity: "identity_unverified" as const,
+        firmware_identity:
+          retainedUpload?.manifest.elfCorrespondence ??
+          ("identity_unverified" as const),
+        ...(retainedUpload
+          ? {
+              upload_manifest: retainedUpload.manifest,
+              upload_manifest_sha256: retainedUpload.manifestSha256,
+            }
+          : {}),
         summary:
           report.verdict === "pass"
             ? "Upload succeeded and fresh boot output passed verification."

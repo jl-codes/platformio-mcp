@@ -4,6 +4,9 @@ import { PlatformIOError } from "../utils/errors.js";
 
 const STRING_OPTIONS = {
   environment: "env",
+  "resume-id": "resume_id",
+  "manifest-approval-id": "manifest_approval_id",
+  "system-approval-id": "system_approval_id",
   "upload-port": "upload_port",
   "monitor-port": "monitor_port",
   expect: "expect",
@@ -41,6 +44,7 @@ export function parseFlashVerificationCli(
   if (!projectDir) throw invalid();
   const allowed = new Set([
     "json",
+    "approve",
     "project-dir",
     "stop-open-sessions",
     ...Object.keys(STRING_OPTIONS),
@@ -74,6 +78,11 @@ export function parseFlashVerificationCli(
       throw invalid();
     input[key] = Number(value);
   }
+  if (
+    options.approve !== undefined &&
+    ![true, false, "true", "false"].includes(options.approve)
+  )
+    throw invalid();
   const stop = options["stop-open-sessions"];
   if (stop !== undefined && ![true, false, "true", "false"].includes(stop))
     throw invalid();

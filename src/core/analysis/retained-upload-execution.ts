@@ -27,6 +27,7 @@ export class UploadCleanupFailure extends PlatformIOError {
 export interface RetainedUploadExecution {
   custody: ProcessDeviceCustody;
   guard: () => void;
+  finishCustody?: () => void; // Host sequence completion remains part of retryable cleanup.
   signal?: AbortSignal;
   timeoutMs?: number;
 }
@@ -53,6 +54,7 @@ export async function executeRetainedEspUpload(
     if (released) return;
     await processOwner?.cleanupProcess();
     options.custody.releaseAfterExit();
+    options.finishCustody?.();
     released = true;
   };
   const check = () => {
@@ -68,7 +70,12 @@ export async function executeRetainedEspUpload(
     output = Buffer.concat([output, data]).subarray(-2 * 1024 * 1024);
   };
   let result:
-    | { exitCode: number; output: string; manifestSha256: string }
+    | {
+        exitCode: number;
+        output: string;
+        manifestSha256: string;
+        manifest: typeof manifest;
+      }
     | undefined;
   let failure: unknown;
   try {
@@ -102,6 +109,7 @@ export async function executeRetainedEspUpload(
       exitCode,
       output: output.toString("utf8"),
       manifestSha256: retained.sha256,
+      manifest,
     };
   } catch (error) {
     failure = error;

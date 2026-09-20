@@ -38,6 +38,9 @@ export const FlashVerificationCompatibilitySchema = z
     max_lines: z.number().int().min(1).max(10000).default(500),
     settle_s: z.number().finite().min(0).max(20).default(1.5),
     stability_window_s: z.number().finite().min(0).max(60).default(10),
+    resume_id: z.string().uuid().optional(),
+    manifest_approval_id: z.string().max(256).optional(),
+    system_approval_id: z.string().max(256).optional(),
     workflow_approval_id: z.string().max(256).optional(),
     approval_id: z.string().max(256).optional(),
     config_approval_id: z.string().max(256).optional(),
@@ -106,6 +109,19 @@ export async function executeFlashVerificationCompatibility(
       monitorPort: resolved.request.path,
       baudRate: resolved.request.baudRate,
       stopOpenSessions: args.stop_open_sessions,
+      retainFirmware:
+        Boolean(args.resume_id) ||
+        ((resolved.uploadSelection?.protocol == null ||
+          resolved.uploadSelection.protocol === "" ||
+          resolved.uploadSelection.protocol === "esptool") &&
+          (resolved.uploadSelection?.protocol === "esptool" ||
+            (typeof resolved.uploadSelection?.platform === "string" &&
+              /^(?:platformio\/)?espressif(?:32|8266)(?:@|$)/.test(
+                resolved.uploadSelection.platform,
+              )))),
+      resumeId: args.resume_id,
+      manifestApprovalId: args.manifest_approval_id,
+      systemApprovalId: args.system_approval_id,
       verification: {
         expect: args.expect,
         failOn: args.fail_on,
@@ -135,6 +151,12 @@ export async function executeFlashVerificationCompatibility(
         project_dir: projectDir,
         env: resolved.environment,
         text: report.lines.join("\n"),
+        ...("upload_manifest" in report && report.upload_manifest
+          ? {
+              archived_elf_sha256: report.upload_manifest.elf.sha256,
+              expected_elf_sha256: report.upload_manifest.elf.sha256,
+            }
+          : {}),
         approval_id: args.decode_approval_id,
         config_approval_id: args.decode_config_approval_id,
       },

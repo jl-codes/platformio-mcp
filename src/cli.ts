@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { withInteractiveApprovals } from "./core/policy/interactive-approvals.js";
 import { parseFlashVerificationCli } from "./adapters/flash-verification-cli.js";
 import { executeFlashVerificationCompatibility } from "./adapters/flash-verification-compat.js";
 import { executeCoredump } from "./tools/coredump.js";
@@ -133,7 +134,7 @@ COMMANDS:
   project-metadata|list-targets --project-dir <dir> [--environment <env>]
   coredump --project-dir <dir> (--dump-path <file> | --port <port> --table-path <csv> --table-offset <bytes>) [--format <raw|base64>] [--analyze false | --elf-path <file>]
   partition-table --project-dir <dir> [--environment <env>] [--table-path <file>] [--format <csv|binary>] [--table-offset <bytes> | --sdkconfig-path <file>] [--flash-size <bytes>] [--firmware-path <file>] [--observed-table-path <file>]
-  flash-verify --project-dir <dir> [--environment <env>] [--upload-port <port>] [--monitor-port <port>] [--baud <rate>] [--expect <regex>] [--fail-on <regex>] [--timeout <seconds>] [--settle <seconds>] [--stability-window <seconds>] [--max-lines <count>] [--stop-open-sessions]
+  flash-verify --project-dir <dir> [--environment <env>] [--upload-port <port>] [--monitor-port <port>] [--baud <rate>] [--expect <regex>] [--fail-on <regex>] [--timeout <seconds>] [--settle <seconds>] [--stability-window <seconds>] [--max-lines <count>] [--stop-open-sessions] [--approve]
   run-target --project-dir <dir> --target <name> [--environment <env>] [--upload-port <port>]
   pkg-search --query <query> [--kind library|platform|tool] [--page <n>]
   pkg-install --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
@@ -450,9 +451,15 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       const input = parseFlashVerificationCli(options, positionals, projectDirForPolicy);
       const client = new SerialClientContext();
       try {
-        const result = await executeFlashVerificationCompatibility(input, client, {}, {
+        const execute = () => executeFlashVerificationCompatibility(input, client, {}, {
           workspaceDir: projectDirForPolicy, actor: "user",
         });
+        const result = (approvalOpt === true || (!jsonMode && approvalOpt !== false))
+          ? await withInteractiveApprovals(
+              async (request) => approvalOpt === true || promptApproval(request.reason),
+              execute,
+            )
+          : await execute();
         printOutput(result, jsonMode);
         if (!result.ok) process.exitCode = 1;
       } finally {

@@ -11,14 +11,18 @@ import type {
   SerialSessionOwner,
 } from "../core/serial/session-manager.js";
 import { PendingUploadStore } from "../core/analysis/pending-upload-store.js";
-import type { executeRetainedEspUpload } from "../core/analysis/retained-upload-execution.js";
+import type {
+  executeRetainedEspUpload,
+  RetainedUploadExecution,
+} from "../core/analysis/retained-upload-execution.js";
 import { PlatformIOError } from "../utils/errors.js";
 
 /** One instance belongs to one authenticated connection, never to a caller-supplied session ID. */
 export class SerialClientContext {
   /** Host-only retained upload approvals and cleanup belong to this connection. */
   readonly pendingUploads = new PendingUploadStore<
-    Awaited<ReturnType<typeof executeRetainedEspUpload>>
+    Awaited<ReturnType<typeof executeRetainedEspUpload>>,
+    RetainedUploadExecution
   >();
   private readonly owner: SerialSessionOwner;
   private closed = false;

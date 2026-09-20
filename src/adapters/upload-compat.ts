@@ -4,6 +4,7 @@ import {
   executeNamedTarget,
   type ReservedUploadCustody,
   type AroundAuthorizedUpload,
+  type HostUploadExecutor,
 } from "../tools/run-target.js";
 import type { SerialClientContext } from "./serial-client.js";
 import type { CompatibilityProjectDefaults } from "./compatibility-project.js";
@@ -20,6 +21,7 @@ export function executeUploadCompatibility(
   onAuthorized?: () => Promise<void>,
   reservedUpload?: ReservedUploadCustody,
   aroundUpload?: AroundAuthorizedUpload,
+  hostUpload?: HostUploadExecutor,
 ) {
   const params = UploadCompatibilitySchema.parse(input);
   return executeNamedTarget(
@@ -30,5 +32,6 @@ export function executeUploadCompatibility(
     onAuthorized,
     reservedUpload,
     aroundUpload,
+    hostUpload,
   );
 }

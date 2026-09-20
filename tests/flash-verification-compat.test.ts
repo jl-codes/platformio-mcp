@@ -158,3 +158,36 @@ it("rejects a denied flash workflow before configuration or device discovery", a
   expect(mocks.resolve).not.toHaveBeenCalled();
   expect(mocks.execute).not.toHaveBeenCalled();
 });
+
+it.each([
+  ["espressif32", null, true],
+  ["platformio/espressif8266@4.2.1", null, true],
+  ["espressif32", "espota", false],
+  ["ststm32", null, false],
+  ["custom-platform", "esptool", true],
+])(
+  "selects retained uploads for platform=%s protocol=%s",
+  async (platform, protocol, retained) => {
+    mocks.resolve.mockResolvedValueOnce({
+      environment: "esp",
+      request: { path: "monitor", baudRate: 115200 },
+      uploadSelection: { platform, protocol },
+    });
+    await executeFlashVerificationCompatibility({}, client);
+    expect(mocks.execute.mock.calls[0][0].retainFirmware).toBe(retained);
+  },
+);
+it("binds automatic crash decoding to the ELF retained by this upload", async () => {
+  const hash = "a".repeat(64);
+  mocks.execute.mockResolvedValueOnce({
+    ok: false,
+    verdict: "fail",
+    lines: ["Backtrace: 0x40001234"],
+    upload_manifest: { elf: { sha256: hash } },
+  });
+  await executeFlashVerificationCompatibility({}, client);
+  expect(mocks.decode.mock.calls[0][1]).toMatchObject({
+    archived_elf_sha256: hash,
+    expected_elf_sha256: hash,
+  });
+});

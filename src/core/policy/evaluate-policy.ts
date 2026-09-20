@@ -1,4 +1,8 @@
 /** Enforce category and concrete-operation policy with one-use request-bound approvals. */
+import {
+  interactiveApprovalId,
+  requestInteractiveApproval,
+} from "./interactive-approvals.js";
 import { policyNamesForOperation } from "../action-catalog.js";
 import path from "node:path";
 import { actionRiskLevels, deniedActionPatterns } from "./default-policy.js";
@@ -96,6 +100,7 @@ async function evaluatePolicyInternal(
   args: Record<string, unknown>,
   context: PolicyEvaluationContext,
   planning: boolean,
+  interactiveRetry = true,
 ): Promise<PolicyDecision> {
   const action = normalizeActionName(actionName);
   const riskLevel = riskForAction(action);
@@ -301,8 +306,16 @@ async function evaluatePolicyInternal(
       scopeVersion: 1,
       operationName: context.operationName ?? action,
     };
+    const interactive =
+      context.actor === "user" &&
+      (context.actorClass === undefined ||
+        context.actorClass === "interactive");
     const explicitApprovalId =
-      typeof args.approvalId === "string" ? args.approvalId : undefined;
+      typeof args.approvalId === "string"
+        ? args.approvalId
+        : interactive
+          ? interactiveApprovalId(scopeDigest)
+          : undefined;
 
     if (explicitApprovalId) {
       const candidate = planning ? getApproval(explicitApprovalId) : undefined;
@@ -346,6 +359,17 @@ async function evaluatePolicyInternal(
       metadata: scopeMetadata,
       expiresInMinutes: 30,
     });
+    if (interactive && interactiveRetry) {
+      const approvedId = await requestInteractiveApproval(approval);
+      if (approvedId)
+        return evaluatePolicyInternal(
+          actionName,
+          { ...args, approvalId: approvedId },
+          context,
+          planning,
+          false,
+        );
+    }
     const needsApproval = decision(
       "requires_approval",
       `${action} requires explicit approval by policy.`,

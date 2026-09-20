@@ -23,7 +23,7 @@ import { resolveSerialEndpoint } from "../core/devices/serial-endpoint.js";
 import { hardwareLockManager } from "../utils/lock-manager.js";
 import { readCommandOutput, retainCommandLog } from "../utils/command-log.js";
 import { PlatformIOError } from "../utils/errors.js";
-import { buildTarget } from "./build.js";
+import { buildTarget, type TargetExecutionOptions } from "./build.js";
 import { cleanCompatibilityResult } from "../adapters/clean-compat.js";
 import {
   resolveCompatibilityProject,
@@ -65,6 +65,15 @@ export type AroundAuthorizedUpload = (
   upload: (custody?: ReservedUploadCustody) => Promise<boolean>,
 ) => Promise<void>;
 
+/** Host-owned firmware executor used only inside the canonical upload authorization and device lock. */
+export type HostUploadExecutor = (
+  input: TargetExecutionOptions & {
+    projectDir: string;
+    environment?: string;
+    deviceBinding?: string;
+  },
+) => Promise<void>;
+
 /** Authorize before stopping monitors or spawning, and preserve cleanup uncertainty on failure. */
 export async function executeNamedTarget(
   input: unknown,
@@ -74,8 +83,14 @@ export async function executeNamedTarget(
   onAuthorized?: () => Promise<void>,
   reservedUpload?: ReservedUploadCustody,
   aroundUpload?: AroundAuthorizedUpload,
+  hostUpload?: HostUploadExecutor,
 ) {
   const request = RunTargetSchema.parse(input);
+  if (hostUpload && request.target !== "upload")
+    throw new PlatformIOError(
+      "Custom upload execution requires the upload target.",
+      "UPLOAD_COMMAND_UNSUPPORTED",
+    );
   const projectDir = await resolveCompatibilityProject(
     request.project_dir,
     defaults,
@@ -215,7 +230,7 @@ export async function executeNamedTarget(
           };
           let timedOut = false;
           try {
-            await buildTarget(projectDir, request.target, environment, false, {
+            const execution: TargetExecutionOptions = {
               uploadPort,
               serialPort: endpoint?.canonicalPort,
               ...(reservedUpload
@@ -228,7 +243,17 @@ export async function executeNamedTarget(
               onResult: async (result) => {
                 completed = await collect(result.exitCode, result.fullLogPath);
               },
-            });
+            };
+            if (hostUpload)
+              await hostUpload({ ...execution, projectDir, environment });
+            else
+              await buildTarget(
+                projectDir,
+                request.target,
+                environment,
+                false,
+                execution,
+              );
           } catch (error) {
             if (
               error instanceof PlatformIOError &&

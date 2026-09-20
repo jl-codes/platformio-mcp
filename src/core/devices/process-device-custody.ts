@@ -8,6 +8,7 @@ import { resolveSerialEndpoint } from "./serial-endpoint.js";
 
 /** Internal lifecycle capability; only confirmed child cleanup permits release. */
 export interface ProcessDeviceCustody {
+  revalidateSpawn?(): void | Promise<void>; // Fresh device check between sequential owned children.
   prepareSpawn(): void | Promise<void>; // Revalidate endpoint and persist uncertainty before creating a child.
   releaseAfterExit(): void; // Trusted caller proves no child started or execution has terminated.
 }
@@ -24,6 +25,7 @@ export function acquireProcessDeviceCustody(
   const endpoint = (dependencies.resolve ?? resolveSerialEndpoint)(port);
   const lease = store.acquire(endpoint.resource);
   return {
+    revalidateSpawn: () => endpoint.revalidate(),
     prepareSpawn() {
       endpoint.revalidate();
       store.beginHandoff(lease);

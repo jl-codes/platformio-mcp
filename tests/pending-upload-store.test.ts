@@ -138,3 +138,24 @@ it("keeps failed upload cleanup available across disconnect retries", async () =
   await store.close();
   expect(cleanup).toHaveBeenCalledTimes(2);
 });
+
+it("rejects a different device on the same port before authorization", async () => {
+  const { retained } = fixture();
+  const store = new PendingUploadStore();
+  const execute = vi.fn();
+  const original = { ...scope, deviceBinding: "usb:original" };
+  const { resumeId } = store.stage(retained, original, () => {}, execute);
+  await expect(
+    store.resume(
+      resumeId,
+      { ...scope, deviceBinding: "usb:replacement" },
+      undefined,
+      {},
+    ),
+  ).rejects.toThrow();
+  await expect(store.resume(resumeId, scope, undefined, {})).rejects.toThrow();
+  expect(mocks.dispatch).not.toHaveBeenCalled();
+  expect(execute).not.toHaveBeenCalled();
+  await store.resume(resumeId, original, undefined, {});
+  expect(execute).toHaveBeenCalledOnce();
+});

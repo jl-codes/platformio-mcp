@@ -3,7 +3,7 @@ import { z } from "zod";
 import { redactSecretsInText } from "../core/policy/redact.js";
 
 const decisionSchema = z.object({
-  status: z.enum(["allow", "deny", "requires_approval"]),
+  status: z.enum(["allow", "ready", "deny", "requires_approval"]),
   reason: z.string().max(8192),
   action: z.string().max(256),
   riskLevel: z.enum(["low", "medium", "high", "critical"]),
@@ -40,6 +40,35 @@ export function compatibilityErrorResult(error: unknown) {
         reason: redactSecretsInText(parsed.data.reason).slice(0, 8192),
       }
     : undefined;
+  const preflight = z
+    .object({
+      opening: decisionSchema,
+      reading: decisionSchema,
+    })
+    .safeParse(context.decisions);
+  const decisions = preflight.success
+    ? Object.fromEntries(
+        Object.entries(preflight.data).map(([key, value]) => [
+          key,
+          {
+            ...value,
+            reason: redactSecretsInText(value.reason).slice(0, 8192),
+          },
+        ]),
+      )
+    : undefined;
+  const resume =
+    code === "APPROVAL_REQUIRED"
+      ? z
+          .object({
+            resumeId: z.string().uuid(),
+            manifestSha256: z
+              .string()
+              .regex(/^[a-f0-9]{64}$/)
+              .optional(),
+          })
+          .safeParse(context)
+      : undefined;
   const result = {
     ok: false as const,
     error: names[code] ?? code,
@@ -49,9 +78,21 @@ export function compatibilityErrorResult(error: unknown) {
         : "Compatibility operation failed.",
     ).slice(0, 8192),
     log_path: null,
+    ...(resume?.success
+      ? {
+          resume_id: resume.data.resumeId,
+          ...(resume.data.manifestSha256
+            ? { manifest_sha256: resume.data.manifestSha256 }
+            : {}),
+        }
+      : {}),
     status:
       code === "APPROVAL_REQUIRED" ? ("blocked" as const) : ("failed" as const),
-    details: { code, ...(policyDecision ? { policyDecision } : {}) },
+    details: {
+      code,
+      ...(policyDecision ? { policyDecision } : {}),
+      ...(decisions ? { decisions } : {}),
+    },
     ...(policyDecision?.approvalId
       ? { approval_id: policyDecision.approvalId }
       : {}),

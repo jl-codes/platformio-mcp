@@ -95,11 +95,11 @@ export interface SerialPowerHold {
  * Trusted hook retains the future monitor's leases; its caller must separately authorize upload effects.
  * Monitor startup permission and this custody capability do not grant firmware execution permission.
  */
-export type SerialBeforeOpen = (input: {
+export type SerialBeforeOpen = ((input: {
   sessionId: string;
   signal: AbortSignal;
   custody: ProcessDeviceCustody;
-}) => Promise<void>;
+}) => Promise<void>) & { discoverySnapshots?: 1 | 2 };
 interface Session {
   id: string;
   owner: SerialSessionOwner;
@@ -640,6 +640,19 @@ export class SerialSessionManager {
     let prepared = false;
     let released = false;
     const custody: ProcessDeviceCustody = {
+      revalidateSpawn: async () => {
+        if (!active || released || abort.signal.aborted)
+          throw new PlatformIOError(
+            "Upload custody is no longer available.",
+            "SERIAL_CLOSED",
+          );
+        await this.checkEndpoint(session, guard);
+        if (!active || released || abort.signal.aborted)
+          throw new PlatformIOError(
+            "Upload custody is no longer available.",
+            "SERIAL_CLOSED",
+          );
+      },
       prepareSpawn: async () => {
         if (!active || prepared || released)
           throw new PlatformIOError(
