@@ -91826,10 +91826,24 @@ function parseDependencyGraph(output) {
       "DEPENDENCY_GRAPH_LIMIT"
     );
   let explicitEmpty = false;
+  let scanning = false;
   const graph = [];
   const stack = [];
   let found = false, active = false, malformed = false, nodes = 0;
   for (const line of lines2) {
+    if (line.trim() === "Scanning dependencies...") {
+      scanning = true;
+      continue;
+    }
+    if (scanning && line.trim() === "No dependencies") {
+      found = true;
+      explicitEmpty = true;
+      scanning = false;
+      active = false;
+      continue;
+    }
+    if (scanning && line.trim() && line.trim() !== "Dependency Graph")
+      scanning = false;
     if (/^Dependency Graph\s*$/.test(line.trim())) {
       if (found) malformed = true;
       found = true;

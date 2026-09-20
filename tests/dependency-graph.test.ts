@@ -35,3 +35,14 @@ it("distinguishes missing and malformed graphs from observed empty graphs", () =
 it("rejects oversized lines before parsing", () => {
   expect(() => parseDependencyGraph("x".repeat(16385))).toThrow("line limits");
 });
+
+it("accepts observed Core no-dependencies output without a graph heading", () => {
+  expect(
+    parseDependencyGraph(
+      "LDF Modes: Finder ~ chain, Compatibility ~ soft\nFound 33 compatible libraries\nScanning dependencies...\nNo dependencies\nBuilding in debug mode",
+    ),
+  ).toMatchObject({ status: "complete", graph: [] });
+  expect(parseDependencyGraph("compiler message: No dependencies").status).toBe(
+    "unavailable",
+  );
+});

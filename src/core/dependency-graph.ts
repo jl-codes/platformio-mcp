@@ -23,6 +23,7 @@ export function parseDependencyGraph(output: string) {
       "DEPENDENCY_GRAPH_LIMIT",
     );
   let explicitEmpty = false;
+  let scanning = false;
   const graph: DependencyGraphNode[] = [];
   const stack: DependencyGraphNode[] = [];
   let found = false,
@@ -30,6 +31,19 @@ export function parseDependencyGraph(output: string) {
     malformed = false,
     nodes = 0;
   for (const line of lines) {
+    if (line.trim() === "Scanning dependencies...") {
+      scanning = true;
+      continue;
+    }
+    if (scanning && line.trim() === "No dependencies") {
+      found = true;
+      explicitEmpty = true;
+      scanning = false;
+      active = false;
+      continue;
+    }
+    if (scanning && line.trim() && line.trim() !== "Dependency Graph")
+      scanning = false;
     if (/^Dependency Graph\s*$/.test(line.trim())) {
       if (found) malformed = true;
       found = true;

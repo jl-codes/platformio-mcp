@@ -518,3 +518,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Results explicitly label inventory as pre-build, matching the reference scan-before-build ordering. Summary reports build success/failure independently; newly installed libraries need a subsequent inspection.
 - Added successful/failed mocked-build tests with graph evidence, mutation of installed inventory during build, secret redaction and policy revocation during build. TypeScript compilation and ten service/graph tests passed; plugin and three npm archive validations passed after rebuild.
 - These are policy/integration tests with mocked subprocesses, not actual PlatformIO build evidence. Full parity/release acceptance remains open.
+
+### Real Windows dependency MCP acceptance
+
+- Added repeatable MCP-only verification script using the existing pinned ESP32-S3 fixture and isolated build-only operator policy. Canonical optional build and compatibility inspection succeeded without hardware access. Evidence: `dependency-mcp-windows-evidence.json`.
+- Real output exposed Core's `Scanning dependencies...` / `No dependencies` form without a graph heading. Added parsing and regression coverage, then reran MCP acceptance successfully with complete empty-graph evidence.
+- TypeScript compilation, 11 graph/service tests, real MCP build/alias checks, plugin validation and three npm archive validations passed. Runtime rebuilt.
+- This proves Windows empty-graph fixture behavior only. Populated graph, other hosts, exact result equivalence and remaining full-plan acceptance/release work remain open. No release publication occurred.
