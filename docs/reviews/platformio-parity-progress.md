@@ -537,3 +537,9 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added bounded byte-valued statistics with sample-order trends, explicit insufficient-sample status, actual timestamp regression for per-second rates, and paired fragmentation hints. No session-uptime-derived rate or confirmed leak claim is produced.
 - TypeScript compilation and four tests pass, including irregular timing, missing/duplicate timestamps, thresholds, limits and inconsistent fragmentation observations.
 - This is an internal analysis foundation. Reference telemetry formats, explicit stack word/byte conversion, bounded custom patterns, serial ownership/capture and public MCP/CLI/reference integration remain required.
+
+### Memory telemetry parser foundation
+
+- Added bounded parsing for Arduino-style free/min/largest heap lines and named task stack high-water marks. Stack units remain unknown unless explicitly supplied; word counts require a specified word size before conversion to bytes.
+- TypeScript compilation and seven parser/statistics tests passed, covering paired heap fields, unit uncertainty/overrides, unknown logs and input/value bounds.
+- ESP-IDF blocks, FreeRTOS task tables, additional print variants, custom bounded patterns, serial collection and public integrations remain open. This is not full memory-watch parity.
