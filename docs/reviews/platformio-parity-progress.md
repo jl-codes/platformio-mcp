@@ -1147,3 +1147,8 @@ Registered coredump in MCP and CLI with strict artifact arguments, staged permis
 
 Added a core-dump partition reader reusing existing flash-read approvals, endpoint ownership and exact-byte checks. Invalid, oversized or encrypted selections fail before device access; erased partitions return an explicit absent-crash result. Shared flash reads now establish owner-only Windows ACL/POSIX staging before writing bytes and retain their existing uncertain-process cleanup behavior. Ten focused selection/flash-policy/private-storage cases passed with mocked hardware; lint and TypeScript passed. Actual hardware and effective-table/public adapter integration remain outstanding.
 
+
+### Effective-table core acquisition
+
+Connected core reads to the authorized partition workflow, retaining exact table source hash, offset and environment evidence. Invalid/mismatching layouts, missing crash storage, ambiguous selections and unknown flags fail before the core read; explicit partition names disambiguate multiple entries. Three real offline parser/policy cases with mocked device acquisition passed after adding the required application partition to valid fixture layouts; lint and TypeScript passed. No live-device layout identity or physical acquisition acceptance is claimed; public acquisition/reference adapter integration remains outstanding.
+
