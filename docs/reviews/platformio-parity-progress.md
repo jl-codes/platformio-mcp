@@ -1784,3 +1784,19 @@ target and spooler regressions pass; TypeScript and scoped lint pass. The affect
 plugin runtime was rebuilt. No physical upload was run. Public flash workflow
 selection, multi-phase custody, retained uploader execution and hash-bound approval
 are still required before firmware correspondence can be claimed publicly.
+
+### Sequential custody and retained uploader execution
+
+`ProcessCustodySequence` keeps the parent lease and pending handoff across child
+phases, revalidates before every phase, rejects parallel or late consumers and
+requires confirmed closure before release. A real lease-store regression proves
+another owner cannot acquire the device between capture and upload.
+`executeRetainedEspUpload` validates the selected command, verifies retained bytes
+before and after custody preparation, then uses the existing process-tree supervisor.
+The supervisor now exposes finite-command completion only with a reported exit code,
+confirmed descendant cleanup and supervisor closure. Cancellation and timeout require
+cleanup; uncertain cleanup retains a private callable retry capability.
+A real benign Windows child returned exit code 7 and its exact expected output with
+confirmed cleanup; see upload-process-windows-evidence.json. This executed no hardware.
+Focused sequence, retained execution and supervisor regressions pass. Public workflow
+selection, approval/resume binding and automatic crash decoding remain to be connected.

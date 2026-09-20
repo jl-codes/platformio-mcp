@@ -1,0 +1,13 @@
+{
+  "observedAt": "2026-09-20T16:53:55.464Z",
+  "platform": "win32",
+  "node": "v24.15.0",
+  "sourceSha256": "12a28340194d4eb01bde8e165205e359e62cfe62382b20cd8eec074eb37fba8d",
+  "exitCode": 7,
+  "output": "retained-upload-supervisor-fixture",
+  "cleanupConfirmed": true,
+  "hardwareExecuted": false,
+  "limitations": [
+    "Benign Node child only; no PlatformIO upload or device operation."
+  ]
+}

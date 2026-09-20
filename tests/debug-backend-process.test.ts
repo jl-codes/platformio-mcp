@@ -112,3 +112,38 @@ it("rejects malformed interactive encoding even when a later cleanup record clai
     code: "DEBUG_BACKEND_CLEANUP_PENDING",
   });
 });
+
+it.each([0, 7])(
+  "returns observed finite command exit %i only after cleanup and closure",
+  async (exitCode) => {
+    const { child, owner, event } = fixture();
+    const completion = owner.waitForCompletion(1000);
+    event({ event: "started", pid: 101 });
+    event({ event: "stopped", cleanupConfirmed: true, exitCode });
+    child.emit("close", 0);
+    await expect(completion).resolves.toBe(exitCode);
+  },
+);
+it("does not invent an exit code from supervisor closure", async () => {
+  const { child, owner, event } = fixture();
+  event({ event: "started", pid: 101 });
+  event({ event: "stopped", cleanupConfirmed: true });
+  child.emit("close", 0);
+  await expect(owner.waitForCompletion(1000)).rejects.toMatchObject({
+    code: "PROCESS_COMPLETION_UNCONFIRMED",
+    context: { cleanupPending: false },
+  });
+});
+it("waits for descendant cleanup when a finite command is cancelled", async () => {
+  const { child, owner, event } = fixture();
+  const abort = new AbortController();
+  event({ event: "started", pid: 101 });
+  const completion = owner.waitForCompletion(1000, abort.signal);
+  abort.abort();
+  event({ event: "stopped", cleanupConfirmed: true, exitCode: 1 });
+  child.emit("close", 0);
+  await expect(completion).rejects.toMatchObject({
+    code: "PROCESS_CANCELLED",
+    context: { cleanupPending: false },
+  });
+});

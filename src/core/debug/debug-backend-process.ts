@@ -35,6 +35,7 @@ export class DebugBackendProcess {
   private output = Buffer.alloc(0);
   private outputBytes = 0;
   private backendPid?: number;
+  private exitCode?: number;
   private cleanupAttempt?: Promise<void>;
   private readonly onStdout?: (data: Buffer) => void;
   private interactiveBytes = 0;
@@ -178,6 +179,63 @@ export class DebugBackendProcess {
     }
   }
 
+  /** Wait for a finite supervised command, requiring an exit code and descendant cleanup proof. */
+  async waitForCompletion(
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<number> {
+    this.validateTimeout(timeoutMs);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = signal?.aborted ?? false;
+    let timedOut = false;
+    let wake!: () => void;
+    const interrupted = new Promise<void>((resolve) => {
+      wake = resolve;
+    });
+    const cancel = () => {
+      cancelled = true;
+      wake();
+    };
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) cancel();
+    try {
+      timer = setTimeout(() => {
+        timedOut = true;
+        wake();
+      }, timeoutMs);
+      await Promise.race([this.closedPromise, interrupted]);
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", cancel);
+    }
+    if (cancelled || timedOut) {
+      await this.cleanupProcess();
+      throw new PlatformIOError(
+        cancelled
+          ? "Supervised command cancelled."
+          : "Supervised command timed out.",
+        cancelled ? "PROCESS_CANCELLED" : "COMMAND_TIMEOUT",
+        { cleanupPending: false },
+      );
+    }
+    if (
+      !this.closed ||
+      !this.confirmed ||
+      this.protocolFailed ||
+      this.failed ||
+      this.exitCode === undefined
+    )
+      throw new PlatformIOError(
+        "Supervised command completion is unconfirmed.",
+        "PROCESS_COMPLETION_UNCONFIRMED",
+        {
+          cleanupPending:
+            !this.closed || !this.confirmed || this.protocolFailed,
+        },
+      );
+    return this.exitCode;
+  }
+
   /** Bounded diagnostic output is not a readiness or device identity claim. */
   state() {
     return {
@@ -276,6 +334,15 @@ export class DebugBackendProcess {
           !this.confirmed &&
           typeof event.cleanupConfirmed === "boolean"
         ) {
+          if (event.exitCode !== undefined && event.exitCode !== null) {
+            if (
+              !Number.isSafeInteger(event.exitCode) ||
+              event.exitCode < -2147483648 ||
+              event.exitCode > 4294967295
+            )
+              throw new Error("Invalid process exit status");
+            this.exitCode = event.exitCode;
+          }
           this.confirmed = event.cleanupConfirmed;
           this.terminal = true;
         } else if (

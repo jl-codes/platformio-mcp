@@ -95749,6 +95749,7 @@ var DebugBackendProcess = class {
   output = Buffer.alloc(0);
   outputBytes = 0;
   backendPid;
+  exitCode;
   cleanupAttempt;
   onStdout;
   interactiveBytes = 0;
@@ -95873,6 +95874,50 @@ var DebugBackendProcess = class {
       clearTimeout(timer);
     }
   }
+  /** Wait for a finite supervised command, requiring an exit code and descendant cleanup proof. */
+  async waitForCompletion(timeoutMs, signal) {
+    this.validateTimeout(timeoutMs);
+    let timer;
+    let cancelled = signal?.aborted ?? false;
+    let timedOut = false;
+    let wake;
+    const interrupted = new Promise((resolve) => {
+      wake = resolve;
+    });
+    const cancel = () => {
+      cancelled = true;
+      wake();
+    };
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) cancel();
+    try {
+      timer = setTimeout(() => {
+        timedOut = true;
+        wake();
+      }, timeoutMs);
+      await Promise.race([this.closedPromise, interrupted]);
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", cancel);
+    }
+    if (cancelled || timedOut) {
+      await this.cleanupProcess();
+      throw new PlatformIOError(
+        cancelled ? "Supervised command cancelled." : "Supervised command timed out.",
+        cancelled ? "PROCESS_CANCELLED" : "COMMAND_TIMEOUT",
+        { cleanupPending: false }
+      );
+    }
+    if (!this.closed || !this.confirmed || this.protocolFailed || this.failed || this.exitCode === void 0)
+      throw new PlatformIOError(
+        "Supervised command completion is unconfirmed.",
+        "PROCESS_COMPLETION_UNCONFIRMED",
+        {
+          cleanupPending: !this.closed || !this.confirmed || this.protocolFailed
+        }
+      );
+    return this.exitCode;
+  }
   /** Bounded diagnostic output is not a readiness or device identity claim. */
   state() {
     return {
@@ -95951,6 +95996,11 @@ var DebugBackendProcess = class {
           this.started = true;
           this.resolveStarted();
         } else if (event.event === "stopped" && this.started && !this.confirmed && typeof event.cleanupConfirmed === "boolean") {
+          if (event.exitCode !== void 0 && event.exitCode !== null) {
+            if (!Number.isSafeInteger(event.exitCode) || event.exitCode < -2147483648 || event.exitCode > 4294967295)
+              throw new Error("Invalid process exit status");
+            this.exitCode = event.exitCode;
+          }
           this.confirmed = event.cleanupConfirmed;
           this.terminal = true;
         } else if (event.event === "failed" && !this.started && event.cleanupConfirmed === true) {
