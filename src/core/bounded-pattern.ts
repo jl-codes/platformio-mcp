@@ -46,8 +46,9 @@ try {
     while((match=regex.exec(workerData.lines[index]))!==null) {
       if(match.groups.value!==undefined) {
         const value=match.groups.value; const name=match.groups.name; const unit=match.groups.unit;
-        if(captures.length>=10000 || value.length>128 || (name!==undefined && name.length>128) || (unit!==undefined && unit.length>16)) { parentPort.postMessage({limit:true}); return; }
-        captures.push({line:index,start:match.index,end:match.index+match[0].length,value,...(name!==undefined?{name}:{}),...(unit!==undefined?{unit}:{})});
+        const voltage=match.groups.voltage; const vunit=match.groups.vunit;
+        if(captures.length>=10000 || value.length>128 || (name!==undefined && name.length>128) || (unit!==undefined && unit.length>16) || (voltage!==undefined && voltage.length>128) || (vunit!==undefined && vunit.length>16)) { parentPort.postMessage({limit:true}); return; }
+        captures.push({line:index,start:match.index,end:match.index+match[0].length,value,...(name!==undefined?{name}:{}),...(unit!==undefined?{unit}:{}),...(voltage!==undefined?{voltage}:{}),...(vunit!==undefined?{vunit}:{})});
       }
       if(match[0].length===0) regex.lastIndex++;
     }
@@ -66,6 +67,8 @@ export interface BoundedCapture {
   value: string;
   name?: string;
   unit?: string;
+  voltage?: string;
+  vunit?: string;
 }
 interface PatternResult {
   indices: number[];
