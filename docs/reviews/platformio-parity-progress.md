@@ -919,3 +919,8 @@ The contract comparator now treats properties and definition dictionaries as nam
 
 Completion tracking is attached immediately after child creation, before asynchronous PID/command registration. Pre-spawn failure closes the output descriptor. PID-registration failure cancels through the same bounded waiter; confirmed exit releases custody, while uncertain termination preserves it and reports the child PID and log path. Focused ownership/spooler checks: 13 passed; TypeScript passed. Plugin runtime rebuilt. This closes a startup failure gap but does not establish process-tree containment, shared physical device leases, or hardware acceptance.
 
+
+### Named-target execution prerequisites
+
+The existing buildTarget engine now accepts explicit uploadPort, bounded timeoutMs and completed-log observation without changing existing call defaults or result behavior. Invalid target/control inputs fail before execution. PlatformIOError codes and cleanupPending context survive target failure, allowing callers to retain uncertain hardware custody. TypeScript and nine mocked target-execution checks passed; plugin runtime rebuilt. PAR-35 remains incomplete: public canonical/compatibility routing, effect-based authorization, owned-session handling and shared physical-device leases must be integrated before exposure. No hardware target was executed.
+

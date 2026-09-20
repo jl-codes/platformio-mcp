@@ -508,6 +508,13 @@ export async function cleanProject(
   }
 }
 
+/** Trusted controls for an already-authorized named target; this helper does not grant device access. */
+export interface TargetExecutionOptions {
+  uploadPort?: string; // Explicit serial or network destination, kept as one argv value.
+  timeoutMs?: number; // Bounded execution deadline, defaulting to the existing ten minutes.
+  onResult?: (result: SpoolingForegroundResult) => Promise<void>; // Preserve full-log collection.
+}
+
 /**
  * Builds project for a specific target (e.g., 'upload', 'monitor', 'test').
  *
@@ -522,7 +529,18 @@ export async function buildTarget(
   target: string,
   environment?: string,
   verbose?: boolean,
+  execution: TargetExecutionOptions = {},
 ): Promise<BuildResult> {
+  const validArgument = (value: string, maximum: number) =>
+    typeof value === "string" && value.trim().length > 0 && value.length <= maximum &&
+    !value.startsWith("-") && !/[\x00-\x1f\x7f]/.test(value);
+  if (!validArgument(target, 4096))
+    throw new BuildError("Invalid named target.", { target });
+  if (execution.uploadPort !== undefined && !validArgument(execution.uploadPort, 512))
+    throw new BuildError("Invalid target upload port.");
+  if (execution.timeoutMs !== undefined &&
+      (!Number.isSafeInteger(execution.timeoutMs) || execution.timeoutMs < 1 || execution.timeoutMs > 3600000))
+    throw new BuildError("Invalid target timeout.");
   const validatedPath = validateProjectPath(projectDir);
 
   if (environment && !validateEnvironmentName(environment)) {
@@ -538,6 +556,8 @@ export async function buildTarget(
       args.push("--environment", environment);
     }
 
+    if (execution.uploadPort) args.push("--upload-port", execution.uploadPort);
+
     if (verbose) {
       args.push("--verbose");
     }
@@ -545,13 +565,14 @@ export async function buildTarget(
     const result = await executeWithSpooling("run", args, {
       cwd: validatedPath,
       projectDir: validatedPath,
-      timeout: 600000,
+      timeout: execution.timeoutMs ?? 600000,
     });
 
     if ('status' in result) {
       return result as unknown as BuildResult;
     }
 
+    await execution.onResult?.(result);
     const success = result.exitCode === 0;
     const errors = success ? undefined : parseStderrErrors(result.finalOutput);
 
@@ -575,13 +596,7 @@ export async function buildTarget(
       flashUsageBytes,
     };
   } catch (error) {
-    if (error instanceof PlatformIOError) {
-      throw new BuildError(`Target '${target}' failed: ${error.message}`, {
-        projectDir,
-        target,
-        environment,
-      });
-    }
+    if (error instanceof PlatformIOError) throw error;
     throw new BuildError(`Failed to build target '${target}': ${error}`, {
       projectDir,
       target,
