@@ -8,8 +8,18 @@ import type { ProcessDeviceCustody } from "../devices/process-device-custody.js"
 
 // Constant program; request data is JSON on stdin and never interpolated into executable code or argv.
 const ESPOTA_BRIDGE = String.raw`
-import json, runpy, sys
+import hashlib, json, runpy, sys
 request = json.loads(sys.stdin.buffer.read(65537))
+for filename, expected in [(request["image"], request["imageSha256"]), (request["script"], request["scriptSha256"])]:
+    digest = hashlib.sha256()
+    with open(filename, "rb") as artifact:
+        while True:
+            chunk = artifact.read(65536)
+            if not chunk:
+                break
+            digest.update(chunk)
+    if digest.hexdigest() != expected:
+        raise RuntimeError("OTA artifact changed before execution")
 sys.argv = [request["script"], "--ip", request["address"], "--port", str(request["port"]), "--file", request["image"], "--progress"]
 if request["auth"] is not None:
     sys.argv += ["--auth", request["auth"]]
@@ -23,6 +33,8 @@ export interface EspotaProcessRequest {
   pythonExecutable: string;
   uploaderScript: string;
   imagePath: string;
+  imageSha256: string;
+  uploaderSha256: string;
   address: string;
   port: number;
   auth?: string;
@@ -51,6 +63,8 @@ export async function runEspotaProcess(request: EspotaProcessRequest) {
     request.timeoutMs < 1 ||
     request.timeoutMs > 600000 ||
     typeof request.filesystem !== "boolean" ||
+    !/^[a-f0-9]{64}$/.test(request.imageSha256) ||
+    !/^[a-f0-9]{64}$/.test(request.uploaderSha256) ||
     (request.auth !== undefined &&
       (typeof request.auth !== "string" ||
         request.auth.length > 1024 ||
@@ -63,6 +77,8 @@ export async function runEspotaProcess(request: EspotaProcessRequest) {
   const payload = JSON.stringify({
     script: request.uploaderScript,
     image: request.imagePath,
+    imageSha256: request.imageSha256,
+    scriptSha256: request.uploaderSha256,
     address: request.address,
     port: request.port,
     auth: request.auth ?? null,

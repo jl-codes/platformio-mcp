@@ -296,6 +296,9 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
 
 /** Implemented internal service actions; these are not advertised as MCP tools. */
 export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  ota_upload_firmware: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
+  ota_upload_filesystem: { ...MCP_ACTIONS.upload_filesystem, policyAction: "upload_filesystem" },
+  ota_uploader_command: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command", riskLevel: "critical" },
   pio_flash_and_verify: { ...MCP_ACTIONS.agent_flash_monitor_verify, policyAction: "flash_verification" },
   flash_verification: { ...MCP_ACTIONS.agent_flash_monitor_verify, policyAction: "agent_flash_monitor_verify" },
   coredump_export: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },

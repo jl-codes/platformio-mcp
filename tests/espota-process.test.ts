@@ -23,6 +23,8 @@ function fixture(
     pythonExecutable: process.execPath,
     uploaderScript: path.join(os.tmpdir(), "espota.py"),
     imagePath: path.join(os.tmpdir(), "firmware.bin"),
+    imageSha256: "a".repeat(64),
+    uploaderSha256: "b".repeat(64),
     address: "192.0.2.8",
     port: 3232,
     auth: "private-password",

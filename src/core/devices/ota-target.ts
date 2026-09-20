@@ -119,14 +119,22 @@ export function acquireOtaCustody(
       "OTA_TARGET_INVALID",
     );
   const lease = store.acquire(target.resource);
+  let released = false;
   return {
     prepareSpawn() {
+      if (released)
+        throw new PlatformIOError(
+          "OTA custody is already released.",
+          "OTA_CUSTODY_CLOSED",
+        );
       store.beginHandoff(lease);
     },
     releaseAfterExit() {
+      if (released) return;
       try {
         store.cancelHandoff(lease);
         store.release(lease);
+        released = true;
       } catch {
         throw new PlatformIOError(
           "OTA lease cleanup is unconfirmed.",
