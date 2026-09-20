@@ -520,6 +520,12 @@ export const CheckProjectParamsSchema = z.object({
 
 // Run tests parameters
 export const RunTestsParamsSchema = z.object({
+  filter: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  ignore: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  withoutUploading: z.boolean().optional(),
+  withoutBuilding: z.boolean().optional(),
+  uploadPort: z.string().min(1).max(512).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  verbose: z.boolean().optional(),
   structuredReport: z.boolean().optional().describe("Collect per-case results for a foreground test run"),
   projectDir: z
     .string()

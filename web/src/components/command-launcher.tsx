@@ -90,6 +90,11 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
       if (values.action === "upload_firmware" && values.start_monitor !== undefined) payload.start_monitor = values.start_monitor;
       if (values.action === "build_project" && values.jobs != null) payload.jobs = values.jobs;
       if (values.action === "clean" && values.full !== undefined) payload.full = values.full;
+      if (values.action === "run_tests") {
+        if (values.filter) payload.filter = values.filter;
+        if (values.ignore) payload.ignore = values.ignore;
+        if (values.compileOnly !== undefined) payload.compileOnly = values.compileOnly;
+      }
       if (values.action === "check_project") {
         if (values.severity) payload.severity = values.severity;
         if (values.pattern) payload.pattern = values.pattern;
@@ -171,6 +176,20 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
           <Form.Item name="full" label="Also remove downloaded dependencies" valuePropName="checked" preserve={false} extra="The next build may need to download dependencies again.">
             <Switch />
           </Form.Item>
+        )}
+
+        {action === 'run_tests' && (
+          <>
+            <Form.Item name="filter" label="Include test suites" rules={[{ max: 4096, pattern: /^[^\x00-\x1f\x7f]*$/, message: 'Use a test pattern without control characters.' }]}>
+              <Input placeholder="For example, test_math*" maxLength={4096} />
+            </Form.Item>
+            <Form.Item name="ignore" label="Exclude test suites" rules={[{ max: 4096, pattern: /^[^\x00-\x1f\x7f]*$/, message: 'Use a test pattern without control characters.' }]}>
+              <Input placeholder="For example, test_slow*" maxLength={4096} />
+            </Form.Item>
+            <Form.Item name="compileOnly" label="Build tests only" valuePropName="checked" extra="Builds test firmware without uploading or running tests. Build-only policy always enforces this.">
+              <Switch />
+            </Form.Item>
+          </>
         )}
 
         {action === 'check_project' && (

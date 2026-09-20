@@ -1477,6 +1477,12 @@ const toolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        filter: { type: "string", minLength: 1, maxLength: 4096, description: "Include matching test suites" },
+        ignore: { type: "string", minLength: 1, maxLength: 4096, description: "Exclude matching test suites" },
+        withoutUploading: { type: "boolean", description: "Skip upload; test execution may still access hardware" },
+        withoutBuilding: { type: "boolean", description: "Use existing test artifacts; incompatible with compile-only" },
+        uploadPort: { type: "string", minLength: 1, maxLength: 512, description: "Explicit test upload port" },
+        verbose: { type: "boolean", description: "Verbose test output" },
         structuredReport: { type: "boolean", description: "Include per-case results for foreground runs; cannot be combined with background" },
         projectDir: {
           type: "string",
@@ -2461,14 +2467,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 const params = RunTestsParamsSchema.parse(args);
                 if (params.structuredReport && params.background)
                   throw new PlatformIOError("Structured test reports require foreground execution", "INVALID_ARGUMENT");
+                const options = { filter: params.filter, ignore: params.ignore, withoutUploading: params.withoutUploading,
+                  withoutBuilding: params.withoutBuilding, uploadPort: params.uploadPort, verbose: params.verbose };
                 const executeTask = () => params.structuredReport
-                  ? runTestsWithReport(params.projectDir, params.environment, params.compileOnly)
+                  ? runTestsWithReport(params.projectDir, params.environment, params.compileOnly, options)
                   :
                   runTests(
                     params.projectDir,
                     params.environment,
                     params.background,
                     params.compileOnly,
+                    options,
                   );
                 const result = params.sessionId
                   ? (hardwareLockManager.requireLock(params.sessionId),

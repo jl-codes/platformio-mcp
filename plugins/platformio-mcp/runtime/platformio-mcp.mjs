@@ -14610,6 +14610,12 @@ var init_types2 = __esm({
       )
     });
     RunTestsParamsSchema = external_exports.object({
+      filter: external_exports.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+      ignore: external_exports.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+      withoutUploading: external_exports.boolean().optional(),
+      withoutBuilding: external_exports.boolean().optional(),
+      uploadPort: external_exports.string().min(1).max(512).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+      verbose: external_exports.boolean().optional(),
       structuredReport: external_exports.boolean().optional().describe("Collect per-case results for a foreground test run"),
       projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
       sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
@@ -113450,8 +113456,8 @@ function startPortalServer(defaultPort = 8080) {
       req.body.projectDir,
       req.body,
       async () => {
-        const { projectDir, environment, compileOnly } = req.body;
-        return await runTests(projectDir, environment, true, compileOnly);
+        const { projectDir, environment, compileOnly, filter, ignore, withoutUploading, withoutBuilding, uploadPort, verbose } = req.body;
+        return await runTests(projectDir, environment, true, compileOnly, { filter, ignore, withoutUploading, withoutBuilding, uploadPort, verbose });
       },
       res
     );
@@ -116328,6 +116334,12 @@ var toolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
+        filter: { type: "string", minLength: 1, maxLength: 4096, description: "Include matching test suites" },
+        ignore: { type: "string", minLength: 1, maxLength: 4096, description: "Exclude matching test suites" },
+        withoutUploading: { type: "boolean", description: "Skip upload; test execution may still access hardware" },
+        withoutBuilding: { type: "boolean", description: "Use existing test artifacts; incompatible with compile-only" },
+        uploadPort: { type: "string", minLength: 1, maxLength: 512, description: "Explicit test upload port" },
+        verbose: { type: "boolean", description: "Verbose test output" },
         structuredReport: { type: "boolean", description: "Include per-case results for foreground runs; cannot be combined with background" },
         projectDir: {
           type: "string",
@@ -117156,11 +117168,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               const params = RunTestsParamsSchema.parse(args2);
               if (params.structuredReport && params.background)
                 throw new PlatformIOError("Structured test reports require foreground execution", "INVALID_ARGUMENT");
-              const executeTask = () => params.structuredReport ? runTestsWithReport(params.projectDir, params.environment, params.compileOnly) : runTests(
+              const options = {
+                filter: params.filter,
+                ignore: params.ignore,
+                withoutUploading: params.withoutUploading,
+                withoutBuilding: params.withoutBuilding,
+                uploadPort: params.uploadPort,
+                verbose: params.verbose
+              };
+              const executeTask = () => params.structuredReport ? runTestsWithReport(params.projectDir, params.environment, params.compileOnly, options) : runTests(
                 params.projectDir,
                 params.environment,
                 params.background,
-                params.compileOnly
+                params.compileOnly,
+                options
               );
               const result = params.sessionId ? (hardwareLockManager.requireLock(params.sessionId), await executeTask()) : await hardwareLockManager.withImplicitLock(executeTask);
               return {

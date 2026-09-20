@@ -14,3 +14,6 @@ The canonical check_project tool accepts optional severity (low, medium or high)
 
 Set structuredReport=true on the canonical run_tests tool to include validated testReport data from a foreground run. Existing calls keep their response shape. Missing or invalid reports produce success=false and testReportError. Combining structuredReport with background is rejected until background report lifecycle/retrieval is implemented. Build-only policy still prevents upload and test execution.
 
+
+The canonical run_tests tool and dashboard command API also accept filter, ignore, withoutUploading, withoutBuilding, uploadPort and verbose. Skipping upload alone can still run tests and open hardware; use compileOnly to disable upload and execution. The dashboard launcher exposes suite inclusion/exclusion patterns and Build tests only. Stage controls cannot override build-only policy.
+

@@ -88,3 +88,11 @@ it("contradictory build-only and skip-building fails before execution", async ()
   await expect(runTests(project, "fixture", false, true, { withoutBuilding: true })).rejects.toThrow("Cannot skip building");
   expect(executeWithSpooling).not.toHaveBeenCalled();
 });
+
+
+it("canonical test schema retains additive selections without changing old defaults", async () => {
+  const { RunTestsParamsSchema } = await import("../src/types.js");
+  expect(RunTestsParamsSchema.parse({ projectDir: project })).toEqual({ projectDir: project });
+  const options = { projectDir: project, filter: "test_math*", ignore: "test_slow*", withoutUploading: true, withoutBuilding: false, uploadPort: "COM8", verbose: true };
+  expect(RunTestsParamsSchema.parse(options)).toEqual(options);
+});

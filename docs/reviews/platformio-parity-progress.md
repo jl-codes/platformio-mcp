@@ -899,3 +899,8 @@ Added opt-in pio_test using canonical high-risk run_tests authorization with req
 
 Confirmed test timeouts now retain bounded redacted output and return an explicit test_timeout error with exit -1 and build diagnostics, without inventing report totals. Unconfirmed termination errors propagate with custody metadata, preserving lock/report retention. TypeScript and five focused mocked adapter checks passed; plugin rebuilt. Physical-device lease integration, real test execution and final release acceptance remain pending. No publication occurred.
 
+
+### Canonical test selections and dashboard access
+
+Added optional suite filters, upload/build stage switches, explicit upload port and verbosity to canonical run_tests and its dashboard command API. Both ordinary and structured foreground calls pass options to the same test runner; existing omitted-option behavior is preserved. Dashboard launcher exposes include/exclude patterns and compile-only mode. TypeScript, eleven focused mocked execution/schema checks and frontend production build passed; plugin rebuilt. Per-device lease coordination and native/background report acceptance remain pending; no publication occurred.
+
