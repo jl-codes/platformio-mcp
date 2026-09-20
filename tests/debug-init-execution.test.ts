@@ -6,10 +6,12 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createPrivateAnalysisDirectory } from "../src/core/analysis/private-analysis-directory.js";
 import {
   retainDebugInitialization,
+  retainDebugInitializationTemplate,
   ownDebugInitialization,
   type DebugInitArtifact,
 } from "../src/core/debug/debug-init-artifact.js";
 import { executeDebugInitialization } from "../src/core/debug/debug-init-execution.js";
+import { approveRequest } from "../src/core/policy/approvals.js";
 import { GdbMiSession } from "../src/core/debug/gdb-mi-session.js";
 import type { OwnedDebugProcess } from "../src/core/debug/debug-client-sessions.js";
 vi.mock("../src/core/analysis/private-analysis-directory.js", () => ({
@@ -167,4 +169,92 @@ it("retains the script until process cleanup succeeds", async () => {
   await expect(fs.stat(artifact.path)).rejects.toMatchObject({
     code: "ENOENT",
   });
+});
+
+it("keeps template authorization stable across private ELF locations while checking exact bytes", async () => {
+  const template =
+    "file __PIO_MCP_INIT_ELF_PATH__\ntarget remote __PIO_MCP_INIT_ENDPOINT__\n";
+  const first = await retainDebugInitializationTemplate(
+    template,
+    binding,
+    path.join(root, "first", "firmware.elf"),
+  );
+  const second = await retainDebugInitializationTemplate(
+    template,
+    binding,
+    path.join(root, "second", "firmware.elf"),
+  );
+  expect(first.authorization).toEqual(second.authorization);
+  expect(first.authorization.kind).toBe("template");
+  expect(first.sha256).not.toBe(second.sha256);
+  await first.verify();
+  await second.verify();
+  await fs.writeFile(second.path, await fs.readFile(first.path));
+  await expect(second.verify()).rejects.toMatchObject({
+    code: "DEBUG_INIT_ARTIFACT_CHANGED",
+  });
+  await first.release();
+  await second.release();
+});
+it("changes authorization when literal script instructions change", async () => {
+  const elf = path.join(root, "firmware.elf");
+  const first = await retainDebugInitializationTemplate(
+    "monitor reset halt\n",
+    binding,
+    elf,
+  );
+  const second = await retainDebugInitializationTemplate(
+    "monitor reset run\n",
+    binding,
+    elf,
+  );
+  expect(first.authorization.sha256).not.toBe(second.authorization.sha256);
+  expect(Object.isFrozen(first.authorization)).toBe(true);
+  await first.release();
+  await second.release();
+});
+
+it("honors a real template approval after retry allocates a different private firmware path", async () => {
+  await fs.writeFile(
+    path.join(root, "operator.json"),
+    JSON.stringify({
+      profile: "lab_admin",
+      overrides: {
+        allow: ["upload_firmware", "run_shell_command"],
+        deny: [],
+        approval_required: ["run_shell_command"],
+        audit_all_agent_actions: false,
+      },
+    }),
+  );
+  const template = "file __PIO_MCP_INIT_ELF_PATH__\n";
+  const first = await retainDebugInitializationTemplate(
+    template,
+    binding,
+    path.join(root, "attempt-one", "firmware.elf"),
+  );
+  const { session, lines } = transport();
+  const denied = await executeDebugInitialization(
+    session,
+    first,
+    input(),
+  ).catch((error: unknown) => error);
+  expect(denied).toMatchObject({ code: "APPROVAL_REQUIRED" });
+  const approvalId = (
+    denied as { context: { policyDecision: { approvalId: string } } }
+  ).context.policyDecision.approvalId;
+  expect(lines).toEqual([]);
+  approveRequest(approvalId);
+  await first.release();
+  const retried = await retainDebugInitializationTemplate(
+    template,
+    binding,
+    path.join(root, "attempt-two", "firmware.elf"),
+  );
+  await executeDebugInitialization(session, retried, {
+    ...input(),
+    hostApprovalId: approvalId,
+  });
+  expect(lines).toHaveLength(3);
+  await retried.release();
 });

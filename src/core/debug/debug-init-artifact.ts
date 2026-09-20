@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 import { PlatformIOError } from "../../utils/errors.js";
 import { createPrivateAnalysisDirectory } from "../analysis/private-analysis-directory.js";
+import { bindDebugInitializationTemplate } from "./debug-init-template.js";
 import type { OwnedDebugProcess } from "./debug-client-sessions.js";
 
 /** Declared startup scope; a privileged script is executable code, not a proof of its eventual target effects. */
@@ -20,6 +21,11 @@ export interface DebugInitArtifact {
   readonly sha256: string;
   readonly size: number;
   readonly binding: Readonly<DebugInitBinding>;
+  readonly authorization: Readonly<{
+    kind: "script" | "template";
+    sha256: string;
+    size: number;
+  }>;
   verify(): Promise<void>;
   release(): Promise<void>;
 }
@@ -29,6 +35,29 @@ const activeArtifacts = new WeakSet<DebugInitArtifact>();
 export async function retainDebugInitialization(
   script: string,
   binding: DebugInitBinding,
+): Promise<DebugInitArtifact> {
+  return retainInitialization(script, binding);
+}
+
+/** Bind trusted Core placeholders; approvals identify the template and firmware, not random private paths. */
+export async function retainDebugInitializationTemplate(
+  template: string,
+  binding: DebugInitBinding,
+  retainedElfPath: string,
+): Promise<DebugInitArtifact> {
+  const script = bindDebugInitializationTemplate(template, {
+    elfPath: retainedElfPath,
+    host: binding.host,
+    port: binding.port,
+  });
+  return retainInitialization(script, binding, template);
+}
+
+/** Keep exact byte integrity separate from the stable semantic approval identity. */
+async function retainInitialization(
+  script: string,
+  binding: DebugInitBinding,
+  template?: string,
 ): Promise<DebugInitArtifact> {
   if (
     typeof script !== "string" ||
@@ -62,6 +91,13 @@ export async function retainDebugInitialization(
       path: file,
       sha256,
       size: bytes.length,
+      authorization: Object.freeze({
+        kind: template === undefined ? "script" : "template",
+        sha256: createHash("sha256")
+          .update(template ?? script, "utf8")
+          .digest("hex"),
+        size: Buffer.byteLength(template ?? script),
+      }),
       binding: Object.freeze({
         ...binding,
         elfSha256: binding.elfSha256.toLowerCase(),

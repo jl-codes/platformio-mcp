@@ -36,8 +36,9 @@ export async function executeDebugInitialization(
   const base = {
     projectDir: input.projectDir,
     sessionId: input.sessionId,
-    scriptSha256: artifact.sha256,
-    scriptBytes: artifact.size,
+    initializationKind: artifact.authorization.kind,
+    scriptSha256: artifact.authorization.sha256,
+    scriptBytes: artifact.authorization.size,
     ...artifact.binding,
     purpose: "debugger_initialization_script",
   };
