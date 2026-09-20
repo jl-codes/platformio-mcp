@@ -131,3 +131,15 @@ The collector verifies source containment and hashes, rejects duplicate requirem
 Upload the validated output as `platformio-parity-acceptance` in the successful same-commit Actions run selected by the release workflow. Actual evidence producers and final hardware results must still be supplied; running the collector alone does not establish parity or publishing readiness.
 
 The manual **Assemble parity acceptance** workflow now provides the Actions artifact path. Run it at the exact release commit with up to 64 successful evidence-run IDs separated by commas or whitespace. Each producer run must belong to `jl-codes/platformio-mcp`, have that exact head SHA and a same-repository head, and supply `platformio-parity-evidence` containing its disjoint `manifest.json` entries and referenced files. All producer identities are checked before downloading. The collector then verifies the complete requirement inventory and uploads `platformio-parity-acceptance` only on success, with source-run accounting. Use the successful assembly run ID for `acceptance_run_id` in Release. This workflow neither executes hardware nor generates missing acceptance assertions.
+
+### Installer evidence producer
+
+The manual **Installer configuration acceptance** workflow runs the complete Codex
+configuration installer regression suite and emits one `platformio-parity-evidence`
+packet for `POL-05`. It requires a clean tracked checkout and unchanged commit, retains
+the actual JSON test report, command output and tested installer/test sources, and
+rejects missing scenarios, skips, failures, inconsistent counts, or an existing output
+directory. It establishes only installer configuration behavior, not physical hardware,
+real host runtime integration, publication, or the full acceptance catalog. Run it at
+the final release commit; its successful run ID can then be combined with disjoint
+producer runs by **Assemble parity acceptance**.

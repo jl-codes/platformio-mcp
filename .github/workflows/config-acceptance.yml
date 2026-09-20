@@ -1,0 +1,23 @@
+name: Installer configuration acceptance
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Produce POL-05 evidence
+        run: node scripts/produce-config-acceptance.mjs config-acceptance-packet
+      - uses: actions/upload-artifact@v7
+        with:
+          name: platformio-parity-evidence
+          path: config-acceptance-packet
+          if-no-files-found: error
