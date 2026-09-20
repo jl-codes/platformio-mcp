@@ -114,7 +114,7 @@ describe("Codex plugin manifest", () => {
       tools: Record<string, string[]>;
     };
 
-    expect(declaredTools.size).toBe(55);
+    expect(declaredTools.size).toBe(56);
     expect(new Set(Object.keys(coverage.tools))).toEqual(declaredTools);
     for (const skillNames of Object.values(coverage.tools)) {
       expect(skillNames.length).toBeGreaterThan(0);

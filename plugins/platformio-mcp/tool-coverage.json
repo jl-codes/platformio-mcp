@@ -225,6 +225,10 @@
     "run_target": [
       "pio-manager",
       "platformio-debug"
+    ],
+    "partition_table": [
+      "pio-manager",
+      "platformio-debug"
     ]
   }
 }

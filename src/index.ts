@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { executePartitionTable } from "./tools/partition-table.js";
 import { executeSystemCompatibility } from "./adapters/system-compat.js";
 import { executeUploadCompatibility } from "./adapters/upload-compat.js";
 import { executeNamedTarget, executeRunTargetAction } from "./tools/run-target.js";
@@ -294,6 +295,23 @@ const toolDefinitions: ToolDefinition[] = [
       },
       required: ["projectDir"],
       additionalProperties: false,
+    },
+  },
+  {
+    name: "partition_table",
+    description: "Inspect explicit offline ESP partition artifacts and firmware fit. Requires the resolved table offset; does not build or read a device.",
+    inputSchema: {
+      type: "object", required: ["projectDir", "tablePath", "format", "tableOffset"], additionalProperties: false,
+      properties: {
+        projectDir: { type: "string", minLength: 1, maxLength: 32768 },
+        tablePath: { type: "string", minLength: 1, maxLength: 32768 },
+        format: { type: "string", enum: ["csv", "binary"] },
+        tableOffset: { type: "integer", minimum: 0, maximum: 4294963200 },
+        flashSize: { type: "integer", minimum: 1, maximum: 4294967296 },
+        firmwarePath: { type: "string", minLength: 1, maxLength: 32768 },
+        observedTablePath: { type: "string", minLength: 1, maxLength: 32768 },
+        approvalId: { type: "string", maxLength: 256 },
+      },
     },
   },
   {
@@ -1659,6 +1677,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     if (
+      name === "partition_table" ||
       name === "run_target" ||
       name === "deps_check" ||
       name === "decode_backtrace" ||
@@ -1698,7 +1717,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         () =>
           registeredTool.handler(args, {
             dispatch: async (tool, parameters) =>
-              tool === "run_target"
+              tool === "partition_table"
+                ? executePartitionTable(parameters, caller, onAuthorized)
+                : tool === "run_target"
                 ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized)
                 : tool === "pio_system_info"
                   ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
@@ -1750,7 +1771,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         success: result.ok,
         status: result.ok ? "completed" : "failed",
         summary:
-          name === "run_target" ||
+          name === "partition_table" ||
+      name === "run_target" ||
           name === "deps_check" ||
           name.startsWith("pkg_") ||
           compatibilityTool ||

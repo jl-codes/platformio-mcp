@@ -1031,3 +1031,7 @@ Added bounded CSV/binary partition parsing with an explicitly supplied table off
 ### Offline partition reports and artifact identities
 
 Added deterministic layout comparison including flag changes, capacity/OTA/NVS/core-dump findings, per-application firmware fit and explicit unknown sizes. Offline artifact inspection uses bounded regular-file reads inside the granted workspace, detects observed replacement/mutation, validates UTF-8 and records SHA-256 identities for table, firmware and comparison bytes. Comparison copies are labelled offline rather than live device evidence. Thirteen report and four artifact regressions passed, plus TypeScript validation. These internal building blocks still require canonical/CLI/compatibility dispatch, effective project layout resolution and authorized device reads; no full partition acceptance is claimed.
+
+### Public offline partition inspection
+
+Connected bounded artifact inspection to canonical partition_table and partition-table CLI with strict arguments, shared get_project_config authorization, concrete action denials and policy revision checks. Supplied comparison mismatches make the public result unsuccessful. Updated tool inventories and plugin coverage. Nineteen focused registry/manifest checks, three permission cases and TypeScript validation passed. The source now exposes 56 canonical tools and 31 optional aliases; pio_partition_table is deliberately not advertised until its project resolution and device-read contract exists. Full PAR acceptance remains incomplete.

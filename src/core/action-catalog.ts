@@ -25,6 +25,7 @@ const READ: ActionSafetyMetadata = {
 
 /** Existing callable MCP actions; additions require matching registered handlers. */
 export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  partition_table: { ...READ, policyAction: "get_project_config" },
   run_target: {
     policyAction: "run_shell_command", riskLevel: "critical",
     readOnly: false, destructive: true, idempotent: false, openWorld: true,
@@ -347,6 +348,8 @@ export const actionRiskLevels: Record<string, PolicyRiskLevel> = {
 /** Resolves the existing CLI spelling to its concrete operation. */
 export function operationForCliCommand(command: string): string {
   switch (command) {
+    case "partition-table":
+      return "partition_table";
     case "run-target":
       return "run_target";
     case "project-envs":

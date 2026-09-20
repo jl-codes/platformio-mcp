@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { executePartitionTable } from "./tools/partition-table.js";
 
 import { executeRunTargetAction } from "./tools/run-target.js";
 import { SerialClientContext } from "./adapters/serial-client.js";
@@ -127,6 +128,7 @@ COMMANDS:
   deps-check --project-dir <dir> [--environment <env>] [--build]
   project-envs --project-dir <dir>
   project-metadata|list-targets --project-dir <dir> [--environment <env>]
+  partition-table --project-dir <dir> --table-path <file> --format <csv|binary> --table-offset <bytes> [--flash-size <bytes>] [--firmware-path <file>] [--observed-table-path <file>]
   run-target --project-dir <dir> --target <name> [--environment <env>] [--upload-port <port>]
   pkg-search --query <query> [--kind library|platform|tool] [--page <n>]
   pkg-install --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
@@ -367,6 +369,27 @@ async function runCliCommand(command: string, rawArgs: string[]) {
   };
 
   try {
+    if (command === "partition-table") {
+      const allowed = new Set(["json", "project-dir", "table-path", "format", "table-offset", "flash-size", "firmware-path", "observed-table-path", "approval-id"]);
+      if (positionals.length || Object.keys(options).some((key) => !allowed.has(key)))
+        throw new PlatformIOError("Unknown partition inspection argument.", "PARTITION_INPUT_INVALID");
+      const numberOption = (key: string) => {
+        const value = asString(options[key]);
+        if (value === undefined) return undefined;
+        if (!/^(?:0x[0-9a-f]+|[0-9]+)$/i.test(value))
+          throw new PlatformIOError("Expected integer bytes for --" + key, "PARTITION_INPUT_INVALID");
+        return Number(value);
+      };
+      const result = await executePartitionTable({
+        projectDir: projectDirForPolicy, tablePath: asString(options["table-path"]),
+        format: asString(options.format), tableOffset: numberOption("table-offset"),
+        flashSize: numberOption("flash-size"), firmwarePath: asString(options["firmware-path"]),
+        observedTablePath: asString(options["observed-table-path"]), approvalId: asString(options["approval-id"]),
+      }, {workspaceDir: projectDirForPolicy, actor: "user"});
+      printOutput(result, jsonMode);
+      if (!result.ok) process.exitCode = 1;
+      return;
+    }
     if (command === "run-target") {
       const allowed = new Set([
         "json", "project-dir", "target", "environment", "upload-port",
@@ -1154,6 +1177,7 @@ async function main() {
   );
   const command = args[0];
   const knownCommands = new Set([
+    "partition-table",
     "run-target",
     "deps-check",
     "project-envs",
