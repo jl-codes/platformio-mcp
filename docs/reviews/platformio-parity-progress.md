@@ -2008,3 +2008,12 @@ collector and was not accepted as release evidence. Updated the read-only workfl
 checkout to pull_request.head.sha (github.sha for manual dispatch), so future packets
 and producer metadata bind the same revision. The mismatch was found through actual
 artifact inspection; no validator was weakened and no release acceptance was claimed.
+
+### 2026-09-20: completed non-publishing 3.1.0 distribution run
+
+Release run 35529831694 completed successfully on 6a2e9566, including all five Python
+host installations, both native container architectures and aggregate artifact gates.
+Retained job outcomes/URLs and GitHub artifact IDs/digests in
+ distribution-310-build-evidence.json. All publication inputs were false; publication
+jobs were skipped as intended. No registry-installed acceptance, physical hardware,
+protected publication or full parity acceptance is inferred from this success.
