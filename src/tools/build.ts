@@ -44,6 +44,13 @@ import { diagnoseBuildLog } from "../core/diagnostics/build-diagnostics.js";
 import { diagnoseUploadLog } from "../core/diagnostics/upload-diagnostics.js";
 import { diagnoseSerialLog } from "../core/diagnostics/serial-diagnostics.js";
 import type { DiagnosticResult } from "../core/diagnostics/types.js";
+/** Trusted execution controls for callers that require a fresh, fully observed build. */
+export interface BuildExecutionOptions {
+  jobs?: number; // Positive parallel job count passed directly to PlatformIO.
+  forceExecution?: boolean; // Bypass content-cache replay without changing log verbosity.
+  timeoutMs?: number; // Foreground compatibility timeout override.
+  onResult?: (result: SpoolingForegroundResult) => Promise<void>; // Observe completed output.
+}
 /**
  * Builds a PlatformIO project.
  *
@@ -57,6 +64,7 @@ export async function buildProject(
   environment?: string,
   verbose?: boolean,
   background?: boolean,
+  execution: BuildExecutionOptions = {},
 ): Promise<BuildResult> {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
@@ -66,6 +74,11 @@ export async function buildProject(
       environment,
     });
   }
+
+  if (execution.jobs !== undefined && (!Number.isSafeInteger(execution.jobs) || execution.jobs < 1 || execution.jobs > 1024))
+    throw new BuildError("Build jobs must be an integer between 1 and 1024", { projectDir });
+  if (execution.timeoutMs !== undefined && (!Number.isInteger(execution.timeoutMs) || execution.timeoutMs < 1 || execution.timeoutMs > 3600000))
+    throw new BuildError("Build timeout must be between 1 and 3600000 milliseconds", { projectDir });
 
   // ----------------------------------------------------------------------------
   // 1. Content-hash cache short-circuit.
@@ -82,7 +95,7 @@ export async function buildProject(
   // want fresh ones from the compiler, not a cached tail.
   // ----------------------------------------------------------------------------
   const envName = environment || "default";
-  if (!background && !verbose) {
+  if (!background && !verbose && !execution.forceExecution && !execution.onResult) {
     const lookup = lookupBuildCache(validatedPath, envName);
     if (lookup.hit) {
       const cached = lookup.entry;
@@ -125,11 +138,13 @@ export async function buildProject(
       args.push("--verbose");
     }
 
+    if (execution.jobs !== undefined) args.push("--jobs", String(execution.jobs));
+
     // Build can take a while, especially first time
     const result = await executeWithSpooling("run", args, {
       cwd: validatedPath,
       projectDir: validatedPath,
-      timeout: background ? 3600000 : 600000, // 1 hour for background, 10 mins for foreground
+      timeout: execution.timeoutMs ?? (background ? 3600000 : 600000), // 1 hour for background, 10 mins for foreground
       background,
       rootCommandId
     });
@@ -140,6 +155,7 @@ export async function buildProject(
       return result as unknown as BuildResult;
     }
 
+    await execution.onResult?.(result);
     const success = result.exitCode === 0;
     const safeOutput = redactSecretsInText(result.finalOutput);
     const legacyErrors = success ? undefined : parseStderrErrors(safeOutput);
@@ -208,10 +224,7 @@ export async function buildProject(
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
-      throw new BuildError(`Build failed: ${error.message}`, {
-        projectDir,
-        environment,
-      });
+      throw error;
     }
     throw new BuildError(`Failed to build project: ${error}`, {
       projectDir,

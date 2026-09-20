@@ -831,3 +831,8 @@ Completed cleanup diagnostic category ordering and overlapping compiler/linker/S
 
 Foreground spooler failures now carry their log path and explicit cleanup state. Clean preserves typed execution errors. Confirmed timeout termination permits bounded redacted output collection, reference timeout marker/status/exit -1 and retry guidance. Unconfirmed termination remains an error, is not read as completed output, and retains the shared implicit hardware lock until recovery instead of releasing it in finally. TypeScript and 21 focused mocked cleanup/spooler/lock checks passed; plugin rebuilt. Native host/process-tree/hardware acceptance remains required; this does not prove termination of arbitrary descendants or complete the overall parity goal.
 
+
+### Public build compatibility adapter
+
+Added opt-in pio_build via canonical build_project authorization and shared implicit locking. Jobs/verbosity bind to the authorized request. Trusted executor options support jobs, timeout and completed-output observation; compatibility invokes a fresh foreground build with the reference twenty-minute timeout while canonical callers retain caching/background/default timeout behavior. Build and cleanup share bounded redacted output collection, diagnostics, memory, port errors and confirmed-timeout projection. Job counts are restricted to integers 1..1024 as an explicit resource bound. Compatibility surface is now 80 tools (54 canonical, 26 aliases). TypeScript and 22 focused build/clean/cache checks passed after correcting a mock export; plugin rebuilt. Native builds, complete artifact identity/upload integration and final-revision acceptance remain unfinished. No distributions published.
+

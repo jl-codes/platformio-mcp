@@ -1,6 +1,6 @@
 /** Verify clean target selection without launching PlatformIO or changing project files. */
 import { beforeEach, expect, test, vi } from "vitest";
-import { cleanProject } from "../src/tools/build.js";
+import { buildProject, cleanProject } from "../src/tools/build.js";
 import { executeWithSpooling } from "../src/utils/spooler.js";
 import { invalidateBuildCache } from "../src/utils/build-cache.js";
 
@@ -32,4 +32,15 @@ test("invalid cleanup options fail before cache mutation or command dispatch", a
   await expect(cleanProject("workspace", false, { full: "yes" as unknown as boolean })).rejects.toThrow("must be a boolean");
   expect(invalidateBuildCache).not.toHaveBeenCalled();
   expect(executeWithSpooling).not.toHaveBeenCalled();
+});
+
+
+test("fresh build passes jobs and timeout and observes nonzero output without a cache replay", async () => {
+  const result = { exitCode: 2, finalOutput: "compile failed", fullLogPath: "build.log" };
+  vi.mocked(executeWithSpooling).mockResolvedValueOnce(result);
+  const onResult = vi.fn().mockResolvedValue(undefined);
+  const built = await buildProject("workspace", "esp32", false, false, { jobs: 4, forceExecution: true, timeoutMs: 1200000, onResult });
+  expect(built.success).toBe(false);
+  expect(onResult).toHaveBeenCalledWith(result);
+  expect(executeWithSpooling).toHaveBeenCalledWith("run", ["--environment", "esp32", "--jobs", "4"], expect.objectContaining({ timeout: 1200000 }));
 });

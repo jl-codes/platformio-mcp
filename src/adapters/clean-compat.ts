@@ -1,7 +1,8 @@
-/** Authorize reference cleanup through the canonical destructive action and shared execution lock. */
+/** Authorize reference builds and cleanup through canonical actions and the shared execution lock. */
 import fs from "node:fs/promises";
 import { z } from "zod";
-import { cleanProject } from "../tools/build.js";
+import type { SpoolingForegroundResult } from "../utils/spooler.js";
+import { buildProject, cleanProject } from "../tools/build.js";
 import { BuildError, PlatformIOError } from "../utils/errors.js";
 import { hardwareLockManager } from "../utils/lock-manager.js";
 import { retainCommandLog } from "../utils/command-log.js";
@@ -15,36 +16,82 @@ import {
 } from "./compatibility-project.js";
 
 /** Execute selected clean target only after the exact request is authorized. */
-export async function executeCleanCompatibility(
+export function executeCleanCompatibility(
   input: unknown,
   defaults: CompatibilityProjectDefaults = {},
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
-  const params = z
-    .object({
-      project_dir: z.string().max(32768).nullable().optional(),
-      env: z
-        .string()
-        .regex(/^[a-zA-Z0-9_-]{1,50}$/)
-        .nullable()
-        .optional(),
-      full: z.boolean().default(false),
-      approval_id: z.string().max(256).optional(),
-    })
-    .strict()
-    .parse(input);
+  return executeRunCompatibility(
+    "clean",
+    input,
+    defaults,
+    caller,
+    onAuthorized,
+  );
+}
+
+/** Execute a fresh reference build through canonical authorization and the existing build engine. */
+export function executeBuildCompatibility(
+  input: unknown,
+  defaults: CompatibilityProjectDefaults = {},
+  caller: PolicyEvaluationContext = {},
+  onAuthorized?: () => Promise<void>,
+) {
+  return executeRunCompatibility(
+    "build",
+    input,
+    defaults,
+    caller,
+    onAuthorized,
+  );
+}
+
+/** Shared result collection never replaces canonical build or cleanup execution. */
+async function executeRunCompatibility(
+  mode: "build" | "clean",
+  input: unknown,
+  defaults: CompatibilityProjectDefaults,
+  caller: PolicyEvaluationContext,
+  onAuthorized?: () => Promise<void>,
+) {
+  const scope = {
+    project_dir: z.string().max(32768).nullable().optional(),
+    env: z
+      .string()
+      .regex(/^[a-zA-Z0-9_-]{1,50}$/)
+      .nullable()
+      .optional(),
+    approval_id: z.string().max(256).optional(),
+  };
+  const params =
+    mode === "clean"
+      ? z
+          .object({ ...scope, full: z.boolean().default(false) })
+          .strict()
+          .parse(input)
+      : z
+          .object({
+            ...scope,
+            jobs: z.number().int().min(1).max(1024).nullable().optional(),
+            verbose: z.boolean().default(false),
+          })
+          .strict()
+          .parse(input);
+  const timeoutMs = mode === "build" ? 1200000 : 120000;
   const projectDir = await resolveCompatibilityProject(
     params.project_dir,
     defaults,
   );
   const environment = params.env ?? undefined;
   return dispatchAuthorizedAction(
-    "clean_project",
+    mode === "build" ? "build_project" : "clean_project",
     {
       projectDir,
       environment,
-      full: params.full,
+      ...("full" in params
+        ? { full: params.full }
+        : { jobs: params.jobs ?? undefined, verbose: params.verbose }),
       approvalId: params.approval_id,
     },
     { ...caller, workspaceDir: projectDir },
@@ -98,20 +145,31 @@ export async function executeCleanCompatibility(
             await handle.close();
           }
           guard();
-          if (timedOut) output += "\n[platformio-mcp] timed out after 120s";
-          const logPath = await retainCommandLog("clean", output, "");
+          if (timedOut)
+            output += `\n[platformio-mcp] timed out after ${timeoutMs / 1000}s`;
+          const logPath = await retainCommandLog(mode, output, "");
           return { exitCode, output, logPath };
         };
         let timedOut = false;
         try {
-          await cleanProject(projectDir, false, {
-            environment,
-            full: params.full,
-            timeoutMs: 120000,
-            onResult: async (result) => {
-              completed = await collect(result.exitCode, result.fullLogPath);
-            },
-          });
+          const onResult = async (result: SpoolingForegroundResult) => {
+            completed = await collect(result.exitCode, result.fullLogPath);
+          };
+          if ("full" in params) {
+            await cleanProject(projectDir, false, {
+              environment,
+              full: params.full,
+              timeoutMs,
+              onResult,
+            });
+          } else {
+            await buildProject(projectDir, environment, params.verbose, false, {
+              jobs: params.jobs ?? undefined,
+              forceExecution: true,
+              timeoutMs,
+              onResult,
+            });
+          }
         } catch (error) {
           if (
             error instanceof PlatformIOError &&
@@ -131,7 +189,7 @@ export async function executeCleanCompatibility(
         guard();
         if (!completed)
           throw new PlatformIOError(
-            "Clean result was not collected",
+            "Command result was not collected",
             "COMPAT_RESULT_INVALID",
           );
         return cleanCompatibilityResult(
@@ -139,6 +197,7 @@ export async function executeCleanCompatibility(
           environment,
           (performance.now() - started) / 1000,
           timedOut,
+          mode,
         );
       });
     },
@@ -151,6 +210,7 @@ export function cleanCompatibilityResult(
   environment: string | undefined,
   duration: number,
   timedOut = false,
+  tool: "clean" | "build" = "clean",
 ) {
   const output = normalizeCleanOutput(result.output);
   const lines = output.split("\n");
@@ -248,7 +308,7 @@ export function cleanCompatibilityResult(
   const status = timedOut ? "timeout" : ok ? "success" : "failed";
   const durationSeconds = Math.round(duration * 100) / 100;
   const summary = [
-    `clean ${status} for env ${environment || environments.join(",") || "default"} in ${durationSeconds}s.`,
+    `${tool} ${status} for env ${environment || environments.join(",") || "default"} in ${durationSeconds}s.`,
   ];
   if (errors.length)
     summary.push(

@@ -3,6 +3,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   dispatch: vi.fn(),
   clean: vi.fn(),
+  build: vi.fn(),
   lock: vi.fn(),
   guard: vi.fn(),
   log: vi.fn(),
@@ -10,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../src/core/action-dispatcher.js", () => ({
   dispatchAuthorizedAction: mocks.dispatch,
 }));
-vi.mock("../src/tools/build.js", () => ({ cleanProject: mocks.clean }));
+vi.mock("../src/tools/build.js", () => ({ cleanProject: mocks.clean, buildProject: mocks.build }));
 vi.mock("../src/utils/lock-manager.js", () => ({
   hardwareLockManager: { withImplicitLock: mocks.lock },
 }));
@@ -32,6 +33,7 @@ vi.mock("node:fs/promises", () => ({
 }));
 import {
   executeCleanCompatibility,
+  executeBuildCompatibility,
   cleanCompatibilityResult,
 } from "../src/adapters/clean-compat.js";
 import { BuildError, PlatformIOError } from "../src/utils/errors.js";
@@ -184,4 +186,25 @@ test("uncertain termination remains an error and cannot be projected as complete
   mocks.clean.mockRejectedValueOnce(error);
   await expect(executeCleanCompatibility({})).rejects.toBe(error);
   expect(mocks.log).not.toHaveBeenCalled();
+});
+
+
+test("reference builds bind jobs and verbosity to canonical authorization and preserve the shared lock", async () => {
+  mocks.build.mockImplementation(async (project, env, verbose, background, options) => {
+    expect([project, env, verbose, background]).toEqual(["workspace", "esp32", true, false]);
+    expect(options).toMatchObject({ jobs: 4, forceExecution: true, timeoutMs: 1200000 });
+    await options.onResult({ exitCode: 0, finalOutput: "", fullLogPath: "raw.log" });
+    return { success: true };
+  });
+  const result = await executeBuildCompatibility({ env: "esp32", jobs: 4, verbose: true });
+  expect(mocks.dispatch.mock.calls[0].slice(0, 2)).toEqual(["build_project", { projectDir: "workspace", environment: "esp32", jobs: 4, verbose: true, approvalId: undefined }]);
+  expect(result.summary).toMatch(/^build success/);
+  expect(mocks.lock).toHaveBeenCalledOnce();
+  expect(mocks.clean).not.toHaveBeenCalled();
+});
+
+test("invalid build job counts fail before authorization or execution", async () => {
+  for (const jobs of [-1, 0, 1.5, 1025]) await expect(executeBuildCompatibility({ jobs })).rejects.toThrow();
+  expect(mocks.dispatch).not.toHaveBeenCalled();
+  expect(mocks.build).not.toHaveBeenCalled();
 });

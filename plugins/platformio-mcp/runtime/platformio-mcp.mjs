@@ -100850,6 +100850,26 @@ function withProjectCompatibility(base2) {
     },
     handler: (args, context) => context.dispatch("pio_clean", args)
   });
+  const build = base2.get("build_project");
+  if (!build || result.has("pio_build"))
+    throw new Error("Invalid build compatibility registry");
+  result.set("pio_build", {
+    ...build,
+    name: "pio_build",
+    description: "Run a fresh PlatformIO build with optional parallel jobs and compact diagnostics. Canonical build permissions apply.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], maxLength: 32768 },
+        env: { type: ["string", "null"], pattern: "^[a-zA-Z0-9_-]{1,50}$" },
+        jobs: { type: ["integer", "null"], minimum: 1, maximum: 1024 },
+        verbose: { type: "boolean", default: false },
+        approval_id: { type: "string", maxLength: 256 }
+      }
+    },
+    handler: (args, context) => context.dispatch("pio_build", args)
+  });
   return result;
 }
 
@@ -101113,7 +101133,7 @@ function diagnoseSerialLog(logText, opts) {
 
 // src/tools/build.ts
 init_command_registry();
-async function buildProject(projectDir, environment, verbose, background) {
+async function buildProject(projectDir, environment, verbose, background, execution = {}) {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto14.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
   if (environment && !validateEnvironmentName(environment)) {
@@ -101121,8 +101141,12 @@ async function buildProject(projectDir, environment, verbose, background) {
       environment
     });
   }
+  if (execution.jobs !== void 0 && (!Number.isSafeInteger(execution.jobs) || execution.jobs < 1 || execution.jobs > 1024))
+    throw new BuildError("Build jobs must be an integer between 1 and 1024", { projectDir });
+  if (execution.timeoutMs !== void 0 && (!Number.isInteger(execution.timeoutMs) || execution.timeoutMs < 1 || execution.timeoutMs > 36e5))
+    throw new BuildError("Build timeout must be between 1 and 3600000 milliseconds", { projectDir });
   const envName = environment || "default";
-  if (!background && !verbose) {
+  if (!background && !verbose && !execution.forceExecution && !execution.onResult) {
     const lookup = lookupBuildCache(validatedPath, envName);
     if (lookup.hit) {
       const cached2 = lookup.entry;
@@ -101159,10 +101183,11 @@ async function buildProject(projectDir, environment, verbose, background) {
     if (verbose) {
       args.push("--verbose");
     }
+    if (execution.jobs !== void 0) args.push("--jobs", String(execution.jobs));
     const result = await executeWithSpooling("run", args, {
       cwd: validatedPath,
       projectDir: validatedPath,
-      timeout: background ? 36e5 : 6e5,
+      timeout: execution.timeoutMs ?? (background ? 36e5 : 6e5),
       // 1 hour for background, 10 mins for foreground
       background,
       rootCommandId
@@ -101170,6 +101195,7 @@ async function buildProject(projectDir, environment, verbose, background) {
     if ("status" in result) {
       return result;
     }
+    await execution.onResult?.(result);
     const success = result.exitCode === 0;
     const safeOutput2 = redactSecretsInText(result.finalOutput);
     const legacyErrors = success ? void 0 : parseStderrErrors(safeOutput2);
@@ -101222,10 +101248,7 @@ async function buildProject(projectDir, environment, verbose, background) {
     };
   } catch (error2) {
     if (error2 instanceof PlatformIOError) {
-      throw new BuildError(`Build failed: ${error2.message}`, {
-        projectDir,
-        environment
-      });
+      throw error2;
     }
     throw new BuildError(`Failed to build project: ${error2}`, {
       projectDir,
@@ -101590,24 +101613,47 @@ var hardwareLockManager = HardwareLockManager.getInstance();
 
 // src/adapters/clean-compat.ts
 init_redact();
-async function executeCleanCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
-  const params = external_exports.object({
+function executeCleanCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
+  return executeRunCompatibility(
+    "clean",
+    input,
+    defaults,
+    caller,
+    onAuthorized
+  );
+}
+function executeBuildCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
+  return executeRunCompatibility(
+    "build",
+    input,
+    defaults,
+    caller,
+    onAuthorized
+  );
+}
+async function executeRunCompatibility(mode, input, defaults, caller, onAuthorized) {
+  const scope5 = {
     project_dir: external_exports.string().max(32768).nullable().optional(),
     env: external_exports.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).nullable().optional(),
-    full: external_exports.boolean().default(false),
     approval_id: external_exports.string().max(256).optional()
+  };
+  const params = mode === "clean" ? external_exports.object({ ...scope5, full: external_exports.boolean().default(false) }).strict().parse(input) : external_exports.object({
+    ...scope5,
+    jobs: external_exports.number().int().min(1).max(1024).nullable().optional(),
+    verbose: external_exports.boolean().default(false)
   }).strict().parse(input);
+  const timeoutMs = mode === "build" ? 12e5 : 12e4;
   const projectDir = await resolveCompatibilityProject(
     params.project_dir,
     defaults
   );
   const environment = params.env ?? void 0;
   return dispatchAuthorizedAction(
-    "clean_project",
+    mode === "build" ? "build_project" : "clean_project",
     {
       projectDir,
       environment,
-      full: params.full,
+      ..."full" in params ? { full: params.full } : { jobs: params.jobs ?? void 0, verbose: params.verbose },
       approvalId: params.approval_id
     },
     { ...caller, workspaceDir: projectDir },
@@ -101655,20 +101701,32 @@ async function executeCleanCompatibility(input, defaults = {}, caller = {}, onAu
             await handle.close();
           }
           guard();
-          if (timedOut2) output += "\n[platformio-mcp] timed out after 120s";
-          const logPath = await retainCommandLog("clean", output, "");
+          if (timedOut2)
+            output += `
+[platformio-mcp] timed out after ${timeoutMs / 1e3}s`;
+          const logPath = await retainCommandLog(mode, output, "");
           return { exitCode, output, logPath };
         };
         let timedOut = false;
         try {
-          await cleanProject(projectDir, false, {
-            environment,
-            full: params.full,
-            timeoutMs: 12e4,
-            onResult: async (result) => {
-              completed = await collect(result.exitCode, result.fullLogPath);
-            }
-          });
+          const onResult = async (result) => {
+            completed = await collect(result.exitCode, result.fullLogPath);
+          };
+          if ("full" in params) {
+            await cleanProject(projectDir, false, {
+              environment,
+              full: params.full,
+              timeoutMs,
+              onResult
+            });
+          } else {
+            await buildProject(projectDir, environment, params.verbose, false, {
+              jobs: params.jobs ?? void 0,
+              forceExecution: true,
+              timeoutMs,
+              onResult
+            });
+          }
         } catch (error2) {
           if (error2 instanceof PlatformIOError && error2.code === "COMMAND_TIMEOUT" && error2.context?.cleanupPending === false && typeof error2.context.fullLogPath === "string") {
             timedOut = true;
@@ -101679,20 +101737,21 @@ async function executeCleanCompatibility(input, defaults = {}, caller = {}, onAu
         guard();
         if (!completed)
           throw new PlatformIOError(
-            "Clean result was not collected",
+            "Command result was not collected",
             "COMPAT_RESULT_INVALID"
           );
         return cleanCompatibilityResult(
           completed,
           environment,
           (performance.now() - started) / 1e3,
-          timedOut
+          timedOut,
+          mode
         );
       });
     }
   );
 }
-function cleanCompatibilityResult(result, environment, duration3, timedOut = false) {
+function cleanCompatibilityResult(result, environment, duration3, timedOut = false, tool = "clean") {
   const output = normalizeCleanOutput(result.output);
   const lines2 = output.split("\n");
   const diagnostics = [];
@@ -101771,7 +101830,7 @@ function cleanCompatibilityResult(result, environment, duration3, timedOut = fal
   const status = timedOut ? "timeout" : ok ? "success" : "failed";
   const durationSeconds = Math.round(duration3 * 100) / 100;
   const summary = [
-    `clean ${status} for env ${environment || environments.join(",") || "default"} in ${durationSeconds}s.`
+    `${tool} ${status} for env ${environment || environments.join(",") || "default"} in ${durationSeconds}s.`
   ];
   if (errors.length)
     summary.push(
@@ -102077,6 +102136,8 @@ function projectCompatibilityResult(result) {
   );
 }
 async function executeProjectCompatibility(name2, input, defaults = {}, caller = {}, onAuthorized) {
+  if (name2 === "pio_build")
+    return executeBuildCompatibility(input, defaults, caller, onAuthorized);
   if (name2 === "pio_clean")
     return executeCleanCompatibility(input, defaults, caller, onAuthorized);
   if (name2 === "pio_project_init")
@@ -115801,6 +115862,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name: name2 } = request.params;
   const packageCompatibility = name2.startsWith("pio_pkg_");
   const projectCompatibility = [
+    "pio_build",
     "pio_clean",
     "pio_project_init",
     "pio_project_envs",

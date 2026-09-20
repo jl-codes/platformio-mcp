@@ -90,5 +90,26 @@ export function withProjectCompatibility<TResult>(
     },
     handler: (args, context) => context.dispatch("pio_clean", args),
   });
+  const build = base.get("build_project");
+  if (!build || result.has("pio_build"))
+    throw new Error("Invalid build compatibility registry");
+  result.set("pio_build", {
+    ...build,
+    name: "pio_build",
+    description:
+      "Run a fresh PlatformIO build with optional parallel jobs and compact diagnostics. Canonical build permissions apply.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], maxLength: 32768 },
+        env: { type: ["string", "null"], pattern: "^[a-zA-Z0-9_-]{1,50}$" },
+        jobs: { type: ["integer", "null"], minimum: 1, maximum: 1024 },
+        verbose: { type: "boolean", default: false },
+        approval_id: { type: "string", maxLength: 256 },
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_build", args),
+  });
   return result;
 }
