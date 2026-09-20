@@ -53,3 +53,20 @@ it("rejects outside-workspace images and detects retained-copy tampering", async
     code: "OTA_IMAGE_CHANGED",
   });
 });
+
+it("preserves upload evidence after cleanup and a later rebuild without overwriting tampering", async () => {
+  const archive = path.join(root, "archive");
+  snapshot = await retainOtaImage(project, image, undefined, archive);
+  const stored = await snapshot.archive();
+  await fs.writeFile(image, "later build");
+  expect(await snapshot.archive()).toBe(stored);
+  await snapshot.release();
+  expect(await fs.readFile(stored)).toEqual(Buffer.from([0xe9, 1, 2, 3]));
+  await fs.writeFile(image, Buffer.from([0xe9, 1, 2, 3]));
+  snapshot = await retainOtaImage(project, image, undefined, archive);
+  await fs.writeFile(stored, "tampered archive");
+  await expect(snapshot.archive()).rejects.toMatchObject({
+    code: "OTA_ARCHIVE_INVALID",
+  });
+  expect(await fs.readFile(stored, "utf8")).toBe("tampered archive");
+});

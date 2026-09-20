@@ -1,5 +1,6 @@
 /** Private snapshots bind OTA approval to exact firmware/filesystem bytes rather than mutable build outputs. */
 import fs from "node:fs/promises";
+import { archiveOtaImage } from "./ota-image-archive.js";
 import path from "node:path";
 import { createPrivateAnalysisDirectory } from "../analysis/private-analysis-directory.js";
 import { readPartitionArtifact } from "../esp-partition-artifacts.js";
@@ -10,6 +11,7 @@ export async function retainOtaImage(
   projectDir: string,
   imagePath: string,
   expectedSha256?: string,
+  archiveRoot?: string, // Trusted host/test dependency, never a public tool argument.
 ) {
   if (expectedSha256 !== undefined && !/^[a-fA-F0-9]{64}$/.test(expectedSha256))
     throw new PlatformIOError(
@@ -56,6 +58,14 @@ export async function retainOtaImage(
             "Retained OTA image changed.",
             "OTA_IMAGE_CHANGED",
           );
+      },
+      async archive() {
+        return archiveOtaImage(
+          snapshot,
+          identity.sourcePath,
+          identity.sha256,
+          archiveRoot,
+        );
       },
       release() {
         releasing ??= fs

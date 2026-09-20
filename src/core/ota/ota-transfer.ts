@@ -87,6 +87,8 @@ export async function executePreparedOtaTransfer(
           guard();
           await input.image.verify();
           guard();
+          const imageArchivePath = await input.image.archive();
+          guard();
           const custody = acquireOtaCustody(input.target);
           let cleanupPending = false;
           try {
@@ -110,6 +112,7 @@ export async function executePreparedOtaTransfer(
               ...result,
               imageSha256: input.image.identity.sha256,
               imageBytes: input.image.identity.size,
+              imageArchivePath,
               address: input.target.address,
               port: input.target.port,
               runtimeVerified: false as const,

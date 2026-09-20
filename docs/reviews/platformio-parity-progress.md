@@ -1674,3 +1674,10 @@ Validation: 38 focused process, initialization, compatibility and connection-own
 Controlled initialization now requests `-gdb-version` from the same supervised MI transport, within its existing total initialization deadline, after safeguards and symbol loading. A bounded, nontruncated GNU GDB banner is retained in process state and exposed through startup, owned listings and stop responses. Missing or unsupported version information remains null; timeout or process closure retains normal initialization-failure cleanup. No additional executable or target command is introduced. The command is specified by the [official GDB MI documentation](https://www.sourceware.org/gdb/current/onlinedocs/gdb.html/GDB_002fMI-Miscellaneous-Commands.html).
 
 Validation: 33 focused initialization/process/compatibility cases passed, including banner, absent output and unsupported-query behavior; TypeScript and scoped lint passed. The plugin was rebuilt. Physical debugger/backend acceptance remains outstanding.
+
+
+### Persistent OTA upload-image evidence
+
+After both OTA upload grants are authorized, the exact private image snapshot is archived by source scope and SHA-256 before network custody or transfer. Archive publication is atomic and never overwrites an existing object; existing bytes are revalidated. Public reports include `firmware_archive_path` while explicitly reporting `elf_correspondence: identity_unverified`. Private working-copy cleanup no longer discards the historical image. An archive does not assert that transfer succeeded, that the device booted it, or that an unrelated ELF corresponds to it. Serial uploader manifests and verified image-to-ELF mappings remain outstanding.
+
+Validation: eleven focused artifact and real-policy/synthetic-transfer cases passed, including retention after rebuild and cleanup, existing-object tampering, no archival before grants and no transfer after archive failure. TypeScript and scoped lint passed; plugin rebuilt. No hardware or network transfer was performed.

@@ -80,6 +80,7 @@ function fixture() {
         sha256: "a".repeat(64),
       },
       verify: vi.fn(async () => {}),
+      archive: vi.fn(async () => path.join(root, "archive.bin")),
       release: vi.fn(async () => {}),
     },
     filesystem: false,
@@ -112,6 +113,7 @@ it("requires both grants before transfer and binds approval to image identity wi
   expect(getApproval(upload.approvalId)?.status).toBe("approved");
   expect(mocks.run).not.toHaveBeenCalled();
   expect(mocks.acquire).not.toHaveBeenCalled();
+  expect(f.input.image.archive).not.toHaveBeenCalled();
   approveRequest(command.approvalId);
   f.input.commandApprovalId = command.approvalId;
   expect(JSON.stringify(getApproval(command.approvalId))).not.toContain(
@@ -121,6 +123,7 @@ it("requires both grants before transfer and binds approval to image identity wi
     exitCode: 0,
     runtimeVerified: false,
     imageSha256: "a".repeat(64),
+    imageArchivePath: path.join(root, "archive.bin"),
   });
   expect(getApproval(upload.approvalId)?.status).toBe("consumed");
   expect(getApproval(command.approvalId)?.status).toBe("consumed");
@@ -178,3 +181,15 @@ it.each([false, true])(
     expect(mocks.acquire).not.toHaveBeenCalled();
   },
 );
+
+it("does not start a transfer when archive verification fails", async () => {
+  const f = fixture();
+  vi.mocked(f.input.image.archive).mockRejectedValueOnce(
+    new PlatformIOError("changed", "OTA_ARCHIVE_INVALID"),
+  );
+  await expect(executePreparedOtaTransfer(f.input)).rejects.toMatchObject({
+    code: "OTA_ARCHIVE_INVALID",
+  });
+  expect(mocks.acquire).not.toHaveBeenCalled();
+  expect(mocks.run).not.toHaveBeenCalled();
+});
