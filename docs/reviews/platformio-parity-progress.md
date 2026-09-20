@@ -1912,3 +1912,16 @@ normal tools or 112 with the same 40 opt-in reference names. All 21 affected reg
 real stdio entrypoint/mode, legacy authorization, and plugin checks passed; TypeScript
 and scoped lint passed. No serial port was opened. Reachability, physical acceptance,
 and publication remain incomplete. The preceding CI runs were still in progress.
+
+### 2026-09-20: bounded OTA ICMP parity
+
+Implemented the previously missing verify_reachable behavior. Discovery authorization
+binds the requested reachability flag along with host/port, then name resolution pins
+one IPv4 destination used by the bounded probe and subsequent transfer. No reply stops
+before build/upload with host_unreachable; explicit opt-out skips the probe. Missing
+system utilities remain unknown and do not invent failure or runtime success. Windows
+exit-zero destination-unreachable replies are not treated as echo replies. Fixed OS
+paths, no shell/PATH search, 4.5-second execution limit, and 8-KiB output bound apply.
+All 23 focused reachability/composition cases passed with mocked network execution;
+TypeScript and scoped lint passed. No physical OTA or ICMP acceptance is claimed.
+Both CI runs 35528338157 and 35528335701 passed on preceding revision 79b8f1d1.

@@ -1,4 +1,8 @@
 /** Authorized ESP OTA build, immutable image capture, fixed network selection and protocol reporting. */
+import {
+  probeOtaReachability,
+  type OtaReachability,
+} from "../core/ota/ota-reachability.js";
 import { cleanCompatibilityResult } from "../adapters/clean-compat.js";
 import { redactSecretsInText } from "../core/policy/redact.js";
 import fs from "node:fs/promises";
@@ -107,21 +111,55 @@ export async function executeOtaUpload(
   const auth = args.auth ?? configuration.auth;
   const redactText = (value: string) =>
     redactSecretsInText(auth ? value.split(auth).join("[REDACTED]") : value);
+  const started = performance.now();
+  let reachability: OtaReachability = {
+    reachable: null,
+    status: "not_requested",
+  };
   const target = await dispatchAuthorizedAction(
     "list_devices",
     {
       projectDir,
       purpose: "ota_resolution",
+      verifyReachable: args.verifyReachable,
       host: args.host,
       port: args.port ?? configuration.configuredPort,
       approvalId: args.resolveApprovalId,
     },
     context,
-    () =>
-      resolveOtaTarget(args.host, args.port ?? configuration.configuredPort),
+    async () => {
+      const selected = await resolveOtaTarget(
+        args.host,
+        args.port ?? configuration.configuredPort,
+      );
+      guard();
+      if (args.verifyReachable)
+        reachability = await probeOtaReachability(selected.address);
+      guard();
+      return selected;
+    },
   );
   guard();
-  const started = performance.now();
+  if (reachability.reachable === false)
+    return {
+      ok: false,
+      error: "host_unreachable",
+      summary:
+        "The selected host did not answer ICMP. OTA availability is unknown; set verify_reachable=false if ICMP is blocked.",
+      host: args.host,
+      target_host: target.address,
+      port: target.port,
+      env: configuration.environment,
+      filesystem: args.filesystem,
+      platform_family: configuration.family,
+      reachable: false,
+      reachability_status: reachability.status,
+      runtime_verified: false,
+      duration_s: (performance.now() - started) / 1000,
+      output_tail: "",
+      log_path: null,
+      exit_code: null,
+    };
   return hardwareLockManager.withImplicitLock(async () => {
     guard();
     let buildResult: Awaited<ReturnType<typeof buildTarget>> | undefined;
@@ -177,6 +215,8 @@ export async function executeOtaUpload(
       return {
         ok: false,
         error: "build_failed",
+        reachable: reachability.reachable,
+        reachability_status: reachability.status,
         summary: "Build failed before OTA transfer.",
         build: buildResult,
         host: args.host,
@@ -319,10 +359,8 @@ export async function executeOtaUpload(
         embedded_elf_sha256: args.filesystem
           ? null
           : image.identity.embeddedElfSha256,
-        reachable: null,
-        reachability_status: args.verifyReachable
-          ? "icmp_not_probed"
-          : "not_requested",
+        reachable: reachability.reachable,
+        reachability_status: reachability.status,
         duration_s: (performance.now() - started) / 1000,
         exit_code: result.exitCode,
         log_path: logPath,

@@ -4,10 +4,14 @@ import path from "node:path";
 import os from "node:os";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
+  reachability: vi.fn(),
   config: vi.fn(),
   build: vi.fn(),
   transfer: vi.fn(),
   tools: vi.fn(),
+}));
+vi.mock("../src/core/ota/ota-reachability.js", () => ({
+  probeOtaReachability: mocks.reachability,
 }));
 vi.mock("../src/platformio.js", () => ({
   platformioExecutor: { execute: mocks.config },
@@ -60,6 +64,10 @@ beforeEach(async () => {
     }),
   );
   vi.clearAllMocks();
+  mocks.reachability.mockResolvedValue({
+    reachable: null,
+    status: "unavailable",
+  });
   mocks.config.mockResolvedValue({
     exitCode: 0,
     stdout: JSON.stringify([["env:esp", [["platform", "espressif32"]]]]),
@@ -244,4 +252,50 @@ it("preserves memory on successful OTA and bounds the uploader tail to forty lin
     errors: [],
   });
   expect(result.output_tail.split("\n")).toHaveLength(40);
+});
+
+it("stops before build or transfer when the pinned host gives no ICMP reply", async () => {
+  mocks.reachability.mockResolvedValue({
+    reachable: false,
+    status: "no_reply",
+  });
+  const result = await executeOtaUpload({
+    projectDir: project,
+    host: "192.0.2.8",
+  });
+  expect(mocks.reachability).toHaveBeenCalledWith("192.0.2.8");
+  expect(result).toMatchObject({
+    ok: false,
+    error: "host_unreachable",
+    reachable: false,
+    runtime_verified: false,
+  });
+  expect(mocks.build).not.toHaveBeenCalled();
+  expect(mocks.transfer).not.toHaveBeenCalled();
+});
+it("skips ICMP when explicitly disabled", async () => {
+  const result = await executeOtaUpload({
+    projectDir: project,
+    host: "192.0.2.8",
+    verifyReachable: false,
+  });
+  expect(mocks.reachability).not.toHaveBeenCalled();
+  expect(result).toMatchObject({
+    ok: true,
+    reachable: null,
+    reachability_status: "not_requested",
+  });
+});
+it("denied discovery cannot send an ICMP probe", async () => {
+  await fs.writeFile(
+    path.join(root, "policy.json"),
+    JSON.stringify({
+      profile: "read_only",
+      overrides: { deny: ["list_devices"] },
+    }),
+  );
+  await expect(
+    executeOtaUpload({ projectDir: project, host: "192.0.2.8" }),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(mocks.reachability).not.toHaveBeenCalled();
 });

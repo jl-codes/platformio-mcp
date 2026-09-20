@@ -50,3 +50,14 @@ handlers, permission checks, and connection-bound ownership. Existing `start_mon
 `monitor_capture`, `memory_watch`, and `port_diagnose` also use the shared
 reference schemas and handlers in normal mode. Capture and memory collection retain
 separate opening/reading authorization; port diagnosis does not open the port.
+
+### OTA reachability
+
+`verify_reachable` defaults to true. Under the discovery permission, OTA resolves one
+IPv4 address and sends one bounded ICMP probe to that exact address before building
+or uploading. A negative result returns `host_unreachable`; use
+`verify_reachable=false` when ICMP is intentionally blocked. Missing system ping
+utilities report `reachable: null` and allow the separately authorized OTA operation
+to continue. A ping reply establishes neither OTA service availability nor firmware
+runtime health. The system utility is selected from fixed OS paths without a shell
+or PATH search; public requests cannot choose its command or arguments.
