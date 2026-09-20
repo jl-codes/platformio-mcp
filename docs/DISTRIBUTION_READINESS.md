@@ -24,7 +24,7 @@ The finite source inventory is `distribution/namespaces.json`. `npm run namespac
 
 - Local `npm whoami --registry=https://registry.npmjs.org` returned HTTP 401. Repository admin access does not establish npm/PyPI ownership. Verify package-specific OIDC configuration in the protected release workflow; do not paste tokens into task messages.
 - Local manifests still use 3.0.0, already published. Select and consistently apply a new release version after compatibility review. Do not treat the existing 3.0.0 packages as the new implementation.
-- Python wheel packaging and MCP Registry publication automation are not implemented yet. The MCP Registry manifest and npm mcpName are implemented and validated locally.
+- A first Windows wheel builds and passes isolated CLI smoke; the other wheel targets and MCP Registry publication automation remain incomplete. The MCP Registry manifest and npm mcpName are implemented and validated locally.
 - Full parity, cross-host/hardware acceptance, and the release gate remain incomplete. No new release has been published by this goal.
 
 ## Release identity enforcement
@@ -42,3 +42,5 @@ Publication now reads the previously uploaded npm preflight manifest and rejects
 ## Python runtime preparation
 
 `distribution/python-runtime.json` pins Node 24.15.0 archive hashes for five planned wheel hosts and records the upstream OS/libc requirements. `scripts/prepare-python-node.py` downloads only the exact official archive at build time, validates its SHA-256, and stages the executable with its full license; the installed launcher never downloads Node. Windows x64 download/hash/extraction and `--version` passed locally. Other host launches and all installed-wheel acceptance remain pending. Wheel tags in this manifest are intended targets, not evidence of native dependency compatibility.
+
+The first Windows wheel (`pio-agent-platformio`) was built with pinned setuptools/wheel tooling, installed offline into a fresh Python 3.14 environment, and launched successfully with only that environment's Scripts directory on PATH. The `pio-agent`, `platformio-mcp`, and `pio-mcp` commands exercised version, plugin validation and help. Evidence and artifact hash are in `docs/reviews/python-wheel-windows-evidence.json`. This development artifact uses 3.0.0 and is not approved for publication; complete installed MCP/signal checks and all release gates remain required.

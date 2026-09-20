@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools==84.0.0", "wheel==0.48.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pio-agent-platformio"
+dynamic = ["version"]
+description = "PlatformIO MCP and CLI with a bundled Node runtime"
+requires-python = ">=3.11"
+license = "MIT"
+
+[project.urls]
+Repository = "https://github.com/jl-codes/platformio-mcp"
+
+[project.scripts]
+pio-agent = "pio_agent_launcher.__main__:main"
+platformio-mcp = "pio_agent_launcher.__main__:main"
+pio-mcp = "pio_agent_launcher.__main__:main"
+
+[project.optional-dependencies]
+platformio = ["platformio==6.1.16"]
+
+[tool.setuptools]
+packages = ["pio_agent_launcher"]
+package-dir = {"" = "src"}
+include-package-data = false
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}

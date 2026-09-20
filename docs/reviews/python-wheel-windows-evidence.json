@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "observedAtUtc": "2026-09-20T01:43:37.449661+00:00",
+  "scope": "local installed Windows x64 wheel CLI smoke; not release acceptance",
+  "baseCommit": "28cc70cb",
+  "builderChangesUncommittedAtBuild": true,
+  "artifact": {
+    "name": "pio_agent_platformio-3.0.0-py3-none-win_amd64.whl",
+    "sha256": "581173c6fbb91965273e82d8793d6281d00921425f054e378dc4acb49500c30a",
+    "bytes": 49067972
+  },
+  "python": "3.14",
+  "node": "24.15.0",
+  "installation": "fresh venv, pip --no-index --no-deps local wheel",
+  "runtimePath": "only fresh venv Scripts; no global Node",
+  "checks": {
+    "pio-agent --version": "3.0.0",
+    "platformio-mcp plugin validate --require-runtime": {
+      "success": true,
+      "skills": 8,
+      "runtimePresent": true
+    },
+    "pio-mcp --help": "PIO Agent usage printed"
+  },
+  "remaining": [
+    "MCP handshake and signal/stdio acceptance",
+    "OS minimum enforcement",
+    "all other platform wheels",
+    "optional PlatformIO extra isolation",
+    "complete license inventory",
+    "publisher authority and publication",
+    "full parity and hardware acceptance"
+  ]
+}
