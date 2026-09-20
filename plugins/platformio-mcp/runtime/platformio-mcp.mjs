@@ -5731,6 +5731,1188 @@ var require_proper_lockfile = __commonJS({
   }
 });
 
+// src/utils/paths.ts
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import fs from "node:fs";
+import os from "node:os";
+function canUseDir(dir) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const probe = path.join(dir, `.write-probe-${process.pid}-${Date.now()}`);
+    fs.writeFileSync(probe, "ok", "utf8");
+    fs.unlinkSync(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function resolveServerDataDir() {
+  const override = process.env.PIO_MCP_DATA_DIR?.trim();
+  if (override && canUseDir(override)) {
+    return path.resolve(override);
+  }
+  const homeScoped = path.join(os.homedir(), ".platformio-mcp");
+  if (canUseDir(homeScoped)) {
+    return homeScoped;
+  }
+  const cwdScoped = path.join(process.cwd(), ".platformio-mcp");
+  if (canUseDir(cwdScoped)) {
+    return cwdScoped;
+  }
+  const tmpScoped = path.join(os.tmpdir(), ".platformio-mcp");
+  if (canUseDir(tmpScoped)) {
+    return tmpScoped;
+  }
+  return cwdScoped;
+}
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+function ensureGlobalDirs() {
+  ensureDir(SERVER_DATA_DIR);
+  ensureDir(GLOBAL_LOCKS_DIR);
+}
+function sanitizePortName(port) {
+  return port.replace(/[\/\.:]/g, "_").replace(/^_+|_+$/g, "");
+}
+var __filename, __dirname2, PROJECT_ROOT, SERVER_DATA_DIR, GLOBAL_LOCKS_DIR;
+var init_paths = __esm({
+  "src/utils/paths.ts"() {
+    "use strict";
+    __filename = fileURLToPath(import.meta.url);
+    __dirname2 = path.dirname(__filename);
+    PROJECT_ROOT = path.resolve(__dirname2, "..", "..");
+    SERVER_DATA_DIR = resolveServerDataDir();
+    GLOBAL_LOCKS_DIR = path.join(SERVER_DATA_DIR, "serial_ports");
+  }
+});
+
+// src/utils/workspace-registry.ts
+var workspace_registry_exports = {};
+__export(workspace_registry_exports, {
+  addWorkspace: () => addWorkspace,
+  getWorkspaces: () => getWorkspaces,
+  rewriteRegistry: () => rewriteRegistry
+});
+import fs2 from "node:fs";
+import path2 from "node:path";
+function ensureRegistryFile() {
+  ensureGlobalDirs();
+  if (!fs2.existsSync(REGISTRY_FILE)) {
+    fs2.writeFileSync(REGISTRY_FILE, "[]");
+  }
+}
+async function addWorkspace(dir) {
+  ensureRegistryFile();
+  const platformioIni = path2.join(dir, "platformio.ini");
+  if (!fs2.existsSync(platformioIni)) {
+    throw new Error(`missing platformio.ini in workspace: ${dir}`);
+  }
+  try {
+    const release = await import_proper_lockfile.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let records = [];
+      try {
+        records = JSON.parse(fs2.readFileSync(REGISTRY_FILE, "utf8"));
+      } catch {
+      }
+      if (records.length > 0) {
+        const lastRecord = records[records.length - 1];
+        if (lastRecord.dir === dir) {
+          return;
+        }
+      }
+      records.push({ dir, timestamp: Date.now() });
+      fs2.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
+    } finally {
+      await release();
+    }
+  } catch {
+  }
+}
+async function getWorkspaces() {
+  ensureRegistryFile();
+  let records = [];
+  try {
+    const release = await import_proper_lockfile.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      records = JSON.parse(fs2.readFileSync(REGISTRY_FILE, "utf8"));
+    } finally {
+      await release();
+    }
+  } catch {
+    try {
+      records = JSON.parse(fs2.readFileSync(REGISTRY_FILE, "utf8"));
+    } catch {
+      return [];
+    }
+  }
+  const seen = /* @__PURE__ */ new Map();
+  for (const parsed of records) {
+    if (parsed.dir) {
+      seen.set(parsed.dir, parsed.timestamp);
+    }
+  }
+  return Array.from(seen.entries()).sort((a, b) => b[1] - a[1]).map((entry) => entry[0]).filter((dir) => fs2.existsSync(path2.join(dir, "platformio.ini")));
+}
+async function rewriteRegistry(directories) {
+  ensureRegistryFile();
+  try {
+    const release = await import_proper_lockfile.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      const records = directories.map((dir) => ({ dir, timestamp: Date.now() }));
+      fs2.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
+    } finally {
+      await release();
+    }
+  } catch {
+  }
+}
+var import_proper_lockfile, REGISTRY_FILE;
+var init_workspace_registry = __esm({
+  "src/utils/workspace-registry.ts"() {
+    "use strict";
+    import_proper_lockfile = __toESM(require_proper_lockfile(), 1);
+    init_paths();
+    REGISTRY_FILE = path2.join(SERVER_DATA_DIR, "workspaces.json");
+  }
+});
+
+// src/core/policy/redact.ts
+function redactSecretsInText(text7) {
+  let redacted = text7;
+  for (const pattern of secretPatterns) {
+    redacted = redacted.replace(pattern, replacement);
+  }
+  return redacted;
+}
+var secretPatterns, replacement;
+var init_redact = __esm({
+  "src/core/policy/redact.ts"() {
+    "use strict";
+    secretPatterns = [
+      /OPENAI_API_KEY=[^\s]+/gi,
+      /GITHUB_TOKEN=[^\s]+/gi,
+      /SUPABASE_KEY=[^\s]+/gi,
+      /AWS_SECRET_ACCESS_KEY=[^\s]+/gi,
+      /(?:wifi|wi-fi|wlan)[_-]?(?:password|pass|psk)\s*[:=]\s*[^\s,;]+/gi,
+      /(?:api[_-]?key|client[_-]?secret|provisioning[_-]?(?:key|secret))\s*[:=]\s*[^\s,;]+/gi,
+      /authorization\s*:\s*bearer\s+[^\s]+/gi,
+      /bearer\s+[a-z0-9._~+/=-]{12,}/gi,
+      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
+      /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gi,
+      /password\s*=\s*[^\s]+/gi,
+      /token\s*=\s*[^\s]+/gi
+    ];
+    replacement = "[REDACTED_SECRET]";
+  }
+});
+
+// src/api/events.ts
+import { EventEmitter } from "events";
+import fs3 from "node:fs";
+import path3 from "node:path";
+var PortalEventEmitter, portalEvents;
+var init_events = __esm({
+  "src/api/events.ts"() {
+    "use strict";
+    init_workspace_registry();
+    init_redact();
+    PortalEventEmitter = class extends EventEmitter {
+      constructor() {
+        super();
+        this.setMaxListeners(50);
+      }
+      /**
+       * Emit an agentic activity event.
+       * @param toolName The name of the tool called
+       * @param args The arguments passed to the tool
+       * @param status The execution status (running, success, error)
+       * @param activityId A unique identifier for this activity
+       */
+      async emitActivity(toolName, args, status, activityId) {
+        const payload = {
+          timestamp: Date.now(),
+          toolName,
+          args,
+          success: status === "success",
+          // Kept for backwards compatibility
+          status,
+          activityId
+        };
+        this.emit("agent_activity", payload);
+        if (this.lastKnownProjectDir) {
+          try {
+            const workspaceDir = path3.join(this.lastKnownProjectDir, ".pio-mcp-workspace");
+            if (!fs3.existsSync(workspaceDir)) {
+              fs3.mkdirSync(workspaceDir, { recursive: true });
+            }
+            const logFile = path3.join(workspaceDir, "agent_activities.jsonl");
+            try {
+              const stat = await fs3.promises.stat(logFile);
+              if (stat.size > 2 * 1024 * 1024) {
+                await fs3.promises.rename(logFile, logFile + ".1");
+              }
+            } catch {
+            }
+            await fs3.promises.appendFile(logFile, JSON.stringify(payload) + "\n");
+          } catch {
+          }
+        }
+      }
+      artifactBuffers = {};
+      /**
+       * Emit a build log stream, buffering partial chunks into clean lines
+       * @param projectId The target project identifier
+       * @param taskId The task ID generating the log
+       * @param chunk Raw string chunk of the log
+       */
+      emitTaskLog(projectId, taskId, chunk) {
+        const safeChunk = redactSecretsInText(chunk);
+        const bufferKey = taskId || projectId;
+        if (!this.artifactBuffers[bufferKey]) {
+          this.artifactBuffers[bufferKey] = "";
+        }
+        this.artifactBuffers[bufferKey] += safeChunk;
+        let newlineIndex;
+        while ((newlineIndex = this.artifactBuffers[bufferKey].indexOf("\n")) !== -1) {
+          const logLine = this.artifactBuffers[bufferKey].substring(0, newlineIndex).trimEnd();
+          this.artifactBuffers[bufferKey] = this.artifactBuffers[bufferKey].substring(
+            newlineIndex + 1
+          );
+          this.emit("build_log", {
+            timestamp: Date.now(),
+            projectId,
+            taskId,
+            logLine
+          });
+        }
+      }
+      /**
+       * Emit a signal to clear the build terminal for a project
+       * @param projectId The target project identifier
+       * @param taskId Optional specific task ID
+       * @param logPaths Optional list of associated log files
+       */
+      clearTaskLog(projectId, taskId, logPaths) {
+        const bufferKey = taskId || projectId;
+        if (this.artifactBuffers[bufferKey]) {
+          this.artifactBuffers[bufferKey] = "";
+        }
+        this.emit("build_clear", {
+          timestamp: Date.now(),
+          projectId,
+          taskId,
+          logPaths
+        });
+      }
+      /**
+       * Emit a serial monitor read
+       * @param port Serial port emitting the log
+       * @param data Log payload data
+       * @param taskId Optional task ID
+       */
+      emitSerialLog(port, data, taskId) {
+        this.emit("serial_log", {
+          timestamp: Date.now(),
+          port,
+          taskId,
+          data: redactSecretsInText(data)
+        });
+      }
+      /**
+       * Emit general server status
+       * @param status String enum of "online" or "offline"
+       */
+      emitServerStatus(status) {
+        this.emit("server_status", {
+          timestamp: Date.now(),
+          status
+        });
+      }
+      /**
+       * Emit hardware queue lock status
+       * @param state The lock state object
+       */
+      emitLockState(state) {
+        this.emit("lock_state", {
+          timestamp: Date.now(),
+          ...state
+        });
+      }
+      /**
+       * Emit a map of all spooler connection and config properties
+       * @param states Record mapping ports to spooler states
+       */
+      emitSpoolerStates(states) {
+        this.emit("spooler_states", states);
+      }
+      /**
+       * Emit an update signal when the command history registry changes
+       * @param projectDir Target project context
+       */
+      emitCommandHistoryUpdated(projectDir) {
+        this.emit("command_history_updated", {
+          timestamp: Date.now(),
+          projectDir
+        });
+      }
+      /**
+       * Emits a lightweight invalidation signal for policy, approval, and automation state.
+       *
+       * @param projectDir Optional workspace affected by the state change.
+       */
+      emitSafetyStateUpdated(projectDir) {
+        this.emit("safety_state_updated", {
+          timestamp: Date.now(),
+          projectDir
+        });
+      }
+      /**
+       * Emit a signal containing the latest rich hardware port state
+       * @param devices List of device objects
+       */
+      emitHardwareStateUpdated(devices) {
+        this.emit("hardware_state_updated", {
+          timestamp: Date.now(),
+          devices
+        });
+      }
+      lastKnownProjectDir;
+      /**
+       * Caches and emits the last known dynamically targeted workspace directory.
+       * @param projectDir Target project directory path
+       */
+      emitWorkspaceState(projectDir) {
+        this.lastKnownProjectDir = projectDir;
+        addWorkspace(projectDir).catch(() => {
+        });
+        this.emit("workspace_state", {
+          timestamp: Date.now(),
+          projectDir
+        });
+      }
+      /**
+       * Retrieves the last known workspace path
+       * @returns The last targeted workspace directory
+       */
+      getLastKnownWorkspace() {
+        return this.lastKnownProjectDir;
+      }
+      /**
+       * Emit an update signal when the overall workspaces registry changes.
+       * @param workspaces List of available workspace directories
+       */
+      emitWorkspacesUpdated(workspaces) {
+        this.emit("workspaces_updated", {
+          timestamp: Date.now(),
+          workspaces
+        });
+      }
+    };
+    portalEvents = new PortalEventEmitter();
+  }
+});
+
+// src/utils/command-registry.ts
+import fs4 from "node:fs";
+import path4 from "node:path";
+function getRegistryFilePath(projectDir) {
+  const baseDir = projectDir || SERVER_DATA_DIR;
+  if (!projectDir) ensureGlobalDirs();
+  const dir = path4.join(baseDir, WORKSPACE_DIR, "registry");
+  if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
+  return path4.join(dir, REGISTRY_FILE2);
+}
+async function registerCommand(record2, projectDir) {
+  const file = getRegistryFilePath(projectDir);
+  if (!fs4.existsSync(file)) fs4.writeFileSync(file, "[]");
+  try {
+    const release = await import_proper_lockfile2.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let history = [];
+      try {
+        history = JSON.parse(fs4.readFileSync(file, "utf8"));
+      } catch {
+      }
+      const existingIndex = history.findIndex((cmd) => cmd.id === record2.id);
+      if (existingIndex !== -1) {
+        const existingCmd = history[existingIndex];
+        record2.tasks.forEach((newArt) => {
+          if (!existingCmd.tasks.find((a) => a.taskId === newArt.taskId)) {
+            existingCmd.tasks.push(newArt);
+          }
+        });
+        existingCmd.status = record2.status;
+      } else {
+        history.push(record2);
+        if (history.length > MAX_HISTORY_ITEMS) {
+          history = history.slice(-MAX_HISTORY_ITEMS);
+        }
+      }
+      fs4.writeFileSync(file, JSON.stringify(history, null, 2));
+      portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+}
+async function updateCommandStatus(id, updates, projectDir) {
+  const file = getRegistryFilePath(projectDir);
+  if (!fs4.existsSync(file)) return;
+  try {
+    const release = await import_proper_lockfile2.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let history = [];
+      try {
+        history = JSON.parse(fs4.readFileSync(file, "utf8"));
+      } catch {
+      }
+      const index = history.findIndex((cmd) => cmd.id === id);
+      if (index !== -1) {
+        history[index] = { ...history[index], ...updates };
+        fs4.writeFileSync(file, JSON.stringify(history, null, 2));
+        portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
+      }
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+}
+async function updateTaskStatus(commandId, taskId, updates, projectDir) {
+  const file = getRegistryFilePath(projectDir);
+  if (!fs4.existsSync(file)) return;
+  try {
+    const release = await import_proper_lockfile2.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let history = [];
+      try {
+        history = JSON.parse(fs4.readFileSync(file, "utf8"));
+      } catch {
+      }
+      const cmdIndex = history.findIndex((cmd) => cmd.id === commandId);
+      if (cmdIndex !== -1) {
+        const cmd = history[cmdIndex];
+        const artIndex = cmd.tasks?.findIndex((art) => art.taskId === taskId) ?? -1;
+        if (artIndex !== -1) {
+          cmd.tasks[artIndex] = { ...cmd.tasks[artIndex], ...updates };
+          const allSuccess = cmd.tasks.every((a) => a.status === "success");
+          const anyError = cmd.tasks.some((a) => a.status === "error");
+          const anyRunning = cmd.tasks.some((a) => a.status === "running");
+          if (anyError) {
+            cmd.status = "error";
+            const failedTask = cmd.tasks.find((a) => a.status === "error" && a.error);
+            if (failedTask?.error) {
+              cmd.error = failedTask.error;
+            }
+          } else if (anyRunning) cmd.status = "running";
+          else if (allSuccess) cmd.status = "success";
+          else cmd.status = "terminated";
+          fs4.writeFileSync(file, JSON.stringify(history, null, 2));
+          portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
+        }
+      }
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+}
+function getCommandHistory(projectDir) {
+  const file = getRegistryFilePath(projectDir);
+  if (!fs4.existsSync(file)) return [];
+  try {
+    return JSON.parse(fs4.readFileSync(file, "utf8"));
+  } catch {
+    return [];
+  }
+}
+async function findCommandAcrossWorkspaces(taskId) {
+  const globalHistory = getCommandHistory();
+  const globalMatch = globalHistory.find(
+    (command) => command.id === taskId || command.tasks.some((task) => task.taskId === taskId)
+  );
+  if (globalMatch) return { command: globalMatch, history: globalHistory };
+  const { getWorkspaces: getWorkspaces2 } = await Promise.resolve().then(() => (init_workspace_registry(), workspace_registry_exports));
+  const workspaces = await getWorkspaces2();
+  for (const ws of workspaces) {
+    const wsHistory = getCommandHistory(ws);
+    const found = wsHistory.find(
+      (command) => command.id === taskId || command.tasks.some((task) => task.taskId === taskId)
+    );
+    if (found) return { command: found, history: wsHistory, projectDir: ws };
+  }
+  return void 0;
+}
+var import_proper_lockfile2, WORKSPACE_DIR, REGISTRY_FILE2, MAX_HISTORY_ITEMS;
+var init_command_registry = __esm({
+  "src/utils/command-registry.ts"() {
+    "use strict";
+    import_proper_lockfile2 = __toESM(require_proper_lockfile(), 1);
+    init_events();
+    init_paths();
+    WORKSPACE_DIR = ".pio-mcp-workspace";
+    REGISTRY_FILE2 = "command_history.json";
+    MAX_HISTORY_ITEMS = 30;
+  }
+});
+
+// src/utils/mcp-context.ts
+import { AsyncLocalStorage } from "node:async_hooks";
+var mcpContext;
+var init_mcp_context = __esm({
+  "src/utils/mcp-context.ts"() {
+    "use strict";
+    mcpContext = new AsyncLocalStorage();
+  }
+});
+
+// src/utils/errors.ts
+function formatPlatformIOError(error2) {
+  if (error2 instanceof PlatformIONotInstalledError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Install PlatformIO Core CLI: https://docs.platformio.org/en/latest/core/installation.html
+2. Ensure 'pio' or 'platformio' is in your system PATH
+3. Try running: pip install platformio`;
+  }
+  if (error2 instanceof BoardNotFoundError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Check board ID spelling (case-sensitive)
+2. List available boards with: pio boards
+3. Search for your board at: https://docs.platformio.org/en/latest/boards/`;
+  }
+  if (error2 instanceof ProjectInitError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Ensure the target directory exists and is writable
+2. Verify the board ID is correct
+3. Check that the framework is supported for this board`;
+  }
+  if (error2 instanceof BuildError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Check your source code for syntax errors
+2. Ensure all required libraries are installed
+3. Verify platformio.ini configuration is correct
+4. Try cleaning the project: pio run -t clean`;
+  }
+  if (error2 instanceof UploadError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Ensure the device is connected and powered
+2. Check USB cable and drivers
+3. Verify the correct port is specified
+4. Try resetting the device
+5. Check that no other programs are using the serial port`;
+  }
+  if (error2 instanceof LibraryError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Check library name spelling
+2. Verify internet connection
+3. Try updating library registry: pio lib update`;
+  }
+  if (error2 instanceof PlatformIOError) {
+    let message = error2.message;
+    if (error2.context) {
+      message += "\n\nContext: " + JSON.stringify(error2.context, null, 2);
+    }
+    return message;
+  }
+  if (error2 instanceof Error) {
+    return error2.message;
+  }
+  return String(error2);
+}
+function parseStderrErrors(stderr) {
+  const errors = [];
+  const lines2 = stderr.split("\n");
+  for (const line of lines2) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.includes("error:") || trimmed.includes("Error:") || trimmed.includes("ERROR:") || trimmed.includes("fatal:") || trimmed.includes("Failed")) {
+      errors.push(trimmed);
+    }
+  }
+  return errors;
+}
+function parseStructuredBuildErrors(log) {
+  if (!log) return [];
+  const out = [];
+  const lines2 = log.split(/\r?\n/);
+  const reMissingHeader = /^(.*?):(\d+)(?::\d+)?:\s*fatal error:\s*([^:]+?):\s*No such file or directory/i;
+  const reSyntax = /^(.*?):(\d+)(?::\d+)?:\s*error:\s*(.+)$/i;
+  const reUndefRef = /undefined reference to\s+[`']?([^'"`\s]+)[`']?/i;
+  const reMissingIni = /(platformio\.ini.*not (found|exist))|Project does not seem to be a PlatformIO Project/i;
+  const reMissingEnv = /UnknownEnvNames|environment.*not found|UndefinedEnvError/i;
+  const reLibMissing = /Library Manager:\s*(Warning|Error).*not found|LibraryNotFound/i;
+  const rePermission = /(EACCES|Permission denied|EPERM)/i;
+  const reToolchain = /(Could not install package|failed to download|PackageException)/i;
+  for (const line of lines2) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let m;
+    if (m = reMissingHeader.exec(trimmed)) {
+      out.push({
+        category: "missing_header",
+        message: `Missing header: ${m[3]} (in ${m[1]}:${m[2]})`,
+        file: m[1],
+        line: Number(m[2]),
+        raw: trimmed
+      });
+      continue;
+    }
+    if (m = reUndefRef.exec(trimmed)) {
+      out.push({
+        category: "undefined_reference",
+        message: `Undefined reference to '${m[1]}' \u2014 symbol not linked.`,
+        raw: trimmed
+      });
+      continue;
+    }
+    if (m = reSyntax.exec(trimmed)) {
+      out.push({
+        category: "syntax",
+        message: `${m[3]} (in ${m[1]}:${m[2]})`,
+        file: m[1],
+        line: Number(m[2]),
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reMissingIni.test(trimmed)) {
+      out.push({
+        category: "missing_platformio_ini",
+        message: "platformio.ini missing or invalid \u2014 project is not initialized.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reMissingEnv.test(trimmed)) {
+      out.push({
+        category: "missing_environment",
+        message: "Requested environment is not defined in platformio.ini.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reLibMissing.test(trimmed)) {
+      out.push({
+        category: "missing_library",
+        message: "A required library is missing or could not be resolved.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (rePermission.test(trimmed)) {
+      out.push({
+        category: "permission",
+        message: "Permission denied accessing project / build artifacts.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reToolchain.test(trimmed)) {
+      out.push({
+        category: "toolchain",
+        message: "Toolchain/package install failed \u2014 likely a network or registry issue.",
+        raw: trimmed
+      });
+      continue;
+    }
+  }
+  const seen = /* @__PURE__ */ new Set();
+  return out.filter((e) => {
+    const k = e.category + "|" + e.message;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+function deriveNextSteps(errors, success) {
+  if (success) {
+    return [
+      "Build succeeded. Call upload_firmware (preferred over `pio run --target upload`) to flash the device.",
+      "Optionally call start_monitor to capture serial output, then query_logs to inspect it."
+    ];
+  }
+  const tips = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const e of errors) {
+    if (seen.has(e.category)) continue;
+    seen.add(e.category);
+    switch (e.category) {
+      case "missing_header":
+        tips.push(
+          "Header file not found \u2014 add the providing library to `lib_deps` in platformio.ini (search via `search_libraries`), then call `build_project` again."
+        );
+        break;
+      case "undefined_reference":
+        tips.push(
+          "Undefined linker reference \u2014 ensure the source/library that defines this symbol is present. If it's from a third-party library, add it to `lib_deps` and rebuild."
+        );
+        break;
+      case "syntax":
+        tips.push(
+          "Syntax error in source \u2014 open the indicated file:line, fix the offending statement, then call `build_project` again. Avoid re-issuing the same edit twice."
+        );
+        break;
+      case "missing_library":
+        tips.push(
+          "Library could not be resolved \u2014 verify the entry in `lib_deps`, run `search_libraries` to confirm the registry id, then rebuild."
+        );
+        break;
+      case "missing_platformio_ini":
+        tips.push(
+          "platformio.ini is missing or malformed \u2014 run `init_project` to regenerate the scaffold, then `build_project` again."
+        );
+        break;
+      case "missing_environment":
+        tips.push(
+          "Environment not declared in platformio.ini \u2014 call `get_project_config` to inspect available environments, then pass the correct `environment` argument to `build_project`."
+        );
+        break;
+      case "permission":
+        tips.push(
+          "Filesystem permission error \u2014 verify the project directory is writable and not held by another process; on macOS check that Terminal/IDE has Full Disk Access."
+        );
+        break;
+      case "toolchain":
+        tips.push(
+          "Toolchain/package install failed \u2014 check network access; if behind a proxy, configure PlatformIO accordingly, then rebuild."
+        );
+        break;
+      case "unknown":
+      default:
+        break;
+    }
+  }
+  if (tips.length === 0) {
+    tips.push(
+      "Build failed but no structured error was matched. Read the bottom of the build log for the actual gcc/clang error, then make the smallest targeted edit and call `build_project` again."
+    );
+  }
+  tips.push(
+    "Use the `build_project` MCP tool to compile \u2014 do NOT run `pio run` in a terminal; the MCP path integrates with the hardware lock, cache, and structured error parser."
+  );
+  return tips;
+}
+function isPlatformIONotFoundError(error2) {
+  if (error2 instanceof Error) {
+    const message = error2.message.toLowerCase();
+    return message.includes("enoent") || message.includes("not found") || message.includes("command not found") || message.includes("platformio") && message.includes("not recognized");
+  }
+  return false;
+}
+var PlatformIOError, PlatformIONotInstalledError, BoardNotFoundError, ProjectInitError, BuildError, UploadError, LibraryError, CommandTimeoutError;
+var init_errors2 = __esm({
+  "src/utils/errors.ts"() {
+    "use strict";
+    PlatformIOError = class extends Error {
+      constructor(message, code, context) {
+        super(message);
+        this.code = code;
+        this.context = context;
+        this.name = "PlatformIOError";
+        Error.captureStackTrace(this, this.constructor);
+      }
+      code;
+      context;
+    };
+    PlatformIONotInstalledError = class extends PlatformIOError {
+      constructor(message = "PlatformIO CLI is not installed or not found in PATH") {
+        super(message, "PLATFORMIO_NOT_INSTALLED");
+        this.name = "PlatformIONotInstalledError";
+      }
+    };
+    BoardNotFoundError = class extends PlatformIOError {
+      constructor(boardId) {
+        super(
+          `Board '${boardId}' not found in PlatformIO registry`,
+          "BOARD_NOT_FOUND",
+          { boardId }
+        );
+        this.name = "BoardNotFoundError";
+      }
+    };
+    ProjectInitError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "PROJECT_INIT_FAILED", context);
+        this.name = "ProjectInitError";
+      }
+    };
+    BuildError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "BUILD_FAILED", context);
+        this.name = "BuildError";
+      }
+    };
+    UploadError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "UPLOAD_FAILED", context);
+        this.name = "UploadError";
+      }
+    };
+    LibraryError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "LIBRARY_ERROR", context);
+        this.name = "LibraryError";
+      }
+    };
+    CommandTimeoutError = class extends PlatformIOError {
+      constructor(command, timeout) {
+        super(
+          `Command '${command}' timed out after ${timeout}ms`,
+          "COMMAND_TIMEOUT",
+          {
+            command,
+            timeout
+          }
+        );
+        this.name = "CommandTimeoutError";
+      }
+    };
+  }
+});
+
+// src/platformio.ts
+import { execFile, spawn } from "node:child_process";
+import fs5 from "node:fs";
+import os2 from "node:os";
+import path5 from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "url";
+import crypto from "node:crypto";
+import { execSync } from "node:child_process";
+async function execPioCommand(args, options = {}) {
+  const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+  const runWrappedProcess = (binary) => {
+    return new Promise((resolve, reject) => {
+      const child = execFile(
+        binary,
+        args,
+        {
+          cwd: options.cwd,
+          env: options.env,
+          timeout,
+          maxBuffer: 10 * 1024 * 1024
+        },
+        (error2, stdout, stderr) => {
+          if (error2) {
+            error2.stdout = stdout;
+            error2.stderr = stderr;
+            reject(error2);
+          } else {
+            resolve({
+              stdout: stdout.toString(),
+              stderr: stderr.toString(),
+              code: 0
+            });
+          }
+        }
+      );
+      if (options.onOutput) {
+        child.stdout?.on("data", (data) => options.onOutput(data.toString()));
+        child.stderr?.on("data", (data) => options.onOutput(data.toString()));
+      }
+    });
+  };
+  try {
+    let result;
+    try {
+      result = await runWrappedProcess("pio");
+    } catch (firstError) {
+      if (isPlatformIONotFoundError(firstError)) {
+        try {
+          result = await runWrappedProcess("platformio");
+        } catch (secondError) {
+          if (isPlatformIONotFoundError(secondError)) {
+            throw new PlatformIONotInstalledError();
+          }
+          throw secondError;
+        }
+      } else {
+        throw firstError;
+      }
+    }
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: 0
+    };
+  } catch (error2) {
+    if (error2.killed && error2.signal === "SIGTERM") {
+      throw new CommandTimeoutError(args.join(" "), timeout);
+    }
+    if (isPlatformIONotFoundError(error2)) {
+      throw new PlatformIONotInstalledError();
+    }
+    if (error2.code && error2.stdout !== void 0) {
+      return {
+        stdout: error2.stdout || "",
+        stderr: error2.stderr || "",
+        exitCode: error2.code
+      };
+    }
+    throw error2;
+  }
+}
+function parsePioJsonOutput(output, schema3) {
+  if (!output || output.trim().length === 0) {
+    throw new PlatformIOError("Empty output from PlatformIO command");
+  }
+  try {
+    const parsed = JSON.parse(output);
+    return schema3.parse(parsed);
+  } catch (error2) {
+    if (error2 instanceof external_exports.ZodError) {
+      throw new PlatformIOError(
+        `Failed to parse PlatformIO output: ${error2.message}`,
+        "PARSE_ERROR",
+        { zodError: error2.issues, output: output.substring(0, 500) }
+      );
+    }
+    if (error2 instanceof SyntaxError) {
+      throw new PlatformIOError(
+        `Invalid JSON output from PlatformIO: ${error2.message}`,
+        "INVALID_JSON",
+        { output: output.substring(0, 500) }
+      );
+    }
+    throw error2;
+  }
+}
+async function checkPlatformIOInstalled() {
+  try {
+    const result = await execPioCommand(["--version"], { timeout: 5e3 });
+    return result.exitCode === 0 && result.stdout.includes("PlatformIO");
+  } catch (error2) {
+    if (error2 instanceof PlatformIONotInstalledError) {
+      return false;
+    }
+    throw error2;
+  }
+}
+async function getPlatformIOVersion() {
+  try {
+    const result = await execPioCommand(["--version"], { timeout: 5e3 });
+    if (result.exitCode === 0) {
+      const match = result.stdout.match(/version\s+([\d\.]+)/i);
+      return match ? match[1] : result.stdout.trim();
+    }
+    throw new PlatformIOError("Failed to get PlatformIO version");
+  } catch (error2) {
+    if (error2 instanceof PlatformIONotInstalledError) {
+      throw error2;
+    }
+    throw new PlatformIOError("Failed to get PlatformIO version");
+  }
+}
+function resolvePioPath() {
+  try {
+    const whichCmd = os2.platform() === "win32" ? "where pio" : "command -v pio";
+    const out = execSync(whichCmd, { stdio: "pipe" }).toString().trim();
+    if (out) {
+      const paths = out.split("\n").map((p) => p.trim()).filter((p) => p.length > 0);
+      for (const p of paths) {
+        if (fs5.existsSync(p)) return p;
+      }
+    }
+  } catch {
+  }
+  if (os2.platform() === "win32") {
+    const winCandidate = path5.join(os2.homedir(), ".platformio", "penv", "Scripts", "pio.exe");
+    if (fs5.existsSync(winCandidate)) return winCandidate;
+    return "pio";
+  }
+  const candidates = [
+    "/usr/local/bin/pio",
+    "/opt/homebrew/bin/pio",
+    "/usr/bin/pio",
+    "/bin/pio",
+    path5.join(os2.homedir(), ".platformio", "penv", "bin", "pio")
+  ];
+  for (const c of candidates) {
+    if (fs5.existsSync(c)) return c;
+  }
+  return "pio";
+}
+var __filename2, __dirname3, DEFAULT_TIMEOUT, PlatformIOExecutor, platformioExecutor;
+var init_platformio = __esm({
+  "src/platformio.ts"() {
+    "use strict";
+    init_zod();
+    init_command_registry();
+    init_mcp_context();
+    init_errors2();
+    __filename2 = fileURLToPath2(import.meta.url);
+    __dirname3 = path5.dirname(__filename2);
+    DEFAULT_TIMEOUT = 3e5;
+    PlatformIOExecutor = class {
+      constructor() {
+      }
+      /**
+       * Executes a PlatformIO command.
+       *
+       * @param command - The PIO subcommand string.
+       * @param args - Arguments array for the command.
+       * @param options - Execution directives for the child process.
+       * @returns Structured runtime output results.
+       */
+      async execute(command, args, options) {
+        const fullArgs = [command, ...args];
+        const ctx = mcpContext.getStore();
+        const commandId = ctx?.activityId;
+        const targetProjectDir = ctx?.targetProjectDir || options?.cwd;
+        let taskId = void 0;
+        if (commandId) {
+          taskId = crypto.randomUUID();
+          try {
+            await registerCommand({
+              id: commandId,
+              commandDesc: `PIO Task: pio ${fullArgs.join(" ")}`,
+              timestamp: Date.now(),
+              status: "running",
+              tasks: [{
+                taskId,
+                type: command,
+                status: "running",
+                commandDesc: `pio ${fullArgs.join(" ")}`
+              }]
+            }, targetProjectDir);
+          } catch (e) {
+            console.error(`[PlatformIO] Inline telemetry failure: ${e.message}`);
+          }
+        }
+        try {
+          const result = await execPioCommand(fullArgs, options);
+          if (commandId && taskId) {
+            await updateTaskStatus(commandId, taskId, {
+              status: result.exitCode === 0 ? "success" : "error",
+              exitCode: result.exitCode
+            }, targetProjectDir).catch(() => {
+            });
+          }
+          return result;
+        } catch (error2) {
+          if (commandId && taskId) {
+            await updateTaskStatus(commandId, taskId, {
+              status: "error",
+              exitCode: error2.code || 1
+            }, targetProjectDir).catch(() => {
+            });
+          }
+          throw error2;
+        }
+      }
+      /**
+       * Checks if PlatformIO is installed.
+       *
+       * @returns A boolean resolving true if PlatformIO is ready.
+       */
+      async checkInstallation() {
+        return checkPlatformIOInstalled();
+      }
+      /**
+       * Gets PlatformIO version.
+       *
+       * @returns The resolved PIO version.
+       */
+      async getVersion() {
+        return getPlatformIOVersion();
+      }
+      /**
+       * Executes a command and parses JSON output.
+       *
+       * @param command - Core PlatformIO subcommand logic.
+       * @param args - Configuration and CLI flag values.
+       * @param schema - Schema for JSON output validation.
+       * @param options - Operational execution directives.
+       * @returns Parsed and validated JSON node entity.
+       */
+      async executeWithJsonOutput(command, args, schema3, options) {
+        const fullArgs = [...args];
+        if (!fullArgs.includes("--json-output")) {
+          fullArgs.push("--json-output");
+        }
+        const result = await this.execute(command, fullArgs, options);
+        if (result.exitCode !== 0) {
+          throw new PlatformIOError(
+            `PlatformIO command failed: ${command} ${args.join(" ")}`,
+            "COMMAND_FAILED",
+            { stderr: result.stderr, exitCode: result.exitCode }
+          );
+        }
+        return parsePioJsonOutput(result.stdout, schema3);
+      }
+      /**
+       * Spawns a long-running PlatformIO command (e.g., monitor).
+       * Implements the same binary resolution logic as 'execute'.
+       *
+       * @param command - The PIO subcommand.
+       * @param args - Arguments array for the PlatformIO CLI.
+       * @param options - Execution options including working directory, environment overrides, and fake TTY bridging.
+       * @returns The spawned ChildProcess instance.
+       */
+      async spawn(command, args, options = {}) {
+        let pioBinary = "pio";
+        let pioArgs = [command, ...args];
+        const env = {
+          ...process.env,
+          ...options.env
+        };
+        if (options.useFakeTty && process.platform !== "win32") {
+          const absolutePio = resolvePioPath();
+          const proxyScriptPath = path5.join(
+            __dirname3,
+            "..",
+            "src",
+            "utils",
+            "mcp_pio_proxy.py"
+          );
+          pioBinary = "python3";
+          pioArgs = [proxyScriptPath, absolutePio, command, ...args];
+        }
+        const fullCmd = `${pioBinary} ${pioArgs.join(" ")}`;
+        try {
+          const logDir = path5.join(__dirname3, "..", "logs");
+          if (!fs5.existsSync(logDir)) fs5.mkdirSync(logDir, { recursive: true });
+          await fs5.promises.appendFile(
+            path5.join(logDir, "mcp-internal.log"),
+            `[${(/* @__PURE__ */ new Date()).toISOString()}] [Spooler Executor] Spawning: ${fullCmd}
+`
+          );
+        } catch (e) {
+          console.error(`Failed to write to internal log: ${e}`);
+        }
+        return spawn(pioBinary, pioArgs, {
+          cwd: options.cwd,
+          env,
+          shell: false,
+          detached: options.detached,
+          stdio: options.stdio
+        });
+      }
+    };
+    platformioExecutor = new PlatformIOExecutor();
+  }
+});
+
 // node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
   "node_modules/yaml/dist/nodes/identity.js"(exports) {
@@ -13061,710 +14243,8 @@ var require_dist = __commonJS({
   }
 });
 
-// src/utils/errors.ts
-function formatPlatformIOError(error2) {
-  if (error2 instanceof PlatformIONotInstalledError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Install PlatformIO Core CLI: https://docs.platformio.org/en/latest/core/installation.html
-2. Ensure 'pio' or 'platformio' is in your system PATH
-3. Try running: pip install platformio`;
-  }
-  if (error2 instanceof BoardNotFoundError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Check board ID spelling (case-sensitive)
-2. List available boards with: pio boards
-3. Search for your board at: https://docs.platformio.org/en/latest/boards/`;
-  }
-  if (error2 instanceof ProjectInitError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Ensure the target directory exists and is writable
-2. Verify the board ID is correct
-3. Check that the framework is supported for this board`;
-  }
-  if (error2 instanceof BuildError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Check your source code for syntax errors
-2. Ensure all required libraries are installed
-3. Verify platformio.ini configuration is correct
-4. Try cleaning the project: pio run -t clean`;
-  }
-  if (error2 instanceof UploadError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Ensure the device is connected and powered
-2. Check USB cable and drivers
-3. Verify the correct port is specified
-4. Try resetting the device
-5. Check that no other programs are using the serial port`;
-  }
-  if (error2 instanceof LibraryError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Check library name spelling
-2. Verify internet connection
-3. Try updating library registry: pio lib update`;
-  }
-  if (error2 instanceof PlatformIOError) {
-    let message = error2.message;
-    if (error2.context) {
-      message += "\n\nContext: " + JSON.stringify(error2.context, null, 2);
-    }
-    return message;
-  }
-  if (error2 instanceof Error) {
-    return error2.message;
-  }
-  return String(error2);
-}
-function parseStderrErrors(stderr) {
-  const errors = [];
-  const lines2 = stderr.split("\n");
-  for (const line of lines2) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (trimmed.includes("error:") || trimmed.includes("Error:") || trimmed.includes("ERROR:") || trimmed.includes("fatal:") || trimmed.includes("Failed")) {
-      errors.push(trimmed);
-    }
-  }
-  return errors;
-}
-function parseStructuredBuildErrors(log) {
-  if (!log) return [];
-  const out = [];
-  const lines2 = log.split(/\r?\n/);
-  const reMissingHeader = /^(.*?):(\d+)(?::\d+)?:\s*fatal error:\s*([^:]+?):\s*No such file or directory/i;
-  const reSyntax = /^(.*?):(\d+)(?::\d+)?:\s*error:\s*(.+)$/i;
-  const reUndefRef = /undefined reference to\s+[`']?([^'"`\s]+)[`']?/i;
-  const reMissingIni = /(platformio\.ini.*not (found|exist))|Project does not seem to be a PlatformIO Project/i;
-  const reMissingEnv = /UnknownEnvNames|environment.*not found|UndefinedEnvError/i;
-  const reLibMissing = /Library Manager:\s*(Warning|Error).*not found|LibraryNotFound/i;
-  const rePermission = /(EACCES|Permission denied|EPERM)/i;
-  const reToolchain = /(Could not install package|failed to download|PackageException)/i;
-  for (const line of lines2) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    let m;
-    if (m = reMissingHeader.exec(trimmed)) {
-      out.push({
-        category: "missing_header",
-        message: `Missing header: ${m[3]} (in ${m[1]}:${m[2]})`,
-        file: m[1],
-        line: Number(m[2]),
-        raw: trimmed
-      });
-      continue;
-    }
-    if (m = reUndefRef.exec(trimmed)) {
-      out.push({
-        category: "undefined_reference",
-        message: `Undefined reference to '${m[1]}' \u2014 symbol not linked.`,
-        raw: trimmed
-      });
-      continue;
-    }
-    if (m = reSyntax.exec(trimmed)) {
-      out.push({
-        category: "syntax",
-        message: `${m[3]} (in ${m[1]}:${m[2]})`,
-        file: m[1],
-        line: Number(m[2]),
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reMissingIni.test(trimmed)) {
-      out.push({
-        category: "missing_platformio_ini",
-        message: "platformio.ini missing or invalid \u2014 project is not initialized.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reMissingEnv.test(trimmed)) {
-      out.push({
-        category: "missing_environment",
-        message: "Requested environment is not defined in platformio.ini.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reLibMissing.test(trimmed)) {
-      out.push({
-        category: "missing_library",
-        message: "A required library is missing or could not be resolved.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (rePermission.test(trimmed)) {
-      out.push({
-        category: "permission",
-        message: "Permission denied accessing project / build artifacts.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reToolchain.test(trimmed)) {
-      out.push({
-        category: "toolchain",
-        message: "Toolchain/package install failed \u2014 likely a network or registry issue.",
-        raw: trimmed
-      });
-      continue;
-    }
-  }
-  const seen = /* @__PURE__ */ new Set();
-  return out.filter((e) => {
-    const k = e.category + "|" + e.message;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-}
-function deriveNextSteps(errors, success) {
-  if (success) {
-    return [
-      "Build succeeded. Call upload_firmware (preferred over `pio run --target upload`) to flash the device.",
-      "Optionally call start_monitor to capture serial output, then query_logs to inspect it."
-    ];
-  }
-  const tips = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const e of errors) {
-    if (seen.has(e.category)) continue;
-    seen.add(e.category);
-    switch (e.category) {
-      case "missing_header":
-        tips.push(
-          "Header file not found \u2014 add the providing library to `lib_deps` in platformio.ini (search via `search_libraries`), then call `build_project` again."
-        );
-        break;
-      case "undefined_reference":
-        tips.push(
-          "Undefined linker reference \u2014 ensure the source/library that defines this symbol is present. If it's from a third-party library, add it to `lib_deps` and rebuild."
-        );
-        break;
-      case "syntax":
-        tips.push(
-          "Syntax error in source \u2014 open the indicated file:line, fix the offending statement, then call `build_project` again. Avoid re-issuing the same edit twice."
-        );
-        break;
-      case "missing_library":
-        tips.push(
-          "Library could not be resolved \u2014 verify the entry in `lib_deps`, run `search_libraries` to confirm the registry id, then rebuild."
-        );
-        break;
-      case "missing_platformio_ini":
-        tips.push(
-          "platformio.ini is missing or malformed \u2014 run `init_project` to regenerate the scaffold, then `build_project` again."
-        );
-        break;
-      case "missing_environment":
-        tips.push(
-          "Environment not declared in platformio.ini \u2014 call `get_project_config` to inspect available environments, then pass the correct `environment` argument to `build_project`."
-        );
-        break;
-      case "permission":
-        tips.push(
-          "Filesystem permission error \u2014 verify the project directory is writable and not held by another process; on macOS check that Terminal/IDE has Full Disk Access."
-        );
-        break;
-      case "toolchain":
-        tips.push(
-          "Toolchain/package install failed \u2014 check network access; if behind a proxy, configure PlatformIO accordingly, then rebuild."
-        );
-        break;
-      case "unknown":
-      default:
-        break;
-    }
-  }
-  if (tips.length === 0) {
-    tips.push(
-      "Build failed but no structured error was matched. Read the bottom of the build log for the actual gcc/clang error, then make the smallest targeted edit and call `build_project` again."
-    );
-  }
-  tips.push(
-    "Use the `build_project` MCP tool to compile \u2014 do NOT run `pio run` in a terminal; the MCP path integrates with the hardware lock, cache, and structured error parser."
-  );
-  return tips;
-}
-function isPlatformIONotFoundError(error2) {
-  if (error2 instanceof Error) {
-    const message = error2.message.toLowerCase();
-    return message.includes("enoent") || message.includes("not found") || message.includes("command not found") || message.includes("platformio") && message.includes("not recognized");
-  }
-  return false;
-}
-var PlatformIOError, PlatformIONotInstalledError, BoardNotFoundError, ProjectInitError, BuildError, UploadError, LibraryError, CommandTimeoutError;
-var init_errors2 = __esm({
-  "src/utils/errors.ts"() {
-    "use strict";
-    PlatformIOError = class extends Error {
-      constructor(message, code, context) {
-        super(message);
-        this.code = code;
-        this.context = context;
-        this.name = "PlatformIOError";
-        Error.captureStackTrace(this, this.constructor);
-      }
-      code;
-      context;
-    };
-    PlatformIONotInstalledError = class extends PlatformIOError {
-      constructor(message = "PlatformIO CLI is not installed or not found in PATH") {
-        super(message, "PLATFORMIO_NOT_INSTALLED");
-        this.name = "PlatformIONotInstalledError";
-      }
-    };
-    BoardNotFoundError = class extends PlatformIOError {
-      constructor(boardId) {
-        super(
-          `Board '${boardId}' not found in PlatformIO registry`,
-          "BOARD_NOT_FOUND",
-          { boardId }
-        );
-        this.name = "BoardNotFoundError";
-      }
-    };
-    ProjectInitError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "PROJECT_INIT_FAILED", context);
-        this.name = "ProjectInitError";
-      }
-    };
-    BuildError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "BUILD_FAILED", context);
-        this.name = "BuildError";
-      }
-    };
-    UploadError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "UPLOAD_FAILED", context);
-        this.name = "UploadError";
-      }
-    };
-    LibraryError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "LIBRARY_ERROR", context);
-        this.name = "LibraryError";
-      }
-    };
-    CommandTimeoutError = class extends PlatformIOError {
-      constructor(command, timeout) {
-        super(
-          `Command '${command}' timed out after ${timeout}ms`,
-          "COMMAND_TIMEOUT",
-          {
-            command,
-            timeout
-          }
-        );
-        this.name = "CommandTimeoutError";
-      }
-    };
-  }
-});
-
-// src/utils/paths.ts
-import path4 from "node:path";
-import { fileURLToPath } from "node:url";
-import fs2 from "node:fs";
-import os2 from "node:os";
-function canUseDir(dir) {
-  try {
-    fs2.mkdirSync(dir, { recursive: true });
-    const probe = path4.join(dir, `.write-probe-${process.pid}-${Date.now()}`);
-    fs2.writeFileSync(probe, "ok", "utf8");
-    fs2.unlinkSync(probe);
-    return true;
-  } catch {
-    return false;
-  }
-}
-function resolveServerDataDir() {
-  const override = process.env.PIO_MCP_DATA_DIR?.trim();
-  if (override && canUseDir(override)) {
-    return path4.resolve(override);
-  }
-  const homeScoped = path4.join(os2.homedir(), ".platformio-mcp");
-  if (canUseDir(homeScoped)) {
-    return homeScoped;
-  }
-  const cwdScoped = path4.join(process.cwd(), ".platformio-mcp");
-  if (canUseDir(cwdScoped)) {
-    return cwdScoped;
-  }
-  const tmpScoped = path4.join(os2.tmpdir(), ".platformio-mcp");
-  if (canUseDir(tmpScoped)) {
-    return tmpScoped;
-  }
-  return cwdScoped;
-}
-function ensureDir(dir) {
-  if (!fs2.existsSync(dir)) {
-    fs2.mkdirSync(dir, { recursive: true });
-  }
-}
-function ensureGlobalDirs() {
-  ensureDir(SERVER_DATA_DIR);
-  ensureDir(GLOBAL_LOCKS_DIR);
-}
-function sanitizePortName(port) {
-  return port.replace(/[\/\.:]/g, "_").replace(/^_+|_+$/g, "");
-}
-var __filename, __dirname2, PROJECT_ROOT, SERVER_DATA_DIR, GLOBAL_LOCKS_DIR;
-var init_paths = __esm({
-  "src/utils/paths.ts"() {
-    "use strict";
-    __filename = fileURLToPath(import.meta.url);
-    __dirname2 = path4.dirname(__filename);
-    PROJECT_ROOT = path4.resolve(__dirname2, "..", "..");
-    SERVER_DATA_DIR = resolveServerDataDir();
-    GLOBAL_LOCKS_DIR = path4.join(SERVER_DATA_DIR, "serial_ports");
-  }
-});
-
-// src/utils/workspace-registry.ts
-var workspace_registry_exports = {};
-__export(workspace_registry_exports, {
-  addWorkspace: () => addWorkspace,
-  getWorkspaces: () => getWorkspaces,
-  rewriteRegistry: () => rewriteRegistry
-});
-import fs3 from "node:fs";
-import path5 from "node:path";
-function ensureRegistryFile() {
-  ensureGlobalDirs();
-  if (!fs3.existsSync(REGISTRY_FILE)) {
-    fs3.writeFileSync(REGISTRY_FILE, "[]");
-  }
-}
-async function addWorkspace(dir) {
-  ensureRegistryFile();
-  const platformioIni = path5.join(dir, "platformio.ini");
-  if (!fs3.existsSync(platformioIni)) {
-    throw new Error(`missing platformio.ini in workspace: ${dir}`);
-  }
-  try {
-    const release = await import_proper_lockfile2.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let records = [];
-      try {
-        records = JSON.parse(fs3.readFileSync(REGISTRY_FILE, "utf8"));
-      } catch {
-      }
-      if (records.length > 0) {
-        const lastRecord = records[records.length - 1];
-        if (lastRecord.dir === dir) {
-          return;
-        }
-      }
-      records.push({ dir, timestamp: Date.now() });
-      fs3.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
-    } finally {
-      await release();
-    }
-  } catch {
-  }
-}
-async function getWorkspaces() {
-  ensureRegistryFile();
-  let records = [];
-  try {
-    const release = await import_proper_lockfile2.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      records = JSON.parse(fs3.readFileSync(REGISTRY_FILE, "utf8"));
-    } finally {
-      await release();
-    }
-  } catch {
-    try {
-      records = JSON.parse(fs3.readFileSync(REGISTRY_FILE, "utf8"));
-    } catch {
-      return [];
-    }
-  }
-  const seen = /* @__PURE__ */ new Map();
-  for (const parsed of records) {
-    if (parsed.dir) {
-      seen.set(parsed.dir, parsed.timestamp);
-    }
-  }
-  return Array.from(seen.entries()).sort((a, b) => b[1] - a[1]).map((entry) => entry[0]).filter((dir) => fs3.existsSync(path5.join(dir, "platformio.ini")));
-}
-async function rewriteRegistry(directories) {
-  ensureRegistryFile();
-  try {
-    const release = await import_proper_lockfile2.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      const records = directories.map((dir) => ({ dir, timestamp: Date.now() }));
-      fs3.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
-    } finally {
-      await release();
-    }
-  } catch {
-  }
-}
-var import_proper_lockfile2, REGISTRY_FILE;
-var init_workspace_registry = __esm({
-  "src/utils/workspace-registry.ts"() {
-    "use strict";
-    import_proper_lockfile2 = __toESM(require_proper_lockfile(), 1);
-    init_paths();
-    REGISTRY_FILE = path5.join(SERVER_DATA_DIR, "workspaces.json");
-  }
-});
-
-// src/core/policy/redact.ts
-function redactSecretsInText(text7) {
-  let redacted = text7;
-  for (const pattern of secretPatterns) {
-    redacted = redacted.replace(pattern, replacement);
-  }
-  return redacted;
-}
-var secretPatterns, replacement;
-var init_redact = __esm({
-  "src/core/policy/redact.ts"() {
-    "use strict";
-    secretPatterns = [
-      /OPENAI_API_KEY=[^\s]+/gi,
-      /GITHUB_TOKEN=[^\s]+/gi,
-      /SUPABASE_KEY=[^\s]+/gi,
-      /AWS_SECRET_ACCESS_KEY=[^\s]+/gi,
-      /(?:wifi|wi-fi|wlan)[_-]?(?:password|pass|psk)\s*[:=]\s*[^\s,;]+/gi,
-      /(?:api[_-]?key|client[_-]?secret|provisioning[_-]?(?:key|secret))\s*[:=]\s*[^\s,;]+/gi,
-      /authorization\s*:\s*bearer\s+[^\s]+/gi,
-      /bearer\s+[a-z0-9._~+/=-]{12,}/gi,
-      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
-      /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gi,
-      /password\s*=\s*[^\s]+/gi,
-      /token\s*=\s*[^\s]+/gi
-    ];
-    replacement = "[REDACTED_SECRET]";
-  }
-});
-
-// src/api/events.ts
-import { EventEmitter } from "events";
-import fs4 from "node:fs";
-import path6 from "node:path";
-var PortalEventEmitter, portalEvents;
-var init_events = __esm({
-  "src/api/events.ts"() {
-    "use strict";
-    init_workspace_registry();
-    init_redact();
-    PortalEventEmitter = class extends EventEmitter {
-      constructor() {
-        super();
-        this.setMaxListeners(50);
-      }
-      /**
-       * Emit an agentic activity event.
-       * @param toolName The name of the tool called
-       * @param args The arguments passed to the tool
-       * @param status The execution status (running, success, error)
-       * @param activityId A unique identifier for this activity
-       */
-      async emitActivity(toolName, args, status, activityId) {
-        const payload = {
-          timestamp: Date.now(),
-          toolName,
-          args,
-          success: status === "success",
-          // Kept for backwards compatibility
-          status,
-          activityId
-        };
-        this.emit("agent_activity", payload);
-        if (this.lastKnownProjectDir) {
-          try {
-            const workspaceDir = path6.join(this.lastKnownProjectDir, ".pio-mcp-workspace");
-            if (!fs4.existsSync(workspaceDir)) {
-              fs4.mkdirSync(workspaceDir, { recursive: true });
-            }
-            const logFile = path6.join(workspaceDir, "agent_activities.jsonl");
-            try {
-              const stat = await fs4.promises.stat(logFile);
-              if (stat.size > 2 * 1024 * 1024) {
-                await fs4.promises.rename(logFile, logFile + ".1");
-              }
-            } catch {
-            }
-            await fs4.promises.appendFile(logFile, JSON.stringify(payload) + "\n");
-          } catch {
-          }
-        }
-      }
-      artifactBuffers = {};
-      /**
-       * Emit a build log stream, buffering partial chunks into clean lines
-       * @param projectId The target project identifier
-       * @param taskId The task ID generating the log
-       * @param chunk Raw string chunk of the log
-       */
-      emitTaskLog(projectId, taskId, chunk) {
-        const safeChunk = redactSecretsInText(chunk);
-        const bufferKey = taskId || projectId;
-        if (!this.artifactBuffers[bufferKey]) {
-          this.artifactBuffers[bufferKey] = "";
-        }
-        this.artifactBuffers[bufferKey] += safeChunk;
-        let newlineIndex;
-        while ((newlineIndex = this.artifactBuffers[bufferKey].indexOf("\n")) !== -1) {
-          const logLine = this.artifactBuffers[bufferKey].substring(0, newlineIndex).trimEnd();
-          this.artifactBuffers[bufferKey] = this.artifactBuffers[bufferKey].substring(
-            newlineIndex + 1
-          );
-          this.emit("build_log", {
-            timestamp: Date.now(),
-            projectId,
-            taskId,
-            logLine
-          });
-        }
-      }
-      /**
-       * Emit a signal to clear the build terminal for a project
-       * @param projectId The target project identifier
-       * @param taskId Optional specific task ID
-       * @param logPaths Optional list of associated log files
-       */
-      clearTaskLog(projectId, taskId, logPaths) {
-        const bufferKey = taskId || projectId;
-        if (this.artifactBuffers[bufferKey]) {
-          this.artifactBuffers[bufferKey] = "";
-        }
-        this.emit("build_clear", {
-          timestamp: Date.now(),
-          projectId,
-          taskId,
-          logPaths
-        });
-      }
-      /**
-       * Emit a serial monitor read
-       * @param port Serial port emitting the log
-       * @param data Log payload data
-       * @param taskId Optional task ID
-       */
-      emitSerialLog(port, data, taskId) {
-        this.emit("serial_log", {
-          timestamp: Date.now(),
-          port,
-          taskId,
-          data: redactSecretsInText(data)
-        });
-      }
-      /**
-       * Emit general server status
-       * @param status String enum of "online" or "offline"
-       */
-      emitServerStatus(status) {
-        this.emit("server_status", {
-          timestamp: Date.now(),
-          status
-        });
-      }
-      /**
-       * Emit hardware queue lock status
-       * @param state The lock state object
-       */
-      emitLockState(state) {
-        this.emit("lock_state", {
-          timestamp: Date.now(),
-          ...state
-        });
-      }
-      /**
-       * Emit a map of all spooler connection and config properties
-       * @param states Record mapping ports to spooler states
-       */
-      emitSpoolerStates(states) {
-        this.emit("spooler_states", states);
-      }
-      /**
-       * Emit an update signal when the command history registry changes
-       * @param projectDir Target project context
-       */
-      emitCommandHistoryUpdated(projectDir) {
-        this.emit("command_history_updated", {
-          timestamp: Date.now(),
-          projectDir
-        });
-      }
-      /**
-       * Emits a lightweight invalidation signal for policy, approval, and automation state.
-       *
-       * @param projectDir Optional workspace affected by the state change.
-       */
-      emitSafetyStateUpdated(projectDir) {
-        this.emit("safety_state_updated", {
-          timestamp: Date.now(),
-          projectDir
-        });
-      }
-      /**
-       * Emit a signal containing the latest rich hardware port state
-       * @param devices List of device objects
-       */
-      emitHardwareStateUpdated(devices) {
-        this.emit("hardware_state_updated", {
-          timestamp: Date.now(),
-          devices
-        });
-      }
-      lastKnownProjectDir;
-      /**
-       * Caches and emits the last known dynamically targeted workspace directory.
-       * @param projectDir Target project directory path
-       */
-      emitWorkspaceState(projectDir) {
-        this.lastKnownProjectDir = projectDir;
-        addWorkspace(projectDir).catch(() => {
-        });
-        this.emit("workspace_state", {
-          timestamp: Date.now(),
-          projectDir
-        });
-      }
-      /**
-       * Retrieves the last known workspace path
-       * @returns The last targeted workspace directory
-       */
-      getLastKnownWorkspace() {
-        return this.lastKnownProjectDir;
-      }
-      /**
-       * Emit an update signal when the overall workspaces registry changes.
-       * @param workspaces List of available workspace directories
-       */
-      emitWorkspacesUpdated(workspaces) {
-        this.emit("workspaces_updated", {
-          timestamp: Date.now(),
-          workspaces
-        });
-      }
-    };
-    portalEvents = new PortalEventEmitter();
-  }
-});
-
 // src/utils/validation.ts
-import path8 from "path";
+import path10 from "path";
 import { access, constants } from "fs/promises";
 function validateBoardId(boardId) {
   if (!boardId || typeof boardId !== "string") {
@@ -13781,8 +14261,8 @@ function validateProjectPath(projectPath) {
     throw new Error("Project path is required and must be a string");
   }
   const sanitized = projectPath.trim();
-  const absolutePath = path8.resolve(sanitized);
-  const normalizedPath = path8.normalize(absolutePath);
+  const absolutePath = path10.resolve(sanitized);
+  const normalizedPath = path10.normalize(absolutePath);
   if (normalizedPath.includes("..") || normalizedPath !== absolutePath) {
     throw new Error("Invalid project path: path traversal detected");
   }
@@ -13863,493 +14343,13 @@ var init_validation = __esm({
   }
 });
 
-// src/utils/command-registry.ts
-import fs12 from "node:fs";
-import path16 from "node:path";
-function getRegistryFilePath(projectDir) {
-  const baseDir = projectDir || SERVER_DATA_DIR;
-  if (!projectDir) ensureGlobalDirs();
-  const dir = path16.join(baseDir, WORKSPACE_DIR, "registry");
-  if (!fs12.existsSync(dir)) fs12.mkdirSync(dir, { recursive: true });
-  return path16.join(dir, REGISTRY_FILE2);
-}
-async function registerCommand(record2, projectDir) {
-  const file = getRegistryFilePath(projectDir);
-  if (!fs12.existsSync(file)) fs12.writeFileSync(file, "[]");
-  try {
-    const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let history = [];
-      try {
-        history = JSON.parse(fs12.readFileSync(file, "utf8"));
-      } catch {
-      }
-      const existingIndex = history.findIndex((cmd) => cmd.id === record2.id);
-      if (existingIndex !== -1) {
-        const existingCmd = history[existingIndex];
-        record2.tasks.forEach((newArt) => {
-          if (!existingCmd.tasks.find((a) => a.taskId === newArt.taskId)) {
-            existingCmd.tasks.push(newArt);
-          }
-        });
-        existingCmd.status = record2.status;
-      } else {
-        history.push(record2);
-        if (history.length > MAX_HISTORY_ITEMS) {
-          history = history.slice(-MAX_HISTORY_ITEMS);
-        }
-      }
-      fs12.writeFileSync(file, JSON.stringify(history, null, 2));
-      portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-}
-async function updateCommandStatus(id, updates, projectDir) {
-  const file = getRegistryFilePath(projectDir);
-  if (!fs12.existsSync(file)) return;
-  try {
-    const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let history = [];
-      try {
-        history = JSON.parse(fs12.readFileSync(file, "utf8"));
-      } catch {
-      }
-      const index = history.findIndex((cmd) => cmd.id === id);
-      if (index !== -1) {
-        history[index] = { ...history[index], ...updates };
-        fs12.writeFileSync(file, JSON.stringify(history, null, 2));
-        portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
-      }
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-}
-async function updateTaskStatus(commandId, taskId, updates, projectDir) {
-  const file = getRegistryFilePath(projectDir);
-  if (!fs12.existsSync(file)) return;
-  try {
-    const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let history = [];
-      try {
-        history = JSON.parse(fs12.readFileSync(file, "utf8"));
-      } catch {
-      }
-      const cmdIndex = history.findIndex((cmd) => cmd.id === commandId);
-      if (cmdIndex !== -1) {
-        const cmd = history[cmdIndex];
-        const artIndex = cmd.tasks?.findIndex((art) => art.taskId === taskId) ?? -1;
-        if (artIndex !== -1) {
-          cmd.tasks[artIndex] = { ...cmd.tasks[artIndex], ...updates };
-          const allSuccess = cmd.tasks.every((a) => a.status === "success");
-          const anyError = cmd.tasks.some((a) => a.status === "error");
-          const anyRunning = cmd.tasks.some((a) => a.status === "running");
-          if (anyError) {
-            cmd.status = "error";
-            const failedTask = cmd.tasks.find((a) => a.status === "error" && a.error);
-            if (failedTask?.error) {
-              cmd.error = failedTask.error;
-            }
-          } else if (anyRunning) cmd.status = "running";
-          else if (allSuccess) cmd.status = "success";
-          else cmd.status = "terminated";
-          fs12.writeFileSync(file, JSON.stringify(history, null, 2));
-          portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
-        }
-      }
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-}
-function getCommandHistory(projectDir) {
-  const file = getRegistryFilePath(projectDir);
-  if (!fs12.existsSync(file)) return [];
-  try {
-    return JSON.parse(fs12.readFileSync(file, "utf8"));
-  } catch {
-    return [];
-  }
-}
-async function findCommandAcrossWorkspaces(taskId) {
-  const globalHistory = getCommandHistory();
-  const globalMatch = globalHistory.find(
-    (command) => command.id === taskId || command.tasks.some((task) => task.taskId === taskId)
-  );
-  if (globalMatch) return { command: globalMatch, history: globalHistory };
-  const { getWorkspaces: getWorkspaces2 } = await Promise.resolve().then(() => (init_workspace_registry(), workspace_registry_exports));
-  const workspaces = await getWorkspaces2();
-  for (const ws of workspaces) {
-    const wsHistory = getCommandHistory(ws);
-    const found = wsHistory.find(
-      (command) => command.id === taskId || command.tasks.some((task) => task.taskId === taskId)
-    );
-    if (found) return { command: found, history: wsHistory, projectDir: ws };
-  }
-  return void 0;
-}
-var import_proper_lockfile4, WORKSPACE_DIR, REGISTRY_FILE2, MAX_HISTORY_ITEMS;
-var init_command_registry = __esm({
-  "src/utils/command-registry.ts"() {
-    "use strict";
-    import_proper_lockfile4 = __toESM(require_proper_lockfile(), 1);
-    init_events();
-    init_paths();
-    WORKSPACE_DIR = ".pio-mcp-workspace";
-    REGISTRY_FILE2 = "command_history.json";
-    MAX_HISTORY_ITEMS = 30;
-  }
-});
-
-// src/utils/mcp-context.ts
-import { AsyncLocalStorage } from "node:async_hooks";
-var mcpContext;
-var init_mcp_context = __esm({
-  "src/utils/mcp-context.ts"() {
-    "use strict";
-    mcpContext = new AsyncLocalStorage();
-  }
-});
-
-// src/platformio.ts
-import { execFile, spawn } from "node:child_process";
-import fs13 from "node:fs";
-import os3 from "node:os";
-import path17 from "node:path";
-import { fileURLToPath as fileURLToPath2 } from "url";
-import crypto7 from "node:crypto";
-import { execSync } from "node:child_process";
-async function execPioCommand(args, options = {}) {
-  const timeout = options.timeout ?? DEFAULT_TIMEOUT;
-  const runWrappedProcess = (binary) => {
-    return new Promise((resolve, reject) => {
-      const child = execFile(
-        binary,
-        args,
-        {
-          cwd: options.cwd,
-          env: options.env,
-          timeout,
-          maxBuffer: 10 * 1024 * 1024
-        },
-        (error2, stdout, stderr) => {
-          if (error2) {
-            error2.stdout = stdout;
-            error2.stderr = stderr;
-            reject(error2);
-          } else {
-            resolve({
-              stdout: stdout.toString(),
-              stderr: stderr.toString(),
-              code: 0
-            });
-          }
-        }
-      );
-      if (options.onOutput) {
-        child.stdout?.on("data", (data) => options.onOutput(data.toString()));
-        child.stderr?.on("data", (data) => options.onOutput(data.toString()));
-      }
-    });
-  };
-  try {
-    let result;
-    try {
-      result = await runWrappedProcess("pio");
-    } catch (firstError) {
-      if (isPlatformIONotFoundError(firstError)) {
-        try {
-          result = await runWrappedProcess("platformio");
-        } catch (secondError) {
-          if (isPlatformIONotFoundError(secondError)) {
-            throw new PlatformIONotInstalledError();
-          }
-          throw secondError;
-        }
-      } else {
-        throw firstError;
-      }
-    }
-    return {
-      stdout: result.stdout,
-      stderr: result.stderr,
-      exitCode: 0
-    };
-  } catch (error2) {
-    if (error2.killed && error2.signal === "SIGTERM") {
-      throw new CommandTimeoutError(args.join(" "), timeout);
-    }
-    if (isPlatformIONotFoundError(error2)) {
-      throw new PlatformIONotInstalledError();
-    }
-    if (error2.code && error2.stdout !== void 0) {
-      return {
-        stdout: error2.stdout || "",
-        stderr: error2.stderr || "",
-        exitCode: error2.code
-      };
-    }
-    throw error2;
-  }
-}
-function parsePioJsonOutput(output, schema3) {
-  if (!output || output.trim().length === 0) {
-    throw new PlatformIOError("Empty output from PlatformIO command");
-  }
-  try {
-    const parsed = JSON.parse(output);
-    return schema3.parse(parsed);
-  } catch (error2) {
-    if (error2 instanceof external_exports.ZodError) {
-      throw new PlatformIOError(
-        `Failed to parse PlatformIO output: ${error2.message}`,
-        "PARSE_ERROR",
-        { zodError: error2.issues, output: output.substring(0, 500) }
-      );
-    }
-    if (error2 instanceof SyntaxError) {
-      throw new PlatformIOError(
-        `Invalid JSON output from PlatformIO: ${error2.message}`,
-        "INVALID_JSON",
-        { output: output.substring(0, 500) }
-      );
-    }
-    throw error2;
-  }
-}
-async function checkPlatformIOInstalled() {
-  try {
-    const result = await execPioCommand(["--version"], { timeout: 5e3 });
-    return result.exitCode === 0 && result.stdout.includes("PlatformIO");
-  } catch (error2) {
-    if (error2 instanceof PlatformIONotInstalledError) {
-      return false;
-    }
-    throw error2;
-  }
-}
-async function getPlatformIOVersion() {
-  try {
-    const result = await execPioCommand(["--version"], { timeout: 5e3 });
-    if (result.exitCode === 0) {
-      const match = result.stdout.match(/version\s+([\d\.]+)/i);
-      return match ? match[1] : result.stdout.trim();
-    }
-    throw new PlatformIOError("Failed to get PlatformIO version");
-  } catch (error2) {
-    if (error2 instanceof PlatformIONotInstalledError) {
-      throw error2;
-    }
-    throw new PlatformIOError("Failed to get PlatformIO version");
-  }
-}
-function resolvePioPath() {
-  try {
-    const whichCmd = os3.platform() === "win32" ? "where pio" : "command -v pio";
-    const out = execSync(whichCmd, { stdio: "pipe" }).toString().trim();
-    if (out) {
-      const paths = out.split("\n").map((p) => p.trim()).filter((p) => p.length > 0);
-      for (const p of paths) {
-        if (fs13.existsSync(p)) return p;
-      }
-    }
-  } catch {
-  }
-  if (os3.platform() === "win32") {
-    const winCandidate = path17.join(os3.homedir(), ".platformio", "penv", "Scripts", "pio.exe");
-    if (fs13.existsSync(winCandidate)) return winCandidate;
-    return "pio";
-  }
-  const candidates = [
-    "/usr/local/bin/pio",
-    "/opt/homebrew/bin/pio",
-    "/usr/bin/pio",
-    "/bin/pio",
-    path17.join(os3.homedir(), ".platformio", "penv", "bin", "pio")
-  ];
-  for (const c of candidates) {
-    if (fs13.existsSync(c)) return c;
-  }
-  return "pio";
-}
-var __filename2, __dirname3, DEFAULT_TIMEOUT, PlatformIOExecutor, platformioExecutor;
-var init_platformio = __esm({
-  "src/platformio.ts"() {
-    "use strict";
-    init_zod();
-    init_command_registry();
-    init_mcp_context();
-    init_errors2();
-    __filename2 = fileURLToPath2(import.meta.url);
-    __dirname3 = path17.dirname(__filename2);
-    DEFAULT_TIMEOUT = 3e5;
-    PlatformIOExecutor = class {
-      constructor() {
-      }
-      /**
-       * Executes a PlatformIO command.
-       *
-       * @param command - The PIO subcommand string.
-       * @param args - Arguments array for the command.
-       * @param options - Execution directives for the child process.
-       * @returns Structured runtime output results.
-       */
-      async execute(command, args, options) {
-        const fullArgs = [command, ...args];
-        const ctx = mcpContext.getStore();
-        const commandId = ctx?.activityId;
-        const targetProjectDir = ctx?.targetProjectDir || options?.cwd;
-        let taskId = void 0;
-        if (commandId) {
-          taskId = crypto7.randomUUID();
-          try {
-            await registerCommand({
-              id: commandId,
-              commandDesc: `PIO Task: pio ${fullArgs.join(" ")}`,
-              timestamp: Date.now(),
-              status: "running",
-              tasks: [{
-                taskId,
-                type: command,
-                status: "running",
-                commandDesc: `pio ${fullArgs.join(" ")}`
-              }]
-            }, targetProjectDir);
-          } catch (e) {
-            console.error(`[PlatformIO] Inline telemetry failure: ${e.message}`);
-          }
-        }
-        try {
-          const result = await execPioCommand(fullArgs, options);
-          if (commandId && taskId) {
-            await updateTaskStatus(commandId, taskId, {
-              status: result.exitCode === 0 ? "success" : "error",
-              exitCode: result.exitCode
-            }, targetProjectDir).catch(() => {
-            });
-          }
-          return result;
-        } catch (error2) {
-          if (commandId && taskId) {
-            await updateTaskStatus(commandId, taskId, {
-              status: "error",
-              exitCode: error2.code || 1
-            }, targetProjectDir).catch(() => {
-            });
-          }
-          throw error2;
-        }
-      }
-      /**
-       * Checks if PlatformIO is installed.
-       *
-       * @returns A boolean resolving true if PlatformIO is ready.
-       */
-      async checkInstallation() {
-        return checkPlatformIOInstalled();
-      }
-      /**
-       * Gets PlatformIO version.
-       *
-       * @returns The resolved PIO version.
-       */
-      async getVersion() {
-        return getPlatformIOVersion();
-      }
-      /**
-       * Executes a command and parses JSON output.
-       *
-       * @param command - Core PlatformIO subcommand logic.
-       * @param args - Configuration and CLI flag values.
-       * @param schema - Schema for JSON output validation.
-       * @param options - Operational execution directives.
-       * @returns Parsed and validated JSON node entity.
-       */
-      async executeWithJsonOutput(command, args, schema3, options) {
-        const fullArgs = [...args];
-        if (!fullArgs.includes("--json-output")) {
-          fullArgs.push("--json-output");
-        }
-        const result = await this.execute(command, fullArgs, options);
-        if (result.exitCode !== 0) {
-          throw new PlatformIOError(
-            `PlatformIO command failed: ${command} ${args.join(" ")}`,
-            "COMMAND_FAILED",
-            { stderr: result.stderr, exitCode: result.exitCode }
-          );
-        }
-        return parsePioJsonOutput(result.stdout, schema3);
-      }
-      /**
-       * Spawns a long-running PlatformIO command (e.g., monitor).
-       * Implements the same binary resolution logic as 'execute'.
-       *
-       * @param command - The PIO subcommand.
-       * @param args - Arguments array for the PlatformIO CLI.
-       * @param options - Execution options including working directory, environment overrides, and fake TTY bridging.
-       * @returns The spawned ChildProcess instance.
-       */
-      async spawn(command, args, options = {}) {
-        let pioBinary = "pio";
-        let pioArgs = [command, ...args];
-        const env = {
-          ...process.env,
-          ...options.env
-        };
-        if (options.useFakeTty && process.platform !== "win32") {
-          const absolutePio = resolvePioPath();
-          const proxyScriptPath = path17.join(
-            __dirname3,
-            "..",
-            "src",
-            "utils",
-            "mcp_pio_proxy.py"
-          );
-          pioBinary = "python3";
-          pioArgs = [proxyScriptPath, absolutePio, command, ...args];
-        }
-        const fullCmd = `${pioBinary} ${pioArgs.join(" ")}`;
-        try {
-          const logDir = path17.join(__dirname3, "..", "logs");
-          if (!fs13.existsSync(logDir)) fs13.mkdirSync(logDir, { recursive: true });
-          await fs13.promises.appendFile(
-            path17.join(logDir, "mcp-internal.log"),
-            `[${(/* @__PURE__ */ new Date()).toISOString()}] [Spooler Executor] Spawning: ${fullCmd}
-`
-          );
-        } catch (e) {
-          console.error(`Failed to write to internal log: ${e}`);
-        }
-        return spawn(pioBinary, pioArgs, {
-          cwd: options.cwd,
-          env,
-          shell: false,
-          detached: options.detached,
-          stdio: options.stdio
-        });
-      }
-    };
-    platformioExecutor = new PlatformIOExecutor();
-  }
-});
-
 // src/utils/build-cache.ts
-import fs14 from "node:fs";
+import fs15 from "node:fs";
 import path18 from "node:path";
 import crypto8 from "node:crypto";
 function hashFile(absPath) {
   try {
-    const buf = fs14.readFileSync(absPath);
+    const buf = fs15.readFileSync(absPath);
     return {
       sha256: crypto8.createHash("sha256").update(buf).digest("hex"),
       size: buf.byteLength
@@ -14362,7 +14362,7 @@ function walkAndHash(rootDir, relPrefix) {
   const out = [];
   let entries;
   try {
-    entries = fs14.readdirSync(rootDir, { withFileTypes: true });
+    entries = fs15.readdirSync(rootDir, { withFileTypes: true });
   } catch {
     return out;
   }
@@ -14389,7 +14389,7 @@ function computeProjectHash(projectDir, environment) {
   const collected = [];
   for (const dir of TRACKED_DIRS) {
     const abs = path18.join(projectDir, dir);
-    if (fs14.existsSync(abs)) collected.push(...walkAndHash(abs, dir));
+    if (fs15.existsSync(abs)) collected.push(...walkAndHash(abs, dir));
   }
   collected.sort((a, b) => a.rel.localeCompare(b.rel));
   for (const f of collected) {
@@ -14403,7 +14403,7 @@ function cacheFilePath(projectDir) {
 function readCache(projectDir) {
   const file = cacheFilePath(projectDir);
   try {
-    const raw = fs14.readFileSync(file, "utf8");
+    const raw = fs15.readFileSync(file, "utf8");
     const parsed = JSON.parse(raw);
     if (!parsed || parsed.schema !== CACHE_SCHEMA) return null;
     if (typeof parsed.inputsHash !== "string") return null;
@@ -14415,9 +14415,9 @@ function readCache(projectDir) {
 function writeCache(projectDir, entry) {
   try {
     const file = cacheFilePath(projectDir);
-    fs14.mkdirSync(path18.dirname(file), { recursive: true });
+    fs15.mkdirSync(path18.dirname(file), { recursive: true });
     const full = { schema: CACHE_SCHEMA, ...entry };
-    fs14.writeFileSync(file, JSON.stringify(full, null, 2));
+    fs15.writeFileSync(file, JSON.stringify(full, null, 2));
   } catch {
   }
 }
@@ -14427,20 +14427,20 @@ function lookupBuildCache(projectDir, environment) {
   if (!entry) return { hit: false, inputsHash };
   if (entry.environment !== environment) return { hit: false, inputsHash };
   if (entry.inputsHash !== inputsHash) return { hit: false, inputsHash };
-  if (entry.firmwarePath && !fs14.existsSync(entry.firmwarePath)) {
+  if (entry.firmwarePath && !fs15.existsSync(entry.firmwarePath)) {
     return { hit: false, inputsHash };
   }
   return { hit: true, entry, inputsHash };
 }
 function findFirmwareArtifact(projectDir, environment) {
   const buildDir = path18.join(projectDir, ".pio", "build", environment);
-  if (!fs14.existsSync(buildDir)) return void 0;
+  if (!fs15.existsSync(buildDir)) return void 0;
   const candidates = ["firmware.bin", "firmware.elf", "firmware.hex", "program"];
   let best;
   for (const name2 of candidates) {
     const p = path18.join(buildDir, name2);
     try {
-      const st = fs14.statSync(p);
+      const st = fs15.statSync(p);
       if (!best || st.mtimeMs > best.mtimeMs) {
         best = { path: p, mtimeMs: st.mtimeMs };
       }
@@ -14451,7 +14451,7 @@ function findFirmwareArtifact(projectDir, environment) {
 }
 function invalidateBuildCache(projectDir) {
   try {
-    fs14.unlinkSync(cacheFilePath(projectDir));
+    fs15.unlinkSync(cacheFilePath(projectDir));
   } catch {
   }
 }
@@ -14920,7 +14920,7 @@ var init_hardware_maps = __esm({
 });
 
 // src/utils/semaphore.ts
-import fs15 from "node:fs";
+import fs16 from "node:fs";
 import path19 from "node:path";
 var SemaphoreManager, portSemaphoreManager;
 var init_semaphore = __esm({
@@ -14957,15 +14957,15 @@ var init_semaphore = __esm({
             timestamp: Date.now()
           }
         }, null, 2);
-        fs15.writeFileSync(filePath, content);
+        fs16.writeFileSync(filePath, content);
       }
       /**
        * Releases a claim by removing the lock file.
        */
       releasePort(port) {
         const filePath = this.getLockFilePath(port);
-        if (fs15.existsSync(filePath)) {
-          fs15.unlinkSync(filePath);
+        if (fs16.existsSync(filePath)) {
+          fs16.unlinkSync(filePath);
         }
       }
       /**
@@ -14973,16 +14973,16 @@ var init_semaphore = __esm({
        */
       isPortClaimed(port) {
         const filePath = this.getLockFilePath(port);
-        return fs15.existsSync(filePath);
+        return fs16.existsSync(filePath);
       }
       /**
        * Retrieves the current claim payload for a port, if it exists.
        */
       getClaim(port) {
         const filePath = this.getLockFilePath(port);
-        if (fs15.existsSync(filePath)) {
+        if (fs16.existsSync(filePath)) {
           try {
-            const content = fs15.readFileSync(filePath, "utf-8");
+            const content = fs16.readFileSync(filePath, "utf-8");
             const parsed = JSON.parse(content);
             return parsed.current_claim || parsed;
           } catch {
@@ -15143,7 +15143,7 @@ __export(projects_exports, {
   isValidProject: () => isValidProject
 });
 import { mkdir } from "fs/promises";
-import fs16 from "node:fs";
+import fs17 from "node:fs";
 import path20 from "path";
 async function initProject(config2, execution = {}) {
   const timeoutMs = external_exports.number().int().min(1).max(6e5).default(12e4).parse(execution.timeoutMs);
@@ -15269,7 +15269,7 @@ function listSourceFiles(projectDir) {
     if (out.length >= MAX_SRC_FILES) return;
     let entries;
     try {
-      entries = fs16.readdirSync(dir, { withFileTypes: true });
+      entries = fs17.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
@@ -15281,7 +15281,7 @@ function listSourceFiles(projectDir) {
       else if (entry.isFile()) out.push(`src/${relPath}`);
     }
   }
-  if (fs16.existsSync(root)) walk(root, "");
+  if (fs17.existsSync(root)) walk(root, "");
   return out;
 }
 function parsePlatformioIni(iniText) {
@@ -15330,10 +15330,10 @@ function inferLastBuild(projectDir) {
     "build",
     "latest-build.log"
   );
-  if (!fs16.existsSync(logFile)) return void 0;
+  if (!fs17.existsSync(logFile)) return void 0;
   let tail = "";
   try {
-    const buf = fs16.readFileSync(logFile);
+    const buf = fs17.readFileSync(logFile);
     tail = buf.slice(Math.max(0, buf.length - 4096)).toString("utf8");
   } catch {
     return { status: "unknown", logPath: logFile };
@@ -15387,7 +15387,7 @@ function buildContextNextSteps(ctx) {
 async function getProjectContext(projectDir, includeBuildHistory) {
   const validatedPath = validateProjectPath(projectDir);
   const iniPath = path20.join(validatedPath, "platformio.ini");
-  const hasPlatformioIni = fs16.existsSync(iniPath);
+  const hasPlatformioIni = fs17.existsSync(iniPath);
   let connectedDevices;
   try {
     const { listDevices: listDevices2 } = await Promise.resolve().then(() => (init_devices(), devices_exports));
@@ -15404,7 +15404,7 @@ async function getProjectContext(projectDir, includeBuildHistory) {
   let libDeps;
   if (hasPlatformioIni) {
     try {
-      const text7 = fs16.readFileSync(iniPath, "utf8");
+      const text7 = fs17.readFileSync(iniPath, "utf8");
       const parsed = parsePlatformioIni(text7);
       environments = parsed.environments;
       libDeps = parsed.libDeps;
@@ -92642,8 +92642,12 @@ var require_ip_address = __commonJS({
 });
 
 // src/tools/partition-table.ts
+import fs14 from "node:fs/promises";
+
+// src/tools/project-inspection.ts
 init_zod();
-import fs11 from "node:fs/promises";
+init_platformio();
+import fs12 from "node:fs/promises";
 
 // src/core/action-catalog.ts
 var READ = {
@@ -92990,7 +92994,7 @@ function policyNamesForOperation(name2) {
 }
 
 // src/core/policy/evaluate-policy.ts
-import path14 from "node:path";
+import path16 from "node:path";
 
 // src/core/policy/default-policy.ts
 var deniedActionPatterns = [
@@ -93064,21 +93068,21 @@ var defaultPolicy = {
 };
 
 // src/core/policy/approvals.ts
-var import_proper_lockfile = __toESM(require_proper_lockfile(), 1);
+var import_proper_lockfile3 = __toESM(require_proper_lockfile(), 1);
 init_zod();
-import fs from "node:fs";
-import path3 from "node:path";
-import crypto from "node:crypto";
+import fs6 from "node:fs";
+import path8 from "node:path";
+import crypto2 from "node:crypto";
 
 // src/core/policy/policy-sources.ts
-import os from "node:os";
-import path2 from "node:path";
+import os3 from "node:os";
+import path7 from "node:path";
 
 // src/core/policy/policy-schema.ts
 var import_yaml = __toESM(require_dist(), 1);
 init_zod();
 init_errors2();
-import path from "node:path";
+import path6 from "node:path";
 var PolicyProfileNameSchema = external_exports.enum([
   "read_only",
   "build_only",
@@ -93128,7 +93132,7 @@ function parsePolicyDocument(text7, source) {
   if (Buffer.byteLength(text7, "utf8") > MAX_POLICY_BYTES) {
     throw new PolicyConfigError(source, "Policy exceeds the 64 KiB limit.");
   }
-  const extension = path.extname(source).toLowerCase();
+  const extension = path6.extname(source).toLowerCase();
   if (![".json", ".yaml", ".yml"].includes(extension)) {
     throw new PolicyConfigError(
       source,
@@ -93177,8 +93181,8 @@ function resolvePolicyFile(selected = launchPolicyFile) {
       "The configured path is empty."
     );
   }
-  const flagPath = selected === void 0 ? void 0 : path2.resolve(selected);
-  const environmentPath = environment === void 0 ? void 0 : path2.resolve(environment);
+  const flagPath = selected === void 0 ? void 0 : path7.resolve(selected);
+  const environmentPath = environment === void 0 ? void 0 : path7.resolve(environment);
   if (flagPath && environmentPath && flagPath !== environmentPath) {
     throw new PolicyConfigError(
       "--policy-file / PIO_MCP_POLICY_FILE",
@@ -93216,7 +93220,7 @@ function resolvePolicyDirectory() {
       "The configured directory is empty."
     );
   }
-  return path2.resolve(configured ?? path2.join(os.homedir(), ".platformio-mcp"));
+  return path7.resolve(configured ?? path7.join(os3.homedir(), ".platformio-mcp"));
 }
 
 // src/core/policy/approvals.ts
@@ -93235,13 +93239,13 @@ var ApprovalRecordSchema = external_exports.object({
   metadata: external_exports.record(external_exports.unknown()).optional()
 }).strict();
 function approvalsFile() {
-  return path3.join(resolvePolicyDirectory(), "approvals.json");
+  return path8.join(resolvePolicyDirectory(), "approvals.json");
 }
 function readApprovals(file = approvalsFile()) {
   let text7;
   try {
-    if (fs.statSync(file).size > 8 * 1024 * 1024) throw new Error("size limit");
-    text7 = fs.readFileSync(file, "utf8");
+    if (fs6.statSync(file).size > 8 * 1024 * 1024) throw new Error("size limit");
+    text7 = fs6.readFileSync(file, "utf8");
   } catch (error2) {
     if (error2.code === "ENOENT") return [];
     throw new PlatformIOError(
@@ -93259,26 +93263,26 @@ function readApprovals(file = approvalsFile()) {
   }
 }
 function writeApprovals(file, records) {
-  const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+  const temporary = `${file}.${crypto2.randomUUID()}.tmp`;
   try {
-    const descriptor2 = fs.openSync(temporary, "wx", 384);
+    const descriptor2 = fs6.openSync(temporary, "wx", 384);
     try {
-      fs.writeFileSync(descriptor2, JSON.stringify(records, null, 2), "utf8");
-      fs.fsyncSync(descriptor2);
+      fs6.writeFileSync(descriptor2, JSON.stringify(records, null, 2), "utf8");
+      fs6.fsyncSync(descriptor2);
     } finally {
-      fs.closeSync(descriptor2);
+      fs6.closeSync(descriptor2);
     }
-    fs.renameSync(temporary, file);
+    fs6.renameSync(temporary, file);
   } finally {
-    if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+    if (fs6.existsSync(temporary)) fs6.unlinkSync(temporary);
   }
 }
 function mutate(operation) {
   const file = approvalsFile();
-  fs.mkdirSync(path3.dirname(file), { recursive: true, mode: 448 });
+  fs6.mkdirSync(path8.dirname(file), { recursive: true, mode: 448 });
   let release;
   try {
-    release = import_proper_lockfile.default.lockSync(file, {
+    release = import_proper_lockfile3.default.lockSync(file, {
       realpath: false,
       stale: 12e4,
       retries: 0
@@ -93299,14 +93303,14 @@ function mutate(operation) {
   }
 }
 function claimPath(file, id) {
-  return path3.join(
-    path3.dirname(file),
+  return path8.join(
+    path8.dirname(file),
     "approval-consumption",
-    crypto.createHash("sha256").update(id).digest("hex")
+    crypto2.createHash("sha256").update(id).digest("hex")
   );
 }
 function currentState(record2, file) {
-  if (fs.existsSync(claimPath(file, record2.id)))
+  if (fs6.existsSync(claimPath(file, record2.id)))
     return { ...record2, status: "consumed" };
   if ((record2.status === "pending" || record2.status === "approved") && record2.expiresAt && Date.parse(record2.expiresAt) <= Date.now())
     return { ...record2, status: "expired" };
@@ -93327,7 +93331,7 @@ function createApprovalRequest(input) {
       "APPROVAL_LIFETIME_INVALID"
     );
   const record2 = ApprovalRecordSchema.parse({
-    id: `approval-${crypto.randomUUID()}`,
+    id: `approval-${crypto2.randomUUID()}`,
     action: input.action,
     riskLevel: input.riskLevel,
     reason: input.reason,
@@ -93378,15 +93382,15 @@ function consumeApproval(id, scopeDigest) {
     if (record2.status !== "approved" || !record2.expiresAt || record2.scopeDigest !== scopeDigest)
       return void 0;
     const claim = claimPath(file, id);
-    fs.mkdirSync(path3.dirname(claim), { recursive: true, mode: 448 });
+    fs6.mkdirSync(path8.dirname(claim), { recursive: true, mode: 448 });
     const consumedAt = (/* @__PURE__ */ new Date()).toISOString();
     try {
-      const descriptor2 = fs.openSync(claim, "wx", 384);
+      const descriptor2 = fs6.openSync(claim, "wx", 384);
       try {
-        fs.writeFileSync(descriptor2, consumedAt, "utf8");
-        fs.fsyncSync(descriptor2);
+        fs6.writeFileSync(descriptor2, consumedAt, "utf8");
+        fs6.fsyncSync(descriptor2);
       } finally {
-        fs.closeSync(descriptor2);
+        fs6.closeSync(descriptor2);
       }
     } catch (error2) {
       if (error2.code === "EEXIST") return void 0;
@@ -93417,7 +93421,7 @@ function getApprovalRequestSummary(id, projectDir) {
   const request = getApproval(id);
   if (!request) return void 0;
   const summary = summarizeApproval(request);
-  if (projectDir && (!summary.projectDir || path3.resolve(summary.projectDir) !== path3.resolve(projectDir))) {
+  if (projectDir && (!summary.projectDir || path8.resolve(summary.projectDir) !== path8.resolve(projectDir))) {
     return void 0;
   }
   return summary;
@@ -93427,51 +93431,51 @@ function listPendingApprovalSummaries(options) {
     status: "pending",
     limit: options?.limit ?? 50
   }).map((request) => getApproval(request.id)).filter((request) => Boolean(request)).filter((request) => request.status === "pending").map(summarizeApproval).filter(
-    (request) => !options?.projectDir || Boolean(request.projectDir) && path3.resolve(request.projectDir) === path3.resolve(options.projectDir)
+    (request) => !options?.projectDir || Boolean(request.projectDir) && path8.resolve(request.projectDir) === path8.resolve(options.projectDir)
   ).slice(0, Math.min(100, Math.max(1, options?.limit ?? 20)));
 }
 
 // src/core/policy/audit-log.ts
 init_paths();
 init_events();
-import fs5 from "node:fs";
-import path7 from "node:path";
-import crypto2 from "node:crypto";
+import fs7 from "node:fs";
+import path9 from "node:path";
+import crypto3 from "node:crypto";
 function ensureDir2(dir) {
-  if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
+  if (!fs7.existsSync(dir)) fs7.mkdirSync(dir, { recursive: true });
 }
 function appendAuditEvent(input) {
   const event = {
-    id: crypto2.randomUUID(),
+    id: crypto3.randomUUID(),
     timestamp: input.timestamp ?? (/* @__PURE__ */ new Date()).toISOString(),
     ...input
   };
-  const globalDir = path7.join(SERVER_DATA_DIR, "audit");
+  const globalDir = path9.join(SERVER_DATA_DIR, "audit");
   ensureDir2(globalDir);
-  const globalFile = path7.join(globalDir, "global-events.jsonl");
-  fs5.appendFileSync(globalFile, JSON.stringify(event) + "\n", "utf8");
+  const globalFile = path9.join(globalDir, "global-events.jsonl");
+  fs7.appendFileSync(globalFile, JSON.stringify(event) + "\n", "utf8");
   if (input.workspaceDir) {
-    const localDir = path7.join(
+    const localDir = path9.join(
       input.workspaceDir,
       ".pio-mcp-workspace",
       "audit"
     );
     ensureDir2(localDir);
-    const localFile = path7.join(localDir, "events.jsonl");
-    fs5.appendFileSync(localFile, JSON.stringify(event) + "\n", "utf8");
+    const localFile = path9.join(localDir, "events.jsonl");
+    fs7.appendFileSync(localFile, JSON.stringify(event) + "\n", "utf8");
   }
   portalEvents.emitSafetyStateUpdated(input.workspaceDir);
   return event;
 }
 function readRecentAuditEvents(opts) {
   const limit = Math.max(1, opts?.limit ?? 50);
-  const globalFile = path7.join(SERVER_DATA_DIR, "audit", "global-events.jsonl");
-  const localFile = opts?.workspaceDir ? path7.join(opts.workspaceDir, ".pio-mcp-workspace", "audit", "events.jsonl") : void 0;
-  const sourceFile = localFile && fs5.existsSync(localFile) ? localFile : globalFile;
-  if (!fs5.existsSync(sourceFile)) {
+  const globalFile = path9.join(SERVER_DATA_DIR, "audit", "global-events.jsonl");
+  const localFile = opts?.workspaceDir ? path9.join(opts.workspaceDir, ".pio-mcp-workspace", "audit", "events.jsonl") : void 0;
+  const sourceFile = localFile && fs7.existsSync(localFile) ? localFile : globalFile;
+  if (!fs7.existsSync(sourceFile)) {
     return [];
   }
-  const lines2 = fs5.readFileSync(sourceFile, "utf8").split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const lines2 = fs7.readFileSync(sourceFile, "utf8").split(/\r?\n/).filter((line) => line.trim().length > 0);
   const events = [];
   for (let i = lines2.length - 1; i >= 0 && events.length < limit; i--) {
     try {
@@ -93485,17 +93489,17 @@ function readRecentAuditEvents(opts) {
 // src/core/policy/automation-policy.ts
 init_errors2();
 init_validation();
-import fs7 from "node:fs";
-import path10 from "node:path";
+import fs9 from "node:fs";
+import path12 from "node:path";
 
 // src/core/automation-state.ts
-var import_proper_lockfile3 = __toESM(require_proper_lockfile(), 1);
+var import_proper_lockfile4 = __toESM(require_proper_lockfile(), 1);
 init_errors2();
 init_validation();
 init_events();
-import crypto3 from "node:crypto";
-import fs6 from "node:fs";
-import path9 from "node:path";
+import crypto4 from "node:crypto";
+import fs8 from "node:fs";
+import path11 from "node:path";
 var MAX_STATE_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
 function validateAutomationKey(automationKey) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u.test(automationKey)) {
@@ -93509,7 +93513,7 @@ function validateAutomationKey(automationKey) {
 function getAutomationStatePath(projectDir, automationKey) {
   const projectRoot = validateProjectPath(projectDir);
   const key = validateAutomationKey(automationKey);
-  return path9.join(
+  return path11.join(
     projectRoot,
     ".pio-mcp-workspace",
     "automations",
@@ -93529,10 +93533,10 @@ function createEmptyState(automationKey, now = /* @__PURE__ */ new Date()) {
 }
 function readAutomationStateRecord(projectDir, automationKey, allowStale) {
   const statePath = getAutomationStatePath(projectDir, automationKey);
-  if (!fs6.existsSync(statePath)) return createEmptyState(automationKey);
+  if (!fs8.existsSync(statePath)) return createEmptyState(automationKey);
   let state;
   try {
-    state = JSON.parse(fs6.readFileSync(statePath, "utf8"));
+    state = JSON.parse(fs8.readFileSync(statePath, "utf8"));
   } catch {
     throw new PlatformIOError(
       `Automation '${automationKey}' state is malformed and requires operator review.`,
@@ -93566,37 +93570,37 @@ function readAutomationWriteBudgetState(projectDir, automationKey) {
 }
 function writeAutomationState(projectDir, state) {
   const statePath = getAutomationStatePath(projectDir, state.automationKey);
-  const directory = path9.dirname(statePath);
-  fs6.mkdirSync(directory, { recursive: true });
+  const directory = path11.dirname(statePath);
+  fs8.mkdirSync(directory, { recursive: true });
   const nextState = {
     ...state,
     schemaVersion: 1,
     updatedAt: (/* @__PURE__ */ new Date()).toISOString()
   };
-  const temporaryPath = path9.join(
+  const temporaryPath = path11.join(
     directory,
-    `.${state.automationKey}.${crypto3.randomUUID()}.tmp`
+    `.${state.automationKey}.${crypto4.randomUUID()}.tmp`
   );
-  fs6.writeFileSync(temporaryPath, `${JSON.stringify(nextState, null, 2)}
+  fs8.writeFileSync(temporaryPath, `${JSON.stringify(nextState, null, 2)}
 `, {
     encoding: "utf8",
     mode: 384
   });
-  fs6.renameSync(temporaryPath, statePath);
+  fs8.renameSync(temporaryPath, statePath);
   portalEvents.emitSafetyStateUpdated(projectDir);
   return nextState;
 }
 function listAutomationStates(projectDir) {
   const projectRoot = validateProjectPath(projectDir);
-  const directory = path9.join(projectRoot, ".pio-mcp-workspace", "automations");
-  if (!fs6.existsSync(directory)) return [];
+  const directory = path11.join(projectRoot, ".pio-mcp-workspace", "automations");
+  if (!fs8.existsSync(directory)) return [];
   const now = Date.now();
-  return fs6.readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(".json")).slice(0, 100).map((entry) => {
+  return fs8.readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(".json")).slice(0, 100).map((entry) => {
     const automationKey = entry.name.slice(0, -".json".length);
     try {
       validateAutomationKey(automationKey);
       const state = JSON.parse(
-        fs6.readFileSync(path9.join(directory, entry.name), "utf8")
+        fs8.readFileSync(path11.join(directory, entry.name), "utf8")
       );
       const updatedAt = new Date(state.updatedAt).getTime();
       if (state.schemaVersion !== 1 || state.automationKey !== automationKey || !Number.isFinite(updatedAt)) {
@@ -93650,13 +93654,13 @@ async function clearAutomationMonitorState(projectDir, automationKey) {
 }
 async function withAutomationStateLock(projectDir, automationKey, operation) {
   const statePath = getAutomationStatePath(projectDir, automationKey);
-  fs6.mkdirSync(path9.dirname(statePath), { recursive: true });
-  if (!fs6.existsSync(statePath)) {
+  fs8.mkdirSync(path11.dirname(statePath), { recursive: true });
+  if (!fs8.existsSync(statePath)) {
     writeAutomationState(projectDir, createEmptyState(automationKey));
   }
   let release;
   try {
-    release = await import_proper_lockfile3.default.lock(statePath, {
+    release = await import_proper_lockfile4.default.lock(statePath, {
       retries: 0,
       stale: 5 * 60 * 1e3,
       realpath: false
@@ -93714,15 +93718,15 @@ var ALWAYS_DENIED_ACTIONS = /* @__PURE__ */ new Set([
   "ssh_deploy"
 ]);
 function loadLabRunnerPolicy(projectDir) {
-  const policyPath = path10.join(
+  const policyPath = path12.join(
     projectDir,
     ".pio-mcp-workspace",
     "automation-policy.json"
   );
-  if (!fs7.existsSync(policyPath)) return void 0;
+  if (!fs9.existsSync(policyPath)) return void 0;
   try {
     return JSON.parse(
-      fs7.readFileSync(policyPath, "utf8")
+      fs9.readFileSync(policyPath, "utf8")
     );
   } catch {
     throw new PlatformIOError(
@@ -93734,7 +93738,7 @@ function loadLabRunnerPolicy(projectDir) {
 function validateAutomationScope(input) {
   validateAutomationKey(input.automationKey);
   const projectDir = validateProjectPath(input.projectDir);
-  if (projectDir === path10.parse(projectDir).root) {
+  if (projectDir === path12.parse(projectDir).root) {
     throw new PlatformIOError(
       "Automation cannot target a filesystem root.",
       "AUTOMATION_POLICY_DENIED"
@@ -93784,7 +93788,7 @@ function validateAutomationScope(input) {
         "AUTOMATION_POLICY_DENIED"
       );
     }
-    if (path10.resolve(input.targetBinding.projectDir) !== projectDir || input.targetBinding.environment !== input.environment || new Date(input.targetBinding.expiresAt).getTime() <= Date.now()) {
+    if (path12.resolve(input.targetBinding.projectDir) !== projectDir || input.targetBinding.environment !== input.environment || new Date(input.targetBinding.expiresAt).getTime() <= Date.now()) {
       throw new PlatformIOError(
         "Automation target binding is expired or outside the requested scope.",
         "AUTOMATION_POLICY_DENIED"
@@ -93866,9 +93870,9 @@ async function reserveAutomationWriteBudget(input) {
 }
 
 // src/core/policy/project-enrollment.ts
-import fs8 from "node:fs";
-import path11 from "node:path";
-import crypto4 from "node:crypto";
+import fs10 from "node:fs";
+import path13 from "node:path";
+import crypto5 from "node:crypto";
 function canonical(value2) {
   if (Array.isArray(value2)) return `[${value2.map(canonical).join(",")}]`;
   if (value2 !== null && typeof value2 === "object")
@@ -93878,8 +93882,8 @@ function canonical(value2) {
   return JSON.stringify(value2);
 }
 function projectEnrollmentIdentity(project, documents) {
-  const realProject = fs8.realpathSync(project);
-  if (!fs8.statSync(realProject).isDirectory())
+  const realProject = fs10.realpathSync(project);
+  if (!fs10.statSync(realProject).isDirectory())
     throw new PolicyConfigError(
       project,
       "Enrollment requires a project directory."
@@ -93887,42 +93891,42 @@ function projectEnrollmentIdentity(project, documents) {
   const identity = { version: 1, project: realProject };
   return {
     ...identity,
-    digest: crypto4.createHash("sha256").update(canonical({ ...identity, documents })).digest("hex")
+    digest: crypto5.createHash("sha256").update(canonical({ ...identity, documents })).digest("hex")
   };
 }
 function realStoragePath(source) {
   try {
-    return fs8.realpathSync(source);
+    return fs10.realpathSync(source);
   } catch (error2) {
     if (error2.code !== "ENOENT") throw error2;
-    const parent = path11.dirname(source);
+    const parent = path13.dirname(source);
     if (parent === source) throw error2;
-    return path11.join(realStoragePath(parent), path11.basename(source));
+    return path13.join(realStoragePath(parent), path13.basename(source));
   }
 }
 function recordPath(project) {
   const directory = realStoragePath(
-    path11.join(path11.resolve(resolvePolicyDirectory()), "project-enrollments")
+    path13.join(path13.resolve(resolvePolicyDirectory()), "project-enrollments")
   );
-  const relative = path11.relative(project, directory);
-  if (relative === "" || !relative.startsWith(`..${path11.sep}`) && relative !== ".." && !path11.isAbsolute(relative)) {
+  const relative = path13.relative(project, directory);
+  if (relative === "" || !relative.startsWith(`..${path13.sep}`) && relative !== ".." && !path13.isAbsolute(relative)) {
     throw new PolicyConfigError(
       directory,
       "Enrollment storage must be outside the project directory."
     );
   }
-  return path11.join(
+  return path13.join(
     directory,
-    `${crypto4.createHash("sha256").update(project).digest("hex")}.json`
+    `${crypto5.createHash("sha256").update(project).digest("hex")}.json`
   );
 }
 function isProjectEnrolled(identity) {
   const source = recordPath(identity.project);
   try {
-    const stat = fs8.statSync(source);
+    const stat = fs10.statSync(source);
     if (!stat.isFile() || stat.size > 4096)
       throw new Error("Invalid enrollment record");
-    const record2 = JSON.parse(fs8.readFileSync(source, "utf8"));
+    const record2 = JSON.parse(fs10.readFileSync(source, "utf8"));
     if (record2.version !== 1 || typeof record2.project !== "string" || !/^[a-f0-9]{64}$/.test(record2.digest))
       throw new Error("Invalid enrollment record");
     return record2.project === identity.project && record2.digest === identity.digest;
@@ -93936,9 +93940,9 @@ function isProjectEnrolled(identity) {
 }
 
 // src/core/policy/load-policy.ts
-import fs9 from "node:fs";
-import path12 from "node:path";
-import crypto5 from "node:crypto";
+import fs11 from "node:fs";
+import path14 from "node:path";
+import crypto6 from "node:crypto";
 
 // src/core/policy/profiles.ts
 var READ_ONLY_ALLOW = [
@@ -94130,14 +94134,14 @@ function mergePolicy(base2, override) {
 }
 function readLayer(source, required2) {
   try {
-    const stat = fs9.statSync(source);
+    const stat = fs11.statSync(source);
     if (!stat.isFile() || stat.size > 64 * 1024) {
       throw new PolicyConfigError(
         source,
         "Expected a regular policy file no larger than 64 KiB."
       );
     }
-    return fs9.readFileSync(source, "utf8");
+    return fs11.readFileSync(source, "utf8");
   } catch (error2) {
     if (error2 instanceof PolicyConfigError) throw error2;
     if (error2.code === "ENOENT" && !required2)
@@ -94153,7 +94157,7 @@ function recordSource(sources, kind3, source, text7) {
     kind: kind3,
     source,
     present: text7 !== void 0,
-    ...text7 === void 0 ? {} : { sha256: crypto5.createHash("sha256").update(text7).digest("hex") }
+    ...text7 === void 0 ? {} : { sha256: crypto6.createHash("sha256").update(text7).digest("hex") }
   });
 }
 function applyOperatorCeiling(policy, operator) {
@@ -94193,8 +94197,8 @@ function loadEffectivePolicyState(workspaceDir) {
   };
   let policy = builtIn;
   if (workspaceDir) {
-    const source2 = path12.join(
-      path12.resolve(workspaceDir),
+    const source2 = path14.join(
+      path14.resolve(workspaceDir),
       ".pio-mcp-policy.json"
     );
     const text7 = readLayer(source2, false);
@@ -94214,7 +94218,7 @@ function loadEffectivePolicyState(workspaceDir) {
     }
   }
   const explicit = resolvePolicyFile();
-  const operatorPath = explicit ?? path12.join(resolvePolicyDirectory(), "policy.yaml");
+  const operatorPath = explicit ?? path14.join(resolvePolicyDirectory(), "policy.yaml");
   const operatorText = readLayer(operatorPath, explicit !== void 0);
   recordSource(sources, "operator", operatorPath, operatorText);
   let operator = {};
@@ -94227,8 +94231,8 @@ function loadEffectivePolicyState(workspaceDir) {
     policy = mergePolicy(policy, operator);
   }
   if (workspaceDir) {
-    const source2 = path12.join(
-      path12.resolve(workspaceDir),
+    const source2 = path14.join(
+      path14.resolve(workspaceDir),
       ".pio-mcp-workspace",
       "policy.yaml"
     );
@@ -94257,14 +94261,14 @@ function loadEffectivePolicyState(workspaceDir) {
   }
   policy = applyOperatorCeiling(policy, operator);
   const source = sources.filter((item) => item.present).at(-1).source;
-  const digest = crypto5.createHash("sha256").update(JSON.stringify({ profile, policy, sources, projectEnrollment })).digest("hex");
+  const digest = crypto6.createHash("sha256").update(JSON.stringify({ profile, policy, sources, projectEnrollment })).digest("hex");
   return { profile, source, policy, sources, digest, projectEnrollment };
 }
 
 // src/core/policy/approval-scope.ts
 init_errors2();
-import crypto6 from "node:crypto";
-import path13 from "node:path";
+import crypto7 from "node:crypto";
+import path15 from "node:path";
 function canonical2(value2, depth = 0) {
   if (depth > 32)
     throw new PlatformIOError(
@@ -94292,13 +94296,13 @@ function approvalScopeDigest(action, args, policyDigest, context) {
   for (const key of ["approvalId", "approved", "__approved"])
     delete operation[key];
   if (typeof operation.projectDir === "string")
-    operation.projectDir = path13.resolve(operation.projectDir);
+    operation.projectDir = path15.resolve(operation.projectDir);
   const encoded = canonical2({
     action,
     operationName: context.operationName ?? action,
     args: operation,
     policyDigest,
-    workspaceDir: context.workspaceDir ? path13.resolve(context.workspaceDir) : null,
+    workspaceDir: context.workspaceDir ? path15.resolve(context.workspaceDir) : null,
     devicePort: context.devicePort ?? null,
     targetBindingDigest: context.targetBindingDigest ?? null,
     automationKey: context.automationKey ?? null,
@@ -94309,7 +94313,7 @@ function approvalScopeDigest(action, args, policyDigest, context) {
       "Approval arguments exceed the 256 KiB limit.",
       "APPROVAL_SCOPE_INVALID"
     );
-  return crypto6.createHash("sha256").update(encoded).digest("hex");
+  return crypto7.createHash("sha256").update(encoded).digest("hex");
 }
 
 // src/core/policy/evaluate-policy.ts
@@ -94326,8 +94330,8 @@ function hasProjectDir(args) {
   return typeof args.projectDir === "string" && args.projectDir.length > 0;
 }
 function isPathBoundaryUnsafe(projectDir) {
-  const resolved = path14.resolve(projectDir);
-  const root = path14.parse(resolved).root;
+  const resolved = path16.resolve(projectDir);
+  const root = path16.parse(resolved).root;
   return resolved === root;
 }
 function decision(status, reason, action, riskLevel, approvalId) {
@@ -94629,11 +94633,297 @@ function createPolicyRevisionGuard(workspaceDir) {
   };
 }
 
-// src/core/esp-partition-artifacts.ts
+// src/core/project-inspection.ts
+init_zod();
 init_errors2();
-import fs10 from "node:fs/promises";
-import path15 from "node:path";
-import { createHash as createHash2 } from "node:crypto";
+init_redact();
+var text = external_exports.string().max(65536);
+var value = external_exports.union([
+  text,
+  external_exports.number().finite(),
+  external_exports.boolean(),
+  external_exports.null(),
+  external_exports.array(text).max(1e4)
+]);
+var configSchema = external_exports.array(
+  external_exports.tuple([
+    external_exports.string().max(256),
+    external_exports.array(external_exports.tuple([external_exports.string().max(256), value])).max(2048)
+  ])
+).max(512);
+var targetSchema = external_exports.object({
+  name: external_exports.string().min(1).max(256),
+  title: text.nullish(),
+  description: text.nullish(),
+  group: text.nullish()
+});
+var metadataSchema = external_exports.record(
+  external_exports.object({
+    env_name: external_exports.string().optional(),
+    build_type: text.nullish(),
+    defines: external_exports.array(text).max(1e4).optional(),
+    includes: external_exports.object({
+      build: external_exports.array(text).max(1e4).optional(),
+      toolchain: external_exports.array(text).max(1e4).optional()
+    }).passthrough().nullish(),
+    libsource_dirs: external_exports.array(text).max(4096).optional(),
+    cc_path: text.nullish(),
+    cxx_path: text.nullish(),
+    gdb_path: text.nullish(),
+    prog_path: text.nullish(),
+    svd_path: text.nullish(),
+    compiler_type: text.nullish(),
+    cc_flags: external_exports.array(text).max(1e4).optional(),
+    cxx_flags: external_exports.array(text).max(1e4).optional(),
+    targets: external_exports.array(targetSchema).max(2048).optional(),
+    extra: external_exports.unknown().optional()
+  }).passthrough()
+);
+function readJson(output) {
+  if (Buffer.byteLength(output) > 10 * 1024 * 1024)
+    throw new PlatformIOError(
+      "Project output exceeds 10 MiB.",
+      "PROJECT_OUTPUT_LIMIT"
+    );
+  let raw;
+  try {
+    raw = JSON.parse(output);
+  } catch {
+    throw new PlatformIOError(
+      "Project output is not valid JSON.",
+      "PROJECT_OUTPUT_INVALID"
+    );
+  }
+  let nodes = 0;
+  const clean = (item, depth) => {
+    if (++nodes > 1e5 || depth > 24)
+      throw new PlatformIOError(
+        "Project output exceeds structural limits.",
+        "PROJECT_OUTPUT_LIMIT"
+      );
+    if (typeof item === "string") return redactSecretsInText(item);
+    if (Array.isArray(item))
+      return item.map((child) => clean(child, depth + 1));
+    if (item && typeof item === "object")
+      return Object.fromEntries(
+        Object.entries(item).map(([key, child]) => [
+          key,
+          depth > 0 && /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
+            key
+          ) ? "[REDACTED_SECRET]" : clean(child, depth + 1)
+        ])
+      );
+    return item;
+  };
+  return clean(raw, 0);
+}
+function parseProjectEnvironments(output) {
+  const parsed = configSchema.safeParse(readJson(output));
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Unexpected computed configuration shape.",
+      "PROJECT_CONFIG_INVALID"
+    );
+  const sections = /* @__PURE__ */ new Map();
+  for (const [name2, options] of parsed.data) {
+    if (sections.has(name2) || new Set(options.map(([key]) => key)).size !== options.length)
+      throw new PlatformIOError(
+        "Duplicate computed configuration section or option.",
+        "PROJECT_CONFIG_INVALID"
+      );
+    sections.set(
+      name2,
+      Object.fromEntries(
+        options.map(([key, field2]) => [
+          key,
+          /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
+            key
+          ) ? "[REDACTED_SECRET]" : field2
+        ])
+      )
+    );
+  }
+  const envs = [...sections.entries()].filter(([name2]) => name2.startsWith("env:")).map(([section, options]) => ({
+    name: section.slice(4),
+    board: options.board ?? null,
+    platform: options.platform ?? null,
+    framework: options.framework ?? null,
+    monitorSpeed: options.monitor_speed ?? null,
+    monitorPort: options.monitor_port ?? null,
+    uploadPort: options.upload_port ?? null,
+    uploadProtocol: options.upload_protocol ?? null,
+    partitionTable: options["board_build.partitions"] ?? null,
+    partitionTableUploadOffset: options["board_upload.partition_table_offset"] ?? null,
+    flashSize: options["board_upload.flash_size"] ?? null,
+    mcu: options["board_build.mcu"] ?? null,
+    libraryDependencies: options.lib_deps ?? [],
+    libraryExtraDirectories: options.lib_extra_dirs ?? [],
+    libraryDependencyFinderMode: options.lib_ldf_mode ?? null,
+    libraryCompatibilityMode: options.lib_compat_mode ?? null,
+    buildFlags: options.build_flags ?? [],
+    extends: options.extends ?? []
+  }));
+  if (envs.length > 256 || envs.some((env) => !env.name))
+    throw new PlatformIOError(
+      "Invalid environment inventory.",
+      "PROJECT_CONFIG_INVALID"
+    );
+  const platformioSection = sections.get("platformio") ?? {};
+  const rawDefaults = platformioSection.default_envs;
+  const defaults = typeof rawDefaults === "string" ? rawDefaults.split(/[,\r\n]/).map((item) => item.trim()).filter(Boolean) : Array.isArray(rawDefaults) ? rawDefaults : rawDefaults == null ? [] : void 0;
+  if (!defaults || defaults.some((name2) => !envs.some((env) => env.name === name2)))
+    throw new PlatformIOError(
+      "Default environments do not match the resolved inventory.",
+      "PROJECT_CONFIG_INVALID"
+    );
+  return {
+    envs,
+    defaultEnvironments: defaults.length ? defaults : envs.map((env) => env.name),
+    platformioSection
+  };
+}
+function parseProjectMetadata(output, environment) {
+  const parsed = metadataSchema.safeParse(readJson(output));
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Unexpected build metadata shape.",
+      "PROJECT_METADATA_INVALID"
+    );
+  const entries = Object.entries(parsed.data);
+  if (entries.length < 1 || entries.length > 256 || environment && (entries.length !== 1 || entries[0][0] !== environment))
+    throw new PlatformIOError(
+      "Metadata does not match the selected environments.",
+      "PROJECT_METADATA_INVALID"
+    );
+  const envs = Object.fromEntries(
+    entries.map(([name2, item]) => {
+      if (!name2 || item.env_name && item.env_name !== name2)
+        throw new PlatformIOError(
+          "Metadata environment identity disagrees with its key.",
+          "PROJECT_METADATA_INVALID"
+        );
+      return [
+        name2,
+        {
+          buildType: item.build_type ?? null,
+          defines: item.defines ?? [],
+          includeDirs: item.includes?.build?.slice(0, 40) ?? [],
+          includeDirCount: item.includes?.build?.length ?? 0,
+          toolchainIncludeDirCount: item.includes?.toolchain?.length ?? 0,
+          librarySourceDirs: item.libsource_dirs ?? [],
+          cc: item.cc_path ?? null,
+          cxx: item.cxx_path ?? null,
+          gdb: item.gdb_path ?? null,
+          compilerType: item.compiler_type ?? null,
+          ccFlags: item.cc_flags ?? [],
+          cxxFlags: item.cxx_flags ?? [],
+          programPath: item.prog_path ?? null,
+          svdPath: item.svd_path ?? null,
+          extra: item.extra ?? null,
+          targets: item.targets ?? [],
+          targetsAvailable: item.targets !== void 0
+        }
+      ];
+    })
+  );
+  return {
+    envs,
+    targets: Object.entries(envs).flatMap(
+      ([name2, item]) => item.targets.map((target) => ({ environment: name2, ...target }))
+    ),
+    targetsAvailable: Object.values(envs).every(
+      (item) => item.targetsAvailable
+    )
+  };
+}
+
+// src/tools/project-inspection.ts
+init_redact();
+init_errors2();
+var base = {
+  projectDir: external_exports.string().min(1).max(32768),
+  approvalId: external_exports.string().optional()
+};
+var envSchema = external_exports.object(base).strict();
+var metadataSchema2 = external_exports.object({
+  ...base,
+  environment: external_exports.string().min(1).max(50).regex(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/).optional()
+}).strict();
+async function executeProjectInspection(action, input, caller = {}, onAuthorized) {
+  if (!["project_envs", "project_metadata", "list_targets"].includes(action))
+    throw new PlatformIOError(
+      "Unknown project inspection operation.",
+      "UNKNOWN_ACTION"
+    );
+  const parsed = action === "project_envs" ? envSchema.parse(input) : metadataSchema2.parse(input);
+  const projectDir = await fs12.realpath(parsed.projectDir);
+  const params = { ...parsed, projectDir };
+  const environment = "environment" in parsed ? parsed.environment : void 0;
+  return dispatchAuthorizedAction(
+    action,
+    params,
+    { ...caller, workspaceDir: projectDir },
+    async () => {
+      const check2 = createPolicyRevisionGuard(projectDir);
+      await onAuthorized?.();
+      check2();
+      const args = [
+        action === "project_envs" ? "config" : "metadata",
+        "--json-output",
+        "--project-dir",
+        projectDir
+      ];
+      if (environment) args.push("--environment", environment);
+      const result = await platformioExecutor.execute("project", args, {
+        cwd: projectDir,
+        env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+        timeout: action === "project_envs" ? 3e4 : 6e5
+      });
+      check2();
+      if (result.exitCode !== 0)
+        return {
+          ok: false,
+          exitCode: result.exitCode,
+          projectDir,
+          summary: `${action} failed; see outputTail.`,
+          outputTail: redactSecretsInText(
+            [result.stdout, result.stderr].join("\n")
+          ).split(/\r?\n/).slice(-40).join("\n").slice(-32768)
+        };
+      if (action === "project_envs") {
+        const report2 = parseProjectEnvironments(result.stdout);
+        return {
+          ok: true,
+          exitCode: 0,
+          projectDir,
+          ...report2,
+          summary: `${report2.envs.length} resolved environment(s); defaults: ${report2.defaultEnvironments.join(", ") || "none"}.`
+        };
+      }
+      const report = parseProjectMetadata(result.stdout, environment);
+      if (action === "list_targets")
+        return {
+          ok: report.targetsAvailable,
+          exitCode: 0,
+          projectDir,
+          targets: report.targets,
+          environments: Object.keys(report.envs),
+          summary: report.targetsAvailable ? `${report.targets.length} build target(s) from PlatformIO metadata.` : "This metadata does not expose a target inventory.",
+          ...!report.targetsAvailable ? { error: "TARGETS_UNAVAILABLE" } : {}
+        };
+      return {
+        ok: true,
+        exitCode: 0,
+        projectDir,
+        envs: report.envs,
+        summary: `Build metadata for ${Object.keys(report.envs).join(", ")}.`
+      };
+    }
+  );
+}
+
+// src/tools/partition-project.ts
+init_errors2();
 
 // src/core/esp-partitions.ts
 init_errors2();
@@ -94802,6 +95092,60 @@ function parseEspPartitionBinary(input, layout) {
   }
   return invalid("Partition binary is missing its terminator.");
 }
+
+// src/tools/partition-project.ts
+async function resolveProjectPartitionInputs(projectDir, environment, caller, approvalId) {
+  const report = await executeProjectInspection(
+    "project_envs",
+    { projectDir, approvalId },
+    caller
+  );
+  if (!report.ok || !("defaultEnvironments" in report) || !Array.isArray(report.envs))
+    throw new PlatformIOError(
+      "Cannot resolve project partition configuration.",
+      "PARTITION_CONFIG_UNAVAILABLE"
+    );
+  const envs = report.envs;
+  const selected = environment ?? (report.defaultEnvironments.length === 1 ? report.defaultEnvironments[0] : void 0);
+  const env = envs.find((entry) => entry.name === selected);
+  if (!env)
+    throw new PlatformIOError(
+      "Select one configured environment for partition inspection.",
+      "PARTITION_ENVIRONMENT_REQUIRED"
+    );
+  if (env.partitionTable !== null && (typeof env.partitionTable !== "string" || !env.partitionTable || env.partitionTable.length > 32768))
+    throw new PlatformIOError(
+      "Invalid configured partition file.",
+      "PARTITION_CONFIG_INVALID"
+    );
+  let flashSize;
+  if (env.flashSize !== null) {
+    if (typeof env.flashSize !== "string" && typeof env.flashSize !== "number")
+      throw new PlatformIOError(
+        "Invalid configured flash size.",
+        "PARTITION_CONFIG_INVALID"
+      );
+    flashSize = typeof env.flashSize === "number" ? env.flashSize : parsePartitionNumber(env.flashSize.replace(/B$/i, ""));
+  }
+  return {
+    environment: env.name,
+    tablePath: env.partitionTable ?? "partitions.csv",
+    tableSource: env.partitionTable ? "board_build.partitions" : "project:partitions.csv",
+    uploadOffset: env.partitionTableUploadOffset,
+    flashSize,
+    board: env.board,
+    mcu: env.mcu
+  };
+}
+
+// src/tools/partition-table.ts
+init_zod();
+
+// src/core/esp-partition-artifacts.ts
+init_errors2();
+import fs13 from "node:fs/promises";
+import path17 from "node:path";
+import { createHash as createHash2 } from "node:crypto";
 
 // src/core/esp-partition-report.ts
 init_errors2();
@@ -95014,18 +95358,18 @@ function reportEspPartitions(parts, layout, firmwareSize) {
 
 // src/core/esp-partition-artifacts.ts
 function contained(root, target) {
-  const relative = path15.relative(root, target);
-  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path15.sep) && !path15.isAbsolute(relative);
+  const relative = path17.relative(root, target);
+  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path17.sep) && !path17.isAbsolute(relative);
 }
 async function readPartitionArtifact(root, requested, limit) {
-  const lexical = path15.resolve(root, requested);
-  const canonical3 = await fs10.realpath(lexical);
+  const lexical = path17.resolve(root, requested);
+  const canonical3 = await fs13.realpath(lexical);
   if (!contained(root, canonical3))
     throw new PlatformIOError(
       "Partition artifact is outside the authorized workspace.",
       "PARTITION_ARTIFACT_OUTSIDE_WORKSPACE"
     );
-  const handle = await fs10.open(canonical3, "r");
+  const handle = await fs13.open(canonical3, "r");
   try {
     const before = await handle.stat();
     if (!before.isFile() || before.size > limit)
@@ -95041,8 +95385,8 @@ async function readPartitionArtifact(root, requested, limit) {
       used += read.bytesRead;
     }
     const after = await handle.stat();
-    const current = await fs10.stat(canonical3);
-    const resolved = await fs10.realpath(lexical);
+    const current = await fs13.stat(canonical3);
+    const resolved = await fs13.realpath(lexical);
     if (used !== before.size || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || before.ino !== current.ino || before.dev !== current.dev || current.size !== after.size || current.mtimeMs !== after.mtimeMs || resolved !== canonical3)
       throw new PlatformIOError(
         "Partition artifact changed during inspection; retry with a stable copy.",
@@ -95062,7 +95406,7 @@ async function readPartitionArtifact(root, requested, limit) {
   }
 }
 async function inspectEspPartitionArtifacts(input) {
-  const root = await fs10.realpath(input.workspaceDir);
+  const root = await fs13.realpath(input.workspaceDir);
   const table = await readPartitionArtifact(
     root,
     input.tablePath,
@@ -95161,21 +95505,20 @@ function resolvePartitionOffset(evidence, configuredUploadOffset) {
 init_errors2();
 var PartitionTableSchema = external_exports.object({
   projectDir: external_exports.string().min(1).max(32768),
-  tablePath: external_exports.string().min(1).max(32768),
-  format: external_exports.enum(["csv", "binary"]),
+  tablePath: external_exports.string().min(1).max(32768).optional(),
+  environment: external_exports.string().regex(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/).max(50).optional(),
+  configApprovalId: external_exports.string().max(256).optional(),
+  format: external_exports.enum(["csv", "binary"]).default("csv"),
   tableOffset: external_exports.number().int().min(0).max(4294963200).optional(),
   sdkconfigPath: external_exports.string().min(1).max(32768).optional(),
   flashSize: external_exports.number().int().positive().max(4294967296).optional(),
   firmwarePath: external_exports.string().min(1).max(32768).optional(),
   observedTablePath: external_exports.string().min(1).max(32768).optional(),
   approvalId: external_exports.string().max(256).optional()
-}).strict().refine(
-  (value2) => value2.tableOffset !== void 0 || value2.sdkconfigPath !== void 0,
-  "Provide tableOffset or sdkconfigPath."
-);
+}).strict();
 async function executePartitionTable(input, caller = {}, onAuthorized) {
   const params = PartitionTableSchema.parse(input);
-  const projectDir = await fs11.realpath(params.projectDir);
+  const projectDir = await fs14.realpath(params.projectDir);
   return dispatchAuthorizedAction(
     "partition_table",
     { ...params, projectDir },
@@ -95183,6 +95526,13 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
     async () => {
       const guard = createPolicyRevisionGuard(projectDir);
       await onAuthorized?.();
+      guard();
+      const project = params.tablePath === void 0 || params.environment !== void 0 ? await resolveProjectPartitionInputs(
+        projectDir,
+        params.environment,
+        { ...caller, workspaceDir: projectDir },
+        params.configApprovalId
+      ) : null;
       guard();
       const evidence = [];
       if (params.tableOffset !== void 0)
@@ -95210,15 +95560,15 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
         const setting = partitionOffsetFromSdkconfig(text7);
         if (setting) evidence.push(setting);
       }
-      const location = resolvePartitionOffset(evidence);
+      const location = resolvePartitionOffset(evidence, project?.uploadOffset);
       guard();
       const result = await inspectEspPartitionArtifacts({
         workspaceDir: projectDir,
-        tablePath: params.tablePath,
+        tablePath: params.tablePath ?? project.tablePath,
         format: params.format,
         layout: {
           tableOffset: location.tableOffset,
-          flashSize: params.flashSize
+          flashSize: params.flashSize ?? project?.flashSize
         },
         firmwarePath: params.firmwarePath,
         observedTablePath: params.observedTablePath
@@ -95227,6 +95577,10 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
       const mismatch = Boolean(result.comparison?.length);
       return {
         ...result,
+        environment: project?.environment ?? null,
+        table_source: params.tablePath ? "explicit:tablePath" : project.tableSource,
+        board: project?.board ?? null,
+        mcu: project?.mcu ?? null,
         offset_evidence: location.evidence,
         sdkconfig_artifact: sdkconfig?.identity ?? null,
         ok: result.ok && !mismatch,
@@ -95254,14 +95608,14 @@ import crypto11 from "node:crypto";
 // src/core/analysis/elf-archive.ts
 init_paths();
 init_errors2();
-import fs18 from "node:fs/promises";
+import fs19 from "node:fs/promises";
 import { constants as constants2 } from "node:fs";
 import path21 from "node:path";
 import { createHash as createHash3, randomUUID } from "node:crypto";
 
 // src/core/analysis/elf-identity.ts
 init_errors2();
-import fs17 from "node:fs/promises";
+import fs18 from "node:fs/promises";
 import crypto9 from "node:crypto";
 async function readElfIdentity(elfPath, expectedSha256) {
   if (expectedSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(expectedSha256))
@@ -95269,8 +95623,8 @@ async function readElfIdentity(elfPath, expectedSha256) {
       "Expected ELF hash must be SHA-256.",
       "ANALYSIS_ELF_INVALID"
     );
-  const resolved = await fs17.realpath(elfPath);
-  const file = await fs17.open(resolved, "r");
+  const resolved = await fs18.realpath(elfPath);
+  const file = await fs18.open(resolved, "r");
   try {
     const before = await file.stat();
     if (!before.isFile() || before.size < 52)
@@ -95360,26 +95714,26 @@ async function readElfIdentity(elfPath, expectedSha256) {
 async function retainElfSnapshot(snapshot, expectedSha256, archiveRoot = path21.join(SERVER_DATA_DIR, "artifacts", "elf"), sourcePath = snapshot) {
   const identity = await readElfIdentity(snapshot, expectedSha256);
   archiveRoot = await sourceArchiveRoot(sourcePath, archiveRoot);
-  await fs18.mkdir(archiveRoot, { recursive: true, mode: 448 });
-  const rootState = await fs18.lstat(archiveRoot);
+  await fs19.mkdir(archiveRoot, { recursive: true, mode: 448 });
+  const rootState = await fs19.lstat(archiveRoot);
   if (!rootState.isDirectory() || rootState.isSymbolicLink())
     throw new PlatformIOError(
       "ELF archive must be an owned directory.",
       "ANALYSIS_ARCHIVE_INVALID"
     );
-  const root = await fs18.realpath(archiveRoot);
+  const root = await fs19.realpath(archiveRoot);
   const destination = path21.join(root, identity.sha256 + ".elf");
   const temporary = path21.join(root, "." + randomUUID() + ".tmp");
   try {
-    await fs18.copyFile(identity.path, temporary, constants2.COPYFILE_EXCL);
-    await fs18.chmod(temporary, 384);
+    await fs19.copyFile(identity.path, temporary, constants2.COPYFILE_EXCL);
+    await fs19.chmod(temporary, 384);
     await readElfIdentity(temporary, identity.sha256);
     try {
-      await fs18.link(temporary, destination);
+      await fs19.link(temporary, destination);
     } catch (error2) {
       if (error2.code !== "EEXIST") throw error2;
     }
-    const stored = await fs18.lstat(destination);
+    const stored = await fs19.lstat(destination);
     if (!stored.isFile() || stored.isSymbolicLink())
       throw new PlatformIOError(
         "Invalid retained ELF object.",
@@ -95388,13 +95742,13 @@ async function retainElfSnapshot(snapshot, expectedSha256, archiveRoot = path21.
     await readElfIdentity(destination, identity.sha256);
     return destination;
   } finally {
-    await fs18.unlink(temporary).catch((error2) => {
+    await fs19.unlink(temporary).catch((error2) => {
       if (error2.code !== "ENOENT") throw error2;
     });
   }
 }
 async function sourceArchiveRoot(sourcePath, archiveRoot) {
-  const source = await fs18.realpath(sourcePath);
+  const source = await fs19.realpath(sourcePath);
   const key = createHash3("sha256").update(source).digest("hex");
   return path21.join(archiveRoot, key);
 }
@@ -95405,15 +95759,15 @@ async function resolveRetainedElf(sourcePath, sha256, archiveRoot = path21.join(
       "ANALYSIS_ELF_INVALID"
     );
   const root = await sourceArchiveRoot(sourcePath, archiveRoot);
-  const rootState = await fs18.lstat(root);
+  const rootState = await fs19.lstat(root);
   if (!rootState.isDirectory() || rootState.isSymbolicLink())
     throw new PlatformIOError(
       "Invalid retained ELF directory.",
       "ANALYSIS_ARCHIVE_INVALID"
     );
-  const canonicalRoot = await fs18.realpath(root);
+  const canonicalRoot = await fs19.realpath(root);
   const file = path21.join(canonicalRoot, sha256.toLowerCase() + ".elf");
-  const entry = await fs18.lstat(file);
+  const entry = await fs19.lstat(file);
   if (!entry.isFile() || entry.isSymbolicLink())
     throw new PlatformIOError(
       "Invalid retained ELF object.",
@@ -95426,13 +95780,13 @@ async function resolveRetainedElf(sourcePath, sha256, archiveRoot = path21.join(
 // src/tools/analysis.ts
 init_zod();
 init_projects();
-import fs23 from "node:fs/promises";
+import fs24 from "node:fs/promises";
 
 // src/utils/command-log.ts
 init_paths();
 init_redact();
 init_errors2();
-import fs19 from "node:fs/promises";
+import fs20 from "node:fs/promises";
 import path22 from "node:path";
 import crypto10 from "node:crypto";
 async function retainCommandLog(purpose, stdout, stderr) {
@@ -95443,16 +95797,16 @@ async function retainCommandLog(purpose, stdout, stderr) {
     );
   const output = redactSecretsInText(stdout + "\n" + stderr);
   const directory = path22.join(SERVER_DATA_DIR, "command-logs");
-  await fs19.mkdir(directory, { recursive: true, mode: 448 });
+  await fs20.mkdir(directory, { recursive: true, mode: 448 });
   const filename = path22.join(
     directory,
     `${purpose}-${crypto10.randomUUID()}.log`
   );
-  await fs19.writeFile(filename, output, { flag: "wx", mode: 384 });
+  await fs20.writeFile(filename, output, { flag: "wx", mode: 384 });
   return filename;
 }
 async function readCommandOutput(filename) {
-  const handle = await fs19.open(filename, "r");
+  const handle = await fs20.open(filename, "r");
   try {
     const stat = await handle.stat();
     if (!stat.isFile() || stat.size > 16 * 1024 * 1024)
@@ -95483,7 +95837,7 @@ import path24 from "node:path";
 
 // src/core/analysis/toolchain-resolver.ts
 init_errors2();
-import fs20 from "node:fs/promises";
+import fs21 from "node:fs/promises";
 import path23 from "node:path";
 function contained2(root, candidate) {
   const relative = path23.relative(root, candidate);
@@ -95495,10 +95849,10 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
       "Analysis needs explicit absolute compiler and trusted-root paths.",
       "ANALYSIS_TOOLCHAIN_INVALID"
     );
-  const compiler = await fs20.realpath(compilerPath);
+  const compiler = await fs21.realpath(compilerPath);
   const roots = [
     ...new Set(
-      await Promise.all(trustedRoots.map((root2) => fs20.realpath(root2)))
+      await Promise.all(trustedRoots.map((root2) => fs21.realpath(root2)))
     )
   ];
   const matches = roots.filter((root2) => contained2(root2, compiler));
@@ -95512,7 +95866,7 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
   const match = name2.match(
     /^((?:[a-z0-9_]+-)*)(?:gcc|g\+\+|cc|c\+\+)(\.exe)?$/i
   );
-  if (!match || !(await fs20.stat(compiler)).isFile())
+  if (!match || !(await fs21.stat(compiler)).isFile())
     throw new PlatformIOError(
       "Expected a native GNU-compatible compiler path.",
       "ANALYSIS_TOOLCHAIN_INVALID"
@@ -95520,7 +95874,7 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
   const companion = async (tool) => {
     let candidate;
     try {
-      candidate = await fs20.realpath(
+      candidate = await fs21.realpath(
         path23.join(
           path23.dirname(compiler),
           `${match[1]}${tool}${match[2] ?? ""}`
@@ -95532,7 +95886,7 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
         "ANALYSIS_TOOL_UNAVAILABLE"
       );
     }
-    if (!contained2(root, candidate) || !(await fs20.stat(candidate)).isFile())
+    if (!contained2(root, candidate) || !(await fs21.stat(candidate)).isFile())
       throw new PlatformIOError(
         `The ${tool} utility escapes the selected toolchain root.`,
         "ANALYSIS_TOOLCHAIN_UNTRUSTED"
@@ -95714,17 +96068,17 @@ async function collectProgramMemory(input, elfPath, caller = {}, authorization) 
 
 // src/core/analysis/toolchain-discovery.ts
 init_errors2();
-import fs21 from "node:fs/promises";
+import fs22 from "node:fs/promises";
 import path25 from "node:path";
 function inside(root, candidate) {
   const relative = path25.relative(root, candidate);
   return relative === "" || relative !== ".." && !relative.startsWith(`..${path25.sep}`) && !path25.isAbsolute(relative);
 }
 async function packageDocument(file) {
-  const stat = await fs21.stat(file);
+  const stat = await fs22.stat(file);
   if (!stat.isFile() || stat.size > 65536)
     throw new Error("Invalid package record");
-  const value2 = JSON.parse(await fs21.readFile(file, "utf8"));
+  const value2 = JSON.parse(await fs22.readFile(file, "utf8"));
   if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
     throw new Error("Invalid package record");
   return value2;
@@ -95733,14 +96087,14 @@ async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectD
   const fail = (message) => {
     throw new PlatformIOError(message, "ANALYSIS_TOOLCHAIN_UNTRUSTED");
   };
-  const project = await fs21.realpath(projectDir);
+  const project = await fs22.realpath(projectDir);
   const validateRoot = async (root2) => {
     if (typeof root2 !== "string" || !path25.isAbsolute(root2))
       return fail(
         "Toolchain roots must be absolute operator installation paths."
       );
-    const real = await fs21.realpath(root2);
-    if (real === path25.parse(real).root || inside(project, real) || inside(real, project) || !(await fs21.stat(real)).isDirectory())
+    const real = await fs22.realpath(root2);
+    if (real === path25.parse(real).root || inside(project, real) || inside(real, project) || !(await fs22.stat(real)).isDirectory())
       return fail(
         "Toolchain installation roots cannot be filesystem roots or project-owned directories."
       );
@@ -95768,7 +96122,7 @@ async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectD
       "PlatformIO system info did not identify an absolute Core directory."
     );
   const packages = await validateRoot(path25.join(value2, "packages"));
-  const compiler = await fs21.realpath(compilerPath);
+  const compiler = await fs22.realpath(compilerPath);
   if (!inside(packages, compiler))
     return fail(
       "Compiler is outside registered host packages; configure an explicit operator root for custom tools."
@@ -96182,18 +96536,18 @@ async function runAnalysisProcess(executable, args, options = {}) {
 }
 
 // src/core/analysis/elf-snapshot.ts
-import fs22 from "node:fs/promises";
+import fs23 from "node:fs/promises";
 import os4 from "node:os";
 import path28 from "node:path";
 async function withElfSnapshot(elfPath, expectedSha256, analyze, sourcePath = elfPath) {
   const identity = await readElfIdentity(elfPath, expectedSha256);
-  const directory = await fs22.mkdtemp(
+  const directory = await fs23.mkdtemp(
     path28.join(os4.tmpdir(), "pio-elf-analysis-")
   );
   try {
-    await fs22.chmod(directory, 448);
+    await fs23.chmod(directory, 448);
     const snapshot = path28.join(directory, "firmware.elf");
-    await fs22.copyFile(identity.path, snapshot);
+    await fs23.copyFile(identity.path, snapshot);
     await readElfIdentity(snapshot, identity.sha256);
     const archivePath = await retainElfSnapshot(
       snapshot,
@@ -96203,7 +96557,7 @@ async function withElfSnapshot(elfPath, expectedSha256, analyze, sourcePath = el
     );
     return await analyze(snapshot, { ...identity, archivePath });
   } finally {
-    await fs22.rm(directory, { recursive: true, force: true });
+    await fs23.rm(directory, { recursive: true, force: true });
   }
 }
 
@@ -96405,7 +96759,7 @@ var FirmwareSizeParamsSchema = external_exports.object({
   filter: external_exports.string().max(4096).optional()
 }).strict();
 async function resolveContext(input, caller, authorization) {
-  const projectDir = await fs23.realpath(input.projectDir);
+  const projectDir = await fs24.realpath(input.projectDir);
   const validatePolicy = createPolicyRevisionGuard(projectDir);
   const selected = {
     projectDir,
@@ -96439,7 +96793,7 @@ async function resolveContext(input, caller, authorization) {
   };
 }
 async function authorizedAnalysis(params, purpose, caller, onAuthorized, execute2) {
-  const projectDir = await fs23.realpath(params.projectDir);
+  const projectDir = await fs24.realpath(params.projectDir);
   const { approvalId, ...request } = params;
   const normalized = { ...request, projectDir };
   const requestDigest = crypto11.createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
@@ -96487,300 +96841,6 @@ async function firmwareSizeReport(input, caller = {}, onAuthorized) {
         authorization
       );
       return reportFirmwareSize(context, params.top, params.filter);
-    }
-  );
-}
-
-// src/tools/project-inspection.ts
-init_zod();
-init_platformio();
-import fs24 from "node:fs/promises";
-
-// src/core/project-inspection.ts
-init_zod();
-init_errors2();
-init_redact();
-var text = external_exports.string().max(65536);
-var value = external_exports.union([
-  text,
-  external_exports.number().finite(),
-  external_exports.boolean(),
-  external_exports.null(),
-  external_exports.array(text).max(1e4)
-]);
-var configSchema = external_exports.array(
-  external_exports.tuple([
-    external_exports.string().max(256),
-    external_exports.array(external_exports.tuple([external_exports.string().max(256), value])).max(2048)
-  ])
-).max(512);
-var targetSchema = external_exports.object({
-  name: external_exports.string().min(1).max(256),
-  title: text.nullish(),
-  description: text.nullish(),
-  group: text.nullish()
-});
-var metadataSchema = external_exports.record(
-  external_exports.object({
-    env_name: external_exports.string().optional(),
-    build_type: text.nullish(),
-    defines: external_exports.array(text).max(1e4).optional(),
-    includes: external_exports.object({
-      build: external_exports.array(text).max(1e4).optional(),
-      toolchain: external_exports.array(text).max(1e4).optional()
-    }).passthrough().nullish(),
-    libsource_dirs: external_exports.array(text).max(4096).optional(),
-    cc_path: text.nullish(),
-    cxx_path: text.nullish(),
-    gdb_path: text.nullish(),
-    prog_path: text.nullish(),
-    svd_path: text.nullish(),
-    compiler_type: text.nullish(),
-    cc_flags: external_exports.array(text).max(1e4).optional(),
-    cxx_flags: external_exports.array(text).max(1e4).optional(),
-    targets: external_exports.array(targetSchema).max(2048).optional(),
-    extra: external_exports.unknown().optional()
-  }).passthrough()
-);
-function readJson(output) {
-  if (Buffer.byteLength(output) > 10 * 1024 * 1024)
-    throw new PlatformIOError(
-      "Project output exceeds 10 MiB.",
-      "PROJECT_OUTPUT_LIMIT"
-    );
-  let raw;
-  try {
-    raw = JSON.parse(output);
-  } catch {
-    throw new PlatformIOError(
-      "Project output is not valid JSON.",
-      "PROJECT_OUTPUT_INVALID"
-    );
-  }
-  let nodes = 0;
-  const clean = (item, depth) => {
-    if (++nodes > 1e5 || depth > 24)
-      throw new PlatformIOError(
-        "Project output exceeds structural limits.",
-        "PROJECT_OUTPUT_LIMIT"
-      );
-    if (typeof item === "string") return redactSecretsInText(item);
-    if (Array.isArray(item))
-      return item.map((child) => clean(child, depth + 1));
-    if (item && typeof item === "object")
-      return Object.fromEntries(
-        Object.entries(item).map(([key, child]) => [
-          key,
-          depth > 0 && /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
-            key
-          ) ? "[REDACTED_SECRET]" : clean(child, depth + 1)
-        ])
-      );
-    return item;
-  };
-  return clean(raw, 0);
-}
-function parseProjectEnvironments(output) {
-  const parsed = configSchema.safeParse(readJson(output));
-  if (!parsed.success)
-    throw new PlatformIOError(
-      "Unexpected computed configuration shape.",
-      "PROJECT_CONFIG_INVALID"
-    );
-  const sections = /* @__PURE__ */ new Map();
-  for (const [name2, options] of parsed.data) {
-    if (sections.has(name2) || new Set(options.map(([key]) => key)).size !== options.length)
-      throw new PlatformIOError(
-        "Duplicate computed configuration section or option.",
-        "PROJECT_CONFIG_INVALID"
-      );
-    sections.set(
-      name2,
-      Object.fromEntries(
-        options.map(([key, field2]) => [
-          key,
-          /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
-            key
-          ) ? "[REDACTED_SECRET]" : field2
-        ])
-      )
-    );
-  }
-  const envs = [...sections.entries()].filter(([name2]) => name2.startsWith("env:")).map(([section, options]) => ({
-    name: section.slice(4),
-    board: options.board ?? null,
-    platform: options.platform ?? null,
-    framework: options.framework ?? null,
-    monitorSpeed: options.monitor_speed ?? null,
-    monitorPort: options.monitor_port ?? null,
-    uploadPort: options.upload_port ?? null,
-    uploadProtocol: options.upload_protocol ?? null,
-    partitionTable: options["board_build.partitions"] ?? null,
-    partitionTableUploadOffset: options["board_upload.partition_table_offset"] ?? null,
-    flashSize: options["board_upload.flash_size"] ?? null,
-    mcu: options["board_build.mcu"] ?? null,
-    libraryDependencies: options.lib_deps ?? [],
-    libraryExtraDirectories: options.lib_extra_dirs ?? [],
-    libraryDependencyFinderMode: options.lib_ldf_mode ?? null,
-    libraryCompatibilityMode: options.lib_compat_mode ?? null,
-    buildFlags: options.build_flags ?? [],
-    extends: options.extends ?? []
-  }));
-  if (envs.length > 256 || envs.some((env) => !env.name))
-    throw new PlatformIOError(
-      "Invalid environment inventory.",
-      "PROJECT_CONFIG_INVALID"
-    );
-  const platformioSection = sections.get("platformio") ?? {};
-  const rawDefaults = platformioSection.default_envs;
-  const defaults = typeof rawDefaults === "string" ? rawDefaults.split(/[,\r\n]/).map((item) => item.trim()).filter(Boolean) : Array.isArray(rawDefaults) ? rawDefaults : rawDefaults == null ? [] : void 0;
-  if (!defaults || defaults.some((name2) => !envs.some((env) => env.name === name2)))
-    throw new PlatformIOError(
-      "Default environments do not match the resolved inventory.",
-      "PROJECT_CONFIG_INVALID"
-    );
-  return {
-    envs,
-    defaultEnvironments: defaults.length ? defaults : envs.map((env) => env.name),
-    platformioSection
-  };
-}
-function parseProjectMetadata(output, environment) {
-  const parsed = metadataSchema.safeParse(readJson(output));
-  if (!parsed.success)
-    throw new PlatformIOError(
-      "Unexpected build metadata shape.",
-      "PROJECT_METADATA_INVALID"
-    );
-  const entries = Object.entries(parsed.data);
-  if (entries.length < 1 || entries.length > 256 || environment && (entries.length !== 1 || entries[0][0] !== environment))
-    throw new PlatformIOError(
-      "Metadata does not match the selected environments.",
-      "PROJECT_METADATA_INVALID"
-    );
-  const envs = Object.fromEntries(
-    entries.map(([name2, item]) => {
-      if (!name2 || item.env_name && item.env_name !== name2)
-        throw new PlatformIOError(
-          "Metadata environment identity disagrees with its key.",
-          "PROJECT_METADATA_INVALID"
-        );
-      return [
-        name2,
-        {
-          buildType: item.build_type ?? null,
-          defines: item.defines ?? [],
-          includeDirs: item.includes?.build?.slice(0, 40) ?? [],
-          includeDirCount: item.includes?.build?.length ?? 0,
-          toolchainIncludeDirCount: item.includes?.toolchain?.length ?? 0,
-          librarySourceDirs: item.libsource_dirs ?? [],
-          cc: item.cc_path ?? null,
-          cxx: item.cxx_path ?? null,
-          gdb: item.gdb_path ?? null,
-          compilerType: item.compiler_type ?? null,
-          ccFlags: item.cc_flags ?? [],
-          cxxFlags: item.cxx_flags ?? [],
-          programPath: item.prog_path ?? null,
-          svdPath: item.svd_path ?? null,
-          extra: item.extra ?? null,
-          targets: item.targets ?? [],
-          targetsAvailable: item.targets !== void 0
-        }
-      ];
-    })
-  );
-  return {
-    envs,
-    targets: Object.entries(envs).flatMap(
-      ([name2, item]) => item.targets.map((target) => ({ environment: name2, ...target }))
-    ),
-    targetsAvailable: Object.values(envs).every(
-      (item) => item.targetsAvailable
-    )
-  };
-}
-
-// src/tools/project-inspection.ts
-init_redact();
-init_errors2();
-var base = {
-  projectDir: external_exports.string().min(1).max(32768),
-  approvalId: external_exports.string().optional()
-};
-var envSchema = external_exports.object(base).strict();
-var metadataSchema2 = external_exports.object({
-  ...base,
-  environment: external_exports.string().min(1).max(50).regex(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/).optional()
-}).strict();
-async function executeProjectInspection(action, input, caller = {}, onAuthorized) {
-  if (!["project_envs", "project_metadata", "list_targets"].includes(action))
-    throw new PlatformIOError(
-      "Unknown project inspection operation.",
-      "UNKNOWN_ACTION"
-    );
-  const parsed = action === "project_envs" ? envSchema.parse(input) : metadataSchema2.parse(input);
-  const projectDir = await fs24.realpath(parsed.projectDir);
-  const params = { ...parsed, projectDir };
-  const environment = "environment" in parsed ? parsed.environment : void 0;
-  return dispatchAuthorizedAction(
-    action,
-    params,
-    { ...caller, workspaceDir: projectDir },
-    async () => {
-      const check2 = createPolicyRevisionGuard(projectDir);
-      await onAuthorized?.();
-      check2();
-      const args = [
-        action === "project_envs" ? "config" : "metadata",
-        "--json-output",
-        "--project-dir",
-        projectDir
-      ];
-      if (environment) args.push("--environment", environment);
-      const result = await platformioExecutor.execute("project", args, {
-        cwd: projectDir,
-        env: { ...process.env, PYTHONIOENCODING: "utf-8" },
-        timeout: action === "project_envs" ? 3e4 : 6e5
-      });
-      check2();
-      if (result.exitCode !== 0)
-        return {
-          ok: false,
-          exitCode: result.exitCode,
-          projectDir,
-          summary: `${action} failed; see outputTail.`,
-          outputTail: redactSecretsInText(
-            [result.stdout, result.stderr].join("\n")
-          ).split(/\r?\n/).slice(-40).join("\n").slice(-32768)
-        };
-      if (action === "project_envs") {
-        const report2 = parseProjectEnvironments(result.stdout);
-        return {
-          ok: true,
-          exitCode: 0,
-          projectDir,
-          ...report2,
-          summary: `${report2.envs.length} resolved environment(s); defaults: ${report2.defaultEnvironments.join(", ") || "none"}.`
-        };
-      }
-      const report = parseProjectMetadata(result.stdout, environment);
-      if (action === "list_targets")
-        return {
-          ok: report.targetsAvailable,
-          exitCode: 0,
-          projectDir,
-          targets: report.targets,
-          environments: Object.keys(report.envs),
-          summary: report.targetsAvailable ? `${report.targets.length} build target(s) from PlatformIO metadata.` : "This metadata does not expose a target inventory.",
-          ...!report.targetsAvailable ? { error: "TARGETS_UNAVAILABLE" } : {}
-        };
-      return {
-        ok: true,
-        exitCode: 0,
-        projectDir,
-        envs: report.envs,
-        summary: `Build metadata for ${Object.keys(report.envs).join(", ")}.`
-      };
     }
   );
 }
@@ -116617,13 +116677,14 @@ var toolDefinitions = [
     description: "Inspect explicit offline ESP partition artifacts and firmware fit. Requires the resolved table offset; does not build or read a device.",
     inputSchema: {
       type: "object",
-      required: ["projectDir", "tablePath", "format"],
-      anyOf: [{ required: ["tableOffset"] }, { required: ["sdkconfigPath"] }],
+      required: ["projectDir"],
       additionalProperties: false,
       properties: {
         projectDir: { type: "string", minLength: 1, maxLength: 32768 },
         tablePath: { type: "string", minLength: 1, maxLength: 32768 },
-        format: { type: "string", enum: ["csv", "binary"] },
+        environment: { type: "string", maxLength: 50, pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$" },
+        configApprovalId: { type: "string", maxLength: 256 },
+        format: { type: "string", enum: ["csv", "binary"], default: "csv" },
         tableOffset: { type: "integer", minimum: 0, maximum: 4294963200 },
         sdkconfigPath: { type: "string", minLength: 1, maxLength: 32768 },
         flashSize: { type: "integer", minimum: 1, maximum: 4294967296 },

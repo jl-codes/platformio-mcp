@@ -3,6 +3,7 @@
  * Explicit artifact paths and table offsets avoid hidden compilation or framework guesses.
  */
 import fs from "node:fs/promises";
+import { resolveProjectPartitionInputs } from "./partition-project.js";
 import { z } from "zod";
 import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
@@ -23,8 +24,14 @@ import { PlatformIOError } from "../utils/errors.js";
 export const PartitionTableSchema = z
   .object({
     projectDir: z.string().min(1).max(32768),
-    tablePath: z.string().min(1).max(32768),
-    format: z.enum(["csv", "binary"]),
+    tablePath: z.string().min(1).max(32768).optional(),
+    environment: z
+      .string()
+      .regex(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/)
+      .max(50)
+      .optional(),
+    configApprovalId: z.string().max(256).optional(),
+    format: z.enum(["csv", "binary"]).default("csv"),
     tableOffset: z.number().int().min(0).max(0xfffff000).optional(),
     sdkconfigPath: z.string().min(1).max(32768).optional(),
     flashSize: z.number().int().positive().max(0x100000000).optional(),
@@ -32,12 +39,7 @@ export const PartitionTableSchema = z
     observedTablePath: z.string().min(1).max(32768).optional(),
     approvalId: z.string().max(256).optional(),
   })
-  .strict()
-  .refine(
-    (value) =>
-      value.tableOffset !== undefined || value.sdkconfigPath !== undefined,
-    "Provide tableOffset or sdkconfigPath.",
-  );
+  .strict();
 
 /** Gate all artifact reads and recheck policy before delivering the resulting report. */
 export async function executePartitionTable(
@@ -54,6 +56,16 @@ export async function executePartitionTable(
     async () => {
       const guard = createPolicyRevisionGuard(projectDir);
       await onAuthorized?.();
+      guard();
+      const project =
+        params.tablePath === undefined || params.environment !== undefined
+          ? await resolveProjectPartitionInputs(
+              projectDir,
+              params.environment,
+              { ...caller, workspaceDir: projectDir },
+              params.configApprovalId,
+            )
+          : null;
       guard();
       const evidence: PartitionOffsetEvidence[] = [];
       if (params.tableOffset !== undefined)
@@ -83,15 +95,15 @@ export async function executePartitionTable(
         const setting = partitionOffsetFromSdkconfig(text);
         if (setting) evidence.push(setting);
       }
-      const location = resolvePartitionOffset(evidence);
+      const location = resolvePartitionOffset(evidence, project?.uploadOffset);
       guard();
       const result = await inspectEspPartitionArtifacts({
         workspaceDir: projectDir,
-        tablePath: params.tablePath,
+        tablePath: params.tablePath ?? project!.tablePath,
         format: params.format,
         layout: {
           tableOffset: location.tableOffset,
-          flashSize: params.flashSize,
+          flashSize: params.flashSize ?? project?.flashSize,
         },
         firmwarePath: params.firmwarePath,
         observedTablePath: params.observedTablePath,
@@ -100,6 +112,12 @@ export async function executePartitionTable(
       const mismatch = Boolean(result.comparison?.length);
       return {
         ...result,
+        environment: project?.environment ?? null,
+        table_source: params.tablePath
+          ? "explicit:tablePath"
+          : project!.tableSource,
+        board: project?.board ?? null,
+        mcu: project?.mcu ?? null,
         offset_evidence: location.evidence,
         sdkconfig_artifact: sdkconfig?.identity ?? null,
         ok: result.ok && !mismatch,

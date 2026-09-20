@@ -4,6 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import { beforeEach, afterEach, it, expect, vi } from "vitest";
 import { executePartitionTable } from "../src/tools/partition-table.js";
+import { executeProjectInspection } from "../src/tools/project-inspection.js";
+vi.mock("../src/tools/project-inspection.js", () => ({
+  executeProjectInspection: vi.fn(),
+}));
 let root: string;
 let state: string;
 beforeEach(() => {
@@ -104,4 +108,45 @@ it("keeps missing SDK configuration evidence unknown", async () => {
       sdkconfigPath: "sdkconfig",
     }),
   ).rejects.toMatchObject({ code: "PARTITION_OFFSET_REQUIRED" });
+});
+
+it("inspects the selected project's configured table and offset", async () => {
+  fs.writeFileSync(path.join(root, "custom.csv"), "app,app,factory,,1M,");
+  vi.mocked(executeProjectInspection).mockResolvedValue({
+    ok: true,
+    exitCode: 0,
+    projectDir: root,
+    summary: "fixture",
+    defaultEnvironments: ["custom"],
+    platformioSection: {},
+    envs: [
+      {
+        name: "custom",
+        partitionTable: "custom.csv",
+        partitionTableUploadOffset: "0x10000",
+        flashSize: "8MB",
+        board: "fixture",
+        mcu: "esp32s3",
+      },
+    ],
+  } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>);
+  const result = await executePartitionTable({ projectDir: root });
+  expect(result).toMatchObject({
+    ok: true,
+    environment: "custom",
+    table_source: "board_build.partitions",
+    table_offset: 0x10000,
+    flash_size: 8388608,
+  });
+  expect(result.partitions[0].offset).toBe(0x20000);
+});
+it("does not silently choose among multiple default environments", async () => {
+  vi.mocked(executeProjectInspection).mockResolvedValue({
+    ok: true,
+    defaultEnvironments: ["first", "second"],
+    envs: [{ name: "first" }, { name: "second" }],
+  } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>);
+  await expect(
+    executePartitionTable({ projectDir: root }),
+  ).rejects.toMatchObject({ code: "PARTITION_ENVIRONMENT_REQUIRED" });
 });

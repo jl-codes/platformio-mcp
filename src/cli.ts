@@ -128,7 +128,7 @@ COMMANDS:
   deps-check --project-dir <dir> [--environment <env>] [--build]
   project-envs --project-dir <dir>
   project-metadata|list-targets --project-dir <dir> [--environment <env>]
-  partition-table --project-dir <dir> --table-path <file> --format <csv|binary> [--table-offset <bytes> | --sdkconfig-path <file>] [--flash-size <bytes>] [--firmware-path <file>] [--observed-table-path <file>]
+  partition-table --project-dir <dir> [--environment <env>] [--table-path <file>] [--format <csv|binary>] [--table-offset <bytes> | --sdkconfig-path <file>] [--flash-size <bytes>] [--firmware-path <file>] [--observed-table-path <file>]
   run-target --project-dir <dir> --target <name> [--environment <env>] [--upload-port <port>]
   pkg-search --query <query> [--kind library|platform|tool] [--page <n>]
   pkg-install --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
@@ -370,7 +370,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
 
   try {
     if (command === "partition-table") {
-      const allowed = new Set(["json", "project-dir", "table-path", "format", "table-offset", "sdkconfig-path", "flash-size", "firmware-path", "observed-table-path", "approval-id"]);
+      const allowed = new Set(["json", "project-dir", "table-path", "format", "table-offset", "sdkconfig-path", "environment", "config-approval-id", "flash-size", "firmware-path", "observed-table-path", "approval-id"]);
       if (positionals.length || Object.keys(options).some((key) => !allowed.has(key)))
         throw new PlatformIOError("Unknown partition inspection argument.", "PARTITION_INPUT_INVALID");
       const numberOption = (key: string) => {
@@ -384,6 +384,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         projectDir: projectDirForPolicy, tablePath: asString(options["table-path"]),
         format: asString(options.format), tableOffset: numberOption("table-offset"),
         sdkconfigPath: asString(options["sdkconfig-path"]),
+        environment: asString(options.environment), configApprovalId: asString(options["config-approval-id"]),
         flashSize: numberOption("flash-size"), firmwarePath: asString(options["firmware-path"]),
         observedTablePath: asString(options["observed-table-path"]), approvalId: asString(options["approval-id"]),
       }, {workspaceDir: projectDirForPolicy, actor: "user"});

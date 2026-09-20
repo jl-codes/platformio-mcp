@@ -301,11 +301,13 @@ const toolDefinitions: ToolDefinition[] = [
     name: "partition_table",
     description: "Inspect explicit offline ESP partition artifacts and firmware fit. Requires the resolved table offset; does not build or read a device.",
     inputSchema: {
-      type: "object", required: ["projectDir", "tablePath", "format"], anyOf: [{ required: ["tableOffset"] }, { required: ["sdkconfigPath"] }], additionalProperties: false,
+      type: "object", required: ["projectDir"], additionalProperties: false,
       properties: {
         projectDir: { type: "string", minLength: 1, maxLength: 32768 },
         tablePath: { type: "string", minLength: 1, maxLength: 32768 },
-        format: { type: "string", enum: ["csv", "binary"] },
+        environment: { type: "string", maxLength: 50, pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$" },
+        configApprovalId: { type: "string", maxLength: 256 },
+        format: { type: "string", enum: ["csv", "binary"], default: "csv" },
         tableOffset: { type: "integer", minimum: 0, maximum: 4294963200 },
         sdkconfigPath: { type: "string", minLength: 1, maxLength: 32768 },
         flashSize: { type: "integer", minimum: 1, maximum: 4294967296 },

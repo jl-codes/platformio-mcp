@@ -1043,3 +1043,7 @@ Computed environment reports now preserve board_build.partitions, board_upload.p
 ### SDK configuration integration
 
 Connected existing sdkconfig offset extraction to canonical partition_table and CLI under the same artifact permission boundary. Explicit offset remains supported, conflicting inputs fail before table access, absent evidence stays unknown, and configuration bytes are identified by SHA-256. Six focused permission/offset cases and TypeScript passed. Automatic environment/framework discovery and device operations remain unfinished.
+
+### Configured project partition workflow
+
+Public partition inspection now resolves configured environment CSV paths, upload offsets and flash sizes through authorized Core configuration inspection. Explicit/default environment selection rejects ambiguity; explicit offline paths retain their existing behavior. Eight focused workflow cases and TypeScript validation passed without PlatformIO execution. Framework package defaults, generated layout evidence, live reads and reference adapter completion remain outstanding.
