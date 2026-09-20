@@ -1083,3 +1083,7 @@ Registered pio_partition_table over the shared canonical workflow, preserving re
 ### Board capacity and firmware fit evidence
 
 Added separately authorized optional catalogue fallback for absent flash size/MCU, preserving explicit/project precedence and unknown states on denial/failure. Corrected compatibility flash-size provenance to use the canonical source. Eighteen focused adapter/workflow tests passed, including catalogue denial and existing firmware.bin discovery; targeted lint and TypeScript passed. CI 35497188383 passed at a5dee8ce. The saved compatibility adapter and catalogue change can now be pushed together; full physical/reference acceptance remains incomplete.
+
+### Core-dump input and report foundations
+
+Added bounded raw framing for supported v0.2/v0.3 and v1.0-v1.3 envelopes, CRC32/SHA-256 validation, exact declared-length trimming, input/content identities and strict base64 decoding. Encrypted, erased, unsupported and corrupted inputs produce distinct errors. Definitions checked against https://github.com/espressif/esp-coredump/blob/v1.10.0/esp_coredump/corefile/loader.py. Added bounded current-thread analyzer report projection with common-secret redaction and explicit truncation. Ten focused cases use Python zlib/hashlib-generated checksum fixtures and synthetic reports; lint and TypeScript passed. No analyzer or hardware executed. Legacy v0.1/direct ELF input, analyzer packaging/execution, immutable matching ELF, private retention, public integration and physical acceptance remain unfinished; this is not PAR completion.
