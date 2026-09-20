@@ -116067,7 +116067,10 @@ function compatibilityErrorResult(error2) {
     ENOENT: "not_found",
     ENOTDIR: "not_found",
     COMPAT_ARGUMENT_INVALID: "ValueError",
-    COMPAT_PROJECT_INVALID: "ValueError"
+    COMPAT_PROJECT_INVALID: "ValueError",
+    BOARD_NOT_FOUND: "KeyError",
+    GET_BOARD_INFO_FAILED: "RuntimeError",
+    LIST_BOARDS_FAILED: "RuntimeError"
   };
   const context = record3.context && typeof record3.context === "object" ? record3.context : {};
   const parsed = decisionSchema.safeParse(context.policyDecision);

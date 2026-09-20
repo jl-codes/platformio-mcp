@@ -2090,3 +2090,8 @@ CI run 35533859317 timed out the dependency CLI case at five seconds while it se
 - Validation: nine focused debugger configuration tests passed; TypeScript checking passed; plugin runtime and inventory regenerated. No hardware operation or smoke-test suite ran.
 - PR head 04001777 contains the previously queued contract evidence and CLI timing correction. CI runs 35534460284 and 35534458295 are still in progress; this follow-up stays local until those runs finish.
 - Current PPK2 tool documentation already supports explicit multi-interface selection; do not retain that as an assumed missing implementation. Physical PPK2 acceptance remains unverified.
+
+### 2026-09-20: Board compatibility error categories
+
+- Compared pinned reference project.py pio_board_info and core.py guard/run_json branches against the actual adapters. Unknown boards now expose KeyError, and failed board catalog commands expose RuntimeError, through the compatibility error formatter. Canonical errors remain unchanged and their codes remain available in compatibility details.
+- Sixteen affected board/error tests and TypeScript checking passed; plugin runtime regenerated. This verifies those error categories only, not full PAR-01/PAR-13 acceptance or live Core execution.

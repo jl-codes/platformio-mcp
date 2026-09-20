@@ -16,6 +16,8 @@ import {
   executeBoardCompatibility,
   compactCompatibilityBoard,
 } from "../src/adapters/board-compat.js";
+import { BoardNotFoundError, PlatformIOError } from "../src/utils/errors.js";
+import { compatibilityErrorResult } from "../src/adapters/compatibility-error.js";
 const board = {
   id: "esp32",
   name: "Example",
@@ -108,3 +110,36 @@ it("keeps absent metrics null and reference negative slice semantics", async () 
     }),
   ).toMatchObject({ total_matches: 2, boards: [{ id: "esp32" }] });
 });
+
+it("reports missing boards using the reference error category while preserving canonical diagnostics", async () => {
+  const failure = new BoardNotFoundError("missing-board");
+  mocks.info.mockRejectedValue(failure);
+  const caught = await executeBoardCompatibility("pio_board_info", {
+    board_id: "missing-board",
+  }).catch((error) => error);
+  expect(caught).toBe(failure);
+  expect(compatibilityErrorResult(caught).structuredContent).toMatchObject({
+    ok: false,
+    error: "KeyError",
+    details: { code: "BOARD_NOT_FOUND" },
+  });
+});
+it.each([
+  ["pio_board_info", { board_id: "esp32" }, "GET_BOARD_INFO_FAILED"],
+  ["pio_list_boards", { query: "esp32" }, "LIST_BOARDS_FAILED"],
+])(
+  "reports catalog process failure for %s as RuntimeError",
+  async (name, args, code) => {
+    const failure = new PlatformIOError("Catalog process failed", code);
+    mocks.info.mockRejectedValue(failure);
+    mocks.list.mockRejectedValue(failure);
+    const caught = await executeBoardCompatibility(name, args).catch(
+      (error) => error,
+    );
+    expect(compatibilityErrorResult(caught).structuredContent).toMatchObject({
+      ok: false,
+      error: "RuntimeError",
+      details: { code },
+    });
+  },
+);
