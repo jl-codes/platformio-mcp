@@ -12,6 +12,7 @@ group = None
 confirmed = False
 read_fd = None
 owner_write = None
+phase = "request"
 try:
     line = b""
     while len(line) <= 262144 and not line.endswith(b"\n"):
@@ -30,6 +31,7 @@ try:
         if libc.prctl(36, 1, 0, 0, 0) != 0: raise OSError("subreaper unavailable")
     read_fd, write_fd = os.pipe()
     owner_read, owner_write = os.pipe()
+    phase = "fork"
     guardian = os.fork()
     if guardian == 0:
         os.close(read_fd)
@@ -63,6 +65,7 @@ try:
     stop = False
     exit_code = None
     startup_deadline = time.monotonic() + 10
+    phase = "startup"
     while True:
         if not started and time.monotonic() >= startup_deadline: raise TimeoutError("backend startup")
         ready, _, _ = select.select([read_fd, sys.stdin.fileno()], [], [], 0.1)
@@ -86,7 +89,9 @@ try:
                     stop = True
                 else: raise RuntimeError("backend startup failed")
         if stop and started: break
+    phase = "terminate_group"
     os.killpg(group, signal.SIGKILL)
+    phase = "confirm_group_exit"
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
         while True:
@@ -98,10 +103,14 @@ try:
         except ProcessLookupError:
             confirmed = True
             break
+        except PermissionError:
+            # macOS can briefly deny signaling orphan/zombie members during launchd reaping.
+            # This is NOT cleanup proof: continue waiting for ESRCH within the same deadline.
+            pass
         time.sleep(0.02)
     emit("stopped", cleanupConfirmed=confirmed, exitCode=exit_code)
 except BaseException as error:
-    emit("failed", cleanupConfirmed=guardian is None, errorType=type(error).__name__)
+    emit("failed", cleanupConfirmed=guardian is None, errorType=type(error).__name__, phase=phase, errno=getattr(error, "errno", None))
 finally:
     if guardian and not confirmed:
         try:

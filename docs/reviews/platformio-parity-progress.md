@@ -1381,3 +1381,10 @@ CI follow-up: Windows checks on 3855b90a exposed fixture comparisons between leg
 ### POSIX backend supervision and Node owner (2026-09-20)
 
 Added Linux/macOS process-group supervision with a live guardian retaining the group identity until shutdown. Linux adopts/reaps orphaned descendants; a separate owner pipe requests group termination if the supervisor exits. Added a Node backend owner that bounds diagnostics/control output, retains cleanup authority after uncertain exit, rejects contradictory control records, and requires both explicit cleanup proof and supervisor closure. Five focused lifecycle tests and TypeScript passed. The native parent/grandchild fixture is now portable and wired into the existing three-host CI matrix; POSIX native acceptance is pending that run. Backend readiness/trust/probe selection and public startup integration remain incomplete.
+
+
+### Backend readiness and OpenOCD selection (2026-09-20)
+
+Added worker-bounded readiness matching over only the owned backend output. Empty-match expressions are rejected; exit/failure, cancellation, deadline and current policy are checked before accepting evidence. Added explicit OpenOCD adapter serial selection with Tcl quoting and loopback GDB endpoint configuration, disabling unused Tcl/Telnet listeners. Explicit competing serial/init commands are rejected; configuration files remain trusted executable Tcl requiring the separate host-code grant. This binding is not yet applied to J-Link/ST-Link standalone backends. Fourteen focused readiness/binding cases passed.
+
+Native lifecycle CI at d984499a passed Windows and Linux; macOS exposed a PermissionError after the backend started. The supervisor now retains ownership and polls through permission-denied group observations until ESRCH, rather than treating that observation as success or immediate terminal failure. Bounded phase/errno diagnostics identify any remaining failure. A new native macOS result is still required; no macOS success is claimed.
