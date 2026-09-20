@@ -1,5 +1,6 @@
 /** Reference test arguments and per-case reports through the canonical high-risk test operation. */
 import { z } from "zod";
+import type { BuildResult } from "../types.js";
 import { runTestsWithReport } from "../core/test-report-execution.js";
 import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
@@ -69,25 +70,60 @@ export async function executeTestCompatibility(
         let captured:
           | { exitCode: number; output: string; logPath: string }
           | undefined;
-        const result = await runTestsWithReport(
-          projectDir,
-          environment,
-          undefined,
-          {
-            ...options,
-            timeoutMs: 1200000,
-            onResult: async (execution) => {
-              guard();
-              const output = await readCommandOutput(execution.fullLogPath);
-              guard();
-              captured = {
-                exitCode: execution.exitCode,
-                output,
-                logPath: await retainCommandLog("test", output, ""),
-              };
+        let result: BuildResult;
+        try {
+          result = await runTestsWithReport(
+            projectDir,
+            environment,
+            undefined,
+            {
+              ...options,
+              timeoutMs: 1200000,
+              onResult: async (execution) => {
+                guard();
+                const output = await readCommandOutput(execution.fullLogPath);
+                guard();
+                captured = {
+                  exitCode: execution.exitCode,
+                  output,
+                  logPath: await retainCommandLog("test", output, ""),
+                };
+              },
             },
-          },
-        );
+          );
+        } catch (error) {
+          if (
+            !(error instanceof PlatformIOError) ||
+            error.code !== "COMMAND_TIMEOUT" ||
+            error.context?.cleanupPending !== false ||
+            typeof error.context.fullLogPath !== "string"
+          )
+            throw error;
+          guard();
+          const output =
+            (await readCommandOutput(error.context.fullLogPath)) +
+            "\n[platformio-mcp] timed out after 1200s";
+          guard();
+          const logPath = await retainCommandLog("test", output, "");
+          const diagnostics = cleanCompatibilityResult(
+            { exitCode: -1, output, logPath },
+            environment,
+            1200,
+            true,
+          );
+          guard();
+          return {
+            ok: false,
+            status: "error",
+            error: "test_timeout",
+            summary:
+              "pio test timed out after 1200s; no complete test report is available.",
+            build_errors: diagnostics.errors,
+            exit_code: -1,
+            output_tail: diagnostics.output_tail,
+            log_path: logPath,
+          };
+        }
         guard();
         if (!captured)
           throw new PlatformIOError(

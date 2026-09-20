@@ -102356,25 +102356,52 @@ async function executeTestCompatibility(input, defaults = {}, caller = {}, onAut
       return hardwareLockManager.withImplicitLock(async () => {
         guard();
         let captured;
-        const result = await runTestsWithReport(
-          projectDir,
-          environment,
-          void 0,
-          {
-            ...options,
-            timeoutMs: 12e5,
-            onResult: async (execution) => {
-              guard();
-              const output = await readCommandOutput(execution.fullLogPath);
-              guard();
-              captured = {
-                exitCode: execution.exitCode,
-                output,
-                logPath: await retainCommandLog("test", output, "")
-              };
+        let result;
+        try {
+          result = await runTestsWithReport(
+            projectDir,
+            environment,
+            void 0,
+            {
+              ...options,
+              timeoutMs: 12e5,
+              onResult: async (execution) => {
+                guard();
+                const output = await readCommandOutput(execution.fullLogPath);
+                guard();
+                captured = {
+                  exitCode: execution.exitCode,
+                  output,
+                  logPath: await retainCommandLog("test", output, "")
+                };
+              }
             }
-          }
-        );
+          );
+        } catch (error2) {
+          if (!(error2 instanceof PlatformIOError) || error2.code !== "COMMAND_TIMEOUT" || error2.context?.cleanupPending !== false || typeof error2.context.fullLogPath !== "string")
+            throw error2;
+          guard();
+          const output = await readCommandOutput(error2.context.fullLogPath) + "\n[platformio-mcp] timed out after 1200s";
+          guard();
+          const logPath = await retainCommandLog("test", output, "");
+          const diagnostics2 = cleanCompatibilityResult(
+            { exitCode: -1, output, logPath },
+            environment,
+            1200,
+            true
+          );
+          guard();
+          return {
+            ok: false,
+            status: "error",
+            error: "test_timeout",
+            summary: "pio test timed out after 1200s; no complete test report is available.",
+            build_errors: diagnostics2.errors,
+            exit_code: -1,
+            output_tail: diagnostics2.output_tail,
+            log_path: logPath
+          };
+        }
         guard();
         if (!captured)
           throw new PlatformIOError(

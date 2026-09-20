@@ -894,3 +894,8 @@ Read PlatformIO Core 6.1.16 test result and JSON serializer source, recording im
 
 Added opt-in pio_test using canonical high-risk run_tests authorization with request-bound filters/stage/port selections, global locking, build-only enforcement, private foreground reports and redacted retained output. Reports include per-case failures/source locations, missing-report errors and distinct WARNED counts rather than counting warnings as passes. Compatibility surface is 82 tools (54 canonical, 28 aliases). TypeScript and 16 focused mocked test/report/execution-mode checks passed; plugin rebuilt. This implementation is not full test acceptance: physical-device target/lease integration, per-connection serial conflicts, exact timeout/no-report diagnostics and native/hardware evidence remain pending. No publication occurred.
 
+
+### Public test timeout diagnostics
+
+Confirmed test timeouts now retain bounded redacted output and return an explicit test_timeout error with exit -1 and build diagnostics, without inventing report totals. Unconfirmed termination errors propagate with custody metadata, preserving lock/report retention. TypeScript and five focused mocked adapter checks passed; plugin rebuilt. Physical-device lease integration, real test execution and final release acceptance remain pending. No publication occurred.
+

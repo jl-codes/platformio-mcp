@@ -41,3 +41,20 @@ test("invalid report does not become a passing run", async () => {
   });
   await expect(executeTestCompatibility({})).resolves.toMatchObject({ ok: false, status: "error", report_error: "TEST_REPORT_INVALID" });
 });
+
+
+test("confirmed test timeout retains diagnostics without inventing case results", async () => {
+  const { PlatformIOError } = await import("../src/utils/errors.js");
+  mocks.run.mockRejectedValueOnce(new PlatformIOError("timeout", "COMMAND_TIMEOUT", { cleanupPending: false, fullLogPath: "raw.log" }));
+  const result = await executeTestCompatibility({});
+  expect(result).toMatchObject({ ok: false, status: "error", error: "test_timeout", exit_code: -1, log_path: "test.log" });
+  expect(result.output_tail).toContain("timed out after 1200s");
+  expect(result).not.toHaveProperty("total");
+});
+
+test("uncertain shutdown propagates its custody error unchanged", async () => {
+  const { PlatformIOError } = await import("../src/utils/errors.js");
+  const error = new PlatformIOError("pending", "PROCESS_CLEANUP_PENDING", { cleanupPending: true });
+  mocks.run.mockRejectedValueOnce(error);
+  await expect(executeTestCompatibility({})).rejects.toBe(error);
+});
