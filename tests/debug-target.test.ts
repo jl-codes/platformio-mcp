@@ -54,6 +54,7 @@ function selection(load: boolean) {
     host: "127.0.0.1",
     port: 3333,
     load,
+    elfSha256: "a".repeat(64),
   };
 }
 it.each([false, true])(
@@ -96,5 +97,17 @@ it("denies target access before connecting", async () => {
   await expect(
     attachDebuggerTarget(session, selection(true), {}),
   ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(lines).toEqual([]);
+});
+
+it("requires exact image identity for download authorization", async () => {
+  const { session, lines } = fixture();
+  await expect(
+    attachDebuggerTarget(
+      session,
+      { ...selection(true), elfSha256: undefined },
+      {},
+    ),
+  ).rejects.toMatchObject({ code: "DEBUG_TARGET_INVALID" });
   expect(lines).toEqual([]);
 });

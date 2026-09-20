@@ -14,10 +14,15 @@ vi.mock("../src/core/debug/debug-elf.js", async (original) => ({
 import { retainDebugElf } from "../src/core/debug/debug-elf.js";
 import { DebugProcess } from "../src/core/debug/debug-process.js";
 import { DebugClientSessions } from "../src/core/debug/debug-client-sessions.js";
+import { approveRequest, getApproval } from "../src/core/policy/approvals.js";
+import { GdbMiSession } from "../src/core/debug/gdb-mi-session.js";
+import { attachDebuggerTarget } from "../src/core/debug/debug-target.js";
+import type { PreparedDebuggerStartup } from "../src/core/debug/debug-startup.js";
 import { startPreparedDebugger } from "../src/core/debug/debug-startup.js";
 let root: string;
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-debug-startup-"));
+  vi.stubEnv("PIO_MCP_DATA_DIR", root);
   vi.stubEnv("PIO_MCP_POLICY_FILE", path.join(root, "operator.json"));
   fs.writeFileSync(
     path.join(root, "operator.json"),
@@ -40,7 +45,7 @@ afterEach(() => {
 });
 function fixture() {
   const process = {
-    attach: vi.fn(async () => {}),
+    attach: vi.fn<DebugProcess["attach"]>(async () => {}),
     command: vi.fn(),
     state: vi.fn(() => ({})),
     cleanupProcess: vi.fn(async () => {}),
@@ -56,6 +61,7 @@ function fixture() {
     projectDir: root,
     environment: "esp",
     elfPath: path.join(root, "firmware.elf"),
+    expectedElfSha256: "a".repeat(64),
     executable: path.join(root, "host-gdb"),
     trustedDebuggerRoots: [root],
     target: { host: "127.0.0.1", port: 3333, load: false },
@@ -106,4 +112,68 @@ it("denies startup before allocating artifacts or probe custody", async () => {
   expect(retainDebugElf).not.toHaveBeenCalled();
   expect(selection.acquireCustody).not.toHaveBeenCalled();
   expect(DebugProcess.start).not.toHaveBeenCalled();
+});
+
+it("consumes real connect, load and host approvals only after the complete request is ready", async () => {
+  const { process, selection } = fixture(),
+    sessions = new DebugClientSessions();
+  const selected: PreparedDebuggerStartup = {
+    ...selection,
+    target: { ...selection.target, load: true },
+  };
+  fs.writeFileSync(
+    path.join(root, "operator.json"),
+    JSON.stringify({
+      profile: "lab_admin",
+      overrides: {
+        allow: ["upload_firmware", "run_shell_command"],
+        deny: [],
+        approval_required: ["upload_firmware", "run_shell_command"],
+        audit_all_agent_actions: false,
+      },
+    }),
+  );
+  const lines: string[] = [];
+  const transport = new GdbMiSession(async (line) => {
+    lines.push(line);
+    const token = /^(\d+)/.exec(line)![1];
+    queueMicrotask(() =>
+      transport.accept(
+        Buffer.from(token + (lines.length === 1 ? "^connected\n" : "^done\n")),
+      ),
+    );
+  });
+  process.attach.mockImplementation(async (target, caller) =>
+    attachDebuggerTarget(transport, target, caller),
+  );
+  const requestApproval = async () => {
+    const result = await startPreparedDebugger(sessions, selected).catch(
+      (error: unknown) => error,
+    );
+    expect(result).toMatchObject({ code: "APPROVAL_REQUIRED" });
+    const approvalId = (
+      result as { context: { policyDecision: { approvalId: string } } }
+    ).context.policyDecision.approvalId;
+    expect(approvalId).toBeTruthy();
+    expect(retainDebugElf).not.toHaveBeenCalled();
+    expect(DebugProcess.start).not.toHaveBeenCalled();
+    approveRequest(approvalId);
+    return approvalId;
+  };
+  selected.target.connectApprovalId = await requestApproval();
+  selected.target.loadApprovalId = await requestApproval();
+  expect(getApproval(selected.target.connectApprovalId)?.status).toBe(
+    "approved",
+  );
+  selected.approvalId = await requestApproval();
+  expect(getApproval(selected.target.loadApprovalId)?.status).toBe("approved");
+  const id = await startPreparedDebugger(sessions, selected);
+  expect(lines).toHaveLength(2);
+  for (const approvalId of [
+    selected.target.connectApprovalId,
+    selected.target.loadApprovalId,
+    selected.approvalId,
+  ])
+    expect(getApproval(approvalId)?.status).toBe("consumed");
+  await sessions.stop(id);
 });

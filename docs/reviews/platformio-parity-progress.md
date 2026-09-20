@@ -1245,3 +1245,7 @@ Joined target-effect preflight, host-command authorization, private ELF retentio
 ### Stable debugger startup retry identity
 
 Prepared startup hashes its concrete project/environment, executable roots, ELF selection, destination, load mode and timeout independently of approval IDs. Connection-owned reservations preserve the generated session ID only across approval-required retries, expire after 15 minutes, and are removed after success/other failure/disconnect. Pending reservations are bounded to eight; simultaneous duplicate requests are rejected before a second launch. Eleven focused registry/orchestration cases, TypeScript and lint passed. Complete public approval-ledger replay and probe discovery remain to be integrated.
+
+### Real debugger approval replay and image binding
+
+Verified connect/load/host startup approvals against the real approval store and MI transport: preflights leave earlier grants approved, launch occurs only after all required grants are supplied, and execution consumes each once. Prepared startup now requires a selected ELF hash; target-download authorization includes that identity, and retained-ELF creation enforces it. Ten focused startup/target cases, TypeScript and lint passed. Launch and artifact acquisition were mocked in the approval replay case; no physical debugger acceptance is claimed.

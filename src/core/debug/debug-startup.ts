@@ -20,7 +20,7 @@ export interface PreparedDebuggerStartup {
   projectDir: string;
   environment: string;
   elfPath: string;
-  expectedElfSha256?: string;
+  expectedElfSha256: string;
   executable: string;
   trustedDebuggerRoots: readonly string[];
   target: Omit<DebugTargetSelection, "projectDir" | "sessionId">;
@@ -58,6 +58,7 @@ export function startPreparedDebugger(
     async (sessionId) => {
       const target = {
         ...selection.target,
+        elfSha256: selection.expectedElfSha256,
         projectDir: selection.projectDir,
         sessionId,
       };

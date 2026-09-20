@@ -13,6 +13,7 @@ export interface DebugTargetSelection {
   host: string;
   port: number;
   load: boolean;
+  elfSha256?: string;
   connectApprovalId?: string;
   loadApprovalId?: string;
   timeoutMs?: number;
@@ -33,6 +34,9 @@ export async function preflightDebuggerTarget(
     timeoutMs < 1 ||
     timeoutMs > 600000 ||
     typeof selection.load !== "boolean" ||
+    (selection.load && !selection.elfSha256) ||
+    (selection.elfSha256 !== undefined &&
+      !/^[a-f0-9]{64}$/i.test(selection.elfSha256)) ||
     !selection.sessionId
   )
     throw new PlatformIOError(
@@ -47,6 +51,7 @@ export async function preflightDebuggerTarget(
     projectDir: selection.projectDir,
     sessionId: selection.sessionId,
     endpoint,
+    elfSha256: selection.elfSha256?.toLowerCase(),
   };
   const stages = [
     {
