@@ -61,3 +61,14 @@ test("coverage reports verified authority without implying new-release deploymen
  inventory.entries[0].publicationControlVerified=false;
  assert.equal(namespaceCoverage(inventory,observations).rows.find(row=>row.channel==="npm").disposition,"published_metadata_observed_authority_unproven");
 });
+
+test("GitHub landing evidence does not imply package publication or cover another owner", async () => {
+ const {namespaceCoverage}=await import("../scripts/namespace-coverage.mjs");
+ const inventory={requestedAliases:["fixture"],canonicalSource:"https://github.com/owner/source",entries:[{registry:"github",name:"owner/fixture",role:"official_landing",publicationControlVerified:true}]};
+ const evidence={observedAt:"2026-09-20T00:00:00Z",repositories:[{name:"owner/fixture",url:"https://github.com/owner/fixture",canonicalSource:inventory.canonicalSource,private:false,repositoryId:123,readmeBlobSha:"a".repeat(40)}]};
+ const rows=namespaceCoverage(inventory,{},evidence).rows;
+ assert.equal(rows.find(row=>row.channel==="github").disposition,"published_official_landing");
+ assert.equal(rows.find(row=>row.channel==="npm").disposition,"not_implemented");
+ evidence.repositories[0].name="other/fixture";
+ assert.equal(namespaceCoverage(inventory,{},evidence).rows.find(row=>row.channel==="github").disposition,"candidate_not_secured");
+});

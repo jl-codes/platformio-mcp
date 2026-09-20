@@ -23,6 +23,8 @@
           "authorityVerified": true,
           "namingEligibilityVerified": false,
           "publicObservation": "observed_project_link",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": "3.0.0",
           "observedAt": "2026-09-20T03:52:45.662Z",
           "reason": null
@@ -52,6 +54,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "third_party",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": "0.2.0",
           "observedAt": "2026-09-20T03:52:48.395Z",
           "reason": null
@@ -72,6 +76,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:48.773Z",
           "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
@@ -92,6 +98,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:48.508Z",
           "reason": null
@@ -112,6 +120,30 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:48.508Z",
+          "reason": null
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/platformio-mcp",
+          "role": "canonical",
+          "packagePath": null,
+          "publishIntent": true,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:48.508Z",
           "reason": null
@@ -181,6 +213,8 @@
           "authorityVerified": true,
           "namingEligibilityVerified": false,
           "publicObservation": "observed_project_link",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": "3.0.0",
           "observedAt": "2026-09-20T03:52:46.090Z",
           "reason": null
@@ -210,6 +244,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:48.199Z",
           "reason": null
@@ -230,6 +266,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:48.773Z",
           "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
@@ -250,6 +288,28 @@
       "channel": "plugin",
       "entries": [],
       "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/pio-mcp",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715067,
+          "landingReadmeBlobSha": "fc63b1099ac0581c64f8f69e20ce6a8610e10327",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
       "scopedAlternatives": []
     },
     {
@@ -313,6 +373,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:46.280Z",
           "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
@@ -342,6 +404,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "third_party",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": "0.2.0",
           "observedAt": "2026-09-20T03:52:48.395Z",
           "reason": null
@@ -362,6 +426,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:48.773Z",
           "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
@@ -382,6 +448,28 @@
       "channel": "plugin",
       "entries": [],
       "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/platformio.mcp",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715115,
+          "landingReadmeBlobSha": "980dfdb41f6f473f7f99c832bd8b4e8fb7f2f9e1",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
       "scopedAlternatives": []
     },
     {
@@ -445,6 +533,8 @@
           "authorityVerified": true,
           "namingEligibilityVerified": false,
           "publicObservation": "observed_project_link",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": "3.0.0",
           "observedAt": "2026-09-20T03:52:45.974Z",
           "reason": null
@@ -474,6 +564,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:47.906Z",
           "reason": null
@@ -494,6 +586,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:48.773Z",
           "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
@@ -514,6 +608,28 @@
       "channel": "plugin",
       "entries": [],
       "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/pio-agent",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715164,
+          "landingReadmeBlobSha": "919e3dd40077c9cf498c1b5a528c1cc6f719ba00",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
       "scopedAlternatives": []
     },
     {
@@ -577,6 +693,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:46.736Z",
           "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
@@ -606,6 +724,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:48.921Z",
           "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified."
@@ -626,6 +746,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:49.085Z",
           "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
@@ -646,6 +768,28 @@
       "channel": "plugin",
       "entries": [],
       "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/platformiomcp",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715205,
+          "landingReadmeBlobSha": "cd7a1154c618733c3c37b49ae8f328b936fb8b20",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
       "scopedAlternatives": []
     },
     {
@@ -709,6 +853,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:47.109Z",
           "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
@@ -738,6 +884,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:49.085Z",
           "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified."
@@ -758,6 +906,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:49.265Z",
           "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
@@ -778,6 +928,28 @@
       "channel": "plugin",
       "entries": [],
       "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/pioagent",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715245,
+          "landingReadmeBlobSha": "27fb4d1d4d28bb080fb624a68e41894393c1d70e",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
       "scopedAlternatives": []
     },
     {
@@ -841,6 +1013,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:48.773Z",
           "reason": "Existing npm flash-agent@1.0.38 creates a punctuation-insensitive naming collision. A missing exact-name lookup does not prove eligibility; publication remains disabled pending registry resolution."
@@ -870,6 +1044,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:49.265Z",
           "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified."
@@ -890,6 +1066,8 @@
           "authorityVerified": false,
           "namingEligibilityVerified": false,
           "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
           "observedVersion": null,
           "observedAt": "2026-09-20T03:52:49.425Z",
           "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
@@ -910,6 +1088,28 @@
       "channel": "plugin",
       "entries": [],
       "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/flashagent",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715300,
+          "landingReadmeBlobSha": "dc88413341cadae2743bd2755f8c3dcb84d9911f",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
       "scopedAlternatives": []
     },
     {
