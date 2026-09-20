@@ -94003,6 +94003,40 @@ function projectCompatibilityDevices(devices) {
   };
 }
 async function executeDeviceCompatibility(client, name2, input, defaults = {}, caller = {}, onAuthorized) {
+  if (name2 === "pio_monitor_write") {
+    const params2 = external_exports.object({
+      session_id: external_exports.string().min(1).max(256),
+      text: external_exports.string().max(65536),
+      newline: external_exports.boolean().default(true),
+      approval_id: external_exports.string().max(256).optional()
+    }).strict().parse(input);
+    const bytes = Buffer.from(
+      params2.text + (params2.newline ? "\n" : ""),
+      "utf8"
+    );
+    if (bytes.length > 65536)
+      throw new PlatformIOError(
+        "Serial writes are limited to 64 KiB including the newline.",
+        "SERIAL_WRITE_LIMIT"
+      );
+    return client.run(
+      { caller, approvalId: params2.approval_id },
+      async (service, owner) => {
+        const result = await service.sessions.write(
+          owner,
+          params2.session_id,
+          bytes
+        );
+        const session = service.sessions.list(owner).find((item) => item.sessionId === params2.session_id);
+        return {
+          ok: true,
+          summary: `sent ${result.bytesWritten} byte(s) to ${session?.path ?? "serial port"}.`,
+          session_id: params2.session_id,
+          bytes: result.bytesWritten
+        };
+      }
+    );
+  }
   if (name2 === "pio_monitor_stop") {
     const params2 = external_exports.object({ session_id: external_exports.string().min(1).max(256) }).strict().parse(input);
     return client.run({ caller }, async (service, owner) => {
@@ -94086,6 +94120,32 @@ function withDeviceCompatibility(base2) {
       additionalProperties: false
     },
     handler: (args, context) => context.dispatch("pio_list_devices", args)
+  });
+  const writeSource = base2.get("upload_firmware");
+  if (!writeSource || result.has("pio_monitor_write"))
+    throw new Error("Invalid serial write compatibility registry");
+  result.set("pio_monitor_write", {
+    ...writeSource,
+    name: "pio_monitor_write",
+    policyAction: "serial_session_write",
+    annotations: {
+      ...writeSource.annotations,
+      title: "Write Monitor",
+      idempotentHint: false
+    },
+    description: "Write UTF-8 text to an owned serial session after payload-bound hardware authorization. Limited to 64 KiB including the optional newline.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        session_id: { type: "string", minLength: 1, maxLength: 256 },
+        text: { type: "string", maxLength: 65536 },
+        newline: { type: "boolean", default: true },
+        approval_id: { type: "string", maxLength: 256 }
+      },
+      required: ["session_id", "text"],
+      additionalProperties: false
+    },
+    handler: (args, context) => context.dispatch("pio_monitor_write", args)
   });
   for (const [name2, canonical3] of [
     ["pio_monitor_list", "get_monitor_status"],
@@ -114094,7 +114154,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_list_targets"
   ].includes(name2);
   const dependencyCompatibility = name2 === "pio_deps_check";
-  const deviceCompatibility = ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop"].includes(name2);
+  const deviceCompatibility = ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop", "pio_monitor_write"].includes(name2);
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name2
   );

@@ -62,6 +62,45 @@ export async function executeDeviceCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_monitor_write") {
+    const params = z
+      .object({
+        session_id: z.string().min(1).max(256),
+        text: z.string().max(65536),
+        newline: z.boolean().default(true),
+        approval_id: z.string().max(256).optional(),
+      })
+      .strict()
+      .parse(input);
+    const bytes = Buffer.from(
+      params.text + (params.newline ? "\n" : ""),
+      "utf8",
+    );
+    if (bytes.length > 65536)
+      throw new PlatformIOError(
+        "Serial writes are limited to 64 KiB including the newline.",
+        "SERIAL_WRITE_LIMIT",
+      );
+    return client.run(
+      { caller, approvalId: params.approval_id },
+      async (service, owner) => {
+        const result = await service.sessions.write(
+          owner,
+          params.session_id,
+          bytes,
+        );
+        const session = service.sessions
+          .list(owner)
+          .find((item) => item.sessionId === params.session_id);
+        return {
+          ok: true,
+          summary: `sent ${result.bytesWritten} byte(s) to ${session?.path ?? "serial port"}.`,
+          session_id: params.session_id,
+          bytes: result.bytesWritten,
+        };
+      },
+    );
+  }
   if (name === "pio_monitor_stop") {
     const params = z
       .object({ session_id: z.string().min(1).max(256) })
@@ -162,6 +201,33 @@ export function withDeviceCompatibility<TResult>(
       additionalProperties: false,
     },
     handler: (args, context) => context.dispatch("pio_list_devices", args),
+  });
+  const writeSource = base.get("upload_firmware");
+  if (!writeSource || result.has("pio_monitor_write"))
+    throw new Error("Invalid serial write compatibility registry");
+  result.set("pio_monitor_write", {
+    ...writeSource,
+    name: "pio_monitor_write",
+    policyAction: "serial_session_write",
+    annotations: {
+      ...writeSource.annotations,
+      title: "Write Monitor",
+      idempotentHint: false,
+    },
+    description:
+      "Write UTF-8 text to an owned serial session after payload-bound hardware authorization. Limited to 64 KiB including the optional newline.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        session_id: { type: "string", minLength: 1, maxLength: 256 },
+        text: { type: "string", maxLength: 65536 },
+        newline: { type: "boolean", default: true },
+        approval_id: { type: "string", maxLength: 256 },
+      },
+      required: ["session_id", "text"],
+      additionalProperties: false,
+    },
+    handler: (args, context) => context.dispatch("pio_monitor_write", args),
   });
   for (const [name, canonical] of [
     ["pio_monitor_list", "get_monitor_status"],
