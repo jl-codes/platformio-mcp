@@ -92,8 +92,9 @@ export async function withTargetUploadCapture<T>(
         exitCode = result.exitCode;
       },
     });
-    // Core returns 1 for a failed SCons action; direct SCons may preserve the hook's status 86.
-    if (exitCode !== 1 && exitCode !== 86)
+    // Core maps failed actions to 1; SCons wraps action status 86 in a BuildError with exit status 2.
+    // The private capture record must still validate; a nonzero exit alone never proves capture.
+    if (exitCode !== 1 && exitCode !== 2 && exitCode !== 86)
       throw new PlatformIOError(
         "Upload target did not stop at the capture phase.",
         "UPLOAD_CAPTURE_FAILED",

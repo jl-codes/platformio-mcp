@@ -30,6 +30,8 @@ export function uploadCaptureEnvironment(
       "UPLOAD_CAPTURE_UNSUPPORTED",
     );
   return {
+    // SCons prints source paths before invoking the capture action; match our UTF-8 log decoder.
+    PYTHONIOENCODING: "utf-8",
     PLATFORMIO_EXTRA_SCRIPTS: `${previous}${previous ? "\n" : ""}post:${scriptPath}\n`,
   };
 }

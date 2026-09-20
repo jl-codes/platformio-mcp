@@ -110442,6 +110442,8 @@ function uploadCaptureEnvironment(scriptPath, inherited = process.env) {
       "UPLOAD_CAPTURE_UNSUPPORTED"
     );
   return {
+    // SCons prints source paths before invoking the capture action; match our UTF-8 log decoder.
+    PYTHONIOENCODING: "utf-8",
     PLATFORMIO_EXTRA_SCRIPTS: `${previous}${previous ? "\n" : ""}post:${scriptPath}
 `
   };
@@ -111014,7 +111016,7 @@ async function withTargetUploadCapture(input, use) {
         exitCode = result.exitCode;
       }
     });
-    if (exitCode !== 1 && exitCode !== 86)
+    if (exitCode !== 1 && exitCode !== 2 && exitCode !== 86)
       throw new PlatformIOError(
         "Upload target did not stop at the capture phase.",
         "UPLOAD_CAPTURE_FAILED"

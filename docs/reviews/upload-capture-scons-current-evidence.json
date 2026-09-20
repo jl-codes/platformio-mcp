@@ -1,0 +1,38 @@
+{
+  "sconsVersion": "4.8.1",
+  "pythonVersion": "3.14.4",
+  "cases": [
+    {
+      "offset": 0,
+      "actionStatus": 86,
+      "sconsExitStatus": 2,
+      "exactArgv": true,
+      "resolvedCompiler": true,
+      "capturedHashes": true,
+      "originalUploaderExecuted": false,
+      "laterActionsExecuted": []
+    },
+    {
+      "offset": 65536,
+      "actionStatus": 86,
+      "sconsExitStatus": 2,
+      "exactArgv": true,
+      "resolvedCompiler": true,
+      "capturedHashes": true,
+      "originalUploaderExecuted": false,
+      "laterActionsExecuted": []
+    }
+  ],
+  "observedAt": "2026-09-20T17:55:49.285Z",
+  "host": "win32-x64",
+  "sourceBase": "237956c021f42dce52419380263a99ca31cb2d7d",
+  "implementationSha256": "5666dc705f92bc36d0e5af6df85e7455483b5e5072a3286090a04d5382cc06fd",
+  "verifierSha256": "57abfe8f9118d2fdb3b41a73a9a5b65485a0061b69093768271658b6e6972887",
+  "hookSha256": "7623cf44bcb7973ab9189c8fc44f77129e954e7c80544c89beb8ab446a0b1415",
+  "scope": "Real SCons 4.8.1 lazy/list actions with synthetic inputs; current command parsing, resolved compiler, both application offsets and stop-before-upload verified.",
+  "hardwareExecuted": false,
+  "limits": [
+    "No PlatformIO build or native uploader executed",
+    "Physical device and full retained-upload acceptance remain required"
+  ]
+}

@@ -50,31 +50,35 @@ afterEach(async () => {
   vi.unstubAllEnvs();
   await fs.rm(root, { recursive: true, force: true });
 });
-it("retains only after the completed target stops, preserving inherited extra scripts", async () => {
-  mocks.target.mockImplementation(
-    async (_project, _target, _environment, _verbose, options) => {
-      expect(options.captureEnvironment.PLATFORMIO_EXTRA_SCRIPTS).toBe(
-        `pre:existing.py\npost:finish.py\npost:${path.join(root, "capture.py")}\n`,
-      );
-      expect(
-        await fs.readFile(path.join(root, "capture.py"), "utf8"),
-      ).toContain("return 86");
-      expect(mocks.retain).not.toHaveBeenCalled();
-      await options.onResult({ exitCode: 1 });
-      return { success: false };
-    },
-  );
-  expect(await captureTargetUpload(input)).toEqual({ sha256: "retained" });
-  expect(mocks.retain).toHaveBeenCalledWith(
-    path.join(root, "selection.json"),
-    expect.objectContaining({ captureDirectory: root }),
-    undefined,
-  );
-  await expect(fs.stat(root)).rejects.toMatchObject({ code: "ENOENT" });
-  expect(process.env.PLATFORMIO_EXTRA_SCRIPTS).toBe(
-    "pre:existing.py\npost:finish.py",
-  );
-});
+it.each([1, 2, 86])(
+  "retains only after the completed target stops with status %i, preserving inherited extra scripts",
+  async (exitCode) => {
+    mocks.target.mockImplementation(
+      async (_project, _target, _environment, _verbose, options) => {
+        expect(options.captureEnvironment.PYTHONIOENCODING).toBe("utf-8");
+        expect(options.captureEnvironment.PLATFORMIO_EXTRA_SCRIPTS).toBe(
+          `pre:existing.py\npost:finish.py\npost:${path.join(root, "capture.py")}\n`,
+        );
+        expect(
+          await fs.readFile(path.join(root, "capture.py"), "utf8"),
+        ).toContain("return 86");
+        expect(mocks.retain).not.toHaveBeenCalled();
+        await options.onResult({ exitCode });
+        return { success: false };
+      },
+    );
+    expect(await captureTargetUpload(input)).toEqual({ sha256: "retained" });
+    expect(mocks.retain).toHaveBeenCalledWith(
+      path.join(root, "selection.json"),
+      expect.objectContaining({ captureDirectory: root }),
+      undefined,
+    );
+    await expect(fs.stat(root)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(process.env.PLATFORMIO_EXTRA_SCRIPTS).toBe(
+      "pre:existing.py\npost:finish.py",
+    );
+  },
+);
 it("rejects a normal successful upload instead of treating it as a captured stop", async () => {
   mocks.target.mockImplementation(async (_p, _t, _e, _v, options) => {
     await options.onResult({ exitCode: 0 });
