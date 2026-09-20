@@ -1,0 +1,26 @@
+{
+  "observedAt": "2026-09-20T10:57:29.388Z",
+  "platform": "win32",
+  "physicalDeviceContacted": false,
+  "supervisorSha256": "83c25830ac12dd6a42aaa29c6011f0de78ff983ec2439ab7204070227b4ce8b6",
+  "results": [
+    {
+      "mode": "stop",
+      "cleanupConfirmed": true,
+      "rootExited": true,
+      "descendantExited": true
+    },
+    {
+      "mode": "owner_eof",
+      "cleanupConfirmed": true,
+      "rootExited": true,
+      "descendantExited": true
+    },
+    {
+      "mode": "natural",
+      "cleanupConfirmed": true,
+      "rootExited": true,
+      "descendantExited": true
+    }
+  ]
+}
