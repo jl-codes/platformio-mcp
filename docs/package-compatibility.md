@@ -55,10 +55,12 @@ separate opening/reading authorization; port diagnosis does not open the port.
 
 `verify_reachable` defaults to true. Under the discovery permission, OTA resolves one
 IPv4 address and sends one bounded ICMP probe to that exact address before building
-or uploading. A negative result returns `host_unreachable`; use
-`verify_reachable=false` when ICMP is intentionally blocked. Missing system ping
-utilities report `reachable: null` and allow the separately authorized OTA operation
-to continue. A ping reply establishes neither OTA service availability nor firmware
+or uploading. A negative result is retained as `reachable: false` with its
+`reachability_status`; the separately authorized OTA operation still proceeds.
+Unlike the pinned reference, a failed ping does not return `host_unreachable` or
+block upload: ICMP may be filtered while OTA is available. Set
+`verify_reachable=false` to skip the diagnostic probe. Missing system ping utilities
+report `reachable: null`. A ping reply establishes neither OTA service availability nor firmware
 runtime health. The system utility is selected from fixed OS paths without a shell
 or PATH search; public requests cannot choose its command or arguments.
 

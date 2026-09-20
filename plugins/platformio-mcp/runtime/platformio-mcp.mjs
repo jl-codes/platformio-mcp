@@ -112559,25 +112559,6 @@ async function executeOtaUpload(input, caller = {}, onAuthorized) {
     }
   );
   guard();
-  if (reachability.reachable === false)
-    return {
-      ok: false,
-      error: "host_unreachable",
-      summary: "The selected host did not answer ICMP. OTA availability is unknown; set verify_reachable=false if ICMP is blocked.",
-      host: args.host,
-      target_host: target.address,
-      port: target.port,
-      env: configuration.environment,
-      filesystem: args.filesystem,
-      platform_family: configuration.family,
-      reachable: false,
-      reachability_status: reachability.status,
-      runtime_verified: false,
-      duration_s: (performance.now() - started) / 1e3,
-      output_tail: "",
-      log_path: null,
-      exit_code: null
-    };
   return hardwareLockManager.withImplicitLock(async () => {
     guard();
     let buildResult;

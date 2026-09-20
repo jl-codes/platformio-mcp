@@ -2075,3 +2075,7 @@ Verified the authenticated GitHub identity is jl-codes and the canonical reposit
 ### GitHub coverage accounting (2026-09-20)
 
 Expanded the per-name coverage report to include GitHub as its thirteenth channel. Published landing status requires matching controlled inventory, public repository ID, exact owner/name URL, canonical source, dated observation and README blob identity from the recorded publication evidence. Landing status is separate from runtime/package publication and cannot transfer to another GitHub owner or npm. Seven namespace tests passed. Regenerated the seven-family report, which still explicitly shows 61 channel/name combinations without implementations.
+
+### OTA ICMP behavior aligned with the approved plan (2026-09-20)
+
+Removed the early host_unreachable return on negative ICMP. The pinned reference blocks at that point, but plan section 6 explicitly requires diagnostic-only reachability and forbids treating failed ping as proof that OTA is unavailable. The shared canonical/reference workflow now retains reachable=false and reachability_status while continuing to independently authorized build/transfer stages. Existing pinned IPv4 binding, probe permissions, transfer grants and runtime_verified=false remain unchanged. Documented this intentional reference deviation. Eleven focused OTA tests and TypeScript passed with mocked build/network operations; no live ping or upload was performed. Plugin rebuilt.

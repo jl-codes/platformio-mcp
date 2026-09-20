@@ -140,26 +140,7 @@ export async function executeOtaUpload(
     },
   );
   guard();
-  if (reachability.reachable === false)
-    return {
-      ok: false,
-      error: "host_unreachable",
-      summary:
-        "The selected host did not answer ICMP. OTA availability is unknown; set verify_reachable=false if ICMP is blocked.",
-      host: args.host,
-      target_host: target.address,
-      port: target.port,
-      env: configuration.environment,
-      filesystem: args.filesystem,
-      platform_family: configuration.family,
-      reachable: false,
-      reachability_status: reachability.status,
-      runtime_verified: false,
-      duration_s: (performance.now() - started) / 1000,
-      output_tail: "",
-      log_path: null,
-      exit_code: null,
-    };
+  // ICMP filtering does not establish OTA availability; only the authorized transfer decides its outcome.
   return hardwareLockManager.withImplicitLock(async () => {
     guard();
     let buildResult: Awaited<ReturnType<typeof buildTarget>> | undefined;

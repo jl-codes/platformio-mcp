@@ -255,7 +255,7 @@ it("preserves memory on successful OTA and bounds the uploader tail to forty lin
   expect(result.output_tail.split("\n")).toHaveLength(40);
 });
 
-it("stops before build or transfer when the pinned host gives no ICMP reply", async () => {
+it("preserves failed ICMP evidence while attempting the separately authorized OTA transfer", async () => {
   mocks.reachability.mockResolvedValue({
     reachable: false,
     status: "no_reply",
@@ -266,13 +266,13 @@ it("stops before build or transfer when the pinned host gives no ICMP reply", as
   });
   expect(mocks.reachability).toHaveBeenCalledWith("192.0.2.8");
   expect(result).toMatchObject({
-    ok: false,
-    error: "host_unreachable",
+    ok: true,
+    reachability_status: "no_reply",
     reachable: false,
     runtime_verified: false,
   });
-  expect(mocks.build).not.toHaveBeenCalled();
-  expect(mocks.transfer).not.toHaveBeenCalled();
+  expect(mocks.build).toHaveBeenCalledOnce();
+  expect(mocks.transfer).toHaveBeenCalledOnce();
 });
 it("skips ICMP when explicitly disabled", async () => {
   const result = await executeOtaUpload({
