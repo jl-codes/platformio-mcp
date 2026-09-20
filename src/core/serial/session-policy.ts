@@ -2,6 +2,11 @@
  * Real policy-dispatcher integration for the owned serial session service.
  * Provides PolicySerialSessionService with request-local approvals and existing permission-source resolution.
  */
+import {
+  captureSessionVerification,
+  VerificationCaptureSchema,
+  validateVerificationCapture,
+} from "./verification-capture.js";
 import { captureSessionMemory, MemoryCaptureSchema } from "./memory-capture.js";
 import { captureTransientMemory } from "./transient-memory-capture.js";
 import { z } from "zod";
@@ -60,8 +65,11 @@ export class PolicySerialSessionService {
   private readonly transientMemoryScope = new AsyncLocalStorage<{
     input:
       | ReturnType<typeof MemoryCaptureSchema.parse>
-      | ReturnType<typeof MonitorCaptureSchema.parse>;
-    purpose: "one_shot_memory" | "one_shot_monitor";
+      | ReturnType<typeof MonitorCaptureSchema.parse>
+      | ReturnType<typeof VerificationCaptureSchema.parse>;
+    purpose: "one_shot_memory" | "one_shot_monitor" | "boot_verification";
+    readGuard?: () => void;
+    expiresAt?: number;
     active: boolean;
     binding?: string;
     guard?: () => void;
@@ -138,6 +146,68 @@ export class PolicySerialSessionService {
         }
         const stopped = await this.sessions.stop(owner, started.sessionId);
         return { result, session: stopped };
+      } finally {
+        scope.active = false;
+      }
+    });
+  }
+  /** Open a fresh boot capture, bind all pages to one bounded read grant, and always close its owned port. */
+  async captureVerificationOnce(
+    owner: SerialSessionOwner,
+    request: Parameters<PolicySerialSessionService["startWithDiscovery"]>[1],
+    input: z.input<typeof VerificationCaptureSchema> = {},
+    signal?: AbortSignal,
+  ) {
+    const args = await validateVerificationCapture(input);
+    const scope = {
+      input: args,
+      purpose: "boot_verification" as const,
+      active: true,
+      expiresAt:
+        performance.now() +
+        (args.timeoutSeconds + args.settleSeconds + 30) * 1000,
+    };
+    return this.transientMemoryScope.run(scope, async () => {
+      try {
+        const started = await this.startWithDiscovery(owner, request);
+        let report: Awaited<ReturnType<typeof captureSessionVerification>>;
+        try {
+          report = await captureSessionVerification(
+            this.sessions,
+            owner,
+            started.sessionId,
+            args,
+            signal,
+          );
+        } catch (error) {
+          const stopped = await this.sessions.stop(owner, started.sessionId);
+          throw new PlatformIOError(
+            error instanceof PlatformIOError
+              ? error.message
+              : "Boot verification failed.",
+            error instanceof PlatformIOError
+              ? error.code
+              : "VERIFICATION_CAPTURE_FAILED",
+            {
+              ...(error instanceof PlatformIOError ? error.context : {}),
+              sessionId: started.sessionId,
+              cleanupPending: stopped.cleanupPending,
+            },
+          );
+        }
+        const stopped = await this.sessions.stop(owner, started.sessionId);
+        return {
+          ...report,
+          ok: report.ok && !stopped.cleanupPending,
+          verdict:
+            stopped.cleanupPending && report.verdict === "pass"
+              ? ("inconclusive" as const)
+              : report.verdict,
+          cleanupPending: stopped.cleanupPending,
+          sessionId: started.sessionId,
+          port: started.path,
+          baud: started.baudRate,
+        };
       } finally {
         scope.active = false;
       }
@@ -448,7 +518,12 @@ export class PolicySerialSessionService {
       // Let the shared dispatcher report its normal invalid-policy denial below.
     }
     const transient = this.transientMemoryScope.getStore();
-    if (transient && !transient.active)
+    if (
+      transient &&
+      (!transient.active ||
+        (transient.expiresAt !== undefined &&
+          performance.now() > transient.expiresAt))
+    )
       throw new PlatformIOError(
         "Transient memory scope expired.",
         "SERIAL_CAPTURE_SCOPE_INVALID",
@@ -469,6 +544,14 @@ export class PolicySerialSessionService {
         "Transient memory device identity changed.",
         "SERIAL_CAPTURE_SCOPE_INVALID",
       );
+    if (
+      transient?.purpose === "boot_verification" &&
+      request.operation === "read" &&
+      transient.readGuard
+    ) {
+      transient.readGuard();
+      return transient.readGuard;
+    }
     const authorizationArgs: Record<string, unknown> = {
       ...request,
       port: request.path,
@@ -483,7 +566,9 @@ export class PolicySerialSessionService {
       authorizationArgs[
         transient.purpose === "one_shot_memory"
           ? "memoryCapture"
-          : "monitorCapture"
+          : transient.purpose === "boot_verification"
+            ? "bootVerification"
+            : "monitorCapture"
       ] = transient.input;
       authorizationArgs.purpose = transient.purpose;
     }
@@ -541,6 +626,22 @@ export class PolicySerialSessionService {
           );
         check();
         if (transient && request.operation === "start") transient.guard = check;
+        if (
+          transient?.purpose === "boot_verification" &&
+          request.operation === "read"
+        ) {
+          const revision = check;
+          const guard = () => {
+            if (!transient.active || performance.now() > transient.expiresAt!)
+              throw new PlatformIOError(
+                "Boot verification scope expired.",
+                "SERIAL_CAPTURE_SCOPE_INVALID",
+              );
+            revision();
+          };
+          transient.readGuard = guard;
+          return guard;
+        }
         if (scopedRead) {
           const revision = check;
           const guard = () => {

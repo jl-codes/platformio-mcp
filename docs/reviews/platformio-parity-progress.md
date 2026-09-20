@@ -1287,3 +1287,12 @@ CI 35502553441 failed because the new probe-custody fixture used macOS's symlink
 Added a bounded operation-owned discovery callback allowing exactly two inventory reads for initial selection and pre-spawn refresh. Authority expires when the operation ends, cannot be reused by later requests, and checks policy revisions around each read. Five focused real-policy/approval-store cases, TypeScript and lint passed. This remains an internal integration primitive; it does not complete public debugger startup.
 
 Current completion gap: 33 reference tools are registered. The seven unregistered reference workflows are pio_debug_start, pio_debug_cmd, pio_debug_list, pio_debug_stop, pio_upload_ota, pio_power_profile and pio_flash_and_verify. Registration is not behavioral acceptance; complete hardware/platform/distribution acceptance and actual publication remain outstanding.
+
+
+### 2026-09-20 — Fresh boot verification capture and Windows CI correction
+
+Added an owned-session boot capture to the existing serial policy service. It validates bounded regex before opening, scopes paged reads to one approval, preserves the opening policy revision, closes on success/failure/revocation, and downgrades a would-be pass when cleanup is unconfirmed. Boot verdicts retain the existing quiet-window and built-in crash checks. Crash evidence overrides a ready marker; lost/truncated evidence cannot pass. Bounded response retention does not erase reset-loop detection. This is an internal capture stage, not completion or registration of `pio_flash_and_verify`: upload composition, pre-upload approval planning, matching immutable firmware evidence, crash decoding and physical acceptance remain.
+
+Verification: 35 focused tests passed across `verification-capture.test.ts` and `serial-session-policy.test.ts`, including delayed crash, one-use approval replay, policy revocation and confirmed mock-port cleanup. Typecheck and changed-file lint passed; bundled plugin rebuilt. No physical device was opened.
+
+Current remote CI at 06457d5c: run 35502805630 passed completely; duplicate run 35502807217 failed only because four sequential CLI process launches shared one five-second test budget on Windows. Split those independent checks into four tests with unchanged assertions and default per-test budgets. Await CI confirmation; no repeated local smoke suite run. Local scoped probe discovery commit 80db9822 is included in this push. No release published and no parity-completion claim.
