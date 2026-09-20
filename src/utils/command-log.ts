@@ -27,3 +27,24 @@ export async function retainCommandLog(
   await fs.writeFile(filename, output, { flag: "wx", mode: 0o600 });
   return filename;
 }
+
+
+/** Read a trusted completed spool file through one descriptor with a fixed allocation bound. */
+export async function readCommandOutput(filename: string): Promise<string> {
+  const handle = await fs.open(filename, "r");
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size > 16 * 1024 * 1024)
+      throw new PlatformIOError("Command output exceeds the report limit", "COMMAND_LOG_LIMIT");
+    const buffer = Buffer.alloc(stat.size + 1);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const read = await handle.read(buffer, offset, buffer.length - offset, offset);
+      if (!read.bytesRead) break;
+      offset += read.bytesRead;
+    }
+    if (offset !== stat.size)
+      throw new PlatformIOError("Command output changed during collection", "COMMAND_LOG_CHANGED");
+    return redactSecretsInText(buffer.subarray(0, offset).toString("utf8")).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+  } finally { await handle.close(); }
+}

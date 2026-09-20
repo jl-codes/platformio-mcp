@@ -9,6 +9,8 @@
  * - listTargets: Discovers valid compilation targets.
  */
 
+import { summarizeCheckOutput } from "../core/analysis/check-report.js";
+import { readCommandOutput } from "../utils/command-log.js";
 import { loadEffectivePolicyState } from "../core/policy/load-policy.js";
 import { platformioExecutor } from "../platformio.js";
 import type { SpoolingForegroundResult } from "../utils/spooler.js";
@@ -304,7 +306,10 @@ export async function checkProject(
     }
 
     await options.onResult?.(result);
-    const success = result.exitCode === 0;
+    const analysisReport = options.jsonOutput && !options.onResult
+      ? summarizeCheckOutput(await readCommandOutput(result.fullLogPath), validatedPath)
+      : undefined;
+    const success = result.exitCode === 0 && (!analysisReport || analysisReport.tools.every(tool => tool.succeeded));
     const errors = success ? undefined : parseStderrErrors(result.finalOutput);
 
     return {
@@ -312,6 +317,7 @@ export async function checkProject(
       environment: environment || "default",
       output: result.finalOutput,
       errors,
+      ...(analysisReport ? { analysisReport, rawLogPath: result.fullLogPath } : {}),
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {

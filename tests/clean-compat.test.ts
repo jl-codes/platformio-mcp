@@ -22,7 +22,7 @@ vi.mock("../src/core/policy/revision-guard.js", () => ({
 vi.mock("../src/adapters/compatibility-project.js", () => ({
   resolveCompatibilityProject: async () => "workspace",
 }));
-vi.mock("../src/utils/command-log.js", () => ({ retainCommandLog: mocks.log }));
+vi.mock("../src/utils/command-log.js", () => ({ retainCommandLog: mocks.log, readCommandOutput: async () => "" }));
 vi.mock("node:fs/promises", () => ({
   default: {
     open: async () => ({

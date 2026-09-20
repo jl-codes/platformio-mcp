@@ -1448,6 +1448,11 @@ const toolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        severity: { type: "string", enum: ["low", "medium", "high"], description: "Minimum defect severity" },
+        pattern: { type: "string", minLength: 1, maxLength: 4096, description: "Source file pattern" },
+        skipPackages: { type: "boolean", description: "Exclude dependency source files" },
+        tool: { type: "string", minLength: 1, maxLength: 4096, description: "Configured analysis tool" },
+        structuredReport: { type: "boolean", description: "Request JSON analysis and return structured defects for foreground calls" },
         projectDir: {
           type: "string",
           description:
@@ -2440,6 +2445,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   params.projectDir,
                   params.environment,
                   params.background,
+                  { severity: params.severity, pattern: params.pattern, skipPackages: params.skipPackages, tool: params.tool, jsonOutput: params.structuredReport },
                 );
                 return {
                   content: [

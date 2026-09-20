@@ -1,15 +1,13 @@
 /** Authorize reference builds and cleanup through canonical actions and the shared execution lock. */
-import fs from "node:fs/promises";
 import { z } from "zod";
 import type { SpoolingForegroundResult } from "../utils/spooler.js";
 import { summarizeCheckOutput } from "../core/analysis/check-report.js";
 import { buildProject, cleanProject, checkProject } from "../tools/build.js";
 import { BuildError, PlatformIOError } from "../utils/errors.js";
 import { hardwareLockManager } from "../utils/lock-manager.js";
-import { retainCommandLog } from "../utils/command-log.js";
+import { retainCommandLog, readCommandOutput } from "../utils/command-log.js";
 import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
-import { redactSecretsInText } from "../core/policy/redact.js";
 import type { PolicyEvaluationContext } from "../core/policy/types.js";
 import {
   resolveCompatibilityProject,
@@ -163,39 +161,7 @@ async function executeRunCompatibility(
           timedOut = false,
         ) => {
           guard();
-          const handle = await fs.open(fullLogPath, "r");
-          let output: string;
-          try {
-            const stat = await handle.stat();
-            const limit = 16 * 1024 * 1024;
-            if (!stat.isFile() || stat.size > limit)
-              throw new PlatformIOError(
-                "Command output exceeds the report limit",
-                "COMMAND_LOG_LIMIT",
-              );
-            const buffer = Buffer.alloc(stat.size + 1);
-            let offset = 0;
-            while (offset < buffer.length) {
-              const read = await handle.read(
-                buffer,
-                offset,
-                buffer.length - offset,
-                offset,
-              );
-              if (!read.bytesRead) break;
-              offset += read.bytesRead;
-            }
-            if (offset > stat.size)
-              throw new PlatformIOError(
-                "Command output changed during collection",
-                "COMMAND_LOG_CHANGED",
-              );
-            output = redactSecretsInText(
-              buffer.subarray(0, offset).toString("utf8"),
-            ).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
-          } finally {
-            await handle.close();
-          }
+          let output = await readCommandOutput(fullLogPath);
           guard();
           if (timedOut)
             output += `\n[platformio-mcp] timed out after ${timeoutMs / 1000}s`;

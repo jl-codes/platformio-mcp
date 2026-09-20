@@ -4,6 +4,7 @@ import { buildProject, checkProject, cleanProject } from "../src/tools/build.js"
 import { executeWithSpooling } from "../src/utils/spooler.js";
 import { invalidateBuildCache } from "../src/utils/build-cache.js";
 
+vi.mock("../src/utils/command-log.js", () => ({ readCommandOutput: async () => '[{"env":"native","tool":"cppcheck","succeeded":true,"defects":[]}]' }));
 vi.mock("../src/utils/spooler.js", () => ({ executeWithSpooling: vi.fn() }));
 vi.mock("../src/utils/build-cache.js", () => ({ invalidateBuildCache: vi.fn() }));
 vi.mock("../src/utils/validation.js", () => ({
@@ -51,4 +52,10 @@ test("structured check forwards severity range and literal filters through the s
   await checkProject("workspace", "native", false, { severity: "medium", pattern: "src/*.cpp", tool: "cppcheck", skipPackages: true, jsonOutput: true, timeoutMs: 1200000, onResult });
   expect(executeWithSpooling).toHaveBeenCalledWith("check", ["--json-output", "--severity", "medium", "--severity", "high", "--pattern", "src/*.cpp", "--skip-packages", "--tool", "cppcheck", "--environment", "native"], expect.objectContaining({ timeout: 1200000 }));
   expect(onResult).toHaveBeenCalledOnce();
+});
+
+
+test("canonical foreground checker exposes structured reports when requested", async () => {
+  const result = await checkProject("workspace", "native", false, { jsonOutput: true });
+  expect(result).toMatchObject({ success: true, analysisReport: { defect_count: 0, tools: [{ tool: "cppcheck", succeeded: true }] }, rawLogPath: "clean.log" });
 });

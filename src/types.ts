@@ -186,6 +186,7 @@ export interface BuildResult {
   taskId?: string; // UUID mapping to the background invocation
   logPaths?: string[]; // Array of associated trailing paths
   rawLogPath?: string; // Full path to the captured raw log when available
+  analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Structured diagnostic summary for agent-safe recovery flows
 }
 
@@ -234,6 +235,7 @@ export interface UploadResult {
   taskId?: string; // UUID mapping to the background invocation
   logPaths?: string[]; // Array of associated trailing paths
   rawLogPath?: string; // Full path to the captured raw log when available
+  analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Structured diagnostic summary for agent-safe recovery flows
 }
 
@@ -491,6 +493,11 @@ export const CleanProjectParamsSchema = z.object({
 
 // Check project parameters
 export const CheckProjectParamsSchema = z.object({
+  severity: z.enum(["low", "medium", "high"]).optional(),
+  pattern: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  skipPackages: z.boolean().optional(),
+  tool: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  structuredReport: z.boolean().optional(),
   projectDir: z
     .string()
     .min(1)
@@ -1000,6 +1007,7 @@ export interface AgentFlashMonitorVerifyResult {
   unmatchedExpectations: string[]; // Expected runtime markers not observed
   rejectedPatterns: string[]; // Rejected runtime patterns that appeared
   detectedRuntimeErrors: string[]; // Built-in runtime failures detected
+  analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Upload-stage diagnostic payload when relevant
   recommendedNextAction: string; // Single recommended next step
   rawMonitorLogPath?: string; // Path to monitor log consumed for verification

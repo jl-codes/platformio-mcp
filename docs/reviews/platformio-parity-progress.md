@@ -856,3 +856,8 @@ Extended the shared checker with optional JSON output, severity threshold, sourc
 
 Added pio_check with reference severity/pattern/skip_packages/tool defaults, bound to canonical check_project permission. Execution shares the existing checker, hardware lock, twenty-minute timeout, revision guard and bounded redacted log collection. Returns structured defects, CWE/source locations, severity totals and tool status; missing/malformed reports, failed tools, and incomplete timeout output are explicit failures. A nonzero exit with an empty report is rejected as a documented safety correction. Compatibility surface now has 81 tools (54 canonical, 27 aliases). TypeScript and 15 focused mocked adapter/parser checks passed; plugin rebuilt. Native cppcheck/clangtidy/PVS reports and canonical structured-report interface remain pending; no publication performed.
 
+
+### Canonical structured checker access
+
+Added optional static-analysis filters and structuredReport to canonical check_project. Foreground structured calls attach validated analysisReport while retaining legacy fields; omitted options retain old behavior. Dashboard API forwards analysis filters. Extracted completed-log reading into a descriptor-based 16 MiB bounded helper shared by compatibility and canonical reporting, rejecting growth or truncation during collection. TypeScript and 21 focused mocked adapter/executor/parser checks passed; plugin rebuilt. Background structured report retrieval, dashboard filter controls, native analyzer acceptance and broader parity remain pending. No distribution publication occurred.
+
