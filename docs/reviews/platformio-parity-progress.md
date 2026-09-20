@@ -1237,3 +1237,7 @@ Added workspace-contained, hash-verified ELF retention in owner-private storage 
 ### Failed debugger startup custody retention
 
 Initialization failures with unconfirmed probe cleanup now carry an internal, non-serialized process capability. The connection registry retains that process under its preallocated session ID and returns bounded cleanup-pending diagnostics, allowing later stop/disconnect retries. Startup factories receive the ID before launch for subsequent authorization binding. Thirteen focused lifecycle/process cases passed, including failed MI initialization followed by successful later probe cleanup; TypeScript and lint passed. Public startup orchestration remains incomplete.
+
+### Prepared debugger startup orchestration
+
+Joined target-effect preflight, host-command authorization, private ELF retention, host-supplied probe custody, controlled GDB launch and target attachment. Confirmed cleanup releases the ELF; unconfirmed startup/attachment cleanup transfers process and artifact ownership to the connection registry. Eight focused orchestration/MI cases passed with mocked launch/artifact acquisition and real policy; TypeScript and lint passed. This internal prepared-start path does not yet provide public probe discovery, stable approval-retry reservations or physical acceptance.

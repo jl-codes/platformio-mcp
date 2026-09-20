@@ -19,11 +19,10 @@ export interface DebugTargetSelection {
 }
 
 /** Preflight all target effects before attachment; loading uses the retained ELF already selected in GDB. */
-export async function attachDebuggerTarget(
-  transport: GdbMiSession,
+export async function preflightDebuggerTarget(
   selection: DebugTargetSelection,
   caller: PolicyEvaluationContext,
-): Promise<void> {
+) {
   const timeoutMs = selection.timeoutMs ?? 90000;
   if (
     !isIP(selection.host) ||
@@ -79,6 +78,19 @@ export async function attachDebuggerTarget(
         { policyDecision: plan },
       );
   }
+  return { stages, context, timeoutMs };
+}
+
+/** Attach and optionally load only after every requested target effect is authorized. */
+export async function attachDebuggerTarget(
+  transport: GdbMiSession,
+  selection: DebugTargetSelection,
+  caller: PolicyEvaluationContext,
+): Promise<void> {
+  const { stages, context, timeoutMs } = await preflightDebuggerTarget(
+    selection,
+    caller,
+  );
   const guard = createPolicyRevisionGuard(selection.projectDir);
   const deadline = performance.now() + timeoutMs;
   for (const stage of stages) {
