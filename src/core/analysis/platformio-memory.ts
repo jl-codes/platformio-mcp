@@ -13,6 +13,7 @@ export interface ProgramMemoryEvidence {
   elfSha256: string;
   exitCode: number;
   output: string;
+  logPath?: string; // Redacted completed-command output retained by the authorized collector.
 }
 
 /** Parses complete, unambiguous RAM/Flash accounting; absent formats remain explicitly unknown. */

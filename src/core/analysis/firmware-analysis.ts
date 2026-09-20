@@ -230,6 +230,7 @@ export async function reportFirmwareSize(
           : ("estimate_from_size" as const),
         memory: memory ?? null,
         memoryUnavailableReason,
+        memoryLogPath: evidence?.logPath ?? null,
         totals,
         sections,
         symbolCount: symbols.length,

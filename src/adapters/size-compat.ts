@@ -121,7 +121,7 @@ export async function executeSizeCompatibility(
       ? { flash: region(report.memory.flash), ram: region(report.memory.ram) }
       : {},
     memory_source: report.memorySource,
-    memory_log_path: null,
+    memory_log_path: report.memoryLogPath,
     memory_unavailable_reason: report.memoryUnavailableReason,
     flash_percent:
       report.memory?.flash.percent ??

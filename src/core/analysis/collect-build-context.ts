@@ -1,4 +1,5 @@
 /** Authorized PlatformIO metadata and size-check collection for analysis adapters. */
+import { retainCommandLog } from "../../utils/command-log.js";
 import { createPolicyRevisionGuard } from "../policy/revision-guard.js";
 import { platformioExecutor } from "../../platformio.js";
 import {
@@ -180,11 +181,13 @@ export async function collectProgramMemory(
         { cwd: selected.projectDir, timeout: 600000 },
       );
       await readElfIdentity(elfPath, before.sha256);
+      const logPath = await retainCommandLog("program-size", result.stdout, result.stderr);
       return {
         environment: selected.environment,
         elfSha256: before.sha256,
         exitCode: result.exitCode,
         output: result.stdout,
+        logPath,
       };
     },
   );

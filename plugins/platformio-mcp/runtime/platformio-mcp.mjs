@@ -460,8 +460,8 @@ var init_parseUtil = __esm({
     init_errors();
     init_en();
     makeIssue = (params) => {
-      const { data, path: path52, errorMaps, issueData } = params;
-      const fullPath = [...path52, ...issueData.path || []];
+      const { data, path: path53, errorMaps, issueData } = params;
+      const fullPath = [...path53, ...issueData.path || []];
       const fullIssue = {
         ...issueData,
         path: fullPath
@@ -769,11 +769,11 @@ var init_types = __esm({
     init_parseUtil();
     init_util();
     ParseInputLazyPath = class {
-      constructor(parent, value2, path52, key) {
+      constructor(parent, value2, path53, key) {
         this._cachedPath = [];
         this.parent = parent;
         this.data = value2;
-        this._path = path52;
+        this._path = path53;
         this._key = key;
       }
       get path() {
@@ -4231,17 +4231,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path52) {
-      const ctrl = callVisitor(key, node, visitor, path52);
+    function visit_(key, node, visitor, path53) {
+      const ctrl = callVisitor(key, node, visitor, path53);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path52, ctrl);
-        return visit_(key, ctrl, visitor, path52);
+        replaceNode(key, path53, ctrl);
+        return visit_(key, ctrl, visitor, path53);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path52 = Object.freeze(path52.concat(node));
+          path53 = Object.freeze(path53.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path52);
+            const ci = visit_(i, node.items[i], visitor, path53);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -4252,13 +4252,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path52 = Object.freeze(path52.concat(node));
-          const ck = visit_("key", node.key, visitor, path52);
+          path53 = Object.freeze(path53.concat(node));
+          const ck = visit_("key", node.key, visitor, path53);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path52);
+          const cv = visit_("value", node.value, visitor, path53);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -4279,17 +4279,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path52) {
-      const ctrl = await callVisitor(key, node, visitor, path52);
+    async function visitAsync_(key, node, visitor, path53) {
+      const ctrl = await callVisitor(key, node, visitor, path53);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path52, ctrl);
-        return visitAsync_(key, ctrl, visitor, path52);
+        replaceNode(key, path53, ctrl);
+        return visitAsync_(key, ctrl, visitor, path53);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path52 = Object.freeze(path52.concat(node));
+          path53 = Object.freeze(path53.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path52);
+            const ci = await visitAsync_(i, node.items[i], visitor, path53);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -4300,13 +4300,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path52 = Object.freeze(path52.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path52);
+          path53 = Object.freeze(path53.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path53);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path52);
+          const cv = await visitAsync_("value", node.value, visitor, path53);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -4333,23 +4333,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path52) {
+    function callVisitor(key, node, visitor, path53) {
       if (typeof visitor === "function")
-        return visitor(key, node, path52);
+        return visitor(key, node, path53);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path52);
+        return visitor.Map?.(key, node, path53);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path52);
+        return visitor.Seq?.(key, node, path53);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path52);
+        return visitor.Pair?.(key, node, path53);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path52);
+        return visitor.Scalar?.(key, node, path53);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path52);
+        return visitor.Alias?.(key, node, path53);
       return void 0;
     }
-    function replaceNode(key, path52, node) {
-      const parent = path52[path52.length - 1];
+    function replaceNode(key, path53, node) {
+      const parent = path53[path53.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -4961,10 +4961,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema3, path52, value2) {
+    function collectionFromPath(schema3, path53, value2) {
       let v = value2;
-      for (let i = path52.length - 1; i >= 0; --i) {
-        const k = path52[i];
+      for (let i = path53.length - 1; i >= 0; --i) {
+        const k = path53[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -4983,7 +4983,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path52) => path52 == null || typeof path52 === "object" && !!path52[Symbol.iterator]().next().done;
+    var isEmptyPath = (path53) => path53 == null || typeof path53 === "object" && !!path53[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema3) {
         super(type);
@@ -5013,11 +5013,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path52, value2) {
-        if (isEmptyPath(path52))
+      addIn(path53, value2) {
+        if (isEmptyPath(path53))
           this.add(value2);
         else {
-          const [key, ...rest] = path52;
+          const [key, ...rest] = path53;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value2);
@@ -5031,8 +5031,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path52) {
-        const [key, ...rest] = path52;
+      deleteIn(path53) {
+        const [key, ...rest] = path53;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -5046,8 +5046,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path52, keepScalar) {
-        const [key, ...rest] = path52;
+      getIn(path53, keepScalar) {
+        const [key, ...rest] = path53;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -5065,8 +5065,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path52) {
-        const [key, ...rest] = path52;
+      hasIn(path53) {
+        const [key, ...rest] = path53;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -5076,8 +5076,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path52, value2) {
-        const [key, ...rest] = path52;
+      setIn(path53, value2) {
+        const [key, ...rest] = path53;
         if (rest.length === 0) {
           this.set(key, value2);
         } else {
@@ -7592,9 +7592,9 @@ var require_Document = __commonJS({
           this.contents.add(value2);
       }
       /** Adds a value to the document. */
-      addIn(path52, value2) {
+      addIn(path53, value2) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path52, value2);
+          this.contents.addIn(path53, value2);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -7669,14 +7669,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path52) {
-        if (Collection.isEmptyPath(path52)) {
+      deleteIn(path53) {
+        if (Collection.isEmptyPath(path53)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path52) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path53) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -7691,10 +7691,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path52, keepScalar) {
-        if (Collection.isEmptyPath(path52))
+      getIn(path53, keepScalar) {
+        if (Collection.isEmptyPath(path53))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path52, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path53, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -7705,10 +7705,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path52) {
-        if (Collection.isEmptyPath(path52))
+      hasIn(path53) {
+        if (Collection.isEmptyPath(path53))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path52) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path53) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -7725,13 +7725,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path52, value2) {
-        if (Collection.isEmptyPath(path52)) {
+      setIn(path53, value2) {
+        if (Collection.isEmptyPath(path53)) {
           this.contents = value2;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path52), value2);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path53), value2);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path52, value2);
+          this.contents.setIn(path53, value2);
         }
       }
       /**
@@ -9692,9 +9692,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path52) => {
+    visit.itemAtPath = (cst, path53) => {
       let item = cst;
-      for (const [field2, index] of path52) {
+      for (const [field2, index] of path53) {
         const tok = item?.[field2];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -9703,23 +9703,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path52) => {
-      const parent = visit.itemAtPath(cst, path52.slice(0, -1));
-      const field2 = path52[path52.length - 1][0];
+    visit.parentCollection = (cst, path53) => {
+      const parent = visit.itemAtPath(cst, path53.slice(0, -1));
+      const field2 = path53[path53.length - 1][0];
       const coll = parent?.[field2];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path52, item, visitor) {
-      let ctrl = visitor(item, path52);
+    function _visit(path53, item, visitor) {
+      let ctrl = visitor(item, path53);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field2 of ["key", "value"]) {
         const token = item[field2];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path52.concat([[field2, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path53.concat([[field2, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -9730,10 +9730,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field2 === "key")
-            ctrl = ctrl(item, path52);
+            ctrl = ctrl(item, path53);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path52) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path53) : ctrl;
     }
     exports.visit = visit;
   }
@@ -11035,14 +11035,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs51 = this.flowScalar(this.type);
+              const fs52 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs51, sep: [] });
+                map.items.push({ start, key: fs52, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs51);
+                this.stack.push(fs52);
               } else {
-                Object.assign(it, { key: fs51, sep: [] });
+                Object.assign(it, { key: fs52, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -11170,13 +11170,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs51 = this.flowScalar(this.type);
+              const fs52 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs51, sep: [] });
+                fc.items.push({ start: [], key: fs52, sep: [] });
               else if (it.sep)
-                this.stack.push(fs51);
+                this.stack.push(fs52);
               else
-                Object.assign(it, { key: fs51, sep: [] });
+                Object.assign(it, { key: fs52, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -11826,54 +11826,54 @@ var require_polyfills = __commonJS({
     }
     var chdir;
     module.exports = patch;
-    function patch(fs51) {
+    function patch(fs52) {
       if (constants2.hasOwnProperty("O_SYMLINK") && process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
-        patchLchmod(fs51);
+        patchLchmod(fs52);
       }
-      if (!fs51.lutimes) {
-        patchLutimes(fs51);
+      if (!fs52.lutimes) {
+        patchLutimes(fs52);
       }
-      fs51.chown = chownFix(fs51.chown);
-      fs51.fchown = chownFix(fs51.fchown);
-      fs51.lchown = chownFix(fs51.lchown);
-      fs51.chmod = chmodFix(fs51.chmod);
-      fs51.fchmod = chmodFix(fs51.fchmod);
-      fs51.lchmod = chmodFix(fs51.lchmod);
-      fs51.chownSync = chownFixSync(fs51.chownSync);
-      fs51.fchownSync = chownFixSync(fs51.fchownSync);
-      fs51.lchownSync = chownFixSync(fs51.lchownSync);
-      fs51.chmodSync = chmodFixSync(fs51.chmodSync);
-      fs51.fchmodSync = chmodFixSync(fs51.fchmodSync);
-      fs51.lchmodSync = chmodFixSync(fs51.lchmodSync);
-      fs51.stat = statFix(fs51.stat);
-      fs51.fstat = statFix(fs51.fstat);
-      fs51.lstat = statFix(fs51.lstat);
-      fs51.statSync = statFixSync(fs51.statSync);
-      fs51.fstatSync = statFixSync(fs51.fstatSync);
-      fs51.lstatSync = statFixSync(fs51.lstatSync);
-      if (fs51.chmod && !fs51.lchmod) {
-        fs51.lchmod = function(path52, mode, cb) {
+      fs52.chown = chownFix(fs52.chown);
+      fs52.fchown = chownFix(fs52.fchown);
+      fs52.lchown = chownFix(fs52.lchown);
+      fs52.chmod = chmodFix(fs52.chmod);
+      fs52.fchmod = chmodFix(fs52.fchmod);
+      fs52.lchmod = chmodFix(fs52.lchmod);
+      fs52.chownSync = chownFixSync(fs52.chownSync);
+      fs52.fchownSync = chownFixSync(fs52.fchownSync);
+      fs52.lchownSync = chownFixSync(fs52.lchownSync);
+      fs52.chmodSync = chmodFixSync(fs52.chmodSync);
+      fs52.fchmodSync = chmodFixSync(fs52.fchmodSync);
+      fs52.lchmodSync = chmodFixSync(fs52.lchmodSync);
+      fs52.stat = statFix(fs52.stat);
+      fs52.fstat = statFix(fs52.fstat);
+      fs52.lstat = statFix(fs52.lstat);
+      fs52.statSync = statFixSync(fs52.statSync);
+      fs52.fstatSync = statFixSync(fs52.fstatSync);
+      fs52.lstatSync = statFixSync(fs52.lstatSync);
+      if (fs52.chmod && !fs52.lchmod) {
+        fs52.lchmod = function(path53, mode, cb) {
           if (cb) process.nextTick(cb);
         };
-        fs51.lchmodSync = function() {
+        fs52.lchmodSync = function() {
         };
       }
-      if (fs51.chown && !fs51.lchown) {
-        fs51.lchown = function(path52, uid, gid, cb) {
+      if (fs52.chown && !fs52.lchown) {
+        fs52.lchown = function(path53, uid, gid, cb) {
           if (cb) process.nextTick(cb);
         };
-        fs51.lchownSync = function() {
+        fs52.lchownSync = function() {
         };
       }
       if (platform2 === "win32") {
-        fs51.rename = typeof fs51.rename !== "function" ? fs51.rename : (function(fs$rename) {
+        fs52.rename = typeof fs52.rename !== "function" ? fs52.rename : (function(fs$rename) {
           function rename(from, to, cb) {
             var start = Date.now();
             var backoff = 0;
             fs$rename(from, to, function CB(er) {
               if (er && (er.code === "EACCES" || er.code === "EPERM" || er.code === "EBUSY") && Date.now() - start < 6e4) {
                 setTimeout(function() {
-                  fs51.stat(to, function(stater, st) {
+                  fs52.stat(to, function(stater, st) {
                     if (stater && stater.code === "ENOENT")
                       fs$rename(from, to, CB);
                     else
@@ -11889,9 +11889,9 @@ var require_polyfills = __commonJS({
           }
           if (Object.setPrototypeOf) Object.setPrototypeOf(rename, fs$rename);
           return rename;
-        })(fs51.rename);
+        })(fs52.rename);
       }
-      fs51.read = typeof fs51.read !== "function" ? fs51.read : (function(fs$read) {
+      fs52.read = typeof fs52.read !== "function" ? fs52.read : (function(fs$read) {
         function read(fd, buffer, offset, length, position, callback_) {
           var callback;
           if (callback_ && typeof callback_ === "function") {
@@ -11899,22 +11899,22 @@ var require_polyfills = __commonJS({
             callback = function(er, _, __) {
               if (er && er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
-                return fs$read.call(fs51, fd, buffer, offset, length, position, callback);
+                return fs$read.call(fs52, fd, buffer, offset, length, position, callback);
               }
               callback_.apply(this, arguments);
             };
           }
-          return fs$read.call(fs51, fd, buffer, offset, length, position, callback);
+          return fs$read.call(fs52, fd, buffer, offset, length, position, callback);
         }
         if (Object.setPrototypeOf) Object.setPrototypeOf(read, fs$read);
         return read;
-      })(fs51.read);
-      fs51.readSync = typeof fs51.readSync !== "function" ? fs51.readSync : /* @__PURE__ */ (function(fs$readSync) {
+      })(fs52.read);
+      fs52.readSync = typeof fs52.readSync !== "function" ? fs52.readSync : /* @__PURE__ */ (function(fs$readSync) {
         return function(fd, buffer, offset, length, position) {
           var eagCounter = 0;
           while (true) {
             try {
-              return fs$readSync.call(fs51, fd, buffer, offset, length, position);
+              return fs$readSync.call(fs52, fd, buffer, offset, length, position);
             } catch (er) {
               if (er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
@@ -11924,11 +11924,11 @@ var require_polyfills = __commonJS({
             }
           }
         };
-      })(fs51.readSync);
-      function patchLchmod(fs52) {
-        fs52.lchmod = function(path52, mode, callback) {
-          fs52.open(
-            path52,
+      })(fs52.readSync);
+      function patchLchmod(fs53) {
+        fs53.lchmod = function(path53, mode, callback) {
+          fs53.open(
+            path53,
             constants2.O_WRONLY | constants2.O_SYMLINK,
             mode,
             function(err, fd) {
@@ -11936,80 +11936,80 @@ var require_polyfills = __commonJS({
                 if (callback) callback(err);
                 return;
               }
-              fs52.fchmod(fd, mode, function(err2) {
-                fs52.close(fd, function(err22) {
+              fs53.fchmod(fd, mode, function(err2) {
+                fs53.close(fd, function(err22) {
                   if (callback) callback(err2 || err22);
                 });
               });
             }
           );
         };
-        fs52.lchmodSync = function(path52, mode) {
-          var fd = fs52.openSync(path52, constants2.O_WRONLY | constants2.O_SYMLINK, mode);
+        fs53.lchmodSync = function(path53, mode) {
+          var fd = fs53.openSync(path53, constants2.O_WRONLY | constants2.O_SYMLINK, mode);
           var threw = true;
           var ret;
           try {
-            ret = fs52.fchmodSync(fd, mode);
+            ret = fs53.fchmodSync(fd, mode);
             threw = false;
           } finally {
             if (threw) {
               try {
-                fs52.closeSync(fd);
+                fs53.closeSync(fd);
               } catch (er) {
               }
             } else {
-              fs52.closeSync(fd);
+              fs53.closeSync(fd);
             }
           }
           return ret;
         };
       }
-      function patchLutimes(fs52) {
-        if (constants2.hasOwnProperty("O_SYMLINK") && fs52.futimes) {
-          fs52.lutimes = function(path52, at, mt, cb) {
-            fs52.open(path52, constants2.O_SYMLINK, function(er, fd) {
+      function patchLutimes(fs53) {
+        if (constants2.hasOwnProperty("O_SYMLINK") && fs53.futimes) {
+          fs53.lutimes = function(path53, at, mt, cb) {
+            fs53.open(path53, constants2.O_SYMLINK, function(er, fd) {
               if (er) {
                 if (cb) cb(er);
                 return;
               }
-              fs52.futimes(fd, at, mt, function(er2) {
-                fs52.close(fd, function(er22) {
+              fs53.futimes(fd, at, mt, function(er2) {
+                fs53.close(fd, function(er22) {
                   if (cb) cb(er2 || er22);
                 });
               });
             });
           };
-          fs52.lutimesSync = function(path52, at, mt) {
-            var fd = fs52.openSync(path52, constants2.O_SYMLINK);
+          fs53.lutimesSync = function(path53, at, mt) {
+            var fd = fs53.openSync(path53, constants2.O_SYMLINK);
             var ret;
             var threw = true;
             try {
-              ret = fs52.futimesSync(fd, at, mt);
+              ret = fs53.futimesSync(fd, at, mt);
               threw = false;
             } finally {
               if (threw) {
                 try {
-                  fs52.closeSync(fd);
+                  fs53.closeSync(fd);
                 } catch (er) {
                 }
               } else {
-                fs52.closeSync(fd);
+                fs53.closeSync(fd);
               }
             }
             return ret;
           };
-        } else if (fs52.futimes) {
-          fs52.lutimes = function(_a, _b, _c, cb) {
+        } else if (fs53.futimes) {
+          fs53.lutimes = function(_a, _b, _c, cb) {
             if (cb) process.nextTick(cb);
           };
-          fs52.lutimesSync = function() {
+          fs53.lutimesSync = function() {
           };
         }
       }
       function chmodFix(orig) {
         if (!orig) return orig;
         return function(target, mode, cb) {
-          return orig.call(fs51, target, mode, function(er) {
+          return orig.call(fs52, target, mode, function(er) {
             if (chownErOk(er)) er = null;
             if (cb) cb.apply(this, arguments);
           });
@@ -12019,7 +12019,7 @@ var require_polyfills = __commonJS({
         if (!orig) return orig;
         return function(target, mode) {
           try {
-            return orig.call(fs51, target, mode);
+            return orig.call(fs52, target, mode);
           } catch (er) {
             if (!chownErOk(er)) throw er;
           }
@@ -12028,7 +12028,7 @@ var require_polyfills = __commonJS({
       function chownFix(orig) {
         if (!orig) return orig;
         return function(target, uid, gid, cb) {
-          return orig.call(fs51, target, uid, gid, function(er) {
+          return orig.call(fs52, target, uid, gid, function(er) {
             if (chownErOk(er)) er = null;
             if (cb) cb.apply(this, arguments);
           });
@@ -12038,7 +12038,7 @@ var require_polyfills = __commonJS({
         if (!orig) return orig;
         return function(target, uid, gid) {
           try {
-            return orig.call(fs51, target, uid, gid);
+            return orig.call(fs52, target, uid, gid);
           } catch (er) {
             if (!chownErOk(er)) throw er;
           }
@@ -12058,13 +12058,13 @@ var require_polyfills = __commonJS({
             }
             if (cb) cb.apply(this, arguments);
           }
-          return options ? orig.call(fs51, target, options, callback) : orig.call(fs51, target, callback);
+          return options ? orig.call(fs52, target, options, callback) : orig.call(fs52, target, callback);
         };
       }
       function statFixSync(orig) {
         if (!orig) return orig;
         return function(target, options) {
-          var stats = options ? orig.call(fs51, target, options) : orig.call(fs51, target);
+          var stats = options ? orig.call(fs52, target, options) : orig.call(fs52, target);
           if (stats) {
             if (stats.uid < 0) stats.uid += 4294967296;
             if (stats.gid < 0) stats.gid += 4294967296;
@@ -12093,16 +12093,16 @@ var require_legacy_streams = __commonJS({
   "node_modules/graceful-fs/legacy-streams.js"(exports, module) {
     var Stream = __require("stream").Stream;
     module.exports = legacy;
-    function legacy(fs51) {
+    function legacy(fs52) {
       return {
         ReadStream,
         WriteStream
       };
-      function ReadStream(path52, options) {
-        if (!(this instanceof ReadStream)) return new ReadStream(path52, options);
+      function ReadStream(path53, options) {
+        if (!(this instanceof ReadStream)) return new ReadStream(path53, options);
         Stream.call(this);
         var self = this;
-        this.path = path52;
+        this.path = path53;
         this.fd = null;
         this.readable = true;
         this.paused = false;
@@ -12136,7 +12136,7 @@ var require_legacy_streams = __commonJS({
           });
           return;
         }
-        fs51.open(this.path, this.flags, this.mode, function(err, fd) {
+        fs52.open(this.path, this.flags, this.mode, function(err, fd) {
           if (err) {
             self.emit("error", err);
             self.readable = false;
@@ -12147,10 +12147,10 @@ var require_legacy_streams = __commonJS({
           self._read();
         });
       }
-      function WriteStream(path52, options) {
-        if (!(this instanceof WriteStream)) return new WriteStream(path52, options);
+      function WriteStream(path53, options) {
+        if (!(this instanceof WriteStream)) return new WriteStream(path53, options);
         Stream.call(this);
-        this.path = path52;
+        this.path = path53;
         this.fd = null;
         this.writable = true;
         this.flags = "w";
@@ -12175,7 +12175,7 @@ var require_legacy_streams = __commonJS({
         this.busy = false;
         this._queue = [];
         if (this.fd === null) {
-          this._open = fs51.open;
+          this._open = fs52.open;
           this._queue.push([this._open, this.path, this.flags, this.mode, void 0]);
           this.flush();
         }
@@ -12210,7 +12210,7 @@ var require_clone = __commonJS({
 // node_modules/graceful-fs/graceful-fs.js
 var require_graceful_fs = __commonJS({
   "node_modules/graceful-fs/graceful-fs.js"(exports, module) {
-    var fs51 = __require("fs");
+    var fs52 = __require("fs");
     var polyfills = require_polyfills();
     var legacy = require_legacy_streams();
     var clone2 = require_clone();
@@ -12242,12 +12242,12 @@ var require_graceful_fs = __commonJS({
         m = "GFS4: " + m.split(/\n/).join("\nGFS4: ");
         console.error(m);
       };
-    if (!fs51[gracefulQueue]) {
+    if (!fs52[gracefulQueue]) {
       queue = global[gracefulQueue] || [];
-      publishQueue(fs51, queue);
-      fs51.close = (function(fs$close) {
+      publishQueue(fs52, queue);
+      fs52.close = (function(fs$close) {
         function close(fd, cb) {
-          return fs$close.call(fs51, fd, function(err) {
+          return fs$close.call(fs52, fd, function(err) {
             if (!err) {
               resetQueue();
             }
@@ -12259,48 +12259,48 @@ var require_graceful_fs = __commonJS({
           value: fs$close
         });
         return close;
-      })(fs51.close);
-      fs51.closeSync = (function(fs$closeSync) {
+      })(fs52.close);
+      fs52.closeSync = (function(fs$closeSync) {
         function closeSync(fd) {
-          fs$closeSync.apply(fs51, arguments);
+          fs$closeSync.apply(fs52, arguments);
           resetQueue();
         }
         Object.defineProperty(closeSync, previousSymbol, {
           value: fs$closeSync
         });
         return closeSync;
-      })(fs51.closeSync);
+      })(fs52.closeSync);
       if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || "")) {
         process.on("exit", function() {
-          debug(fs51[gracefulQueue]);
-          __require("assert").equal(fs51[gracefulQueue].length, 0);
+          debug(fs52[gracefulQueue]);
+          __require("assert").equal(fs52[gracefulQueue].length, 0);
         });
       }
     }
     var queue;
     if (!global[gracefulQueue]) {
-      publishQueue(global, fs51[gracefulQueue]);
+      publishQueue(global, fs52[gracefulQueue]);
     }
-    module.exports = patch(clone2(fs51));
-    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs51.__patched) {
-      module.exports = patch(fs51);
-      fs51.__patched = true;
+    module.exports = patch(clone2(fs52));
+    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs52.__patched) {
+      module.exports = patch(fs52);
+      fs52.__patched = true;
     }
-    function patch(fs52) {
-      polyfills(fs52);
-      fs52.gracefulify = patch;
-      fs52.createReadStream = createReadStream;
-      fs52.createWriteStream = createWriteStream;
-      var fs$readFile = fs52.readFile;
-      fs52.readFile = readFile;
-      function readFile(path52, options, cb) {
+    function patch(fs53) {
+      polyfills(fs53);
+      fs53.gracefulify = patch;
+      fs53.createReadStream = createReadStream;
+      fs53.createWriteStream = createWriteStream;
+      var fs$readFile = fs53.readFile;
+      fs53.readFile = readFile;
+      function readFile(path53, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$readFile(path52, options, cb);
-        function go$readFile(path53, options2, cb2, startTime) {
-          return fs$readFile(path53, options2, function(err) {
+        return go$readFile(path53, options, cb);
+        function go$readFile(path54, options2, cb2, startTime) {
+          return fs$readFile(path54, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$readFile, [path53, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$readFile, [path54, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -12308,16 +12308,16 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$writeFile = fs52.writeFile;
-      fs52.writeFile = writeFile;
-      function writeFile(path52, data, options, cb) {
+      var fs$writeFile = fs53.writeFile;
+      fs53.writeFile = writeFile;
+      function writeFile(path53, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$writeFile(path52, data, options, cb);
-        function go$writeFile(path53, data2, options2, cb2, startTime) {
-          return fs$writeFile(path53, data2, options2, function(err) {
+        return go$writeFile(path53, data, options, cb);
+        function go$writeFile(path54, data2, options2, cb2, startTime) {
+          return fs$writeFile(path54, data2, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$writeFile, [path53, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$writeFile, [path54, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -12325,17 +12325,17 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$appendFile = fs52.appendFile;
+      var fs$appendFile = fs53.appendFile;
       if (fs$appendFile)
-        fs52.appendFile = appendFile;
-      function appendFile(path52, data, options, cb) {
+        fs53.appendFile = appendFile;
+      function appendFile(path53, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$appendFile(path52, data, options, cb);
-        function go$appendFile(path53, data2, options2, cb2, startTime) {
-          return fs$appendFile(path53, data2, options2, function(err) {
+        return go$appendFile(path53, data, options, cb);
+        function go$appendFile(path54, data2, options2, cb2, startTime) {
+          return fs$appendFile(path54, data2, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$appendFile, [path53, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$appendFile, [path54, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -12343,9 +12343,9 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$copyFile = fs52.copyFile;
+      var fs$copyFile = fs53.copyFile;
       if (fs$copyFile)
-        fs52.copyFile = copyFile;
+        fs53.copyFile = copyFile;
       function copyFile(src, dest, flags, cb) {
         if (typeof flags === "function") {
           cb = flags;
@@ -12363,34 +12363,34 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$readdir = fs52.readdir;
-      fs52.readdir = readdir;
+      var fs$readdir = fs53.readdir;
+      fs53.readdir = readdir;
       var noReaddirOptionVersions = /^v[0-5]\./;
-      function readdir(path52, options, cb) {
+      function readdir(path53, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path53, options2, cb2, startTime) {
-          return fs$readdir(path53, fs$readdirCallback(
-            path53,
+        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path54, options2, cb2, startTime) {
+          return fs$readdir(path54, fs$readdirCallback(
+            path54,
             options2,
             cb2,
             startTime
           ));
-        } : function go$readdir2(path53, options2, cb2, startTime) {
-          return fs$readdir(path53, options2, fs$readdirCallback(
-            path53,
+        } : function go$readdir2(path54, options2, cb2, startTime) {
+          return fs$readdir(path54, options2, fs$readdirCallback(
+            path54,
             options2,
             cb2,
             startTime
           ));
         };
-        return go$readdir(path52, options, cb);
-        function fs$readdirCallback(path53, options2, cb2, startTime) {
+        return go$readdir(path53, options, cb);
+        function fs$readdirCallback(path54, options2, cb2, startTime) {
           return function(err, files) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
               enqueue([
                 go$readdir,
-                [path53, options2, cb2],
+                [path54, options2, cb2],
                 err,
                 startTime || Date.now(),
                 Date.now()
@@ -12405,21 +12405,21 @@ var require_graceful_fs = __commonJS({
         }
       }
       if (process.version.substr(0, 4) === "v0.8") {
-        var legStreams = legacy(fs52);
+        var legStreams = legacy(fs53);
         ReadStream = legStreams.ReadStream;
         WriteStream = legStreams.WriteStream;
       }
-      var fs$ReadStream = fs52.ReadStream;
+      var fs$ReadStream = fs53.ReadStream;
       if (fs$ReadStream) {
         ReadStream.prototype = Object.create(fs$ReadStream.prototype);
         ReadStream.prototype.open = ReadStream$open;
       }
-      var fs$WriteStream = fs52.WriteStream;
+      var fs$WriteStream = fs53.WriteStream;
       if (fs$WriteStream) {
         WriteStream.prototype = Object.create(fs$WriteStream.prototype);
         WriteStream.prototype.open = WriteStream$open;
       }
-      Object.defineProperty(fs52, "ReadStream", {
+      Object.defineProperty(fs53, "ReadStream", {
         get: function() {
           return ReadStream;
         },
@@ -12429,7 +12429,7 @@ var require_graceful_fs = __commonJS({
         enumerable: true,
         configurable: true
       });
-      Object.defineProperty(fs52, "WriteStream", {
+      Object.defineProperty(fs53, "WriteStream", {
         get: function() {
           return WriteStream;
         },
@@ -12440,7 +12440,7 @@ var require_graceful_fs = __commonJS({
         configurable: true
       });
       var FileReadStream = ReadStream;
-      Object.defineProperty(fs52, "FileReadStream", {
+      Object.defineProperty(fs53, "FileReadStream", {
         get: function() {
           return FileReadStream;
         },
@@ -12451,7 +12451,7 @@ var require_graceful_fs = __commonJS({
         configurable: true
       });
       var FileWriteStream = WriteStream;
-      Object.defineProperty(fs52, "FileWriteStream", {
+      Object.defineProperty(fs53, "FileWriteStream", {
         get: function() {
           return FileWriteStream;
         },
@@ -12461,7 +12461,7 @@ var require_graceful_fs = __commonJS({
         enumerable: true,
         configurable: true
       });
-      function ReadStream(path52, options) {
+      function ReadStream(path53, options) {
         if (this instanceof ReadStream)
           return fs$ReadStream.apply(this, arguments), this;
         else
@@ -12481,7 +12481,7 @@ var require_graceful_fs = __commonJS({
           }
         });
       }
-      function WriteStream(path52, options) {
+      function WriteStream(path53, options) {
         if (this instanceof WriteStream)
           return fs$WriteStream.apply(this, arguments), this;
         else
@@ -12499,22 +12499,22 @@ var require_graceful_fs = __commonJS({
           }
         });
       }
-      function createReadStream(path52, options) {
-        return new fs52.ReadStream(path52, options);
+      function createReadStream(path53, options) {
+        return new fs53.ReadStream(path53, options);
       }
-      function createWriteStream(path52, options) {
-        return new fs52.WriteStream(path52, options);
+      function createWriteStream(path53, options) {
+        return new fs53.WriteStream(path53, options);
       }
-      var fs$open = fs52.open;
-      fs52.open = open2;
-      function open2(path52, flags, mode, cb) {
+      var fs$open = fs53.open;
+      fs53.open = open2;
+      function open2(path53, flags, mode, cb) {
         if (typeof mode === "function")
           cb = mode, mode = null;
-        return go$open(path52, flags, mode, cb);
-        function go$open(path53, flags2, mode2, cb2, startTime) {
-          return fs$open(path53, flags2, mode2, function(err, fd) {
+        return go$open(path53, flags, mode, cb);
+        function go$open(path54, flags2, mode2, cb2, startTime) {
+          return fs$open(path54, flags2, mode2, function(err, fd) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$open, [path53, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$open, [path54, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -12522,20 +12522,20 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      return fs52;
+      return fs53;
     }
     function enqueue(elem) {
       debug("ENQUEUE", elem[0].name, elem[1]);
-      fs51[gracefulQueue].push(elem);
+      fs52[gracefulQueue].push(elem);
       retry();
     }
     var retryTimer;
     function resetQueue() {
       var now = Date.now();
-      for (var i = 0; i < fs51[gracefulQueue].length; ++i) {
-        if (fs51[gracefulQueue][i].length > 2) {
-          fs51[gracefulQueue][i][3] = now;
-          fs51[gracefulQueue][i][4] = now;
+      for (var i = 0; i < fs52[gracefulQueue].length; ++i) {
+        if (fs52[gracefulQueue][i].length > 2) {
+          fs52[gracefulQueue][i][3] = now;
+          fs52[gracefulQueue][i][4] = now;
         }
       }
       retry();
@@ -12543,9 +12543,9 @@ var require_graceful_fs = __commonJS({
     function retry() {
       clearTimeout(retryTimer);
       retryTimer = void 0;
-      if (fs51[gracefulQueue].length === 0)
+      if (fs52[gracefulQueue].length === 0)
         return;
-      var elem = fs51[gracefulQueue].shift();
+      var elem = fs52[gracefulQueue].shift();
       var fn = elem[0];
       var args = elem[1];
       var err = elem[2];
@@ -12567,7 +12567,7 @@ var require_graceful_fs = __commonJS({
           debug("RETRY", fn.name, args);
           fn.apply(null, args.concat([startTime]));
         } else {
-          fs51[gracefulQueue].push(elem);
+          fs52[gracefulQueue].push(elem);
         }
       }
       if (retryTimer === void 0) {
@@ -13002,10 +13002,10 @@ var require_mtime_precision = __commonJS({
   "node_modules/proper-lockfile/lib/mtime-precision.js"(exports, module) {
     "use strict";
     var cacheSymbol = /* @__PURE__ */ Symbol();
-    function probe(file, fs51, callback) {
-      const cachedPrecision = fs51[cacheSymbol];
+    function probe(file, fs52, callback) {
+      const cachedPrecision = fs52[cacheSymbol];
       if (cachedPrecision) {
-        return fs51.stat(file, (err, stat) => {
+        return fs52.stat(file, (err, stat) => {
           if (err) {
             return callback(err);
           }
@@ -13013,16 +13013,16 @@ var require_mtime_precision = __commonJS({
         });
       }
       const mtime = new Date(Math.ceil(Date.now() / 1e3) * 1e3 + 5);
-      fs51.utimes(file, mtime, mtime, (err) => {
+      fs52.utimes(file, mtime, mtime, (err) => {
         if (err) {
           return callback(err);
         }
-        fs51.stat(file, (err2, stat) => {
+        fs52.stat(file, (err2, stat) => {
           if (err2) {
             return callback(err2);
           }
           const precision = stat.mtime.getTime() % 1e3 === 0 ? "s" : "ms";
-          Object.defineProperty(fs51, cacheSymbol, { value: precision });
+          Object.defineProperty(fs52, cacheSymbol, { value: precision });
           callback(null, stat.mtime, precision);
         });
       });
@@ -13043,8 +13043,8 @@ var require_mtime_precision = __commonJS({
 var require_lockfile = __commonJS({
   "node_modules/proper-lockfile/lib/lockfile.js"(exports, module) {
     "use strict";
-    var path52 = __require("path");
-    var fs51 = require_graceful_fs();
+    var path53 = __require("path");
+    var fs52 = require_graceful_fs();
     var retry = require_retry2();
     var onExit = require_signal_exit();
     var mtimePrecision = require_mtime_precision();
@@ -13054,7 +13054,7 @@ var require_lockfile = __commonJS({
     }
     function resolveCanonicalPath(file, options, callback) {
       if (!options.realpath) {
-        return callback(null, path52.resolve(file));
+        return callback(null, path53.resolve(file));
       }
       options.fs.realpath(file, callback);
     }
@@ -13175,7 +13175,7 @@ var require_lockfile = __commonJS({
         update: null,
         realpath: true,
         retries: 0,
-        fs: fs51,
+        fs: fs52,
         onCompromised: (err) => {
           throw err;
         },
@@ -13219,7 +13219,7 @@ var require_lockfile = __commonJS({
     }
     function unlock(file, options, callback) {
       options = {
-        fs: fs51,
+        fs: fs52,
         realpath: true,
         ...options
       };
@@ -13241,7 +13241,7 @@ var require_lockfile = __commonJS({
       options = {
         stale: 1e4,
         realpath: true,
-        fs: fs51,
+        fs: fs52,
         ...options
       };
       options.stale = Math.max(options.stale || 0, 2e3);
@@ -13280,16 +13280,16 @@ var require_lockfile = __commonJS({
 var require_adapter = __commonJS({
   "node_modules/proper-lockfile/lib/adapter.js"(exports, module) {
     "use strict";
-    var fs51 = require_graceful_fs();
-    function createSyncFs(fs52) {
+    var fs52 = require_graceful_fs();
+    function createSyncFs(fs53) {
       const methods = ["mkdir", "realpath", "stat", "rmdir", "utimes"];
-      const newFs = { ...fs52 };
+      const newFs = { ...fs53 };
       methods.forEach((method) => {
         newFs[method] = (...args) => {
           const callback = args.pop();
           let ret;
           try {
-            ret = fs52[`${method}Sync`](...args);
+            ret = fs53[`${method}Sync`](...args);
           } catch (err) {
             return callback(err);
           }
@@ -13327,7 +13327,7 @@ var require_adapter = __commonJS({
     }
     function toSyncOptions(options) {
       options = { ...options };
-      options.fs = createSyncFs(options.fs || fs51);
+      options.fs = createSyncFs(options.fs || fs52);
       if (typeof options.retries === "number" && options.retries > 0 || options.retries && typeof options.retries.retries === "number" && options.retries.retries > 0) {
         throw Object.assign(new Error("Cannot use retries with the sync api"), { code: "ESYNC" });
       }
@@ -15622,8 +15622,8 @@ parentPort.postMessage({ready:true});
 });
 
 // src/core/devices/process-identity.ts
-import fs25 from "node:fs";
-import path29 from "node:path";
+import fs26 from "node:fs";
+import path30 from "node:path";
 import { execFileSync } from "node:child_process";
 function linuxStartToken(stat, bootId, pid) {
   const end = stat.lastIndexOf(")");
@@ -15646,16 +15646,16 @@ function inspectProcessIdentity(pid) {
     let startToken;
     if (process.platform === "linux") {
       startToken = linuxStartToken(
-        fs25.readFileSync(`/proc/${pid}/stat`, "utf8"),
-        fs25.readFileSync("/proc/sys/kernel/random/boot_id", "utf8"),
+        fs26.readFileSync(`/proc/${pid}/stat`, "utf8"),
+        fs26.readFileSync("/proc/sys/kernel/random/boot_id", "utf8"),
         pid
       );
     } else if (process.platform === "win32") {
       const systemRoot = process.env.SystemRoot;
-      if (!systemRoot || !path29.isAbsolute(systemRoot))
+      if (!systemRoot || !path30.isAbsolute(systemRoot))
         return { status: "unknown" };
       startToken = execFileSync(
-        path29.join(
+        path30.join(
           systemRoot,
           "System32",
           "WindowsPowerShell",
@@ -18964,8 +18964,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path52) {
-      let input = path52;
+    function removeDotSegments(path53) {
+      let input = path53;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -19374,8 +19374,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path52 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path52 && path52 !== "/" ? path52 : void 0;
+        const path53 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path53 && path53 !== "/" ? path53 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -22887,12 +22887,12 @@ var require_dist2 = __commonJS({
         throw new Error(`Unknown format "${name2}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs51, exportName) {
+    function addFormats(ajv, list2, fs52, exportName) {
       var _a;
       var _b;
       (_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 ? _a : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs51[f]);
+        ajv.addFormat(f, fs52[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -23089,16 +23089,16 @@ var require_tree_kill = __commonJS({
 });
 
 // src/utils/logger.ts
-import fs35 from "node:fs";
-import path41 from "node:path";
+import fs36 from "node:fs";
+import path42 from "node:path";
 async function logDiagnostic(msg, _projectDir) {
   ensureGlobalDirs();
-  const diagLog = path41.join(SERVER_DATA_DIR, "server.log");
+  const diagLog = path42.join(SERVER_DATA_DIR, "server.log");
   const timestamp = (/* @__PURE__ */ new Date()).toISOString();
   const line = `[${timestamp}] ${msg}
 `;
   try {
-    await fs35.promises.appendFile(diagLog, line);
+    await fs36.promises.appendFile(diagLog, line);
   } catch {
   }
   console.error(msg);
@@ -23111,59 +23111,59 @@ var init_logger = __esm({
 });
 
 // src/utils/process-manager.ts
-import fs36 from "node:fs";
+import fs37 from "node:fs";
 import { setTimeout as delay2 } from "node:timers/promises";
 import os8 from "node:os";
-import path42 from "node:path";
+import path43 from "node:path";
 import { execSync as execSync2 } from "node:child_process";
 import crypto13 from "node:crypto";
 function getPidsFilePath(projectDir, file = SERIAL_PIDS_FILE) {
   if (file === SERIAL_PIDS_FILE) {
     ensureGlobalDirs();
-    const dir = path42.join(SERVER_DATA_DIR, "serial_monitors");
-    if (!fs36.existsSync(dir)) fs36.mkdirSync(dir, { recursive: true });
-    return path42.join(dir, file);
+    const dir = path43.join(SERVER_DATA_DIR, "serial_monitors");
+    if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
+    return path43.join(dir, file);
   } else if (file === BUILD_PIDS_FILE) {
     const baseDir2 = projectDir || SERVER_DATA_DIR;
     if (!projectDir) ensureGlobalDirs();
-    const dir = path42.join(baseDir2, WORKSPACE_DIR2, "tasks");
-    if (!fs36.existsSync(dir)) fs36.mkdirSync(dir, { recursive: true });
-    return path42.join(dir, file);
+    const dir = path43.join(baseDir2, WORKSPACE_DIR2, "tasks");
+    if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
+    return path43.join(dir, file);
   }
   const baseDir = projectDir || SERVER_DATA_DIR;
   if (!projectDir) ensureGlobalDirs();
-  return path42.join(baseDir, WORKSPACE_DIR2, LOCKS_DIR, file);
+  return path43.join(baseDir, WORKSPACE_DIR2, LOCKS_DIR, file);
 }
 function readMonitorIdentities(pidsFile) {
   const file = pidsFile + ".identities.json";
-  if (!fs36.existsSync(file)) return {};
-  if (fs36.statSync(file).size > 1024 * 1024)
+  if (!fs37.existsSync(file)) return {};
+  if (fs37.statSync(file).size > 1024 * 1024)
     throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
-  const value2 = JSON.parse(fs36.readFileSync(file, "utf8"));
+  const value2 = JSON.parse(fs37.readFileSync(file, "utf8"));
   if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
     throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
   return value2;
 }
 async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFile, taskId, commandDesc) {
   const pidsFile = getPidsFilePath(projectDir);
-  const dir = path42.dirname(pidsFile);
-  if (!fs36.existsSync(dir)) fs36.mkdirSync(dir, { recursive: true });
-  if (!fs36.existsSync(pidsFile)) fs36.writeFileSync(pidsFile, "{}");
+  const dir = path43.dirname(pidsFile);
+  if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
+  if (!fs37.existsSync(pidsFile)) fs37.writeFileSync(pidsFile, "{}");
   try {
     const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let pids = {};
       try {
-        pids = JSON.parse(fs36.readFileSync(pidsFile, "utf8"));
+        pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
       } catch {
       }
       const identities = readMonitorIdentities(pidsFile);
       const observed = inspectProcessIdentity(pid);
       if (observed.status === "running") identities[port] = observed.identity;
       else delete identities[port];
-      fs36.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+      fs37.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
       pids[port] = pid;
-      fs36.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+      fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
     } finally {
       await release();
     }
@@ -23194,17 +23194,17 @@ async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFi
 }
 async function unregisterPioMonitorPid(port, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (fs36.existsSync(pidsFile)) {
+  if (fs37.existsSync(pidsFile)) {
     try {
       const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
       try {
-        const pids = JSON.parse(fs36.readFileSync(pidsFile, "utf8"));
+        const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
         if (pids[port]) {
           delete pids[port];
           const identities = readMonitorIdentities(pidsFile);
           delete identities[port];
-          fs36.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-          fs36.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+          fs37.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+          fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
         }
       } finally {
         await release();
@@ -23230,11 +23230,11 @@ async function unregisterPioMonitorPid(port, projectDir) {
 }
 async function killPioMonitorByPort(port, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (!fs36.existsSync(pidsFile)) return false;
+  if (!fs37.existsSync(pidsFile)) return false;
   let stoppedPid;
   const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
   try {
-    const pids = JSON.parse(fs36.readFileSync(pidsFile, "utf8"));
+    const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
     const pid = pids[port];
     if (!pid) return false;
     stoppedPid = pid;
@@ -23258,8 +23258,8 @@ async function killPioMonitorByPort(port, projectDir) {
     delete pids[port];
     const identities = readMonitorIdentities(pidsFile);
     delete identities[port];
-    fs36.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-    fs36.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    fs37.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+    fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
   } finally {
     await release();
   }
@@ -23299,18 +23299,18 @@ function isPidAlive(pid) {
 }
 function getActiveMonitorPids(projectDir) {
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (!fs36.existsSync(pidsFile)) return {};
+  if (!fs37.existsSync(pidsFile)) return {};
   try {
-    return JSON.parse(fs36.readFileSync(pidsFile, "utf8"));
+    return JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
   } catch {
     return {};
   }
 }
 function isBuildActive(projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs36.existsSync(pidsFile)) return false;
+  if (!fs37.existsSync(pidsFile)) return false;
   try {
-    const pids = JSON.parse(fs36.readFileSync(pidsFile, "utf8"));
+    const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
     for (const key of Object.keys(pids)) {
       if (pids[key]?.type === "build" || key === "build") {
         const targetPid = key === "build" ? pids[key] : Number(key);
@@ -23323,19 +23323,19 @@ function isBuildActive(projectDir) {
 }
 async function registerBuildPid(pid, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  const dir = path42.dirname(pidsFile);
-  if (!fs36.existsSync(dir)) fs36.mkdirSync(dir, { recursive: true });
-  if (!fs36.existsSync(pidsFile)) fs36.writeFileSync(pidsFile, "{}");
+  const dir = path43.dirname(pidsFile);
+  if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
+  if (!fs37.existsSync(pidsFile)) fs37.writeFileSync(pidsFile, "{}");
   try {
     const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let pids = {};
       try {
-        pids = JSON.parse(fs36.readFileSync(pidsFile, "utf8"));
+        pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
       } catch {
       }
       pids[pid.toString()] = { type: "build", started: Date.now() };
-      fs36.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+      fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
     } finally {
       await release();
     }
@@ -23345,11 +23345,11 @@ async function registerBuildPid(pid, projectDir) {
 }
 async function unregisterBuildPid(projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs36.existsSync(pidsFile)) return;
+  if (!fs37.existsSync(pidsFile)) return;
   try {
     const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
-      const pids = JSON.parse(fs36.readFileSync(pidsFile, "utf8"));
+      const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
       let changed = false;
       for (const key of Object.keys(pids)) {
         if (pids[key]?.type === "build" || key === "build") {
@@ -23358,7 +23358,7 @@ async function unregisterBuildPid(projectDir) {
         }
       }
       if (changed) {
-        fs36.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+        fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
       }
     } finally {
       await release();
@@ -23369,14 +23369,14 @@ async function unregisterBuildPid(projectDir) {
 }
 async function unregisterBuildPidValue(pid, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs36.existsSync(pidsFile)) return;
+  if (!fs37.existsSync(pidsFile)) return;
   const release = await import_proper_lockfile6.default.lock(pidsFile, {
     retries: { retries: 5, minTimeout: 50, maxTimeout: 200 }
   });
   try {
-    const pids = JSON.parse(fs36.readFileSync(pidsFile, "utf8"));
+    const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
     delete pids[String(pid)];
-    fs36.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
   } finally {
     await release();
   }
@@ -23386,9 +23386,9 @@ async function killTrackedTaskProcess(task, projectDir) {
   const monitorPids = getActiveMonitorPids(projectDir);
   const buildPidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
   let buildPids = {};
-  if (fs36.existsSync(buildPidsFile)) {
+  if (fs37.existsSync(buildPidsFile)) {
     try {
-      buildPids = JSON.parse(fs36.readFileSync(buildPidsFile, "utf8"));
+      buildPids = JSON.parse(fs37.readFileSync(buildPidsFile, "utf8"));
     } catch {
       buildPids = {};
     }
@@ -23420,9 +23420,9 @@ async function killAllTrackedProcesses(projectDir) {
   const tasks = [];
   for (const file of [SERIAL_PIDS_FILE, BUILD_PIDS_FILE]) {
     const pidsFile = getPidsFilePath(projectDir, file);
-    if (fs36.existsSync(pidsFile)) {
+    if (fs37.existsSync(pidsFile)) {
       try {
-        const pids = JSON.parse(fs36.readFileSync(pidsFile, "utf8"));
+        const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
         for (const key of Object.keys(pids)) {
           let targetPid;
           if (file === BUILD_PIDS_FILE) {
@@ -23440,7 +23440,7 @@ async function killAllTrackedProcesses(projectDir) {
             tasks.push(p);
           }
         }
-        fs36.unlinkSync(pidsFile);
+        fs37.unlinkSync(pidsFile);
       } catch {
       }
     }
@@ -23496,16 +23496,16 @@ var init_process_manager = __esm({
 });
 
 // src/utils/tail.ts
-import fs37 from "node:fs";
+import fs38 from "node:fs";
 async function tailFileBounded(filePath, maxBytes = 1024 * 1024) {
-  if (!fs37.existsSync(filePath)) {
+  if (!fs38.existsSync(filePath)) {
     return [];
   }
-  const stat = await fs37.promises.stat(filePath);
+  const stat = await fs38.promises.stat(filePath);
   if (stat.size === 0) return [];
   const sizeToRead = Math.min(stat.size, maxBytes);
   const startPos = stat.size - sizeToRead;
-  const stream = fs37.createReadStream(filePath, { start: startPos, encoding: "utf8" });
+  const stream = fs38.createReadStream(filePath, { start: startPos, encoding: "utf8" });
   let content = "";
   for await (const chunk of stream) {
     content += chunk;
@@ -23519,26 +23519,26 @@ var init_tail = __esm({
 });
 
 // src/utils/spooler.ts
-import fs38 from "node:fs";
-import path43 from "node:path";
+import fs39 from "node:fs";
+import path44 from "node:path";
 import crypto14 from "node:crypto";
 function getLogDir(verb, projectDir) {
   const baseDir = projectDir || SERVER_DATA_DIR;
   if (!projectDir) ensureGlobalDirs();
-  return path43.join(baseDir, WORKSPACE_DIR3, "logs", verb);
+  return path44.join(baseDir, WORKSPACE_DIR3, "logs", verb);
 }
 function rotateLogs(targetDir, prefix, maxHistory = 30) {
-  if (!fs38.existsSync(targetDir)) return;
-  const files = fs38.readdirSync(targetDir).filter((f) => f.startsWith(prefix) && f.endsWith(".log")).map((f) => ({
+  if (!fs39.existsSync(targetDir)) return;
+  const files = fs39.readdirSync(targetDir).filter((f) => f.startsWith(prefix) && f.endsWith(".log")).map((f) => ({
     name: f,
-    path: path43.join(targetDir, f),
-    ctime: fs38.statSync(path43.join(targetDir, f)).ctime.getTime()
+    path: path44.join(targetDir, f),
+    ctime: fs39.statSync(path44.join(targetDir, f)).ctime.getTime()
   })).sort((a, b) => b.ctime - a.ctime);
   if (files.length > maxHistory) {
     const toDelete = files.slice(maxHistory);
     for (const f of toDelete) {
       try {
-        fs38.unlinkSync(f.path);
+        fs39.unlinkSync(f.path);
       } catch {
       }
     }
@@ -23546,33 +23546,33 @@ function rotateLogs(targetDir, prefix, maxHistory = 30) {
 }
 function rotateSpoolerStreams(verb, projectDir) {
   const targetDir = getLogDir(verb, projectDir);
-  if (!fs38.existsSync(targetDir)) {
-    fs38.mkdirSync(targetDir, { recursive: true });
+  if (!fs39.existsSync(targetDir)) {
+    fs39.mkdirSync(targetDir, { recursive: true });
   }
   rotateLogs(targetDir, `${verb}-`, 30);
   const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
   const shortHash = crypto14.randomBytes(4).toString("hex");
-  const logFile = path43.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
-  const latestLog = path43.join(targetDir, `latest-${verb}.log`);
+  const logFile = path44.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
+  const latestLog = path44.join(targetDir, `latest-${verb}.log`);
   return { logFile, latestLog };
 }
 function ensureLatestLogPointer(logFile, latestLog) {
   try {
-    if (fs38.existsSync(latestLog)) fs38.unlinkSync(latestLog);
+    if (fs39.existsSync(latestLog)) fs39.unlinkSync(latestLog);
   } catch {
   }
   try {
-    fs38.symlinkSync(logFile, latestLog);
+    fs39.symlinkSync(logFile, latestLog);
     return { mirrorLatest: false };
   } catch {
   }
   try {
-    fs38.linkSync(logFile, latestLog);
+    fs39.linkSync(logFile, latestLog);
     return { mirrorLatest: false };
   } catch {
   }
   try {
-    fs38.writeFileSync(latestLog, "");
+    fs39.writeFileSync(latestLog, "");
     return { mirrorLatest: true };
   } catch {
   }
@@ -23585,7 +23585,7 @@ async function executeWithSpooling(command, args, options) {
   }
   const verb = options.artifactType || "build";
   const { logFile, latestLog } = rotateSpoolerStreams(verb, projectArea);
-  const outFd = fs38.openSync(logFile, "a");
+  const outFd = fs39.openSync(logFile, "a");
   const proc = await platformioExecutor.spawn(command, args, {
     cwd: options.cwd,
     stdio: ["ignore", outFd, outFd],
@@ -23619,18 +23619,18 @@ async function executeWithSpooling(command, args, options) {
   let watcher = null;
   portalEvents.clearTaskLog(targetProjectArea || "global", taskId, [logFile]);
   try {
-    watcher = fs38.watch(logFile, (eventType) => {
+    watcher = fs39.watch(logFile, (eventType) => {
       if (eventType === "change") {
         try {
-          const stat = fs38.statSync(logFile);
+          const stat = fs39.statSync(logFile);
           if (stat.size > fileOffset) {
-            const stream = fs38.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
+            const stream = fs39.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on("data", (chunk) => {
               const text6 = chunk.toString();
               portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text6);
               if (latestPointer.mirrorLatest) {
                 try {
-                  fs38.appendFileSync(latestLog, text6);
+                  fs39.appendFileSync(latestLog, text6);
                 } catch {
                 }
               }
@@ -23676,17 +23676,17 @@ async function executeWithSpooling(command, args, options) {
         if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
       }
       try {
-        fs38.closeSync(outFd);
+        fs39.closeSync(outFd);
       } catch {
       }
       if (watcher) {
         try {
-          const stat = fs38.statSync(logFile);
+          const stat = fs39.statSync(logFile);
           if (stat.size > fileOffset) {
             const buffer = Buffer.alloc(stat.size - fileOffset);
-            const fd = fs38.openSync(logFile, "r");
-            fs38.readSync(fd, buffer, 0, buffer.length, fileOffset);
-            fs38.closeSync(fd);
+            const fd = fs39.openSync(logFile, "r");
+            fs39.readSync(fd, buffer, 0, buffer.length, fileOffset);
+            fs39.closeSync(fd);
             portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
             fileOffset = stat.size;
           }
@@ -23721,7 +23721,7 @@ async function executeWithSpooling(command, args, options) {
       }
     } finally {
       try {
-        fs38.closeSync(outFd);
+        fs39.closeSync(outFd);
       } catch {
       }
       try {
@@ -23749,17 +23749,17 @@ async function executeWithSpooling(command, args, options) {
   await unregisterBuildPid(projectArea);
   if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
   try {
-    fs38.closeSync(outFd);
+    fs39.closeSync(outFd);
   } catch {
   }
   if (watcher) {
     try {
-      const stat = fs38.statSync(logFile);
+      const stat = fs39.statSync(logFile);
       if (stat.size > fileOffset) {
         const buffer = Buffer.alloc(stat.size - fileOffset);
-        const fd = fs38.openSync(logFile, "r");
-        fs38.readSync(fd, buffer, 0, buffer.length, fileOffset);
-        fs38.closeSync(fd);
+        const fd = fs39.openSync(logFile, "r");
+        fs39.readSync(fd, buffer, 0, buffer.length, fileOffset);
+        fs39.closeSync(fd);
         portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
         fileOffset = stat.size;
       }
@@ -23790,18 +23790,18 @@ function spoolLargeDataset(toolName, data, targetDir, threshold = 2e3) {
   const stringified = JSON.stringify(data, null, 2);
   if (stringified.length > threshold) {
     const cacheDir = getLogDir(toolName, targetDir);
-    if (!fs38.existsSync(cacheDir)) {
-      fs38.mkdirSync(cacheDir, { recursive: true });
+    if (!fs39.existsSync(cacheDir)) {
+      fs39.mkdirSync(cacheDir, { recursive: true });
     }
     rotateLogs(cacheDir, `${toolName}-`, 30);
     const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
     const shortHash = crypto14.randomBytes(4).toString("hex");
-    const cacheFile = path43.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
-    const latestFile = path43.join(cacheDir, `latest-${toolName}.json`);
-    fs38.writeFileSync(cacheFile, stringified, "utf-8");
+    const cacheFile = path44.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
+    const latestFile = path44.join(cacheDir, `latest-${toolName}.json`);
+    fs39.writeFileSync(cacheFile, stringified, "utf-8");
     try {
-      if (fs38.existsSync(latestFile)) fs38.unlinkSync(latestFile);
-      fs38.symlinkSync(cacheFile, latestFile);
+      if (fs39.existsSync(latestFile)) fs39.unlinkSync(latestFile);
+      fs39.symlinkSync(cacheFile, latestFile);
     } catch {
     }
     return `Payload too large for context window. Full dataset successfully spooled to disk at ${cacheFile}. Please use your grep_search or view_file tools to query this file.`;
@@ -23829,8 +23829,8 @@ var init_spooler = __esm({
 
 // src/core/target-resolution.ts
 import crypto16 from "node:crypto";
-import fs40 from "node:fs";
-import path45 from "node:path";
+import fs41 from "node:fs";
+import path46 from "node:path";
 function parseTargetEnvironments(iniText) {
   const environments = [];
   const defaults = [];
@@ -23884,8 +23884,8 @@ function createBindingDigest(fields) {
 }
 async function resolveTarget(input, discoveredDevices) {
   const projectDir = validateProjectPath(input.projectDir);
-  const iniPath = path45.join(projectDir, "platformio.ini");
-  if (!fs40.existsSync(iniPath)) {
+  const iniPath = path46.join(projectDir, "platformio.ini");
+  if (!fs41.existsSync(iniPath)) {
     return {
       success: false,
       status: "invalid_config",
@@ -23896,7 +23896,7 @@ async function resolveTarget(input, discoveredDevices) {
       nextSteps: ["Initialize or select a PlatformIO project, then resolve the target again."]
     };
   }
-  const parsed = parseTargetEnvironments(fs40.readFileSync(iniPath, "utf8"));
+  const parsed = parseTargetEnvironments(fs41.readFileSync(iniPath, "utf8"));
   let selectedEnvironment;
   if (input.environment) {
     selectedEnvironment = parsed.environments.find(
@@ -24129,8 +24129,8 @@ __export(monitor_exports, {
   startMonitor: () => startMonitor,
   stopMonitor: () => stopMonitor
 });
-import fs41 from "node:fs";
-import path46 from "node:path";
+import fs42 from "node:fs";
+import path47 from "node:path";
 import crypto17 from "node:crypto";
 function getSpoolerStates() {
   const clean = {};
@@ -24145,12 +24145,12 @@ function getSpoolerStates() {
 function emitNewLogBytes(port, daemon) {
   let fd;
   try {
-    const stat = fs41.statSync(daemon.logFile);
+    const stat = fs42.statSync(daemon.logFile);
     if (stat.size <= (daemon.fileOffset || 0)) return;
     const start = daemon.fileOffset || 0;
     const buffer = Buffer.alloc(stat.size - start);
-    fd = fs41.openSync(daemon.logFile, "r");
-    fs41.readSync(fd, buffer, 0, buffer.length, start);
+    fd = fs42.openSync(daemon.logFile, "r");
+    fs42.readSync(fd, buffer, 0, buffer.length, start);
     const text6 = buffer.toString();
     if (text6.length > 0) {
       portalEvents.emitSerialLog(port, text6, daemon.taskId);
@@ -24161,7 +24161,7 @@ function emitNewLogBytes(port, daemon) {
   } finally {
     if (fd !== void 0) {
       try {
-        fs41.closeSync(fd);
+        fs42.closeSync(fd);
       } catch {
       }
     }
@@ -24187,12 +24187,12 @@ async function stopMonitor(port, projectDir) {
     }
     if (daemon.watcher) {
       try {
-        const stat = fs41.statSync(daemon.logFile);
+        const stat = fs42.statSync(daemon.logFile);
         if (stat.size > (daemon.fileOffset || 0)) {
           const buffer = Buffer.alloc(stat.size - (daemon.fileOffset || 0));
-          const fd = fs41.openSync(daemon.logFile, "r");
-          fs41.readSync(fd, buffer, 0, buffer.length, daemon.fileOffset || 0);
-          fs41.closeSync(fd);
+          const fd = fs42.openSync(daemon.logFile, "r");
+          fs42.readSync(fd, buffer, 0, buffer.length, daemon.fileOffset || 0);
+          fs42.closeSync(fd);
           portalEvents.emitSerialLog(port, buffer.toString(), daemon.taskId);
         }
       } catch {
@@ -24226,7 +24226,7 @@ async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
     `[Spooler] Spawning pio monitor (Env: ${daemon.environment || "None"}) via executor for ${targetPort}`,
     projectDir
   );
-  const outFd = fs41.openSync(daemon.logFile, "a");
+  const outFd = fs42.openSync(daemon.logFile, "a");
   const proc = await platformioExecutor.spawn(
     "device",
     ["monitor", ...monitorArgs],
@@ -24249,13 +24249,13 @@ async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
     );
   }
   const targetDir = getLogDir("monitor", projectDir);
-  const latestLog = path46.join(targetDir, "latest-monitor.log");
+  const latestLog = path47.join(targetDir, "latest-monitor.log");
   try {
-    if (fs41.existsSync(latestLog)) fs41.unlinkSync(latestLog);
-    fs41.symlinkSync(daemon.logFile, latestLog);
+    if (fs42.existsSync(latestLog)) fs42.unlinkSync(latestLog);
+    fs42.symlinkSync(daemon.logFile, latestLog);
   } catch (e) {
     try {
-      fs41.linkSync(daemon.logFile, latestLog);
+      fs42.linkSync(daemon.logFile, latestLog);
     } catch {
       logDiagnostic(`[Spooler] Failed to link latest-monitor.log: ${e}`, projectDir);
     }
@@ -24271,7 +24271,7 @@ async function rehydrateMonitors() {
   let rehydrationCount = 0;
   const activeWorkspaces = [];
   for (const projectDir of workspaces) {
-    if (fs41.existsSync(projectDir)) {
+    if (fs42.existsSync(projectDir)) {
       activeWorkspaces.push(projectDir);
       if (isBuildActive(projectDir)) {
       }
@@ -24280,14 +24280,14 @@ async function rehydrateMonitors() {
         const pid = pids[port];
         if (isPidAlive(pid)) {
           if (!activeDaemons[port]) {
-            const logFile = path46.join(
+            const logFile = path47.join(
               getLogDir("monitor", projectDir),
               "latest-monitor.log"
             );
             let currentSize = 0;
             try {
-              if (fs41.existsSync(logFile)) {
-                currentSize = fs41.statSync(logFile).size;
+              if (fs42.existsSync(logFile)) {
+                currentSize = fs42.statSync(logFile).size;
               }
             } catch {
             }
@@ -24319,12 +24319,12 @@ async function rehydrateMonitors() {
             };
             activeDaemons[port] = daemon;
             try {
-              daemon.watcher = fs41.watch(logFile, (eventType) => {
+              daemon.watcher = fs42.watch(logFile, (eventType) => {
                 if (eventType === "change") {
                   try {
-                    const stat = fs41.statSync(logFile);
+                    const stat = fs42.statSync(logFile);
                     if (stat.size > (daemon.fileOffset || 0)) {
-                      const stream = fs41.createReadStream(logFile, {
+                      const stream = fs42.createReadStream(logFile, {
                         start: daemon.fileOffset || 0,
                         end: stat.size - 1
                       });
@@ -24397,8 +24397,8 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
       "PORT_BUSY"
     );
   const targetDir = getLogDir("monitor", projectDir);
-  if (!fs41.existsSync(targetDir)) {
-    fs41.mkdirSync(targetDir, { recursive: true });
+  if (!fs42.existsSync(targetDir)) {
+    fs42.mkdirSync(targetDir, { recursive: true });
   }
   const { logFile } = rotateSpoolerStreams("monitor", projectDir);
   portSemaphoreManager.claimPort(activePort, "Monitor Daemon");
@@ -24416,12 +24416,12 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
   activeDaemons[activePort] = daemon;
   await spawnPioMonitor(activePort, projectDir, effectiveCommandId);
   try {
-    daemon.watcher = fs41.watch(logFile, (eventType) => {
+    daemon.watcher = fs42.watch(logFile, (eventType) => {
       if (eventType === "change") {
         try {
-          const stat = fs41.statSync(logFile);
+          const stat = fs42.statSync(logFile);
           if (stat.size > (daemon.fileOffset || 0)) {
-            const stream = fs41.createReadStream(logFile, {
+            const stream = fs42.createReadStream(logFile, {
               start: daemon.fileOffset || 0,
               end: stat.size - 1
             });
@@ -24465,18 +24465,18 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
       }
     }
     if (cmd) {
-      targetPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f) => Boolean(f && fs41.existsSync(f)));
+      targetPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f) => Boolean(f && fs42.existsSync(f)));
     }
   } else if (logPath) {
-    if (fs41.existsSync(logPath)) {
+    if (fs42.existsSync(logPath)) {
       targetPaths = [logPath];
     }
   } else if (port && activeDaemons[port]) {
     targetPaths = [activeDaemons[port].logFile];
   } else {
     const targetDir = getLogDir("monitor", projectDir);
-    const targetFile = path46.join(targetDir, "latest-monitor.log");
-    if (fs41.existsSync(targetFile)) {
+    const targetFile = path47.join(targetDir, "latest-monitor.log");
+    if (fs42.existsSync(targetFile)) {
       targetPaths = [targetFile];
     }
   }
@@ -24513,7 +24513,7 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
 function encodeMonitorCursor(logPath, offset) {
   const payload = {
     version: 1,
-    logHash: crypto17.createHash("sha256").update(path46.resolve(logPath)).digest("hex"),
+    logHash: crypto17.createHash("sha256").update(path47.resolve(logPath)).digest("hex"),
     offset
   };
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
@@ -24523,7 +24523,7 @@ function decodeMonitorCursor(cursor, logPath) {
     const payload = JSON.parse(
       Buffer.from(cursor, "base64url").toString("utf8")
     );
-    const expectedHash = crypto17.createHash("sha256").update(path46.resolve(logPath)).digest("hex");
+    const expectedHash = crypto17.createHash("sha256").update(path47.resolve(logPath)).digest("hex");
     if (payload.version !== 1 || payload.logHash !== expectedHash || !Number.isSafeInteger(payload.offset) || (payload.offset ?? -1) < 0) {
       throw new Error("invalid cursor");
     }
@@ -24538,18 +24538,18 @@ function decodeMonitorCursor(cursor, logPath) {
 function getMonitorStatus(port, projectDir) {
   const trackedPids = getActiveMonitorPids(projectDir);
   const statuses = Object.entries(activeDaemons).filter(
-    ([activePort, daemon]) => (!port || activePort === port) && (!projectDir || path46.resolve(daemon.projectDir ?? "") === path46.resolve(projectDir))
+    ([activePort, daemon]) => (!port || activePort === port) && (!projectDir || path47.resolve(daemon.projectDir ?? "") === path47.resolve(projectDir))
   ).map(([activePort, daemon]) => {
     let size = 0;
     let lastActivityAt = daemon.lastActivityAt;
     try {
-      const stats = fs41.statSync(daemon.logFile);
+      const stats = fs42.statSync(daemon.logFile);
       size = stats.size;
       lastActivityAt = lastActivityAt ?? stats.mtime.toISOString();
     } catch {
     }
     const trackedPid = trackedPids[activePort];
-    const stale = !fs41.existsSync(daemon.logFile) || trackedPid !== void 0 && !isPidAlive(trackedPid);
+    const stale = !fs42.existsSync(daemon.logFile) || trackedPid !== void 0 && !isPidAlive(trackedPid);
     return {
       state: stale ? "stale" : "active",
       port: activePort,
@@ -24570,7 +24570,7 @@ function getMonitorStatus(port, projectDir) {
   return { monitors: statuses };
 }
 function readSerialWindowFromFile(logPath, options = {}) {
-  const finalSize = fs41.statSync(logPath).size;
+  const finalSize = fs42.statSync(logPath).size;
   const requestedStart = options.cursor ? decodeMonitorCursor(options.cursor, logPath) : Math.max(0, options.startOffset ?? 0);
   if (requestedStart > finalSize) {
     throw new PlatformIOError(
@@ -24583,13 +24583,13 @@ function readSerialWindowFromFile(logPath, options = {}) {
   const bytesToRead = Math.max(0, finalSize - readStart);
   let content = "";
   if (bytesToRead > 0) {
-    const descriptor2 = fs41.openSync(logPath, "r");
+    const descriptor2 = fs42.openSync(logPath, "r");
     try {
       const buffer = Buffer.alloc(bytesToRead);
-      fs41.readSync(descriptor2, buffer, 0, bytesToRead, readStart);
+      fs42.readSync(descriptor2, buffer, 0, bytesToRead, readStart);
       content = redactSecretsInText(buffer.toString("utf8"));
     } finally {
-      fs41.closeSync(descriptor2);
+      fs42.closeSync(descriptor2);
     }
   }
   return {
@@ -24601,7 +24601,7 @@ function readSerialWindowFromFile(logPath, options = {}) {
   };
 }
 async function captureSerialWindow(input) {
-  const projectDir = path46.resolve(input.projectDir);
+  const projectDir = path47.resolve(input.projectDir);
   const verifiedTarget = input.targetBinding ? await resolveWriteTarget({
     projectDir,
     environment: input.environment,
@@ -24612,7 +24612,7 @@ async function captureSerialWindow(input) {
   let startedMonitor = false;
   if (!selectedPort) {
     const matchingPorts = Object.entries(activeDaemons).filter(
-      ([, daemon2]) => path46.resolve(daemon2.projectDir ?? "") === projectDir
+      ([, daemon2]) => path47.resolve(daemon2.projectDir ?? "") === projectDir
     ).map(([activePort]) => activePort);
     if (matchingPorts.length > 1) {
       throw new PlatformIOError(
@@ -24656,7 +24656,7 @@ async function captureSerialWindow(input) {
   try {
     let initialSize = 0;
     try {
-      initialSize = fs41.statSync(daemon.logFile).size;
+      initialSize = fs42.statSync(daemon.logFile).size;
     } catch {
     }
     const startOffset = input.cursor ? decodeMonitorCursor(input.cursor, daemon.logFile) : initialSize;
@@ -24664,7 +24664,7 @@ async function captureSerialWindow(input) {
       await new Promise((resolve) => setTimeout(resolve, durationMs));
     }
     try {
-      fs41.statSync(daemon.logFile);
+      fs42.statSync(daemon.logFile);
     } catch {
       throw new PlatformIOError(
         "The serial monitor log is unavailable.",
@@ -40030,11 +40030,11 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path52) {
-      if (!path52 || typeof path52 !== "string") {
+    function lookup(path53) {
+      if (!path53 || typeof path53 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path52).toLowerCase().slice(1);
+      var extension2 = extname("x." + path53).toLowerCase().slice(1);
       if (!extension2) {
         return false;
       }
@@ -43721,13 +43721,13 @@ var require_view = __commonJS({
   "node_modules/express/lib/view.js"(exports, module) {
     "use strict";
     var debug = require_src()("express:view");
-    var path52 = __require("node:path");
-    var fs51 = __require("node:fs");
-    var dirname = path52.dirname;
-    var basename = path52.basename;
-    var extname = path52.extname;
-    var join = path52.join;
-    var resolve = path52.resolve;
+    var path53 = __require("node:path");
+    var fs52 = __require("node:fs");
+    var dirname = path53.dirname;
+    var basename = path53.basename;
+    var extname = path53.extname;
+    var join = path53.join;
+    var resolve = path53.resolve;
     module.exports = View;
     function View(name2, options) {
       var opts = options || {};
@@ -43756,17 +43756,17 @@ var require_view = __commonJS({
       this.path = this.lookup(fileName);
     }
     View.prototype.lookup = function lookup(name2) {
-      var path53;
+      var path54;
       var roots = [].concat(this.root);
       debug('lookup "%s"', name2);
-      for (var i = 0; i < roots.length && !path53; i++) {
+      for (var i = 0; i < roots.length && !path54; i++) {
         var root = roots[i];
         var loc = resolve(root, name2);
         var dir = dirname(loc);
         var file = basename(loc);
-        path53 = this.resolve(dir, file);
+        path54 = this.resolve(dir, file);
       }
-      return path53;
+      return path54;
     };
     View.prototype.render = function render(options, callback) {
       var sync = true;
@@ -43788,21 +43788,21 @@ var require_view = __commonJS({
     };
     View.prototype.resolve = function resolve2(dir, file) {
       var ext = this.ext;
-      var path53 = join(dir, file);
-      var stat = tryStat(path53);
+      var path54 = join(dir, file);
+      var stat = tryStat(path54);
       if (stat && stat.isFile()) {
-        return path53;
+        return path54;
       }
-      path53 = join(dir, basename(file, ext), "index" + ext);
-      stat = tryStat(path53);
+      path54 = join(dir, basename(file, ext), "index" + ext);
+      stat = tryStat(path54);
       if (stat && stat.isFile()) {
-        return path53;
+        return path54;
       }
     };
-    function tryStat(path53) {
-      debug('stat "%s"', path53);
+    function tryStat(path54) {
+      debug('stat "%s"', path54);
       try {
-        return fs51.statSync(path53);
+        return fs52.statSync(path54);
       } catch (e) {
         return void 0;
       }
@@ -53412,11 +53412,11 @@ var require_mime_types2 = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path52) {
-      if (!path52 || typeof path52 !== "string") {
+    function lookup(path53) {
+      if (!path53 || typeof path53 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path52).toLowerCase().slice(1);
+      var extension2 = extname("x." + path53).toLowerCase().slice(1);
       if (!extension2) {
         return false;
       }
@@ -54547,15 +54547,15 @@ var require_dist5 = __commonJS({
       let index = 0;
       function consumeUntil(end) {
         const output = [];
-        let path52 = "";
+        let path53 = "";
         function writePath() {
-          if (!path52)
+          if (!path53)
             return;
           output.push({
             type: "text",
-            value: encodePath(path52)
+            value: encodePath(path53)
           });
-          path52 = "";
+          path53 = "";
         }
         while (index < chars.length) {
           const value2 = chars[index++];
@@ -54567,7 +54567,7 @@ var require_dist5 = __commonJS({
             if (index === chars.length) {
               throw new PathError(`Unexpected end after \\ at index ${index}`, str);
             }
-            path52 += chars[index++];
+            path53 += chars[index++];
             continue;
           }
           if (value2 === ":" || value2 === "*") {
@@ -54611,7 +54611,7 @@ var require_dist5 = __commonJS({
           if (value2 === "}" || value2 === "(" || value2 === ")" || value2 === "[" || value2 === "]" || value2 === "+" || value2 === "?" || value2 === "!") {
             throw new PathError(`Unexpected ${value2} at index ${index - 1}`, str);
           }
-          path52 += value2;
+          path53 += value2;
         }
         if (end) {
           throw new PathError(`Unexpected end at index ${index}, expected ${end}`, str);
@@ -54621,17 +54621,17 @@ var require_dist5 = __commonJS({
       }
       return new TokenData(consumeUntil(""), str);
     }
-    function compile(path52, options = {}) {
+    function compile(path53, options = {}) {
       const { encode = encodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
-      const data = typeof path52 === "object" ? path52 : parse4(path52, options);
+      const data = typeof path53 === "object" ? path53 : parse4(path53, options);
       const fn = tokensToFunction(data.tokens, delimiter, encode);
-      return function path53(params = {}) {
+      return function path54(params = {}) {
         const missing = [];
-        const path54 = fn(params, missing);
+        const path55 = fn(params, missing);
         if (missing.length) {
           throw new TypeError(`Missing parameters: ${missing.join(", ")}`);
         }
-        return path54;
+        return path55;
       };
     }
     function tokensToFunction(tokens, delimiter, encode) {
@@ -54693,9 +54693,9 @@ var require_dist5 = __commonJS({
         return encodeValue(value2);
       };
     }
-    function match(path52, options = {}) {
+    function match(path53, options = {}) {
       const { decode = decodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
-      const { regexp, keys } = pathToRegexp(path52, options);
+      const { regexp, keys } = pathToRegexp(path53, options);
       const decoders = keys.map((key) => {
         if (decode === false)
           return NOOP_VALUE;
@@ -54707,7 +54707,7 @@ var require_dist5 = __commonJS({
         const m = regexp.exec(input);
         if (!m)
           return false;
-        const path53 = m[0];
+        const path54 = m[0];
         const params = /* @__PURE__ */ Object.create(null);
         for (let i = 1; i < m.length; i++) {
           if (m[i] === void 0)
@@ -54716,21 +54716,21 @@ var require_dist5 = __commonJS({
           const decoder = decoders[i - 1];
           params[key.name] = decoder(m[i]);
         }
-        return { path: path53, params };
+        return { path: path54, params };
       };
     }
-    function pathToRegexp(path52, options = {}) {
+    function pathToRegexp(path53, options = {}) {
       const { delimiter = DEFAULT_DELIMITER, end = true, sensitive = false, trailing = true } = options;
       const keys = [];
       let source = "";
       let combinations = 0;
-      function process9(path53) {
-        if (Array.isArray(path53)) {
-          for (const p of path53)
+      function process9(path54) {
+        if (Array.isArray(path54)) {
+          for (const p of path54)
             process9(p);
           return;
         }
-        const data = typeof path53 === "object" ? path53 : parse4(path53, options);
+        const data = typeof path54 === "object" ? path54 : parse4(path54, options);
         flatten(data.tokens, 0, [], (tokens) => {
           if (combinations >= 256) {
             throw new PathError("Too many path combinations", data.originalPath);
@@ -54741,7 +54741,7 @@ var require_dist5 = __commonJS({
           combinations++;
         });
       }
-      process9(path52);
+      process9(path53);
       let pattern = `^(?:${source})`;
       if (trailing)
         pattern += "(?:" + escape2(delimiter) + "$)?";
@@ -54881,18 +54881,18 @@ var require_layer = __commonJS({
     var TRAILING_SLASH_REGEXP = /\/+$/;
     var MATCHING_GROUP_REGEXP = /\((?:\?<(.*?)>)?(?!\?)/g;
     module.exports = Layer;
-    function Layer(path52, options, fn) {
+    function Layer(path53, options, fn) {
       if (!(this instanceof Layer)) {
-        return new Layer(path52, options, fn);
+        return new Layer(path53, options, fn);
       }
-      debug("new %o", path52);
+      debug("new %o", path53);
       const opts = options || {};
       this.handle = fn;
       this.keys = [];
       this.name = fn.name || "<anonymous>";
       this.params = void 0;
       this.path = void 0;
-      this.slash = path52 === "/" && opts.end === false;
+      this.slash = path53 === "/" && opts.end === false;
       function matcher(_path) {
         if (_path instanceof RegExp) {
           const keys = [];
@@ -54931,7 +54931,7 @@ var require_layer = __commonJS({
           decode: decodeParam
         });
       }
-      this.matchers = Array.isArray(path52) ? path52.map(matcher) : [matcher(path52)];
+      this.matchers = Array.isArray(path53) ? path53.map(matcher) : [matcher(path53)];
     }
     Layer.prototype.handleError = function handleError(error2, req, res, next) {
       const fn = this.handle;
@@ -54971,9 +54971,9 @@ var require_layer = __commonJS({
         next(err);
       }
     };
-    Layer.prototype.match = function match(path52) {
+    Layer.prototype.match = function match(path53) {
       let match2;
-      if (path52 != null) {
+      if (path53 != null) {
         if (this.slash) {
           this.params = {};
           this.path = "";
@@ -54981,7 +54981,7 @@ var require_layer = __commonJS({
         }
         let i = 0;
         while (!match2 && i < this.matchers.length) {
-          match2 = this.matchers[i](path52);
+          match2 = this.matchers[i](path53);
           i++;
         }
       }
@@ -55009,13 +55009,13 @@ var require_layer = __commonJS({
         throw err;
       }
     }
-    function loosen(path52) {
-      if (path52 instanceof RegExp || path52 === "/") {
-        return path52;
+    function loosen(path53) {
+      if (path53 instanceof RegExp || path53 === "/") {
+        return path53;
       }
-      return Array.isArray(path52) ? path52.map(function(p) {
+      return Array.isArray(path53) ? path53.map(function(p) {
         return loosen(p);
-      }) : String(path52).replace(TRAILING_SLASH_REGEXP, "");
+      }) : String(path53).replace(TRAILING_SLASH_REGEXP, "");
     }
   }
 });
@@ -55031,9 +55031,9 @@ var require_route = __commonJS({
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
     module.exports = Route;
-    function Route(path52) {
-      debug("new %o", path52);
-      this.path = path52;
+    function Route(path53) {
+      debug("new %o", path53);
+      this.path = path53;
       this.stack = [];
       this.methods = /* @__PURE__ */ Object.create(null);
     }
@@ -55241,8 +55241,8 @@ var require_router = __commonJS({
         if (++sync > 100) {
           return setImmediate(next, err);
         }
-        const path52 = getPathname(req);
-        if (path52 == null) {
+        const path53 = getPathname(req);
+        if (path53 == null) {
           return done(layerError);
         }
         let layer;
@@ -55250,7 +55250,7 @@ var require_router = __commonJS({
         let route;
         while (match !== true && idx < stack.length) {
           layer = stack[idx++];
-          match = matchLayer(layer, path52);
+          match = matchLayer(layer, path53);
           route = layer.route;
           if (typeof match !== "boolean") {
             layerError = layerError || match;
@@ -55288,18 +55288,18 @@ var require_router = __commonJS({
           } else if (route) {
             layer.handleRequest(req, res, next);
           } else {
-            trimPrefix(layer, layerError, layerPath, path52);
+            trimPrefix(layer, layerError, layerPath, path53);
           }
           sync = 0;
         });
       }
-      function trimPrefix(layer, layerError, layerPath, path52) {
+      function trimPrefix(layer, layerError, layerPath, path53) {
         if (layerPath.length !== 0) {
-          if (layerPath !== path52.substring(0, layerPath.length)) {
+          if (layerPath !== path53.substring(0, layerPath.length)) {
             next(layerError);
             return;
           }
-          const c = path52[layerPath.length];
+          const c = path53[layerPath.length];
           if (c && c !== "/") {
             next(layerError);
             return;
@@ -55323,7 +55323,7 @@ var require_router = __commonJS({
     };
     Router.prototype.use = function use(handler) {
       let offset = 0;
-      let path52 = "/";
+      let path53 = "/";
       if (typeof handler !== "function") {
         let arg = handler;
         while (Array.isArray(arg) && arg.length !== 0) {
@@ -55331,7 +55331,7 @@ var require_router = __commonJS({
         }
         if (typeof arg !== "function") {
           offset = 1;
-          path52 = handler;
+          path53 = handler;
         }
       }
       const callbacks = flatten.call(slice.call(arguments, offset), Infinity);
@@ -55343,8 +55343,8 @@ var require_router = __commonJS({
         if (typeof fn !== "function") {
           throw new TypeError("argument handler must be a function");
         }
-        debug("use %o %s", path52, fn.name || "<anonymous>");
-        const layer = new Layer(path52, {
+        debug("use %o %s", path53, fn.name || "<anonymous>");
+        const layer = new Layer(path53, {
           sensitive: this.caseSensitive,
           strict: false,
           end: false
@@ -55354,9 +55354,9 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router.prototype.route = function route(path52) {
-      const route2 = new Route(path52);
-      const layer = new Layer(path52, {
+    Router.prototype.route = function route(path53) {
+      const route2 = new Route(path53);
+      const layer = new Layer(path53, {
         sensitive: this.caseSensitive,
         strict: this.strict,
         end: true
@@ -55369,8 +55369,8 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router.prototype[method] = function(path52) {
-        const route = this.route(path52);
+      Router.prototype[method] = function(path53) {
+        const route = this.route(path53);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
       };
@@ -55399,9 +55399,9 @@ var require_router = __commonJS({
       const fqdnIndex = url.substring(0, pathLength).indexOf("://");
       return fqdnIndex !== -1 ? url.substring(0, url.indexOf("/", 3 + fqdnIndex)) : void 0;
     }
-    function matchLayer(layer, path52) {
+    function matchLayer(layer, path53) {
       try {
-        return layer.match(path52);
+        return layer.match(path53);
       } catch (err) {
         return err;
       }
@@ -55629,7 +55629,7 @@ var require_application = __commonJS({
     };
     app.use = function use(fn) {
       var offset = 0;
-      var path52 = "/";
+      var path53 = "/";
       if (typeof fn !== "function") {
         var arg = fn;
         while (Array.isArray(arg) && arg.length !== 0) {
@@ -55637,7 +55637,7 @@ var require_application = __commonJS({
         }
         if (typeof arg !== "function") {
           offset = 1;
-          path52 = fn;
+          path53 = fn;
         }
       }
       var fns = flatten.call(slice.call(arguments, offset), Infinity);
@@ -55647,12 +55647,12 @@ var require_application = __commonJS({
       var router = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router.use(path52, fn2);
+          return router.use(path53, fn2);
         }
-        debug(".use app under %s", path52);
-        fn2.mountpath = path52;
+        debug(".use app under %s", path53);
+        fn2.mountpath = path53;
         fn2.parent = this;
-        router.use(path52, function mounted_app(req, res, next) {
+        router.use(path53, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -55664,8 +55664,8 @@ var require_application = __commonJS({
       }, this);
       return this;
     };
-    app.route = function route(path52) {
-      return this.router.route(path52);
+    app.route = function route(path53) {
+      return this.router.route(path53);
     };
     app.engine = function engine(ext, fn) {
       if (typeof fn !== "function") {
@@ -55708,7 +55708,7 @@ var require_application = __commonJS({
       }
       return this;
     };
-    app.path = function path52() {
+    app.path = function path53() {
       return this.parent ? this.parent.path() + this.mountpath : "";
     };
     app.enabled = function enabled(setting) {
@@ -55724,17 +55724,17 @@ var require_application = __commonJS({
       return this.set(setting, false);
     };
     methods.forEach(function(method) {
-      app[method] = function(path52) {
+      app[method] = function(path53) {
         if (method === "get" && arguments.length === 1) {
-          return this.set(path52);
+          return this.set(path53);
         }
-        var route = this.route(path52);
+        var route = this.route(path53);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
       };
     });
-    app.all = function all(path52) {
-      var route = this.route(path52);
+    app.all = function all(path53) {
+      var route = this.route(path53);
       var args = slice.call(arguments, 1);
       for (var i = 0; i < methods.length; i++) {
         route[methods[i]].apply(route, args);
@@ -56707,7 +56707,7 @@ var require_request = __commonJS({
       var subdomains2 = !isIP2(hostname2) ? hostname2.split(".").reverse() : [hostname2];
       return subdomains2.slice(offset);
     });
-    defineGetter(req, "path", function path52() {
+    defineGetter(req, "path", function path53() {
       return parse4(this).pathname;
     });
     defineGetter(req, "host", function host() {
@@ -56918,8 +56918,8 @@ var require_content_disposition = __commonJS({
       this.type = type;
       this.parameters = parameters;
     }
-    function basename(path52) {
-      const normalized = path52.replaceAll("\\", "/");
+    function basename(path53) {
+      const normalized = path53.replaceAll("\\", "/");
       let end = normalized.length;
       while (end > 0 && normalized[end - 1] === "/") {
         end--;
@@ -66606,11 +66606,11 @@ var require_mime_types3 = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path52) {
-      if (!path52 || typeof path52 !== "string") {
+    function lookup(path53) {
+      if (!path53 || typeof path53 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path52).toLowerCase().slice(1);
+      var extension2 = extname("x." + path53).toLowerCase().slice(1);
       if (!extension2) {
         return false;
       }
@@ -66665,32 +66665,32 @@ var require_send = __commonJS({
     var escapeHtml = require_escape_html();
     var etag = require_etag();
     var fresh = require_fresh();
-    var fs51 = __require("fs");
+    var fs52 = __require("fs");
     var mime = require_mime_types3();
     var ms = require_ms();
     var onFinished = require_on_finished();
     var parseRange = require_range_parser();
-    var path52 = __require("path");
+    var path53 = __require("path");
     var statuses = require_statuses();
     var Stream = __require("stream");
     var util2 = __require("util");
-    var extname = path52.extname;
-    var join = path52.join;
-    var normalize = path52.normalize;
-    var resolve = path52.resolve;
-    var sep = path52.sep;
+    var extname = path53.extname;
+    var join = path53.join;
+    var normalize = path53.normalize;
+    var resolve = path53.resolve;
+    var sep = path53.sep;
     var BYTES_RANGE_REGEXP = /^ *bytes=/;
     var MAX_MAXAGE = 60 * 60 * 24 * 365 * 1e3;
     var UP_PATH_REGEXP = /(?:^|[\\/])\.\.(?:[\\/]|$)/;
     module.exports = send;
-    function send(req, path53, options) {
-      return new SendStream(req, path53, options);
+    function send(req, path54, options) {
+      return new SendStream(req, path54, options);
     }
-    function SendStream(req, path53, options) {
+    function SendStream(req, path54, options) {
       Stream.call(this);
       var opts = options || {};
       this.options = opts;
-      this.path = path53;
+      this.path = path54;
       this.req = req;
       this._acceptRanges = opts.acceptRanges !== void 0 ? Boolean(opts.acceptRanges) : true;
       this._cacheControl = opts.cacheControl !== void 0 ? Boolean(opts.cacheControl) : true;
@@ -66804,10 +66804,10 @@ var require_send = __commonJS({
       var lastModified = this.res.getHeader("Last-Modified");
       return parseHttpDate(lastModified) <= parseHttpDate(ifRange);
     };
-    SendStream.prototype.redirect = function redirect(path53) {
+    SendStream.prototype.redirect = function redirect(path54) {
       var res = this.res;
       if (hasListeners(this, "directory")) {
-        this.emit("directory", res, path53);
+        this.emit("directory", res, path54);
         return;
       }
       if (this.hasTrailingSlash()) {
@@ -66827,38 +66827,38 @@ var require_send = __commonJS({
     SendStream.prototype.pipe = function pipe2(res) {
       var root = this._root;
       this.res = res;
-      var path53 = decode(this.path);
-      if (path53 === -1) {
+      var path54 = decode(this.path);
+      if (path54 === -1) {
         this.error(400);
         return res;
       }
-      if (~path53.indexOf("\0")) {
+      if (~path54.indexOf("\0")) {
         this.error(400);
         return res;
       }
       var parts;
       if (root !== null) {
-        if (path53) {
-          path53 = normalize("." + sep + path53);
+        if (path54) {
+          path54 = normalize("." + sep + path54);
         }
-        if (UP_PATH_REGEXP.test(path53)) {
-          debug('malicious path "%s"', path53);
+        if (UP_PATH_REGEXP.test(path54)) {
+          debug('malicious path "%s"', path54);
           this.error(403);
           return res;
         }
-        parts = path53.split(sep);
-        path53 = normalize(join(root, path53));
+        parts = path54.split(sep);
+        path54 = normalize(join(root, path54));
       } else {
-        if (UP_PATH_REGEXP.test(path53)) {
-          debug('malicious path "%s"', path53);
+        if (UP_PATH_REGEXP.test(path54)) {
+          debug('malicious path "%s"', path54);
           this.error(403);
           return res;
         }
-        parts = normalize(path53).split(sep);
-        path53 = resolve(path53);
+        parts = normalize(path54).split(sep);
+        path54 = resolve(path54);
       }
       if (containsDotFile(parts)) {
-        debug('%s dotfile "%s"', this._dotfiles, path53);
+        debug('%s dotfile "%s"', this._dotfiles, path54);
         switch (this._dotfiles) {
           case "allow":
             break;
@@ -66872,13 +66872,13 @@ var require_send = __commonJS({
         }
       }
       if (this._index.length && this.hasTrailingSlash()) {
-        this.sendIndex(path53);
+        this.sendIndex(path54);
         return res;
       }
-      this.sendFile(path53);
+      this.sendFile(path54);
       return res;
     };
-    SendStream.prototype.send = function send2(path53, stat) {
+    SendStream.prototype.send = function send2(path54, stat) {
       var len = stat.size;
       var options = this.options;
       var opts = {};
@@ -66890,9 +66890,9 @@ var require_send = __commonJS({
         this.headersAlreadySent();
         return;
       }
-      debug('pipe "%s"', path53);
-      this.setHeader(path53, stat);
-      this.type(path53);
+      debug('pipe "%s"', path54);
+      this.setHeader(path54, stat);
+      this.type(path54);
       if (this.isConditionalGET()) {
         if (this.isPreconditionFailure()) {
           this.error(412);
@@ -66941,30 +66941,30 @@ var require_send = __commonJS({
         res.end();
         return;
       }
-      this.stream(path53, opts);
+      this.stream(path54, opts);
     };
-    SendStream.prototype.sendFile = function sendFile(path53) {
+    SendStream.prototype.sendFile = function sendFile(path54) {
       var i = 0;
       var self = this;
-      debug('stat "%s"', path53);
-      fs51.stat(path53, function onstat(err, stat) {
-        var pathEndsWithSep = path53[path53.length - 1] === sep;
-        if (err && err.code === "ENOENT" && !extname(path53) && !pathEndsWithSep) {
+      debug('stat "%s"', path54);
+      fs52.stat(path54, function onstat(err, stat) {
+        var pathEndsWithSep = path54[path54.length - 1] === sep;
+        if (err && err.code === "ENOENT" && !extname(path54) && !pathEndsWithSep) {
           return next(err);
         }
         if (err) return self.onStatError(err);
-        if (stat.isDirectory()) return self.redirect(path53);
+        if (stat.isDirectory()) return self.redirect(path54);
         if (pathEndsWithSep) return self.error(404);
-        self.emit("file", path53, stat);
-        self.send(path53, stat);
+        self.emit("file", path54, stat);
+        self.send(path54, stat);
       });
       function next(err) {
         if (self._extensions.length <= i) {
           return err ? self.onStatError(err) : self.error(404);
         }
-        var p = path53 + "." + self._extensions[i++];
+        var p = path54 + "." + self._extensions[i++];
         debug('stat "%s"', p);
-        fs51.stat(p, function(err2, stat) {
+        fs52.stat(p, function(err2, stat) {
           if (err2) return next(err2);
           if (stat.isDirectory()) return next();
           self.emit("file", p, stat);
@@ -66972,7 +66972,7 @@ var require_send = __commonJS({
         });
       }
     };
-    SendStream.prototype.sendIndex = function sendIndex(path53) {
+    SendStream.prototype.sendIndex = function sendIndex(path54) {
       var i = -1;
       var self = this;
       function next(err) {
@@ -66980,9 +66980,9 @@ var require_send = __commonJS({
           if (err) return self.onStatError(err);
           return self.error(404);
         }
-        var p = join(path53, self._index[i]);
+        var p = join(path54, self._index[i]);
         debug('stat "%s"', p);
-        fs51.stat(p, function(err2, stat) {
+        fs52.stat(p, function(err2, stat) {
           if (err2) return next(err2);
           if (stat.isDirectory()) return next();
           self.emit("file", p, stat);
@@ -66991,10 +66991,10 @@ var require_send = __commonJS({
       }
       next();
     };
-    SendStream.prototype.stream = function stream(path53, options) {
+    SendStream.prototype.stream = function stream(path54, options) {
       var self = this;
       var res = this.res;
-      var stream2 = fs51.createReadStream(path53, options);
+      var stream2 = fs52.createReadStream(path54, options);
       this.emit("stream", stream2);
       stream2.pipe(res);
       function cleanup() {
@@ -67009,17 +67009,17 @@ var require_send = __commonJS({
         self.emit("end");
       });
     };
-    SendStream.prototype.type = function type(path53) {
+    SendStream.prototype.type = function type(path54) {
       var res = this.res;
       if (res.getHeader("Content-Type")) return;
-      var ext = extname(path53);
+      var ext = extname(path54);
       var type2 = mime.contentType(ext) || "application/octet-stream";
       debug("content-type %s", type2);
       res.setHeader("Content-Type", type2);
     };
-    SendStream.prototype.setHeader = function setHeader(path53, stat) {
+    SendStream.prototype.setHeader = function setHeader(path54, stat) {
       var res = this.res;
-      this.emit("headers", res, path53, stat);
+      this.emit("headers", res, path54, stat);
       if (this._acceptRanges && !res.getHeader("Accept-Ranges")) {
         debug("accept ranges");
         res.setHeader("Accept-Ranges", "bytes");
@@ -67077,9 +67077,9 @@ var require_send = __commonJS({
       }
       return err instanceof Error ? createError(status, err, { expose: false }) : createError(status, err);
     }
-    function decode(path53) {
+    function decode(path54) {
       try {
-        return decodeURIComponent(path53);
+        return decodeURIComponent(path54);
       } catch (err) {
         return -1;
       }
@@ -67223,7 +67223,7 @@ var require_response = __commonJS({
     var http = __require("node:http");
     var onFinished = require_on_finished();
     var mime = require_mime_types2();
-    var path52 = __require("node:path");
+    var path53 = __require("node:path");
     var pathIsAbsolute = __require("node:path").isAbsolute;
     var statuses = require_statuses();
     var sign = require_cookie_signature().sign;
@@ -67232,8 +67232,8 @@ var require_response = __commonJS({
     var setCharset = require_utils4().setCharset;
     var cookie = require_cookie();
     var send = require_send();
-    var extname = path52.extname;
-    var resolve = path52.resolve;
+    var extname = path53.extname;
+    var resolve = path53.resolve;
     var vary = require_vary();
     var { Buffer: Buffer4 } = __require("node:buffer");
     var res = Object.create(http.ServerResponse.prototype);
@@ -67379,26 +67379,26 @@ var require_response = __commonJS({
       this.type("txt");
       return this.send(body);
     };
-    res.sendFile = function sendFile(path53, options, callback) {
+    res.sendFile = function sendFile(path54, options, callback) {
       var done = callback;
       var req = this.req;
       var res2 = this;
       var next = req.next;
       var opts = options || {};
-      if (!path53) {
+      if (!path54) {
         throw new TypeError("path argument is required to res.sendFile");
       }
-      if (typeof path53 !== "string") {
+      if (typeof path54 !== "string") {
         throw new TypeError("path must be a string to res.sendFile");
       }
       if (typeof options === "function") {
         done = options;
         opts = {};
       }
-      if (!opts.root && !pathIsAbsolute(path53)) {
+      if (!opts.root && !pathIsAbsolute(path54)) {
         throw new TypeError("path must be absolute or specify root to res.sendFile");
       }
-      var pathname = encodeURI(path53);
+      var pathname = encodeURI(path54);
       opts.etag = this.app.enabled("etag");
       var file = send(req, pathname, opts);
       sendfile(res2, file, opts, function(err) {
@@ -67409,7 +67409,7 @@ var require_response = __commonJS({
         }
       });
     };
-    res.download = function download(path53, filename, options, callback) {
+    res.download = function download(path54, filename, options, callback) {
       var done = callback;
       var name2 = filename;
       var opts = options || null;
@@ -67426,7 +67426,7 @@ var require_response = __commonJS({
         opts = filename;
       }
       var headers = {
-        "Content-Disposition": contentDisposition(name2 || path53)
+        "Content-Disposition": contentDisposition(name2 || path54)
       };
       if (opts && opts.headers) {
         var keys = Object.keys(opts.headers);
@@ -67439,7 +67439,7 @@ var require_response = __commonJS({
       }
       opts = Object.create(opts);
       opts.headers = headers;
-      var fullPath = !opts.root ? resolve(path53) : path53;
+      var fullPath = !opts.root ? resolve(path54) : path54;
       return this.sendFile(fullPath, opts, done);
     };
     res.contentType = res.type = function contentType(type) {
@@ -67722,11 +67722,11 @@ var require_serve_static = __commonJS({
         }
         var forwardError = !fallthrough;
         var originalUrl = parseUrl.original(req);
-        var path52 = parseUrl(req).pathname;
-        if (path52 === "/" && originalUrl.pathname.substr(-1) !== "/") {
-          path52 = "";
+        var path53 = parseUrl(req).pathname;
+        if (path53 === "/" && originalUrl.pathname.substr(-1) !== "/") {
+          path53 = "";
         }
-        var stream = send(req, path52, opts);
+        var stream = send(req, path53, opts);
         stream.on("directory", onDirectory);
         if (setHeaders) {
           stream.on("headers", setHeaders);
@@ -76917,11 +76917,11 @@ var require_mime_types4 = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path52) {
-      if (!path52 || typeof path52 !== "string") {
+    function lookup(path53) {
+      if (!path53 || typeof path53 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path52).toLowerCase().substr(1);
+      var extension2 = extname("x." + path53).toLowerCase().substr(1);
       if (!extension2) {
         return false;
       }
@@ -83092,11 +83092,11 @@ var require_server = __commonJS({
        * @protected
        */
       _computePath(options) {
-        let path52 = (options.path || "/engine.io").replace(/\/$/, "");
+        let path53 = (options.path || "/engine.io").replace(/\/$/, "");
         if (options.addTrailingSlash !== false) {
-          path52 += "/";
+          path53 += "/";
         }
-        return path52;
+        return path53;
       }
       /**
        * Returns a list of available transports for upgrade given a certain transport.
@@ -83622,10 +83622,10 @@ var require_server = __commonJS({
        * @param {Object} options
        */
       attach(server2, options = {}) {
-        const path52 = this._computePath(options);
+        const path53 = this._computePath(options);
         const destroyUpgradeTimeout = options.destroyUpgradeTimeout || 1e3;
         function check2(req) {
-          return path52 === req.url.slice(0, path52.length);
+          return path53 === req.url.slice(0, path53.length);
         }
         const listeners = server2.listeners("request").slice(0);
         server2.removeAllListeners("request");
@@ -83633,7 +83633,7 @@ var require_server = __commonJS({
         server2.on("listening", this.init.bind(this));
         server2.on("request", (req, res) => {
           if (check2(req)) {
-            debug('intercepting request for path "%s"', path52);
+            debug('intercepting request for path "%s"', path53);
             this.handleRequest(req, res);
           } else {
             let i = 0;
@@ -84482,8 +84482,8 @@ var require_userver = __commonJS({
        * @param options
        */
       attach(app, options = {}) {
-        const path52 = this._computePath(options);
-        app.any(path52, this.handleRequest.bind(this)).ws(path52, {
+        const path53 = this._computePath(options);
+        app.any(path53, this.handleRequest.bind(this)).ws(path53, {
           compression: options.compression,
           idleTimeout: options.idleTimeout,
           maxBackpressure: options.maxBackpressure,
@@ -89013,7 +89013,7 @@ var require_dist8 = __commonJS({
     var zlib_1 = __require("zlib");
     var accepts = require_accepts2();
     var stream_1 = __require("stream");
-    var path52 = __require("path");
+    var path53 = __require("path");
     var engine_io_1 = require_engine_io();
     var client_1 = require_client();
     var events_1 = __require("events");
@@ -89208,7 +89208,7 @@ var require_dist8 = __commonJS({
             res.writeHeader("cache-control", "public, max-age=0");
             res.writeHeader("content-type", "application/" + (isMap ? "json" : "javascript") + "; charset=utf-8");
             res.writeHeader("etag", expectedEtag);
-            const filepath = path52.join(__dirname, "../client-dist/", filename);
+            const filepath = path53.join(__dirname, "../client-dist/", filename);
             (0, uws_1.serveFile)(res, filepath);
           });
         }
@@ -89290,7 +89290,7 @@ var require_dist8 = __commonJS({
        * @private
        */
       static sendFile(filename, req, res) {
-        const readStream = (0, fs_1.createReadStream)(path52.join(__dirname, "../client-dist/", filename));
+        const readStream = (0, fs_1.createReadStream)(path53.join(__dirname, "../client-dist/", filename));
         const encoding = accepts(req).encodings(["br", "gzip", "deflate"]);
         const onError = (err) => {
           if (err) {
@@ -93028,8 +93028,8 @@ function createPolicyRevisionGuard(workspaceDir) {
 // src/tools/analysis.ts
 init_zod();
 init_projects();
-import crypto10 from "node:crypto";
-import fs19 from "node:fs/promises";
+import crypto11 from "node:crypto";
+import fs20 from "node:fs/promises";
 
 // src/core/policy/evaluate-policy.ts
 import path19 from "node:path";
@@ -94040,6 +94040,30 @@ async function planAction(name2, args, context) {
   return planPolicy(action, args, { ...context, operationName: name2 });
 }
 
+// src/utils/command-log.ts
+init_paths();
+init_redact();
+init_errors2();
+import fs15 from "node:fs/promises";
+import path20 from "node:path";
+import crypto9 from "node:crypto";
+async function retainCommandLog(purpose, stdout, stderr) {
+  if (Buffer.byteLength(stdout) + Buffer.byteLength(stderr) > 16 * 1024 * 1024)
+    throw new PlatformIOError(
+      "Command log exceeds its bound.",
+      "COMMAND_LOG_LIMIT"
+    );
+  const output = redactSecretsInText(stdout + "\n" + stderr);
+  const directory = path20.join(SERVER_DATA_DIR, "command-logs");
+  await fs15.mkdir(directory, { recursive: true, mode: 448 });
+  const filename = path20.join(
+    directory,
+    `${purpose}-${crypto9.randomUUID()}.log`
+  );
+  await fs15.writeFile(filename, output, { flag: "wx", mode: 384 });
+  return filename;
+}
+
 // src/core/analysis/collect-build-context.ts
 init_platformio();
 init_validation();
@@ -94047,26 +94071,26 @@ init_errors2();
 
 // src/core/analysis/build-metadata.ts
 init_errors2();
-import path21 from "node:path";
+import path22 from "node:path";
 
 // src/core/analysis/toolchain-resolver.ts
 init_errors2();
-import fs15 from "node:fs/promises";
-import path20 from "node:path";
+import fs16 from "node:fs/promises";
+import path21 from "node:path";
 function contained(root, candidate) {
-  const relative = path20.relative(root, candidate);
-  return relative !== "" && relative !== ".." && !relative.startsWith(`..${path20.sep}`) && !path20.isAbsolute(relative);
+  const relative = path21.relative(root, candidate);
+  return relative !== "" && relative !== ".." && !relative.startsWith(`..${path21.sep}`) && !path21.isAbsolute(relative);
 }
 async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
-  if (!path20.isAbsolute(compilerPath) || !trustedRoots.length || trustedRoots.some((root2) => !path20.isAbsolute(root2)))
+  if (!path21.isAbsolute(compilerPath) || !trustedRoots.length || trustedRoots.some((root2) => !path21.isAbsolute(root2)))
     throw new PlatformIOError(
       "Analysis needs explicit absolute compiler and trusted-root paths.",
       "ANALYSIS_TOOLCHAIN_INVALID"
     );
-  const compiler = await fs15.realpath(compilerPath);
+  const compiler = await fs16.realpath(compilerPath);
   const roots = [
     ...new Set(
-      await Promise.all(trustedRoots.map((root2) => fs15.realpath(root2)))
+      await Promise.all(trustedRoots.map((root2) => fs16.realpath(root2)))
     )
   ];
   const matches = roots.filter((root2) => contained(root2, compiler));
@@ -94076,11 +94100,11 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
       "ANALYSIS_TOOLCHAIN_UNTRUSTED"
     );
   const root = matches.sort((a, b) => b.length - a.length)[0];
-  const name2 = path20.basename(compiler);
+  const name2 = path21.basename(compiler);
   const match = name2.match(
     /^((?:[a-z0-9_]+-)*)(?:gcc|g\+\+|cc|c\+\+)(\.exe)?$/i
   );
-  if (!match || !(await fs15.stat(compiler)).isFile())
+  if (!match || !(await fs16.stat(compiler)).isFile())
     throw new PlatformIOError(
       "Expected a native GNU-compatible compiler path.",
       "ANALYSIS_TOOLCHAIN_INVALID"
@@ -94088,9 +94112,9 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
   const companion = async (tool) => {
     let candidate;
     try {
-      candidate = await fs15.realpath(
-        path20.join(
-          path20.dirname(compiler),
+      candidate = await fs16.realpath(
+        path21.join(
+          path21.dirname(compiler),
           `${match[1]}${tool}${match[2] ?? ""}`
         )
       );
@@ -94100,7 +94124,7 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
         "ANALYSIS_TOOL_UNAVAILABLE"
       );
     }
-    if (!contained(root, candidate) || !(await fs15.stat(candidate)).isFile())
+    if (!contained(root, candidate) || !(await fs16.stat(candidate)).isFile())
       throw new PlatformIOError(
         `The ${tool} utility escapes the selected toolchain root.`,
         "ANALYSIS_TOOLCHAIN_UNTRUSTED"
@@ -94150,9 +94174,9 @@ function selectBuildMetadata(output, environment) {
   const fields = entry;
   const absolutePath = (field2) => {
     const value2 = fields[field2];
-    if (typeof value2 !== "string" || !value2 || value2.length > 32768 || /[\x00-\x1f]/.test(value2) || !path21.isAbsolute(value2))
+    if (typeof value2 !== "string" || !value2 || value2.length > 32768 || /[\x00-\x1f]/.test(value2) || !path22.isAbsolute(value2))
       return invalid3(`Metadata ${field2} must be an absolute native path.`);
-    return path21.normalize(value2);
+    return path22.normalize(value2);
   };
   return {
     environment: selected,
@@ -94163,16 +94187,16 @@ function selectBuildMetadata(output, environment) {
 
 // src/core/analysis/elf-identity.ts
 init_errors2();
-import fs16 from "node:fs/promises";
-import crypto9 from "node:crypto";
+import fs17 from "node:fs/promises";
+import crypto10 from "node:crypto";
 async function readElfIdentity(elfPath, expectedSha256) {
   if (expectedSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(expectedSha256))
     throw new PlatformIOError(
       "Expected ELF hash must be SHA-256.",
       "ANALYSIS_ELF_INVALID"
     );
-  const resolved = await fs16.realpath(elfPath);
-  const file = await fs16.open(resolved, "r");
+  const resolved = await fs17.realpath(elfPath);
+  const file = await fs17.open(resolved, "r");
   try {
     const before = await file.stat();
     if (!before.isFile() || before.size < 52)
@@ -94213,7 +94237,7 @@ async function readElfIdentity(elfPath, expectedSha256) {
       183: "aarch64",
       243: "riscv"
     };
-    const hash = crypto9.createHash("sha256");
+    const hash = crypto10.createHash("sha256");
     const chunk = Buffer.alloc(64 * 1024);
     let position = 0;
     while (position < before.size) {
@@ -94365,11 +94389,13 @@ async function collectProgramMemory(input, elfPath, caller = {}, authorization) 
         { cwd: selected.projectDir, timeout: 6e5 }
       );
       await readElfIdentity(elfPath, before.sha256);
+      const logPath = await retainCommandLog("program-size", result.stdout, result.stderr);
       return {
         environment: selected.environment,
         elfSha256: before.sha256,
         exitCode: result.exitCode,
-        output: result.stdout
+        output: result.stdout,
+        logPath
       };
     }
   );
@@ -94377,17 +94403,17 @@ async function collectProgramMemory(input, elfPath, caller = {}, authorization) 
 
 // src/core/analysis/toolchain-discovery.ts
 init_errors2();
-import fs17 from "node:fs/promises";
-import path22 from "node:path";
+import fs18 from "node:fs/promises";
+import path23 from "node:path";
 function inside(root, candidate) {
-  const relative = path22.relative(root, candidate);
-  return relative === "" || relative !== ".." && !relative.startsWith(`..${path22.sep}`) && !path22.isAbsolute(relative);
+  const relative = path23.relative(root, candidate);
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${path23.sep}`) && !path23.isAbsolute(relative);
 }
 async function packageDocument(file) {
-  const stat = await fs17.stat(file);
+  const stat = await fs18.stat(file);
   if (!stat.isFile() || stat.size > 65536)
     throw new Error("Invalid package record");
-  const value2 = JSON.parse(await fs17.readFile(file, "utf8"));
+  const value2 = JSON.parse(await fs18.readFile(file, "utf8"));
   if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
     throw new Error("Invalid package record");
   return value2;
@@ -94396,14 +94422,14 @@ async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectD
   const fail = (message) => {
     throw new PlatformIOError(message, "ANALYSIS_TOOLCHAIN_UNTRUSTED");
   };
-  const project = await fs17.realpath(projectDir);
+  const project = await fs18.realpath(projectDir);
   const validateRoot = async (root2) => {
-    if (typeof root2 !== "string" || !path22.isAbsolute(root2))
+    if (typeof root2 !== "string" || !path23.isAbsolute(root2))
       return fail(
         "Toolchain roots must be absolute operator installation paths."
       );
-    const real = await fs17.realpath(root2);
-    if (real === path22.parse(real).root || inside(project, real) || inside(real, project) || !(await fs17.stat(real)).isDirectory())
+    const real = await fs18.realpath(root2);
+    if (real === path23.parse(real).root || inside(project, real) || inside(real, project) || !(await fs18.stat(real)).isDirectory())
       return fail(
         "Toolchain installation roots cannot be filesystem roots or project-owned directories."
       );
@@ -94426,25 +94452,25 @@ async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectD
     return [...new Set(await Promise.all(roots.map(validateRoot)))];
   }
   const value2 = systemInfo?.core_dir?.value;
-  if (typeof value2 !== "string" || !path22.isAbsolute(value2))
+  if (typeof value2 !== "string" || !path23.isAbsolute(value2))
     return fail(
       "PlatformIO system info did not identify an absolute Core directory."
     );
-  const packages = await validateRoot(path22.join(value2, "packages"));
-  const compiler = await fs17.realpath(compilerPath);
+  const packages = await validateRoot(path23.join(value2, "packages"));
+  const compiler = await fs18.realpath(compilerPath);
   if (!inside(packages, compiler))
     return fail(
       "Compiler is outside registered host packages; configure an explicit operator root for custom tools."
     );
-  const relative = path22.relative(packages, compiler);
-  const folder = relative.split(path22.sep)[0];
-  const root = await validateRoot(path22.join(packages, folder));
+  const relative = path23.relative(packages, compiler);
+  const folder = relative.split(path23.sep)[0];
+  const root = await validateRoot(path23.join(packages, folder));
   if (!inside(packages, root) || !inside(root, compiler))
     return fail("Toolchain package escapes the host installation.");
   try {
     const [manifest, record2] = await Promise.all([
-      packageDocument(path22.join(root, "package.json")),
-      packageDocument(path22.join(root, ".piopm"))
+      packageDocument(path23.join(root, "package.json")),
+      packageDocument(path23.join(root, ".piopm"))
     ]);
     if (typeof manifest.name !== "string" || !manifest.name.startsWith("toolchain-") || record2.type !== "tool" || record2.name !== manifest.name || typeof manifest.version !== "string" || record2.version !== manifest.version)
       throw new Error("Unregistered compiler package");
@@ -94642,7 +94668,7 @@ function parseAddr2line(output) {
 
 // src/core/analysis/size-parser.ts
 init_errors2();
-import path23 from "node:path";
+import path24 from "node:path";
 function lines(output) {
   if (Buffer.byteLength(output) > 16 * 1024 * 1024)
     throw new PlatformIOError(
@@ -94760,7 +94786,7 @@ function groupSymbolsByFile(symbols, projectDir) {
   for (const symbol of symbols) {
     let file = symbol.file ?? "<no debug info>";
     if (symbol.file && projectDir) {
-      const paths = /^[a-z]:[\\/]/i.test(projectDir) ? path23.win32 : path23.posix;
+      const paths = /^[a-z]:[\\/]/i.test(projectDir) ? path24.win32 : path24.posix;
       const relative = paths.relative(projectDir, symbol.file);
       if (relative && relative !== ".." && !relative.startsWith(`..${paths.sep}`) && !paths.isAbsolute(relative))
         file = relative;
@@ -94786,11 +94812,11 @@ function groupSymbolsByFile(symbols, projectDir) {
 // src/core/analysis/analysis-process.ts
 init_errors2();
 import { execFile as execFile2 } from "node:child_process";
-import path24 from "node:path";
+import path25 from "node:path";
 async function runAnalysisProcess(executable, args, options = {}) {
   const timeout = options.timeoutMs ?? 3e4;
   const maxBuffer = options.maxOutputBytes ?? 16 * 1024 * 1024;
-  if (!path24.isAbsolute(executable) || /\.(?:cmd|bat|ps1|sh)$/i.test(executable))
+  if (!path25.isAbsolute(executable) || /\.(?:cmd|bat|ps1|sh)$/i.test(executable))
     throw new PlatformIOError(
       "Analysis requires an absolute native executable path.",
       "ANALYSIS_EXECUTABLE_INVALID"
@@ -94834,7 +94860,7 @@ async function runAnalysisProcess(executable, args, options = {}) {
             `Analysis utility failed (${failure}).`,
             failure,
             {
-              executable: path24.basename(executable),
+              executable: path25.basename(executable),
               exitCode: typeof code === "number" ? code : void 0
             }
           )
@@ -94845,22 +94871,22 @@ async function runAnalysisProcess(executable, args, options = {}) {
 }
 
 // src/core/analysis/elf-snapshot.ts
-import fs18 from "node:fs/promises";
+import fs19 from "node:fs/promises";
 import os4 from "node:os";
-import path25 from "node:path";
+import path26 from "node:path";
 async function withElfSnapshot(elfPath, expectedSha256, analyze) {
   const identity = await readElfIdentity(elfPath, expectedSha256);
-  const directory = await fs18.mkdtemp(
-    path25.join(os4.tmpdir(), "pio-elf-analysis-")
+  const directory = await fs19.mkdtemp(
+    path26.join(os4.tmpdir(), "pio-elf-analysis-")
   );
   try {
-    await fs18.chmod(directory, 448);
-    const snapshot = path25.join(directory, "firmware.elf");
-    await fs18.copyFile(identity.path, snapshot);
+    await fs19.chmod(directory, 448);
+    const snapshot = path26.join(directory, "firmware.elf");
+    await fs19.copyFile(identity.path, snapshot);
     await readElfIdentity(snapshot, identity.sha256);
     return await analyze(snapshot, identity);
   } finally {
-    await fs18.rm(directory, { recursive: true, force: true });
+    await fs19.rm(directory, { recursive: true, force: true });
   }
 }
 
@@ -95021,6 +95047,7 @@ async function reportFirmwareSize(context, top = 25, filter) {
         memorySource: memory ? "platformio" : "estimate_from_size",
         memory: memory ?? null,
         memoryUnavailableReason,
+        memoryLogPath: evidence?.logPath ?? null,
         totals,
         sections,
         symbolCount: symbols.length,
@@ -95058,7 +95085,7 @@ var FirmwareSizeParamsSchema = external_exports.object({
   filter: external_exports.string().max(4096).optional()
 }).strict();
 async function resolveContext(input, caller, authorization) {
-  const projectDir = await fs19.realpath(input.projectDir);
+  const projectDir = await fs20.realpath(input.projectDir);
   const validatePolicy = createPolicyRevisionGuard(projectDir);
   const selected = {
     projectDir,
@@ -95092,10 +95119,10 @@ async function resolveContext(input, caller, authorization) {
   };
 }
 async function authorizedAnalysis(params, purpose, caller, onAuthorized, execute2) {
-  const projectDir = await fs19.realpath(params.projectDir);
+  const projectDir = await fs20.realpath(params.projectDir);
   const { approvalId, ...request } = params;
   const normalized = { ...request, projectDir };
-  const requestDigest = crypto10.createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
+  const requestDigest = crypto11.createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
   return withAuthorizedBuildCollection(
     {
       projectDir,
@@ -95147,7 +95174,7 @@ async function firmwareSizeReport(input, caller = {}, onAuthorized) {
 // src/tools/project-inspection.ts
 init_zod();
 init_platformio();
-import fs20 from "node:fs/promises";
+import fs21 from "node:fs/promises";
 
 // src/core/project-inspection.ts
 init_zod();
@@ -95368,7 +95395,7 @@ async function executeProjectInspection(action, input, caller = {}, onAuthorized
       "UNKNOWN_ACTION"
     );
   const parsed = action === "project_envs" ? envSchema.parse(input) : metadataSchema2.parse(input);
-  const projectDir = await fs20.realpath(parsed.projectDir);
+  const projectDir = await fs21.realpath(parsed.projectDir);
   const params = { ...parsed, projectDir };
   const environment = "environment" in parsed ? parsed.environment : void 0;
   return dispatchAuthorizedAction(
@@ -95516,22 +95543,22 @@ async function getBoardInfo(boardId) {
 
 // src/adapters/compatibility-project.ts
 init_errors2();
-import fs21 from "node:fs/promises";
+import fs22 from "node:fs/promises";
 import os5 from "node:os";
-import path26 from "node:path";
+import path27 from "node:path";
 async function resolveCompatibilityProject(requested, defaults) {
   let selected = requested || defaults.projectDir || defaults.cwd || process.cwd();
   if (selected === "~" || selected.startsWith("~/") || selected.startsWith("~\\"))
-    selected = path26.join(defaults.home ?? os5.homedir(), selected.slice(2));
+    selected = path27.join(defaults.home ?? os5.homedir(), selected.slice(2));
   else if (selected.startsWith("~"))
     throw new PlatformIOError(
       "Named-user home expansion is unsupported; pass an absolute project path.",
       "COMPAT_PROJECT_INVALID"
     );
-  const canonical3 = await fs21.realpath(
-    path26.resolve(defaults.cwd ?? process.cwd(), selected)
+  const canonical3 = await fs22.realpath(
+    path27.resolve(defaults.cwd ?? process.cwd(), selected)
   );
-  if (!(await fs21.stat(canonical3)).isDirectory() || !(await fs21.stat(path26.join(canonical3, "platformio.ini"))).isFile())
+  if (!(await fs22.stat(canonical3)).isDirectory() || !(await fs22.stat(path27.join(canonical3, "platformio.ini"))).isFile())
     throw new PlatformIOError(
       "Expected a PlatformIO project directory.",
       "COMPAT_PROJECT_INVALID"
@@ -95626,7 +95653,7 @@ async function executeSizeCompatibility(input, defaults, caller, onAuthorized) {
     },
     memory: report.memory ? { flash: region(report.memory.flash), ram: region(report.memory.ram) } : {},
     memory_source: report.memorySource,
-    memory_log_path: null,
+    memory_log_path: report.memoryLogPath,
     memory_unavailable_reason: report.memoryUnavailableReason,
     flash_percent: report.memory?.flash.percent ?? percent(report.totals.flashEstimate, board?.rom),
     ram_percent: report.memory?.ram.percent ?? percent(report.totals.ramEstimate, board?.ram),
@@ -95755,8 +95782,8 @@ async function executeDecodeCompatibility(client, input, defaults, caller, onAut
 
 // src/core/devices/port-diagnostics.ts
 init_errors2();
-import fs22 from "node:fs/promises";
-import path27 from "node:path";
+import fs23 from "node:fs/promises";
+import path28 from "node:path";
 import { execFile as execFile3 } from "node:child_process";
 import { promisify } from "node:util";
 var execute = promisify(execFile3);
@@ -95785,7 +95812,7 @@ function parsePortHolders(output) {
 async function holders(port) {
   for (const command of ["/usr/sbin/lsof", "/usr/bin/lsof"]) {
     try {
-      await fs22.access(command, fs22.constants.X_OK);
+      await fs23.access(command, fs23.constants.X_OK);
       const result = await execute(command, ["-Fpc", "--", port], {
         timeout: 5e3,
         maxBuffer: 65536,
@@ -95807,7 +95834,7 @@ async function holders(port) {
     }
   }
   try {
-    await fs22.access("/usr/bin/fuser", fs22.constants.X_OK);
+    await fs23.access("/usr/bin/fuser", fs23.constants.X_OK);
     const result = await execute("/usr/bin/fuser", ["--", port], {
       timeout: 5e3,
       maxBuffer: 65536,
@@ -95848,14 +95875,14 @@ async function inspectPortDiagnostics(port, listed) {
       platform: process.platform
     };
   }
-  if (!path27.posix.isAbsolute(port) || !path27.posix.normalize(port).startsWith("/dev/"))
+  if (!path28.posix.isAbsolute(port) || !path28.posix.normalize(port).startsWith("/dev/"))
     throw new PlatformIOError(
       "Unix serial ports must be within /dev.",
       "SERIAL_ENDPOINT_INVALID"
     );
   let canonical3;
   try {
-    canonical3 = await fs22.realpath(port);
+    canonical3 = await fs23.realpath(port);
   } catch (error2) {
     const missing = error2.code === "ENOENT";
     return {
@@ -95873,7 +95900,7 @@ async function inspectPortDiagnostics(port, listed) {
       "Serial alias escapes /dev.",
       "SERIAL_ENDPOINT_INVALID"
     );
-  const stat = await fs22.stat(canonical3);
+  const stat = await fs23.stat(canonical3);
   if (!stat.isCharacterDevice())
     throw new PlatformIOError(
       "Port is not a character device.",
@@ -95881,7 +95908,7 @@ async function inspectPortDiagnostics(port, listed) {
     );
   const access2 = async (mode) => {
     try {
-      await fs22.access(canonical3, mode);
+      await fs23.access(canonical3, mode);
       return true;
     } catch {
       return false;
@@ -95891,8 +95918,8 @@ async function inspectPortDiagnostics(port, listed) {
     exists: true,
     in_device_list: listed,
     permission: {
-      readable: await access2(fs22.constants.R_OK),
-      writable: await access2(fs22.constants.W_OK)
+      readable: await access2(fs23.constants.R_OK),
+      writable: await access2(fs23.constants.W_OK)
     },
     ...await holders(canonical3),
     platform: process.platform
@@ -95904,8 +95931,8 @@ init_zod();
 
 // src/adapters/monitor-start-compat.ts
 init_zod();
-import fs29 from "node:fs/promises";
-import path33 from "node:path";
+import fs30 from "node:fs/promises";
+import path34 from "node:path";
 
 // src/core/serial/memory-capture.ts
 init_zod();
@@ -96491,8 +96518,8 @@ import { performance as performance5 } from "node:perf_hooks";
 
 // src/core/devices/serial-endpoint.ts
 init_errors2();
-import fs23 from "node:fs";
-import path28 from "node:path";
+import fs24 from "node:fs";
+import path29 from "node:path";
 function validatePort(port) {
   if (typeof port !== "string" || !port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
     throw new PlatformIOError(
@@ -96503,9 +96530,9 @@ function validatePort(port) {
 function resolveSerialEndpoint(port, options = {}) {
   validatePort(port);
   const platform2 = options.platform ?? process.platform;
-  const realpath = options.realpath ?? fs23.realpathSync.native;
+  const realpath = options.realpath ?? fs24.realpathSync.native;
   const stat = options.stat ?? ((target) => {
-    const metadata = fs23.statSync(target, { bigint: true });
+    const metadata = fs24.statSync(target, { bigint: true });
     return {
       characterDevice: metadata.isCharacterDevice(),
       deviceNumber: metadata.rdev
@@ -96534,7 +96561,7 @@ function resolveSerialEndpoint(port, options = {}) {
         "Serial endpoint identity is unavailable on this platform.",
         "SERIAL_ENDPOINT_UNSUPPORTED"
       );
-    if (!path28.posix.isAbsolute(port) || !path28.posix.normalize(port).startsWith("/dev/"))
+    if (!path29.posix.isAbsolute(port) || !path29.posix.normalize(port).startsWith("/dev/"))
       throw new PlatformIOError(
         "Unix serial endpoints must resolve within /dev.",
         "SERIAL_ENDPOINT_INVALID"
@@ -96544,7 +96571,7 @@ function resolveSerialEndpoint(port, options = {}) {
     try {
       canonicalPort = realpath(port);
       validatePort(canonicalPort);
-      if (!path28.posix.isAbsolute(canonicalPort) || !path28.posix.normalize(canonicalPort).startsWith("/dev/"))
+      if (!path29.posix.isAbsolute(canonicalPort) || !path29.posix.normalize(canonicalPort).startsWith("/dev/"))
         throw new PlatformIOError(
           "Serial alias resolves outside /dev.",
           "SERIAL_ENDPOINT_INVALID"
@@ -96612,7 +96639,7 @@ function resolveSerialEndpoint(port, options = {}) {
 
 // src/core/serial/serial-backend.ts
 init_errors2();
-import fs24 from "node:fs";
+import fs25 from "node:fs";
 async function loadSerialBackend() {
   if (Number(process.versions.node.split(".")[0]) < 20)
     throw new PlatformIOError(
@@ -96622,12 +96649,12 @@ async function loadSerialBackend() {
   try {
     const bundled = new URL("./native/serialport.cjs", import.meta.url);
     const nativeDirectory = new URL("./native/", import.meta.url);
-    if (fs24.existsSync(nativeDirectory) || new URL(import.meta.url).pathname.endsWith("/platformio-mcp.mjs")) {
-      if (!fs24.existsSync(bundled))
+    if (fs25.existsSync(nativeDirectory) || new URL(import.meta.url).pathname.endsWith("/platformio-mcp.mjs")) {
+      if (!fs25.existsSync(bundled))
         throw new Error("Packaged serial backend is missing");
       const target = process.platform === "darwin" ? "darwin-x64+arm64" : `${process.platform}-${process.arch}`;
       const prebuilds = new URL(`./prebuilds/${target}/`, import.meta.url);
-      if (!fs24.existsSync(prebuilds) || !fs24.readdirSync(prebuilds).some((file) => file.endsWith(".node")))
+      if (!fs25.existsSync(prebuilds) || !fs25.readdirSync(prebuilds).some((file) => file.endsWith(".node")))
         throw new Error("Packaged native target is missing");
       const loaded = await import(bundled.href);
       const backend = loaded.default ?? loaded;
@@ -96968,8 +96995,8 @@ async function createDirectSerialTransport(options, onData) {
 }
 
 // src/core/serial/session-policy.ts
-import fs28 from "node:fs";
-import path32 from "node:path";
+import fs29 from "node:fs";
+import path33 from "node:path";
 
 // src/core/devices/native-serial-discovery.ts
 init_zod();
@@ -97087,8 +97114,8 @@ import { createHash as createHash4 } from "node:crypto";
 init_errors2();
 
 // src/core/serial/session-manager.ts
-import fs27 from "node:fs";
-import path31 from "node:path";
+import fs28 from "node:fs";
+import path32 from "node:path";
 import { createHash as createHash3, randomUUID as randomUUID2 } from "node:crypto";
 import { performance as performance4 } from "node:perf_hooks";
 
@@ -97193,12 +97220,12 @@ init_errors2();
 // src/core/devices/device-lease.ts
 init_errors2();
 init_process_identity();
-import fs26 from "node:fs";
+import fs27 from "node:fs";
 import os6 from "node:os";
-import path30 from "node:path";
+import path31 from "node:path";
 import { createHash as createHash2, randomUUID } from "node:crypto";
 function stableDeviceLeaseRoot() {
-  return path30.join(
+  return path31.join(
     os6.userInfo().homedir,
     ".platformio-mcp",
     "device-leases-v1"
@@ -97226,7 +97253,7 @@ var DeviceLeaseStore = class {
   owner;
   /** Construct a store; no file is created or device opened until acquisition. */
   constructor(options = {}) {
-    this.root = path30.resolve(options.root ?? stableDeviceLeaseRoot());
+    this.root = path31.resolve(options.root ?? stableDeviceLeaseRoot());
     this.inspect = options.inspect ?? inspectProcessIdentity;
   }
   /** Inspect persisted ownership without releasing or recovering it; acquisition must still be atomic. */
@@ -97367,7 +97394,7 @@ var DeviceLeaseStore = class {
           "Transferred child exit is not confirmed.",
           "DEVICE_OWNER_UNKNOWN"
         );
-      fs26.unlinkSync(path30.join(this.root, `${key}.json`));
+      fs27.unlinkSync(path31.join(this.root, `${key}.json`));
       this.transfers.delete(ticket);
     });
   }
@@ -97406,7 +97433,7 @@ var DeviceLeaseStore = class {
           "Cannot release unresolved child custody.",
           "DEVICE_HANDOFF_PENDING"
         );
-      fs26.unlinkSync(path30.join(this.root, `${key}.json`));
+      fs27.unlinkSync(path31.join(this.root, `${key}.json`));
       this.held.delete(lease);
     });
   }
@@ -97449,23 +97476,23 @@ var DeviceLeaseStore = class {
   }
   /** Refuse symlinked/non-directory components instead of silently splitting the global lock domain. */
   ensureRoot() {
-    const parsed = path30.parse(this.root);
+    const parsed = path31.parse(this.root);
     let current = parsed.root;
-    for (const part of this.root.slice(parsed.root.length).split(path30.sep).filter(Boolean)) {
-      current = path30.join(current, part);
+    for (const part of this.root.slice(parsed.root.length).split(path31.sep).filter(Boolean)) {
+      current = path31.join(current, part);
       try {
-        fs26.mkdirSync(current, { mode: 448 });
+        fs27.mkdirSync(current, { mode: 448 });
       } catch (error2) {
         if (error2.code !== "EEXIST") throw error2;
       }
-      const stat = fs26.lstatSync(current);
+      const stat = fs27.lstatSync(current);
       if (!stat.isDirectory() || stat.isSymbolicLink())
         throw new PlatformIOError(
           "Device lease directory must not contain symlinks.",
           "DEVICE_LEASE_PATH_INVALID"
         );
     }
-    const rootStat = fs26.statSync(this.root);
+    const rootStat = fs27.statSync(this.root);
     if (process.platform !== "win32" && (rootStat.uid !== process.getuid?.() || (rootStat.mode & 18) !== 0))
       throw new PlatformIOError(
         "Device lease directory must be owned by this user and not writable by others.",
@@ -97474,9 +97501,9 @@ var DeviceLeaseStore = class {
   }
   withGate(key, action) {
     this.ensureRoot();
-    const gate = path30.join(this.root, `${key}.gate`);
+    const gate = path31.join(this.root, `${key}.gate`);
     try {
-      fs26.mkdirSync(gate, { mode: 448 });
+      fs27.mkdirSync(gate, { mode: 448 });
     } catch (error2) {
       if (error2.code === "EEXIST")
         throw new PlatformIOError(
@@ -97488,14 +97515,14 @@ var DeviceLeaseStore = class {
     try {
       return action();
     } finally {
-      fs26.rmdirSync(gate);
+      fs27.rmdirSync(gate);
     }
   }
   readRecord(key) {
-    const file = path30.join(this.root, `${key}.json`);
+    const file = path31.join(this.root, `${key}.json`);
     let stat;
     try {
-      stat = fs26.lstatSync(file);
+      stat = fs27.lstatSync(file);
     } catch (error2) {
       if (error2.code === "ENOENT") return void 0;
       throw error2;
@@ -97506,7 +97533,7 @@ var DeviceLeaseStore = class {
         "DEVICE_LEASE_CORRUPT"
       );
     try {
-      const record2 = JSON.parse(fs26.readFileSync(file, "utf8"));
+      const record2 = JSON.parse(fs27.readFileSync(file, "utf8"));
       if (record2.version !== 1 || record2.handoffPending !== void 0 && record2.handoffPending !== true || resourceKey(record2.resource) !== key || !validProcessIdentity(record2.owner) || typeof record2.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(record2.nonce) || typeof record2.acquiredAt !== "string" || !Number.isFinite(Date.parse(record2.acquiredAt)))
         throw new Error("Invalid lease schema");
       return record2;
@@ -97518,19 +97545,19 @@ var DeviceLeaseStore = class {
     }
   }
   writeRecord(key, record2) {
-    const temporary = path30.join(this.root, `${key}.${record2.nonce}.tmp`);
+    const temporary = path31.join(this.root, `${key}.${record2.nonce}.tmp`);
     let fd;
     try {
-      fd = fs26.openSync(temporary, "wx", 384);
-      fs26.writeFileSync(fd, JSON.stringify(record2), "utf8");
-      fs26.fsyncSync(fd);
-      fs26.closeSync(fd);
+      fd = fs27.openSync(temporary, "wx", 384);
+      fs27.writeFileSync(fd, JSON.stringify(record2), "utf8");
+      fs27.fsyncSync(fd);
+      fs27.closeSync(fd);
       fd = void 0;
-      fs26.renameSync(temporary, path30.join(this.root, `${key}.json`));
+      fs27.renameSync(temporary, path31.join(this.root, `${key}.json`));
     } finally {
-      if (fd !== void 0) fs26.closeSync(fd);
+      if (fd !== void 0) fs27.closeSync(fd);
       try {
-        fs26.unlinkSync(temporary);
+        fs27.unlinkSync(temporary);
       } catch (error2) {
         if (error2.code !== "ENOENT") throw error2;
       }
@@ -98078,13 +98105,13 @@ var SerialSessionManager = class {
   async start(owner, input) {
     this.requireActiveOwner(owner);
     validateDirectSerialOptions(input);
-    if (!path31.isAbsolute(input.projectDir))
+    if (!path32.isAbsolute(input.projectDir))
       throw new PlatformIOError(
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
-    const projectDir = fs27.realpathSync.native(input.projectDir);
-    if (!fs27.statSync(projectDir).isDirectory())
+    const projectDir = fs28.realpathSync.native(input.projectDir);
+    if (!fs28.statSync(projectDir).isDirectory())
       throw new PlatformIOError(
         "Serial project directory is not a directory.",
         "SERIAL_PROJECT_INVALID"
@@ -98562,14 +98589,14 @@ var PolicySerialSessionService = class {
   async startWithDiscovery(owner, input) {
     const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
-    if (!path32.isAbsolute(input.projectDir))
+    if (!path33.isAbsolute(input.projectDir))
       throw new PlatformIOError(
         "Serial project must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
     const request = Object.freeze({
       ...input,
-      projectDir: fs28.realpathSync.native(input.projectDir),
+      projectDir: fs29.realpathSync.native(input.projectDir),
       buffer: input.buffer ? Object.freeze({ ...input.buffer }) : void 0
     });
     const context = this.context.getStore();
@@ -98609,13 +98636,13 @@ var PolicySerialSessionService = class {
   }
   /** Enumerate through one shared native provider under this request's canonical workspace policy. */
   async listSerialDevices(projectDir) {
-    if (!path32.isAbsolute(projectDir))
+    if (!path33.isAbsolute(projectDir))
       throw new PlatformIOError(
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
-    const canonical3 = fs28.realpathSync.native(projectDir);
-    if (!fs28.statSync(canonical3).isDirectory())
+    const canonical3 = fs29.realpathSync.native(projectDir);
+    if (!fs29.statSync(canonical3).isDirectory())
       throw new PlatformIOError(
         "Serial project directory is not a directory.",
         "SERIAL_PROJECT_INVALID"
@@ -98631,13 +98658,13 @@ var PolicySerialSessionService = class {
         "Session listing requires a trusted request context.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED"
       );
-    if (!path32.isAbsolute(projectDir))
+    if (!path33.isAbsolute(projectDir))
       throw new PlatformIOError(
         "Serial project must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
-    const canonical3 = fs28.realpathSync.native(projectDir);
-    if (!fs28.statSync(canonical3).isDirectory())
+    const canonical3 = fs29.realpathSync.native(projectDir);
+    if (!fs29.statSync(canonical3).isDirectory())
       throw new PlatformIOError(
         "Serial project must be a directory.",
         "SERIAL_PROJECT_INVALID"
@@ -98874,7 +98901,7 @@ var MonitorStartCompatibilitySchema = external_exports.object({
 async function resolveMonitorRequest(input, defaults, caller, projectDevices) {
   const params = MonitorStartCompatibilitySchema.parse(input);
   const useConfig = !!(params.project_dir || defaults.projectDir || params.env);
-  const projectDir = useConfig ? await resolveCompatibilityProject(params.project_dir, defaults) : await fs29.realpath(path33.resolve(defaults.cwd ?? process.cwd()));
+  const projectDir = useConfig ? await resolveCompatibilityProject(params.project_dir, defaults) : await fs30.realpath(path34.resolve(defaults.cwd ?? process.cwd()));
   let port = params.port || void 0;
   let baud = params.baud || void 0;
   if (useConfig) {
@@ -99129,8 +99156,8 @@ async function executeMemoryCompatibility(client, input, defaults, caller, proje
 
 // src/adapters/device-compat.ts
 init_zod();
-import fs30 from "node:fs/promises";
-import path34 from "node:path";
+import fs31 from "node:fs/promises";
+import path35 from "node:path";
 init_devices2();
 init_errors2();
 var DEVELOPMENT_BOARD_HINT = /CP210|CH34|CH9102|FTDI|FT23|Silicon Labs|SLAB|usbserial|usbmodem|wchusbserial|ttyUSB|ttyACM|ESP|Arduino|STLink|ST-Link|JLink|J-Link|CMSIS|DAPLink|Espressif|USB/i;
@@ -99200,7 +99227,7 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
           guard2();
           const normalize = async (value2) => {
             if (process.platform !== "win32")
-              return fs30.realpath(value2).catch(() => value2);
+              return fs31.realpath(value2).catch(() => value2);
             const prefix = String.fromCharCode(92, 92, 46, 92);
             return (value2.startsWith(prefix) ? value2.slice(4) : value2).toUpperCase();
           };
@@ -99373,8 +99400,8 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
   }
   if (name2 === "pio_monitor_list") {
     const params2 = external_exports.object({ approval_id: external_exports.string().max(256).optional() }).strict().parse(input);
-    const projectDir2 = await fs30.realpath(
-      path34.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
+    const projectDir2 = await fs31.realpath(
+      path35.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
     );
     return client.run(
       { caller, approvalId: params2.approval_id },
@@ -99400,8 +99427,8 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
     approval_id: external_exports.string().max(256).optional(),
     monitor_approval_id: external_exports.string().max(256).optional()
   }).strict().parse(input);
-  const projectDir = await fs30.realpath(
-    path34.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
+  const projectDir = await fs31.realpath(
+    path35.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
   );
   const guard = createPolicyRevisionGuard(projectDir);
   return client.run(
@@ -99823,11 +99850,11 @@ function parseDependencyGraph(output) {
 
 // src/tools/dependency-inspection.ts
 init_zod();
-import fs32 from "node:fs/promises";
-import path37 from "node:path";
+import fs33 from "node:fs/promises";
+import path38 from "node:path";
 
 // src/core/dependency-project.ts
-import path35 from "node:path";
+import path36 from "node:path";
 
 // src/core/dependency-manifest.ts
 init_zod();
@@ -99948,15 +99975,15 @@ function dependencyProjectInputs(projectDir, report, environment) {
       "No valid selected environment for dependency inspection.",
       "DEPENDENCY_ENVIRONMENT_INVALID"
     );
-  const project = path35.resolve(projectDir);
+  const project = path36.resolve(projectDir);
   const settingPath = (value2, fallback) => {
-    if (value2 == null) return path35.join(project, fallback);
+    if (value2 == null) return path36.join(project, fallback);
     if (typeof value2 !== "string" || !value2.trim() || value2.length > 32768 || /[\x00-\x1f\x7f]/.test(value2))
       throw new PlatformIOError(
         "Invalid resolved library directory.",
         "DEPENDENCY_CONFIG_INVALID"
       );
-    return path35.resolve(project, value2);
+    return path36.resolve(project, value2);
   };
   const extras = list(env.libraryExtraDirectories);
   if (extras.length > 62)
@@ -99970,11 +99997,11 @@ function dependencyProjectInputs(projectDir, report, environment) {
       source: "lib"
     },
     ...extras.map((directory) => ({
-      directory: path35.resolve(project, directory),
+      directory: path36.resolve(project, directory),
       source: "extra"
     })),
     {
-      directory: path35.join(
+      directory: path36.join(
         settingPath(report.platformioSection.libdeps_dir, ".pio/libdeps"),
         env.name
       ),
@@ -99992,8 +100019,8 @@ function dependencyProjectInputs(projectDir, report, environment) {
 }
 
 // src/core/dependency-inventory.ts
-import fs31 from "node:fs/promises";
-import path36 from "node:path";
+import fs32 from "node:fs/promises";
+import path37 from "node:path";
 init_errors2();
 async function collectDependencyInventory(roots, assertAuthorized) {
   if (roots.length > 64)
@@ -100012,11 +100039,11 @@ async function collectDependencyInventory(roots, assertAuthorized) {
   let entries = 0, bytes = 0;
   const seenRoots = /* @__PURE__ */ new Set();
   for (const root of roots) {
-    const directory = path36.resolve(root.directory);
+    const directory = path37.resolve(root.directory);
     check2(directory);
     let canonical3;
     try {
-      canonical3 = await fs31.realpath(directory);
+      canonical3 = await fs32.realpath(directory);
     } catch (error2) {
       if (error2.code === "ENOENT") continue;
       diagnostics.push({ path: directory, code: "ROOT_UNREADABLE" });
@@ -100027,7 +100054,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
     seenRoots.add(canonical3);
     let handle;
     try {
-      handle = await fs31.opendir(canonical3);
+      handle = await fs32.opendir(canonical3);
     } catch {
       diagnostics.push({ path: directory, code: "ROOT_UNREADABLE" });
       continue;
@@ -100039,7 +100066,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
           "DEPENDENCY_LIMIT"
         );
       if (entry.name.startsWith(".")) continue;
-      const libraryPath = path36.join(canonical3, entry.name);
+      const libraryPath = path37.join(canonical3, entry.name);
       check2(libraryPath);
       if (entry.isSymbolicLink()) {
         diagnostics.push({
@@ -100059,11 +100086,11 @@ async function collectDependencyInventory(roots, assertAuthorized) {
         ["library.json", "json"],
         ["library.properties", "properties"]
       ]) {
-        const manifestPath = path36.join(libraryPath, filename);
+        const manifestPath = path37.join(libraryPath, filename);
         check2(manifestPath);
         let info;
         try {
-          info = await fs31.lstat(manifestPath);
+          info = await fs32.lstat(manifestPath);
         } catch (error2) {
           if (authorizationFailed) throw error2;
           if (error2.code === "ENOENT") continue;
@@ -100084,7 +100111,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
           );
         check2(manifestPath);
         try {
-          const file = await fs31.open(manifestPath, "r");
+          const file = await fs32.open(manifestPath, "r");
           try {
             check2(manifestPath);
             const opened = await file.stat();
@@ -100143,7 +100170,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
       });
     }
   }
-  for (const root of roots) check2(path36.resolve(root.directory));
+  for (const root of roots) check2(path37.resolve(root.directory));
   return {
     libraries,
     diagnostics,
@@ -100300,7 +100327,7 @@ var schema = external_exports.object({
 }).strict();
 async function inspectDependencies(input, caller = {}, onAuthorized) {
   const parsed = schema.parse(input);
-  const projectDir = await fs32.realpath(parsed.projectDir);
+  const projectDir = await fs33.realpath(parsed.projectDir);
   const check2 = createPolicyRevisionGuard(projectDir);
   const context = { ...caller, workspaceDir: projectDir };
   return dispatchAuthorizedAction(
@@ -100343,7 +100370,7 @@ async function inspectDependencies(input, caller = {}, onAuthorized) {
               try {
                 return {
                   ...root,
-                  directory: await fs32.realpath(root.directory)
+                  directory: await fs33.realpath(root.directory)
                 };
               } catch (error2) {
                 if (error2.code === "ENOENT")
@@ -100352,12 +100379,12 @@ async function inspectDependencies(input, caller = {}, onAuthorized) {
               }
             })
           );
-          const allowed = roots.map((root) => path37.resolve(root.directory));
+          const allowed = roots.map((root) => path38.resolve(root.directory));
           const assertAuthorized = (target) => {
             check2();
             if (!allowed.some((root) => {
-              const relative = path37.relative(root, target);
-              return relative === "" || !relative.startsWith(`..${path37.sep}`) && relative !== ".." && !path37.isAbsolute(relative);
+              const relative = path38.relative(root, target);
+              return relative === "" || !relative.startsWith(`..${path38.sep}`) && relative !== ".." && !path38.isAbsolute(relative);
             }))
               throw new PlatformIOError(
                 "Library path moved outside the authorized roots.",
@@ -100806,12 +100833,10 @@ function withProjectCompatibility(base2) {
 }
 
 // src/adapters/init-compat.ts
-init_paths();
 init_zod();
 init_projects();
-import crypto11 from "node:crypto";
-import fs33 from "node:fs/promises";
-import path38 from "node:path";
+import fs34 from "node:fs/promises";
+import path39 from "node:path";
 import os7 from "node:os";
 init_redact();
 init_errors2();
@@ -100826,13 +100851,13 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
   }).strict().parse(input);
   let requested = params.project_dir;
   if (requested === "~" || requested.startsWith("~/") || requested.startsWith("~\\"))
-    requested = path38.join(defaults.home ?? os7.homedir(), requested.slice(2));
+    requested = path39.join(defaults.home ?? os7.homedir(), requested.slice(2));
   else if (requested.startsWith("~"))
     throw new PlatformIOError(
       "Named-user home expansion is unsupported.",
       "COMPAT_PROJECT_INVALID"
     );
-  const projectDir = path38.resolve(defaults.cwd ?? process.cwd(), requested);
+  const projectDir = path39.resolve(defaults.cwd ?? process.cwd(), requested);
   const config2 = {
     board: params.board,
     framework: params.framework || void 0,
@@ -100859,24 +100884,11 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
             timeoutMs: 6e5,
             onResult: async (execution) => {
               guard();
-              const directory = path38.join(
-                SERVER_DATA_DIR,
-                "initialization-logs"
+              logPath = await retainCommandLog(
+                "initialization",
+                execution.stdout,
+                execution.stderr
               );
-              await fs33.mkdir(directory, { recursive: true, mode: 448 });
-              logPath = path38.join(directory, `${crypto11.randomUUID()}.log`);
-              const output = redactSecretsInText(
-                execution.stdout + "\n" + execution.stderr
-              );
-              if (Buffer.byteLength(output) > 16 * 1024 * 1024)
-                throw new PlatformIOError(
-                  "Initialization log exceeds its bound.",
-                  "COMPAT_RESULT_LIMIT"
-                );
-              await fs33.writeFile(logPath, output, {
-                flag: "wx",
-                mode: 384
-              });
             }
           });
         } catch (error2) {
@@ -100895,18 +100907,18 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
           throw error2;
         }
         guard();
-        const root = await fs33.realpath(result.path);
+        const root = await fs34.realpath(result.path);
         let ini = "";
         try {
-          const filename = await fs33.realpath(
-            path38.join(root, "platformio.ini")
+          const filename = await fs34.realpath(
+            path39.join(root, "platformio.ini")
           );
-          if (path38.dirname(filename) !== root)
+          if (path39.dirname(filename) !== root)
             throw new PlatformIOError(
               "Generated configuration escapes the project.",
               "COMPAT_PROJECT_INVALID"
             );
-          const file = await fs33.open(filename, "r");
+          const file = await fs34.open(filename, "r");
           try {
             const stat = await file.stat();
             if (!stat.isFile() || stat.size > 1048576)
@@ -100935,7 +100947,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
         } catch (error2) {
           if (error2.code !== "ENOENT") throw error2;
         }
-        const items = (await fs33.readdir(root, { withFileTypes: true })).filter((item) => !item.name.startsWith("."));
+        const items = (await fs34.readdir(root, { withFileTypes: true })).filter((item) => !item.name.startsWith("."));
         if (items.length > 4096)
           throw new PlatformIOError(
             "Project layout exceeds report limits.",
@@ -100957,7 +100969,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
 
 // src/adapters/project-compat.ts
 init_zod();
-import path39 from "node:path";
+import path40 from "node:path";
 init_errors2();
 var text4 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var scope2 = {
@@ -101013,7 +101025,7 @@ function projectCompatibilityResult(result) {
       ...common,
       default_envs: result.defaultEnvironments,
       platformio_section: result.platformioSection,
-      platformio_ini_path: path39.join(result.projectDir, "platformio.ini"),
+      platformio_ini_path: path40.join(result.projectDir, "platformio.ini"),
       envs: result.envs.map((item) => ({
         name: item.name,
         board: item.board,
@@ -101183,8 +101195,8 @@ var import_proper_lockfile5 = __toESM(require_proper_lockfile(), 1);
 init_zod();
 init_platformio();
 init_errors2();
-import fs34 from "node:fs/promises";
-import path40 from "node:path";
+import fs35 from "node:fs/promises";
+import path41 from "node:path";
 import crypto12 from "node:crypto";
 init_redact();
 
@@ -101414,7 +101426,7 @@ function safeOutput(text6) {
   );
 }
 async function readConfiguration(projectDir) {
-  const file = await fs34.open(path40.join(projectDir, "platformio.ini"), "r").catch((error2) => {
+  const file = await fs35.open(path41.join(projectDir, "platformio.ini"), "r").catch((error2) => {
     if (error2.code === "ENOENT") return null;
     throw error2;
   });
@@ -101449,34 +101461,34 @@ async function readConfiguration(projectDir) {
   }
 }
 async function retainOutput(projectDir, output) {
-  const dir = path40.join(projectDir, ".pio-mcp-workspace", "logs", "packages");
+  const dir = path41.join(projectDir, ".pio-mcp-workspace", "logs", "packages");
   let current = projectDir;
   for (const component of [".pio-mcp-workspace", "logs", "packages"]) {
-    current = path40.join(current, component);
-    await fs34.mkdir(current, { mode: 448 }).catch((error2) => {
+    current = path41.join(current, component);
+    await fs35.mkdir(current, { mode: 448 }).catch((error2) => {
       if (error2.code !== "EEXIST") throw error2;
     });
-    const actual = await fs34.realpath(current);
-    const relative = path40.relative(projectDir, actual);
-    if (relative === ".." || relative.startsWith(`..${path40.sep}`) || path40.isAbsolute(relative))
+    const actual = await fs35.realpath(current);
+    const relative = path41.relative(projectDir, actual);
+    if (relative === ".." || relative.startsWith(`..${path41.sep}`) || path41.isAbsolute(relative))
       throw new PlatformIOError(
         "Package log directory escapes the project.",
         "PACKAGE_LOG_PATH_INVALID"
       );
   }
-  const file = path40.join(dir, `packages-${crypto12.randomUUID()}.log`);
-  await fs34.writeFile(file, output, { flag: "wx", mode: 384 });
+  const file = path41.join(dir, `packages-${crypto12.randomUUID()}.log`);
+  await fs35.writeFile(file, output, { flag: "wx", mode: 384 });
   const completed = [];
-  for (const entry of await fs34.readdir(dir, { withFileTypes: true })) {
+  for (const entry of await fs35.readdir(dir, { withFileTypes: true })) {
     if (!entry.isFile() || !/^packages-[a-f0-9-]{36}\.log$/.test(entry.name))
       continue;
-    const candidate = path40.join(dir, entry.name);
+    const candidate = path41.join(dir, entry.name);
     if (candidate === file) continue;
-    const stat = await fs34.lstat(candidate);
+    const stat = await fs35.lstat(candidate);
     if (stat.isFile()) completed.push({ path: candidate, time: stat.mtimeMs });
   }
   for (const stale of completed.sort((a, b) => b.time - a.time).slice(199))
-    await fs34.unlink(stale.path);
+    await fs35.unlink(stale.path);
   return file;
 }
 async function executePackageAction(action, input, caller = {}, onAuthorized, outputOptions = {}) {
@@ -101498,7 +101510,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
   const search = action === "pkg_search";
   const mutation = action === "pkg_install" || action === "pkg_uninstall";
   const parsed = search ? searchSchema.parse(input) : mutation ? mutationSchema.parse(input) : projectSchema.parse(input);
-  const projectDir = "projectDir" in parsed ? await fs34.realpath(parsed.projectDir) : void 0;
+  const projectDir = "projectDir" in parsed ? await fs35.realpath(parsed.projectDir) : void 0;
   const params = { ...parsed, ...projectDir ? { projectDir } : {} };
   if (params.spec !== void 0 && (/[a-z][a-z0-9+.-]*:\/\/[^\s/@]+@/i.test(params.spec) || /[?&](?:token|password|key|secret|signature)=/i.test(params.spec)))
     throw new PlatformIOError(
@@ -101515,16 +101527,16 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
     validatePolicy();
     const release = projectDir ? await import_proper_lockfile5.default.lock(projectDir, {
       realpath: true,
-      lockfilePath: path40.join(projectDir, ".pio-mcp-packages.lock"),
+      lockfilePath: path41.join(projectDir, ".pio-mcp-packages.lock"),
       retries: 0
     }) : void 0;
     try {
       validatePolicy();
       const before = projectDir ? await readConfiguration(projectDir) : null;
-      const configPath = projectDir && before !== null ? await fs34.realpath(path40.join(projectDir, "platformio.ini")) : void 0;
+      const configPath = projectDir && before !== null ? await fs35.realpath(path41.join(projectDir, "platformio.ini")) : void 0;
       if (projectDir && configPath) {
-        const relative = path40.relative(projectDir, configPath);
-        if (relative === ".." || relative.startsWith(`..${path40.sep}`) || path40.isAbsolute(relative))
+        const relative = path41.relative(projectDir, configPath);
+        if (relative === ".." || relative.startsWith(`..${path41.sep}`) || path41.isAbsolute(relative))
           throw new PlatformIOError(
             "Project configuration resolves outside the project.",
             "PACKAGE_CONFIG_CONFLICT"
@@ -101574,7 +101586,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
           keys
         });
         validatePolicy();
-        if (configPath !== await fs34.realpath(path40.join(projectDir, "platformio.ini")) || after !== await readConfiguration(projectDir))
+        if (configPath !== await fs35.realpath(path41.join(projectDir, "platformio.ini")) || after !== await readConfiguration(projectDir))
           throw new PlatformIOError(
             "Configuration changed concurrently; inspect it before retrying.",
             "PACKAGE_CONFIG_CONFLICT"
@@ -101582,18 +101594,18 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
         if (merged !== after) {
           const temp = `${configPath}.${crypto12.randomUUID()}.tmp`;
           try {
-            await fs34.writeFile(temp, merged, {
+            await fs35.writeFile(temp, merged, {
               flag: "wx",
-              mode: (await fs34.stat(configPath)).mode
+              mode: (await fs35.stat(configPath)).mode
             });
             if (after !== await readConfiguration(projectDir))
               throw new PlatformIOError(
                 "Configuration changed concurrently.",
                 "PACKAGE_CONFIG_CONFLICT"
               );
-            await fs34.rename(temp, configPath);
+            await fs35.rename(temp, configPath);
           } finally {
-            await fs34.unlink(temp).catch(() => {
+            await fs35.unlink(temp).catch(() => {
             });
           }
           after = merged;
@@ -101943,10 +101955,10 @@ function assignProp(target, prop, value2) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path52) {
-  if (!path52)
+function getElementAtPath(obj, path53) {
+  if (!path53)
     return obj;
-  return path52.reduce((acc, key) => acc?.[key], obj);
+  return path53.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -102266,11 +102278,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path52, issues) {
+function prefixIssues(path53, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path52);
+    iss.path.unshift(path53);
     return iss;
   });
 }
@@ -108850,8 +108862,8 @@ init_mcp_context();
 init_build_cache();
 init_logger();
 init_redact();
-import fs39 from "node:fs";
-import path44 from "node:path";
+import fs40 from "node:fs";
+import path45 from "node:path";
 import crypto15 from "node:crypto";
 
 // src/core/diagnostics/matchers.ts
@@ -109374,7 +109386,7 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
       status = cmd.status;
       logPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f) => Boolean(f));
       const latestLog = logPath || logPaths[logPaths.length - 1];
-      if (latestLog && fs39.existsSync(latestLog)) {
+      if (latestLog && fs40.existsSync(latestLog)) {
         try {
           const lines2 = await tailFileBounded(latestLog, 512 * 1024);
           output = lines2.slice(status === "running" ? -30 : -150).join("\n");
@@ -109389,10 +109401,10 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
       output = `Task ID not found: ${resolvedTaskId}`;
     }
   } else {
-    const logFile = path44.join(baseDir, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
+    const logFile = path45.join(baseDir, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
     const active = isBuildActive(projectDir);
     status = active ? "running" : "completed";
-    if (fs39.existsSync(logFile)) {
+    if (fs40.existsSync(logFile)) {
       logPaths = [logFile];
       try {
         const lines2 = await tailFileBounded(logFile, 512 * 1024);
@@ -109950,7 +109962,7 @@ var { Server: Server2, Namespace, Socket } = import_dist.default;
 
 // src/api/server.ts
 var import_cors = __toESM(require_lib3(), 1);
-import path48 from "path";
+import path49 from "path";
 
 // node_modules/express-rate-limit/dist/index.mjs
 var import_ip_address = __toESM(require_ip_address(), 1);
@@ -110968,30 +110980,30 @@ import { exec } from "child_process";
 // node_modules/open/index.js
 import process8 from "node:process";
 import { Buffer as Buffer3 } from "node:buffer";
-import path47 from "node:path";
+import path48 from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 import { promisify as promisify6 } from "node:util";
 import childProcess from "node:child_process";
-import fs46, { constants as fsConstants2 } from "node:fs/promises";
+import fs47, { constants as fsConstants2 } from "node:fs/promises";
 
 // node_modules/wsl-utils/index.js
 import process4 from "node:process";
-import fs45, { constants as fsConstants } from "node:fs/promises";
+import fs46, { constants as fsConstants } from "node:fs/promises";
 
 // node_modules/is-wsl/index.js
 import process3 from "node:process";
 import os9 from "node:os";
-import fs44 from "node:fs";
+import fs45 from "node:fs";
 
 // node_modules/is-inside-container/index.js
-import fs43 from "node:fs";
+import fs44 from "node:fs";
 
 // node_modules/is-docker/index.js
-import fs42 from "node:fs";
+import fs43 from "node:fs";
 var isDockerCached;
 function hasDockerEnv() {
   try {
-    fs42.statSync("/.dockerenv");
+    fs43.statSync("/.dockerenv");
     return true;
   } catch {
     return false;
@@ -110999,7 +111011,7 @@ function hasDockerEnv() {
 }
 function hasDockerCGroup() {
   try {
-    return fs42.readFileSync("/proc/self/cgroup", "utf8").includes("docker");
+    return fs43.readFileSync("/proc/self/cgroup", "utf8").includes("docker");
   } catch {
     return false;
   }
@@ -111015,7 +111027,7 @@ function isDocker() {
 var cachedResult;
 var hasContainerEnv = () => {
   try {
-    fs43.statSync("/run/.containerenv");
+    fs44.statSync("/run/.containerenv");
     return true;
   } catch {
     return false;
@@ -111040,12 +111052,12 @@ var isWsl = () => {
     return true;
   }
   try {
-    if (fs44.readFileSync("/proc/version", "utf8").toLowerCase().includes("microsoft")) {
+    if (fs45.readFileSync("/proc/version", "utf8").toLowerCase().includes("microsoft")) {
       return !isInsideContainer();
     }
   } catch {
   }
-  if (fs44.existsSync("/proc/sys/fs/binfmt_misc/WSLInterop") || fs44.existsSync("/run/WSL")) {
+  if (fs45.existsSync("/proc/sys/fs/binfmt_misc/WSLInterop") || fs45.existsSync("/run/WSL")) {
     return !isInsideContainer();
   }
   return false;
@@ -111063,14 +111075,14 @@ var wslDrivesMountPoint = /* @__PURE__ */ (() => {
     const configFilePath = "/etc/wsl.conf";
     let isConfigFileExists = false;
     try {
-      await fs45.access(configFilePath, fsConstants.F_OK);
+      await fs46.access(configFilePath, fsConstants.F_OK);
       isConfigFileExists = true;
     } catch {
     }
     if (!isConfigFileExists) {
       return defaultMountPoint;
     }
-    const configContent = await fs45.readFile(configFilePath, { encoding: "utf8" });
+    const configContent = await fs46.readFile(configFilePath, { encoding: "utf8" });
     const configMountPoint = /(?<!#.*)root\s*=\s*(?<mountPoint>.*)/g.exec(configContent);
     if (!configMountPoint) {
       return defaultMountPoint;
@@ -111224,8 +111236,8 @@ async function defaultBrowser2() {
 
 // node_modules/open/index.js
 var execFile8 = promisify6(childProcess.execFile);
-var __dirname4 = path47.dirname(fileURLToPath3(import.meta.url));
-var localXdgOpenPath = path47.join(__dirname4, "xdg-open");
+var __dirname4 = path48.dirname(fileURLToPath3(import.meta.url));
+var localXdgOpenPath = path48.join(__dirname4, "xdg-open");
 var { platform, arch } = process8;
 async function getWindowsDefaultBrowserFromWsl() {
   const powershellPath = await powerShellPath();
@@ -111375,7 +111387,7 @@ var baseOpen = async (options) => {
       const isBundled = !__dirname4 || __dirname4 === "/";
       let exeLocalXdgOpen = false;
       try {
-        await fs46.access(localXdgOpenPath, fsConstants2.X_OK);
+        await fs47.access(localXdgOpenPath, fsConstants2.X_OK);
         exeLocalXdgOpen = true;
       } catch {
       }
@@ -111480,7 +111492,7 @@ defineLazyProperty(apps, "browserPrivate", () => "browserPrivate");
 var open_default = open;
 
 // src/api/server.ts
-import fs47 from "node:fs";
+import fs48 from "node:fs";
 init_process_manager();
 init_tail();
 init_command_registry();
@@ -111771,10 +111783,10 @@ function pickWorkspaceDirectory() {
 
 // src/api/server.ts
 var __filename3 = fileURLToPath4(import.meta.url);
-var __dirname5 = path48.dirname(__filename3);
+var __dirname5 = path49.dirname(__filename3);
 function resolveDashboardWebRoot(environment = process.env, moduleDirectory = __dirname5) {
   const configuredPath = environment.PIO_MCP_WEB_DIST?.trim();
-  return configuredPath ? path48.resolve(configuredPath) : path48.join(moduleDirectory, "..", "..", "web", "dist");
+  return configuredPath ? path49.resolve(configuredPath) : path49.join(moduleDirectory, "..", "..", "web", "dist");
 }
 var PORTAL_AUTH_TOKEN = crypto19.randomUUID();
 var DASHBOARD_SESSION_COOKIE = "pio_mcp_session";
@@ -111842,14 +111854,14 @@ function issueLaunchTicket(projectDir) {
 }
 function parseDeviceLocks() {
   const locks = [];
-  if (!fs47.existsSync(GLOBAL_LOCKS_DIR)) {
+  if (!fs48.existsSync(GLOBAL_LOCKS_DIR)) {
     return locks;
   }
-  for (const file of fs47.readdirSync(GLOBAL_LOCKS_DIR)) {
+  for (const file of fs48.readdirSync(GLOBAL_LOCKS_DIR)) {
     if (!file.endsWith(".json")) continue;
-    const lockFile = path48.join(GLOBAL_LOCKS_DIR, file);
+    const lockFile = path49.join(GLOBAL_LOCKS_DIR, file);
     try {
-      const payload = JSON.parse(fs47.readFileSync(lockFile, "utf8"));
+      const payload = JSON.parse(fs48.readFileSync(lockFile, "utf8"));
       const claim = payload?.current_claim ?? payload;
       locks.push({
         lockFile,
@@ -112112,10 +112124,10 @@ function startPortalServer(defaultPort = 8080) {
               taskId: task.taskId,
               type: task.type,
               logPath: firstLogPath,
-              exists: fs47.existsSync(firstLogPath)
+              exists: fs48.existsSync(firstLogPath)
             });
           }
-          if (!firstLogPath || !fs47.existsSync(firstLogPath)) {
+          if (!firstLogPath || !fs48.existsSync(firstLogPath)) {
             continue;
           }
           try {
@@ -112400,10 +112412,10 @@ function startPortalServer(defaultPort = 8080) {
           hardwareLockManager.releaseLock(status.sessionId);
         }
         try {
-          if (fs47.existsSync(GLOBAL_LOCKS_DIR)) {
-            for (const file of fs47.readdirSync(GLOBAL_LOCKS_DIR)) {
+          if (fs48.existsSync(GLOBAL_LOCKS_DIR)) {
+            for (const file of fs48.readdirSync(GLOBAL_LOCKS_DIR)) {
               if (file.endsWith(".json") || file.endsWith(".lock")) {
-                fs47.unlinkSync(path48.join(GLOBAL_LOCKS_DIR, file));
+                fs48.unlinkSync(path49.join(GLOBAL_LOCKS_DIR, file));
               }
             }
           }
@@ -112424,7 +112436,7 @@ function startPortalServer(defaultPort = 8080) {
         res.status(400).json({ error: "Missing dir parameter" });
         return;
       }
-      const resolved = path48.resolve(dir);
+      const resolved = path49.resolve(dir);
       if (!await isValidProject(resolved)) {
         res.status(400).json({
           error: "This folder is not a PlatformIO project. Please initialize it using the AI Agent or terminal first, then try opening it again."
@@ -112443,7 +112455,7 @@ function startPortalServer(defaultPort = 8080) {
     try {
       let result = pickWorkspaceDirectory();
       if (result) {
-        result = path48.resolve(result);
+        result = path49.resolve(result);
         if (!await isValidProject(result)) {
           res.status(400).json({
             error: "This folder is not a PlatformIO project. Please initialize it using the AI Agent or terminal first, then try opening it again."
@@ -112558,11 +112570,11 @@ function startPortalServer(defaultPort = 8080) {
         res.status(404).json({ error: "No log paths mapped for this task" });
         return;
       }
-      if (!fs47.existsSync(task.logPaths[0])) {
+      if (!fs48.existsSync(task.logPaths[0])) {
         res.status(404).json({ error: "Log file missing from disk" });
         return;
       }
-      const fileStream = fs47.createReadStream(task.logPaths[0]);
+      const fileStream = fs48.createReadStream(task.logPaths[0]);
       res.setHeader("Content-Type", "text/plain");
       fileStream.pipe(res);
     } catch (e) {
@@ -112759,7 +112771,7 @@ function startPortalServer(defaultPort = 8080) {
     const spoolers = getSpoolerStates();
     socket.emit("spooler_states", spoolers);
     for (const [port2, daemon] of Object.entries(spoolers)) {
-      if (daemon.logFile && fs47.existsSync(daemon.logFile)) {
+      if (daemon.logFile && fs48.existsSync(daemon.logFile)) {
         try {
           socket.emit("serial_clear", { port: port2, taskId: daemon.taskId });
           const lines2 = await tailFileBounded(daemon.logFile);
@@ -112784,12 +112796,12 @@ function startPortalServer(defaultPort = 8080) {
         timestamp: Date.now(),
         projectDir: activeWorkspace
       });
-      const activityLogPath = path48.join(
+      const activityLogPath = path49.join(
         activeWorkspace,
         ".pio-mcp-workspace",
         "agent_activities.jsonl"
       );
-      if (fs47.existsSync(activityLogPath)) {
+      if (fs48.existsSync(activityLogPath)) {
         try {
           const lines2 = await tailFileBounded(activityLogPath);
           const tailLines = lines2.slice(-100);
@@ -112801,14 +112813,14 @@ function startPortalServer(defaultPort = 8080) {
         } catch {
         }
       }
-      const latestBuildLog = path48.join(
+      const latestBuildLog = path49.join(
         activeWorkspace,
         ".pio-mcp-workspace",
         "logs",
         "build",
         "latest-build.log"
       );
-      if (fs47.existsSync(latestBuildLog)) {
+      if (fs48.existsSync(latestBuildLog)) {
         socket.emit("build_state", {
           timestamp: Date.now(),
           logFile: latestBuildLog
@@ -112932,8 +112944,8 @@ async function getDashboardStatusCore(input) {
 }
 
 // src/tools/agent.ts
-import fs49 from "node:fs";
-import path50 from "node:path";
+import fs50 from "node:fs";
+import path51 from "node:path";
 
 // src/core/runtime-assertions.ts
 var RUNTIME_FAILURE_MATCHERS = [
@@ -113142,37 +113154,37 @@ function getBoardProfile(input) {
 init_build_cache();
 
 // src/utils/artifacts.ts
-import fs48 from "node:fs";
-import path49 from "node:path";
+import fs49 from "node:fs";
+import path50 from "node:path";
 var WORKSPACE_DIR4 = ".pio-mcp-workspace";
 var LAST_AGENT_REPORT_FILE = "lastAgentReport.json";
 var BOARD_REPORT_FILE = "boardReport.json";
 function getWorkspaceArtifactsDir(projectDir) {
-  return path49.join(projectDir, WORKSPACE_DIR4);
+  return path50.join(projectDir, WORKSPACE_DIR4);
 }
 function getLastAgentReportPath(projectDir) {
-  return path49.join(getWorkspaceArtifactsDir(projectDir), LAST_AGENT_REPORT_FILE);
+  return path50.join(getWorkspaceArtifactsDir(projectDir), LAST_AGENT_REPORT_FILE);
 }
 function getBoardReportPath(projectDir) {
-  return path49.join(getWorkspaceArtifactsDir(projectDir), BOARD_REPORT_FILE);
+  return path50.join(getWorkspaceArtifactsDir(projectDir), BOARD_REPORT_FILE);
 }
 function ensureArtifactsDir(projectDir) {
   const dir = getWorkspaceArtifactsDir(projectDir);
-  if (!fs48.existsSync(dir)) {
-    fs48.mkdirSync(dir, { recursive: true });
+  if (!fs49.existsSync(dir)) {
+    fs49.mkdirSync(dir, { recursive: true });
   }
 }
 function readJsonFile(filePath) {
-  if (!fs48.existsSync(filePath)) return null;
+  if (!fs49.existsSync(filePath)) return null;
   try {
-    const raw = fs48.readFileSync(filePath, "utf8");
+    const raw = fs49.readFileSync(filePath, "utf8");
     return JSON.parse(raw);
   } catch {
     return null;
   }
 }
 function writeJsonFile(filePath, payload) {
-  fs48.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
+  fs49.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
 }
 function writeLastAgentReport(projectDir, report) {
   ensureArtifactsDir(projectDir);
@@ -113236,37 +113248,37 @@ function parseEnvironmentsFromIni(iniText) {
   return environments;
 }
 function readProjectIniText(projectDir) {
-  const iniPath = path50.join(projectDir, "platformio.ini");
-  if (!fs49.existsSync(iniPath)) return "";
+  const iniPath = path51.join(projectDir, "platformio.ini");
+  if (!fs50.existsSync(iniPath)) return "";
   try {
-    return fs49.readFileSync(iniPath, "utf8");
+    return fs50.readFileSync(iniPath, "utf8");
   } catch {
     return "";
   }
 }
 function listSourceFiles2(projectDir) {
-  const srcRoot = path50.join(projectDir, "src");
-  if (!fs49.existsSync(srcRoot)) return [];
+  const srcRoot = path51.join(projectDir, "src");
+  if (!fs50.existsSync(srcRoot)) return [];
   const out = [];
   const stack = [srcRoot];
   while (stack.length > 0) {
     const current = stack.pop();
     let entries;
     try {
-      entries = fs49.readdirSync(current, { withFileTypes: true });
+      entries = fs50.readdirSync(current, { withFileTypes: true });
     } catch {
       continue;
     }
     for (const entry of entries) {
-      const absPath = path50.join(current, entry.name);
+      const absPath = path51.join(current, entry.name);
       if (entry.isDirectory()) {
         stack.push(absPath);
         continue;
       }
       if (!entry.isFile()) continue;
-      const ext = path50.extname(entry.name).toLowerCase();
+      const ext = path51.extname(entry.name).toLowerCase();
       if (!SOURCE_EXTENSIONS.has(ext)) continue;
-      out.push(path50.relative(projectDir, absPath).replace(/\\/g, "/"));
+      out.push(path51.relative(projectDir, absPath).replace(/\\/g, "/"));
     }
   }
   return out.sort((a, b) => a.localeCompare(b));
@@ -113315,12 +113327,12 @@ function persistAgentReport(projectDir, tool, success, summary, payload) {
 }
 async function agentValidateProject(projectDir) {
   const validatedPath = validateProjectPath(projectDir);
-  const iniPath = path50.join(validatedPath, "platformio.ini");
-  const hasPlatformioIni = fs49.existsSync(iniPath);
+  const iniPath = path51.join(validatedPath, "platformio.ini");
+  const hasPlatformioIni = fs50.existsSync(iniPath);
   let iniText = "";
   if (hasPlatformioIni) {
     try {
-      iniText = fs49.readFileSync(iniPath, "utf8");
+      iniText = fs50.readFileSync(iniPath, "utf8");
     } catch {
       iniText = "";
     }
@@ -113461,7 +113473,7 @@ async function agentBuildDiagnose(projectDir, environment, verbose, background) 
   return result;
 }
 function collectPinUsages(projectDir) {
-  const srcFiles = listSourceFiles2(projectDir).map((relPath) => path50.join(projectDir, relPath)).filter((absPath) => fs49.existsSync(absPath));
+  const srcFiles = listSourceFiles2(projectDir).map((relPath) => path51.join(projectDir, relPath)).filter((absPath) => fs50.existsSync(absPath));
   const usages = [];
   const macroMap = /* @__PURE__ */ new Map();
   const defineRegex = /^\s*#define\s+([A-Za-z_][A-Za-z0-9_]*)\s+(\d{1,2})\b/gm;
@@ -113469,7 +113481,7 @@ function collectPinUsages(projectDir) {
   for (const absPath of srcFiles) {
     let text6 = "";
     try {
-      text6 = fs49.readFileSync(absPath, "utf8");
+      text6 = fs50.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
@@ -113481,7 +113493,7 @@ function collectPinUsages(projectDir) {
   for (const absPath of srcFiles) {
     let text6 = "";
     try {
-      text6 = fs49.readFileSync(absPath, "utf8");
+      text6 = fs50.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
@@ -113616,10 +113628,10 @@ async function collectMonitorTail(logPath, timeoutSeconds) {
   let captured = "";
   let monitorSuccess = false;
   while (Date.now() < deadline) {
-    if (fs49.existsSync(logPath)) {
+    if (fs50.existsSync(logPath)) {
       monitorSuccess = true;
       try {
-        const content = fs49.readFileSync(logPath, "utf8");
+        const content = fs50.readFileSync(logPath, "utf8");
         if (content.length < lastKnownLength) {
           lastKnownLength = 0;
         }
@@ -113874,7 +113886,7 @@ async function agentFlashMonitorVerify(input) {
     );
     return failedResult;
   }
-  const monitorLogPath = path50.join(
+  const monitorLogPath = path51.join(
     validatedPath,
     ".pio-mcp-workspace",
     "logs",
@@ -114070,10 +114082,10 @@ init_platformio();
 init_errors2();
 init_process_manager();
 init_paths();
-import fs50 from "node:fs";
+import fs51 from "node:fs";
 init_logger();
 init_events();
-import path51 from "node:path";
+import path52 from "node:path";
 import { execSync as execSync4 } from "node:child_process";
 import crypto21 from "node:crypto";
 init_target_resolution();
@@ -115924,10 +115936,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 hardwareLockManager.releaseLock(status.sessionId);
               }
               try {
-                if (fs50.existsSync(GLOBAL_LOCKS_DIR)) {
-                  for (const file of fs50.readdirSync(GLOBAL_LOCKS_DIR)) {
+                if (fs51.existsSync(GLOBAL_LOCKS_DIR)) {
+                  for (const file of fs51.readdirSync(GLOBAL_LOCKS_DIR)) {
                     if (file.endsWith(".json") || file.endsWith(".lock")) {
-                      fs50.unlinkSync(path51.join(GLOBAL_LOCKS_DIR, file));
+                      fs51.unlinkSync(path52.join(GLOBAL_LOCKS_DIR, file));
                     }
                   }
                 }
@@ -116383,8 +116395,8 @@ async function main() {
       process.exit(1);
     }
     try {
-      const currentDir = path51.dirname(new URL(import.meta.url).pathname);
-      const installerEntry = path51.join(
+      const currentDir = path52.dirname(new URL(import.meta.url).pathname);
+      const installerEntry = path52.join(
         currentDir,
         "..",
         "scripts",
@@ -116440,7 +116452,7 @@ async function main() {
   }
   let gitHash = "unknown";
   try {
-    const currentDir = path51.dirname(new URL(import.meta.url).pathname);
+    const currentDir = path52.dirname(new URL(import.meta.url).pathname);
     gitHash = execSync4("git rev-parse --short HEAD", {
       cwd: currentDir,
       stdio: "pipe"

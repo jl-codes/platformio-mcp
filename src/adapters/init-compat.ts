@@ -1,6 +1,5 @@
 /** Authorized reference project initialization with bounded configuration disclosure. */
-import crypto from "node:crypto";
-import { SERVER_DATA_DIR } from "../utils/paths.js";
+import { retainCommandLog } from "../utils/command-log.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -75,24 +74,11 @@ export async function executeInitCompatibility(
               timeoutMs: 600000,
               onResult: async (execution) => {
                 guard();
-                const directory = path.join(
-                  SERVER_DATA_DIR,
-                  "initialization-logs",
+                logPath = await retainCommandLog(
+                  "initialization",
+                  execution.stdout,
+                  execution.stderr,
                 );
-                await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-                logPath = path.join(directory, `${crypto.randomUUID()}.log`);
-                const output = redactSecretsInText(
-                  execution.stdout + "\n" + execution.stderr,
-                );
-                if (Buffer.byteLength(output) > 16 * 1024 * 1024)
-                  throw new PlatformIOError(
-                    "Initialization log exceeds its bound.",
-                    "COMPAT_RESULT_LIMIT",
-                  );
-                await fs.writeFile(logPath, output, {
-                  flag: "wx",
-                  mode: 0o600,
-                });
               },
             });
           } catch (error) {

@@ -802,3 +802,7 @@ Added `pio_project_init` (78 compatibility-visible tools, 54 canonical). The ada
 ### Initialization timeout and logs
 
 The compatibility initializer now requests the reference's 600-second timeout through a trusted execution option; canonical callers retain 120 seconds. Completed command output is written to a uniquely named, bounded, redacted initialization log with restrictive creation permissions. Nonzero command results project `init_failed`, exit-specific summary, bounded redacted output and log path. Missing-executable/timeout exceptions remain explicit errors through the shared wrapper. TypeScript and focused initializer/permission checks passed, including the timeout/output callback. Native execution and persisted-log acceptance remain unverified locally.
+
+### Retained size-check logs
+
+Unified initialization and size-check output retention in a bounded, redacted command-log writer with unique filenames and restrictive file creation permissions. Authorized `checkprogsize` results now retain stdout/stderr for both success and nonzero exit status, and size reports expose that actual log path. ELF/environment identity checks remain in place before report construction. TypeScript and the existing focused build-context checks passed; plugin rebuilt. Native command execution and full final-revision acceptance remain separate.
