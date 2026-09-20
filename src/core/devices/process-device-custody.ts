@@ -8,7 +8,7 @@ import { resolveSerialEndpoint } from "./serial-endpoint.js";
 
 /** Internal lifecycle capability; only confirmed child cleanup permits release. */
 export interface ProcessDeviceCustody {
-  prepareSpawn(): void; // Revalidate endpoint and persist uncertainty before creating a child.
+  prepareSpawn(): void | Promise<void>; // Revalidate endpoint and persist uncertainty before creating a child.
   releaseAfterExit(): void; // Trusted caller proves no child started or execution has terminated.
 }
 

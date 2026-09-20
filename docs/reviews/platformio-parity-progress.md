@@ -1259,3 +1259,7 @@ Added a bounded parser for the resolved server object, preserving argument bound
 ### Physical USB probe selection
 
 Added unique probe selection from trusted USB inventory using vendor/product/serial identity, independent of backend names. Duplicate interfaces at one physical location share an identity; duplicate serials at different locations and ambiguous candidates fail explicitly. Missing serial metadata does not fabricate a stable identity. Four focused selection cases, TypeScript and lint passed. OS inventory collection, serial-less probe support and integration with backend selection/custody remain incomplete. CI runs 35502231269 and 35502233612 were still live on b17f2acb while this change was prepared.
+
+### Debug probe custody integration
+
+Connected trusted physical-probe discovery to DeviceLeaseStore. Selection acquires a probe lease, startup refreshes inventory before persisting child handoff uncertainty, and only confirmed cleanup releases custody. Process launch callers now await potentially asynchronous identity revalidation. Fifteen focused real lease-store/process cases, TypeScript and lint passed; USB inventory and actual debugger launches were not performed. Backend command binding and OS enumeration remain unfinished. Prior CI runs 35502231269 and 35502233612 remain live; this batch is committed locally pending their completion.

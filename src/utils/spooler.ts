@@ -160,7 +160,7 @@ export async function executeWithSpooling(
     const custodyPort = options.devicePort ?? options.activePort;
     if (custodyPort) {
       deviceCustody = acquireProcessDeviceCustody(custodyPort);
-      deviceCustody.prepareSpawn();
+      await deviceCustody.prepareSpawn();
     }
     proc = await platformioExecutor.spawn(command, args, {
       cwd: options.cwd,

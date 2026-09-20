@@ -118,7 +118,7 @@ export class DebugProcess {
         roots,
         options.projectDir,
       );
-      options.custody.prepareSpawn();
+      await options.custody.prepareSpawn();
       child = (options.launch ?? spawn)(executable, [...GDB_STARTUP_ARGS], {
         cwd: options.projectDir,
         shell: false,
