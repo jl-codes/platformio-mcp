@@ -111,5 +111,32 @@ export function withProjectCompatibility<TResult>(
     },
     handler: (args, context) => context.dispatch("pio_build", args),
   });
+  const check = base.get("check_project");
+  if (!check || result.has("pio_check"))
+    throw new Error("Invalid check compatibility registry");
+  result.set("pio_check", {
+    ...check,
+    name: "pio_check",
+    description:
+      "Run static analysis with structured defects, source locations and CWE. Canonical check permissions apply.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], maxLength: 32768 },
+        env: { type: ["string", "null"], pattern: "^[a-zA-Z0-9_-]{1,50}$" },
+        severity: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+          default: "medium",
+        },
+        pattern: { type: ["string", "null"], minLength: 1, maxLength: 4096 },
+        skip_packages: { type: "boolean", default: true },
+        tool: { type: ["string", "null"], minLength: 1, maxLength: 4096 },
+        approval_id: { type: "string", maxLength: 256 },
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_check", args),
+  });
   return result;
 }

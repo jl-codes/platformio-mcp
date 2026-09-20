@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   dispatch: vi.fn(),
   clean: vi.fn(),
   build: vi.fn(),
+  check: vi.fn(),
   lock: vi.fn(),
   guard: vi.fn(),
   log: vi.fn(),
@@ -11,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../src/core/action-dispatcher.js", () => ({
   dispatchAuthorizedAction: mocks.dispatch,
 }));
-vi.mock("../src/tools/build.js", () => ({ cleanProject: mocks.clean, buildProject: mocks.build }));
+vi.mock("../src/tools/build.js", () => ({ cleanProject: mocks.clean, buildProject: mocks.build, checkProject: mocks.check }));
 vi.mock("../src/utils/lock-manager.js", () => ({
   hardwareLockManager: { withImplicitLock: mocks.lock },
 }));
@@ -34,6 +35,8 @@ vi.mock("node:fs/promises", () => ({
 import {
   executeCleanCompatibility,
   executeBuildCompatibility,
+  executeCheckCompatibility,
+  checkCompatibilityResult,
   cleanCompatibilityResult,
 } from "../src/adapters/clean-compat.js";
 import { BuildError, PlatformIOError } from "../src/utils/errors.js";
@@ -207,4 +210,26 @@ test("invalid build job counts fail before authorization or execution", async ()
   for (const jobs of [-1, 0, 1.5, 1025]) await expect(executeBuildCompatibility({ jobs })).rejects.toThrow();
   expect(mocks.dispatch).not.toHaveBeenCalled();
   expect(mocks.build).not.toHaveBeenCalled();
+});
+
+
+test("static analysis binds defaults and literal filters to canonical authorization", async () => {
+  mocks.check.mockImplementation(async (_project, env, background, options) => {
+    expect([env, background]).toEqual(["native", false]);
+    expect(options).toMatchObject({ severity: "medium", skipPackages: true, jsonOutput: true, tool: "cppcheck", pattern: "src/*.cpp", timeoutMs: 1200000 });
+    await options.onResult({ exitCode: 1, fullLogPath: "raw.log", finalOutput: "" });
+  });
+  const result = await executeCheckCompatibility({ env: "native", tool: "cppcheck", pattern: "src/*.cpp" });
+  expect(mocks.dispatch.mock.calls[0].slice(0, 2)).toEqual(["check_project", { projectDir: "workspace", environment: "native", severity: "medium", skipPackages: true, jsonOutput: true, tool: "cppcheck", pattern: "src/*.cpp", approvalId: undefined }]);
+  expect(result).toMatchObject({ ok: false, error: "check_failed" });
+  expect(mocks.lock).toHaveBeenCalledOnce();
+});
+
+test("checker reports tool failures and defects, but never accepts missing failure output", () => {
+  const output = JSON.stringify([{ env: "native", tool: "cppcheck", succeeded: false, defects: [{ severity: "high", file: "src/main.cpp", line: 7, message: "overflow", cwe: 120 }] }]);
+  const result = checkCompatibilityResult({ exitCode: 1, output, logPath: "report.log" }, "workspace", "medium");
+  expect(result).toMatchObject({ ok: false, defect_count: 1, defects: [{ cwe: 120 }] });
+  expect(result.summary).toContain("Tool(s) failed: cppcheck(native)");
+  expect(checkCompatibilityResult({ exitCode: 1, output: "[]", logPath: "report.log" }, "workspace", "medium")).toMatchObject({ ok: false, error: "check_failed" });
+  expect(checkCompatibilityResult({ exitCode: -1, output, logPath: "report.log" }, "workspace", "medium", true)).toMatchObject({ ok: false, status: "timeout" });
 });

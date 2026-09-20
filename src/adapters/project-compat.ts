@@ -1,6 +1,7 @@
 /** Adapt pinned project inspection vocabulary to the existing authorized canonical services. */
 import {
   executeBuildCompatibility,
+  executeCheckCompatibility,
   executeCleanCompatibility,
 } from "./clean-compat.js";
 import { executeInitCompatibility } from "./init-compat.js";
@@ -144,6 +145,8 @@ export async function executeProjectCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_check")
+    return executeCheckCompatibility(input, defaults, caller, onAuthorized);
   if (name === "pio_build")
     return executeBuildCompatibility(input, defaults, caller, onAuthorized);
   if (name === "pio_clean")

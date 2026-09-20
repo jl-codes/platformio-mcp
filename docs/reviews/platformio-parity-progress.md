@@ -851,3 +851,8 @@ The launcher now exposes bounded parallel build jobs, environment selection for 
 
 Extended the shared checker with optional JSON output, severity threshold, source pattern, package skipping, analysis tool, trusted timeout and result observer. Existing calls retain defaults. Added a bounded validated report parser retaining tool success/duration, defects, CWE, source location, severity totals and reference severity ordering. Project-relative paths require actual ancestry, avoiding sibling-prefix truncation. Missing or malformed reports fail explicitly rather than becoming empty success; unusual severity keys cannot mutate prototypes. TypeScript and eight focused parser/executor checks passed after fixing cross-platform path normalization. Public pio_check wiring, native tool reports and canonical structured presentation remain pending. Plugin rebuilt; no publication performed.
 
+
+### Public static analysis compatibility
+
+Added pio_check with reference severity/pattern/skip_packages/tool defaults, bound to canonical check_project permission. Execution shares the existing checker, hardware lock, twenty-minute timeout, revision guard and bounded redacted log collection. Returns structured defects, CWE/source locations, severity totals and tool status; missing/malformed reports, failed tools, and incomplete timeout output are explicit failures. A nonzero exit with an empty report is rejected as a documented safety correction. Compatibility surface now has 81 tools (54 canonical, 27 aliases). TypeScript and 15 focused mocked adapter/parser checks passed; plugin rebuilt. Native cppcheck/clangtidy/PVS reports and canonical structured-report interface remain pending; no publication performed.
+

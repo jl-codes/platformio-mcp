@@ -2,7 +2,8 @@
 import fs from "node:fs/promises";
 import { z } from "zod";
 import type { SpoolingForegroundResult } from "../utils/spooler.js";
-import { buildProject, cleanProject } from "../tools/build.js";
+import { summarizeCheckOutput } from "../core/analysis/check-report.js";
+import { buildProject, cleanProject, checkProject } from "../tools/build.js";
 import { BuildError, PlatformIOError } from "../utils/errors.js";
 import { hardwareLockManager } from "../utils/lock-manager.js";
 import { retainCommandLog } from "../utils/command-log.js";
@@ -47,9 +48,25 @@ export function executeBuildCompatibility(
   );
 }
 
+/** Run structured static analysis under the canonical checker permission. */
+export function executeCheckCompatibility(
+  input: unknown,
+  defaults: CompatibilityProjectDefaults = {},
+  caller: PolicyEvaluationContext = {},
+  onAuthorized?: () => Promise<void>,
+) {
+  return executeRunCompatibility(
+    "check",
+    input,
+    defaults,
+    caller,
+    onAuthorized,
+  );
+}
+
 /** Shared result collection never replaces canonical build or cleanup execution. */
 async function executeRunCompatibility(
-  mode: "build" | "clean",
+  mode: "build" | "clean" | "check",
   input: unknown,
   defaults: CompatibilityProjectDefaults,
   caller: PolicyEvaluationContext,
@@ -70,28 +87,63 @@ async function executeRunCompatibility(
           .object({ ...scope, full: z.boolean().default(false) })
           .strict()
           .parse(input)
-      : z
-          .object({
-            ...scope,
-            jobs: z.number().int().min(1).max(1024).nullable().optional(),
-            verbose: z.boolean().default(false),
-          })
-          .strict()
-          .parse(input);
-  const timeoutMs = mode === "build" ? 1200000 : 120000;
+      : mode === "check"
+        ? z
+            .object({
+              ...scope,
+              severity: z.enum(["low", "medium", "high"]).default("medium"),
+              pattern: z
+                .string()
+                .min(1)
+                .max(4096)
+                .regex(/^[^\x00-\x1f\x7f]+$/)
+                .nullable()
+                .optional(),
+              skip_packages: z.boolean().default(true),
+              tool: z
+                .string()
+                .min(1)
+                .max(4096)
+                .regex(/^[^\x00-\x1f\x7f]+$/)
+                .nullable()
+                .optional(),
+            })
+            .strict()
+            .parse(input)
+        : z
+            .object({
+              ...scope,
+              jobs: z.number().int().min(1).max(1024).nullable().optional(),
+              verbose: z.boolean().default(false),
+            })
+            .strict()
+            .parse(input);
+  const timeoutMs = mode === "clean" ? 120000 : 1200000;
   const projectDir = await resolveCompatibilityProject(
     params.project_dir,
     defaults,
   );
   const environment = params.env ?? undefined;
   return dispatchAuthorizedAction(
-    mode === "build" ? "build_project" : "clean_project",
+    mode === "build"
+      ? "build_project"
+      : mode === "check"
+        ? "check_project"
+        : "clean_project",
     {
       projectDir,
       environment,
       ...("full" in params
         ? { full: params.full }
-        : { jobs: params.jobs ?? undefined, verbose: params.verbose }),
+        : "severity" in params
+          ? {
+              severity: params.severity,
+              pattern: params.pattern ?? undefined,
+              skipPackages: params.skip_packages,
+              tool: params.tool ?? undefined,
+              jsonOutput: true,
+            }
+          : { jobs: params.jobs ?? undefined, verbose: params.verbose }),
       approvalId: params.approval_id,
     },
     { ...caller, workspaceDir: projectDir },
@@ -118,7 +170,7 @@ async function executeRunCompatibility(
             const limit = 16 * 1024 * 1024;
             if (!stat.isFile() || stat.size > limit)
               throw new PlatformIOError(
-                "Clean output exceeds the report limit",
+                "Command output exceeds the report limit",
                 "COMMAND_LOG_LIMIT",
               );
             const buffer = Buffer.alloc(stat.size + 1);
@@ -135,7 +187,7 @@ async function executeRunCompatibility(
             }
             if (offset > stat.size)
               throw new PlatformIOError(
-                "Clean output changed during collection",
+                "Command output changed during collection",
                 "COMMAND_LOG_CHANGED",
               );
             output = redactSecretsInText(
@@ -159,6 +211,16 @@ async function executeRunCompatibility(
             await cleanProject(projectDir, false, {
               environment,
               full: params.full,
+              timeoutMs,
+              onResult,
+            });
+          } else if ("severity" in params) {
+            await checkProject(projectDir, environment, false, {
+              severity: params.severity,
+              pattern: params.pattern ?? undefined,
+              skipPackages: params.skip_packages,
+              tool: params.tool ?? undefined,
+              jsonOutput: true,
               timeoutMs,
               onResult,
             });
@@ -192,12 +254,19 @@ async function executeRunCompatibility(
             "Command result was not collected",
             "COMPAT_RESULT_INVALID",
           );
+        if ("severity" in params)
+          return checkCompatibilityResult(
+            completed,
+            projectDir,
+            params.severity,
+            timedOut,
+          );
         return cleanCompatibilityResult(
           completed,
           environment,
           (performance.now() - started) / 1000,
           timedOut,
-          mode,
+          mode === "build" ? "build" : "clean",
         );
       });
     },
@@ -389,4 +458,45 @@ function classifyCleanPortError(output: string): string | null {
     ],
   ];
   return patterns.find(([, pattern]) => pattern.test(output))?.[0] ?? null;
+}
+
+/** Project structured defects; tool failures and incomplete executions cannot be reported as success. */
+export function checkCompatibilityResult(
+  result: { exitCode: number; output: string; logPath: string },
+  projectDir: string,
+  severity: "low" | "medium" | "high",
+  timedOut = false,
+) {
+  const output = normalizeCleanOutput(result.output);
+  const failure = () => ({
+    ok: false,
+    error: "check_failed",
+    summary: `pio check did not return a complete valid report (exit ${result.exitCode}).`,
+    output_tail: output.split("\n").slice(-30).join("\n"),
+    log_path: result.logPath,
+  });
+  if (timedOut) return { ...failure(), status: "timeout" };
+  let report;
+  try {
+    report = summarizeCheckOutput(output, projectDir);
+  } catch (error) {
+    if (
+      error instanceof PlatformIOError &&
+      error.code?.startsWith("CHECK_REPORT_")
+    )
+      return failure();
+    throw error;
+  }
+  const failed = report.tools.filter((tool) => !tool.succeeded);
+  let summary = `${report.defect_count} defect(s) at severity >= ${severity}: ${report.by_severity.high} high, ${report.by_severity.medium} medium, ${report.by_severity.low} low.`;
+  if (report.defects.length) {
+    const defect = report.defects[0];
+    summary += ` Top: [${defect.severity}] ${defect.file}:${defect.line} ${defect.message}`;
+  }
+  if (failed.length)
+    summary +=
+      " Tool(s) failed: " +
+      failed.map((tool) => `${tool.tool}(${tool.env})`).join(", ");
+  if (result.exitCode !== 0 && !report.tools.length) return failure();
+  return { ok: !failed.length, summary, ...report, log_path: result.logPath };
 }
