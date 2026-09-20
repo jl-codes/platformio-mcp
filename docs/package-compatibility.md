@@ -114,3 +114,11 @@ uses the shared read-only metadata and holder inspection path. It does not open 
 reset the port, change OS permissions, or stop other processes. Missing holder
 information remains unknown; it does not prove exclusive access. CLI session
 listings cannot see another MCP connection's owned session inventory.
+
+Instruction stepping is supported through `stepi`/`si` and `nexti`/`ni` (and their
+exact MI equivalents). Read and access watchpoints use `rwatch` and `awatch` with
+the same bounded simple-expression grammar as `watch`. All are target mutations;
+instruction stepping retains asynchronous stop waiting. These mappings follow
+[GDB/MI execution](https://sourceware.org/gdb/current/onlinedocs/gdb.html/GDB_002fMI-Program-Execution.html)
+and [watchpoint commands](https://sourceware.org/gdb/current/onlinedocs/gdb.html/GDB_002fMI-Breakpoint-Commands.html).
+Hardware support and watchpoint availability still depend on the selected target.

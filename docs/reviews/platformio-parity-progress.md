@@ -2108,3 +2108,7 @@ Run 35536115719 completed all five native installed-wheel jobs successfully on s
 ### 2026-09-20: Completed signal-era distribution build
 
 Release artifact run 35536115719 completed successfully on source 1aae2a11e056a4242ad54a4c8ee032ee868a599d: all five native installs, amd64/arm64 native containers, and final release-artifact validation passed. All four publication inputs were false. Run/job and retained artifact identities are in distribution-signal-build-evidence.json; inspected native reports remain in native-python-signal-evidence.json. This is not final parity, physical, minimum-OS, Windows console-control, or public-registry acceptance.
+
+### 2026-09-20: Debugger instruction stepping and watchpoint coverage
+
+Added stepi/si, nexti/ni and their exact MI forms, plus rwatch/awatch, to the shared debugger classifier. All require target-mutation permission; step commands wait for asynchronous stops, and watchpoint expressions retain existing injection/call restrictions. Official GDB/MI execution and breakpoint documentation verified the mappings. Fifty-four focused classifier/policy tests and TypeScript passed; plugin rebuilt. No physical debugger was operated, and backend custody/physical acceptance remain incomplete.

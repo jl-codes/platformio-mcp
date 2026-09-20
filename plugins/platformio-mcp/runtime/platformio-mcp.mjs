@@ -109513,6 +109513,10 @@ function prepareDebugCommand(input) {
     n: "-exec-next",
     step: "-exec-step",
     s: "-exec-step",
+    stepi: "-exec-step-instruction",
+    si: "-exec-step-instruction",
+    nexti: "-exec-next-instruction",
+    ni: "-exec-next-instruction",
     finish: "-exec-finish",
     interrupt: "-exec-interrupt"
   };
@@ -109553,10 +109557,11 @@ function prepareDebugCommand(input) {
       "target"
     );
   }
-  const watch = /^watch (.+)$/.exec(command);
+  const watch = /^(watch|rwatch|awatch) (.+)$/.exec(command);
   if (watch) {
-    if (!SIMPLE_EXPRESSION.test(watch[1])) return invalid4();
-    return make("-break-watch " + JSON.stringify(watch[1]), "target");
+    if (!SIMPLE_EXPRESSION.test(watch[2])) return invalid4();
+    const option = watch[1] === "rwatch" ? "-r " : watch[1] === "awatch" ? "-a " : "";
+    return make("-break-watch " + option + JSON.stringify(watch[2]), "target");
   }
   const breakpointChange = /^(delete|disable|enable) ([1-9][0-9]{0,8})$/.exec(
     command
