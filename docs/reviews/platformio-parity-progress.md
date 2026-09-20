@@ -2063,3 +2063,7 @@ Both real telemetry CLI commands returned PolicyDenied for an explicit start_mon
 ### Port-diagnosis CLI (2026-09-20)
 
 Added port-diagnose through the existing authorized diagnostics adapter and extracted its existing public schema for reuse. The CLI accepts selection fields only, not capture duration, baud, write data, or cross-connection session IDs. Canonical policy maps to list_devices and lower configuration/monitor-inspection gates remain intact. Eight focused CLI/device-adapter tests and TypeScript passed; rebuilt the plugin. No ports were opened or reset. Unknown holder status is explicitly not reported as proof of free access.
+
+### Shared-schema test integration (2026-09-20)
+
+CI run 35532658887 exposed a legacy complete module mock in flash-verification-compat.test.ts that omitted MonitorStartCompatibilitySchema after memory validation moved to a module-level shared export. Updated it to retain actual schema exports while mocking only monitor resolution. This preserves validation and hardware isolation. The affected flash and existing power partial-mock suites were rerun; no production behavior or release gate was weakened.

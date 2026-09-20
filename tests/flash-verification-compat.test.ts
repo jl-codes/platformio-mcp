@@ -14,7 +14,8 @@ vi.mock("../src/adapters/compatibility-project.js", () => ({
 vi.mock("../src/core/policy/revision-guard.js", () => ({
   createPolicyRevisionGuard: () => () => {},
 }));
-vi.mock("../src/adapters/monitor-start-compat.js", () => ({
+vi.mock("../src/adapters/monitor-start-compat.js", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../src/adapters/monitor-start-compat.js")>(),
   resolveMonitorRequest: mocks.resolve,
 }));
 vi.mock("../src/tools/flash-verification.js", () => ({
