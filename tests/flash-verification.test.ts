@@ -26,7 +26,11 @@ beforeEach(() => {
     path.join(fs.realpathSync(os.tmpdir()), "pio-flash-verify-"),
   );
   vi.stubEnv("PIO_MCP_DATA_DIR", path.join(root, "operator"));
-  vi.stubEnv("PIO_MCP_POLICY_FILE", undefined);
+  vi.stubEnv("PIO_MCP_POLICY_FILE", path.join(root, "operator.json"));
+  fs.writeFileSync(
+    path.join(root, "operator.json"),
+    JSON.stringify({ profile: "lab_admin" }),
+  );
   upload.mockReset();
 });
 afterEach(() => {
@@ -102,3 +106,21 @@ it("does not open a monitor after upload failure", async () => {
   expect(await f.run()).toMatchObject({ ok: false, verdict: "upload_failed" });
   expect(f.service.captureVerificationOnce).not.toHaveBeenCalled();
 });
+
+it.each([
+  "pio_flash_and_verify",
+  "agent_flash_monitor_verify",
+  "upload_firmware",
+])(
+  "honors concrete or ancestor denial for %s before upload",
+  async (denied) => {
+    const f = fixture();
+    fs.writeFileSync(
+      path.join(root, "operator.json"),
+      JSON.stringify({ profile: "lab_admin", overrides: { deny: [denied] } }),
+    );
+    await expect(f.run()).rejects.toMatchObject({ code: "POLICY_DENIED" });
+    expect(upload).not.toHaveBeenCalled();
+    expect(f.service.preflightVerificationCapture).not.toHaveBeenCalled();
+  },
+);

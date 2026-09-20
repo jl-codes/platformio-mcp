@@ -48,1958 +48,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// node_modules/graceful-fs/polyfills.js
-var require_polyfills = __commonJS({
-  "node_modules/graceful-fs/polyfills.js"(exports, module) {
-    var constants3 = __require("constants");
-    var origCwd = process.cwd;
-    var cwd = null;
-    var platform2 = process.env.GRACEFUL_FS_PLATFORM || process.platform;
-    process.cwd = function() {
-      if (!cwd)
-        cwd = origCwd.call(process);
-      return cwd;
-    };
-    try {
-      process.cwd();
-    } catch (er) {
-    }
-    if (typeof process.chdir === "function") {
-      chdir = process.chdir;
-      process.chdir = function(d) {
-        cwd = null;
-        chdir.call(process, d);
-      };
-      if (Object.setPrototypeOf) Object.setPrototypeOf(process.chdir, chdir);
-    }
-    var chdir;
-    module.exports = patch;
-    function patch(fs70) {
-      if (constants3.hasOwnProperty("O_SYMLINK") && process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
-        patchLchmod(fs70);
-      }
-      if (!fs70.lutimes) {
-        patchLutimes(fs70);
-      }
-      fs70.chown = chownFix(fs70.chown);
-      fs70.fchown = chownFix(fs70.fchown);
-      fs70.lchown = chownFix(fs70.lchown);
-      fs70.chmod = chmodFix(fs70.chmod);
-      fs70.fchmod = chmodFix(fs70.fchmod);
-      fs70.lchmod = chmodFix(fs70.lchmod);
-      fs70.chownSync = chownFixSync(fs70.chownSync);
-      fs70.fchownSync = chownFixSync(fs70.fchownSync);
-      fs70.lchownSync = chownFixSync(fs70.lchownSync);
-      fs70.chmodSync = chmodFixSync(fs70.chmodSync);
-      fs70.fchmodSync = chmodFixSync(fs70.fchmodSync);
-      fs70.lchmodSync = chmodFixSync(fs70.lchmodSync);
-      fs70.stat = statFix(fs70.stat);
-      fs70.fstat = statFix(fs70.fstat);
-      fs70.lstat = statFix(fs70.lstat);
-      fs70.statSync = statFixSync(fs70.statSync);
-      fs70.fstatSync = statFixSync(fs70.fstatSync);
-      fs70.lstatSync = statFixSync(fs70.lstatSync);
-      if (fs70.chmod && !fs70.lchmod) {
-        fs70.lchmod = function(path70, mode, cb) {
-          if (cb) process.nextTick(cb);
-        };
-        fs70.lchmodSync = function() {
-        };
-      }
-      if (fs70.chown && !fs70.lchown) {
-        fs70.lchown = function(path70, uid, gid, cb) {
-          if (cb) process.nextTick(cb);
-        };
-        fs70.lchownSync = function() {
-        };
-      }
-      if (platform2 === "win32") {
-        fs70.rename = typeof fs70.rename !== "function" ? fs70.rename : (function(fs$rename) {
-          function rename(from, to, cb) {
-            var start = Date.now();
-            var backoff = 0;
-            fs$rename(from, to, function CB(er) {
-              if (er && (er.code === "EACCES" || er.code === "EPERM" || er.code === "EBUSY") && Date.now() - start < 6e4) {
-                setTimeout(function() {
-                  fs70.stat(to, function(stater, st) {
-                    if (stater && stater.code === "ENOENT")
-                      fs$rename(from, to, CB);
-                    else
-                      cb(er);
-                  });
-                }, backoff);
-                if (backoff < 100)
-                  backoff += 10;
-                return;
-              }
-              if (cb) cb(er);
-            });
-          }
-          if (Object.setPrototypeOf) Object.setPrototypeOf(rename, fs$rename);
-          return rename;
-        })(fs70.rename);
-      }
-      fs70.read = typeof fs70.read !== "function" ? fs70.read : (function(fs$read) {
-        function read(fd, buffer, offset2, length, position, callback_) {
-          var callback;
-          if (callback_ && typeof callback_ === "function") {
-            var eagCounter = 0;
-            callback = function(er, _, __) {
-              if (er && er.code === "EAGAIN" && eagCounter < 10) {
-                eagCounter++;
-                return fs$read.call(fs70, fd, buffer, offset2, length, position, callback);
-              }
-              callback_.apply(this, arguments);
-            };
-          }
-          return fs$read.call(fs70, fd, buffer, offset2, length, position, callback);
-        }
-        if (Object.setPrototypeOf) Object.setPrototypeOf(read, fs$read);
-        return read;
-      })(fs70.read);
-      fs70.readSync = typeof fs70.readSync !== "function" ? fs70.readSync : /* @__PURE__ */ (function(fs$readSync) {
-        return function(fd, buffer, offset2, length, position) {
-          var eagCounter = 0;
-          while (true) {
-            try {
-              return fs$readSync.call(fs70, fd, buffer, offset2, length, position);
-            } catch (er) {
-              if (er.code === "EAGAIN" && eagCounter < 10) {
-                eagCounter++;
-                continue;
-              }
-              throw er;
-            }
-          }
-        };
-      })(fs70.readSync);
-      function patchLchmod(fs71) {
-        fs71.lchmod = function(path70, mode, callback) {
-          fs71.open(
-            path70,
-            constants3.O_WRONLY | constants3.O_SYMLINK,
-            mode,
-            function(err, fd) {
-              if (err) {
-                if (callback) callback(err);
-                return;
-              }
-              fs71.fchmod(fd, mode, function(err2) {
-                fs71.close(fd, function(err22) {
-                  if (callback) callback(err2 || err22);
-                });
-              });
-            }
-          );
-        };
-        fs71.lchmodSync = function(path70, mode) {
-          var fd = fs71.openSync(path70, constants3.O_WRONLY | constants3.O_SYMLINK, mode);
-          var threw = true;
-          var ret;
-          try {
-            ret = fs71.fchmodSync(fd, mode);
-            threw = false;
-          } finally {
-            if (threw) {
-              try {
-                fs71.closeSync(fd);
-              } catch (er) {
-              }
-            } else {
-              fs71.closeSync(fd);
-            }
-          }
-          return ret;
-        };
-      }
-      function patchLutimes(fs71) {
-        if (constants3.hasOwnProperty("O_SYMLINK") && fs71.futimes) {
-          fs71.lutimes = function(path70, at, mt, cb) {
-            fs71.open(path70, constants3.O_SYMLINK, function(er, fd) {
-              if (er) {
-                if (cb) cb(er);
-                return;
-              }
-              fs71.futimes(fd, at, mt, function(er2) {
-                fs71.close(fd, function(er22) {
-                  if (cb) cb(er2 || er22);
-                });
-              });
-            });
-          };
-          fs71.lutimesSync = function(path70, at, mt) {
-            var fd = fs71.openSync(path70, constants3.O_SYMLINK);
-            var ret;
-            var threw = true;
-            try {
-              ret = fs71.futimesSync(fd, at, mt);
-              threw = false;
-            } finally {
-              if (threw) {
-                try {
-                  fs71.closeSync(fd);
-                } catch (er) {
-                }
-              } else {
-                fs71.closeSync(fd);
-              }
-            }
-            return ret;
-          };
-        } else if (fs71.futimes) {
-          fs71.lutimes = function(_a, _b, _c, cb) {
-            if (cb) process.nextTick(cb);
-          };
-          fs71.lutimesSync = function() {
-          };
-        }
-      }
-      function chmodFix(orig) {
-        if (!orig) return orig;
-        return function(target, mode, cb) {
-          return orig.call(fs70, target, mode, function(er) {
-            if (chownErOk(er)) er = null;
-            if (cb) cb.apply(this, arguments);
-          });
-        };
-      }
-      function chmodFixSync(orig) {
-        if (!orig) return orig;
-        return function(target, mode) {
-          try {
-            return orig.call(fs70, target, mode);
-          } catch (er) {
-            if (!chownErOk(er)) throw er;
-          }
-        };
-      }
-      function chownFix(orig) {
-        if (!orig) return orig;
-        return function(target, uid, gid, cb) {
-          return orig.call(fs70, target, uid, gid, function(er) {
-            if (chownErOk(er)) er = null;
-            if (cb) cb.apply(this, arguments);
-          });
-        };
-      }
-      function chownFixSync(orig) {
-        if (!orig) return orig;
-        return function(target, uid, gid) {
-          try {
-            return orig.call(fs70, target, uid, gid);
-          } catch (er) {
-            if (!chownErOk(er)) throw er;
-          }
-        };
-      }
-      function statFix(orig) {
-        if (!orig) return orig;
-        return function(target, options, cb) {
-          if (typeof options === "function") {
-            cb = options;
-            options = null;
-          }
-          function callback(er, stats) {
-            if (stats) {
-              if (stats.uid < 0) stats.uid += 4294967296;
-              if (stats.gid < 0) stats.gid += 4294967296;
-            }
-            if (cb) cb.apply(this, arguments);
-          }
-          return options ? orig.call(fs70, target, options, callback) : orig.call(fs70, target, callback);
-        };
-      }
-      function statFixSync(orig) {
-        if (!orig) return orig;
-        return function(target, options) {
-          var stats = options ? orig.call(fs70, target, options) : orig.call(fs70, target);
-          if (stats) {
-            if (stats.uid < 0) stats.uid += 4294967296;
-            if (stats.gid < 0) stats.gid += 4294967296;
-          }
-          return stats;
-        };
-      }
-      function chownErOk(er) {
-        if (!er)
-          return true;
-        if (er.code === "ENOSYS")
-          return true;
-        var nonroot = !process.getuid || process.getuid() !== 0;
-        if (nonroot) {
-          if (er.code === "EINVAL" || er.code === "EPERM")
-            return true;
-        }
-        return false;
-      }
-    }
-  }
-});
-
-// node_modules/graceful-fs/legacy-streams.js
-var require_legacy_streams = __commonJS({
-  "node_modules/graceful-fs/legacy-streams.js"(exports, module) {
-    var Stream = __require("stream").Stream;
-    module.exports = legacy;
-    function legacy(fs70) {
-      return {
-        ReadStream,
-        WriteStream
-      };
-      function ReadStream(path70, options) {
-        if (!(this instanceof ReadStream)) return new ReadStream(path70, options);
-        Stream.call(this);
-        var self = this;
-        this.path = path70;
-        this.fd = null;
-        this.readable = true;
-        this.paused = false;
-        this.flags = "r";
-        this.mode = 438;
-        this.bufferSize = 64 * 1024;
-        options = options || {};
-        var keys = Object.keys(options);
-        for (var index = 0, length = keys.length; index < length; index++) {
-          var key = keys[index];
-          this[key] = options[key];
-        }
-        if (this.encoding) this.setEncoding(this.encoding);
-        if (this.start !== void 0) {
-          if ("number" !== typeof this.start) {
-            throw TypeError("start must be a Number");
-          }
-          if (this.end === void 0) {
-            this.end = Infinity;
-          } else if ("number" !== typeof this.end) {
-            throw TypeError("end must be a Number");
-          }
-          if (this.start > this.end) {
-            throw new Error("start must be <= end");
-          }
-          this.pos = this.start;
-        }
-        if (this.fd !== null) {
-          process.nextTick(function() {
-            self._read();
-          });
-          return;
-        }
-        fs70.open(this.path, this.flags, this.mode, function(err, fd) {
-          if (err) {
-            self.emit("error", err);
-            self.readable = false;
-            return;
-          }
-          self.fd = fd;
-          self.emit("open", fd);
-          self._read();
-        });
-      }
-      function WriteStream(path70, options) {
-        if (!(this instanceof WriteStream)) return new WriteStream(path70, options);
-        Stream.call(this);
-        this.path = path70;
-        this.fd = null;
-        this.writable = true;
-        this.flags = "w";
-        this.encoding = "binary";
-        this.mode = 438;
-        this.bytesWritten = 0;
-        options = options || {};
-        var keys = Object.keys(options);
-        for (var index = 0, length = keys.length; index < length; index++) {
-          var key = keys[index];
-          this[key] = options[key];
-        }
-        if (this.start !== void 0) {
-          if ("number" !== typeof this.start) {
-            throw TypeError("start must be a Number");
-          }
-          if (this.start < 0) {
-            throw new Error("start must be >= zero");
-          }
-          this.pos = this.start;
-        }
-        this.busy = false;
-        this._queue = [];
-        if (this.fd === null) {
-          this._open = fs70.open;
-          this._queue.push([this._open, this.path, this.flags, this.mode, void 0]);
-          this.flush();
-        }
-      }
-    }
-  }
-});
-
-// node_modules/graceful-fs/clone.js
-var require_clone = __commonJS({
-  "node_modules/graceful-fs/clone.js"(exports, module) {
-    "use strict";
-    module.exports = clone2;
-    var getPrototypeOf = Object.getPrototypeOf || function(obj) {
-      return obj.__proto__;
-    };
-    function clone2(obj) {
-      if (obj === null || typeof obj !== "object")
-        return obj;
-      if (obj instanceof Object)
-        var copy = { __proto__: getPrototypeOf(obj) };
-      else
-        var copy = /* @__PURE__ */ Object.create(null);
-      Object.getOwnPropertyNames(obj).forEach(function(key) {
-        Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(obj, key));
-      });
-      return copy;
-    }
-  }
-});
-
-// node_modules/graceful-fs/graceful-fs.js
-var require_graceful_fs = __commonJS({
-  "node_modules/graceful-fs/graceful-fs.js"(exports, module) {
-    var fs70 = __require("fs");
-    var polyfills = require_polyfills();
-    var legacy = require_legacy_streams();
-    var clone2 = require_clone();
-    var util2 = __require("util");
-    var gracefulQueue;
-    var previousSymbol;
-    if (typeof Symbol === "function" && typeof Symbol.for === "function") {
-      gracefulQueue = /* @__PURE__ */ Symbol.for("graceful-fs.queue");
-      previousSymbol = /* @__PURE__ */ Symbol.for("graceful-fs.previous");
-    } else {
-      gracefulQueue = "___graceful-fs.queue";
-      previousSymbol = "___graceful-fs.previous";
-    }
-    function noop() {
-    }
-    function publishQueue(context, queue2) {
-      Object.defineProperty(context, gracefulQueue, {
-        get: function() {
-          return queue2;
-        }
-      });
-    }
-    var debug = noop;
-    if (util2.debuglog)
-      debug = util2.debuglog("gfs4");
-    else if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || ""))
-      debug = function() {
-        var m = util2.format.apply(util2, arguments);
-        m = "GFS4: " + m.split(/\n/).join("\nGFS4: ");
-        console.error(m);
-      };
-    if (!fs70[gracefulQueue]) {
-      queue = global[gracefulQueue] || [];
-      publishQueue(fs70, queue);
-      fs70.close = (function(fs$close) {
-        function close(fd, cb) {
-          return fs$close.call(fs70, fd, function(err) {
-            if (!err) {
-              resetQueue();
-            }
-            if (typeof cb === "function")
-              cb.apply(this, arguments);
-          });
-        }
-        Object.defineProperty(close, previousSymbol, {
-          value: fs$close
-        });
-        return close;
-      })(fs70.close);
-      fs70.closeSync = (function(fs$closeSync) {
-        function closeSync(fd) {
-          fs$closeSync.apply(fs70, arguments);
-          resetQueue();
-        }
-        Object.defineProperty(closeSync, previousSymbol, {
-          value: fs$closeSync
-        });
-        return closeSync;
-      })(fs70.closeSync);
-      if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || "")) {
-        process.on("exit", function() {
-          debug(fs70[gracefulQueue]);
-          __require("assert").equal(fs70[gracefulQueue].length, 0);
-        });
-      }
-    }
-    var queue;
-    if (!global[gracefulQueue]) {
-      publishQueue(global, fs70[gracefulQueue]);
-    }
-    module.exports = patch(clone2(fs70));
-    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs70.__patched) {
-      module.exports = patch(fs70);
-      fs70.__patched = true;
-    }
-    function patch(fs71) {
-      polyfills(fs71);
-      fs71.gracefulify = patch;
-      fs71.createReadStream = createReadStream;
-      fs71.createWriteStream = createWriteStream;
-      var fs$readFile = fs71.readFile;
-      fs71.readFile = readFile;
-      function readFile(path70, options, cb) {
-        if (typeof options === "function")
-          cb = options, options = null;
-        return go$readFile(path70, options, cb);
-        function go$readFile(path71, options2, cb2, startTime) {
-          return fs$readFile(path71, options2, function(err) {
-            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$readFile, [path71, options2, cb2], err, startTime || Date.now(), Date.now()]);
-            else {
-              if (typeof cb2 === "function")
-                cb2.apply(this, arguments);
-            }
-          });
-        }
-      }
-      var fs$writeFile = fs71.writeFile;
-      fs71.writeFile = writeFile;
-      function writeFile(path70, data, options, cb) {
-        if (typeof options === "function")
-          cb = options, options = null;
-        return go$writeFile(path70, data, options, cb);
-        function go$writeFile(path71, data2, options2, cb2, startTime) {
-          return fs$writeFile(path71, data2, options2, function(err) {
-            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$writeFile, [path71, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
-            else {
-              if (typeof cb2 === "function")
-                cb2.apply(this, arguments);
-            }
-          });
-        }
-      }
-      var fs$appendFile = fs71.appendFile;
-      if (fs$appendFile)
-        fs71.appendFile = appendFile;
-      function appendFile(path70, data, options, cb) {
-        if (typeof options === "function")
-          cb = options, options = null;
-        return go$appendFile(path70, data, options, cb);
-        function go$appendFile(path71, data2, options2, cb2, startTime) {
-          return fs$appendFile(path71, data2, options2, function(err) {
-            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$appendFile, [path71, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
-            else {
-              if (typeof cb2 === "function")
-                cb2.apply(this, arguments);
-            }
-          });
-        }
-      }
-      var fs$copyFile = fs71.copyFile;
-      if (fs$copyFile)
-        fs71.copyFile = copyFile;
-      function copyFile(src, dest, flags, cb) {
-        if (typeof flags === "function") {
-          cb = flags;
-          flags = 0;
-        }
-        return go$copyFile(src, dest, flags, cb);
-        function go$copyFile(src2, dest2, flags2, cb2, startTime) {
-          return fs$copyFile(src2, dest2, flags2, function(err) {
-            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$copyFile, [src2, dest2, flags2, cb2], err, startTime || Date.now(), Date.now()]);
-            else {
-              if (typeof cb2 === "function")
-                cb2.apply(this, arguments);
-            }
-          });
-        }
-      }
-      var fs$readdir = fs71.readdir;
-      fs71.readdir = readdir;
-      var noReaddirOptionVersions = /^v[0-5]\./;
-      function readdir(path70, options, cb) {
-        if (typeof options === "function")
-          cb = options, options = null;
-        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path71, options2, cb2, startTime) {
-          return fs$readdir(path71, fs$readdirCallback(
-            path71,
-            options2,
-            cb2,
-            startTime
-          ));
-        } : function go$readdir2(path71, options2, cb2, startTime) {
-          return fs$readdir(path71, options2, fs$readdirCallback(
-            path71,
-            options2,
-            cb2,
-            startTime
-          ));
-        };
-        return go$readdir(path70, options, cb);
-        function fs$readdirCallback(path71, options2, cb2, startTime) {
-          return function(err, files) {
-            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([
-                go$readdir,
-                [path71, options2, cb2],
-                err,
-                startTime || Date.now(),
-                Date.now()
-              ]);
-            else {
-              if (files && files.sort)
-                files.sort();
-              if (typeof cb2 === "function")
-                cb2.call(this, err, files);
-            }
-          };
-        }
-      }
-      if (process.version.substr(0, 4) === "v0.8") {
-        var legStreams = legacy(fs71);
-        ReadStream = legStreams.ReadStream;
-        WriteStream = legStreams.WriteStream;
-      }
-      var fs$ReadStream = fs71.ReadStream;
-      if (fs$ReadStream) {
-        ReadStream.prototype = Object.create(fs$ReadStream.prototype);
-        ReadStream.prototype.open = ReadStream$open;
-      }
-      var fs$WriteStream = fs71.WriteStream;
-      if (fs$WriteStream) {
-        WriteStream.prototype = Object.create(fs$WriteStream.prototype);
-        WriteStream.prototype.open = WriteStream$open;
-      }
-      Object.defineProperty(fs71, "ReadStream", {
-        get: function() {
-          return ReadStream;
-        },
-        set: function(val) {
-          ReadStream = val;
-        },
-        enumerable: true,
-        configurable: true
-      });
-      Object.defineProperty(fs71, "WriteStream", {
-        get: function() {
-          return WriteStream;
-        },
-        set: function(val) {
-          WriteStream = val;
-        },
-        enumerable: true,
-        configurable: true
-      });
-      var FileReadStream = ReadStream;
-      Object.defineProperty(fs71, "FileReadStream", {
-        get: function() {
-          return FileReadStream;
-        },
-        set: function(val) {
-          FileReadStream = val;
-        },
-        enumerable: true,
-        configurable: true
-      });
-      var FileWriteStream = WriteStream;
-      Object.defineProperty(fs71, "FileWriteStream", {
-        get: function() {
-          return FileWriteStream;
-        },
-        set: function(val) {
-          FileWriteStream = val;
-        },
-        enumerable: true,
-        configurable: true
-      });
-      function ReadStream(path70, options) {
-        if (this instanceof ReadStream)
-          return fs$ReadStream.apply(this, arguments), this;
-        else
-          return ReadStream.apply(Object.create(ReadStream.prototype), arguments);
-      }
-      function ReadStream$open() {
-        var that = this;
-        open2(that.path, that.flags, that.mode, function(err, fd) {
-          if (err) {
-            if (that.autoClose)
-              that.destroy();
-            that.emit("error", err);
-          } else {
-            that.fd = fd;
-            that.emit("open", fd);
-            that.read();
-          }
-        });
-      }
-      function WriteStream(path70, options) {
-        if (this instanceof WriteStream)
-          return fs$WriteStream.apply(this, arguments), this;
-        else
-          return WriteStream.apply(Object.create(WriteStream.prototype), arguments);
-      }
-      function WriteStream$open() {
-        var that = this;
-        open2(that.path, that.flags, that.mode, function(err, fd) {
-          if (err) {
-            that.destroy();
-            that.emit("error", err);
-          } else {
-            that.fd = fd;
-            that.emit("open", fd);
-          }
-        });
-      }
-      function createReadStream(path70, options) {
-        return new fs71.ReadStream(path70, options);
-      }
-      function createWriteStream(path70, options) {
-        return new fs71.WriteStream(path70, options);
-      }
-      var fs$open = fs71.open;
-      fs71.open = open2;
-      function open2(path70, flags, mode, cb) {
-        if (typeof mode === "function")
-          cb = mode, mode = null;
-        return go$open(path70, flags, mode, cb);
-        function go$open(path71, flags2, mode2, cb2, startTime) {
-          return fs$open(path71, flags2, mode2, function(err, fd) {
-            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$open, [path71, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
-            else {
-              if (typeof cb2 === "function")
-                cb2.apply(this, arguments);
-            }
-          });
-        }
-      }
-      return fs71;
-    }
-    function enqueue(elem) {
-      debug("ENQUEUE", elem[0].name, elem[1]);
-      fs70[gracefulQueue].push(elem);
-      retry();
-    }
-    var retryTimer;
-    function resetQueue() {
-      var now = Date.now();
-      for (var i = 0; i < fs70[gracefulQueue].length; ++i) {
-        if (fs70[gracefulQueue][i].length > 2) {
-          fs70[gracefulQueue][i][3] = now;
-          fs70[gracefulQueue][i][4] = now;
-        }
-      }
-      retry();
-    }
-    function retry() {
-      clearTimeout(retryTimer);
-      retryTimer = void 0;
-      if (fs70[gracefulQueue].length === 0)
-        return;
-      var elem = fs70[gracefulQueue].shift();
-      var fn = elem[0];
-      var args = elem[1];
-      var err = elem[2];
-      var startTime = elem[3];
-      var lastTime = elem[4];
-      if (startTime === void 0) {
-        debug("RETRY", fn.name, args);
-        fn.apply(null, args);
-      } else if (Date.now() - startTime >= 6e4) {
-        debug("TIMEOUT", fn.name, args);
-        var cb = args.pop();
-        if (typeof cb === "function")
-          cb.call(null, err);
-      } else {
-        var sinceAttempt = Date.now() - lastTime;
-        var sinceStart = Math.max(lastTime - startTime, 1);
-        var desiredDelay = Math.min(sinceStart * 1.2, 100);
-        if (sinceAttempt >= desiredDelay) {
-          debug("RETRY", fn.name, args);
-          fn.apply(null, args.concat([startTime]));
-        } else {
-          fs70[gracefulQueue].push(elem);
-        }
-      }
-      if (retryTimer === void 0) {
-        retryTimer = setTimeout(retry, 0);
-      }
-    }
-  }
-});
-
-// node_modules/retry/lib/retry_operation.js
-var require_retry_operation = __commonJS({
-  "node_modules/retry/lib/retry_operation.js"(exports, module) {
-    function RetryOperation(timeouts, options) {
-      if (typeof options === "boolean") {
-        options = { forever: options };
-      }
-      this._originalTimeouts = JSON.parse(JSON.stringify(timeouts));
-      this._timeouts = timeouts;
-      this._options = options || {};
-      this._maxRetryTime = options && options.maxRetryTime || Infinity;
-      this._fn = null;
-      this._errors = [];
-      this._attempts = 1;
-      this._operationTimeout = null;
-      this._operationTimeoutCb = null;
-      this._timeout = null;
-      this._operationStart = null;
-      if (this._options.forever) {
-        this._cachedTimeouts = this._timeouts.slice(0);
-      }
-    }
-    module.exports = RetryOperation;
-    RetryOperation.prototype.reset = function() {
-      this._attempts = 1;
-      this._timeouts = this._originalTimeouts;
-    };
-    RetryOperation.prototype.stop = function() {
-      if (this._timeout) {
-        clearTimeout(this._timeout);
-      }
-      this._timeouts = [];
-      this._cachedTimeouts = null;
-    };
-    RetryOperation.prototype.retry = function(err) {
-      if (this._timeout) {
-        clearTimeout(this._timeout);
-      }
-      if (!err) {
-        return false;
-      }
-      var currentTime = (/* @__PURE__ */ new Date()).getTime();
-      if (err && currentTime - this._operationStart >= this._maxRetryTime) {
-        this._errors.unshift(new Error("RetryOperation timeout occurred"));
-        return false;
-      }
-      this._errors.push(err);
-      var timeout = this._timeouts.shift();
-      if (timeout === void 0) {
-        if (this._cachedTimeouts) {
-          this._errors.splice(this._errors.length - 1, this._errors.length);
-          this._timeouts = this._cachedTimeouts.slice(0);
-          timeout = this._timeouts.shift();
-        } else {
-          return false;
-        }
-      }
-      var self = this;
-      var timer = setTimeout(function() {
-        self._attempts++;
-        if (self._operationTimeoutCb) {
-          self._timeout = setTimeout(function() {
-            self._operationTimeoutCb(self._attempts);
-          }, self._operationTimeout);
-          if (self._options.unref) {
-            self._timeout.unref();
-          }
-        }
-        self._fn(self._attempts);
-      }, timeout);
-      if (this._options.unref) {
-        timer.unref();
-      }
-      return true;
-    };
-    RetryOperation.prototype.attempt = function(fn, timeoutOps) {
-      this._fn = fn;
-      if (timeoutOps) {
-        if (timeoutOps.timeout) {
-          this._operationTimeout = timeoutOps.timeout;
-        }
-        if (timeoutOps.cb) {
-          this._operationTimeoutCb = timeoutOps.cb;
-        }
-      }
-      var self = this;
-      if (this._operationTimeoutCb) {
-        this._timeout = setTimeout(function() {
-          self._operationTimeoutCb();
-        }, self._operationTimeout);
-      }
-      this._operationStart = (/* @__PURE__ */ new Date()).getTime();
-      this._fn(this._attempts);
-    };
-    RetryOperation.prototype.try = function(fn) {
-      console.log("Using RetryOperation.try() is deprecated");
-      this.attempt(fn);
-    };
-    RetryOperation.prototype.start = function(fn) {
-      console.log("Using RetryOperation.start() is deprecated");
-      this.attempt(fn);
-    };
-    RetryOperation.prototype.start = RetryOperation.prototype.try;
-    RetryOperation.prototype.errors = function() {
-      return this._errors;
-    };
-    RetryOperation.prototype.attempts = function() {
-      return this._attempts;
-    };
-    RetryOperation.prototype.mainError = function() {
-      if (this._errors.length === 0) {
-        return null;
-      }
-      var counts = {};
-      var mainError = null;
-      var mainErrorCount = 0;
-      for (var i = 0; i < this._errors.length; i++) {
-        var error2 = this._errors[i];
-        var message = error2.message;
-        var count2 = (counts[message] || 0) + 1;
-        counts[message] = count2;
-        if (count2 >= mainErrorCount) {
-          mainError = error2;
-          mainErrorCount = count2;
-        }
-      }
-      return mainError;
-    };
-  }
-});
-
-// node_modules/retry/lib/retry.js
-var require_retry = __commonJS({
-  "node_modules/retry/lib/retry.js"(exports) {
-    var RetryOperation = require_retry_operation();
-    exports.operation = function(options) {
-      var timeouts = exports.timeouts(options);
-      return new RetryOperation(timeouts, {
-        forever: options && options.forever,
-        unref: options && options.unref,
-        maxRetryTime: options && options.maxRetryTime
-      });
-    };
-    exports.timeouts = function(options) {
-      if (options instanceof Array) {
-        return [].concat(options);
-      }
-      var opts = {
-        retries: 10,
-        factor: 2,
-        minTimeout: 1 * 1e3,
-        maxTimeout: Infinity,
-        randomize: false
-      };
-      for (var key in options) {
-        opts[key] = options[key];
-      }
-      if (opts.minTimeout > opts.maxTimeout) {
-        throw new Error("minTimeout is greater than maxTimeout");
-      }
-      var timeouts = [];
-      for (var i = 0; i < opts.retries; i++) {
-        timeouts.push(this.createTimeout(i, opts));
-      }
-      if (options && options.forever && !timeouts.length) {
-        timeouts.push(this.createTimeout(i, opts));
-      }
-      timeouts.sort(function(a, b) {
-        return a - b;
-      });
-      return timeouts;
-    };
-    exports.createTimeout = function(attempt, opts) {
-      var random = opts.randomize ? Math.random() + 1 : 1;
-      var timeout = Math.round(random * opts.minTimeout * Math.pow(opts.factor, attempt));
-      timeout = Math.min(timeout, opts.maxTimeout);
-      return timeout;
-    };
-    exports.wrap = function(obj, options, methods) {
-      if (options instanceof Array) {
-        methods = options;
-        options = null;
-      }
-      if (!methods) {
-        methods = [];
-        for (var key in obj) {
-          if (typeof obj[key] === "function") {
-            methods.push(key);
-          }
-        }
-      }
-      for (var i = 0; i < methods.length; i++) {
-        var method = methods[i];
-        var original = obj[method];
-        obj[method] = function retryWrapper(original2) {
-          var op = exports.operation(options);
-          var args = Array.prototype.slice.call(arguments, 1);
-          var callback = args.pop();
-          args.push(function(err) {
-            if (op.retry(err)) {
-              return;
-            }
-            if (err) {
-              arguments[0] = op.mainError();
-            }
-            callback.apply(this, arguments);
-          });
-          op.attempt(function() {
-            original2.apply(obj, args);
-          });
-        }.bind(obj, original);
-        obj[method].options = options;
-      }
-    };
-  }
-});
-
-// node_modules/retry/index.js
-var require_retry2 = __commonJS({
-  "node_modules/retry/index.js"(exports, module) {
-    module.exports = require_retry();
-  }
-});
-
-// node_modules/signal-exit/signals.js
-var require_signals = __commonJS({
-  "node_modules/signal-exit/signals.js"(exports, module) {
-    module.exports = [
-      "SIGABRT",
-      "SIGALRM",
-      "SIGHUP",
-      "SIGINT",
-      "SIGTERM"
-    ];
-    if (process.platform !== "win32") {
-      module.exports.push(
-        "SIGVTALRM",
-        "SIGXCPU",
-        "SIGXFSZ",
-        "SIGUSR2",
-        "SIGTRAP",
-        "SIGSYS",
-        "SIGQUIT",
-        "SIGIOT"
-        // should detect profiler and enable/disable accordingly.
-        // see #21
-        // 'SIGPROF'
-      );
-    }
-    if (process.platform === "linux") {
-      module.exports.push(
-        "SIGIO",
-        "SIGPOLL",
-        "SIGPWR",
-        "SIGSTKFLT",
-        "SIGUNUSED"
-      );
-    }
-  }
-});
-
-// node_modules/signal-exit/index.js
-var require_signal_exit = __commonJS({
-  "node_modules/signal-exit/index.js"(exports, module) {
-    var process9 = global.process;
-    var processOk = function(process10) {
-      return process10 && typeof process10 === "object" && typeof process10.removeListener === "function" && typeof process10.emit === "function" && typeof process10.reallyExit === "function" && typeof process10.listeners === "function" && typeof process10.kill === "function" && typeof process10.pid === "number" && typeof process10.on === "function";
-    };
-    if (!processOk(process9)) {
-      module.exports = function() {
-        return function() {
-        };
-      };
-    } else {
-      assert2 = __require("assert");
-      signals = require_signals();
-      isWin = /^win/i.test(process9.platform);
-      EE = __require("events");
-      if (typeof EE !== "function") {
-        EE = EE.EventEmitter;
-      }
-      if (process9.__signal_exit_emitter__) {
-        emitter = process9.__signal_exit_emitter__;
-      } else {
-        emitter = process9.__signal_exit_emitter__ = new EE();
-        emitter.count = 0;
-        emitter.emitted = {};
-      }
-      if (!emitter.infinite) {
-        emitter.setMaxListeners(Infinity);
-        emitter.infinite = true;
-      }
-      module.exports = function(cb, opts) {
-        if (!processOk(global.process)) {
-          return function() {
-          };
-        }
-        assert2.equal(typeof cb, "function", "a callback must be provided for exit handler");
-        if (loaded === false) {
-          load();
-        }
-        var ev = "exit";
-        if (opts && opts.alwaysLast) {
-          ev = "afterexit";
-        }
-        var remove = function() {
-          emitter.removeListener(ev, cb);
-          if (emitter.listeners("exit").length === 0 && emitter.listeners("afterexit").length === 0) {
-            unload();
-          }
-        };
-        emitter.on(ev, cb);
-        return remove;
-      };
-      unload = function unload2() {
-        if (!loaded || !processOk(global.process)) {
-          return;
-        }
-        loaded = false;
-        signals.forEach(function(sig) {
-          try {
-            process9.removeListener(sig, sigListeners[sig]);
-          } catch (er) {
-          }
-        });
-        process9.emit = originalProcessEmit;
-        process9.reallyExit = originalProcessReallyExit;
-        emitter.count -= 1;
-      };
-      module.exports.unload = unload;
-      emit = function emit2(event, code, signal) {
-        if (emitter.emitted[event]) {
-          return;
-        }
-        emitter.emitted[event] = true;
-        emitter.emit(event, code, signal);
-      };
-      sigListeners = {};
-      signals.forEach(function(sig) {
-        sigListeners[sig] = function listener() {
-          if (!processOk(global.process)) {
-            return;
-          }
-          var listeners = process9.listeners(sig);
-          if (listeners.length === emitter.count) {
-            unload();
-            emit("exit", null, sig);
-            emit("afterexit", null, sig);
-            if (isWin && sig === "SIGHUP") {
-              sig = "SIGINT";
-            }
-            process9.kill(process9.pid, sig);
-          }
-        };
-      });
-      module.exports.signals = function() {
-        return signals;
-      };
-      loaded = false;
-      load = function load2() {
-        if (loaded || !processOk(global.process)) {
-          return;
-        }
-        loaded = true;
-        emitter.count += 1;
-        signals = signals.filter(function(sig) {
-          try {
-            process9.on(sig, sigListeners[sig]);
-            return true;
-          } catch (er) {
-            return false;
-          }
-        });
-        process9.emit = processEmit;
-        process9.reallyExit = processReallyExit;
-      };
-      module.exports.load = load;
-      originalProcessReallyExit = process9.reallyExit;
-      processReallyExit = function processReallyExit2(code) {
-        if (!processOk(global.process)) {
-          return;
-        }
-        process9.exitCode = code || /* istanbul ignore next */
-        0;
-        emit("exit", process9.exitCode, null);
-        emit("afterexit", process9.exitCode, null);
-        originalProcessReallyExit.call(process9, process9.exitCode);
-      };
-      originalProcessEmit = process9.emit;
-      processEmit = function processEmit2(ev, arg) {
-        if (ev === "exit" && processOk(global.process)) {
-          if (arg !== void 0) {
-            process9.exitCode = arg;
-          }
-          var ret = originalProcessEmit.apply(this, arguments);
-          emit("exit", process9.exitCode, null);
-          emit("afterexit", process9.exitCode, null);
-          return ret;
-        } else {
-          return originalProcessEmit.apply(this, arguments);
-        }
-      };
-    }
-    var assert2;
-    var signals;
-    var isWin;
-    var EE;
-    var emitter;
-    var unload;
-    var emit;
-    var sigListeners;
-    var loaded;
-    var load;
-    var originalProcessReallyExit;
-    var processReallyExit;
-    var originalProcessEmit;
-    var processEmit;
-  }
-});
-
-// node_modules/proper-lockfile/lib/mtime-precision.js
-var require_mtime_precision = __commonJS({
-  "node_modules/proper-lockfile/lib/mtime-precision.js"(exports, module) {
-    "use strict";
-    var cacheSymbol = /* @__PURE__ */ Symbol();
-    function probe(file, fs70, callback) {
-      const cachedPrecision = fs70[cacheSymbol];
-      if (cachedPrecision) {
-        return fs70.stat(file, (err, stat) => {
-          if (err) {
-            return callback(err);
-          }
-          callback(null, stat.mtime, cachedPrecision);
-        });
-      }
-      const mtime = new Date(Math.ceil(Date.now() / 1e3) * 1e3 + 5);
-      fs70.utimes(file, mtime, mtime, (err) => {
-        if (err) {
-          return callback(err);
-        }
-        fs70.stat(file, (err2, stat) => {
-          if (err2) {
-            return callback(err2);
-          }
-          const precision = stat.mtime.getTime() % 1e3 === 0 ? "s" : "ms";
-          Object.defineProperty(fs70, cacheSymbol, { value: precision });
-          callback(null, stat.mtime, precision);
-        });
-      });
-    }
-    function getMtime(precision) {
-      let now = Date.now();
-      if (precision === "s") {
-        now = Math.ceil(now / 1e3) * 1e3;
-      }
-      return new Date(now);
-    }
-    module.exports.probe = probe;
-    module.exports.getMtime = getMtime;
-  }
-});
-
-// node_modules/proper-lockfile/lib/lockfile.js
-var require_lockfile = __commonJS({
-  "node_modules/proper-lockfile/lib/lockfile.js"(exports, module) {
-    "use strict";
-    var path70 = __require("path");
-    var fs70 = require_graceful_fs();
-    var retry = require_retry2();
-    var onExit = require_signal_exit();
-    var mtimePrecision = require_mtime_precision();
-    var locks = {};
-    function getLockFile(file, options) {
-      return options.lockfilePath || `${file}.lock`;
-    }
-    function resolveCanonicalPath(file, options, callback) {
-      if (!options.realpath) {
-        return callback(null, path70.resolve(file));
-      }
-      options.fs.realpath(file, callback);
-    }
-    function acquireLock(file, options, callback) {
-      const lockfilePath = getLockFile(file, options);
-      options.fs.mkdir(lockfilePath, (err) => {
-        if (!err) {
-          return mtimePrecision.probe(lockfilePath, options.fs, (err2, mtime, mtimePrecision2) => {
-            if (err2) {
-              options.fs.rmdir(lockfilePath, () => {
-              });
-              return callback(err2);
-            }
-            callback(null, mtime, mtimePrecision2);
-          });
-        }
-        if (err.code !== "EEXIST") {
-          return callback(err);
-        }
-        if (options.stale <= 0) {
-          return callback(Object.assign(new Error("Lock file is already being held"), { code: "ELOCKED", file }));
-        }
-        options.fs.stat(lockfilePath, (err2, stat) => {
-          if (err2) {
-            if (err2.code === "ENOENT") {
-              return acquireLock(file, { ...options, stale: 0 }, callback);
-            }
-            return callback(err2);
-          }
-          if (!isLockStale(stat, options)) {
-            return callback(Object.assign(new Error("Lock file is already being held"), { code: "ELOCKED", file }));
-          }
-          removeLock(file, options, (err3) => {
-            if (err3) {
-              return callback(err3);
-            }
-            acquireLock(file, { ...options, stale: 0 }, callback);
-          });
-        });
-      });
-    }
-    function isLockStale(stat, options) {
-      return stat.mtime.getTime() < Date.now() - options.stale;
-    }
-    function removeLock(file, options, callback) {
-      options.fs.rmdir(getLockFile(file, options), (err) => {
-        if (err && err.code !== "ENOENT") {
-          return callback(err);
-        }
-        callback();
-      });
-    }
-    function updateLock(file, options) {
-      const lock2 = locks[file];
-      if (lock2.updateTimeout) {
-        return;
-      }
-      lock2.updateDelay = lock2.updateDelay || options.update;
-      lock2.updateTimeout = setTimeout(() => {
-        lock2.updateTimeout = null;
-        options.fs.stat(lock2.lockfilePath, (err, stat) => {
-          const isOverThreshold = lock2.lastUpdate + options.stale < Date.now();
-          if (err) {
-            if (err.code === "ENOENT" || isOverThreshold) {
-              return setLockAsCompromised(file, lock2, Object.assign(err, { code: "ECOMPROMISED" }));
-            }
-            lock2.updateDelay = 1e3;
-            return updateLock(file, options);
-          }
-          const isMtimeOurs = lock2.mtime.getTime() === stat.mtime.getTime();
-          if (!isMtimeOurs) {
-            return setLockAsCompromised(
-              file,
-              lock2,
-              Object.assign(
-                new Error("Unable to update lock within the stale threshold"),
-                { code: "ECOMPROMISED" }
-              )
-            );
-          }
-          const mtime = mtimePrecision.getMtime(lock2.mtimePrecision);
-          options.fs.utimes(lock2.lockfilePath, mtime, mtime, (err2) => {
-            const isOverThreshold2 = lock2.lastUpdate + options.stale < Date.now();
-            if (lock2.released) {
-              return;
-            }
-            if (err2) {
-              if (err2.code === "ENOENT" || isOverThreshold2) {
-                return setLockAsCompromised(file, lock2, Object.assign(err2, { code: "ECOMPROMISED" }));
-              }
-              lock2.updateDelay = 1e3;
-              return updateLock(file, options);
-            }
-            lock2.mtime = mtime;
-            lock2.lastUpdate = Date.now();
-            lock2.updateDelay = null;
-            updateLock(file, options);
-          });
-        });
-      }, lock2.updateDelay);
-      if (lock2.updateTimeout.unref) {
-        lock2.updateTimeout.unref();
-      }
-    }
-    function setLockAsCompromised(file, lock2, err) {
-      lock2.released = true;
-      if (lock2.updateTimeout) {
-        clearTimeout(lock2.updateTimeout);
-      }
-      if (locks[file] === lock2) {
-        delete locks[file];
-      }
-      lock2.options.onCompromised(err);
-    }
-    function lock(file, options, callback) {
-      options = {
-        stale: 1e4,
-        update: null,
-        realpath: true,
-        retries: 0,
-        fs: fs70,
-        onCompromised: (err) => {
-          throw err;
-        },
-        ...options
-      };
-      options.retries = options.retries || 0;
-      options.retries = typeof options.retries === "number" ? { retries: options.retries } : options.retries;
-      options.stale = Math.max(options.stale || 0, 2e3);
-      options.update = options.update == null ? options.stale / 2 : options.update || 0;
-      options.update = Math.max(Math.min(options.update, options.stale / 2), 1e3);
-      resolveCanonicalPath(file, options, (err, file2) => {
-        if (err) {
-          return callback(err);
-        }
-        const operation = retry.operation(options.retries);
-        operation.attempt(() => {
-          acquireLock(file2, options, (err2, mtime, mtimePrecision2) => {
-            if (operation.retry(err2)) {
-              return;
-            }
-            if (err2) {
-              return callback(operation.mainError());
-            }
-            const lock2 = locks[file2] = {
-              lockfilePath: getLockFile(file2, options),
-              mtime,
-              mtimePrecision: mtimePrecision2,
-              options,
-              lastUpdate: Date.now()
-            };
-            updateLock(file2, options);
-            callback(null, (releasedCallback) => {
-              if (lock2.released) {
-                return releasedCallback && releasedCallback(Object.assign(new Error("Lock is already released"), { code: "ERELEASED" }));
-              }
-              unlock(file2, { ...options, realpath: false }, releasedCallback);
-            });
-          });
-        });
-      });
-    }
-    function unlock(file, options, callback) {
-      options = {
-        fs: fs70,
-        realpath: true,
-        ...options
-      };
-      resolveCanonicalPath(file, options, (err, file2) => {
-        if (err) {
-          return callback(err);
-        }
-        const lock2 = locks[file2];
-        if (!lock2) {
-          return callback(Object.assign(new Error("Lock is not acquired/owned by you"), { code: "ENOTACQUIRED" }));
-        }
-        lock2.updateTimeout && clearTimeout(lock2.updateTimeout);
-        lock2.released = true;
-        delete locks[file2];
-        removeLock(file2, options, callback);
-      });
-    }
-    function check2(file, options, callback) {
-      options = {
-        stale: 1e4,
-        realpath: true,
-        fs: fs70,
-        ...options
-      };
-      options.stale = Math.max(options.stale || 0, 2e3);
-      resolveCanonicalPath(file, options, (err, file2) => {
-        if (err) {
-          return callback(err);
-        }
-        options.fs.stat(getLockFile(file2, options), (err2, stat) => {
-          if (err2) {
-            return err2.code === "ENOENT" ? callback(null, false) : callback(err2);
-          }
-          return callback(null, !isLockStale(stat, options));
-        });
-      });
-    }
-    function getLocks() {
-      return locks;
-    }
-    onExit(() => {
-      for (const file in locks) {
-        const options = locks[file].options;
-        try {
-          options.fs.rmdirSync(getLockFile(file, options));
-        } catch (e) {
-        }
-      }
-    });
-    module.exports.lock = lock;
-    module.exports.unlock = unlock;
-    module.exports.check = check2;
-    module.exports.getLocks = getLocks;
-  }
-});
-
-// node_modules/proper-lockfile/lib/adapter.js
-var require_adapter = __commonJS({
-  "node_modules/proper-lockfile/lib/adapter.js"(exports, module) {
-    "use strict";
-    var fs70 = require_graceful_fs();
-    function createSyncFs(fs71) {
-      const methods = ["mkdir", "realpath", "stat", "rmdir", "utimes"];
-      const newFs = { ...fs71 };
-      methods.forEach((method) => {
-        newFs[method] = (...args) => {
-          const callback = args.pop();
-          let ret;
-          try {
-            ret = fs71[`${method}Sync`](...args);
-          } catch (err) {
-            return callback(err);
-          }
-          callback(null, ret);
-        };
-      });
-      return newFs;
-    }
-    function toPromise(method) {
-      return (...args) => new Promise((resolve, reject) => {
-        args.push((err, result) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(result);
-          }
-        });
-        method(...args);
-      });
-    }
-    function toSync(method) {
-      return (...args) => {
-        let err;
-        let result;
-        args.push((_err, _result) => {
-          err = _err;
-          result = _result;
-        });
-        method(...args);
-        if (err) {
-          throw err;
-        }
-        return result;
-      };
-    }
-    function toSyncOptions(options) {
-      options = { ...options };
-      options.fs = createSyncFs(options.fs || fs70);
-      if (typeof options.retries === "number" && options.retries > 0 || options.retries && typeof options.retries.retries === "number" && options.retries.retries > 0) {
-        throw Object.assign(new Error("Cannot use retries with the sync api"), { code: "ESYNC" });
-      }
-      return options;
-    }
-    module.exports = {
-      toPromise,
-      toSync,
-      toSyncOptions
-    };
-  }
-});
-
-// node_modules/proper-lockfile/index.js
-var require_proper_lockfile = __commonJS({
-  "node_modules/proper-lockfile/index.js"(exports, module) {
-    "use strict";
-    var lockfile8 = require_lockfile();
-    var { toPromise, toSync, toSyncOptions } = require_adapter();
-    async function lock(file, options) {
-      const release = await toPromise(lockfile8.lock)(file, options);
-      return toPromise(release);
-    }
-    function lockSync(file, options) {
-      const release = toSync(lockfile8.lock)(file, toSyncOptions(options));
-      return toSync(release);
-    }
-    function unlock(file, options) {
-      return toPromise(lockfile8.unlock)(file, options);
-    }
-    function unlockSync(file, options) {
-      return toSync(lockfile8.unlock)(file, toSyncOptions(options));
-    }
-    function check2(file, options) {
-      return toPromise(lockfile8.check)(file, options);
-    }
-    function checkSync(file, options) {
-      return toSync(lockfile8.check)(file, toSyncOptions(options));
-    }
-    module.exports = lock;
-    module.exports.lock = lock;
-    module.exports.unlock = unlock;
-    module.exports.lockSync = lockSync;
-    module.exports.unlockSync = unlockSync;
-    module.exports.check = check2;
-    module.exports.checkSync = checkSync;
-  }
-});
-
-// src/utils/paths.ts
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import fs from "node:fs";
-import os from "node:os";
-function canUseDir(dir) {
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-    const probe = path.join(dir, `.write-probe-${process.pid}-${Date.now()}`);
-    fs.writeFileSync(probe, "ok", "utf8");
-    fs.unlinkSync(probe);
-    return true;
-  } catch {
-    return false;
-  }
-}
-function resolveServerDataDir() {
-  const override = process.env.PIO_MCP_DATA_DIR?.trim();
-  if (override && canUseDir(override)) {
-    return path.resolve(override);
-  }
-  const homeScoped = path.join(os.homedir(), ".platformio-mcp");
-  if (canUseDir(homeScoped)) {
-    return homeScoped;
-  }
-  const cwdScoped = path.join(process.cwd(), ".platformio-mcp");
-  if (canUseDir(cwdScoped)) {
-    return cwdScoped;
-  }
-  const tmpScoped = path.join(os.tmpdir(), ".platformio-mcp");
-  if (canUseDir(tmpScoped)) {
-    return tmpScoped;
-  }
-  return cwdScoped;
-}
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
-function ensureGlobalDirs() {
-  ensureDir(SERVER_DATA_DIR);
-  ensureDir(GLOBAL_LOCKS_DIR);
-}
-function sanitizePortName(port) {
-  return port.replace(/[\/\.:]/g, "_").replace(/^_+|_+$/g, "");
-}
-var __filename, __dirname2, PROJECT_ROOT, SERVER_DATA_DIR, GLOBAL_LOCKS_DIR;
-var init_paths = __esm({
-  "src/utils/paths.ts"() {
-    "use strict";
-    __filename = fileURLToPath(import.meta.url);
-    __dirname2 = path.dirname(__filename);
-    PROJECT_ROOT = path.resolve(__dirname2, "..", "..");
-    SERVER_DATA_DIR = resolveServerDataDir();
-    GLOBAL_LOCKS_DIR = path.join(SERVER_DATA_DIR, "serial_ports");
-  }
-});
-
-// src/utils/errors.ts
-function formatPlatformIOError(error2) {
-  if (error2 instanceof PlatformIONotInstalledError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Install PlatformIO Core CLI: https://docs.platformio.org/en/latest/core/installation.html
-2. Ensure 'pio' or 'platformio' is in your system PATH
-3. Try running: pip install platformio`;
-  }
-  if (error2 instanceof BoardNotFoundError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Check board ID spelling (case-sensitive)
-2. List available boards with: pio boards
-3. Search for your board at: https://docs.platformio.org/en/latest/boards/`;
-  }
-  if (error2 instanceof ProjectInitError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Ensure the target directory exists and is writable
-2. Verify the board ID is correct
-3. Check that the framework is supported for this board`;
-  }
-  if (error2 instanceof BuildError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Check your source code for syntax errors
-2. Ensure all required libraries are installed
-3. Verify platformio.ini configuration is correct
-4. Try cleaning the project: pio run -t clean`;
-  }
-  if (error2 instanceof UploadError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Ensure the device is connected and powered
-2. Check USB cable and drivers
-3. Verify the correct port is specified
-4. Try resetting the device
-5. Check that no other programs are using the serial port`;
-  }
-  if (error2 instanceof LibraryError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Check library name spelling
-2. Verify internet connection
-3. Try updating library registry: pio lib update`;
-  }
-  if (error2 instanceof PlatformIOError) {
-    let message = error2.message;
-    if (error2.context) {
-      message += "\n\nContext: " + JSON.stringify(error2.context, null, 2);
-    }
-    return message;
-  }
-  if (error2 instanceof Error) {
-    return error2.message;
-  }
-  return String(error2);
-}
-function parseStderrErrors(stderr) {
-  const errors = [];
-  const lines2 = stderr.split("\n");
-  for (const line of lines2) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (trimmed.includes("error:") || trimmed.includes("Error:") || trimmed.includes("ERROR:") || trimmed.includes("fatal:") || trimmed.includes("Failed")) {
-      errors.push(trimmed);
-    }
-  }
-  return errors;
-}
-function parseStructuredBuildErrors(log) {
-  if (!log) return [];
-  const out = [];
-  const lines2 = log.split(/\r?\n/);
-  const reMissingHeader = /^(.*?):(\d+)(?::\d+)?:\s*fatal error:\s*([^:]+?):\s*No such file or directory/i;
-  const reSyntax = /^(.*?):(\d+)(?::\d+)?:\s*error:\s*(.+)$/i;
-  const reUndefRef = /undefined reference to\s+[`']?([^'"`\s]+)[`']?/i;
-  const reMissingIni = /(platformio\.ini.*not (found|exist))|Project does not seem to be a PlatformIO Project/i;
-  const reMissingEnv = /UnknownEnvNames|environment.*not found|UndefinedEnvError/i;
-  const reLibMissing = /Library Manager:\s*(Warning|Error).*not found|LibraryNotFound/i;
-  const rePermission = /(EACCES|Permission denied|EPERM)/i;
-  const reToolchain = /(Could not install package|failed to download|PackageException)/i;
-  for (const line of lines2) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    let m;
-    if (m = reMissingHeader.exec(trimmed)) {
-      out.push({
-        category: "missing_header",
-        message: `Missing header: ${m[3]} (in ${m[1]}:${m[2]})`,
-        file: m[1],
-        line: Number(m[2]),
-        raw: trimmed
-      });
-      continue;
-    }
-    if (m = reUndefRef.exec(trimmed)) {
-      out.push({
-        category: "undefined_reference",
-        message: `Undefined reference to '${m[1]}' \u2014 symbol not linked.`,
-        raw: trimmed
-      });
-      continue;
-    }
-    if (m = reSyntax.exec(trimmed)) {
-      out.push({
-        category: "syntax",
-        message: `${m[3]} (in ${m[1]}:${m[2]})`,
-        file: m[1],
-        line: Number(m[2]),
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reMissingIni.test(trimmed)) {
-      out.push({
-        category: "missing_platformio_ini",
-        message: "platformio.ini missing or invalid \u2014 project is not initialized.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reMissingEnv.test(trimmed)) {
-      out.push({
-        category: "missing_environment",
-        message: "Requested environment is not defined in platformio.ini.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reLibMissing.test(trimmed)) {
-      out.push({
-        category: "missing_library",
-        message: "A required library is missing or could not be resolved.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (rePermission.test(trimmed)) {
-      out.push({
-        category: "permission",
-        message: "Permission denied accessing project / build artifacts.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reToolchain.test(trimmed)) {
-      out.push({
-        category: "toolchain",
-        message: "Toolchain/package install failed \u2014 likely a network or registry issue.",
-        raw: trimmed
-      });
-      continue;
-    }
-  }
-  const seen = /* @__PURE__ */ new Set();
-  return out.filter((e) => {
-    const k = e.category + "|" + e.message;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-}
-function deriveNextSteps(errors, success) {
-  if (success) {
-    return [
-      "Build succeeded. Call upload_firmware (preferred over `pio run --target upload`) to flash the device.",
-      "Optionally call start_monitor to capture serial output, then query_logs to inspect it."
-    ];
-  }
-  const tips = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const e of errors) {
-    if (seen.has(e.category)) continue;
-    seen.add(e.category);
-    switch (e.category) {
-      case "missing_header":
-        tips.push(
-          "Header file not found \u2014 add the providing library to `lib_deps` in platformio.ini (search via `search_libraries`), then call `build_project` again."
-        );
-        break;
-      case "undefined_reference":
-        tips.push(
-          "Undefined linker reference \u2014 ensure the source/library that defines this symbol is present. If it's from a third-party library, add it to `lib_deps` and rebuild."
-        );
-        break;
-      case "syntax":
-        tips.push(
-          "Syntax error in source \u2014 open the indicated file:line, fix the offending statement, then call `build_project` again. Avoid re-issuing the same edit twice."
-        );
-        break;
-      case "missing_library":
-        tips.push(
-          "Library could not be resolved \u2014 verify the entry in `lib_deps`, run `search_libraries` to confirm the registry id, then rebuild."
-        );
-        break;
-      case "missing_platformio_ini":
-        tips.push(
-          "platformio.ini is missing or malformed \u2014 run `init_project` to regenerate the scaffold, then `build_project` again."
-        );
-        break;
-      case "missing_environment":
-        tips.push(
-          "Environment not declared in platformio.ini \u2014 call `get_project_config` to inspect available environments, then pass the correct `environment` argument to `build_project`."
-        );
-        break;
-      case "permission":
-        tips.push(
-          "Filesystem permission error \u2014 verify the project directory is writable and not held by another process; on macOS check that Terminal/IDE has Full Disk Access."
-        );
-        break;
-      case "toolchain":
-        tips.push(
-          "Toolchain/package install failed \u2014 check network access; if behind a proxy, configure PlatformIO accordingly, then rebuild."
-        );
-        break;
-      case "unknown":
-      default:
-        break;
-    }
-  }
-  if (tips.length === 0) {
-    tips.push(
-      "Build failed but no structured error was matched. Read the bottom of the build log for the actual gcc/clang error, then make the smallest targeted edit and call `build_project` again."
-    );
-  }
-  tips.push(
-    "Use the `build_project` MCP tool to compile \u2014 do NOT run `pio run` in a terminal; the MCP path integrates with the hardware lock, cache, and structured error parser."
-  );
-  return tips;
-}
-function isPlatformIONotFoundError(error2) {
-  if (error2 instanceof Error) {
-    const message = error2.message.toLowerCase();
-    return message.includes("enoent") || message.includes("not found") || message.includes("command not found") || message.includes("platformio") && message.includes("not recognized");
-  }
-  return false;
-}
-var PlatformIOError, PlatformIONotInstalledError, BoardNotFoundError, ProjectInitError, BuildError, UploadError, LibraryError, CommandTimeoutError;
-var init_errors = __esm({
-  "src/utils/errors.ts"() {
-    "use strict";
-    PlatformIOError = class extends Error {
-      constructor(message, code, context) {
-        super(message);
-        this.code = code;
-        this.context = context;
-        this.name = "PlatformIOError";
-        Error.captureStackTrace(this, this.constructor);
-      }
-      code;
-      context;
-    };
-    PlatformIONotInstalledError = class extends PlatformIOError {
-      constructor(message = "PlatformIO CLI is not installed or not found in PATH") {
-        super(message, "PLATFORMIO_NOT_INSTALLED");
-        this.name = "PlatformIONotInstalledError";
-      }
-    };
-    BoardNotFoundError = class extends PlatformIOError {
-      constructor(boardId) {
-        super(
-          `Board '${boardId}' not found in PlatformIO registry`,
-          "BOARD_NOT_FOUND",
-          { boardId }
-        );
-        this.name = "BoardNotFoundError";
-      }
-    };
-    ProjectInitError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "PROJECT_INIT_FAILED", context);
-        this.name = "ProjectInitError";
-      }
-    };
-    BuildError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "BUILD_FAILED", context);
-        this.name = "BuildError";
-      }
-    };
-    UploadError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "UPLOAD_FAILED", context);
-        this.name = "UploadError";
-      }
-    };
-    LibraryError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "LIBRARY_ERROR", context);
-        this.name = "LibraryError";
-      }
-    };
-    CommandTimeoutError = class extends PlatformIOError {
-      constructor(command, timeout) {
-        super(
-          `Command '${command}' timed out after ${timeout}ms`,
-          "COMMAND_TIMEOUT",
-          {
-            command,
-            timeout
-          }
-        );
-        this.name = "CommandTimeoutError";
-      }
-    };
-  }
-});
-
 // node_modules/zod/v3/helpers/util.js
 var util, objectUtil, ZodParsedType, getParsedType;
 var init_util = __esm({
@@ -2379,7 +427,7 @@ function getErrorMap() {
   return overrideErrorMap;
 }
 var overrideErrorMap;
-var init_errors2 = __esm({
+var init_errors = __esm({
   "node_modules/zod/v3/errors.js"() {
     init_en();
     overrideErrorMap = en_default;
@@ -2409,7 +457,7 @@ function addIssueToContext(ctx, issueData) {
 var makeIssue, EMPTY_PATH, ParseStatus, INVALID, DIRTY, OK, isAborted, isDirty, isValid, isAsync;
 var init_parseUtil = __esm({
   "node_modules/zod/v3/helpers/parseUtil.js"() {
-    init_errors2();
+    init_errors();
     init_en();
     makeIssue = (params) => {
       const { data, path: path70, errorMaps, issueData } = params;
@@ -2716,7 +764,7 @@ var ParseInputLazyPath, handleResult, ZodType, cuidRegex, cuid2Regex, ulidRegex,
 var init_types = __esm({
   "node_modules/zod/v3/types.js"() {
     init_ZodError();
-    init_errors2();
+    init_errors();
     init_errorUtil();
     init_parseUtil();
     init_util();
@@ -6089,7 +4137,7 @@ __export(external_exports, {
 });
 var init_external = __esm({
   "node_modules/zod/v3/external.js"() {
-    init_errors2();
+    init_errors();
     init_parseUtil();
     init_typeAliases();
     init_util();
@@ -6103,6 +4151,1583 @@ var init_zod = __esm({
   "node_modules/zod/index.js"() {
     init_external();
     init_external();
+  }
+});
+
+// node_modules/graceful-fs/polyfills.js
+var require_polyfills = __commonJS({
+  "node_modules/graceful-fs/polyfills.js"(exports, module) {
+    var constants3 = __require("constants");
+    var origCwd = process.cwd;
+    var cwd = null;
+    var platform2 = process.env.GRACEFUL_FS_PLATFORM || process.platform;
+    process.cwd = function() {
+      if (!cwd)
+        cwd = origCwd.call(process);
+      return cwd;
+    };
+    try {
+      process.cwd();
+    } catch (er) {
+    }
+    if (typeof process.chdir === "function") {
+      chdir = process.chdir;
+      process.chdir = function(d) {
+        cwd = null;
+        chdir.call(process, d);
+      };
+      if (Object.setPrototypeOf) Object.setPrototypeOf(process.chdir, chdir);
+    }
+    var chdir;
+    module.exports = patch;
+    function patch(fs70) {
+      if (constants3.hasOwnProperty("O_SYMLINK") && process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
+        patchLchmod(fs70);
+      }
+      if (!fs70.lutimes) {
+        patchLutimes(fs70);
+      }
+      fs70.chown = chownFix(fs70.chown);
+      fs70.fchown = chownFix(fs70.fchown);
+      fs70.lchown = chownFix(fs70.lchown);
+      fs70.chmod = chmodFix(fs70.chmod);
+      fs70.fchmod = chmodFix(fs70.fchmod);
+      fs70.lchmod = chmodFix(fs70.lchmod);
+      fs70.chownSync = chownFixSync(fs70.chownSync);
+      fs70.fchownSync = chownFixSync(fs70.fchownSync);
+      fs70.lchownSync = chownFixSync(fs70.lchownSync);
+      fs70.chmodSync = chmodFixSync(fs70.chmodSync);
+      fs70.fchmodSync = chmodFixSync(fs70.fchmodSync);
+      fs70.lchmodSync = chmodFixSync(fs70.lchmodSync);
+      fs70.stat = statFix(fs70.stat);
+      fs70.fstat = statFix(fs70.fstat);
+      fs70.lstat = statFix(fs70.lstat);
+      fs70.statSync = statFixSync(fs70.statSync);
+      fs70.fstatSync = statFixSync(fs70.fstatSync);
+      fs70.lstatSync = statFixSync(fs70.lstatSync);
+      if (fs70.chmod && !fs70.lchmod) {
+        fs70.lchmod = function(path70, mode, cb) {
+          if (cb) process.nextTick(cb);
+        };
+        fs70.lchmodSync = function() {
+        };
+      }
+      if (fs70.chown && !fs70.lchown) {
+        fs70.lchown = function(path70, uid, gid, cb) {
+          if (cb) process.nextTick(cb);
+        };
+        fs70.lchownSync = function() {
+        };
+      }
+      if (platform2 === "win32") {
+        fs70.rename = typeof fs70.rename !== "function" ? fs70.rename : (function(fs$rename) {
+          function rename(from, to, cb) {
+            var start = Date.now();
+            var backoff = 0;
+            fs$rename(from, to, function CB(er) {
+              if (er && (er.code === "EACCES" || er.code === "EPERM" || er.code === "EBUSY") && Date.now() - start < 6e4) {
+                setTimeout(function() {
+                  fs70.stat(to, function(stater, st) {
+                    if (stater && stater.code === "ENOENT")
+                      fs$rename(from, to, CB);
+                    else
+                      cb(er);
+                  });
+                }, backoff);
+                if (backoff < 100)
+                  backoff += 10;
+                return;
+              }
+              if (cb) cb(er);
+            });
+          }
+          if (Object.setPrototypeOf) Object.setPrototypeOf(rename, fs$rename);
+          return rename;
+        })(fs70.rename);
+      }
+      fs70.read = typeof fs70.read !== "function" ? fs70.read : (function(fs$read) {
+        function read(fd, buffer, offset2, length, position, callback_) {
+          var callback;
+          if (callback_ && typeof callback_ === "function") {
+            var eagCounter = 0;
+            callback = function(er, _, __) {
+              if (er && er.code === "EAGAIN" && eagCounter < 10) {
+                eagCounter++;
+                return fs$read.call(fs70, fd, buffer, offset2, length, position, callback);
+              }
+              callback_.apply(this, arguments);
+            };
+          }
+          return fs$read.call(fs70, fd, buffer, offset2, length, position, callback);
+        }
+        if (Object.setPrototypeOf) Object.setPrototypeOf(read, fs$read);
+        return read;
+      })(fs70.read);
+      fs70.readSync = typeof fs70.readSync !== "function" ? fs70.readSync : /* @__PURE__ */ (function(fs$readSync) {
+        return function(fd, buffer, offset2, length, position) {
+          var eagCounter = 0;
+          while (true) {
+            try {
+              return fs$readSync.call(fs70, fd, buffer, offset2, length, position);
+            } catch (er) {
+              if (er.code === "EAGAIN" && eagCounter < 10) {
+                eagCounter++;
+                continue;
+              }
+              throw er;
+            }
+          }
+        };
+      })(fs70.readSync);
+      function patchLchmod(fs71) {
+        fs71.lchmod = function(path70, mode, callback) {
+          fs71.open(
+            path70,
+            constants3.O_WRONLY | constants3.O_SYMLINK,
+            mode,
+            function(err, fd) {
+              if (err) {
+                if (callback) callback(err);
+                return;
+              }
+              fs71.fchmod(fd, mode, function(err2) {
+                fs71.close(fd, function(err22) {
+                  if (callback) callback(err2 || err22);
+                });
+              });
+            }
+          );
+        };
+        fs71.lchmodSync = function(path70, mode) {
+          var fd = fs71.openSync(path70, constants3.O_WRONLY | constants3.O_SYMLINK, mode);
+          var threw = true;
+          var ret;
+          try {
+            ret = fs71.fchmodSync(fd, mode);
+            threw = false;
+          } finally {
+            if (threw) {
+              try {
+                fs71.closeSync(fd);
+              } catch (er) {
+              }
+            } else {
+              fs71.closeSync(fd);
+            }
+          }
+          return ret;
+        };
+      }
+      function patchLutimes(fs71) {
+        if (constants3.hasOwnProperty("O_SYMLINK") && fs71.futimes) {
+          fs71.lutimes = function(path70, at, mt, cb) {
+            fs71.open(path70, constants3.O_SYMLINK, function(er, fd) {
+              if (er) {
+                if (cb) cb(er);
+                return;
+              }
+              fs71.futimes(fd, at, mt, function(er2) {
+                fs71.close(fd, function(er22) {
+                  if (cb) cb(er2 || er22);
+                });
+              });
+            });
+          };
+          fs71.lutimesSync = function(path70, at, mt) {
+            var fd = fs71.openSync(path70, constants3.O_SYMLINK);
+            var ret;
+            var threw = true;
+            try {
+              ret = fs71.futimesSync(fd, at, mt);
+              threw = false;
+            } finally {
+              if (threw) {
+                try {
+                  fs71.closeSync(fd);
+                } catch (er) {
+                }
+              } else {
+                fs71.closeSync(fd);
+              }
+            }
+            return ret;
+          };
+        } else if (fs71.futimes) {
+          fs71.lutimes = function(_a, _b, _c, cb) {
+            if (cb) process.nextTick(cb);
+          };
+          fs71.lutimesSync = function() {
+          };
+        }
+      }
+      function chmodFix(orig) {
+        if (!orig) return orig;
+        return function(target, mode, cb) {
+          return orig.call(fs70, target, mode, function(er) {
+            if (chownErOk(er)) er = null;
+            if (cb) cb.apply(this, arguments);
+          });
+        };
+      }
+      function chmodFixSync(orig) {
+        if (!orig) return orig;
+        return function(target, mode) {
+          try {
+            return orig.call(fs70, target, mode);
+          } catch (er) {
+            if (!chownErOk(er)) throw er;
+          }
+        };
+      }
+      function chownFix(orig) {
+        if (!orig) return orig;
+        return function(target, uid, gid, cb) {
+          return orig.call(fs70, target, uid, gid, function(er) {
+            if (chownErOk(er)) er = null;
+            if (cb) cb.apply(this, arguments);
+          });
+        };
+      }
+      function chownFixSync(orig) {
+        if (!orig) return orig;
+        return function(target, uid, gid) {
+          try {
+            return orig.call(fs70, target, uid, gid);
+          } catch (er) {
+            if (!chownErOk(er)) throw er;
+          }
+        };
+      }
+      function statFix(orig) {
+        if (!orig) return orig;
+        return function(target, options, cb) {
+          if (typeof options === "function") {
+            cb = options;
+            options = null;
+          }
+          function callback(er, stats) {
+            if (stats) {
+              if (stats.uid < 0) stats.uid += 4294967296;
+              if (stats.gid < 0) stats.gid += 4294967296;
+            }
+            if (cb) cb.apply(this, arguments);
+          }
+          return options ? orig.call(fs70, target, options, callback) : orig.call(fs70, target, callback);
+        };
+      }
+      function statFixSync(orig) {
+        if (!orig) return orig;
+        return function(target, options) {
+          var stats = options ? orig.call(fs70, target, options) : orig.call(fs70, target);
+          if (stats) {
+            if (stats.uid < 0) stats.uid += 4294967296;
+            if (stats.gid < 0) stats.gid += 4294967296;
+          }
+          return stats;
+        };
+      }
+      function chownErOk(er) {
+        if (!er)
+          return true;
+        if (er.code === "ENOSYS")
+          return true;
+        var nonroot = !process.getuid || process.getuid() !== 0;
+        if (nonroot) {
+          if (er.code === "EINVAL" || er.code === "EPERM")
+            return true;
+        }
+        return false;
+      }
+    }
+  }
+});
+
+// node_modules/graceful-fs/legacy-streams.js
+var require_legacy_streams = __commonJS({
+  "node_modules/graceful-fs/legacy-streams.js"(exports, module) {
+    var Stream = __require("stream").Stream;
+    module.exports = legacy;
+    function legacy(fs70) {
+      return {
+        ReadStream,
+        WriteStream
+      };
+      function ReadStream(path70, options) {
+        if (!(this instanceof ReadStream)) return new ReadStream(path70, options);
+        Stream.call(this);
+        var self = this;
+        this.path = path70;
+        this.fd = null;
+        this.readable = true;
+        this.paused = false;
+        this.flags = "r";
+        this.mode = 438;
+        this.bufferSize = 64 * 1024;
+        options = options || {};
+        var keys = Object.keys(options);
+        for (var index = 0, length = keys.length; index < length; index++) {
+          var key = keys[index];
+          this[key] = options[key];
+        }
+        if (this.encoding) this.setEncoding(this.encoding);
+        if (this.start !== void 0) {
+          if ("number" !== typeof this.start) {
+            throw TypeError("start must be a Number");
+          }
+          if (this.end === void 0) {
+            this.end = Infinity;
+          } else if ("number" !== typeof this.end) {
+            throw TypeError("end must be a Number");
+          }
+          if (this.start > this.end) {
+            throw new Error("start must be <= end");
+          }
+          this.pos = this.start;
+        }
+        if (this.fd !== null) {
+          process.nextTick(function() {
+            self._read();
+          });
+          return;
+        }
+        fs70.open(this.path, this.flags, this.mode, function(err, fd) {
+          if (err) {
+            self.emit("error", err);
+            self.readable = false;
+            return;
+          }
+          self.fd = fd;
+          self.emit("open", fd);
+          self._read();
+        });
+      }
+      function WriteStream(path70, options) {
+        if (!(this instanceof WriteStream)) return new WriteStream(path70, options);
+        Stream.call(this);
+        this.path = path70;
+        this.fd = null;
+        this.writable = true;
+        this.flags = "w";
+        this.encoding = "binary";
+        this.mode = 438;
+        this.bytesWritten = 0;
+        options = options || {};
+        var keys = Object.keys(options);
+        for (var index = 0, length = keys.length; index < length; index++) {
+          var key = keys[index];
+          this[key] = options[key];
+        }
+        if (this.start !== void 0) {
+          if ("number" !== typeof this.start) {
+            throw TypeError("start must be a Number");
+          }
+          if (this.start < 0) {
+            throw new Error("start must be >= zero");
+          }
+          this.pos = this.start;
+        }
+        this.busy = false;
+        this._queue = [];
+        if (this.fd === null) {
+          this._open = fs70.open;
+          this._queue.push([this._open, this.path, this.flags, this.mode, void 0]);
+          this.flush();
+        }
+      }
+    }
+  }
+});
+
+// node_modules/graceful-fs/clone.js
+var require_clone = __commonJS({
+  "node_modules/graceful-fs/clone.js"(exports, module) {
+    "use strict";
+    module.exports = clone2;
+    var getPrototypeOf = Object.getPrototypeOf || function(obj) {
+      return obj.__proto__;
+    };
+    function clone2(obj) {
+      if (obj === null || typeof obj !== "object")
+        return obj;
+      if (obj instanceof Object)
+        var copy = { __proto__: getPrototypeOf(obj) };
+      else
+        var copy = /* @__PURE__ */ Object.create(null);
+      Object.getOwnPropertyNames(obj).forEach(function(key) {
+        Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(obj, key));
+      });
+      return copy;
+    }
+  }
+});
+
+// node_modules/graceful-fs/graceful-fs.js
+var require_graceful_fs = __commonJS({
+  "node_modules/graceful-fs/graceful-fs.js"(exports, module) {
+    var fs70 = __require("fs");
+    var polyfills = require_polyfills();
+    var legacy = require_legacy_streams();
+    var clone2 = require_clone();
+    var util2 = __require("util");
+    var gracefulQueue;
+    var previousSymbol;
+    if (typeof Symbol === "function" && typeof Symbol.for === "function") {
+      gracefulQueue = /* @__PURE__ */ Symbol.for("graceful-fs.queue");
+      previousSymbol = /* @__PURE__ */ Symbol.for("graceful-fs.previous");
+    } else {
+      gracefulQueue = "___graceful-fs.queue";
+      previousSymbol = "___graceful-fs.previous";
+    }
+    function noop() {
+    }
+    function publishQueue(context, queue2) {
+      Object.defineProperty(context, gracefulQueue, {
+        get: function() {
+          return queue2;
+        }
+      });
+    }
+    var debug = noop;
+    if (util2.debuglog)
+      debug = util2.debuglog("gfs4");
+    else if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || ""))
+      debug = function() {
+        var m = util2.format.apply(util2, arguments);
+        m = "GFS4: " + m.split(/\n/).join("\nGFS4: ");
+        console.error(m);
+      };
+    if (!fs70[gracefulQueue]) {
+      queue = global[gracefulQueue] || [];
+      publishQueue(fs70, queue);
+      fs70.close = (function(fs$close) {
+        function close(fd, cb) {
+          return fs$close.call(fs70, fd, function(err) {
+            if (!err) {
+              resetQueue();
+            }
+            if (typeof cb === "function")
+              cb.apply(this, arguments);
+          });
+        }
+        Object.defineProperty(close, previousSymbol, {
+          value: fs$close
+        });
+        return close;
+      })(fs70.close);
+      fs70.closeSync = (function(fs$closeSync) {
+        function closeSync(fd) {
+          fs$closeSync.apply(fs70, arguments);
+          resetQueue();
+        }
+        Object.defineProperty(closeSync, previousSymbol, {
+          value: fs$closeSync
+        });
+        return closeSync;
+      })(fs70.closeSync);
+      if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || "")) {
+        process.on("exit", function() {
+          debug(fs70[gracefulQueue]);
+          __require("assert").equal(fs70[gracefulQueue].length, 0);
+        });
+      }
+    }
+    var queue;
+    if (!global[gracefulQueue]) {
+      publishQueue(global, fs70[gracefulQueue]);
+    }
+    module.exports = patch(clone2(fs70));
+    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs70.__patched) {
+      module.exports = patch(fs70);
+      fs70.__patched = true;
+    }
+    function patch(fs71) {
+      polyfills(fs71);
+      fs71.gracefulify = patch;
+      fs71.createReadStream = createReadStream;
+      fs71.createWriteStream = createWriteStream;
+      var fs$readFile = fs71.readFile;
+      fs71.readFile = readFile;
+      function readFile(path70, options, cb) {
+        if (typeof options === "function")
+          cb = options, options = null;
+        return go$readFile(path70, options, cb);
+        function go$readFile(path71, options2, cb2, startTime) {
+          return fs$readFile(path71, options2, function(err) {
+            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
+              enqueue([go$readFile, [path71, options2, cb2], err, startTime || Date.now(), Date.now()]);
+            else {
+              if (typeof cb2 === "function")
+                cb2.apply(this, arguments);
+            }
+          });
+        }
+      }
+      var fs$writeFile = fs71.writeFile;
+      fs71.writeFile = writeFile;
+      function writeFile(path70, data, options, cb) {
+        if (typeof options === "function")
+          cb = options, options = null;
+        return go$writeFile(path70, data, options, cb);
+        function go$writeFile(path71, data2, options2, cb2, startTime) {
+          return fs$writeFile(path71, data2, options2, function(err) {
+            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
+              enqueue([go$writeFile, [path71, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+            else {
+              if (typeof cb2 === "function")
+                cb2.apply(this, arguments);
+            }
+          });
+        }
+      }
+      var fs$appendFile = fs71.appendFile;
+      if (fs$appendFile)
+        fs71.appendFile = appendFile;
+      function appendFile(path70, data, options, cb) {
+        if (typeof options === "function")
+          cb = options, options = null;
+        return go$appendFile(path70, data, options, cb);
+        function go$appendFile(path71, data2, options2, cb2, startTime) {
+          return fs$appendFile(path71, data2, options2, function(err) {
+            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
+              enqueue([go$appendFile, [path71, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+            else {
+              if (typeof cb2 === "function")
+                cb2.apply(this, arguments);
+            }
+          });
+        }
+      }
+      var fs$copyFile = fs71.copyFile;
+      if (fs$copyFile)
+        fs71.copyFile = copyFile;
+      function copyFile(src, dest, flags, cb) {
+        if (typeof flags === "function") {
+          cb = flags;
+          flags = 0;
+        }
+        return go$copyFile(src, dest, flags, cb);
+        function go$copyFile(src2, dest2, flags2, cb2, startTime) {
+          return fs$copyFile(src2, dest2, flags2, function(err) {
+            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
+              enqueue([go$copyFile, [src2, dest2, flags2, cb2], err, startTime || Date.now(), Date.now()]);
+            else {
+              if (typeof cb2 === "function")
+                cb2.apply(this, arguments);
+            }
+          });
+        }
+      }
+      var fs$readdir = fs71.readdir;
+      fs71.readdir = readdir;
+      var noReaddirOptionVersions = /^v[0-5]\./;
+      function readdir(path70, options, cb) {
+        if (typeof options === "function")
+          cb = options, options = null;
+        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path71, options2, cb2, startTime) {
+          return fs$readdir(path71, fs$readdirCallback(
+            path71,
+            options2,
+            cb2,
+            startTime
+          ));
+        } : function go$readdir2(path71, options2, cb2, startTime) {
+          return fs$readdir(path71, options2, fs$readdirCallback(
+            path71,
+            options2,
+            cb2,
+            startTime
+          ));
+        };
+        return go$readdir(path70, options, cb);
+        function fs$readdirCallback(path71, options2, cb2, startTime) {
+          return function(err, files) {
+            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
+              enqueue([
+                go$readdir,
+                [path71, options2, cb2],
+                err,
+                startTime || Date.now(),
+                Date.now()
+              ]);
+            else {
+              if (files && files.sort)
+                files.sort();
+              if (typeof cb2 === "function")
+                cb2.call(this, err, files);
+            }
+          };
+        }
+      }
+      if (process.version.substr(0, 4) === "v0.8") {
+        var legStreams = legacy(fs71);
+        ReadStream = legStreams.ReadStream;
+        WriteStream = legStreams.WriteStream;
+      }
+      var fs$ReadStream = fs71.ReadStream;
+      if (fs$ReadStream) {
+        ReadStream.prototype = Object.create(fs$ReadStream.prototype);
+        ReadStream.prototype.open = ReadStream$open;
+      }
+      var fs$WriteStream = fs71.WriteStream;
+      if (fs$WriteStream) {
+        WriteStream.prototype = Object.create(fs$WriteStream.prototype);
+        WriteStream.prototype.open = WriteStream$open;
+      }
+      Object.defineProperty(fs71, "ReadStream", {
+        get: function() {
+          return ReadStream;
+        },
+        set: function(val) {
+          ReadStream = val;
+        },
+        enumerable: true,
+        configurable: true
+      });
+      Object.defineProperty(fs71, "WriteStream", {
+        get: function() {
+          return WriteStream;
+        },
+        set: function(val) {
+          WriteStream = val;
+        },
+        enumerable: true,
+        configurable: true
+      });
+      var FileReadStream = ReadStream;
+      Object.defineProperty(fs71, "FileReadStream", {
+        get: function() {
+          return FileReadStream;
+        },
+        set: function(val) {
+          FileReadStream = val;
+        },
+        enumerable: true,
+        configurable: true
+      });
+      var FileWriteStream = WriteStream;
+      Object.defineProperty(fs71, "FileWriteStream", {
+        get: function() {
+          return FileWriteStream;
+        },
+        set: function(val) {
+          FileWriteStream = val;
+        },
+        enumerable: true,
+        configurable: true
+      });
+      function ReadStream(path70, options) {
+        if (this instanceof ReadStream)
+          return fs$ReadStream.apply(this, arguments), this;
+        else
+          return ReadStream.apply(Object.create(ReadStream.prototype), arguments);
+      }
+      function ReadStream$open() {
+        var that = this;
+        open2(that.path, that.flags, that.mode, function(err, fd) {
+          if (err) {
+            if (that.autoClose)
+              that.destroy();
+            that.emit("error", err);
+          } else {
+            that.fd = fd;
+            that.emit("open", fd);
+            that.read();
+          }
+        });
+      }
+      function WriteStream(path70, options) {
+        if (this instanceof WriteStream)
+          return fs$WriteStream.apply(this, arguments), this;
+        else
+          return WriteStream.apply(Object.create(WriteStream.prototype), arguments);
+      }
+      function WriteStream$open() {
+        var that = this;
+        open2(that.path, that.flags, that.mode, function(err, fd) {
+          if (err) {
+            that.destroy();
+            that.emit("error", err);
+          } else {
+            that.fd = fd;
+            that.emit("open", fd);
+          }
+        });
+      }
+      function createReadStream(path70, options) {
+        return new fs71.ReadStream(path70, options);
+      }
+      function createWriteStream(path70, options) {
+        return new fs71.WriteStream(path70, options);
+      }
+      var fs$open = fs71.open;
+      fs71.open = open2;
+      function open2(path70, flags, mode, cb) {
+        if (typeof mode === "function")
+          cb = mode, mode = null;
+        return go$open(path70, flags, mode, cb);
+        function go$open(path71, flags2, mode2, cb2, startTime) {
+          return fs$open(path71, flags2, mode2, function(err, fd) {
+            if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
+              enqueue([go$open, [path71, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
+            else {
+              if (typeof cb2 === "function")
+                cb2.apply(this, arguments);
+            }
+          });
+        }
+      }
+      return fs71;
+    }
+    function enqueue(elem) {
+      debug("ENQUEUE", elem[0].name, elem[1]);
+      fs70[gracefulQueue].push(elem);
+      retry();
+    }
+    var retryTimer;
+    function resetQueue() {
+      var now = Date.now();
+      for (var i = 0; i < fs70[gracefulQueue].length; ++i) {
+        if (fs70[gracefulQueue][i].length > 2) {
+          fs70[gracefulQueue][i][3] = now;
+          fs70[gracefulQueue][i][4] = now;
+        }
+      }
+      retry();
+    }
+    function retry() {
+      clearTimeout(retryTimer);
+      retryTimer = void 0;
+      if (fs70[gracefulQueue].length === 0)
+        return;
+      var elem = fs70[gracefulQueue].shift();
+      var fn = elem[0];
+      var args = elem[1];
+      var err = elem[2];
+      var startTime = elem[3];
+      var lastTime = elem[4];
+      if (startTime === void 0) {
+        debug("RETRY", fn.name, args);
+        fn.apply(null, args);
+      } else if (Date.now() - startTime >= 6e4) {
+        debug("TIMEOUT", fn.name, args);
+        var cb = args.pop();
+        if (typeof cb === "function")
+          cb.call(null, err);
+      } else {
+        var sinceAttempt = Date.now() - lastTime;
+        var sinceStart = Math.max(lastTime - startTime, 1);
+        var desiredDelay = Math.min(sinceStart * 1.2, 100);
+        if (sinceAttempt >= desiredDelay) {
+          debug("RETRY", fn.name, args);
+          fn.apply(null, args.concat([startTime]));
+        } else {
+          fs70[gracefulQueue].push(elem);
+        }
+      }
+      if (retryTimer === void 0) {
+        retryTimer = setTimeout(retry, 0);
+      }
+    }
+  }
+});
+
+// node_modules/retry/lib/retry_operation.js
+var require_retry_operation = __commonJS({
+  "node_modules/retry/lib/retry_operation.js"(exports, module) {
+    function RetryOperation(timeouts, options) {
+      if (typeof options === "boolean") {
+        options = { forever: options };
+      }
+      this._originalTimeouts = JSON.parse(JSON.stringify(timeouts));
+      this._timeouts = timeouts;
+      this._options = options || {};
+      this._maxRetryTime = options && options.maxRetryTime || Infinity;
+      this._fn = null;
+      this._errors = [];
+      this._attempts = 1;
+      this._operationTimeout = null;
+      this._operationTimeoutCb = null;
+      this._timeout = null;
+      this._operationStart = null;
+      if (this._options.forever) {
+        this._cachedTimeouts = this._timeouts.slice(0);
+      }
+    }
+    module.exports = RetryOperation;
+    RetryOperation.prototype.reset = function() {
+      this._attempts = 1;
+      this._timeouts = this._originalTimeouts;
+    };
+    RetryOperation.prototype.stop = function() {
+      if (this._timeout) {
+        clearTimeout(this._timeout);
+      }
+      this._timeouts = [];
+      this._cachedTimeouts = null;
+    };
+    RetryOperation.prototype.retry = function(err) {
+      if (this._timeout) {
+        clearTimeout(this._timeout);
+      }
+      if (!err) {
+        return false;
+      }
+      var currentTime = (/* @__PURE__ */ new Date()).getTime();
+      if (err && currentTime - this._operationStart >= this._maxRetryTime) {
+        this._errors.unshift(new Error("RetryOperation timeout occurred"));
+        return false;
+      }
+      this._errors.push(err);
+      var timeout = this._timeouts.shift();
+      if (timeout === void 0) {
+        if (this._cachedTimeouts) {
+          this._errors.splice(this._errors.length - 1, this._errors.length);
+          this._timeouts = this._cachedTimeouts.slice(0);
+          timeout = this._timeouts.shift();
+        } else {
+          return false;
+        }
+      }
+      var self = this;
+      var timer = setTimeout(function() {
+        self._attempts++;
+        if (self._operationTimeoutCb) {
+          self._timeout = setTimeout(function() {
+            self._operationTimeoutCb(self._attempts);
+          }, self._operationTimeout);
+          if (self._options.unref) {
+            self._timeout.unref();
+          }
+        }
+        self._fn(self._attempts);
+      }, timeout);
+      if (this._options.unref) {
+        timer.unref();
+      }
+      return true;
+    };
+    RetryOperation.prototype.attempt = function(fn, timeoutOps) {
+      this._fn = fn;
+      if (timeoutOps) {
+        if (timeoutOps.timeout) {
+          this._operationTimeout = timeoutOps.timeout;
+        }
+        if (timeoutOps.cb) {
+          this._operationTimeoutCb = timeoutOps.cb;
+        }
+      }
+      var self = this;
+      if (this._operationTimeoutCb) {
+        this._timeout = setTimeout(function() {
+          self._operationTimeoutCb();
+        }, self._operationTimeout);
+      }
+      this._operationStart = (/* @__PURE__ */ new Date()).getTime();
+      this._fn(this._attempts);
+    };
+    RetryOperation.prototype.try = function(fn) {
+      console.log("Using RetryOperation.try() is deprecated");
+      this.attempt(fn);
+    };
+    RetryOperation.prototype.start = function(fn) {
+      console.log("Using RetryOperation.start() is deprecated");
+      this.attempt(fn);
+    };
+    RetryOperation.prototype.start = RetryOperation.prototype.try;
+    RetryOperation.prototype.errors = function() {
+      return this._errors;
+    };
+    RetryOperation.prototype.attempts = function() {
+      return this._attempts;
+    };
+    RetryOperation.prototype.mainError = function() {
+      if (this._errors.length === 0) {
+        return null;
+      }
+      var counts = {};
+      var mainError = null;
+      var mainErrorCount = 0;
+      for (var i = 0; i < this._errors.length; i++) {
+        var error2 = this._errors[i];
+        var message = error2.message;
+        var count2 = (counts[message] || 0) + 1;
+        counts[message] = count2;
+        if (count2 >= mainErrorCount) {
+          mainError = error2;
+          mainErrorCount = count2;
+        }
+      }
+      return mainError;
+    };
+  }
+});
+
+// node_modules/retry/lib/retry.js
+var require_retry = __commonJS({
+  "node_modules/retry/lib/retry.js"(exports) {
+    var RetryOperation = require_retry_operation();
+    exports.operation = function(options) {
+      var timeouts = exports.timeouts(options);
+      return new RetryOperation(timeouts, {
+        forever: options && options.forever,
+        unref: options && options.unref,
+        maxRetryTime: options && options.maxRetryTime
+      });
+    };
+    exports.timeouts = function(options) {
+      if (options instanceof Array) {
+        return [].concat(options);
+      }
+      var opts = {
+        retries: 10,
+        factor: 2,
+        minTimeout: 1 * 1e3,
+        maxTimeout: Infinity,
+        randomize: false
+      };
+      for (var key in options) {
+        opts[key] = options[key];
+      }
+      if (opts.minTimeout > opts.maxTimeout) {
+        throw new Error("minTimeout is greater than maxTimeout");
+      }
+      var timeouts = [];
+      for (var i = 0; i < opts.retries; i++) {
+        timeouts.push(this.createTimeout(i, opts));
+      }
+      if (options && options.forever && !timeouts.length) {
+        timeouts.push(this.createTimeout(i, opts));
+      }
+      timeouts.sort(function(a, b) {
+        return a - b;
+      });
+      return timeouts;
+    };
+    exports.createTimeout = function(attempt, opts) {
+      var random = opts.randomize ? Math.random() + 1 : 1;
+      var timeout = Math.round(random * opts.minTimeout * Math.pow(opts.factor, attempt));
+      timeout = Math.min(timeout, opts.maxTimeout);
+      return timeout;
+    };
+    exports.wrap = function(obj, options, methods) {
+      if (options instanceof Array) {
+        methods = options;
+        options = null;
+      }
+      if (!methods) {
+        methods = [];
+        for (var key in obj) {
+          if (typeof obj[key] === "function") {
+            methods.push(key);
+          }
+        }
+      }
+      for (var i = 0; i < methods.length; i++) {
+        var method = methods[i];
+        var original = obj[method];
+        obj[method] = function retryWrapper(original2) {
+          var op = exports.operation(options);
+          var args = Array.prototype.slice.call(arguments, 1);
+          var callback = args.pop();
+          args.push(function(err) {
+            if (op.retry(err)) {
+              return;
+            }
+            if (err) {
+              arguments[0] = op.mainError();
+            }
+            callback.apply(this, arguments);
+          });
+          op.attempt(function() {
+            original2.apply(obj, args);
+          });
+        }.bind(obj, original);
+        obj[method].options = options;
+      }
+    };
+  }
+});
+
+// node_modules/retry/index.js
+var require_retry2 = __commonJS({
+  "node_modules/retry/index.js"(exports, module) {
+    module.exports = require_retry();
+  }
+});
+
+// node_modules/signal-exit/signals.js
+var require_signals = __commonJS({
+  "node_modules/signal-exit/signals.js"(exports, module) {
+    module.exports = [
+      "SIGABRT",
+      "SIGALRM",
+      "SIGHUP",
+      "SIGINT",
+      "SIGTERM"
+    ];
+    if (process.platform !== "win32") {
+      module.exports.push(
+        "SIGVTALRM",
+        "SIGXCPU",
+        "SIGXFSZ",
+        "SIGUSR2",
+        "SIGTRAP",
+        "SIGSYS",
+        "SIGQUIT",
+        "SIGIOT"
+        // should detect profiler and enable/disable accordingly.
+        // see #21
+        // 'SIGPROF'
+      );
+    }
+    if (process.platform === "linux") {
+      module.exports.push(
+        "SIGIO",
+        "SIGPOLL",
+        "SIGPWR",
+        "SIGSTKFLT",
+        "SIGUNUSED"
+      );
+    }
+  }
+});
+
+// node_modules/signal-exit/index.js
+var require_signal_exit = __commonJS({
+  "node_modules/signal-exit/index.js"(exports, module) {
+    var process9 = global.process;
+    var processOk = function(process10) {
+      return process10 && typeof process10 === "object" && typeof process10.removeListener === "function" && typeof process10.emit === "function" && typeof process10.reallyExit === "function" && typeof process10.listeners === "function" && typeof process10.kill === "function" && typeof process10.pid === "number" && typeof process10.on === "function";
+    };
+    if (!processOk(process9)) {
+      module.exports = function() {
+        return function() {
+        };
+      };
+    } else {
+      assert2 = __require("assert");
+      signals = require_signals();
+      isWin = /^win/i.test(process9.platform);
+      EE = __require("events");
+      if (typeof EE !== "function") {
+        EE = EE.EventEmitter;
+      }
+      if (process9.__signal_exit_emitter__) {
+        emitter = process9.__signal_exit_emitter__;
+      } else {
+        emitter = process9.__signal_exit_emitter__ = new EE();
+        emitter.count = 0;
+        emitter.emitted = {};
+      }
+      if (!emitter.infinite) {
+        emitter.setMaxListeners(Infinity);
+        emitter.infinite = true;
+      }
+      module.exports = function(cb, opts) {
+        if (!processOk(global.process)) {
+          return function() {
+          };
+        }
+        assert2.equal(typeof cb, "function", "a callback must be provided for exit handler");
+        if (loaded === false) {
+          load();
+        }
+        var ev = "exit";
+        if (opts && opts.alwaysLast) {
+          ev = "afterexit";
+        }
+        var remove = function() {
+          emitter.removeListener(ev, cb);
+          if (emitter.listeners("exit").length === 0 && emitter.listeners("afterexit").length === 0) {
+            unload();
+          }
+        };
+        emitter.on(ev, cb);
+        return remove;
+      };
+      unload = function unload2() {
+        if (!loaded || !processOk(global.process)) {
+          return;
+        }
+        loaded = false;
+        signals.forEach(function(sig) {
+          try {
+            process9.removeListener(sig, sigListeners[sig]);
+          } catch (er) {
+          }
+        });
+        process9.emit = originalProcessEmit;
+        process9.reallyExit = originalProcessReallyExit;
+        emitter.count -= 1;
+      };
+      module.exports.unload = unload;
+      emit = function emit2(event, code, signal) {
+        if (emitter.emitted[event]) {
+          return;
+        }
+        emitter.emitted[event] = true;
+        emitter.emit(event, code, signal);
+      };
+      sigListeners = {};
+      signals.forEach(function(sig) {
+        sigListeners[sig] = function listener() {
+          if (!processOk(global.process)) {
+            return;
+          }
+          var listeners = process9.listeners(sig);
+          if (listeners.length === emitter.count) {
+            unload();
+            emit("exit", null, sig);
+            emit("afterexit", null, sig);
+            if (isWin && sig === "SIGHUP") {
+              sig = "SIGINT";
+            }
+            process9.kill(process9.pid, sig);
+          }
+        };
+      });
+      module.exports.signals = function() {
+        return signals;
+      };
+      loaded = false;
+      load = function load2() {
+        if (loaded || !processOk(global.process)) {
+          return;
+        }
+        loaded = true;
+        emitter.count += 1;
+        signals = signals.filter(function(sig) {
+          try {
+            process9.on(sig, sigListeners[sig]);
+            return true;
+          } catch (er) {
+            return false;
+          }
+        });
+        process9.emit = processEmit;
+        process9.reallyExit = processReallyExit;
+      };
+      module.exports.load = load;
+      originalProcessReallyExit = process9.reallyExit;
+      processReallyExit = function processReallyExit2(code) {
+        if (!processOk(global.process)) {
+          return;
+        }
+        process9.exitCode = code || /* istanbul ignore next */
+        0;
+        emit("exit", process9.exitCode, null);
+        emit("afterexit", process9.exitCode, null);
+        originalProcessReallyExit.call(process9, process9.exitCode);
+      };
+      originalProcessEmit = process9.emit;
+      processEmit = function processEmit2(ev, arg) {
+        if (ev === "exit" && processOk(global.process)) {
+          if (arg !== void 0) {
+            process9.exitCode = arg;
+          }
+          var ret = originalProcessEmit.apply(this, arguments);
+          emit("exit", process9.exitCode, null);
+          emit("afterexit", process9.exitCode, null);
+          return ret;
+        } else {
+          return originalProcessEmit.apply(this, arguments);
+        }
+      };
+    }
+    var assert2;
+    var signals;
+    var isWin;
+    var EE;
+    var emitter;
+    var unload;
+    var emit;
+    var sigListeners;
+    var loaded;
+    var load;
+    var originalProcessReallyExit;
+    var processReallyExit;
+    var originalProcessEmit;
+    var processEmit;
+  }
+});
+
+// node_modules/proper-lockfile/lib/mtime-precision.js
+var require_mtime_precision = __commonJS({
+  "node_modules/proper-lockfile/lib/mtime-precision.js"(exports, module) {
+    "use strict";
+    var cacheSymbol = /* @__PURE__ */ Symbol();
+    function probe(file, fs70, callback) {
+      const cachedPrecision = fs70[cacheSymbol];
+      if (cachedPrecision) {
+        return fs70.stat(file, (err, stat) => {
+          if (err) {
+            return callback(err);
+          }
+          callback(null, stat.mtime, cachedPrecision);
+        });
+      }
+      const mtime = new Date(Math.ceil(Date.now() / 1e3) * 1e3 + 5);
+      fs70.utimes(file, mtime, mtime, (err) => {
+        if (err) {
+          return callback(err);
+        }
+        fs70.stat(file, (err2, stat) => {
+          if (err2) {
+            return callback(err2);
+          }
+          const precision = stat.mtime.getTime() % 1e3 === 0 ? "s" : "ms";
+          Object.defineProperty(fs70, cacheSymbol, { value: precision });
+          callback(null, stat.mtime, precision);
+        });
+      });
+    }
+    function getMtime(precision) {
+      let now = Date.now();
+      if (precision === "s") {
+        now = Math.ceil(now / 1e3) * 1e3;
+      }
+      return new Date(now);
+    }
+    module.exports.probe = probe;
+    module.exports.getMtime = getMtime;
+  }
+});
+
+// node_modules/proper-lockfile/lib/lockfile.js
+var require_lockfile = __commonJS({
+  "node_modules/proper-lockfile/lib/lockfile.js"(exports, module) {
+    "use strict";
+    var path70 = __require("path");
+    var fs70 = require_graceful_fs();
+    var retry = require_retry2();
+    var onExit = require_signal_exit();
+    var mtimePrecision = require_mtime_precision();
+    var locks = {};
+    function getLockFile(file, options) {
+      return options.lockfilePath || `${file}.lock`;
+    }
+    function resolveCanonicalPath(file, options, callback) {
+      if (!options.realpath) {
+        return callback(null, path70.resolve(file));
+      }
+      options.fs.realpath(file, callback);
+    }
+    function acquireLock(file, options, callback) {
+      const lockfilePath = getLockFile(file, options);
+      options.fs.mkdir(lockfilePath, (err) => {
+        if (!err) {
+          return mtimePrecision.probe(lockfilePath, options.fs, (err2, mtime, mtimePrecision2) => {
+            if (err2) {
+              options.fs.rmdir(lockfilePath, () => {
+              });
+              return callback(err2);
+            }
+            callback(null, mtime, mtimePrecision2);
+          });
+        }
+        if (err.code !== "EEXIST") {
+          return callback(err);
+        }
+        if (options.stale <= 0) {
+          return callback(Object.assign(new Error("Lock file is already being held"), { code: "ELOCKED", file }));
+        }
+        options.fs.stat(lockfilePath, (err2, stat) => {
+          if (err2) {
+            if (err2.code === "ENOENT") {
+              return acquireLock(file, { ...options, stale: 0 }, callback);
+            }
+            return callback(err2);
+          }
+          if (!isLockStale(stat, options)) {
+            return callback(Object.assign(new Error("Lock file is already being held"), { code: "ELOCKED", file }));
+          }
+          removeLock(file, options, (err3) => {
+            if (err3) {
+              return callback(err3);
+            }
+            acquireLock(file, { ...options, stale: 0 }, callback);
+          });
+        });
+      });
+    }
+    function isLockStale(stat, options) {
+      return stat.mtime.getTime() < Date.now() - options.stale;
+    }
+    function removeLock(file, options, callback) {
+      options.fs.rmdir(getLockFile(file, options), (err) => {
+        if (err && err.code !== "ENOENT") {
+          return callback(err);
+        }
+        callback();
+      });
+    }
+    function updateLock(file, options) {
+      const lock2 = locks[file];
+      if (lock2.updateTimeout) {
+        return;
+      }
+      lock2.updateDelay = lock2.updateDelay || options.update;
+      lock2.updateTimeout = setTimeout(() => {
+        lock2.updateTimeout = null;
+        options.fs.stat(lock2.lockfilePath, (err, stat) => {
+          const isOverThreshold = lock2.lastUpdate + options.stale < Date.now();
+          if (err) {
+            if (err.code === "ENOENT" || isOverThreshold) {
+              return setLockAsCompromised(file, lock2, Object.assign(err, { code: "ECOMPROMISED" }));
+            }
+            lock2.updateDelay = 1e3;
+            return updateLock(file, options);
+          }
+          const isMtimeOurs = lock2.mtime.getTime() === stat.mtime.getTime();
+          if (!isMtimeOurs) {
+            return setLockAsCompromised(
+              file,
+              lock2,
+              Object.assign(
+                new Error("Unable to update lock within the stale threshold"),
+                { code: "ECOMPROMISED" }
+              )
+            );
+          }
+          const mtime = mtimePrecision.getMtime(lock2.mtimePrecision);
+          options.fs.utimes(lock2.lockfilePath, mtime, mtime, (err2) => {
+            const isOverThreshold2 = lock2.lastUpdate + options.stale < Date.now();
+            if (lock2.released) {
+              return;
+            }
+            if (err2) {
+              if (err2.code === "ENOENT" || isOverThreshold2) {
+                return setLockAsCompromised(file, lock2, Object.assign(err2, { code: "ECOMPROMISED" }));
+              }
+              lock2.updateDelay = 1e3;
+              return updateLock(file, options);
+            }
+            lock2.mtime = mtime;
+            lock2.lastUpdate = Date.now();
+            lock2.updateDelay = null;
+            updateLock(file, options);
+          });
+        });
+      }, lock2.updateDelay);
+      if (lock2.updateTimeout.unref) {
+        lock2.updateTimeout.unref();
+      }
+    }
+    function setLockAsCompromised(file, lock2, err) {
+      lock2.released = true;
+      if (lock2.updateTimeout) {
+        clearTimeout(lock2.updateTimeout);
+      }
+      if (locks[file] === lock2) {
+        delete locks[file];
+      }
+      lock2.options.onCompromised(err);
+    }
+    function lock(file, options, callback) {
+      options = {
+        stale: 1e4,
+        update: null,
+        realpath: true,
+        retries: 0,
+        fs: fs70,
+        onCompromised: (err) => {
+          throw err;
+        },
+        ...options
+      };
+      options.retries = options.retries || 0;
+      options.retries = typeof options.retries === "number" ? { retries: options.retries } : options.retries;
+      options.stale = Math.max(options.stale || 0, 2e3);
+      options.update = options.update == null ? options.stale / 2 : options.update || 0;
+      options.update = Math.max(Math.min(options.update, options.stale / 2), 1e3);
+      resolveCanonicalPath(file, options, (err, file2) => {
+        if (err) {
+          return callback(err);
+        }
+        const operation = retry.operation(options.retries);
+        operation.attempt(() => {
+          acquireLock(file2, options, (err2, mtime, mtimePrecision2) => {
+            if (operation.retry(err2)) {
+              return;
+            }
+            if (err2) {
+              return callback(operation.mainError());
+            }
+            const lock2 = locks[file2] = {
+              lockfilePath: getLockFile(file2, options),
+              mtime,
+              mtimePrecision: mtimePrecision2,
+              options,
+              lastUpdate: Date.now()
+            };
+            updateLock(file2, options);
+            callback(null, (releasedCallback) => {
+              if (lock2.released) {
+                return releasedCallback && releasedCallback(Object.assign(new Error("Lock is already released"), { code: "ERELEASED" }));
+              }
+              unlock(file2, { ...options, realpath: false }, releasedCallback);
+            });
+          });
+        });
+      });
+    }
+    function unlock(file, options, callback) {
+      options = {
+        fs: fs70,
+        realpath: true,
+        ...options
+      };
+      resolveCanonicalPath(file, options, (err, file2) => {
+        if (err) {
+          return callback(err);
+        }
+        const lock2 = locks[file2];
+        if (!lock2) {
+          return callback(Object.assign(new Error("Lock is not acquired/owned by you"), { code: "ENOTACQUIRED" }));
+        }
+        lock2.updateTimeout && clearTimeout(lock2.updateTimeout);
+        lock2.released = true;
+        delete locks[file2];
+        removeLock(file2, options, callback);
+      });
+    }
+    function check2(file, options, callback) {
+      options = {
+        stale: 1e4,
+        realpath: true,
+        fs: fs70,
+        ...options
+      };
+      options.stale = Math.max(options.stale || 0, 2e3);
+      resolveCanonicalPath(file, options, (err, file2) => {
+        if (err) {
+          return callback(err);
+        }
+        options.fs.stat(getLockFile(file2, options), (err2, stat) => {
+          if (err2) {
+            return err2.code === "ENOENT" ? callback(null, false) : callback(err2);
+          }
+          return callback(null, !isLockStale(stat, options));
+        });
+      });
+    }
+    function getLocks() {
+      return locks;
+    }
+    onExit(() => {
+      for (const file in locks) {
+        const options = locks[file].options;
+        try {
+          options.fs.rmdirSync(getLockFile(file, options));
+        } catch (e) {
+        }
+      }
+    });
+    module.exports.lock = lock;
+    module.exports.unlock = unlock;
+    module.exports.check = check2;
+    module.exports.getLocks = getLocks;
+  }
+});
+
+// node_modules/proper-lockfile/lib/adapter.js
+var require_adapter = __commonJS({
+  "node_modules/proper-lockfile/lib/adapter.js"(exports, module) {
+    "use strict";
+    var fs70 = require_graceful_fs();
+    function createSyncFs(fs71) {
+      const methods = ["mkdir", "realpath", "stat", "rmdir", "utimes"];
+      const newFs = { ...fs71 };
+      methods.forEach((method) => {
+        newFs[method] = (...args) => {
+          const callback = args.pop();
+          let ret;
+          try {
+            ret = fs71[`${method}Sync`](...args);
+          } catch (err) {
+            return callback(err);
+          }
+          callback(null, ret);
+        };
+      });
+      return newFs;
+    }
+    function toPromise(method) {
+      return (...args) => new Promise((resolve, reject) => {
+        args.push((err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(result);
+          }
+        });
+        method(...args);
+      });
+    }
+    function toSync(method) {
+      return (...args) => {
+        let err;
+        let result;
+        args.push((_err, _result) => {
+          err = _err;
+          result = _result;
+        });
+        method(...args);
+        if (err) {
+          throw err;
+        }
+        return result;
+      };
+    }
+    function toSyncOptions(options) {
+      options = { ...options };
+      options.fs = createSyncFs(options.fs || fs70);
+      if (typeof options.retries === "number" && options.retries > 0 || options.retries && typeof options.retries.retries === "number" && options.retries.retries > 0) {
+        throw Object.assign(new Error("Cannot use retries with the sync api"), { code: "ESYNC" });
+      }
+      return options;
+    }
+    module.exports = {
+      toPromise,
+      toSync,
+      toSyncOptions
+    };
+  }
+});
+
+// node_modules/proper-lockfile/index.js
+var require_proper_lockfile = __commonJS({
+  "node_modules/proper-lockfile/index.js"(exports, module) {
+    "use strict";
+    var lockfile8 = require_lockfile();
+    var { toPromise, toSync, toSyncOptions } = require_adapter();
+    async function lock(file, options) {
+      const release = await toPromise(lockfile8.lock)(file, options);
+      return toPromise(release);
+    }
+    function lockSync(file, options) {
+      const release = toSync(lockfile8.lock)(file, toSyncOptions(options));
+      return toSync(release);
+    }
+    function unlock(file, options) {
+      return toPromise(lockfile8.unlock)(file, options);
+    }
+    function unlockSync(file, options) {
+      return toSync(lockfile8.unlock)(file, toSyncOptions(options));
+    }
+    function check2(file, options) {
+      return toPromise(lockfile8.check)(file, options);
+    }
+    function checkSync(file, options) {
+      return toSync(lockfile8.check)(file, toSyncOptions(options));
+    }
+    module.exports = lock;
+    module.exports.lock = lock;
+    module.exports.unlock = unlock;
+    module.exports.lockSync = lockSync;
+    module.exports.unlockSync = unlockSync;
+    module.exports.check = check2;
+    module.exports.checkSync = checkSync;
   }
 });
 
@@ -13436,6 +13061,381 @@ var require_dist = __commonJS({
   }
 });
 
+// src/utils/errors.ts
+function formatPlatformIOError(error2) {
+  if (error2 instanceof PlatformIONotInstalledError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Install PlatformIO Core CLI: https://docs.platformio.org/en/latest/core/installation.html
+2. Ensure 'pio' or 'platformio' is in your system PATH
+3. Try running: pip install platformio`;
+  }
+  if (error2 instanceof BoardNotFoundError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Check board ID spelling (case-sensitive)
+2. List available boards with: pio boards
+3. Search for your board at: https://docs.platformio.org/en/latest/boards/`;
+  }
+  if (error2 instanceof ProjectInitError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Ensure the target directory exists and is writable
+2. Verify the board ID is correct
+3. Check that the framework is supported for this board`;
+  }
+  if (error2 instanceof BuildError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Check your source code for syntax errors
+2. Ensure all required libraries are installed
+3. Verify platformio.ini configuration is correct
+4. Try cleaning the project: pio run -t clean`;
+  }
+  if (error2 instanceof UploadError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Ensure the device is connected and powered
+2. Check USB cable and drivers
+3. Verify the correct port is specified
+4. Try resetting the device
+5. Check that no other programs are using the serial port`;
+  }
+  if (error2 instanceof LibraryError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Check library name spelling
+2. Verify internet connection
+3. Try updating library registry: pio lib update`;
+  }
+  if (error2 instanceof PlatformIOError) {
+    let message = error2.message;
+    if (error2.context) {
+      message += "\n\nContext: " + JSON.stringify(error2.context, null, 2);
+    }
+    return message;
+  }
+  if (error2 instanceof Error) {
+    return error2.message;
+  }
+  return String(error2);
+}
+function parseStderrErrors(stderr) {
+  const errors = [];
+  const lines2 = stderr.split("\n");
+  for (const line of lines2) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.includes("error:") || trimmed.includes("Error:") || trimmed.includes("ERROR:") || trimmed.includes("fatal:") || trimmed.includes("Failed")) {
+      errors.push(trimmed);
+    }
+  }
+  return errors;
+}
+function parseStructuredBuildErrors(log) {
+  if (!log) return [];
+  const out = [];
+  const lines2 = log.split(/\r?\n/);
+  const reMissingHeader = /^(.*?):(\d+)(?::\d+)?:\s*fatal error:\s*([^:]+?):\s*No such file or directory/i;
+  const reSyntax = /^(.*?):(\d+)(?::\d+)?:\s*error:\s*(.+)$/i;
+  const reUndefRef = /undefined reference to\s+[`']?([^'"`\s]+)[`']?/i;
+  const reMissingIni = /(platformio\.ini.*not (found|exist))|Project does not seem to be a PlatformIO Project/i;
+  const reMissingEnv = /UnknownEnvNames|environment.*not found|UndefinedEnvError/i;
+  const reLibMissing = /Library Manager:\s*(Warning|Error).*not found|LibraryNotFound/i;
+  const rePermission = /(EACCES|Permission denied|EPERM)/i;
+  const reToolchain = /(Could not install package|failed to download|PackageException)/i;
+  for (const line of lines2) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let m;
+    if (m = reMissingHeader.exec(trimmed)) {
+      out.push({
+        category: "missing_header",
+        message: `Missing header: ${m[3]} (in ${m[1]}:${m[2]})`,
+        file: m[1],
+        line: Number(m[2]),
+        raw: trimmed
+      });
+      continue;
+    }
+    if (m = reUndefRef.exec(trimmed)) {
+      out.push({
+        category: "undefined_reference",
+        message: `Undefined reference to '${m[1]}' \u2014 symbol not linked.`,
+        raw: trimmed
+      });
+      continue;
+    }
+    if (m = reSyntax.exec(trimmed)) {
+      out.push({
+        category: "syntax",
+        message: `${m[3]} (in ${m[1]}:${m[2]})`,
+        file: m[1],
+        line: Number(m[2]),
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reMissingIni.test(trimmed)) {
+      out.push({
+        category: "missing_platformio_ini",
+        message: "platformio.ini missing or invalid \u2014 project is not initialized.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reMissingEnv.test(trimmed)) {
+      out.push({
+        category: "missing_environment",
+        message: "Requested environment is not defined in platformio.ini.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reLibMissing.test(trimmed)) {
+      out.push({
+        category: "missing_library",
+        message: "A required library is missing or could not be resolved.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (rePermission.test(trimmed)) {
+      out.push({
+        category: "permission",
+        message: "Permission denied accessing project / build artifacts.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reToolchain.test(trimmed)) {
+      out.push({
+        category: "toolchain",
+        message: "Toolchain/package install failed \u2014 likely a network or registry issue.",
+        raw: trimmed
+      });
+      continue;
+    }
+  }
+  const seen = /* @__PURE__ */ new Set();
+  return out.filter((e) => {
+    const k = e.category + "|" + e.message;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+function deriveNextSteps(errors, success) {
+  if (success) {
+    return [
+      "Build succeeded. Call upload_firmware (preferred over `pio run --target upload`) to flash the device.",
+      "Optionally call start_monitor to capture serial output, then query_logs to inspect it."
+    ];
+  }
+  const tips = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const e of errors) {
+    if (seen.has(e.category)) continue;
+    seen.add(e.category);
+    switch (e.category) {
+      case "missing_header":
+        tips.push(
+          "Header file not found \u2014 add the providing library to `lib_deps` in platformio.ini (search via `search_libraries`), then call `build_project` again."
+        );
+        break;
+      case "undefined_reference":
+        tips.push(
+          "Undefined linker reference \u2014 ensure the source/library that defines this symbol is present. If it's from a third-party library, add it to `lib_deps` and rebuild."
+        );
+        break;
+      case "syntax":
+        tips.push(
+          "Syntax error in source \u2014 open the indicated file:line, fix the offending statement, then call `build_project` again. Avoid re-issuing the same edit twice."
+        );
+        break;
+      case "missing_library":
+        tips.push(
+          "Library could not be resolved \u2014 verify the entry in `lib_deps`, run `search_libraries` to confirm the registry id, then rebuild."
+        );
+        break;
+      case "missing_platformio_ini":
+        tips.push(
+          "platformio.ini is missing or malformed \u2014 run `init_project` to regenerate the scaffold, then `build_project` again."
+        );
+        break;
+      case "missing_environment":
+        tips.push(
+          "Environment not declared in platformio.ini \u2014 call `get_project_config` to inspect available environments, then pass the correct `environment` argument to `build_project`."
+        );
+        break;
+      case "permission":
+        tips.push(
+          "Filesystem permission error \u2014 verify the project directory is writable and not held by another process; on macOS check that Terminal/IDE has Full Disk Access."
+        );
+        break;
+      case "toolchain":
+        tips.push(
+          "Toolchain/package install failed \u2014 check network access; if behind a proxy, configure PlatformIO accordingly, then rebuild."
+        );
+        break;
+      case "unknown":
+      default:
+        break;
+    }
+  }
+  if (tips.length === 0) {
+    tips.push(
+      "Build failed but no structured error was matched. Read the bottom of the build log for the actual gcc/clang error, then make the smallest targeted edit and call `build_project` again."
+    );
+  }
+  tips.push(
+    "Use the `build_project` MCP tool to compile \u2014 do NOT run `pio run` in a terminal; the MCP path integrates with the hardware lock, cache, and structured error parser."
+  );
+  return tips;
+}
+function isPlatformIONotFoundError(error2) {
+  if (error2 instanceof Error) {
+    const message = error2.message.toLowerCase();
+    return message.includes("enoent") || message.includes("not found") || message.includes("command not found") || message.includes("platformio") && message.includes("not recognized");
+  }
+  return false;
+}
+var PlatformIOError, PlatformIONotInstalledError, BoardNotFoundError, ProjectInitError, BuildError, UploadError, LibraryError, CommandTimeoutError;
+var init_errors2 = __esm({
+  "src/utils/errors.ts"() {
+    "use strict";
+    PlatformIOError = class extends Error {
+      constructor(message, code, context) {
+        super(message);
+        this.code = code;
+        this.context = context;
+        this.name = "PlatformIOError";
+        Error.captureStackTrace(this, this.constructor);
+      }
+      code;
+      context;
+    };
+    PlatformIONotInstalledError = class extends PlatformIOError {
+      constructor(message = "PlatformIO CLI is not installed or not found in PATH") {
+        super(message, "PLATFORMIO_NOT_INSTALLED");
+        this.name = "PlatformIONotInstalledError";
+      }
+    };
+    BoardNotFoundError = class extends PlatformIOError {
+      constructor(boardId) {
+        super(
+          `Board '${boardId}' not found in PlatformIO registry`,
+          "BOARD_NOT_FOUND",
+          { boardId }
+        );
+        this.name = "BoardNotFoundError";
+      }
+    };
+    ProjectInitError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "PROJECT_INIT_FAILED", context);
+        this.name = "ProjectInitError";
+      }
+    };
+    BuildError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "BUILD_FAILED", context);
+        this.name = "BuildError";
+      }
+    };
+    UploadError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "UPLOAD_FAILED", context);
+        this.name = "UploadError";
+      }
+    };
+    LibraryError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "LIBRARY_ERROR", context);
+        this.name = "LibraryError";
+      }
+    };
+    CommandTimeoutError = class extends PlatformIOError {
+      constructor(command, timeout) {
+        super(
+          `Command '${command}' timed out after ${timeout}ms`,
+          "COMMAND_TIMEOUT",
+          {
+            command,
+            timeout
+          }
+        );
+        this.name = "CommandTimeoutError";
+      }
+    };
+  }
+});
+
+// src/utils/paths.ts
+import path4 from "node:path";
+import { fileURLToPath } from "node:url";
+import fs2 from "node:fs";
+import os2 from "node:os";
+function canUseDir(dir) {
+  try {
+    fs2.mkdirSync(dir, { recursive: true });
+    const probe = path4.join(dir, `.write-probe-${process.pid}-${Date.now()}`);
+    fs2.writeFileSync(probe, "ok", "utf8");
+    fs2.unlinkSync(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function resolveServerDataDir() {
+  const override = process.env.PIO_MCP_DATA_DIR?.trim();
+  if (override && canUseDir(override)) {
+    return path4.resolve(override);
+  }
+  const homeScoped = path4.join(os2.homedir(), ".platformio-mcp");
+  if (canUseDir(homeScoped)) {
+    return homeScoped;
+  }
+  const cwdScoped = path4.join(process.cwd(), ".platformio-mcp");
+  if (canUseDir(cwdScoped)) {
+    return cwdScoped;
+  }
+  const tmpScoped = path4.join(os2.tmpdir(), ".platformio-mcp");
+  if (canUseDir(tmpScoped)) {
+    return tmpScoped;
+  }
+  return cwdScoped;
+}
+function ensureDir(dir) {
+  if (!fs2.existsSync(dir)) {
+    fs2.mkdirSync(dir, { recursive: true });
+  }
+}
+function ensureGlobalDirs() {
+  ensureDir(SERVER_DATA_DIR);
+  ensureDir(GLOBAL_LOCKS_DIR);
+}
+function sanitizePortName(port) {
+  return port.replace(/[\/\.:]/g, "_").replace(/^_+|_+$/g, "");
+}
+var __filename, __dirname2, PROJECT_ROOT, SERVER_DATA_DIR, GLOBAL_LOCKS_DIR;
+var init_paths = __esm({
+  "src/utils/paths.ts"() {
+    "use strict";
+    __filename = fileURLToPath(import.meta.url);
+    __dirname2 = path4.dirname(__filename);
+    PROJECT_ROOT = path4.resolve(__dirname2, "..", "..");
+    SERVER_DATA_DIR = resolveServerDataDir();
+    GLOBAL_LOCKS_DIR = path4.join(SERVER_DATA_DIR, "serial_ports");
+  }
+});
+
 // src/utils/workspace-registry.ts
 var workspace_registry_exports = {};
 __export(workspace_registry_exports, {
@@ -13443,26 +13443,26 @@ __export(workspace_registry_exports, {
   getWorkspaces: () => getWorkspaces,
   rewriteRegistry: () => rewriteRegistry
 });
-import fs7 from "node:fs";
-import path9 from "node:path";
+import fs3 from "node:fs";
+import path5 from "node:path";
 function ensureRegistryFile() {
   ensureGlobalDirs();
-  if (!fs7.existsSync(REGISTRY_FILE)) {
-    fs7.writeFileSync(REGISTRY_FILE, "[]");
+  if (!fs3.existsSync(REGISTRY_FILE)) {
+    fs3.writeFileSync(REGISTRY_FILE, "[]");
   }
 }
 async function addWorkspace(dir) {
   ensureRegistryFile();
-  const platformioIni = path9.join(dir, "platformio.ini");
-  if (!fs7.existsSync(platformioIni)) {
+  const platformioIni = path5.join(dir, "platformio.ini");
+  if (!fs3.existsSync(platformioIni)) {
     throw new Error(`missing platformio.ini in workspace: ${dir}`);
   }
   try {
-    const release = await import_proper_lockfile3.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    const release = await import_proper_lockfile2.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let records = [];
       try {
-        records = JSON.parse(fs7.readFileSync(REGISTRY_FILE, "utf8"));
+        records = JSON.parse(fs3.readFileSync(REGISTRY_FILE, "utf8"));
       } catch {
       }
       if (records.length > 0) {
@@ -13472,7 +13472,7 @@ async function addWorkspace(dir) {
         }
       }
       records.push({ dir, timestamp: Date.now() });
-      fs7.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
+      fs3.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
     } finally {
       await release();
     }
@@ -13483,15 +13483,15 @@ async function getWorkspaces() {
   ensureRegistryFile();
   let records = [];
   try {
-    const release = await import_proper_lockfile3.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    const release = await import_proper_lockfile2.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
-      records = JSON.parse(fs7.readFileSync(REGISTRY_FILE, "utf8"));
+      records = JSON.parse(fs3.readFileSync(REGISTRY_FILE, "utf8"));
     } finally {
       await release();
     }
   } catch {
     try {
-      records = JSON.parse(fs7.readFileSync(REGISTRY_FILE, "utf8"));
+      records = JSON.parse(fs3.readFileSync(REGISTRY_FILE, "utf8"));
     } catch {
       return [];
     }
@@ -13502,28 +13502,28 @@ async function getWorkspaces() {
       seen.set(parsed.dir, parsed.timestamp);
     }
   }
-  return Array.from(seen.entries()).sort((a, b) => b[1] - a[1]).map((entry) => entry[0]).filter((dir) => fs7.existsSync(path9.join(dir, "platformio.ini")));
+  return Array.from(seen.entries()).sort((a, b) => b[1] - a[1]).map((entry) => entry[0]).filter((dir) => fs3.existsSync(path5.join(dir, "platformio.ini")));
 }
 async function rewriteRegistry(directories) {
   ensureRegistryFile();
   try {
-    const release = await import_proper_lockfile3.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    const release = await import_proper_lockfile2.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       const records = directories.map((dir) => ({ dir, timestamp: Date.now() }));
-      fs7.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
+      fs3.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
     } finally {
       await release();
     }
   } catch {
   }
 }
-var import_proper_lockfile3, REGISTRY_FILE;
+var import_proper_lockfile2, REGISTRY_FILE;
 var init_workspace_registry = __esm({
   "src/utils/workspace-registry.ts"() {
     "use strict";
-    import_proper_lockfile3 = __toESM(require_proper_lockfile(), 1);
+    import_proper_lockfile2 = __toESM(require_proper_lockfile(), 1);
     init_paths();
-    REGISTRY_FILE = path9.join(SERVER_DATA_DIR, "workspaces.json");
+    REGISTRY_FILE = path5.join(SERVER_DATA_DIR, "workspaces.json");
   }
 });
 
@@ -13559,8 +13559,8 @@ var init_redact = __esm({
 
 // src/api/events.ts
 import { EventEmitter } from "events";
-import fs8 from "node:fs";
-import path10 from "node:path";
+import fs4 from "node:fs";
+import path6 from "node:path";
 var PortalEventEmitter, portalEvents;
 var init_events = __esm({
   "src/api/events.ts"() {
@@ -13592,19 +13592,19 @@ var init_events = __esm({
         this.emit("agent_activity", payload);
         if (this.lastKnownProjectDir) {
           try {
-            const workspaceDir = path10.join(this.lastKnownProjectDir, ".pio-mcp-workspace");
-            if (!fs8.existsSync(workspaceDir)) {
-              fs8.mkdirSync(workspaceDir, { recursive: true });
+            const workspaceDir = path6.join(this.lastKnownProjectDir, ".pio-mcp-workspace");
+            if (!fs4.existsSync(workspaceDir)) {
+              fs4.mkdirSync(workspaceDir, { recursive: true });
             }
-            const logFile = path10.join(workspaceDir, "agent_activities.jsonl");
+            const logFile = path6.join(workspaceDir, "agent_activities.jsonl");
             try {
-              const stat = await fs8.promises.stat(logFile);
+              const stat = await fs4.promises.stat(logFile);
               if (stat.size > 2 * 1024 * 1024) {
-                await fs8.promises.rename(logFile, logFile + ".1");
+                await fs4.promises.rename(logFile, logFile + ".1");
               }
             } catch {
             }
-            await fs8.promises.appendFile(logFile, JSON.stringify(payload) + "\n");
+            await fs4.promises.appendFile(logFile, JSON.stringify(payload) + "\n");
           } catch {
           }
         }
@@ -13764,7 +13764,7 @@ var init_events = __esm({
 });
 
 // src/utils/validation.ts
-import path12 from "path";
+import path8 from "path";
 import { access, constants } from "fs/promises";
 function validateBoardId(boardId) {
   if (!boardId || typeof boardId !== "string") {
@@ -13781,8 +13781,8 @@ function validateProjectPath(projectPath) {
     throw new Error("Project path is required and must be a string");
   }
   const sanitized = projectPath.trim();
-  const absolutePath = path12.resolve(sanitized);
-  const normalizedPath = path12.normalize(absolutePath);
+  const absolutePath = path8.resolve(sanitized);
+  const normalizedPath = path8.normalize(absolutePath);
   if (normalizedPath.includes("..") || normalizedPath !== absolutePath) {
     throw new Error("Invalid project path: path traversal detected");
   }
@@ -13864,24 +13864,24 @@ var init_validation = __esm({
 });
 
 // src/utils/command-registry.ts
-import fs14 from "node:fs";
-import path19 from "node:path";
+import fs11 from "node:fs";
+import path16 from "node:path";
 function getRegistryFilePath(projectDir) {
   const baseDir = projectDir || SERVER_DATA_DIR;
   if (!projectDir) ensureGlobalDirs();
-  const dir = path19.join(baseDir, WORKSPACE_DIR, "registry");
-  if (!fs14.existsSync(dir)) fs14.mkdirSync(dir, { recursive: true });
-  return path19.join(dir, REGISTRY_FILE2);
+  const dir = path16.join(baseDir, WORKSPACE_DIR, "registry");
+  if (!fs11.existsSync(dir)) fs11.mkdirSync(dir, { recursive: true });
+  return path16.join(dir, REGISTRY_FILE2);
 }
 async function registerCommand(record2, projectDir) {
   const file = getRegistryFilePath(projectDir);
-  if (!fs14.existsSync(file)) fs14.writeFileSync(file, "[]");
+  if (!fs11.existsSync(file)) fs11.writeFileSync(file, "[]");
   try {
-    const release = await import_proper_lockfile5.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let history = [];
       try {
-        history = JSON.parse(fs14.readFileSync(file, "utf8"));
+        history = JSON.parse(fs11.readFileSync(file, "utf8"));
       } catch {
       }
       const existingIndex = history.findIndex((cmd) => cmd.id === record2.id);
@@ -13899,7 +13899,7 @@ async function registerCommand(record2, projectDir) {
           history = history.slice(-MAX_HISTORY_ITEMS);
         }
       }
-      fs14.writeFileSync(file, JSON.stringify(history, null, 2));
+      fs11.writeFileSync(file, JSON.stringify(history, null, 2));
       portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
     } finally {
       await release();
@@ -13910,19 +13910,19 @@ async function registerCommand(record2, projectDir) {
 }
 async function updateCommandStatus(id, updates, projectDir) {
   const file = getRegistryFilePath(projectDir);
-  if (!fs14.existsSync(file)) return;
+  if (!fs11.existsSync(file)) return;
   try {
-    const release = await import_proper_lockfile5.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let history = [];
       try {
-        history = JSON.parse(fs14.readFileSync(file, "utf8"));
+        history = JSON.parse(fs11.readFileSync(file, "utf8"));
       } catch {
       }
       const index = history.findIndex((cmd) => cmd.id === id);
       if (index !== -1) {
         history[index] = { ...history[index], ...updates };
-        fs14.writeFileSync(file, JSON.stringify(history, null, 2));
+        fs11.writeFileSync(file, JSON.stringify(history, null, 2));
         portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
       }
     } finally {
@@ -13934,13 +13934,13 @@ async function updateCommandStatus(id, updates, projectDir) {
 }
 async function updateTaskStatus(commandId, taskId, updates, projectDir) {
   const file = getRegistryFilePath(projectDir);
-  if (!fs14.existsSync(file)) return;
+  if (!fs11.existsSync(file)) return;
   try {
-    const release = await import_proper_lockfile5.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let history = [];
       try {
-        history = JSON.parse(fs14.readFileSync(file, "utf8"));
+        history = JSON.parse(fs11.readFileSync(file, "utf8"));
       } catch {
       }
       const cmdIndex = history.findIndex((cmd) => cmd.id === commandId);
@@ -13961,7 +13961,7 @@ async function updateTaskStatus(commandId, taskId, updates, projectDir) {
           } else if (anyRunning) cmd.status = "running";
           else if (allSuccess) cmd.status = "success";
           else cmd.status = "terminated";
-          fs14.writeFileSync(file, JSON.stringify(history, null, 2));
+          fs11.writeFileSync(file, JSON.stringify(history, null, 2));
           portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
         }
       }
@@ -13974,9 +13974,9 @@ async function updateTaskStatus(commandId, taskId, updates, projectDir) {
 }
 function getCommandHistory(projectDir) {
   const file = getRegistryFilePath(projectDir);
-  if (!fs14.existsSync(file)) return [];
+  if (!fs11.existsSync(file)) return [];
   try {
-    return JSON.parse(fs14.readFileSync(file, "utf8"));
+    return JSON.parse(fs11.readFileSync(file, "utf8"));
   } catch {
     return [];
   }
@@ -13998,11 +13998,11 @@ async function findCommandAcrossWorkspaces(taskId) {
   }
   return void 0;
 }
-var import_proper_lockfile5, WORKSPACE_DIR, REGISTRY_FILE2, MAX_HISTORY_ITEMS;
+var import_proper_lockfile4, WORKSPACE_DIR, REGISTRY_FILE2, MAX_HISTORY_ITEMS;
 var init_command_registry = __esm({
   "src/utils/command-registry.ts"() {
     "use strict";
-    import_proper_lockfile5 = __toESM(require_proper_lockfile(), 1);
+    import_proper_lockfile4 = __toESM(require_proper_lockfile(), 1);
     init_events();
     init_paths();
     WORKSPACE_DIR = ".pio-mcp-workspace";
@@ -14023,9 +14023,9 @@ var init_mcp_context = __esm({
 
 // src/platformio.ts
 import { execFile as execFile2, spawn } from "node:child_process";
-import fs15 from "node:fs";
-import os4 from "node:os";
-import path20 from "node:path";
+import fs12 from "node:fs";
+import os3 from "node:os";
+import path17 from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import crypto7 from "node:crypto";
 import { execSync } from "node:child_process";
@@ -14155,19 +14155,19 @@ async function getPlatformIOVersion() {
 }
 function resolvePioPath() {
   try {
-    const whichCmd = os4.platform() === "win32" ? "where pio" : "command -v pio";
+    const whichCmd = os3.platform() === "win32" ? "where pio" : "command -v pio";
     const out = execSync(whichCmd, { stdio: "pipe" }).toString().trim();
     if (out) {
       const paths = out.split("\n").map((p) => p.trim()).filter((p) => p.length > 0);
       for (const p of paths) {
-        if (fs15.existsSync(p)) return p;
+        if (fs12.existsSync(p)) return p;
       }
     }
   } catch {
   }
-  if (os4.platform() === "win32") {
-    const winCandidate = path20.join(os4.homedir(), ".platformio", "penv", "Scripts", "pio.exe");
-    if (fs15.existsSync(winCandidate)) return winCandidate;
+  if (os3.platform() === "win32") {
+    const winCandidate = path17.join(os3.homedir(), ".platformio", "penv", "Scripts", "pio.exe");
+    if (fs12.existsSync(winCandidate)) return winCandidate;
     return "pio";
   }
   const candidates = [
@@ -14175,10 +14175,10 @@ function resolvePioPath() {
     "/opt/homebrew/bin/pio",
     "/usr/bin/pio",
     "/bin/pio",
-    path20.join(os4.homedir(), ".platformio", "penv", "bin", "pio")
+    path17.join(os3.homedir(), ".platformio", "penv", "bin", "pio")
   ];
   for (const c of candidates) {
-    if (fs15.existsSync(c)) return c;
+    if (fs12.existsSync(c)) return c;
   }
   return "pio";
 }
@@ -14189,9 +14189,9 @@ var init_platformio = __esm({
     init_zod();
     init_command_registry();
     init_mcp_context();
-    init_errors();
+    init_errors2();
     __filename2 = fileURLToPath2(import.meta.url);
-    __dirname3 = path20.dirname(__filename2);
+    __dirname3 = path17.dirname(__filename2);
     DEFAULT_TIMEOUT = 3e5;
     PlatformIOExecutor = class {
       constructor() {
@@ -14308,7 +14308,7 @@ var init_platformio = __esm({
         };
         if (options.useFakeTty && process.platform !== "win32") {
           const absolutePio = resolvePioPath();
-          const proxyScriptPath = path20.join(
+          const proxyScriptPath = path17.join(
             __dirname3,
             "..",
             "src",
@@ -14320,10 +14320,10 @@ var init_platformio = __esm({
         }
         const fullCmd = `${pioBinary} ${pioArgs.join(" ")}`;
         try {
-          const logDir = path20.join(__dirname3, "..", "logs");
-          if (!fs15.existsSync(logDir)) fs15.mkdirSync(logDir, { recursive: true });
-          await fs15.promises.appendFile(
-            path20.join(logDir, "mcp-internal.log"),
+          const logDir = path17.join(__dirname3, "..", "logs");
+          if (!fs12.existsSync(logDir)) fs12.mkdirSync(logDir, { recursive: true });
+          await fs12.promises.appendFile(
+            path17.join(logDir, "mcp-internal.log"),
             `[${(/* @__PURE__ */ new Date()).toISOString()}] [Spooler Executor] Spawning: ${fullCmd}
 `
           );
@@ -14340,128 +14340,6 @@ var init_platformio = __esm({
       }
     };
     platformioExecutor = new PlatformIOExecutor();
-  }
-});
-
-// src/utils/build-cache.ts
-import fs16 from "node:fs";
-import path21 from "node:path";
-import crypto8 from "node:crypto";
-function hashFile(absPath) {
-  try {
-    const buf = fs16.readFileSync(absPath);
-    return {
-      sha256: crypto8.createHash("sha256").update(buf).digest("hex"),
-      size: buf.byteLength
-    };
-  } catch {
-    return null;
-  }
-}
-function walkAndHash(rootDir, relPrefix) {
-  const out = [];
-  let entries;
-  try {
-    entries = fs16.readdirSync(rootDir, { withFileTypes: true });
-  } catch {
-    return out;
-  }
-  for (const entry of entries) {
-    const absPath = path21.join(rootDir, entry.name);
-    const relPath = path21.posix.join(relPrefix, entry.name);
-    if (entry.isDirectory()) {
-      out.push(...walkAndHash(absPath, relPath));
-    } else if (entry.isFile()) {
-      const h = hashFile(absPath);
-      if (h) out.push({ rel: relPath, size: h.size, sha256: h.sha256 });
-    }
-  }
-  return out;
-}
-function computeProjectHash(projectDir, environment) {
-  const components = [`schema:${CACHE_SCHEMA}`, `env:${environment}`];
-  for (const file of TRACKED_FILES) {
-    const abs = path21.join(projectDir, file);
-    const h = hashFile(abs);
-    if (h) components.push(`${file}|${h.size}|${h.sha256}`);
-    else components.push(`${file}|missing`);
-  }
-  const collected = [];
-  for (const dir of TRACKED_DIRS) {
-    const abs = path21.join(projectDir, dir);
-    if (fs16.existsSync(abs)) collected.push(...walkAndHash(abs, dir));
-  }
-  collected.sort((a, b) => a.rel.localeCompare(b.rel));
-  for (const f of collected) {
-    components.push(`${f.rel}|${f.size}|${f.sha256}`);
-  }
-  return crypto8.createHash("sha256").update(components.join("\n")).digest("hex");
-}
-function cacheFilePath(projectDir) {
-  return path21.join(projectDir, ".pio", ".mcp-build-cache.json");
-}
-function readCache(projectDir) {
-  const file = cacheFilePath(projectDir);
-  try {
-    const raw = fs16.readFileSync(file, "utf8");
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.schema !== CACHE_SCHEMA) return null;
-    if (typeof parsed.inputsHash !== "string") return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-function writeCache(projectDir, entry) {
-  try {
-    const file = cacheFilePath(projectDir);
-    fs16.mkdirSync(path21.dirname(file), { recursive: true });
-    const full = { schema: CACHE_SCHEMA, ...entry };
-    fs16.writeFileSync(file, JSON.stringify(full, null, 2));
-  } catch {
-  }
-}
-function lookupBuildCache(projectDir, environment) {
-  const inputsHash = computeProjectHash(projectDir, environment);
-  const entry = readCache(projectDir);
-  if (!entry) return { hit: false, inputsHash };
-  if (entry.environment !== environment) return { hit: false, inputsHash };
-  if (entry.inputsHash !== inputsHash) return { hit: false, inputsHash };
-  if (entry.firmwarePath && !fs16.existsSync(entry.firmwarePath)) {
-    return { hit: false, inputsHash };
-  }
-  return { hit: true, entry, inputsHash };
-}
-function findFirmwareArtifact(projectDir, environment) {
-  const buildDir = path21.join(projectDir, ".pio", "build", environment);
-  if (!fs16.existsSync(buildDir)) return void 0;
-  const candidates = ["firmware.bin", "firmware.elf", "firmware.hex", "program"];
-  let best;
-  for (const name2 of candidates) {
-    const p = path21.join(buildDir, name2);
-    try {
-      const st = fs16.statSync(p);
-      if (!best || st.mtimeMs > best.mtimeMs) {
-        best = { path: p, mtimeMs: st.mtimeMs };
-      }
-    } catch {
-    }
-  }
-  return best?.path;
-}
-function invalidateBuildCache(projectDir) {
-  try {
-    fs16.unlinkSync(cacheFilePath(projectDir));
-  } catch {
-  }
-}
-var CACHE_SCHEMA, TRACKED_DIRS, TRACKED_FILES;
-var init_build_cache = __esm({
-  "src/utils/build-cache.ts"() {
-    "use strict";
-    CACHE_SCHEMA = "v1";
-    TRACKED_DIRS = ["src", "include", "lib"];
-    TRACKED_FILES = ["platformio.ini"];
   }
 });
 
@@ -14920,8 +14798,8 @@ var init_hardware_maps = __esm({
 });
 
 // src/utils/semaphore.ts
-import fs17 from "node:fs";
-import path22 from "node:path";
+import fs16 from "node:fs";
+import path20 from "node:path";
 var SemaphoreManager, portSemaphoreManager;
 var init_semaphore = __esm({
   "src/utils/semaphore.ts"() {
@@ -14940,7 +14818,7 @@ var init_semaphore = __esm({
       }
       getLockFilePath(port) {
         const id = sanitizePortName(port);
-        return path22.join(GLOBAL_LOCKS_DIR, `${id}.json`);
+        return path20.join(GLOBAL_LOCKS_DIR, `${id}.json`);
       }
       /**
        * Claims a physical port by creating a lock file.
@@ -14957,15 +14835,15 @@ var init_semaphore = __esm({
             timestamp: Date.now()
           }
         }, null, 2);
-        fs17.writeFileSync(filePath, content);
+        fs16.writeFileSync(filePath, content);
       }
       /**
        * Releases a claim by removing the lock file.
        */
       releasePort(port) {
         const filePath = this.getLockFilePath(port);
-        if (fs17.existsSync(filePath)) {
-          fs17.unlinkSync(filePath);
+        if (fs16.existsSync(filePath)) {
+          fs16.unlinkSync(filePath);
         }
       }
       /**
@@ -14973,16 +14851,16 @@ var init_semaphore = __esm({
        */
       isPortClaimed(port) {
         const filePath = this.getLockFilePath(port);
-        return fs17.existsSync(filePath);
+        return fs16.existsSync(filePath);
       }
       /**
        * Retrieves the current claim payload for a port, if it exists.
        */
       getClaim(port) {
         const filePath = this.getLockFilePath(port);
-        if (fs17.existsSync(filePath)) {
+        if (fs16.existsSync(filePath)) {
           try {
-            const content = fs17.readFileSync(filePath, "utf-8");
+            const content = fs16.readFileSync(filePath, "utf-8");
             const parsed = JSON.parse(content);
             return parsed.current_claim || parsed;
           } catch {
@@ -15127,9 +15005,142 @@ var init_devices = __esm({
     "use strict";
     init_platformio();
     init_types2();
-    init_errors();
+    init_errors2();
     init_hardware_maps();
     init_semaphore();
+  }
+});
+
+// src/core/devices.ts
+async function listDevicesCore() {
+  return listDevices();
+}
+var init_devices2 = __esm({
+  "src/core/devices.ts"() {
+    "use strict";
+    init_devices();
+  }
+});
+
+// src/utils/build-cache.ts
+import fs19 from "node:fs";
+import path22 from "node:path";
+import crypto9 from "node:crypto";
+function hashFile(absPath) {
+  try {
+    const buf = fs19.readFileSync(absPath);
+    return {
+      sha256: crypto9.createHash("sha256").update(buf).digest("hex"),
+      size: buf.byteLength
+    };
+  } catch {
+    return null;
+  }
+}
+function walkAndHash(rootDir, relPrefix) {
+  const out = [];
+  let entries;
+  try {
+    entries = fs19.readdirSync(rootDir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    const absPath = path22.join(rootDir, entry.name);
+    const relPath = path22.posix.join(relPrefix, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...walkAndHash(absPath, relPath));
+    } else if (entry.isFile()) {
+      const h = hashFile(absPath);
+      if (h) out.push({ rel: relPath, size: h.size, sha256: h.sha256 });
+    }
+  }
+  return out;
+}
+function computeProjectHash(projectDir, environment) {
+  const components = [`schema:${CACHE_SCHEMA}`, `env:${environment}`];
+  for (const file of TRACKED_FILES) {
+    const abs = path22.join(projectDir, file);
+    const h = hashFile(abs);
+    if (h) components.push(`${file}|${h.size}|${h.sha256}`);
+    else components.push(`${file}|missing`);
+  }
+  const collected = [];
+  for (const dir of TRACKED_DIRS) {
+    const abs = path22.join(projectDir, dir);
+    if (fs19.existsSync(abs)) collected.push(...walkAndHash(abs, dir));
+  }
+  collected.sort((a, b) => a.rel.localeCompare(b.rel));
+  for (const f of collected) {
+    components.push(`${f.rel}|${f.size}|${f.sha256}`);
+  }
+  return crypto9.createHash("sha256").update(components.join("\n")).digest("hex");
+}
+function cacheFilePath(projectDir) {
+  return path22.join(projectDir, ".pio", ".mcp-build-cache.json");
+}
+function readCache(projectDir) {
+  const file = cacheFilePath(projectDir);
+  try {
+    const raw = fs19.readFileSync(file, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.schema !== CACHE_SCHEMA) return null;
+    if (typeof parsed.inputsHash !== "string") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+function writeCache(projectDir, entry) {
+  try {
+    const file = cacheFilePath(projectDir);
+    fs19.mkdirSync(path22.dirname(file), { recursive: true });
+    const full = { schema: CACHE_SCHEMA, ...entry };
+    fs19.writeFileSync(file, JSON.stringify(full, null, 2));
+  } catch {
+  }
+}
+function lookupBuildCache(projectDir, environment) {
+  const inputsHash = computeProjectHash(projectDir, environment);
+  const entry = readCache(projectDir);
+  if (!entry) return { hit: false, inputsHash };
+  if (entry.environment !== environment) return { hit: false, inputsHash };
+  if (entry.inputsHash !== inputsHash) return { hit: false, inputsHash };
+  if (entry.firmwarePath && !fs19.existsSync(entry.firmwarePath)) {
+    return { hit: false, inputsHash };
+  }
+  return { hit: true, entry, inputsHash };
+}
+function findFirmwareArtifact(projectDir, environment) {
+  const buildDir = path22.join(projectDir, ".pio", "build", environment);
+  if (!fs19.existsSync(buildDir)) return void 0;
+  const candidates = ["firmware.bin", "firmware.elf", "firmware.hex", "program"];
+  let best;
+  for (const name2 of candidates) {
+    const p = path22.join(buildDir, name2);
+    try {
+      const st = fs19.statSync(p);
+      if (!best || st.mtimeMs > best.mtimeMs) {
+        best = { path: p, mtimeMs: st.mtimeMs };
+      }
+    } catch {
+    }
+  }
+  return best?.path;
+}
+function invalidateBuildCache(projectDir) {
+  try {
+    fs19.unlinkSync(cacheFilePath(projectDir));
+  } catch {
+  }
+}
+var CACHE_SCHEMA, TRACKED_DIRS, TRACKED_FILES;
+var init_build_cache = __esm({
+  "src/utils/build-cache.ts"() {
+    "use strict";
+    CACHE_SCHEMA = "v1";
+    TRACKED_DIRS = ["src", "include", "lib"];
+    TRACKED_FILES = ["platformio.ini"];
   }
 });
 
@@ -15143,7 +15154,7 @@ __export(projects_exports, {
   isValidProject: () => isValidProject
 });
 import { mkdir } from "fs/promises";
-import fs18 from "node:fs";
+import fs20 from "node:fs";
 import path23 from "path";
 async function initProject(config2, execution = {}) {
   const timeoutMs = external_exports.number().int().min(1).max(6e5).default(12e4).parse(execution.timeoutMs);
@@ -15269,7 +15280,7 @@ function listSourceFiles(projectDir) {
     if (out.length >= MAX_SRC_FILES) return;
     let entries;
     try {
-      entries = fs18.readdirSync(dir, { withFileTypes: true });
+      entries = fs20.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
@@ -15281,7 +15292,7 @@ function listSourceFiles(projectDir) {
       else if (entry.isFile()) out.push(`src/${relPath}`);
     }
   }
-  if (fs18.existsSync(root)) walk(root, "");
+  if (fs20.existsSync(root)) walk(root, "");
   return out;
 }
 function parsePlatformioIni(iniText) {
@@ -15330,10 +15341,10 @@ function inferLastBuild(projectDir) {
     "build",
     "latest-build.log"
   );
-  if (!fs18.existsSync(logFile)) return void 0;
+  if (!fs20.existsSync(logFile)) return void 0;
   let tail = "";
   try {
-    const buf = fs18.readFileSync(logFile);
+    const buf = fs20.readFileSync(logFile);
     tail = buf.slice(Math.max(0, buf.length - 4096)).toString("utf8");
   } catch {
     return { status: "unknown", logPath: logFile };
@@ -15387,7 +15398,7 @@ function buildContextNextSteps(ctx) {
 async function getProjectContext(projectDir, includeBuildHistory) {
   const validatedPath = validateProjectPath(projectDir);
   const iniPath = path23.join(validatedPath, "platformio.ini");
-  const hasPlatformioIni = fs18.existsSync(iniPath);
+  const hasPlatformioIni = fs20.existsSync(iniPath);
   let connectedDevices;
   try {
     const { listDevices: listDevices2 } = await Promise.resolve().then(() => (init_devices(), devices_exports));
@@ -15404,7 +15415,7 @@ async function getProjectContext(projectDir, includeBuildHistory) {
   let libDeps;
   if (hasPlatformioIni) {
     try {
-      const text7 = fs18.readFileSync(iniPath, "utf8");
+      const text7 = fs20.readFileSync(iniPath, "utf8");
       const parsed = parsePlatformioIni(text7);
       environments = parsed.environments;
       libDeps = parsed.libDeps;
@@ -15451,1628 +15462,10 @@ var init_projects = __esm({
     init_zod();
     init_platformio();
     init_validation();
-    init_errors();
+    init_errors2();
     init_build_cache();
     PLATFORMIO_INI_ENV_RE = /^\s*\[env:([^\]\s]+)\]\s*$/gm;
     MAX_SRC_FILES = 50;
-  }
-});
-
-// src/core/devices/serial-endpoint.ts
-import fs20 from "node:fs";
-import path25 from "node:path";
-function validatePort(port) {
-  if (typeof port !== "string" || !port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
-    throw new PlatformIOError(
-      "Invalid serial endpoint name.",
-      "SERIAL_ENDPOINT_INVALID"
-    );
-}
-function resolveSerialEndpoint(port, options = {}) {
-  validatePort(port);
-  const platform2 = options.platform ?? process.platform;
-  const realpath = options.realpath ?? fs20.realpathSync.native;
-  const stat = options.stat ?? ((target) => {
-    const metadata = fs20.statSync(target, { bigint: true });
-    return {
-      characterDevice: metadata.isCharacterDevice(),
-      deviceNumber: metadata.rdev
-    };
-  });
-  const snapshot = () => {
-    if (platform2 === "win32") {
-      const localPrefix = "\\\\.\\";
-      const name2 = port.startsWith(localPrefix) ? port.slice(localPrefix.length) : port;
-      const match = /^COM([1-9][0-9]{0,8})$/i.exec(name2);
-      if (!match)
-        throw new PlatformIOError(
-          "Expected a COM port or its local device-path spelling.",
-          "SERIAL_ENDPOINT_INVALID"
-        );
-      const canonicalPort2 = `COM${match[1]}`;
-      return {
-        canonicalPort: canonicalPort2,
-        identity: `endpoint:win32:${canonicalPort2}`,
-        identityBasis: "windows-port-name",
-        presence: "unverified"
-      };
-    }
-    if (platform2 !== "linux" && platform2 !== "darwin")
-      throw new PlatformIOError(
-        "Serial endpoint identity is unavailable on this platform.",
-        "SERIAL_ENDPOINT_UNSUPPORTED"
-      );
-    if (!path25.posix.isAbsolute(port) || !path25.posix.normalize(port).startsWith("/dev/"))
-      throw new PlatformIOError(
-        "Unix serial endpoints must resolve within /dev.",
-        "SERIAL_ENDPOINT_INVALID"
-      );
-    let canonicalPort;
-    let metadata;
-    try {
-      canonicalPort = realpath(port);
-      validatePort(canonicalPort);
-      if (!path25.posix.isAbsolute(canonicalPort) || !path25.posix.normalize(canonicalPort).startsWith("/dev/"))
-        throw new PlatformIOError(
-          "Serial alias resolves outside /dev.",
-          "SERIAL_ENDPOINT_INVALID"
-        );
-      metadata = stat(canonicalPort);
-    } catch (error2) {
-      if (error2 instanceof PlatformIOError) throw error2;
-      throw new PlatformIOError(
-        "Serial endpoint metadata is unavailable.",
-        "SERIAL_ENDPOINT_UNAVAILABLE"
-      );
-    }
-    if (!metadata.characterDevice || typeof metadata.deviceNumber !== "bigint" || metadata.deviceNumber < 0n || metadata.deviceNumber > 0xffffffffffffffffn)
-      throw new PlatformIOError(
-        "Serial endpoint is not a valid character device.",
-        "SERIAL_ENDPOINT_INVALID"
-      );
-    const deviceNumber = metadata.deviceNumber.toString();
-    if (platform2 === "darwin") {
-      const match = /^\/dev\/(?:cu|tty)\.([a-zA-Z0-9_.-]+)$/.exec(
-        canonicalPort
-      );
-      if (!match)
-        throw new PlatformIOError(
-          "Expected a Darwin callout/dial-in serial endpoint.",
-          "SERIAL_ENDPOINT_INVALID"
-        );
-      return {
-        canonicalPort,
-        identity: `endpoint:darwin:serial:${match[1]}`,
-        deviceNumber,
-        identityBasis: "darwin-serial-pair",
-        presence: "character-device"
-      };
-    }
-    return {
-      canonicalPort,
-      identity: `endpoint:linux:char:${deviceNumber}`,
-      deviceNumber,
-      identityBasis: "unix-device-number",
-      presence: "character-device"
-    };
-  };
-  const expected = snapshot();
-  return Object.freeze({
-    requestedPort: port,
-    canonicalPort: expected.canonicalPort,
-    resource: Object.freeze({
-      kind: "serial",
-      identity: expected.identity
-    }),
-    identityBasis: expected.identityBasis,
-    presence: expected.presence,
-    survivesReenumeration: false,
-    revalidate() {
-      const current = snapshot();
-      if (current.canonicalPort !== expected.canonicalPort || current.identity !== expected.identity || current.deviceNumber !== expected.deviceNumber)
-        throw new PlatformIOError(
-          "Serial endpoint changed after selection; resolve and authorize again.",
-          "SERIAL_ENDPOINT_CHANGED"
-        );
-    }
-  });
-}
-var init_serial_endpoint = __esm({
-  "src/core/devices/serial-endpoint.ts"() {
-    "use strict";
-    init_errors();
-  }
-});
-
-// src/core/devices/process-identity.ts
-import fs21 from "node:fs";
-import path26 from "node:path";
-import { execFileSync } from "node:child_process";
-function linuxStartToken(stat, bootId, pid) {
-  const end = stat.lastIndexOf(")");
-  const fields = stat.slice(end + 1).trim().split(/\s+/);
-  const start = fields[19];
-  if (stat.length > 8192 || end < 0 || !stat.startsWith(`${pid} (`) || !/^[0-9]+$/.test(start ?? "") || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(bootId.trim()))
-    throw new PlatformIOError(
-      "Invalid Linux process identity.",
-      "PROCESS_IDENTITY_INVALID"
-    );
-  return `${bootId.trim().toLowerCase()}:${start}`;
-}
-function inspectProcessIdentity(pid) {
-  if (!Number.isSafeInteger(pid) || pid < 1 || pid > 2147483647)
-    throw new PlatformIOError(
-      "Invalid process ID.",
-      "PROCESS_IDENTITY_INVALID"
-    );
-  try {
-    let startToken;
-    if (process.platform === "linux") {
-      startToken = linuxStartToken(
-        fs21.readFileSync(`/proc/${pid}/stat`, "utf8"),
-        fs21.readFileSync("/proc/sys/kernel/random/boot_id", "utf8"),
-        pid
-      );
-    } else if (process.platform === "win32") {
-      const systemRoot = process.env.SystemRoot;
-      if (!systemRoot || !path26.isAbsolute(systemRoot))
-        return { status: "unknown" };
-      startToken = execFileSync(
-        path26.join(
-          systemRoot,
-          "System32",
-          "WindowsPowerShell",
-          "v1.0",
-          "powershell.exe"
-        ),
-        [
-          "-NoLogo",
-          "-NoProfile",
-          "-NonInteractive",
-          "-Command",
-          `$ErrorActionPreference='Stop'; [System.Diagnostics.Process]::GetProcessById(${pid}).StartTime.ToFileTimeUtc().ToString([System.Globalization.CultureInfo]::InvariantCulture)`
-        ],
-        {
-          encoding: "utf8",
-          // Windows PowerShell cold startup can exceed three seconds on loaded hosts.
-          timeout: 1e4,
-          maxBuffer: 8192,
-          windowsHide: true,
-          stdio: ["ignore", "pipe", "pipe"]
-        }
-      ).trim();
-      if (!/^[0-9]{15,20}$/.test(startToken)) return { status: "unknown" };
-    } else if (process.platform === "darwin") {
-      startToken = execFileSync(
-        "/bin/ps",
-        ["-p", String(pid), "-o", "lstart="],
-        {
-          encoding: "utf8",
-          timeout: 3e3,
-          maxBuffer: 8192,
-          env: { ...process.env, LC_ALL: "C", TZ: "UTC" },
-          stdio: ["ignore", "pipe", "pipe"]
-        }
-      ).trim();
-      if (!/^[A-Z][a-z]{2} [A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2} \d{4}$/.test(
-        startToken
-      ))
-        return { status: "unknown" };
-    } else return { status: "unknown" };
-    return {
-      status: "running",
-      identity: { pid, platform: process.platform, startToken }
-    };
-  } catch {
-    try {
-      process.kill(pid, 0);
-    } catch (error2) {
-      if (error2.code === "ESRCH")
-        return { status: "absent" };
-    }
-    return { status: "unknown" };
-  }
-}
-function compareProcessIdentity(owner, observation) {
-  if (observation.status === "absent") return "stale";
-  if (observation.status === "unknown") return "unknown";
-  if (owner.platform !== observation.identity.platform || owner.pid !== observation.identity.pid)
-    return "unknown";
-  return owner.startToken === observation.identity.startToken ? "alive" : "stale";
-}
-var init_process_identity = __esm({
-  "src/core/devices/process-identity.ts"() {
-    "use strict";
-    init_errors();
-  }
-});
-
-// src/core/devices/device-lease.ts
-import fs22 from "node:fs";
-import os5 from "node:os";
-import path27 from "node:path";
-import { createHash as createHash5, randomUUID as randomUUID2 } from "node:crypto";
-function stableDeviceLeaseRoot() {
-  return path27.join(
-    os5.userInfo().homedir,
-    ".platformio-mcp",
-    "device-leases-v1"
-  );
-}
-function resourceKey(resource) {
-  if (!resource || !["serial", "probe"].includes(resource.kind) || typeof resource.identity !== "string" || !resource.identity.trim() || resource.identity.length > 1024 || /[\x00-\x1f\x7f]/.test(resource.identity))
-    throw new PlatformIOError(
-      "Invalid physical resource identity.",
-      "DEVICE_IDENTITY_INVALID"
-    );
-  return createHash5("sha256").update(JSON.stringify([resource.kind, resource.identity])).digest("hex");
-}
-function validProcessIdentity(value2) {
-  return !!value2 && Number.isSafeInteger(value2.pid) && value2.pid >= 1 && value2.pid <= 2147483647 && ["win32", "linux", "darwin"].includes(value2.platform) && typeof value2.startToken === "string" && value2.startToken.length > 0 && value2.startToken.length <= 256;
-}
-function sameProcessIdentity(first, second) {
-  return first.pid === second.pid && first.platform === second.platform && first.startToken === second.startToken;
-}
-var DeviceLeaseStore;
-var init_device_lease = __esm({
-  "src/core/devices/device-lease.ts"() {
-    "use strict";
-    init_errors();
-    init_process_identity();
-    DeviceLeaseStore = class {
-      root;
-      inspect;
-      held = /* @__PURE__ */ new WeakMap();
-      transfers = /* @__PURE__ */ new WeakMap();
-      owner;
-      /** Construct a store; no file is created or device opened until acquisition. */
-      constructor(options = {}) {
-        this.root = path27.resolve(options.root ?? stableDeviceLeaseRoot());
-        this.inspect = options.inspect ?? inspectProcessIdentity;
-      }
-      /** Inspect persisted ownership without releasing or recovering it; acquisition must still be atomic. */
-      status(resource) {
-        const key = resourceKey(resource);
-        return this.withGate(key, () => {
-          const record2 = this.readRecord(key);
-          if (!record2) return { status: "unclaimed", resource: { ...resource } };
-          if (record2.handoffPending)
-            return {
-              status: "unknown",
-              resource: { ...record2.resource },
-              ownerPid: record2.owner.pid,
-              acquiredAt: record2.acquiredAt
-            };
-          const identity = compareProcessIdentity(
-            record2.owner,
-            this.inspect(record2.owner.pid)
-          );
-          return {
-            status: identity === "alive" ? "owned" : identity,
-            resource: { ...record2.resource },
-            ownerPid: record2.owner.pid,
-            acquiredAt: record2.acquiredAt
-          };
-        });
-      }
-      /** Acquire exclusively, recovering a previous lease only after its owner is proven stale. */
-      acquire(resource) {
-        const key = resourceKey(resource);
-        const owner = this.currentOwner();
-        return this.withGate(key, () => {
-          const previous = this.readRecord(key);
-          if (previous) {
-            if (previous.handoffPending)
-              throw new PlatformIOError(
-                "Device custody handoff is unresolved; automatic stale recovery is disabled.",
-                "DEVICE_HANDOFF_PENDING"
-              );
-            const status = compareProcessIdentity(
-              previous.owner,
-              this.inspect(previous.owner.pid)
-            );
-            if (status !== "stale")
-              throw new PlatformIOError(
-                status === "alive" ? "Physical resource is already owned." : "Physical resource ownership cannot be verified.",
-                status === "alive" ? "DEVICE_BUSY" : "DEVICE_OWNER_UNKNOWN"
-              );
-          }
-          const record2 = {
-            version: 1,
-            resource: { kind: resource.kind, identity: resource.identity },
-            owner: { ...owner },
-            nonce: randomUUID2(),
-            acquiredAt: (/* @__PURE__ */ new Date()).toISOString()
-          };
-          this.writeRecord(key, record2);
-          return this.createHandle(record2);
-        });
-      }
-      /** Persist uncertainty before launching a child, so a coordinator crash cannot expose its hardware. */
-      beginHandoff(lease) {
-        const held = this.requireHandle(lease);
-        const key = resourceKey(held.resource);
-        this.withGate(key, () => {
-          const current = this.requirePersistedOwner(key, held);
-          if (current.handoffPending)
-            throw new PlatformIOError(
-              "Device handoff is already pending.",
-              "DEVICE_HANDOFF_PENDING"
-            );
-          this.writeRecord(key, { ...current, handoffPending: true });
-        });
-      }
-      /** Cancel only after the trusted launcher proves no child started or all started children exited. */
-      cancelHandoff(lease) {
-        const held = this.requireHandle(lease);
-        const key = resourceKey(held.resource);
-        this.withGate(key, () => {
-          const current = this.requirePersistedOwner(key, held);
-          const rest = { ...current };
-          delete rest.handoffPending;
-          this.writeRecord(key, rest);
-        });
-      }
-      /**
-       * Atomically transfer ownership to an already-started, verified child waiting behind an IPC barrier.
-       * The caller must keep the child from opening hardware until adoption succeeds. No process is spawned here.
-       * On success the old handle is invalid, even if delivery of the returned ticket subsequently fails.
-       */
-      transfer(lease, target) {
-        const held = this.requireHandle(lease);
-        const key = resourceKey(held.resource);
-        if (!validProcessIdentity(target) || target.platform !== held.owner.platform || target.pid === held.owner.pid)
-          throw new PlatformIOError(
-            "Invalid lease transfer target.",
-            "DEVICE_TRANSFER_INVALID"
-          );
-        return this.withGate(key, () => {
-          const current = this.requirePersistedOwner(key, held);
-          if (compareProcessIdentity(target, this.inspect(target.pid)) !== "alive")
-            throw new PlatformIOError(
-              "Lease transfer target is unavailable or its process identity changed.",
-              "DEVICE_TRANSFER_INVALID"
-            );
-          const transferred = {
-            ...current,
-            owner: { ...target },
-            handoffPending: void 0,
-            nonce: randomUUID2()
-          };
-          this.writeRecord(key, transferred);
-          this.held.delete(lease);
-          const ticket = Object.freeze({
-            resource: Object.freeze({ ...current.resource }),
-            nonce: transferred.nonce
-          });
-          this.transfers.set(ticket, transferred);
-          return ticket;
-        });
-      }
-      /** Retire an unadopted handoff only after its exact child owner is proven stale; never kill a process. */
-      finishTransfer(ticket) {
-        const transferred = this.transfers.get(ticket);
-        if (!transferred)
-          throw new PlatformIOError(
-            "Unknown or completed transfer receipt.",
-            "DEVICE_TRANSFER_INVALID"
-          );
-        const key = resourceKey(transferred.resource);
-        this.withGate(key, () => {
-          const current = this.requirePersistedOwner(key, transferred);
-          if (current.handoffPending || compareProcessIdentity(
-            current.owner,
-            this.inspect(current.owner.pid)
-          ) !== "stale")
-            throw new PlatformIOError(
-              "Transferred child exit is not confirmed.",
-              "DEVICE_OWNER_UNKNOWN"
-            );
-          fs22.unlinkSync(path27.join(this.root, `${key}.json`));
-          this.transfers.delete(ticket);
-        });
-      }
-      /**
-       * Consume an IPC ticket only in the target OS process, rotating its nonce to prevent ticket replay.
-       * This grants lease custody, not tool authorization; public adapters must not accept transfer tickets.
-       */
-      adopt(ticket) {
-        const key = resourceKey(ticket?.resource);
-        if (typeof ticket.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(ticket.nonce))
-          throw new PlatformIOError(
-            "Invalid lease transfer ticket.",
-            "DEVICE_TRANSFER_INVALID"
-          );
-        const owner = this.currentOwner();
-        return this.withGate(key, () => {
-          const current = this.readRecord(key);
-          if (!current || current.nonce !== ticket.nonce || !sameProcessIdentity(current.owner, owner))
-            throw new PlatformIOError(
-              "Lease transfer ticket is stale or belongs to another process.",
-              "DEVICE_TRANSFER_INVALID"
-            );
-          const adopted = { ...current, nonce: randomUUID2() };
-          this.writeRecord(key, adopted);
-          return this.createHandle(adopted);
-        });
-      }
-      /** Release only a capability issued by this store whose persisted nonce and owner still match. */
-      release(lease) {
-        const held = this.requireHandle(lease);
-        const key = resourceKey(held.resource);
-        this.withGate(key, () => {
-          const current = this.requirePersistedOwner(key, held);
-          if (current.handoffPending)
-            throw new PlatformIOError(
-              "Cannot release unresolved child custody.",
-              "DEVICE_HANDOFF_PENDING"
-            );
-          fs22.unlinkSync(path27.join(this.root, `${key}.json`));
-          this.held.delete(lease);
-        });
-      }
-      createHandle(record2) {
-        const lease = Object.freeze({
-          resource: Object.freeze({ ...record2.resource }),
-          acquiredAt: record2.acquiredAt
-        });
-        this.held.set(lease, record2);
-        return lease;
-      }
-      requireHandle(lease) {
-        const held = this.held.get(lease);
-        if (!held)
-          throw new PlatformIOError(
-            "Unknown or already released device lease.",
-            "DEVICE_LEASE_NOT_OWNED"
-          );
-        return held;
-      }
-      requirePersistedOwner(key, held) {
-        const current = this.readRecord(key);
-        if (!current || current.nonce !== held.nonce || !sameProcessIdentity(current.owner, held.owner))
-          throw new PlatformIOError(
-            "Device lease ownership changed; refusing mutation.",
-            "DEVICE_LEASE_NOT_OWNED"
-          );
-        return current;
-      }
-      currentOwner() {
-        if (this.owner) return this.owner;
-        const observation = this.inspect(process.pid);
-        if (observation.status !== "running" || observation.identity.pid !== process.pid || !validProcessIdentity(observation.identity))
-          throw new PlatformIOError(
-            "Cannot establish this process's start identity.",
-            "DEVICE_OWNER_UNKNOWN"
-          );
-        this.owner = { ...observation.identity };
-        return this.owner;
-      }
-      /** Refuse symlinked/non-directory components instead of silently splitting the global lock domain. */
-      ensureRoot() {
-        const parsed = path27.parse(this.root);
-        let current = parsed.root;
-        for (const part of this.root.slice(parsed.root.length).split(path27.sep).filter(Boolean)) {
-          current = path27.join(current, part);
-          try {
-            fs22.mkdirSync(current, { mode: 448 });
-          } catch (error2) {
-            if (error2.code !== "EEXIST") throw error2;
-          }
-          const stat = fs22.lstatSync(current);
-          if (!stat.isDirectory() || stat.isSymbolicLink())
-            throw new PlatformIOError(
-              "Device lease directory must not contain symlinks.",
-              "DEVICE_LEASE_PATH_INVALID"
-            );
-        }
-        const rootStat = fs22.statSync(this.root);
-        if (process.platform !== "win32" && (rootStat.uid !== process.getuid?.() || (rootStat.mode & 18) !== 0))
-          throw new PlatformIOError(
-            "Device lease directory must be owned by this user and not writable by others.",
-            "DEVICE_LEASE_PATH_INVALID"
-          );
-      }
-      withGate(key, action) {
-        this.ensureRoot();
-        const gate = path27.join(this.root, `${key}.gate`);
-        try {
-          fs22.mkdirSync(gate, { mode: 448 });
-        } catch (error2) {
-          if (error2.code === "EEXIST")
-            throw new PlatformIOError(
-              "Device lease update is busy or interrupted; retry, then inspect the gate if it persists.",
-              "DEVICE_LEASE_GATE_BUSY"
-            );
-          throw error2;
-        }
-        try {
-          return action();
-        } finally {
-          fs22.rmdirSync(gate);
-        }
-      }
-      readRecord(key) {
-        const file = path27.join(this.root, `${key}.json`);
-        let stat;
-        try {
-          stat = fs22.lstatSync(file);
-        } catch (error2) {
-          if (error2.code === "ENOENT") return void 0;
-          throw error2;
-        }
-        if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 8192)
-          throw new PlatformIOError(
-            "Invalid device lease record.",
-            "DEVICE_LEASE_CORRUPT"
-          );
-        try {
-          const record2 = JSON.parse(fs22.readFileSync(file, "utf8"));
-          if (record2.version !== 1 || record2.handoffPending !== void 0 && record2.handoffPending !== true || resourceKey(record2.resource) !== key || !validProcessIdentity(record2.owner) || typeof record2.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(record2.nonce) || typeof record2.acquiredAt !== "string" || !Number.isFinite(Date.parse(record2.acquiredAt)))
-            throw new Error("Invalid lease schema");
-          return record2;
-        } catch {
-          throw new PlatformIOError(
-            "Invalid device lease record; ownership is not assumed stale.",
-            "DEVICE_LEASE_CORRUPT"
-          );
-        }
-      }
-      writeRecord(key, record2) {
-        const temporary = path27.join(this.root, `${key}.${record2.nonce}.tmp`);
-        let fd;
-        try {
-          fd = fs22.openSync(temporary, "wx", 384);
-          fs22.writeFileSync(fd, JSON.stringify(record2), "utf8");
-          fs22.fsyncSync(fd);
-          fs22.closeSync(fd);
-          fd = void 0;
-          fs22.renameSync(temporary, path27.join(this.root, `${key}.json`));
-        } finally {
-          if (fd !== void 0) fs22.closeSync(fd);
-          try {
-            fs22.unlinkSync(temporary);
-          } catch (error2) {
-            if (error2.code !== "ENOENT") throw error2;
-          }
-        }
-      }
-    };
-  }
-});
-
-// src/core/devices/process-device-custody.ts
-function acquireProcessDeviceCustody(port, dependencies = {}) {
-  const store = dependencies.store ?? new DeviceLeaseStore();
-  const endpoint = (dependencies.resolve ?? resolveSerialEndpoint)(port);
-  const lease = store.acquire(endpoint.resource);
-  return {
-    prepareSpawn() {
-      endpoint.revalidate();
-      store.beginHandoff(lease);
-    },
-    releaseAfterExit() {
-      try {
-        store.cancelHandoff(lease);
-        store.release(lease);
-      } catch (error2) {
-        throw new PlatformIOError(
-          error2 instanceof Error ? error2.message : "Device lease cleanup failed.",
-          "DEVICE_CLEANUP_PENDING",
-          { cleanupPending: true }
-        );
-      }
-    }
-  };
-}
-var init_process_device_custody = __esm({
-  "src/core/devices/process-device-custody.ts"() {
-    "use strict";
-    init_errors();
-    init_device_lease();
-    init_serial_endpoint();
-  }
-});
-
-// src/utils/owned-process-wait.ts
-function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3, cancellation) {
-  return new Promise((resolve, reject) => {
-    let settled = false, timedOut = false, cancelled = false;
-    let escalation;
-    let deadline;
-    const cleanup = () => {
-      settled = true;
-      clearTimeout(timer);
-      clearTimeout(escalation);
-      clearTimeout(deadline);
-      proc.off("exit", exited);
-      proc.off("close", exited);
-      proc.off("error", failed);
-      cancellation?.removeEventListener("abort", cancel);
-    };
-    const exited = (code) => {
-      if (settled) return;
-      cleanup();
-      if (timedOut || cancelled)
-        reject(
-          new PlatformIOError(
-            cancelled ? "Command cancelled after startup failure." : `Command timed out after ${timeoutMs}ms`,
-            cancelled ? "PROCESS_CANCELLED" : "COMMAND_TIMEOUT",
-            { cleanupPending: false }
-          )
-        );
-      else resolve(code ?? 1);
-    };
-    const failed = (error2) => {
-      if (settled) return;
-      cleanup();
-      reject(
-        new PlatformIOError(error2.message, "PROCESS_FAILED", {
-          cleanupPending: !!proc.pid && proc.exitCode === null && proc.signalCode === null
-        })
-      );
-    };
-    const terminate = () => {
-      if (settled) return;
-      try {
-        proc.kill("SIGTERM");
-      } catch {
-      }
-      if (settled) return;
-      escalation = setTimeout(() => {
-        if (settled) return;
-        try {
-          proc.kill("SIGKILL");
-        } catch {
-        }
-        if (settled) return;
-        deadline = setTimeout(() => {
-          if (settled) return;
-          cleanup();
-          reject(
-            new PlatformIOError(
-              "Child termination could not be confirmed.",
-              "PROCESS_CLEANUP_PENDING",
-              { cleanupPending: true }
-            )
-          );
-        }, graceMs);
-      }, graceMs);
-    };
-    const cancel = () => {
-      if (settled || cancelled || timedOut) return;
-      cancelled = true;
-      clearTimeout(timer);
-      terminate();
-    };
-    const timer = setTimeout(() => {
-      timedOut = true;
-      terminate();
-    }, timeoutMs);
-    proc.once("exit", exited);
-    proc.once("close", exited);
-    proc.once("error", failed);
-    cancellation?.addEventListener("abort", cancel, { once: true });
-    if (proc.exitCode !== null || proc.signalCode !== null)
-      exited(proc.exitCode);
-    else if (cancellation?.aborted) cancel();
-  });
-}
-var init_owned_process_wait = __esm({
-  "src/utils/owned-process-wait.ts"() {
-    "use strict";
-    init_errors();
-  }
-});
-
-// node_modules/tree-kill/index.js
-var require_tree_kill = __commonJS({
-  "node_modules/tree-kill/index.js"(exports, module) {
-    "use strict";
-    var childProcess2 = __require("child_process");
-    var spawn2 = childProcess2.spawn;
-    var exec2 = childProcess2.exec;
-    module.exports = function(pid, signal, callback) {
-      if (typeof signal === "function" && callback === void 0) {
-        callback = signal;
-        signal = void 0;
-      }
-      pid = parseInt(pid);
-      if (Number.isNaN(pid)) {
-        if (callback) {
-          return callback(new Error("pid must be a number"));
-        } else {
-          throw new Error("pid must be a number");
-        }
-      }
-      var tree = {};
-      var pidsToProcess = {};
-      tree[pid] = [];
-      pidsToProcess[pid] = 1;
-      switch (process.platform) {
-        case "win32":
-          exec2("taskkill /pid " + pid + " /T /F", callback);
-          break;
-        case "darwin":
-          buildProcessTree(pid, tree, pidsToProcess, function(parentPid) {
-            return spawn2("pgrep", ["-P", parentPid]);
-          }, function() {
-            killAll(tree, signal, callback);
-          });
-          break;
-        // case 'sunos':
-        //     buildProcessTreeSunOS(pid, tree, pidsToProcess, function () {
-        //         killAll(tree, signal, callback);
-        //     });
-        //     break;
-        default:
-          buildProcessTree(pid, tree, pidsToProcess, function(parentPid) {
-            return spawn2("ps", ["-o", "pid", "--no-headers", "--ppid", parentPid]);
-          }, function() {
-            killAll(tree, signal, callback);
-          });
-          break;
-      }
-    };
-    function killAll(tree, signal, callback) {
-      var killed = {};
-      try {
-        Object.keys(tree).forEach(function(pid) {
-          tree[pid].forEach(function(pidpid) {
-            if (!killed[pidpid]) {
-              killPid(pidpid, signal);
-              killed[pidpid] = 1;
-            }
-          });
-          if (!killed[pid]) {
-            killPid(pid, signal);
-            killed[pid] = 1;
-          }
-        });
-      } catch (err) {
-        if (callback) {
-          return callback(err);
-        } else {
-          throw err;
-        }
-      }
-      if (callback) {
-        return callback();
-      }
-    }
-    function killPid(pid, signal) {
-      try {
-        process.kill(parseInt(pid, 10), signal);
-      } catch (err) {
-        if (err.code !== "ESRCH") throw err;
-      }
-    }
-    function buildProcessTree(parentPid, tree, pidsToProcess, spawnChildProcessesList, cb) {
-      var ps = spawnChildProcessesList(parentPid);
-      var allData = "";
-      ps.stdout.on("data", function(data) {
-        var data = data.toString("ascii");
-        allData += data;
-      });
-      var onClose = function(code) {
-        delete pidsToProcess[parentPid];
-        if (code != 0) {
-          if (Object.keys(pidsToProcess).length == 0) {
-            cb();
-          }
-          return;
-        }
-        allData.match(/\d+/g).forEach(function(pid) {
-          pid = parseInt(pid, 10);
-          tree[parentPid].push(pid);
-          tree[pid] = [];
-          pidsToProcess[pid] = 1;
-          buildProcessTree(pid, tree, pidsToProcess, spawnChildProcessesList, cb);
-        });
-      };
-      ps.on("close", onClose);
-    }
-  }
-});
-
-// src/utils/logger.ts
-import fs23 from "node:fs";
-import path28 from "node:path";
-async function logDiagnostic(msg, _projectDir) {
-  ensureGlobalDirs();
-  const diagLog = path28.join(SERVER_DATA_DIR, "server.log");
-  const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-  const line = `[${timestamp}] ${msg}
-`;
-  try {
-    await fs23.promises.appendFile(diagLog, line);
-  } catch {
-  }
-  console.error(msg);
-}
-var init_logger = __esm({
-  "src/utils/logger.ts"() {
-    "use strict";
-    init_paths();
-  }
-});
-
-// src/utils/process-manager.ts
-import fs24 from "node:fs";
-import { setTimeout as delay } from "node:timers/promises";
-import os6 from "node:os";
-import path29 from "node:path";
-import { execSync as execSync2 } from "node:child_process";
-import crypto9 from "node:crypto";
-function getPidsFilePath(projectDir, file = SERIAL_PIDS_FILE) {
-  if (file === SERIAL_PIDS_FILE) {
-    ensureGlobalDirs();
-    const dir = path29.join(SERVER_DATA_DIR, "serial_monitors");
-    if (!fs24.existsSync(dir)) fs24.mkdirSync(dir, { recursive: true });
-    return path29.join(dir, file);
-  } else if (file === BUILD_PIDS_FILE) {
-    const baseDir2 = projectDir || SERVER_DATA_DIR;
-    if (!projectDir) ensureGlobalDirs();
-    const dir = path29.join(baseDir2, WORKSPACE_DIR2, "tasks");
-    if (!fs24.existsSync(dir)) fs24.mkdirSync(dir, { recursive: true });
-    return path29.join(dir, file);
-  }
-  const baseDir = projectDir || SERVER_DATA_DIR;
-  if (!projectDir) ensureGlobalDirs();
-  return path29.join(baseDir, WORKSPACE_DIR2, LOCKS_DIR, file);
-}
-function readMonitorIdentities(pidsFile) {
-  const file = pidsFile + ".identities.json";
-  if (!fs24.existsSync(file)) return {};
-  if (fs24.statSync(file).size > 1024 * 1024)
-    throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
-  const value2 = JSON.parse(fs24.readFileSync(file, "utf8"));
-  if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
-    throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
-  return value2;
-}
-async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFile, taskId, commandDesc) {
-  const pidsFile = getPidsFilePath(projectDir);
-  const dir = path29.dirname(pidsFile);
-  if (!fs24.existsSync(dir)) fs24.mkdirSync(dir, { recursive: true });
-  if (!fs24.existsSync(pidsFile)) fs24.writeFileSync(pidsFile, "{}");
-  try {
-    const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let pids = {};
-      try {
-        pids = JSON.parse(fs24.readFileSync(pidsFile, "utf8"));
-      } catch {
-      }
-      const identities = readMonitorIdentities(pidsFile);
-      const observed = inspectProcessIdentity(pid);
-      if (observed.status === "running") identities[port] = observed.identity;
-      else delete identities[port];
-      fs24.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-      pids[port] = pid;
-      fs24.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-  try {
-    const commandId = rootCommandId || crypto9.randomUUID();
-    const effectiveTaskId = taskId || crypto9.randomUUID();
-    await registerCommand({
-      id: commandId,
-      commandDesc: `PIO Serial Monitor: ${port}`,
-      timestamp: Date.now(),
-      status: "running",
-      tasks: [{
-        taskId: effectiveTaskId,
-        type: "monitor",
-        status: "running",
-        port,
-        pid,
-        commandDesc,
-        logPaths: logFile ? [logFile] : []
-      }]
-    }, projectDir);
-  } catch (e) {
-    logDiagnostic(`[ProcessManager] Failed to register monitor command: ${e.message}`, projectDir);
-  }
-}
-async function unregisterPioMonitorPid(port, projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (fs24.existsSync(pidsFile)) {
-    try {
-      const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-      try {
-        const pids = JSON.parse(fs24.readFileSync(pidsFile, "utf8"));
-        if (pids[port]) {
-          delete pids[port];
-          const identities = readMonitorIdentities(pidsFile);
-          delete identities[port];
-          fs24.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-          fs24.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-        }
-      } finally {
-        await release();
-      }
-    } catch (e) {
-      throw new Error(`Registry contention timeout: ${e.message}`);
-    }
-  }
-  try {
-    const history = getCommandHistory(projectDir);
-    const activeCommand = [...history].reverse().find(
-      (cmd) => cmd.tasks?.some((a) => a.type === "monitor" && a.status === "running" && a.port === port)
-    );
-    if (activeCommand) {
-      const activeTask = activeCommand.tasks.find((a) => a.type === "monitor" && a.status === "running" && a.port === port);
-      if (activeTask) {
-        await updateTaskStatus(activeCommand.id, activeTask.taskId, { status: "terminated" }, projectDir);
-      }
-    }
-  } catch (e) {
-    logDiagnostic(`[ProcessManager] Failed to update monitor command status: ${e.message}`, projectDir);
-  }
-}
-async function killPioMonitorByPort(port, projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (!fs24.existsSync(pidsFile)) return false;
-  let stoppedPid;
-  const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-  try {
-    const pids = JSON.parse(fs24.readFileSync(pidsFile, "utf8"));
-    const pid = pids[port];
-    if (!pid) return false;
-    stoppedPid = pid;
-    const identity = readMonitorIdentities(pidsFile)[port];
-    const observation = inspectProcessIdentity(pid);
-    if (observation.status === "absent") {
-    } else {
-      if (!identity || identity.pid !== pid || compareProcessIdentity(identity, observation) !== "alive")
-        throw new PlatformIOError("Monitor process identity is unavailable or changed; refusing PID-only termination.", "PROCESS_IDENTITY_UNVERIFIED");
-      await new Promise((resolve, reject) => (0, import_tree_kill.default)(pid, "SIGKILL", (error2) => error2 ? reject(error2) : resolve()));
-      let confirmed = false;
-      for (let attempt = 0; attempt < 20; attempt++) {
-        if (compareProcessIdentity(identity, inspectProcessIdentity(pid)) === "stale") {
-          confirmed = true;
-          break;
-        }
-        await delay(50);
-      }
-      if (!confirmed) throw new PlatformIOError("Monitor exit could not be confirmed.", "PROCESS_CLEANUP_PENDING");
-    }
-    delete pids[port];
-    const identities = readMonitorIdentities(pidsFile);
-    delete identities[port];
-    fs24.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-    fs24.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-  } finally {
-    await release();
-  }
-  const history = getCommandHistory(projectDir);
-  for (const command of history) {
-    for (const task of command.tasks ?? []) {
-      if (task.type === "monitor" && task.port === port && task.pid === stoppedPid && task.status === "running")
-        await updateTaskStatus(command.id, task.taskId, { status: "terminated" }, projectDir);
-    }
-  }
-  return true;
-}
-function isPidAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    if (os6.platform() !== "win32") {
-      try {
-        const stdout = execSync2(`ps -p ${pid} -o command=`, { encoding: "utf8" }).toLowerCase();
-        if (!stdout.includes("platformio") && !stdout.includes("pio") && !stdout.includes("python")) {
-          return false;
-        }
-        try {
-          const stat = execSync2(`ps -p ${pid} -o stat=`, { encoding: "utf8" }).trim().toUpperCase();
-          if (stat.startsWith("Z")) {
-            return false;
-          }
-        } catch {
-        }
-      } catch {
-        return false;
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-function getActiveMonitorPids(projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (!fs24.existsSync(pidsFile)) return {};
-  try {
-    return JSON.parse(fs24.readFileSync(pidsFile, "utf8"));
-  } catch {
-    return {};
-  }
-}
-function isBuildActive(projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs24.existsSync(pidsFile)) return false;
-  try {
-    const pids = JSON.parse(fs24.readFileSync(pidsFile, "utf8"));
-    for (const key of Object.keys(pids)) {
-      if (pids[key]?.type === "build" || key === "build") {
-        const targetPid = key === "build" ? pids[key] : Number(key);
-        if (isPidAlive(targetPid)) return true;
-      }
-    }
-  } catch {
-  }
-  return false;
-}
-async function registerBuildPid(pid, projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  const dir = path29.dirname(pidsFile);
-  if (!fs24.existsSync(dir)) fs24.mkdirSync(dir, { recursive: true });
-  if (!fs24.existsSync(pidsFile)) fs24.writeFileSync(pidsFile, "{}");
-  try {
-    const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let pids = {};
-      try {
-        pids = JSON.parse(fs24.readFileSync(pidsFile, "utf8"));
-      } catch {
-      }
-      pids[pid.toString()] = { type: "build", started: Date.now() };
-      fs24.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-}
-async function unregisterBuildPid(projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs24.existsSync(pidsFile)) return;
-  try {
-    const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      const pids = JSON.parse(fs24.readFileSync(pidsFile, "utf8"));
-      let changed = false;
-      for (const key of Object.keys(pids)) {
-        if (pids[key]?.type === "build" || key === "build") {
-          delete pids[key];
-          changed = true;
-        }
-      }
-      if (changed) {
-        fs24.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-      }
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-}
-async function unregisterBuildPidValue(pid, projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs24.existsSync(pidsFile)) return;
-  const release = await import_proper_lockfile6.default.lock(pidsFile, {
-    retries: { retries: 5, minTimeout: 50, maxTimeout: 200 }
-  });
-  try {
-    const pids = JSON.parse(fs24.readFileSync(pidsFile, "utf8"));
-    delete pids[String(pid)];
-    fs24.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-  } finally {
-    await release();
-  }
-}
-async function killTrackedTaskProcess(task, projectDir) {
-  if (!task.pid) return false;
-  const monitorPids = getActiveMonitorPids(projectDir);
-  const buildPidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  let buildPids = {};
-  if (fs24.existsSync(buildPidsFile)) {
-    try {
-      buildPids = JSON.parse(fs24.readFileSync(buildPidsFile, "utf8"));
-    } catch {
-      buildPids = {};
-    }
-  }
-  const trackedMonitor = task.type === "monitor" && Boolean(task.port) && monitorPids[task.port] === task.pid;
-  const trackedBuild = task.type !== "monitor" && Object.hasOwn(buildPids, String(task.pid));
-  if (!trackedMonitor && !trackedBuild) {
-    if (!isPidAlive(task.pid)) return false;
-    throw new Error(
-      `Refusing to terminate PID ${task.pid}; it is not owned by task ${task.taskId}.`
-    );
-  }
-  if (isPidAlive(task.pid)) {
-    await new Promise((resolve, reject) => {
-      (0, import_tree_kill.default)(task.pid, "SIGTERM", (error2) => {
-        if (error2) reject(error2);
-        else resolve();
-      });
-    });
-  }
-  if (trackedMonitor && task.port) {
-    await unregisterPioMonitorPid(task.port, projectDir);
-  } else if (trackedBuild) {
-    await unregisterBuildPidValue(task.pid, projectDir);
-  }
-  return true;
-}
-async function killAllTrackedProcesses(projectDir) {
-  const tasks = [];
-  for (const file of [SERIAL_PIDS_FILE, BUILD_PIDS_FILE]) {
-    const pidsFile = getPidsFilePath(projectDir, file);
-    if (fs24.existsSync(pidsFile)) {
-      try {
-        const pids = JSON.parse(fs24.readFileSync(pidsFile, "utf8"));
-        for (const key of Object.keys(pids)) {
-          let targetPid;
-          if (file === BUILD_PIDS_FILE) {
-            if (pids[key]?.type === "build" || key === "build") {
-              targetPid = key === "build" ? pids[key] : Number(key);
-            }
-          } else {
-            targetPid = pids[key];
-          }
-          if (targetPid) {
-            logDiagnostic(`[ProcessManager Diagnostic] Emergency killing tracked PID ${targetPid} via ${file}.`, projectDir);
-            const p = new Promise((res) => {
-              (0, import_tree_kill.default)(targetPid, "SIGKILL", () => res());
-            });
-            tasks.push(p);
-          }
-        }
-        fs24.unlinkSync(pidsFile);
-      } catch {
-      }
-    }
-  }
-  await Promise.all(tasks);
-  await sweepGhostTasks(projectDir);
-}
-async function sweepGhostTasks(projectDir) {
-  try {
-    const history = getCommandHistory(projectDir);
-    let changed = false;
-    for (const cmd of history) {
-      if (cmd.tasks) {
-        for (const task of cmd.tasks) {
-          if (task.status === "running") {
-            const pid = task.pid;
-            let isAlive = false;
-            if (pid && isPidAlive(pid)) {
-              isAlive = true;
-            }
-            if (!isAlive) {
-              await updateTaskStatus(cmd.id, task.taskId, { status: "terminated" }, projectDir);
-              logDiagnostic(`[Ghost Sweeper] Cleaned up orphaned ghost task ${task.taskId} (PID: ${pid || "Unknown"})`, projectDir);
-              changed = true;
-            }
-          }
-        }
-      }
-    }
-    if (changed) {
-      logDiagnostic(`[Ghost Sweeper] Successfully scrubbed stale background tasks from registry.`, projectDir);
-    }
-  } catch (e) {
-    logDiagnostic(`[Ghost Sweeper] Failed to sweep tasks: ${e.message}`, projectDir);
-  }
-}
-var import_tree_kill, import_proper_lockfile6, WORKSPACE_DIR2, LOCKS_DIR, SERIAL_PIDS_FILE, BUILD_PIDS_FILE;
-var init_process_manager = __esm({
-  "src/utils/process-manager.ts"() {
-    "use strict";
-    init_process_identity();
-    init_errors();
-    import_tree_kill = __toESM(require_tree_kill(), 1);
-    import_proper_lockfile6 = __toESM(require_proper_lockfile(), 1);
-    init_logger();
-    init_command_registry();
-    init_paths();
-    WORKSPACE_DIR2 = ".pio-mcp-workspace";
-    LOCKS_DIR = "locks";
-    SERIAL_PIDS_FILE = "monitor-pids.json";
-    BUILD_PIDS_FILE = "active_tasks.json";
-  }
-});
-
-// src/utils/tail.ts
-import fs25 from "node:fs";
-async function tailFileBounded(filePath, maxBytes = 1024 * 1024) {
-  if (!fs25.existsSync(filePath)) {
-    return [];
-  }
-  const stat = await fs25.promises.stat(filePath);
-  if (stat.size === 0) return [];
-  const sizeToRead = Math.min(stat.size, maxBytes);
-  const startPos = stat.size - sizeToRead;
-  const stream = fs25.createReadStream(filePath, { start: startPos, encoding: "utf8" });
-  let content = "";
-  for await (const chunk of stream) {
-    content += chunk;
-  }
-  return content.split("\n");
-}
-var init_tail = __esm({
-  "src/utils/tail.ts"() {
-    "use strict";
-  }
-});
-
-// src/utils/spooler.ts
-import fs26 from "node:fs";
-import path30 from "node:path";
-import crypto10 from "node:crypto";
-function getLogDir(verb, projectDir) {
-  const baseDir = projectDir || SERVER_DATA_DIR;
-  if (!projectDir) ensureGlobalDirs();
-  return path30.join(baseDir, WORKSPACE_DIR3, "logs", verb);
-}
-function rotateLogs(targetDir, prefix, maxHistory = 30) {
-  if (!fs26.existsSync(targetDir)) return;
-  const files = fs26.readdirSync(targetDir).filter((f) => f.startsWith(prefix) && f.endsWith(".log")).map((f) => ({
-    name: f,
-    path: path30.join(targetDir, f),
-    ctime: fs26.statSync(path30.join(targetDir, f)).ctime.getTime()
-  })).sort((a, b) => b.ctime - a.ctime);
-  if (files.length > maxHistory) {
-    const toDelete = files.slice(maxHistory);
-    for (const f of toDelete) {
-      try {
-        fs26.unlinkSync(f.path);
-      } catch {
-      }
-    }
-  }
-}
-function rotateSpoolerStreams(verb, projectDir) {
-  const targetDir = getLogDir(verb, projectDir);
-  if (!fs26.existsSync(targetDir)) {
-    fs26.mkdirSync(targetDir, { recursive: true });
-  }
-  rotateLogs(targetDir, `${verb}-`, 30);
-  const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-  const shortHash = crypto10.randomBytes(4).toString("hex");
-  const logFile = path30.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
-  const latestLog = path30.join(targetDir, `latest-${verb}.log`);
-  return { logFile, latestLog };
-}
-function ensureLatestLogPointer(logFile, latestLog) {
-  try {
-    if (fs26.existsSync(latestLog)) fs26.unlinkSync(latestLog);
-  } catch {
-  }
-  try {
-    fs26.symlinkSync(logFile, latestLog);
-    return { mirrorLatest: false };
-  } catch {
-  }
-  try {
-    fs26.linkSync(logFile, latestLog);
-    return { mirrorLatest: false };
-  } catch {
-  }
-  try {
-    fs26.writeFileSync(latestLog, "");
-    return { mirrorLatest: true };
-  } catch {
-  }
-  return { mirrorLatest: false };
-}
-async function executeWithSpooling(command, args, options) {
-  const projectArea = options.projectDir ?? options.cwd;
-  if (isBuildActive(projectArea)) {
-    throw new Error("A build is already actively running for this project.");
-  }
-  const verb = options.artifactType || "build";
-  const { logFile, latestLog } = rotateSpoolerStreams(verb, projectArea);
-  const outFd = fs26.openSync(logFile, "a");
-  let proc;
-  let deviceCustody;
-  try {
-    const custodyPort = options.devicePort ?? options.activePort;
-    if (custodyPort) {
-      deviceCustody = acquireProcessDeviceCustody(custodyPort);
-      await deviceCustody.prepareSpawn();
-    }
-    proc = await platformioExecutor.spawn(command, args, {
-      cwd: options.cwd,
-      stdio: ["ignore", outFd, outFd],
-      detached: false
-    });
-  } catch (error2) {
-    try {
-      fs26.closeSync(outFd);
-    } catch {
-    }
-    deviceCustody?.releaseAfterExit();
-    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
-    throw new PlatformIOError(
-      error2 instanceof Error ? error2.message : "Process could not be started.",
-      "PROCESS_START_FAILED",
-      { cleanupPending: false, fullLogPath: logFile }
-    );
-  }
-  const timeoutMs = options.timeout ?? (options.background ? 36e5 : 6e5);
-  const startupCancellation = new AbortController();
-  const completion = waitForOwnedProcess(proc, timeoutMs, 1e3, startupCancellation.signal);
-  void completion.catch(() => {
-  });
-  const ctx = mcpContext.getStore();
-  const commandId = options.rootCommandId || ctx?.activityId || crypto10.randomUUID();
-  const taskId = crypto10.randomUUID();
-  const artType = options.artifactType || "build";
-  const targetProjectArea = projectArea || ctx?.targetProjectDir;
-  try {
-    if (proc.pid) {
-      logDiagnostic(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, targetProjectArea);
-      await registerBuildPid(proc.pid, targetProjectArea);
-      await registerCommand({
-        id: commandId,
-        commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
-        timestamp: Date.now(),
-        status: "running",
-        tasks: [{
-          taskId,
-          type: artType,
-          status: "running",
-          logPaths: [logFile],
-          pid: proc.pid,
-          commandDesc: `pio ${command} ${args.join(" ")}`
-        }]
-      }, targetProjectArea).catch((e) => logDiagnostic(`[Spooler] Registry fail: ${e.message}`, targetProjectArea));
-    }
-  } catch (error2) {
-    startupCancellation.abort();
-    let cleanupPending = false;
-    try {
-      await completion;
-    } catch (terminationError) {
-      cleanupPending = !(terminationError instanceof PlatformIOError) || terminationError.context?.cleanupPending !== false;
-    }
-    try {
-      if (!cleanupPending) {
-        deviceCustody?.releaseAfterExit();
-        await unregisterBuildPid(targetProjectArea).catch(() => {
-        });
-        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
-      }
-    } finally {
-      try {
-        fs26.closeSync(outFd);
-      } catch {
-      }
-    }
-    throw new PlatformIOError(
-      error2 instanceof Error ? error2.message : "Process registration failed.",
-      "PROCESS_REGISTRATION_FAILED",
-      { cleanupPending, fullLogPath: logFile, pid: proc.pid }
-    );
-  }
-  const latestPointer = ensureLatestLogPointer(logFile, latestLog);
-  let fileOffset = 0;
-  let watcher = null;
-  portalEvents.clearTaskLog(targetProjectArea || "global", taskId, [logFile]);
-  try {
-    watcher = fs26.watch(logFile, (eventType) => {
-      if (eventType === "change") {
-        try {
-          const stat = fs26.statSync(logFile);
-          if (stat.size > fileOffset) {
-            const stream = fs26.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
-            stream.on("data", (chunk) => {
-              const text7 = chunk.toString();
-              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text7);
-              if (latestPointer.mirrorLatest) {
-                try {
-                  fs26.appendFileSync(latestLog, text7);
-                } catch {
-                }
-              }
-            });
-            fileOffset = stat.size;
-          }
-        } catch {
-        }
-      }
-    });
-    watcher.on("error", () => {
-    });
-  } catch {
-  }
-  const closeOutput = () => {
-    try {
-      fs26.closeSync(outFd);
-    } catch {
-    }
-    if (watcher) {
-      let fd;
-      try {
-        const size = fs26.statSync(logFile).size;
-        if (size > fileOffset) {
-          const start = Math.max(fileOffset, size - 512 * 1024);
-          const buffer = Buffer.alloc(size - start);
-          fd = fs26.openSync(logFile, "r");
-          const bytes = fs26.readSync(fd, buffer, 0, buffer.length, start);
-          portalEvents.emitTaskLog(targetProjectArea || "global", taskId, buffer.subarray(0, bytes).toString());
-        }
-      } catch {
-      } finally {
-        if (fd !== void 0) {
-          try {
-            fs26.closeSync(fd);
-          } catch {
-          }
-        }
-        try {
-          watcher.close();
-        } catch {
-        }
-      }
-    }
-  };
-  if (options.background) {
-    const p = completion;
-    let cleanupPending = false;
-    p.catch((e) => {
-      cleanupPending = e?.context?.cleanupPending !== false;
-      console.error(`[Background Task Error]: ${e.message}`);
-      updateTaskStatus(commandId, taskId, { status: "error", error: e.message }, targetProjectArea).catch(() => {
-      });
-      return 1;
-    }).then(async (code) => {
-      let errorMessage2 = void 0;
-      if (code !== 0) {
-        try {
-          const lines2 = await tailFileBounded(logFile, 512 * 1024);
-          const errors = parseStderrErrors(lines2.join("\n"));
-          if (errors && errors.length > 0) errorMessage2 = errors[0];
-        } catch {
-        }
-      }
-      await updateTaskStatus(commandId, taskId, {
-        status: code === 0 ? "success" : "error",
-        exitCode: code,
-        ...errorMessage2 ? { error: errorMessage2 } : {}
-      }, targetProjectArea).catch(() => {
-      });
-      try {
-        if (!cleanupPending) {
-          deviceCustody?.releaseAfterExit();
-          await unregisterBuildPid(targetProjectArea);
-          if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
-        }
-      } finally {
-        closeOutput();
-      }
-      if (code === 0 && options.onSuccess) {
-        try {
-          await options.onSuccess();
-        } catch (e) {
-          console.error(`[Spooler Diagnostic] Background onSuccess hook failed: ${e.message}`);
-        }
-      }
-    }).catch(async (error2) => {
-      console.error("[Background Task Cleanup Error]:", error2 instanceof Error ? error2.message : "Cleanup failed.");
-      await updateTaskStatus(commandId, taskId, { status: "error", error: error2 instanceof Error ? error2.message : "Cleanup failed." }, targetProjectArea).catch(() => {
-      });
-    });
-    return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
-  }
-  let exitCode;
-  try {
-    exitCode = await completion;
-  } catch (error2) {
-    const cleanupPending = !(error2 instanceof PlatformIOError) || error2.context?.cleanupPending !== false;
-    await updateTaskStatus(commandId, taskId, { status: "error", error: error2 instanceof Error ? error2.message : "Process failed." }, projectArea).catch(() => {
-    });
-    try {
-      if (!cleanupPending) {
-        deviceCustody?.releaseAfterExit();
-        await unregisterBuildPid(projectArea);
-        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
-      }
-    } finally {
-      closeOutput();
-    }
-    if (error2 instanceof PlatformIOError)
-      throw new PlatformIOError(error2.message, error2.code, { ...error2.context, cleanupPending, fullLogPath: logFile });
-    throw error2;
-  }
-  let errorMessage = void 0;
-  if (exitCode !== 0) {
-    try {
-      const lines2 = await tailFileBounded(logFile, 512 * 1024);
-      const errors = parseStderrErrors(lines2.join("\n"));
-      if (errors && errors.length > 0) errorMessage = errors[0];
-    } catch {
-    }
-  }
-  await updateTaskStatus(commandId, taskId, {
-    status: exitCode === 0 ? "success" : "error",
-    exitCode,
-    ...errorMessage ? { error: errorMessage } : {}
-  }, projectArea).catch(() => {
-  });
-  try {
-    deviceCustody?.releaseAfterExit();
-    await unregisterBuildPid(projectArea);
-    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
-  } finally {
-    closeOutput();
-  }
-  if (exitCode === 0 && options.onSuccess) {
-    try {
-      await options.onSuccess();
-    } catch (e) {
-      console.error(`[Spooler Diagnostic] onSuccess hook failed: ${e.message}`);
-    }
-  }
-  let finalOutput = "";
-  try {
-    const lines2 = await tailFileBounded(logFile, 512 * 1024);
-    finalOutput = lines2.slice(-150).join("\n");
-  } catch (e) {
-    finalOutput = `[Spooler Fetch Error] Could not parse log ending: ${e.message}`;
-  }
-  return { exitCode, finalOutput, fullLogPath: logFile };
-}
-function spoolLargeDataset(toolName, data, targetDir, threshold = 2e3) {
-  const stringified = JSON.stringify(data, null, 2);
-  if (stringified.length > threshold) {
-    const cacheDir = getLogDir(toolName, targetDir);
-    if (!fs26.existsSync(cacheDir)) {
-      fs26.mkdirSync(cacheDir, { recursive: true });
-    }
-    rotateLogs(cacheDir, `${toolName}-`, 30);
-    const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-    const shortHash = crypto10.randomBytes(4).toString("hex");
-    const cacheFile = path30.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
-    const latestFile = path30.join(cacheDir, `latest-${toolName}.json`);
-    fs26.writeFileSync(cacheFile, stringified, "utf-8");
-    try {
-      if (fs26.existsSync(latestFile)) fs26.unlinkSync(latestFile);
-      fs26.symlinkSync(cacheFile, latestFile);
-    } catch {
-    }
-    return `Payload too large for context window. Full dataset successfully spooled to disk at ${cacheFile}. Please use your grep_search or view_file tools to query this file.`;
-  }
-  return data;
-}
-var WORKSPACE_DIR3;
-var init_spooler = __esm({
-  "src/utils/spooler.ts"() {
-    "use strict";
-    init_process_device_custody();
-    init_owned_process_wait();
-    init_platformio();
-    init_process_manager();
-    init_semaphore();
-    init_tail();
-    init_command_registry();
-    init_mcp_context();
-    init_errors();
-    init_paths();
-    init_logger();
-    init_events();
-    WORKSPACE_DIR3 = ".pio-mcp-workspace";
-  }
-});
-
-// src/core/devices.ts
-async function listDevicesCore() {
-  return listDevices();
-}
-var init_devices2 = __esm({
-  "src/core/devices.ts"() {
-    "use strict";
-    init_devices();
   }
 });
 
@@ -17230,7 +15623,7 @@ var WORKER_SOURCE, activeRegexWorkers;
 var init_bounded_pattern = __esm({
   "src/core/bounded-pattern.ts"() {
     "use strict";
-    init_errors();
+    init_errors2();
     WORKER_SOURCE = `
 const {parentPort,workerData}=require('node:worker_threads');
 parentPort.once('message', () => {
@@ -17260,6 +15653,1613 @@ try {
 parentPort.postMessage({ready:true});
 `;
     activeRegexWorkers = 0;
+  }
+});
+
+// src/core/devices/serial-endpoint.ts
+import fs28 from "node:fs";
+import path33 from "node:path";
+function validatePort(port) {
+  if (typeof port !== "string" || !port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
+    throw new PlatformIOError(
+      "Invalid serial endpoint name.",
+      "SERIAL_ENDPOINT_INVALID"
+    );
+}
+function resolveSerialEndpoint(port, options = {}) {
+  validatePort(port);
+  const platform2 = options.platform ?? process.platform;
+  const realpath = options.realpath ?? fs28.realpathSync.native;
+  const stat = options.stat ?? ((target) => {
+    const metadata = fs28.statSync(target, { bigint: true });
+    return {
+      characterDevice: metadata.isCharacterDevice(),
+      deviceNumber: metadata.rdev
+    };
+  });
+  const snapshot = () => {
+    if (platform2 === "win32") {
+      const localPrefix = "\\\\.\\";
+      const name2 = port.startsWith(localPrefix) ? port.slice(localPrefix.length) : port;
+      const match = /^COM([1-9][0-9]{0,8})$/i.exec(name2);
+      if (!match)
+        throw new PlatformIOError(
+          "Expected a COM port or its local device-path spelling.",
+          "SERIAL_ENDPOINT_INVALID"
+        );
+      const canonicalPort2 = `COM${match[1]}`;
+      return {
+        canonicalPort: canonicalPort2,
+        identity: `endpoint:win32:${canonicalPort2}`,
+        identityBasis: "windows-port-name",
+        presence: "unverified"
+      };
+    }
+    if (platform2 !== "linux" && platform2 !== "darwin")
+      throw new PlatformIOError(
+        "Serial endpoint identity is unavailable on this platform.",
+        "SERIAL_ENDPOINT_UNSUPPORTED"
+      );
+    if (!path33.posix.isAbsolute(port) || !path33.posix.normalize(port).startsWith("/dev/"))
+      throw new PlatformIOError(
+        "Unix serial endpoints must resolve within /dev.",
+        "SERIAL_ENDPOINT_INVALID"
+      );
+    let canonicalPort;
+    let metadata;
+    try {
+      canonicalPort = realpath(port);
+      validatePort(canonicalPort);
+      if (!path33.posix.isAbsolute(canonicalPort) || !path33.posix.normalize(canonicalPort).startsWith("/dev/"))
+        throw new PlatformIOError(
+          "Serial alias resolves outside /dev.",
+          "SERIAL_ENDPOINT_INVALID"
+        );
+      metadata = stat(canonicalPort);
+    } catch (error2) {
+      if (error2 instanceof PlatformIOError) throw error2;
+      throw new PlatformIOError(
+        "Serial endpoint metadata is unavailable.",
+        "SERIAL_ENDPOINT_UNAVAILABLE"
+      );
+    }
+    if (!metadata.characterDevice || typeof metadata.deviceNumber !== "bigint" || metadata.deviceNumber < 0n || metadata.deviceNumber > 0xffffffffffffffffn)
+      throw new PlatformIOError(
+        "Serial endpoint is not a valid character device.",
+        "SERIAL_ENDPOINT_INVALID"
+      );
+    const deviceNumber = metadata.deviceNumber.toString();
+    if (platform2 === "darwin") {
+      const match = /^\/dev\/(?:cu|tty)\.([a-zA-Z0-9_.-]+)$/.exec(
+        canonicalPort
+      );
+      if (!match)
+        throw new PlatformIOError(
+          "Expected a Darwin callout/dial-in serial endpoint.",
+          "SERIAL_ENDPOINT_INVALID"
+        );
+      return {
+        canonicalPort,
+        identity: `endpoint:darwin:serial:${match[1]}`,
+        deviceNumber,
+        identityBasis: "darwin-serial-pair",
+        presence: "character-device"
+      };
+    }
+    return {
+      canonicalPort,
+      identity: `endpoint:linux:char:${deviceNumber}`,
+      deviceNumber,
+      identityBasis: "unix-device-number",
+      presence: "character-device"
+    };
+  };
+  const expected = snapshot();
+  return Object.freeze({
+    requestedPort: port,
+    canonicalPort: expected.canonicalPort,
+    resource: Object.freeze({
+      kind: "serial",
+      identity: expected.identity
+    }),
+    identityBasis: expected.identityBasis,
+    presence: expected.presence,
+    survivesReenumeration: false,
+    revalidate() {
+      const current = snapshot();
+      if (current.canonicalPort !== expected.canonicalPort || current.identity !== expected.identity || current.deviceNumber !== expected.deviceNumber)
+        throw new PlatformIOError(
+          "Serial endpoint changed after selection; resolve and authorize again.",
+          "SERIAL_ENDPOINT_CHANGED"
+        );
+    }
+  });
+}
+var init_serial_endpoint = __esm({
+  "src/core/devices/serial-endpoint.ts"() {
+    "use strict";
+    init_errors2();
+  }
+});
+
+// src/core/devices/process-identity.ts
+import fs30 from "node:fs";
+import path34 from "node:path";
+import { execFileSync } from "node:child_process";
+function linuxStartToken(stat, bootId, pid) {
+  const end = stat.lastIndexOf(")");
+  const fields = stat.slice(end + 1).trim().split(/\s+/);
+  const start = fields[19];
+  if (stat.length > 8192 || end < 0 || !stat.startsWith(`${pid} (`) || !/^[0-9]+$/.test(start ?? "") || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(bootId.trim()))
+    throw new PlatformIOError(
+      "Invalid Linux process identity.",
+      "PROCESS_IDENTITY_INVALID"
+    );
+  return `${bootId.trim().toLowerCase()}:${start}`;
+}
+function inspectProcessIdentity(pid) {
+  if (!Number.isSafeInteger(pid) || pid < 1 || pid > 2147483647)
+    throw new PlatformIOError(
+      "Invalid process ID.",
+      "PROCESS_IDENTITY_INVALID"
+    );
+  try {
+    let startToken;
+    if (process.platform === "linux") {
+      startToken = linuxStartToken(
+        fs30.readFileSync(`/proc/${pid}/stat`, "utf8"),
+        fs30.readFileSync("/proc/sys/kernel/random/boot_id", "utf8"),
+        pid
+      );
+    } else if (process.platform === "win32") {
+      const systemRoot = process.env.SystemRoot;
+      if (!systemRoot || !path34.isAbsolute(systemRoot))
+        return { status: "unknown" };
+      startToken = execFileSync(
+        path34.join(
+          systemRoot,
+          "System32",
+          "WindowsPowerShell",
+          "v1.0",
+          "powershell.exe"
+        ),
+        [
+          "-NoLogo",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          `$ErrorActionPreference='Stop'; [System.Diagnostics.Process]::GetProcessById(${pid}).StartTime.ToFileTimeUtc().ToString([System.Globalization.CultureInfo]::InvariantCulture)`
+        ],
+        {
+          encoding: "utf8",
+          // Windows PowerShell cold startup can exceed three seconds on loaded hosts.
+          timeout: 1e4,
+          maxBuffer: 8192,
+          windowsHide: true,
+          stdio: ["ignore", "pipe", "pipe"]
+        }
+      ).trim();
+      if (!/^[0-9]{15,20}$/.test(startToken)) return { status: "unknown" };
+    } else if (process.platform === "darwin") {
+      startToken = execFileSync(
+        "/bin/ps",
+        ["-p", String(pid), "-o", "lstart="],
+        {
+          encoding: "utf8",
+          timeout: 3e3,
+          maxBuffer: 8192,
+          env: { ...process.env, LC_ALL: "C", TZ: "UTC" },
+          stdio: ["ignore", "pipe", "pipe"]
+        }
+      ).trim();
+      if (!/^[A-Z][a-z]{2} [A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2} \d{4}$/.test(
+        startToken
+      ))
+        return { status: "unknown" };
+    } else return { status: "unknown" };
+    return {
+      status: "running",
+      identity: { pid, platform: process.platform, startToken }
+    };
+  } catch {
+    try {
+      process.kill(pid, 0);
+    } catch (error2) {
+      if (error2.code === "ESRCH")
+        return { status: "absent" };
+    }
+    return { status: "unknown" };
+  }
+}
+function compareProcessIdentity(owner, observation) {
+  if (observation.status === "absent") return "stale";
+  if (observation.status === "unknown") return "unknown";
+  if (owner.platform !== observation.identity.platform || owner.pid !== observation.identity.pid)
+    return "unknown";
+  return owner.startToken === observation.identity.startToken ? "alive" : "stale";
+}
+var init_process_identity = __esm({
+  "src/core/devices/process-identity.ts"() {
+    "use strict";
+    init_errors2();
+  }
+});
+
+// src/core/devices/device-lease.ts
+import fs31 from "node:fs";
+import os6 from "node:os";
+import path35 from "node:path";
+import { createHash as createHash5, randomUUID as randomUUID2 } from "node:crypto";
+function stableDeviceLeaseRoot() {
+  return path35.join(
+    os6.userInfo().homedir,
+    ".platformio-mcp",
+    "device-leases-v1"
+  );
+}
+function resourceKey(resource) {
+  if (!resource || !["serial", "probe"].includes(resource.kind) || typeof resource.identity !== "string" || !resource.identity.trim() || resource.identity.length > 1024 || /[\x00-\x1f\x7f]/.test(resource.identity))
+    throw new PlatformIOError(
+      "Invalid physical resource identity.",
+      "DEVICE_IDENTITY_INVALID"
+    );
+  return createHash5("sha256").update(JSON.stringify([resource.kind, resource.identity])).digest("hex");
+}
+function validProcessIdentity(value2) {
+  return !!value2 && Number.isSafeInteger(value2.pid) && value2.pid >= 1 && value2.pid <= 2147483647 && ["win32", "linux", "darwin"].includes(value2.platform) && typeof value2.startToken === "string" && value2.startToken.length > 0 && value2.startToken.length <= 256;
+}
+function sameProcessIdentity(first, second) {
+  return first.pid === second.pid && first.platform === second.platform && first.startToken === second.startToken;
+}
+var DeviceLeaseStore;
+var init_device_lease = __esm({
+  "src/core/devices/device-lease.ts"() {
+    "use strict";
+    init_errors2();
+    init_process_identity();
+    DeviceLeaseStore = class {
+      root;
+      inspect;
+      held = /* @__PURE__ */ new WeakMap();
+      transfers = /* @__PURE__ */ new WeakMap();
+      owner;
+      /** Construct a store; no file is created or device opened until acquisition. */
+      constructor(options = {}) {
+        this.root = path35.resolve(options.root ?? stableDeviceLeaseRoot());
+        this.inspect = options.inspect ?? inspectProcessIdentity;
+      }
+      /** Inspect persisted ownership without releasing or recovering it; acquisition must still be atomic. */
+      status(resource) {
+        const key = resourceKey(resource);
+        return this.withGate(key, () => {
+          const record2 = this.readRecord(key);
+          if (!record2) return { status: "unclaimed", resource: { ...resource } };
+          if (record2.handoffPending)
+            return {
+              status: "unknown",
+              resource: { ...record2.resource },
+              ownerPid: record2.owner.pid,
+              acquiredAt: record2.acquiredAt
+            };
+          const identity = compareProcessIdentity(
+            record2.owner,
+            this.inspect(record2.owner.pid)
+          );
+          return {
+            status: identity === "alive" ? "owned" : identity,
+            resource: { ...record2.resource },
+            ownerPid: record2.owner.pid,
+            acquiredAt: record2.acquiredAt
+          };
+        });
+      }
+      /** Acquire exclusively, recovering a previous lease only after its owner is proven stale. */
+      acquire(resource) {
+        const key = resourceKey(resource);
+        const owner = this.currentOwner();
+        return this.withGate(key, () => {
+          const previous = this.readRecord(key);
+          if (previous) {
+            if (previous.handoffPending)
+              throw new PlatformIOError(
+                "Device custody handoff is unresolved; automatic stale recovery is disabled.",
+                "DEVICE_HANDOFF_PENDING"
+              );
+            const status = compareProcessIdentity(
+              previous.owner,
+              this.inspect(previous.owner.pid)
+            );
+            if (status !== "stale")
+              throw new PlatformIOError(
+                status === "alive" ? "Physical resource is already owned." : "Physical resource ownership cannot be verified.",
+                status === "alive" ? "DEVICE_BUSY" : "DEVICE_OWNER_UNKNOWN"
+              );
+          }
+          const record2 = {
+            version: 1,
+            resource: { kind: resource.kind, identity: resource.identity },
+            owner: { ...owner },
+            nonce: randomUUID2(),
+            acquiredAt: (/* @__PURE__ */ new Date()).toISOString()
+          };
+          this.writeRecord(key, record2);
+          return this.createHandle(record2);
+        });
+      }
+      /** Persist uncertainty before launching a child, so a coordinator crash cannot expose its hardware. */
+      beginHandoff(lease) {
+        const held = this.requireHandle(lease);
+        const key = resourceKey(held.resource);
+        this.withGate(key, () => {
+          const current = this.requirePersistedOwner(key, held);
+          if (current.handoffPending)
+            throw new PlatformIOError(
+              "Device handoff is already pending.",
+              "DEVICE_HANDOFF_PENDING"
+            );
+          this.writeRecord(key, { ...current, handoffPending: true });
+        });
+      }
+      /** Cancel only after the trusted launcher proves no child started or all started children exited. */
+      cancelHandoff(lease) {
+        const held = this.requireHandle(lease);
+        const key = resourceKey(held.resource);
+        this.withGate(key, () => {
+          const current = this.requirePersistedOwner(key, held);
+          const rest = { ...current };
+          delete rest.handoffPending;
+          this.writeRecord(key, rest);
+        });
+      }
+      /**
+       * Atomically transfer ownership to an already-started, verified child waiting behind an IPC barrier.
+       * The caller must keep the child from opening hardware until adoption succeeds. No process is spawned here.
+       * On success the old handle is invalid, even if delivery of the returned ticket subsequently fails.
+       */
+      transfer(lease, target) {
+        const held = this.requireHandle(lease);
+        const key = resourceKey(held.resource);
+        if (!validProcessIdentity(target) || target.platform !== held.owner.platform || target.pid === held.owner.pid)
+          throw new PlatformIOError(
+            "Invalid lease transfer target.",
+            "DEVICE_TRANSFER_INVALID"
+          );
+        return this.withGate(key, () => {
+          const current = this.requirePersistedOwner(key, held);
+          if (compareProcessIdentity(target, this.inspect(target.pid)) !== "alive")
+            throw new PlatformIOError(
+              "Lease transfer target is unavailable or its process identity changed.",
+              "DEVICE_TRANSFER_INVALID"
+            );
+          const transferred = {
+            ...current,
+            owner: { ...target },
+            handoffPending: void 0,
+            nonce: randomUUID2()
+          };
+          this.writeRecord(key, transferred);
+          this.held.delete(lease);
+          const ticket = Object.freeze({
+            resource: Object.freeze({ ...current.resource }),
+            nonce: transferred.nonce
+          });
+          this.transfers.set(ticket, transferred);
+          return ticket;
+        });
+      }
+      /** Retire an unadopted handoff only after its exact child owner is proven stale; never kill a process. */
+      finishTransfer(ticket) {
+        const transferred = this.transfers.get(ticket);
+        if (!transferred)
+          throw new PlatformIOError(
+            "Unknown or completed transfer receipt.",
+            "DEVICE_TRANSFER_INVALID"
+          );
+        const key = resourceKey(transferred.resource);
+        this.withGate(key, () => {
+          const current = this.requirePersistedOwner(key, transferred);
+          if (current.handoffPending || compareProcessIdentity(
+            current.owner,
+            this.inspect(current.owner.pid)
+          ) !== "stale")
+            throw new PlatformIOError(
+              "Transferred child exit is not confirmed.",
+              "DEVICE_OWNER_UNKNOWN"
+            );
+          fs31.unlinkSync(path35.join(this.root, `${key}.json`));
+          this.transfers.delete(ticket);
+        });
+      }
+      /**
+       * Consume an IPC ticket only in the target OS process, rotating its nonce to prevent ticket replay.
+       * This grants lease custody, not tool authorization; public adapters must not accept transfer tickets.
+       */
+      adopt(ticket) {
+        const key = resourceKey(ticket?.resource);
+        if (typeof ticket.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(ticket.nonce))
+          throw new PlatformIOError(
+            "Invalid lease transfer ticket.",
+            "DEVICE_TRANSFER_INVALID"
+          );
+        const owner = this.currentOwner();
+        return this.withGate(key, () => {
+          const current = this.readRecord(key);
+          if (!current || current.nonce !== ticket.nonce || !sameProcessIdentity(current.owner, owner))
+            throw new PlatformIOError(
+              "Lease transfer ticket is stale or belongs to another process.",
+              "DEVICE_TRANSFER_INVALID"
+            );
+          const adopted = { ...current, nonce: randomUUID2() };
+          this.writeRecord(key, adopted);
+          return this.createHandle(adopted);
+        });
+      }
+      /** Release only a capability issued by this store whose persisted nonce and owner still match. */
+      release(lease) {
+        const held = this.requireHandle(lease);
+        const key = resourceKey(held.resource);
+        this.withGate(key, () => {
+          const current = this.requirePersistedOwner(key, held);
+          if (current.handoffPending)
+            throw new PlatformIOError(
+              "Cannot release unresolved child custody.",
+              "DEVICE_HANDOFF_PENDING"
+            );
+          fs31.unlinkSync(path35.join(this.root, `${key}.json`));
+          this.held.delete(lease);
+        });
+      }
+      createHandle(record2) {
+        const lease = Object.freeze({
+          resource: Object.freeze({ ...record2.resource }),
+          acquiredAt: record2.acquiredAt
+        });
+        this.held.set(lease, record2);
+        return lease;
+      }
+      requireHandle(lease) {
+        const held = this.held.get(lease);
+        if (!held)
+          throw new PlatformIOError(
+            "Unknown or already released device lease.",
+            "DEVICE_LEASE_NOT_OWNED"
+          );
+        return held;
+      }
+      requirePersistedOwner(key, held) {
+        const current = this.readRecord(key);
+        if (!current || current.nonce !== held.nonce || !sameProcessIdentity(current.owner, held.owner))
+          throw new PlatformIOError(
+            "Device lease ownership changed; refusing mutation.",
+            "DEVICE_LEASE_NOT_OWNED"
+          );
+        return current;
+      }
+      currentOwner() {
+        if (this.owner) return this.owner;
+        const observation = this.inspect(process.pid);
+        if (observation.status !== "running" || observation.identity.pid !== process.pid || !validProcessIdentity(observation.identity))
+          throw new PlatformIOError(
+            "Cannot establish this process's start identity.",
+            "DEVICE_OWNER_UNKNOWN"
+          );
+        this.owner = { ...observation.identity };
+        return this.owner;
+      }
+      /** Refuse symlinked/non-directory components instead of silently splitting the global lock domain. */
+      ensureRoot() {
+        const parsed = path35.parse(this.root);
+        let current = parsed.root;
+        for (const part of this.root.slice(parsed.root.length).split(path35.sep).filter(Boolean)) {
+          current = path35.join(current, part);
+          try {
+            fs31.mkdirSync(current, { mode: 448 });
+          } catch (error2) {
+            if (error2.code !== "EEXIST") throw error2;
+          }
+          const stat = fs31.lstatSync(current);
+          if (!stat.isDirectory() || stat.isSymbolicLink())
+            throw new PlatformIOError(
+              "Device lease directory must not contain symlinks.",
+              "DEVICE_LEASE_PATH_INVALID"
+            );
+        }
+        const rootStat = fs31.statSync(this.root);
+        if (process.platform !== "win32" && (rootStat.uid !== process.getuid?.() || (rootStat.mode & 18) !== 0))
+          throw new PlatformIOError(
+            "Device lease directory must be owned by this user and not writable by others.",
+            "DEVICE_LEASE_PATH_INVALID"
+          );
+      }
+      withGate(key, action) {
+        this.ensureRoot();
+        const gate = path35.join(this.root, `${key}.gate`);
+        try {
+          fs31.mkdirSync(gate, { mode: 448 });
+        } catch (error2) {
+          if (error2.code === "EEXIST")
+            throw new PlatformIOError(
+              "Device lease update is busy or interrupted; retry, then inspect the gate if it persists.",
+              "DEVICE_LEASE_GATE_BUSY"
+            );
+          throw error2;
+        }
+        try {
+          return action();
+        } finally {
+          fs31.rmdirSync(gate);
+        }
+      }
+      readRecord(key) {
+        const file = path35.join(this.root, `${key}.json`);
+        let stat;
+        try {
+          stat = fs31.lstatSync(file);
+        } catch (error2) {
+          if (error2.code === "ENOENT") return void 0;
+          throw error2;
+        }
+        if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 8192)
+          throw new PlatformIOError(
+            "Invalid device lease record.",
+            "DEVICE_LEASE_CORRUPT"
+          );
+        try {
+          const record2 = JSON.parse(fs31.readFileSync(file, "utf8"));
+          if (record2.version !== 1 || record2.handoffPending !== void 0 && record2.handoffPending !== true || resourceKey(record2.resource) !== key || !validProcessIdentity(record2.owner) || typeof record2.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(record2.nonce) || typeof record2.acquiredAt !== "string" || !Number.isFinite(Date.parse(record2.acquiredAt)))
+            throw new Error("Invalid lease schema");
+          return record2;
+        } catch {
+          throw new PlatformIOError(
+            "Invalid device lease record; ownership is not assumed stale.",
+            "DEVICE_LEASE_CORRUPT"
+          );
+        }
+      }
+      writeRecord(key, record2) {
+        const temporary = path35.join(this.root, `${key}.${record2.nonce}.tmp`);
+        let fd;
+        try {
+          fd = fs31.openSync(temporary, "wx", 384);
+          fs31.writeFileSync(fd, JSON.stringify(record2), "utf8");
+          fs31.fsyncSync(fd);
+          fs31.closeSync(fd);
+          fd = void 0;
+          fs31.renameSync(temporary, path35.join(this.root, `${key}.json`));
+        } finally {
+          if (fd !== void 0) fs31.closeSync(fd);
+          try {
+            fs31.unlinkSync(temporary);
+          } catch (error2) {
+            if (error2.code !== "ENOENT") throw error2;
+          }
+        }
+      }
+    };
+  }
+});
+
+// src/core/devices/process-device-custody.ts
+function acquireProcessDeviceCustody(port, dependencies = {}) {
+  const store = dependencies.store ?? new DeviceLeaseStore();
+  const endpoint = (dependencies.resolve ?? resolveSerialEndpoint)(port);
+  const lease = store.acquire(endpoint.resource);
+  return {
+    prepareSpawn() {
+      endpoint.revalidate();
+      store.beginHandoff(lease);
+    },
+    releaseAfterExit() {
+      try {
+        store.cancelHandoff(lease);
+        store.release(lease);
+      } catch (error2) {
+        throw new PlatformIOError(
+          error2 instanceof Error ? error2.message : "Device lease cleanup failed.",
+          "DEVICE_CLEANUP_PENDING",
+          { cleanupPending: true }
+        );
+      }
+    }
+  };
+}
+var init_process_device_custody = __esm({
+  "src/core/devices/process-device-custody.ts"() {
+    "use strict";
+    init_errors2();
+    init_device_lease();
+    init_serial_endpoint();
+  }
+});
+
+// src/utils/owned-process-wait.ts
+function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3, cancellation) {
+  return new Promise((resolve, reject) => {
+    let settled = false, timedOut = false, cancelled = false;
+    let escalation;
+    let deadline;
+    const cleanup = () => {
+      settled = true;
+      clearTimeout(timer);
+      clearTimeout(escalation);
+      clearTimeout(deadline);
+      proc.off("exit", exited);
+      proc.off("close", exited);
+      proc.off("error", failed);
+      cancellation?.removeEventListener("abort", cancel);
+    };
+    const exited = (code) => {
+      if (settled) return;
+      cleanup();
+      if (timedOut || cancelled)
+        reject(
+          new PlatformIOError(
+            cancelled ? "Command cancelled after startup failure." : `Command timed out after ${timeoutMs}ms`,
+            cancelled ? "PROCESS_CANCELLED" : "COMMAND_TIMEOUT",
+            { cleanupPending: false }
+          )
+        );
+      else resolve(code ?? 1);
+    };
+    const failed = (error2) => {
+      if (settled) return;
+      cleanup();
+      reject(
+        new PlatformIOError(error2.message, "PROCESS_FAILED", {
+          cleanupPending: !!proc.pid && proc.exitCode === null && proc.signalCode === null
+        })
+      );
+    };
+    const terminate = () => {
+      if (settled) return;
+      try {
+        proc.kill("SIGTERM");
+      } catch {
+      }
+      if (settled) return;
+      escalation = setTimeout(() => {
+        if (settled) return;
+        try {
+          proc.kill("SIGKILL");
+        } catch {
+        }
+        if (settled) return;
+        deadline = setTimeout(() => {
+          if (settled) return;
+          cleanup();
+          reject(
+            new PlatformIOError(
+              "Child termination could not be confirmed.",
+              "PROCESS_CLEANUP_PENDING",
+              { cleanupPending: true }
+            )
+          );
+        }, graceMs);
+      }, graceMs);
+    };
+    const cancel = () => {
+      if (settled || cancelled || timedOut) return;
+      cancelled = true;
+      clearTimeout(timer);
+      terminate();
+    };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      terminate();
+    }, timeoutMs);
+    proc.once("exit", exited);
+    proc.once("close", exited);
+    proc.once("error", failed);
+    cancellation?.addEventListener("abort", cancel, { once: true });
+    if (proc.exitCode !== null || proc.signalCode !== null)
+      exited(proc.exitCode);
+    else if (cancellation?.aborted) cancel();
+  });
+}
+var init_owned_process_wait = __esm({
+  "src/utils/owned-process-wait.ts"() {
+    "use strict";
+    init_errors2();
+  }
+});
+
+// node_modules/tree-kill/index.js
+var require_tree_kill = __commonJS({
+  "node_modules/tree-kill/index.js"(exports, module) {
+    "use strict";
+    var childProcess2 = __require("child_process");
+    var spawn2 = childProcess2.spawn;
+    var exec2 = childProcess2.exec;
+    module.exports = function(pid, signal, callback) {
+      if (typeof signal === "function" && callback === void 0) {
+        callback = signal;
+        signal = void 0;
+      }
+      pid = parseInt(pid);
+      if (Number.isNaN(pid)) {
+        if (callback) {
+          return callback(new Error("pid must be a number"));
+        } else {
+          throw new Error("pid must be a number");
+        }
+      }
+      var tree = {};
+      var pidsToProcess = {};
+      tree[pid] = [];
+      pidsToProcess[pid] = 1;
+      switch (process.platform) {
+        case "win32":
+          exec2("taskkill /pid " + pid + " /T /F", callback);
+          break;
+        case "darwin":
+          buildProcessTree(pid, tree, pidsToProcess, function(parentPid) {
+            return spawn2("pgrep", ["-P", parentPid]);
+          }, function() {
+            killAll(tree, signal, callback);
+          });
+          break;
+        // case 'sunos':
+        //     buildProcessTreeSunOS(pid, tree, pidsToProcess, function () {
+        //         killAll(tree, signal, callback);
+        //     });
+        //     break;
+        default:
+          buildProcessTree(pid, tree, pidsToProcess, function(parentPid) {
+            return spawn2("ps", ["-o", "pid", "--no-headers", "--ppid", parentPid]);
+          }, function() {
+            killAll(tree, signal, callback);
+          });
+          break;
+      }
+    };
+    function killAll(tree, signal, callback) {
+      var killed = {};
+      try {
+        Object.keys(tree).forEach(function(pid) {
+          tree[pid].forEach(function(pidpid) {
+            if (!killed[pidpid]) {
+              killPid(pidpid, signal);
+              killed[pidpid] = 1;
+            }
+          });
+          if (!killed[pid]) {
+            killPid(pid, signal);
+            killed[pid] = 1;
+          }
+        });
+      } catch (err) {
+        if (callback) {
+          return callback(err);
+        } else {
+          throw err;
+        }
+      }
+      if (callback) {
+        return callback();
+      }
+    }
+    function killPid(pid, signal) {
+      try {
+        process.kill(parseInt(pid, 10), signal);
+      } catch (err) {
+        if (err.code !== "ESRCH") throw err;
+      }
+    }
+    function buildProcessTree(parentPid, tree, pidsToProcess, spawnChildProcessesList, cb) {
+      var ps = spawnChildProcessesList(parentPid);
+      var allData = "";
+      ps.stdout.on("data", function(data) {
+        var data = data.toString("ascii");
+        allData += data;
+      });
+      var onClose = function(code) {
+        delete pidsToProcess[parentPid];
+        if (code != 0) {
+          if (Object.keys(pidsToProcess).length == 0) {
+            cb();
+          }
+          return;
+        }
+        allData.match(/\d+/g).forEach(function(pid) {
+          pid = parseInt(pid, 10);
+          tree[parentPid].push(pid);
+          tree[pid] = [];
+          pidsToProcess[pid] = 1;
+          buildProcessTree(pid, tree, pidsToProcess, spawnChildProcessesList, cb);
+        });
+      };
+      ps.on("close", onClose);
+    }
+  }
+});
+
+// src/utils/logger.ts
+import fs36 from "node:fs";
+import path41 from "node:path";
+async function logDiagnostic(msg, _projectDir) {
+  ensureGlobalDirs();
+  const diagLog = path41.join(SERVER_DATA_DIR, "server.log");
+  const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+  const line = `[${timestamp}] ${msg}
+`;
+  try {
+    await fs36.promises.appendFile(diagLog, line);
+  } catch {
+  }
+  console.error(msg);
+}
+var init_logger = __esm({
+  "src/utils/logger.ts"() {
+    "use strict";
+    init_paths();
+  }
+});
+
+// src/utils/process-manager.ts
+import fs37 from "node:fs";
+import { setTimeout as delay3 } from "node:timers/promises";
+import os7 from "node:os";
+import path42 from "node:path";
+import { execSync as execSync2 } from "node:child_process";
+import crypto12 from "node:crypto";
+function getPidsFilePath(projectDir, file = SERIAL_PIDS_FILE) {
+  if (file === SERIAL_PIDS_FILE) {
+    ensureGlobalDirs();
+    const dir = path42.join(SERVER_DATA_DIR, "serial_monitors");
+    if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
+    return path42.join(dir, file);
+  } else if (file === BUILD_PIDS_FILE) {
+    const baseDir2 = projectDir || SERVER_DATA_DIR;
+    if (!projectDir) ensureGlobalDirs();
+    const dir = path42.join(baseDir2, WORKSPACE_DIR2, "tasks");
+    if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
+    return path42.join(dir, file);
+  }
+  const baseDir = projectDir || SERVER_DATA_DIR;
+  if (!projectDir) ensureGlobalDirs();
+  return path42.join(baseDir, WORKSPACE_DIR2, LOCKS_DIR, file);
+}
+function readMonitorIdentities(pidsFile) {
+  const file = pidsFile + ".identities.json";
+  if (!fs37.existsSync(file)) return {};
+  if (fs37.statSync(file).size > 1024 * 1024)
+    throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
+  const value2 = JSON.parse(fs37.readFileSync(file, "utf8"));
+  if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
+    throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
+  return value2;
+}
+async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFile, taskId, commandDesc) {
+  const pidsFile = getPidsFilePath(projectDir);
+  const dir = path42.dirname(pidsFile);
+  if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
+  if (!fs37.existsSync(pidsFile)) fs37.writeFileSync(pidsFile, "{}");
+  try {
+    const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let pids = {};
+      try {
+        pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
+      } catch {
+      }
+      const identities = readMonitorIdentities(pidsFile);
+      const observed = inspectProcessIdentity(pid);
+      if (observed.status === "running") identities[port] = observed.identity;
+      else delete identities[port];
+      fs37.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+      pids[port] = pid;
+      fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+  try {
+    const commandId = rootCommandId || crypto12.randomUUID();
+    const effectiveTaskId = taskId || crypto12.randomUUID();
+    await registerCommand({
+      id: commandId,
+      commandDesc: `PIO Serial Monitor: ${port}`,
+      timestamp: Date.now(),
+      status: "running",
+      tasks: [{
+        taskId: effectiveTaskId,
+        type: "monitor",
+        status: "running",
+        port,
+        pid,
+        commandDesc,
+        logPaths: logFile ? [logFile] : []
+      }]
+    }, projectDir);
+  } catch (e) {
+    logDiagnostic(`[ProcessManager] Failed to register monitor command: ${e.message}`, projectDir);
+  }
+}
+async function unregisterPioMonitorPid(port, projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
+  if (fs37.existsSync(pidsFile)) {
+    try {
+      const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+      try {
+        const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
+        if (pids[port]) {
+          delete pids[port];
+          const identities = readMonitorIdentities(pidsFile);
+          delete identities[port];
+          fs37.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+          fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+        }
+      } finally {
+        await release();
+      }
+    } catch (e) {
+      throw new Error(`Registry contention timeout: ${e.message}`);
+    }
+  }
+  try {
+    const history = getCommandHistory(projectDir);
+    const activeCommand = [...history].reverse().find(
+      (cmd) => cmd.tasks?.some((a) => a.type === "monitor" && a.status === "running" && a.port === port)
+    );
+    if (activeCommand) {
+      const activeTask = activeCommand.tasks.find((a) => a.type === "monitor" && a.status === "running" && a.port === port);
+      if (activeTask) {
+        await updateTaskStatus(activeCommand.id, activeTask.taskId, { status: "terminated" }, projectDir);
+      }
+    }
+  } catch (e) {
+    logDiagnostic(`[ProcessManager] Failed to update monitor command status: ${e.message}`, projectDir);
+  }
+}
+async function killPioMonitorByPort(port, projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
+  if (!fs37.existsSync(pidsFile)) return false;
+  let stoppedPid;
+  const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+  try {
+    const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
+    const pid = pids[port];
+    if (!pid) return false;
+    stoppedPid = pid;
+    const identity = readMonitorIdentities(pidsFile)[port];
+    const observation = inspectProcessIdentity(pid);
+    if (observation.status === "absent") {
+    } else {
+      if (!identity || identity.pid !== pid || compareProcessIdentity(identity, observation) !== "alive")
+        throw new PlatformIOError("Monitor process identity is unavailable or changed; refusing PID-only termination.", "PROCESS_IDENTITY_UNVERIFIED");
+      await new Promise((resolve, reject) => (0, import_tree_kill.default)(pid, "SIGKILL", (error2) => error2 ? reject(error2) : resolve()));
+      let confirmed = false;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if (compareProcessIdentity(identity, inspectProcessIdentity(pid)) === "stale") {
+          confirmed = true;
+          break;
+        }
+        await delay3(50);
+      }
+      if (!confirmed) throw new PlatformIOError("Monitor exit could not be confirmed.", "PROCESS_CLEANUP_PENDING");
+    }
+    delete pids[port];
+    const identities = readMonitorIdentities(pidsFile);
+    delete identities[port];
+    fs37.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+    fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+  } finally {
+    await release();
+  }
+  const history = getCommandHistory(projectDir);
+  for (const command of history) {
+    for (const task of command.tasks ?? []) {
+      if (task.type === "monitor" && task.port === port && task.pid === stoppedPid && task.status === "running")
+        await updateTaskStatus(command.id, task.taskId, { status: "terminated" }, projectDir);
+    }
+  }
+  return true;
+}
+function isPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    if (os7.platform() !== "win32") {
+      try {
+        const stdout = execSync2(`ps -p ${pid} -o command=`, { encoding: "utf8" }).toLowerCase();
+        if (!stdout.includes("platformio") && !stdout.includes("pio") && !stdout.includes("python")) {
+          return false;
+        }
+        try {
+          const stat = execSync2(`ps -p ${pid} -o stat=`, { encoding: "utf8" }).trim().toUpperCase();
+          if (stat.startsWith("Z")) {
+            return false;
+          }
+        } catch {
+        }
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+function getActiveMonitorPids(projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
+  if (!fs37.existsSync(pidsFile)) return {};
+  try {
+    return JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
+  } catch {
+    return {};
+  }
+}
+function isBuildActive(projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  if (!fs37.existsSync(pidsFile)) return false;
+  try {
+    const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
+    for (const key of Object.keys(pids)) {
+      if (pids[key]?.type === "build" || key === "build") {
+        const targetPid = key === "build" ? pids[key] : Number(key);
+        if (isPidAlive(targetPid)) return true;
+      }
+    }
+  } catch {
+  }
+  return false;
+}
+async function registerBuildPid(pid, projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  const dir = path42.dirname(pidsFile);
+  if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
+  if (!fs37.existsSync(pidsFile)) fs37.writeFileSync(pidsFile, "{}");
+  try {
+    const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let pids = {};
+      try {
+        pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
+      } catch {
+      }
+      pids[pid.toString()] = { type: "build", started: Date.now() };
+      fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+}
+async function unregisterBuildPid(projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  if (!fs37.existsSync(pidsFile)) return;
+  try {
+    const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
+      let changed = false;
+      for (const key of Object.keys(pids)) {
+        if (pids[key]?.type === "build" || key === "build") {
+          delete pids[key];
+          changed = true;
+        }
+      }
+      if (changed) {
+        fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+      }
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+}
+async function unregisterBuildPidValue(pid, projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  if (!fs37.existsSync(pidsFile)) return;
+  const release = await import_proper_lockfile5.default.lock(pidsFile, {
+    retries: { retries: 5, minTimeout: 50, maxTimeout: 200 }
+  });
+  try {
+    const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
+    delete pids[String(pid)];
+    fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+  } finally {
+    await release();
+  }
+}
+async function killTrackedTaskProcess(task, projectDir) {
+  if (!task.pid) return false;
+  const monitorPids = getActiveMonitorPids(projectDir);
+  const buildPidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  let buildPids = {};
+  if (fs37.existsSync(buildPidsFile)) {
+    try {
+      buildPids = JSON.parse(fs37.readFileSync(buildPidsFile, "utf8"));
+    } catch {
+      buildPids = {};
+    }
+  }
+  const trackedMonitor = task.type === "monitor" && Boolean(task.port) && monitorPids[task.port] === task.pid;
+  const trackedBuild = task.type !== "monitor" && Object.hasOwn(buildPids, String(task.pid));
+  if (!trackedMonitor && !trackedBuild) {
+    if (!isPidAlive(task.pid)) return false;
+    throw new Error(
+      `Refusing to terminate PID ${task.pid}; it is not owned by task ${task.taskId}.`
+    );
+  }
+  if (isPidAlive(task.pid)) {
+    await new Promise((resolve, reject) => {
+      (0, import_tree_kill.default)(task.pid, "SIGTERM", (error2) => {
+        if (error2) reject(error2);
+        else resolve();
+      });
+    });
+  }
+  if (trackedMonitor && task.port) {
+    await unregisterPioMonitorPid(task.port, projectDir);
+  } else if (trackedBuild) {
+    await unregisterBuildPidValue(task.pid, projectDir);
+  }
+  return true;
+}
+async function killAllTrackedProcesses(projectDir) {
+  const tasks = [];
+  for (const file of [SERIAL_PIDS_FILE, BUILD_PIDS_FILE]) {
+    const pidsFile = getPidsFilePath(projectDir, file);
+    if (fs37.existsSync(pidsFile)) {
+      try {
+        const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
+        for (const key of Object.keys(pids)) {
+          let targetPid;
+          if (file === BUILD_PIDS_FILE) {
+            if (pids[key]?.type === "build" || key === "build") {
+              targetPid = key === "build" ? pids[key] : Number(key);
+            }
+          } else {
+            targetPid = pids[key];
+          }
+          if (targetPid) {
+            logDiagnostic(`[ProcessManager Diagnostic] Emergency killing tracked PID ${targetPid} via ${file}.`, projectDir);
+            const p = new Promise((res) => {
+              (0, import_tree_kill.default)(targetPid, "SIGKILL", () => res());
+            });
+            tasks.push(p);
+          }
+        }
+        fs37.unlinkSync(pidsFile);
+      } catch {
+      }
+    }
+  }
+  await Promise.all(tasks);
+  await sweepGhostTasks(projectDir);
+}
+async function sweepGhostTasks(projectDir) {
+  try {
+    const history = getCommandHistory(projectDir);
+    let changed = false;
+    for (const cmd of history) {
+      if (cmd.tasks) {
+        for (const task of cmd.tasks) {
+          if (task.status === "running") {
+            const pid = task.pid;
+            let isAlive = false;
+            if (pid && isPidAlive(pid)) {
+              isAlive = true;
+            }
+            if (!isAlive) {
+              await updateTaskStatus(cmd.id, task.taskId, { status: "terminated" }, projectDir);
+              logDiagnostic(`[Ghost Sweeper] Cleaned up orphaned ghost task ${task.taskId} (PID: ${pid || "Unknown"})`, projectDir);
+              changed = true;
+            }
+          }
+        }
+      }
+    }
+    if (changed) {
+      logDiagnostic(`[Ghost Sweeper] Successfully scrubbed stale background tasks from registry.`, projectDir);
+    }
+  } catch (e) {
+    logDiagnostic(`[Ghost Sweeper] Failed to sweep tasks: ${e.message}`, projectDir);
+  }
+}
+var import_tree_kill, import_proper_lockfile5, WORKSPACE_DIR2, LOCKS_DIR, SERIAL_PIDS_FILE, BUILD_PIDS_FILE;
+var init_process_manager = __esm({
+  "src/utils/process-manager.ts"() {
+    "use strict";
+    init_process_identity();
+    init_errors2();
+    import_tree_kill = __toESM(require_tree_kill(), 1);
+    import_proper_lockfile5 = __toESM(require_proper_lockfile(), 1);
+    init_logger();
+    init_command_registry();
+    init_paths();
+    WORKSPACE_DIR2 = ".pio-mcp-workspace";
+    LOCKS_DIR = "locks";
+    SERIAL_PIDS_FILE = "monitor-pids.json";
+    BUILD_PIDS_FILE = "active_tasks.json";
+  }
+});
+
+// src/utils/tail.ts
+import fs38 from "node:fs";
+async function tailFileBounded(filePath, maxBytes = 1024 * 1024) {
+  if (!fs38.existsSync(filePath)) {
+    return [];
+  }
+  const stat = await fs38.promises.stat(filePath);
+  if (stat.size === 0) return [];
+  const sizeToRead = Math.min(stat.size, maxBytes);
+  const startPos = stat.size - sizeToRead;
+  const stream = fs38.createReadStream(filePath, { start: startPos, encoding: "utf8" });
+  let content = "";
+  for await (const chunk of stream) {
+    content += chunk;
+  }
+  return content.split("\n");
+}
+var init_tail = __esm({
+  "src/utils/tail.ts"() {
+    "use strict";
+  }
+});
+
+// src/utils/spooler.ts
+import fs39 from "node:fs";
+import path43 from "node:path";
+import crypto13 from "node:crypto";
+function getLogDir(verb, projectDir) {
+  const baseDir = projectDir || SERVER_DATA_DIR;
+  if (!projectDir) ensureGlobalDirs();
+  return path43.join(baseDir, WORKSPACE_DIR3, "logs", verb);
+}
+function rotateLogs(targetDir, prefix, maxHistory = 30) {
+  if (!fs39.existsSync(targetDir)) return;
+  const files = fs39.readdirSync(targetDir).filter((f) => f.startsWith(prefix) && f.endsWith(".log")).map((f) => ({
+    name: f,
+    path: path43.join(targetDir, f),
+    ctime: fs39.statSync(path43.join(targetDir, f)).ctime.getTime()
+  })).sort((a, b) => b.ctime - a.ctime);
+  if (files.length > maxHistory) {
+    const toDelete = files.slice(maxHistory);
+    for (const f of toDelete) {
+      try {
+        fs39.unlinkSync(f.path);
+      } catch {
+      }
+    }
+  }
+}
+function rotateSpoolerStreams(verb, projectDir) {
+  const targetDir = getLogDir(verb, projectDir);
+  if (!fs39.existsSync(targetDir)) {
+    fs39.mkdirSync(targetDir, { recursive: true });
+  }
+  rotateLogs(targetDir, `${verb}-`, 30);
+  const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+  const shortHash = crypto13.randomBytes(4).toString("hex");
+  const logFile = path43.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
+  const latestLog = path43.join(targetDir, `latest-${verb}.log`);
+  return { logFile, latestLog };
+}
+function ensureLatestLogPointer(logFile, latestLog) {
+  try {
+    if (fs39.existsSync(latestLog)) fs39.unlinkSync(latestLog);
+  } catch {
+  }
+  try {
+    fs39.symlinkSync(logFile, latestLog);
+    return { mirrorLatest: false };
+  } catch {
+  }
+  try {
+    fs39.linkSync(logFile, latestLog);
+    return { mirrorLatest: false };
+  } catch {
+  }
+  try {
+    fs39.writeFileSync(latestLog, "");
+    return { mirrorLatest: true };
+  } catch {
+  }
+  return { mirrorLatest: false };
+}
+async function executeWithSpooling(command, args, options) {
+  const projectArea = options.projectDir ?? options.cwd;
+  if (isBuildActive(projectArea)) {
+    throw new Error("A build is already actively running for this project.");
+  }
+  const verb = options.artifactType || "build";
+  const { logFile, latestLog } = rotateSpoolerStreams(verb, projectArea);
+  const outFd = fs39.openSync(logFile, "a");
+  let proc;
+  let deviceCustody;
+  try {
+    const custodyPort = options.devicePort ?? options.activePort;
+    if (custodyPort) {
+      deviceCustody = acquireProcessDeviceCustody(custodyPort);
+      await deviceCustody.prepareSpawn();
+    }
+    proc = await platformioExecutor.spawn(command, args, {
+      cwd: options.cwd,
+      stdio: ["ignore", outFd, outFd],
+      detached: false
+    });
+  } catch (error2) {
+    try {
+      fs39.closeSync(outFd);
+    } catch {
+    }
+    deviceCustody?.releaseAfterExit();
+    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+    throw new PlatformIOError(
+      error2 instanceof Error ? error2.message : "Process could not be started.",
+      "PROCESS_START_FAILED",
+      { cleanupPending: false, fullLogPath: logFile }
+    );
+  }
+  const timeoutMs = options.timeout ?? (options.background ? 36e5 : 6e5);
+  const startupCancellation = new AbortController();
+  const completion = waitForOwnedProcess(proc, timeoutMs, 1e3, startupCancellation.signal);
+  void completion.catch(() => {
+  });
+  const ctx = mcpContext.getStore();
+  const commandId = options.rootCommandId || ctx?.activityId || crypto13.randomUUID();
+  const taskId = crypto13.randomUUID();
+  const artType = options.artifactType || "build";
+  const targetProjectArea = projectArea || ctx?.targetProjectDir;
+  try {
+    if (proc.pid) {
+      logDiagnostic(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, targetProjectArea);
+      await registerBuildPid(proc.pid, targetProjectArea);
+      await registerCommand({
+        id: commandId,
+        commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
+        timestamp: Date.now(),
+        status: "running",
+        tasks: [{
+          taskId,
+          type: artType,
+          status: "running",
+          logPaths: [logFile],
+          pid: proc.pid,
+          commandDesc: `pio ${command} ${args.join(" ")}`
+        }]
+      }, targetProjectArea).catch((e) => logDiagnostic(`[Spooler] Registry fail: ${e.message}`, targetProjectArea));
+    }
+  } catch (error2) {
+    startupCancellation.abort();
+    let cleanupPending = false;
+    try {
+      await completion;
+    } catch (terminationError) {
+      cleanupPending = !(terminationError instanceof PlatformIOError) || terminationError.context?.cleanupPending !== false;
+    }
+    try {
+      if (!cleanupPending) {
+        deviceCustody?.releaseAfterExit();
+        await unregisterBuildPid(targetProjectArea).catch(() => {
+        });
+        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      }
+    } finally {
+      try {
+        fs39.closeSync(outFd);
+      } catch {
+      }
+    }
+    throw new PlatformIOError(
+      error2 instanceof Error ? error2.message : "Process registration failed.",
+      "PROCESS_REGISTRATION_FAILED",
+      { cleanupPending, fullLogPath: logFile, pid: proc.pid }
+    );
+  }
+  const latestPointer = ensureLatestLogPointer(logFile, latestLog);
+  let fileOffset = 0;
+  let watcher = null;
+  portalEvents.clearTaskLog(targetProjectArea || "global", taskId, [logFile]);
+  try {
+    watcher = fs39.watch(logFile, (eventType) => {
+      if (eventType === "change") {
+        try {
+          const stat = fs39.statSync(logFile);
+          if (stat.size > fileOffset) {
+            const stream = fs39.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
+            stream.on("data", (chunk) => {
+              const text7 = chunk.toString();
+              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text7);
+              if (latestPointer.mirrorLatest) {
+                try {
+                  fs39.appendFileSync(latestLog, text7);
+                } catch {
+                }
+              }
+            });
+            fileOffset = stat.size;
+          }
+        } catch {
+        }
+      }
+    });
+    watcher.on("error", () => {
+    });
+  } catch {
+  }
+  const closeOutput = () => {
+    try {
+      fs39.closeSync(outFd);
+    } catch {
+    }
+    if (watcher) {
+      let fd;
+      try {
+        const size = fs39.statSync(logFile).size;
+        if (size > fileOffset) {
+          const start = Math.max(fileOffset, size - 512 * 1024);
+          const buffer = Buffer.alloc(size - start);
+          fd = fs39.openSync(logFile, "r");
+          const bytes = fs39.readSync(fd, buffer, 0, buffer.length, start);
+          portalEvents.emitTaskLog(targetProjectArea || "global", taskId, buffer.subarray(0, bytes).toString());
+        }
+      } catch {
+      } finally {
+        if (fd !== void 0) {
+          try {
+            fs39.closeSync(fd);
+          } catch {
+          }
+        }
+        try {
+          watcher.close();
+        } catch {
+        }
+      }
+    }
+  };
+  if (options.background) {
+    const p = completion;
+    let cleanupPending = false;
+    p.catch((e) => {
+      cleanupPending = e?.context?.cleanupPending !== false;
+      console.error(`[Background Task Error]: ${e.message}`);
+      updateTaskStatus(commandId, taskId, { status: "error", error: e.message }, targetProjectArea).catch(() => {
+      });
+      return 1;
+    }).then(async (code) => {
+      let errorMessage2 = void 0;
+      if (code !== 0) {
+        try {
+          const lines2 = await tailFileBounded(logFile, 512 * 1024);
+          const errors = parseStderrErrors(lines2.join("\n"));
+          if (errors && errors.length > 0) errorMessage2 = errors[0];
+        } catch {
+        }
+      }
+      await updateTaskStatus(commandId, taskId, {
+        status: code === 0 ? "success" : "error",
+        exitCode: code,
+        ...errorMessage2 ? { error: errorMessage2 } : {}
+      }, targetProjectArea).catch(() => {
+      });
+      try {
+        if (!cleanupPending) {
+          deviceCustody?.releaseAfterExit();
+          await unregisterBuildPid(targetProjectArea);
+          if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+        }
+      } finally {
+        closeOutput();
+      }
+      if (code === 0 && options.onSuccess) {
+        try {
+          await options.onSuccess();
+        } catch (e) {
+          console.error(`[Spooler Diagnostic] Background onSuccess hook failed: ${e.message}`);
+        }
+      }
+    }).catch(async (error2) => {
+      console.error("[Background Task Cleanup Error]:", error2 instanceof Error ? error2.message : "Cleanup failed.");
+      await updateTaskStatus(commandId, taskId, { status: "error", error: error2 instanceof Error ? error2.message : "Cleanup failed." }, targetProjectArea).catch(() => {
+      });
+    });
+    return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
+  }
+  let exitCode;
+  try {
+    exitCode = await completion;
+  } catch (error2) {
+    const cleanupPending = !(error2 instanceof PlatformIOError) || error2.context?.cleanupPending !== false;
+    await updateTaskStatus(commandId, taskId, { status: "error", error: error2 instanceof Error ? error2.message : "Process failed." }, projectArea).catch(() => {
+    });
+    try {
+      if (!cleanupPending) {
+        deviceCustody?.releaseAfterExit();
+        await unregisterBuildPid(projectArea);
+        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      }
+    } finally {
+      closeOutput();
+    }
+    if (error2 instanceof PlatformIOError)
+      throw new PlatformIOError(error2.message, error2.code, { ...error2.context, cleanupPending, fullLogPath: logFile });
+    throw error2;
+  }
+  let errorMessage = void 0;
+  if (exitCode !== 0) {
+    try {
+      const lines2 = await tailFileBounded(logFile, 512 * 1024);
+      const errors = parseStderrErrors(lines2.join("\n"));
+      if (errors && errors.length > 0) errorMessage = errors[0];
+    } catch {
+    }
+  }
+  await updateTaskStatus(commandId, taskId, {
+    status: exitCode === 0 ? "success" : "error",
+    exitCode,
+    ...errorMessage ? { error: errorMessage } : {}
+  }, projectArea).catch(() => {
+  });
+  try {
+    deviceCustody?.releaseAfterExit();
+    await unregisterBuildPid(projectArea);
+    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+  } finally {
+    closeOutput();
+  }
+  if (exitCode === 0 && options.onSuccess) {
+    try {
+      await options.onSuccess();
+    } catch (e) {
+      console.error(`[Spooler Diagnostic] onSuccess hook failed: ${e.message}`);
+    }
+  }
+  let finalOutput = "";
+  try {
+    const lines2 = await tailFileBounded(logFile, 512 * 1024);
+    finalOutput = lines2.slice(-150).join("\n");
+  } catch (e) {
+    finalOutput = `[Spooler Fetch Error] Could not parse log ending: ${e.message}`;
+  }
+  return { exitCode, finalOutput, fullLogPath: logFile };
+}
+function spoolLargeDataset(toolName, data, targetDir, threshold = 2e3) {
+  const stringified = JSON.stringify(data, null, 2);
+  if (stringified.length > threshold) {
+    const cacheDir = getLogDir(toolName, targetDir);
+    if (!fs39.existsSync(cacheDir)) {
+      fs39.mkdirSync(cacheDir, { recursive: true });
+    }
+    rotateLogs(cacheDir, `${toolName}-`, 30);
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+    const shortHash = crypto13.randomBytes(4).toString("hex");
+    const cacheFile = path43.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
+    const latestFile = path43.join(cacheDir, `latest-${toolName}.json`);
+    fs39.writeFileSync(cacheFile, stringified, "utf-8");
+    try {
+      if (fs39.existsSync(latestFile)) fs39.unlinkSync(latestFile);
+      fs39.symlinkSync(cacheFile, latestFile);
+    } catch {
+    }
+    return `Payload too large for context window. Full dataset successfully spooled to disk at ${cacheFile}. Please use your grep_search or view_file tools to query this file.`;
+  }
+  return data;
+}
+var WORKSPACE_DIR3;
+var init_spooler = __esm({
+  "src/utils/spooler.ts"() {
+    "use strict";
+    init_process_device_custody();
+    init_owned_process_wait();
+    init_platformio();
+    init_process_manager();
+    init_semaphore();
+    init_tail();
+    init_command_registry();
+    init_mcp_context();
+    init_errors2();
+    init_paths();
+    init_logger();
+    init_events();
+    WORKSPACE_DIR3 = ".pio-mcp-workspace";
   }
 });
 
@@ -24711,7 +24711,7 @@ var MAX_BINDING_TTL_SECONDS;
 var init_target_resolution = __esm({
   "src/core/target-resolution.ts"() {
     "use strict";
-    init_errors();
+    init_errors2();
     init_validation();
     init_devices2();
     MAX_BINDING_TTL_SECONDS = 900;
@@ -25304,7 +25304,7 @@ var init_monitor = __esm({
     "use strict";
     init_bounded_pattern();
     init_validation();
-    init_errors();
+    init_errors2();
     init_semaphore();
     init_devices();
     init_process_manager();
@@ -92641,781 +92641,11 @@ var require_ip_address = __commonJS({
   }
 });
 
-// src/core/analysis/esp-coredump-retention.ts
-var import_proper_lockfile = __toESM(require_proper_lockfile(), 1);
-init_paths();
-init_errors();
-import fs4 from "node:fs/promises";
-import path4 from "node:path";
-import { createHash as createHash3 } from "node:crypto";
-
-// src/core/analysis/private-analysis-directory.ts
-init_errors();
-import fs2 from "node:fs/promises";
-import os2 from "node:os";
-import path2 from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-var execute = promisify(execFile);
-var WINDOWS_PRIVATE_ACL = String.raw`
-$ErrorActionPreference = 'Stop'
-$target = $env:PIO_PRIVATE_ANALYSIS_DIRECTORY
-$sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
-$acl = New-Object System.Security.AccessControl.DirectorySecurity
-$acl.SetOwner($sid)
-$acl.SetAccessRuleProtection($true, $false)
-$rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')
-$acl.AddAccessRule($rule)
-[System.IO.Directory]::SetAccessControl($target, $acl)
-$actual = [System.IO.Directory]::GetAccessControl($target)
-if (-not $actual.AreAccessRulesProtected) { throw 'Unprotected analysis directory' }
-$rules = $actual.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])
-if ($rules.Count -ne 1 -or $rules[0].IdentityReference.Value -ne $sid.Value -or $rules[0].AccessControlType -ne 'Allow' -or $rules[0].FileSystemRights -ne 'FullControl') { throw 'Unexpected analysis ACL' }
-`;
-async function createPrivateAnalysisDirectory(parent = os2.tmpdir()) {
-  const directory = await fs2.mkdtemp(
-    path2.join(parent, "pio-private-analysis-")
-  );
-  try {
-    try {
-      if (process.platform === "win32") {
-        const systemRoot = process.env.SystemRoot;
-        if (!systemRoot || !path2.isAbsolute(systemRoot))
-          throw new Error("Windows system root unavailable");
-        await execute(
-          path2.join(
-            systemRoot,
-            "System32",
-            "WindowsPowerShell",
-            "v1.0",
-            "powershell.exe"
-          ),
-          [
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-EncodedCommand",
-            Buffer.from(WINDOWS_PRIVATE_ACL, "utf16le").toString("base64")
-          ],
-          {
-            windowsHide: true,
-            timeout: 15e3,
-            maxBuffer: 16384,
-            env: { ...process.env, PIO_PRIVATE_ANALYSIS_DIRECTORY: directory }
-          }
-        );
-      } else {
-        await fs2.chmod(directory, 448);
-        const permissions = await fs2.stat(directory);
-        if ((permissions.mode & 511) !== 448 || process.getuid && permissions.uid !== process.getuid())
-          throw new Error("Unexpected analysis directory owner or permissions");
-      }
-    } catch {
-      throw new PlatformIOError(
-        "Cannot establish private analysis storage.",
-        "ANALYSIS_PRIVATE_STORAGE_UNAVAILABLE"
-      );
-    }
-    return directory;
-  } catch (error2) {
-    await fs2.rm(directory, { recursive: true, force: true });
-    throw error2;
-  }
-}
-async function withPrivateAnalysisDirectory(use, parent) {
-  const directory = await createPrivateAnalysisDirectory(parent);
-  try {
-    return await use(directory);
-  } finally {
-    await fs2.rm(directory, { recursive: true, force: true });
-  }
-}
-
-// src/core/esp-partition-artifacts.ts
-init_errors();
-import fs3 from "node:fs/promises";
-import path3 from "node:path";
-import { createHash as createHash2 } from "node:crypto";
-
-// src/core/esp-partitions.ts
-init_errors();
-import { createHash } from "node:crypto";
-var SECTOR = 4096;
-var UINT32_END = 4294967296;
-var DATA_SUBTYPES = {
-  ota: 0,
-  phy: 1,
-  nvs: 2,
-  coredump: 3,
-  nvs_keys: 4,
-  efuse: 5,
-  undefined: 6,
-  esphttpd: 128,
-  fat: 129,
-  spiffs: 130,
-  littlefs: 131
-};
-function invalid(message) {
-  throw new PlatformIOError(message, "PARTITION_TABLE_INVALID");
-}
-function unsigned(value2, maximum, label) {
-  if (!Number.isSafeInteger(value2) || value2 < 0 || value2 > maximum)
-    invalid("Invalid " + label + ".");
-  return value2;
-}
-function parsePartitionNumber(text7) {
-  const match = /^(0x[0-9a-f]+|[0-9]+)([km])?$/i.exec(text7.trim());
-  if (!match) invalid("Invalid partition number.");
-  return unsigned(
-    Number(match[1]) * (match[2]?.toLowerCase() === "k" ? 1024 : match[2] ? 1048576 : 1),
-    UINT32_END,
-    "partition number"
-  );
-}
-function validateLocation(layout) {
-  unsigned(layout.tableOffset, UINT32_END - SECTOR, "partition table offset");
-  if (layout.tableOffset % SECTOR)
-    invalid("Partition table offset is not sector aligned.");
-  if (layout.flashSize !== void 0) {
-    unsigned(layout.flashSize, UINT32_END, "flash size");
-    if (layout.flashSize < layout.tableOffset + SECTOR)
-      invalid("Partition table exceeds flash size.");
-  }
-}
-function validateEspPartitions(parts, layout) {
-  validateLocation(layout);
-  if (parts.length > 95) invalid("Partition table exceeds the 95-entry limit.");
-  const names = /* @__PURE__ */ new Set();
-  let end = layout.tableOffset + SECTOR;
-  let otaCount = 0;
-  for (const part of [...parts].sort((a, b) => a.offset - b.offset)) {
-    if (!part.name || Buffer.byteLength(part.name, "utf8") > 16 || /[\x00-\x1f\x7f]/.test(part.name))
-      invalid("Invalid partition label.");
-    if (names.has(part.name)) invalid("Duplicate partition label.");
-    names.add(part.name);
-    unsigned(part.type, 255, "partition type");
-    unsigned(part.subtype, 255, "partition subtype");
-    unsigned(part.flags, 4294967295, "partition flags");
-    unsigned(part.offset, 4294967295, "partition offset");
-    unsigned(part.size, 4294967295, "partition size");
-    if (!part.size || part.offset + part.size > UINT32_END)
-      invalid("Invalid partition address range.");
-    if (part.offset < end)
-      invalid("Partition overlaps the table or another partition.");
-    if (part.offset % (part.type === 0 ? 65536 : SECTOR))
-      invalid("Partition offset is not aligned for its type.");
-    if (part.type === 0 && part.size % SECTOR)
-      invalid("Application size is not sector aligned.");
-    if (part.type === 1 && [0, 3].includes(part.subtype) && part.flags & 2)
-      invalid("OTA metadata and core-dump partitions cannot be read-only.");
-    if (part.type === 1 && part.subtype === 0) {
-      if (++otaCount > 1 || part.size !== 8192)
-        invalid("Invalid OTA metadata partition.");
-    }
-    end = part.offset + part.size;
-    if (layout.flashSize !== void 0 && end > layout.flashSize)
-      invalid("Partition exceeds flash size.");
-  }
-}
-function parseEspPartitionCsv(text7, layout) {
-  validateLocation(layout);
-  if (Buffer.byteLength(text7, "utf8") > 65536)
-    invalid("Partition CSV exceeds 64 KiB.");
-  const parts = [];
-  let end = layout.tableOffset + SECTOR;
-  for (const line of text7.replace(/^\uFEFF/, "").split(/\r?\n/)) {
-    if (!line.trim() || line.trimStart().startsWith("#")) continue;
-    const fields = line.split(",").map((field2) => field2.trim());
-    if (fields.length < 5 || fields.length > 6)
-      invalid("Expected five or six CSV columns.");
-    const [name2, rawType, rawSubtype, offsetText, sizeText, flagText = ""] = fields;
-    const typeText = rawType.toLowerCase();
-    const subtypeText = rawSubtype.toLowerCase();
-    const type = typeText === "app" ? 0 : typeText === "data" ? 1 : parsePartitionNumber(typeText);
-    let subtype;
-    const ota = /^ota_([0-9]|1[0-5])$/.exec(subtypeText);
-    if (type !== 0 && !subtypeText) subtype = 6;
-    else if (type === 0 && subtypeText === "factory") subtype = 0;
-    else if (type === 0 && subtypeText === "test") subtype = 32;
-    else if (type === 0 && ota) subtype = 16 + Number(ota[1]);
-    else if (type === 1 && Object.hasOwn(DATA_SUBTYPES, subtypeText))
-      subtype = DATA_SUBTYPES[subtypeText];
-    else subtype = parsePartitionNumber(subtypeText);
-    const alignment = type === 0 ? 65536 : SECTOR;
-    const offset2 = offsetText ? parsePartitionNumber(offsetText) : Math.ceil(end / alignment) * alignment;
-    const size = sizeText.startsWith("-") ? parsePartitionNumber(sizeText.slice(1)) - offset2 : parsePartitionNumber(sizeText);
-    let flags = 0;
-    for (const flag of flagText.split(":").filter(Boolean)) {
-      if (flag === "encrypted") flags |= 1;
-      else if (flag === "readonly") flags |= 2;
-      else invalid("Unsupported partition flag.");
-    }
-    parts.push({ name: name2, type, subtype, offset: offset2, size, flags });
-    if (parts.length > 95)
-      invalid("Partition table exceeds the 95-entry limit.");
-    end = offset2 + size;
-  }
-  validateEspPartitions(parts, layout);
-  return parts;
-}
-function parseEspPartitionBinary(input, layout) {
-  validateLocation(layout);
-  const data = Buffer.from(input);
-  if (!data.length || data.length > SECTOR || data.length % 32)
-    invalid("Partition binary must contain 32-byte records within one sector.");
-  const parts = [];
-  let checksumSeen = false;
-  for (let index = 0; index < Math.min(data.length, 3072); index += 32) {
-    const record2 = data.subarray(index, index + 32);
-    if (record2.every((byte) => byte === 255)) {
-      if (!data.subarray(index, Math.min(data.length, 3072)).every((byte) => byte === 255))
-        invalid("Unexpected data after partition terminator.");
-      validateEspPartitions(parts, layout);
-      return parts;
-    }
-    if (record2.readUInt16LE(0) === 60395) {
-      if (checksumSeen || !record2.subarray(2, 16).every((byte) => byte === 255))
-        invalid("Invalid partition checksum record.");
-      if (!createHash("md5").update(data.subarray(0, index)).digest().equals(record2.subarray(16)))
-        invalid("Partition checksum mismatch.");
-      checksumSeen = true;
-      continue;
-    }
-    if (checksumSeen || record2.readUInt16LE(0) !== 20650)
-      invalid("Invalid partition record magic or record order.");
-    const label = record2.subarray(12, 28);
-    const zero = label.indexOf(0);
-    let name2;
-    try {
-      name2 = new TextDecoder("utf-8", { fatal: true }).decode(
-        zero < 0 ? label : label.subarray(0, zero)
-      );
-    } catch {
-      return invalid("Partition label is not valid UTF-8.");
-    }
-    parts.push({
-      name: name2,
-      type: record2[2],
-      subtype: record2[3],
-      offset: record2.readUInt32LE(4),
-      size: record2.readUInt32LE(8),
-      flags: record2.readUInt32LE(28)
-    });
-  }
-  return invalid("Partition binary is missing its terminator.");
-}
-
-// src/core/esp-partition-report.ts
-init_errors();
-var dataNames = {
-  0: "ota",
-  1: "phy",
-  2: "nvs",
-  3: "coredump",
-  4: "nvs_keys",
-  5: "efuse",
-  6: "undefined",
-  128: "esphttpd",
-  129: "fat",
-  130: "spiffs",
-  131: "littlefs"
-};
-var hex = (value2) => "0x" + value2.toString(16);
-function projectEspPartition(part) {
-  const subtype = part.type === 0 ? part.subtype === 0 ? "factory" : part.subtype === 32 ? "test" : part.subtype >= 16 && part.subtype < 32 ? "ota_" + (part.subtype - 16) : hex(part.subtype) : part.type === 1 ? dataNames[part.subtype] ?? hex(part.subtype) : hex(part.subtype);
-  return {
-    name: part.name,
-    type: part.type === 0 ? "app" : part.type === 1 ? "data" : hex(part.type),
-    subtype,
-    offset: part.offset,
-    size: part.size,
-    flags: [
-      ...part.flags & 1 ? ["encrypted"] : [],
-      ...part.flags & 2 ? ["readonly"] : []
-    ],
-    unknown_flags: (part.flags & ~3) >>> 0,
-    offset_hex: hex(part.offset),
-    size_hex: hex(part.size),
-    end_hex: hex(part.offset + part.size)
-  };
-}
-function compareEspPartitions(expected, observed, layout) {
-  validateEspPartitions(expected, layout);
-  validateEspPartitions(observed, layout);
-  const wanted = new Map(expected.map((part) => [part.name, part]));
-  const actual = new Map(observed.map((part) => [part.name, part]));
-  const differences = [];
-  for (const [name2, part] of wanted) {
-    const other = actual.get(name2);
-    if (!other)
-      differences.push({
-        name: name2,
-        kind: "missing_on_device",
-        expected: projectEspPartition(part)
-      });
-    else {
-      const fields = ["type", "subtype", "offset", "size", "flags"].filter((field2) => part[field2] !== other[field2]);
-      if (fields.length)
-        differences.push({
-          name: name2,
-          kind: "changed",
-          fields,
-          expected: projectEspPartition(part),
-          device: projectEspPartition(other)
-        });
-    }
-  }
-  for (const [name2, part] of actual) {
-    if (!wanted.has(name2))
-      differences.push({
-        name: name2,
-        kind: "extra_on_device",
-        device: projectEspPartition(part)
-      });
-  }
-  const order = { missing_on_device: 0, changed: 1, extra_on_device: 2 };
-  return differences.sort(
-    (a, b) => order[a.kind] - order[b.kind] || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
-  );
-}
-function reportEspPartitions(parts, layout, firmwareSize) {
-  validateEspPartitions(parts, { tableOffset: layout.tableOffset });
-  if (layout.flashSize !== void 0 && (!Number.isSafeInteger(layout.flashSize) || layout.flashSize <= 0 || layout.flashSize > 4294967296))
-    throw new PlatformIOError("Invalid flash size.", "PARTITION_TABLE_INVALID");
-  if (firmwareSize !== void 0 && (!Number.isSafeInteger(firmwareSize) || firmwareSize < 0 || firmwareSize > 4294967295))
-    throw new PlatformIOError(
-      "Invalid firmware size.",
-      "PARTITION_TABLE_INVALID"
-    );
-  const issues = [];
-  const add = (severity, code, message, fix) => issues.push({ severity, code, message, fix });
-  const apps2 = parts.filter((part) => part.type === 0);
-  const slots = apps2.filter((part) => part.subtype >= 16 && part.subtype < 32);
-  const hasData = (subtype) => parts.some((part) => part.type === 1 && part.subtype === subtype);
-  const end = Math.max(
-    layout.tableOffset + 4096,
-    ...parts.map((part) => part.offset + part.size)
-  );
-  if (!parts.length)
-    add(
-      "error",
-      "empty_table",
-      "The table contains no partitions.",
-      "Select the project's effective partition table."
-    );
-  if (!apps2.length)
-    add(
-      "error",
-      "no_app",
-      "No application partition is present.",
-      "Add an application partition suitable for the selected chip."
-    );
-  if (slots.length && !hasData(0))
-    add(
-      "error",
-      "ota_without_otadata",
-      "OTA application slots have no OTA selection metadata.",
-      "Add a correctly sized OTA metadata partition."
-    );
-  if (!slots.length && hasData(0))
-    add(
-      "warning",
-      "otadata_without_ota",
-      "OTA selection metadata exists without OTA application slots.",
-      "Check whether OTA is intended for this layout."
-    );
-  if (slots.length === 1)
-    add(
-      "warning",
-      "single_ota_slot",
-      "Only one OTA application slot is available.",
-      "Review update recovery and add an alternate slot if needed."
-    );
-  if (new Set(slots.map((part) => part.size)).size > 1)
-    add(
-      "warning",
-      "uneven_ota_slots",
-      "OTA slots have different capacities.",
-      "Ensure each intended update fits its destination slot."
-    );
-  if (!hasData(2))
-    add(
-      "warning",
-      "no_nvs",
-      "The layout has no NVS partition.",
-      "Check application persistence and framework requirements."
-    );
-  if (!hasData(3))
-    add(
-      "info",
-      "no_coredump",
-      "No flash core-dump partition is present.",
-      "Configure crash storage if flash core dumps are required."
-    );
-  if (layout.flashSize !== void 0) {
-    if (end > layout.flashSize)
-      add(
-        "error",
-        "exceeds_flash",
-        "The layout extends beyond the supplied flash capacity.",
-        "Verify the actual chip capacity and partition sizes."
-      );
-    else if (layout.flashSize - end >= 1048576)
-      add(
-        "info",
-        "unused_flash",
-        String(layout.flashSize - end) + " trailing flash bytes are unassigned.",
-        "Review whether the remaining capacity should be allocated."
-      );
-  }
-  const fits = firmwareSize === void 0 ? [] : apps2.map((part) => ({
-    name: part.name,
-    size: part.size,
-    firmware_size: firmwareSize,
-    fits: firmwareSize <= part.size,
-    used_percent: Math.round(firmwareSize / part.size * 1e3) / 10
-  }));
-  if (fits.length) {
-    const limiting = fits.reduce((a, b) => a.size <= b.size ? a : b);
-    if (!limiting.fits)
-      add(
-        "error",
-        "app_too_big",
-        "Firmware exceeds app partition " + limiting.name + ".",
-        "Select the intended destination explicitly or reduce firmware size."
-      );
-    else if (limiting.used_percent >= 90)
-      add(
-        "warning",
-        "app_nearly_full",
-        "Firmware uses " + limiting.used_percent + "% of the smallest app partition.",
-        "Review space needed for future updates."
-      );
-    else
-      add(
-        "info",
-        "app_fits",
-        "Firmware fits all declared application partitions.",
-        ""
-      );
-  }
-  return {
-    ok: !issues.some((issue2) => issue2.severity === "error"),
-    table_offset: layout.tableOffset,
-    table_end: end,
-    flash_size: layout.flashSize ?? null,
-    firmware_size: firmwareSize ?? null,
-    partitions: parts.map(projectEspPartition),
-    application_fit: fits,
-    issues,
-    error_count: issues.filter((issue2) => issue2.severity === "error").length,
-    warning_count: issues.filter((issue2) => issue2.severity === "warning").length,
-    evidence: "offline_layout"
-  };
-}
-
-// src/core/esp-partition-artifacts.ts
-function contained(root, target) {
-  const relative = path3.relative(root, target);
-  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path3.sep) && !path3.isAbsolute(relative);
-}
-async function readPartitionArtifact(root, requested, limit) {
-  const lexical = path3.resolve(root, requested);
-  const canonical3 = await fs3.realpath(lexical);
-  if (!contained(root, canonical3))
-    throw new PlatformIOError(
-      "Partition artifact is outside the authorized workspace.",
-      "PARTITION_ARTIFACT_OUTSIDE_WORKSPACE"
-    );
-  const handle = await fs3.open(canonical3, "r");
-  try {
-    const before = await handle.stat();
-    if (!before.isFile() || before.size > limit)
-      throw new PlatformIOError(
-        "Partition artifact is not a bounded regular file.",
-        "PARTITION_ARTIFACT_INVALID"
-      );
-    const bytes = Buffer.alloc(before.size + 1);
-    let used = 0;
-    while (used < bytes.length) {
-      const read = await handle.read(bytes, used, bytes.length - used, used);
-      if (!read.bytesRead) break;
-      used += read.bytesRead;
-    }
-    const after = await handle.stat();
-    const current = await fs3.stat(canonical3);
-    const resolved = await fs3.realpath(lexical);
-    if (used !== before.size || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || before.ino !== current.ino || before.dev !== current.dev || current.size !== after.size || current.mtimeMs !== after.mtimeMs || resolved !== canonical3)
-      throw new PlatformIOError(
-        "Partition artifact changed during inspection; retry with a stable copy.",
-        "PARTITION_ARTIFACT_CHANGED"
-      );
-    const content = bytes.subarray(0, used);
-    return {
-      content,
-      identity: {
-        path: canonical3,
-        size: used,
-        sha256: createHash2("sha256").update(content).digest("hex")
-      }
-    };
-  } finally {
-    await handle.close();
-  }
-}
-async function inspectEspPartitionArtifacts(input) {
-  const root = await fs3.realpath(input.workspaceDir);
-  const table = await readPartitionArtifact(
-    input.trustedTableRoot ? await fs3.realpath(input.trustedTableRoot) : root,
-    input.tablePath,
-    input.format === "csv" ? 65536 : 4096
-  );
-  let text7;
-  if (input.format === "csv") {
-    try {
-      text7 = new TextDecoder("utf-8", { fatal: true }).decode(table.content);
-    } catch {
-      throw new PlatformIOError(
-        "Partition CSV is not valid UTF-8.",
-        "PARTITION_TABLE_INVALID"
-      );
-    }
-  }
-  const parts = input.format === "csv" ? parseEspPartitionCsv(text7, { tableOffset: input.layout.tableOffset }) : parseEspPartitionBinary(table.content, {
-    tableOffset: input.layout.tableOffset
-  });
-  const firmware = input.firmwarePath ? await readPartitionArtifact(root, input.firmwarePath, 128 * 1024 * 1024) : null;
-  const observed = input.observedTablePath ? await readPartitionArtifact(root, input.observedTablePath, 4096) : null;
-  const comparison = observed ? compareEspPartitions(
-    parts,
-    parseEspPartitionBinary(observed.content, {
-      tableOffset: input.layout.tableOffset
-    }),
-    { tableOffset: input.layout.tableOffset }
-  ) : null;
-  return {
-    ...reportEspPartitions(parts, input.layout, firmware?.identity.size),
-    partitionRecords: parts,
-    artifacts: {
-      table: table.identity,
-      firmware: firmware?.identity ?? null,
-      observed_table: observed?.identity ?? null
-    },
-    comparison,
-    // An offline copy can be stale; never label it a verified live-device match.
-    comparison_source: observed ? "offline_binary" : null
-  };
-}
-
-// src/core/analysis/esp-coredump-retention.ts
-var LIFETIME_MS = 24 * 60 * 60 * 1e3;
-var ROOT = path4.join(SERVER_DATA_DIR, "artifacts", "coredumps");
-var ENTRY = /^pio-private-analysis-[A-Za-z0-9]{6}$/;
-async function withStore(root, use) {
-  await fs4.mkdir(root, { recursive: true, mode: 448 });
-  const state = await fs4.lstat(root);
-  if (!state.isDirectory() || state.isSymbolicLink())
-    throw new PlatformIOError(
-      "Invalid core-dump retention store.",
-      "COREDUMP_STORE_INVALID"
-    );
-  const canonical3 = await fs4.realpath(root);
-  let release;
-  try {
-    release = await import_proper_lockfile.default.lock(canonical3, { stale: 12e4, retries: 0 });
-  } catch {
-    throw new PlatformIOError(
-      "Core-dump retention store is busy.",
-      "COREDUMP_STORE_BUSY"
-    );
-  }
-  try {
-    return await use(canonical3);
-  } finally {
-    await release();
-  }
-}
-async function prune(root, now) {
-  const entries = (await fs4.readdir(root)).filter((name2) => ENTRY.test(name2));
-  let retained = 0;
-  for (const name2 of entries) {
-    const directory = path4.join(root, name2);
-    const stat = await fs4.lstat(directory);
-    if (!stat.isDirectory() || stat.isSymbolicLink())
-      throw new PlatformIOError(
-        "Invalid retained core-dump entry.",
-        "COREDUMP_STORE_INVALID"
-      );
-    let expires;
-    try {
-      const metadata = await readPartitionArtifact(
-        directory,
-        "record.json",
-        4096
-      );
-      const record2 = JSON.parse(metadata.content.toString("utf8"));
-      if (!Number.isSafeInteger(record2.createdAt) || !Number.isSafeInteger(record2.expiresAt) || record2.expiresAt - record2.createdAt !== LIFETIME_MS)
-        throw new Error("Invalid retention interval");
-      expires = record2.expiresAt;
-    } catch (error2) {
-      if (error2.code !== "ENOENT")
-        throw new PlatformIOError(
-          "Invalid core-dump retention record.",
-          "COREDUMP_STORE_INVALID"
-        );
-      expires = stat.birthtimeMs + LIFETIME_MS;
-    }
-    if (expires <= now)
-      await fs4.rm(directory, { recursive: true, force: true });
-    else retained++;
-  }
-  return retained;
-}
-async function pruneRetainedEspCoredumps(root = ROOT, now = Date.now()) {
-  return withStore(root, (canonical3) => prune(canonical3, now));
-}
-async function retainEspCoredump(input, root = ROOT, now = Date.now()) {
-  if (input.byteLength > 16 * 1024 * 1024 || !Number.isSafeInteger(now) || now < 0)
-    throw new PlatformIOError(
-      "Invalid core-dump retention input.",
-      "COREDUMP_INPUT_LIMIT"
-    );
-  return withStore(root, async (canonical3) => {
-    if (await prune(canonical3, now) >= 32)
-      throw new PlatformIOError(
-        "Core-dump retention has reached its 32-object limit.",
-        "COREDUMP_STORE_FULL"
-      );
-    const directory = await createPrivateAnalysisDirectory(canonical3);
-    try {
-      const bytes = Buffer.from(input);
-      const sha256 = createHash3("sha256").update(bytes).digest("hex");
-      const destination = path4.join(directory, "dump.bin");
-      const expiresAt = now + LIFETIME_MS;
-      await fs4.writeFile(destination, bytes, { flag: "wx", mode: 384 });
-      await fs4.writeFile(
-        path4.join(directory, "record.json"),
-        JSON.stringify({
-          createdAt: now,
-          expiresAt,
-          size: bytes.length,
-          sha256
-        }),
-        { flag: "wx", mode: 384 }
-      );
-      const timer = setTimeout(() => {
-        void pruneRetainedEspCoredumps(canonical3).catch(() => {
-        });
-      }, LIFETIME_MS);
-      timer.unref();
-      return {
-        path: destination,
-        size: bytes.length,
-        sha256,
-        expiresAt,
-        retention: "managed_24h"
-      };
-    } catch (error2) {
-      await fs4.rm(directory, { recursive: true, force: true });
-      throw error2;
-    }
-  });
-}
-async function startCoredumpRetentionCleanup(reportFailure, root = ROOT) {
-  let pending = null;
-  const sweep = () => {
-    if (pending) return pending;
-    pending = (async () => {
-      try {
-        try {
-          await fs4.access(root);
-        } catch (error2) {
-          if (error2.code === "ENOENT") return;
-          throw error2;
-        }
-        await pruneRetainedEspCoredumps(root);
-      } catch (error2) {
-        reportFailure(
-          error2 instanceof PlatformIOError ? error2.code ?? "COREDUMP_CLEANUP_FAILED" : "COREDUMP_CLEANUP_FAILED"
-        );
-      }
-    })().finally(() => {
-      pending = null;
-    });
-    return pending;
-  };
-  await sweep();
-  const timer = setInterval(() => {
-    void sweep();
-  }, 6e4);
-  timer.unref();
-  return async () => {
-    clearInterval(timer);
-    await pending;
-  };
-}
-
-// src/tools/coredump.ts
-import fs40 from "node:fs/promises";
-import { createHash as createHash9 } from "node:crypto";
-
-// src/core/analysis/esp-coredump-export.ts
-init_errors();
-import fs5 from "node:fs/promises";
-import path5 from "node:path";
-import { createHash as createHash4 } from "node:crypto";
-async function exportEspCoredump(workspaceDir, destination, input) {
-  if (!destination || /[\x00-\x1f\x7f]/.test(destination) || input.byteLength > 16 * 1024 * 1024)
-    throw new PlatformIOError(
-      "Invalid dump export path or size.",
-      "COREDUMP_EXPORT_INVALID"
-    );
-  const root = await fs5.realpath(workspaceDir);
-  const target = path5.resolve(root, destination);
-  const parent = await fs5.realpath(path5.dirname(target));
-  const relative = path5.relative(root, parent);
-  if (relative === ".." || relative.startsWith(".." + path5.sep) || path5.isAbsolute(relative))
-    throw new PlatformIOError(
-      "Dump exports must remain in the authorized workspace.",
-      "COREDUMP_EXPORT_OUTSIDE_WORKSPACE"
-    );
-  const name2 = path5.basename(target);
-  if (name2 === "." || name2 === ".." || name2.includes(":"))
-    throw new PlatformIOError(
-      "Invalid dump export filename.",
-      "COREDUMP_EXPORT_INVALID"
-    );
-  const canonicalTarget = path5.join(parent, name2);
-  const bytes = Buffer.from(input);
-  const sha256 = createHash4("sha256").update(bytes).digest("hex");
-  return withPrivateAnalysisDirectory(async (directory) => {
-    const staged = path5.join(directory, "dump.bin");
-    await fs5.writeFile(staged, bytes, { flag: "wx", mode: 384 });
-    if (await fs5.realpath(path5.dirname(target)) !== parent)
-      throw new PlatformIOError(
-        "Dump export parent changed.",
-        "COREDUMP_EXPORT_CHANGED"
-      );
-    try {
-      await fs5.link(staged, canonicalTarget);
-    } catch (error2) {
-      throw new PlatformIOError(
-        error2.code === "EEXIST" ? "Dump export destination already exists." : "Cannot publish the private dump export.",
-        error2.code === "EEXIST" ? "COREDUMP_EXPORT_EXISTS" : "COREDUMP_EXPORT_FAILED"
-      );
-    }
-    return {
-      path: canonicalTarget,
-      size: bytes.length,
-      sha256,
-      retention: "user_managed"
-    };
-  }, parent);
-}
-
-// src/tools/coredump.ts
+// src/adapters/flash-verification-compat.ts
 init_zod();
-init_errors();
+
+// src/tools/flash-verification.ts
+init_zod();
 
 // src/core/action-catalog.ts
 var READ = {
@@ -93697,6 +92927,8 @@ var MCP_ACTIONS = {
   }
 };
 var INTERNAL_ACTIONS = {
+  pio_flash_and_verify: { ...MCP_ACTIONS.agent_flash_monitor_verify, policyAction: "flash_verification" },
+  flash_verification: { ...MCP_ACTIONS.agent_flash_monitor_verify, policyAction: "agent_flash_monitor_verify" },
   coredump_export: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
   coredump_inspect: { ...READ, policyAction: "coredump" },
   coredump_analyze: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
@@ -93759,6 +92991,7 @@ function policyNamesForOperation(name2) {
   let current = name2;
   while (!names.includes(current)) {
     names.push(current);
+    if (current === "flash_verification" && !names.includes("pio_flash_and_verify")) names.push("pio_flash_and_verify");
     if (current === name2 && Object.hasOwn(INTERNAL_ACTIONS, name2) && name2.startsWith("target_"))
       names.push("run_target", "pio_run_target");
     const parent = Object.hasOwn(MCP_ACTIONS, current) ? MCP_ACTIONS[current].policyAction : Object.hasOwn(INTERNAL_ACTIONS, current) ? INTERNAL_ACTIONS[current].policyAction : void 0;
@@ -93769,7 +93002,7 @@ function policyNamesForOperation(name2) {
 }
 
 // src/core/policy/evaluate-policy.ts
-import path18 from "node:path";
+import path14 from "node:path";
 
 // src/core/policy/default-policy.ts
 var deniedActionPatterns = [
@@ -93843,21 +93076,21 @@ var defaultPolicy = {
 };
 
 // src/core/policy/approvals.ts
-var import_proper_lockfile2 = __toESM(require_proper_lockfile(), 1);
+var import_proper_lockfile = __toESM(require_proper_lockfile(), 1);
 init_zod();
-import fs6 from "node:fs";
-import path8 from "node:path";
+import fs from "node:fs";
+import path3 from "node:path";
 import crypto from "node:crypto";
 
 // src/core/policy/policy-sources.ts
-import os3 from "node:os";
-import path7 from "node:path";
+import os from "node:os";
+import path2 from "node:path";
 
 // src/core/policy/policy-schema.ts
 var import_yaml = __toESM(require_dist(), 1);
 init_zod();
-init_errors();
-import path6 from "node:path";
+init_errors2();
+import path from "node:path";
 var PolicyProfileNameSchema = external_exports.enum([
   "read_only",
   "build_only",
@@ -93907,7 +93140,7 @@ function parsePolicyDocument(text7, source) {
   if (Buffer.byteLength(text7, "utf8") > MAX_POLICY_BYTES) {
     throw new PolicyConfigError(source, "Policy exceeds the 64 KiB limit.");
   }
-  const extension = path6.extname(source).toLowerCase();
+  const extension = path.extname(source).toLowerCase();
   if (![".json", ".yaml", ".yml"].includes(extension)) {
     throw new PolicyConfigError(
       source,
@@ -93956,8 +93189,8 @@ function resolvePolicyFile(selected = launchPolicyFile) {
       "The configured path is empty."
     );
   }
-  const flagPath = selected === void 0 ? void 0 : path7.resolve(selected);
-  const environmentPath = environment === void 0 ? void 0 : path7.resolve(environment);
+  const flagPath = selected === void 0 ? void 0 : path2.resolve(selected);
+  const environmentPath = environment === void 0 ? void 0 : path2.resolve(environment);
   if (flagPath && environmentPath && flagPath !== environmentPath) {
     throw new PolicyConfigError(
       "--policy-file / PIO_MCP_POLICY_FILE",
@@ -93995,11 +93228,11 @@ function resolvePolicyDirectory() {
       "The configured directory is empty."
     );
   }
-  return path7.resolve(configured ?? path7.join(os3.homedir(), ".platformio-mcp"));
+  return path2.resolve(configured ?? path2.join(os.homedir(), ".platformio-mcp"));
 }
 
 // src/core/policy/approvals.ts
-init_errors();
+init_errors2();
 var ApprovalRecordSchema = external_exports.object({
   id: external_exports.string().regex(/^approval-[a-f0-9-]{36}$/),
   action: external_exports.string(),
@@ -94014,13 +93247,13 @@ var ApprovalRecordSchema = external_exports.object({
   metadata: external_exports.record(external_exports.unknown()).optional()
 }).strict();
 function approvalsFile() {
-  return path8.join(resolvePolicyDirectory(), "approvals.json");
+  return path3.join(resolvePolicyDirectory(), "approvals.json");
 }
 function readApprovals(file = approvalsFile()) {
   let text7;
   try {
-    if (fs6.statSync(file).size > 8 * 1024 * 1024) throw new Error("size limit");
-    text7 = fs6.readFileSync(file, "utf8");
+    if (fs.statSync(file).size > 8 * 1024 * 1024) throw new Error("size limit");
+    text7 = fs.readFileSync(file, "utf8");
   } catch (error2) {
     if (error2.code === "ENOENT") return [];
     throw new PlatformIOError(
@@ -94040,24 +93273,24 @@ function readApprovals(file = approvalsFile()) {
 function writeApprovals(file, records) {
   const temporary = `${file}.${crypto.randomUUID()}.tmp`;
   try {
-    const descriptor2 = fs6.openSync(temporary, "wx", 384);
+    const descriptor2 = fs.openSync(temporary, "wx", 384);
     try {
-      fs6.writeFileSync(descriptor2, JSON.stringify(records, null, 2), "utf8");
-      fs6.fsyncSync(descriptor2);
+      fs.writeFileSync(descriptor2, JSON.stringify(records, null, 2), "utf8");
+      fs.fsyncSync(descriptor2);
     } finally {
-      fs6.closeSync(descriptor2);
+      fs.closeSync(descriptor2);
     }
-    fs6.renameSync(temporary, file);
+    fs.renameSync(temporary, file);
   } finally {
-    if (fs6.existsSync(temporary)) fs6.unlinkSync(temporary);
+    if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
   }
 }
 function mutate(operation) {
   const file = approvalsFile();
-  fs6.mkdirSync(path8.dirname(file), { recursive: true, mode: 448 });
+  fs.mkdirSync(path3.dirname(file), { recursive: true, mode: 448 });
   let release;
   try {
-    release = import_proper_lockfile2.default.lockSync(file, {
+    release = import_proper_lockfile.default.lockSync(file, {
       realpath: false,
       stale: 12e4,
       retries: 0
@@ -94078,14 +93311,14 @@ function mutate(operation) {
   }
 }
 function claimPath(file, id) {
-  return path8.join(
-    path8.dirname(file),
+  return path3.join(
+    path3.dirname(file),
     "approval-consumption",
     crypto.createHash("sha256").update(id).digest("hex")
   );
 }
 function currentState(record2, file) {
-  if (fs6.existsSync(claimPath(file, record2.id)))
+  if (fs.existsSync(claimPath(file, record2.id)))
     return { ...record2, status: "consumed" };
   if ((record2.status === "pending" || record2.status === "approved") && record2.expiresAt && Date.parse(record2.expiresAt) <= Date.now())
     return { ...record2, status: "expired" };
@@ -94157,15 +93390,15 @@ function consumeApproval(id, scopeDigest) {
     if (record2.status !== "approved" || !record2.expiresAt || record2.scopeDigest !== scopeDigest)
       return void 0;
     const claim = claimPath(file, id);
-    fs6.mkdirSync(path8.dirname(claim), { recursive: true, mode: 448 });
+    fs.mkdirSync(path3.dirname(claim), { recursive: true, mode: 448 });
     const consumedAt = (/* @__PURE__ */ new Date()).toISOString();
     try {
-      const descriptor2 = fs6.openSync(claim, "wx", 384);
+      const descriptor2 = fs.openSync(claim, "wx", 384);
       try {
-        fs6.writeFileSync(descriptor2, consumedAt, "utf8");
-        fs6.fsyncSync(descriptor2);
+        fs.writeFileSync(descriptor2, consumedAt, "utf8");
+        fs.fsyncSync(descriptor2);
       } finally {
-        fs6.closeSync(descriptor2);
+        fs.closeSync(descriptor2);
       }
     } catch (error2) {
       if (error2.code === "EEXIST") return void 0;
@@ -94196,7 +93429,7 @@ function getApprovalRequestSummary(id, projectDir) {
   const request = getApproval(id);
   if (!request) return void 0;
   const summary = summarizeApproval(request);
-  if (projectDir && (!summary.projectDir || path8.resolve(summary.projectDir) !== path8.resolve(projectDir))) {
+  if (projectDir && (!summary.projectDir || path3.resolve(summary.projectDir) !== path3.resolve(projectDir))) {
     return void 0;
   }
   return summary;
@@ -94206,18 +93439,18 @@ function listPendingApprovalSummaries(options) {
     status: "pending",
     limit: options?.limit ?? 50
   }).map((request) => getApproval(request.id)).filter((request) => Boolean(request)).filter((request) => request.status === "pending").map(summarizeApproval).filter(
-    (request) => !options?.projectDir || Boolean(request.projectDir) && path8.resolve(request.projectDir) === path8.resolve(options.projectDir)
+    (request) => !options?.projectDir || Boolean(request.projectDir) && path3.resolve(request.projectDir) === path3.resolve(options.projectDir)
   ).slice(0, Math.min(100, Math.max(1, options?.limit ?? 20)));
 }
 
 // src/core/policy/audit-log.ts
 init_paths();
 init_events();
-import fs9 from "node:fs";
-import path11 from "node:path";
+import fs5 from "node:fs";
+import path7 from "node:path";
 import crypto2 from "node:crypto";
 function ensureDir2(dir) {
-  if (!fs9.existsSync(dir)) fs9.mkdirSync(dir, { recursive: true });
+  if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
 }
 function appendAuditEvent(input) {
   const event = {
@@ -94225,32 +93458,32 @@ function appendAuditEvent(input) {
     timestamp: input.timestamp ?? (/* @__PURE__ */ new Date()).toISOString(),
     ...input
   };
-  const globalDir = path11.join(SERVER_DATA_DIR, "audit");
+  const globalDir = path7.join(SERVER_DATA_DIR, "audit");
   ensureDir2(globalDir);
-  const globalFile = path11.join(globalDir, "global-events.jsonl");
-  fs9.appendFileSync(globalFile, JSON.stringify(event) + "\n", "utf8");
+  const globalFile = path7.join(globalDir, "global-events.jsonl");
+  fs5.appendFileSync(globalFile, JSON.stringify(event) + "\n", "utf8");
   if (input.workspaceDir) {
-    const localDir = path11.join(
+    const localDir = path7.join(
       input.workspaceDir,
       ".pio-mcp-workspace",
       "audit"
     );
     ensureDir2(localDir);
-    const localFile = path11.join(localDir, "events.jsonl");
-    fs9.appendFileSync(localFile, JSON.stringify(event) + "\n", "utf8");
+    const localFile = path7.join(localDir, "events.jsonl");
+    fs5.appendFileSync(localFile, JSON.stringify(event) + "\n", "utf8");
   }
   portalEvents.emitSafetyStateUpdated(input.workspaceDir);
   return event;
 }
 function readRecentAuditEvents(opts) {
   const limit = Math.max(1, opts?.limit ?? 50);
-  const globalFile = path11.join(SERVER_DATA_DIR, "audit", "global-events.jsonl");
-  const localFile = opts?.workspaceDir ? path11.join(opts.workspaceDir, ".pio-mcp-workspace", "audit", "events.jsonl") : void 0;
-  const sourceFile = localFile && fs9.existsSync(localFile) ? localFile : globalFile;
-  if (!fs9.existsSync(sourceFile)) {
+  const globalFile = path7.join(SERVER_DATA_DIR, "audit", "global-events.jsonl");
+  const localFile = opts?.workspaceDir ? path7.join(opts.workspaceDir, ".pio-mcp-workspace", "audit", "events.jsonl") : void 0;
+  const sourceFile = localFile && fs5.existsSync(localFile) ? localFile : globalFile;
+  if (!fs5.existsSync(sourceFile)) {
     return [];
   }
-  const lines2 = fs9.readFileSync(sourceFile, "utf8").split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const lines2 = fs5.readFileSync(sourceFile, "utf8").split(/\r?\n/).filter((line) => line.trim().length > 0);
   const events = [];
   for (let i = lines2.length - 1; i >= 0 && events.length < limit; i--) {
     try {
@@ -94262,19 +93495,19 @@ function readRecentAuditEvents(opts) {
 }
 
 // src/core/policy/automation-policy.ts
-init_errors();
+init_errors2();
 init_validation();
-import fs11 from "node:fs";
-import path14 from "node:path";
+import fs7 from "node:fs";
+import path10 from "node:path";
 
 // src/core/automation-state.ts
-var import_proper_lockfile4 = __toESM(require_proper_lockfile(), 1);
-init_errors();
+var import_proper_lockfile3 = __toESM(require_proper_lockfile(), 1);
+init_errors2();
 init_validation();
 init_events();
 import crypto3 from "node:crypto";
-import fs10 from "node:fs";
-import path13 from "node:path";
+import fs6 from "node:fs";
+import path9 from "node:path";
 var MAX_STATE_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
 function validateAutomationKey(automationKey) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u.test(automationKey)) {
@@ -94288,7 +93521,7 @@ function validateAutomationKey(automationKey) {
 function getAutomationStatePath(projectDir, automationKey) {
   const projectRoot = validateProjectPath(projectDir);
   const key = validateAutomationKey(automationKey);
-  return path13.join(
+  return path9.join(
     projectRoot,
     ".pio-mcp-workspace",
     "automations",
@@ -94308,10 +93541,10 @@ function createEmptyState(automationKey, now = /* @__PURE__ */ new Date()) {
 }
 function readAutomationStateRecord(projectDir, automationKey, allowStale) {
   const statePath = getAutomationStatePath(projectDir, automationKey);
-  if (!fs10.existsSync(statePath)) return createEmptyState(automationKey);
+  if (!fs6.existsSync(statePath)) return createEmptyState(automationKey);
   let state;
   try {
-    state = JSON.parse(fs10.readFileSync(statePath, "utf8"));
+    state = JSON.parse(fs6.readFileSync(statePath, "utf8"));
   } catch {
     throw new PlatformIOError(
       `Automation '${automationKey}' state is malformed and requires operator review.`,
@@ -94345,37 +93578,37 @@ function readAutomationWriteBudgetState(projectDir, automationKey) {
 }
 function writeAutomationState(projectDir, state) {
   const statePath = getAutomationStatePath(projectDir, state.automationKey);
-  const directory = path13.dirname(statePath);
-  fs10.mkdirSync(directory, { recursive: true });
+  const directory = path9.dirname(statePath);
+  fs6.mkdirSync(directory, { recursive: true });
   const nextState = {
     ...state,
     schemaVersion: 1,
     updatedAt: (/* @__PURE__ */ new Date()).toISOString()
   };
-  const temporaryPath = path13.join(
+  const temporaryPath = path9.join(
     directory,
     `.${state.automationKey}.${crypto3.randomUUID()}.tmp`
   );
-  fs10.writeFileSync(temporaryPath, `${JSON.stringify(nextState, null, 2)}
+  fs6.writeFileSync(temporaryPath, `${JSON.stringify(nextState, null, 2)}
 `, {
     encoding: "utf8",
     mode: 384
   });
-  fs10.renameSync(temporaryPath, statePath);
+  fs6.renameSync(temporaryPath, statePath);
   portalEvents.emitSafetyStateUpdated(projectDir);
   return nextState;
 }
 function listAutomationStates(projectDir) {
   const projectRoot = validateProjectPath(projectDir);
-  const directory = path13.join(projectRoot, ".pio-mcp-workspace", "automations");
-  if (!fs10.existsSync(directory)) return [];
+  const directory = path9.join(projectRoot, ".pio-mcp-workspace", "automations");
+  if (!fs6.existsSync(directory)) return [];
   const now = Date.now();
-  return fs10.readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(".json")).slice(0, 100).map((entry) => {
+  return fs6.readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(".json")).slice(0, 100).map((entry) => {
     const automationKey = entry.name.slice(0, -".json".length);
     try {
       validateAutomationKey(automationKey);
       const state = JSON.parse(
-        fs10.readFileSync(path13.join(directory, entry.name), "utf8")
+        fs6.readFileSync(path9.join(directory, entry.name), "utf8")
       );
       const updatedAt = new Date(state.updatedAt).getTime();
       if (state.schemaVersion !== 1 || state.automationKey !== automationKey || !Number.isFinite(updatedAt)) {
@@ -94429,13 +93662,13 @@ async function clearAutomationMonitorState(projectDir, automationKey) {
 }
 async function withAutomationStateLock(projectDir, automationKey, operation) {
   const statePath = getAutomationStatePath(projectDir, automationKey);
-  fs10.mkdirSync(path13.dirname(statePath), { recursive: true });
-  if (!fs10.existsSync(statePath)) {
+  fs6.mkdirSync(path9.dirname(statePath), { recursive: true });
+  if (!fs6.existsSync(statePath)) {
     writeAutomationState(projectDir, createEmptyState(automationKey));
   }
   let release;
   try {
-    release = await import_proper_lockfile4.default.lock(statePath, {
+    release = await import_proper_lockfile3.default.lock(statePath, {
       retries: 0,
       stale: 5 * 60 * 1e3,
       realpath: false
@@ -94493,15 +93726,15 @@ var ALWAYS_DENIED_ACTIONS = /* @__PURE__ */ new Set([
   "ssh_deploy"
 ]);
 function loadLabRunnerPolicy(projectDir) {
-  const policyPath = path14.join(
+  const policyPath = path10.join(
     projectDir,
     ".pio-mcp-workspace",
     "automation-policy.json"
   );
-  if (!fs11.existsSync(policyPath)) return void 0;
+  if (!fs7.existsSync(policyPath)) return void 0;
   try {
     return JSON.parse(
-      fs11.readFileSync(policyPath, "utf8")
+      fs7.readFileSync(policyPath, "utf8")
     );
   } catch {
     throw new PlatformIOError(
@@ -94513,7 +93746,7 @@ function loadLabRunnerPolicy(projectDir) {
 function validateAutomationScope(input) {
   validateAutomationKey(input.automationKey);
   const projectDir = validateProjectPath(input.projectDir);
-  if (projectDir === path14.parse(projectDir).root) {
+  if (projectDir === path10.parse(projectDir).root) {
     throw new PlatformIOError(
       "Automation cannot target a filesystem root.",
       "AUTOMATION_POLICY_DENIED"
@@ -94563,7 +93796,7 @@ function validateAutomationScope(input) {
         "AUTOMATION_POLICY_DENIED"
       );
     }
-    if (path14.resolve(input.targetBinding.projectDir) !== projectDir || input.targetBinding.environment !== input.environment || new Date(input.targetBinding.expiresAt).getTime() <= Date.now()) {
+    if (path10.resolve(input.targetBinding.projectDir) !== projectDir || input.targetBinding.environment !== input.environment || new Date(input.targetBinding.expiresAt).getTime() <= Date.now()) {
       throw new PlatformIOError(
         "Automation target binding is expired or outside the requested scope.",
         "AUTOMATION_POLICY_DENIED"
@@ -94645,8 +93878,8 @@ async function reserveAutomationWriteBudget(input) {
 }
 
 // src/core/policy/project-enrollment.ts
-import fs12 from "node:fs";
-import path15 from "node:path";
+import fs8 from "node:fs";
+import path11 from "node:path";
 import crypto4 from "node:crypto";
 function canonical(value2) {
   if (Array.isArray(value2)) return `[${value2.map(canonical).join(",")}]`;
@@ -94657,8 +93890,8 @@ function canonical(value2) {
   return JSON.stringify(value2);
 }
 function projectEnrollmentIdentity(project, documents) {
-  const realProject = fs12.realpathSync(project);
-  if (!fs12.statSync(realProject).isDirectory())
+  const realProject = fs8.realpathSync(project);
+  if (!fs8.statSync(realProject).isDirectory())
     throw new PolicyConfigError(
       project,
       "Enrollment requires a project directory."
@@ -94671,26 +93904,26 @@ function projectEnrollmentIdentity(project, documents) {
 }
 function realStoragePath(source) {
   try {
-    return fs12.realpathSync(source);
+    return fs8.realpathSync(source);
   } catch (error2) {
     if (error2.code !== "ENOENT") throw error2;
-    const parent = path15.dirname(source);
+    const parent = path11.dirname(source);
     if (parent === source) throw error2;
-    return path15.join(realStoragePath(parent), path15.basename(source));
+    return path11.join(realStoragePath(parent), path11.basename(source));
   }
 }
 function recordPath(project) {
   const directory = realStoragePath(
-    path15.join(path15.resolve(resolvePolicyDirectory()), "project-enrollments")
+    path11.join(path11.resolve(resolvePolicyDirectory()), "project-enrollments")
   );
-  const relative = path15.relative(project, directory);
-  if (relative === "" || !relative.startsWith(`..${path15.sep}`) && relative !== ".." && !path15.isAbsolute(relative)) {
+  const relative = path11.relative(project, directory);
+  if (relative === "" || !relative.startsWith(`..${path11.sep}`) && relative !== ".." && !path11.isAbsolute(relative)) {
     throw new PolicyConfigError(
       directory,
       "Enrollment storage must be outside the project directory."
     );
   }
-  return path15.join(
+  return path11.join(
     directory,
     `${crypto4.createHash("sha256").update(project).digest("hex")}.json`
   );
@@ -94698,10 +93931,10 @@ function recordPath(project) {
 function isProjectEnrolled(identity) {
   const source = recordPath(identity.project);
   try {
-    const stat = fs12.statSync(source);
+    const stat = fs8.statSync(source);
     if (!stat.isFile() || stat.size > 4096)
       throw new Error("Invalid enrollment record");
-    const record2 = JSON.parse(fs12.readFileSync(source, "utf8"));
+    const record2 = JSON.parse(fs8.readFileSync(source, "utf8"));
     if (record2.version !== 1 || typeof record2.project !== "string" || !/^[a-f0-9]{64}$/.test(record2.digest))
       throw new Error("Invalid enrollment record");
     return record2.project === identity.project && record2.digest === identity.digest;
@@ -94715,8 +93948,8 @@ function isProjectEnrolled(identity) {
 }
 
 // src/core/policy/load-policy.ts
-import fs13 from "node:fs";
-import path16 from "node:path";
+import fs9 from "node:fs";
+import path12 from "node:path";
 import crypto5 from "node:crypto";
 
 // src/core/policy/profiles.ts
@@ -94909,14 +94142,14 @@ function mergePolicy(base2, override) {
 }
 function readLayer(source, required2) {
   try {
-    const stat = fs13.statSync(source);
+    const stat = fs9.statSync(source);
     if (!stat.isFile() || stat.size > 64 * 1024) {
       throw new PolicyConfigError(
         source,
         "Expected a regular policy file no larger than 64 KiB."
       );
     }
-    return fs13.readFileSync(source, "utf8");
+    return fs9.readFileSync(source, "utf8");
   } catch (error2) {
     if (error2 instanceof PolicyConfigError) throw error2;
     if (error2.code === "ENOENT" && !required2)
@@ -94972,8 +94205,8 @@ function loadEffectivePolicyState(workspaceDir) {
   };
   let policy = builtIn;
   if (workspaceDir) {
-    const source2 = path16.join(
-      path16.resolve(workspaceDir),
+    const source2 = path12.join(
+      path12.resolve(workspaceDir),
       ".pio-mcp-policy.json"
     );
     const text7 = readLayer(source2, false);
@@ -94993,7 +94226,7 @@ function loadEffectivePolicyState(workspaceDir) {
     }
   }
   const explicit = resolvePolicyFile();
-  const operatorPath = explicit ?? path16.join(resolvePolicyDirectory(), "policy.yaml");
+  const operatorPath = explicit ?? path12.join(resolvePolicyDirectory(), "policy.yaml");
   const operatorText = readLayer(operatorPath, explicit !== void 0);
   recordSource(sources, "operator", operatorPath, operatorText);
   let operator = {};
@@ -95006,8 +94239,8 @@ function loadEffectivePolicyState(workspaceDir) {
     policy = mergePolicy(policy, operator);
   }
   if (workspaceDir) {
-    const source2 = path16.join(
-      path16.resolve(workspaceDir),
+    const source2 = path12.join(
+      path12.resolve(workspaceDir),
       ".pio-mcp-workspace",
       "policy.yaml"
     );
@@ -95041,9 +94274,9 @@ function loadEffectivePolicyState(workspaceDir) {
 }
 
 // src/core/policy/approval-scope.ts
-init_errors();
+init_errors2();
 import crypto6 from "node:crypto";
-import path17 from "node:path";
+import path13 from "node:path";
 function canonical2(value2, depth = 0) {
   if (depth > 32)
     throw new PlatformIOError(
@@ -95071,13 +94304,13 @@ function approvalScopeDigest(action, args, policyDigest, context) {
   for (const key of ["approvalId", "approved", "__approved"])
     delete operation[key];
   if (typeof operation.projectDir === "string")
-    operation.projectDir = path17.resolve(operation.projectDir);
+    operation.projectDir = path13.resolve(operation.projectDir);
   const encoded = canonical2({
     action,
     operationName: context.operationName ?? action,
     args: operation,
     policyDigest,
-    workspaceDir: context.workspaceDir ? path17.resolve(context.workspaceDir) : null,
+    workspaceDir: context.workspaceDir ? path13.resolve(context.workspaceDir) : null,
     devicePort: context.devicePort ?? null,
     targetBindingDigest: context.targetBindingDigest ?? null,
     automationKey: context.automationKey ?? null,
@@ -95105,8 +94338,8 @@ function hasProjectDir(args) {
   return typeof args.projectDir === "string" && args.projectDir.length > 0;
 }
 function isPathBoundaryUnsafe(projectDir) {
-  const resolved = path18.resolve(projectDir);
-  const root = path18.parse(resolved).root;
+  const resolved = path14.resolve(projectDir);
+  const root = path14.parse(resolved).root;
   return resolved === root;
 }
 function decision(status, reason, action, riskLevel, approvalId) {
@@ -95368,7 +94601,7 @@ async function evaluatePolicyInternal(actionName, args, context, planning) {
 }
 
 // src/core/action-dispatcher.ts
-init_errors();
+init_errors2();
 async function dispatchAuthorizedAction(name2, args, context, execute3) {
   const decision2 = await authorizeAction(name2, args, context);
   if (decision2.status !== "allow")
@@ -95395,8 +94628,162 @@ async function planAction(name2, args, context) {
   return planPolicy(action, args, { ...context, operationName: name2 });
 }
 
+// src/tools/run-target.ts
+init_zod();
+
+// src/core/devices/port-diagnostics.ts
+init_errors2();
+import fs10 from "node:fs/promises";
+import path15 from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+var execute = promisify(execFile);
+function parsePortHolders(output) {
+  const holders2 = [];
+  let current;
+  for (const line of output.split(/\r?\n/)) {
+    if (/^p[1-9][0-9]{0,9}$/.test(line)) {
+      const pid = Number(line.slice(1));
+      if (pid > 2147483647 || pid === process.pid || holders2.some((row) => row.pid === pid)) {
+        current = void 0;
+        continue;
+      }
+      current = { pid, command: null };
+      holders2.push(current);
+      if (holders2.length > 64)
+        throw new PlatformIOError(
+          "Port holder report exceeds its limit.",
+          "PORT_DIAGNOSTICS_LIMIT"
+        );
+    } else if (line.startsWith("c") && current)
+      current.command = line.slice(1).replace(/[\x00-\x1f\x7f]/g, "").slice(0, 256);
+  }
+  return holders2;
+}
+async function holders(port) {
+  for (const command of ["/usr/sbin/lsof", "/usr/bin/lsof"]) {
+    try {
+      await fs10.access(command, fs10.constants.X_OK);
+      const result = await execute(command, ["-Fpc", "--", port], {
+        timeout: 5e3,
+        maxBuffer: 65536,
+        windowsHide: true
+      });
+      return {
+        held_by_processes: parsePortHolders(result.stdout),
+        process_check: "lsof",
+        process_check_complete: !result.stderr.trim()
+      };
+    } catch (error2) {
+      const failure = error2;
+      if (failure.code === 1 && !failure.stderr?.trim() && !failure.stdout?.trim())
+        return {
+          held_by_processes: [],
+          process_check: "lsof",
+          process_check_complete: true
+        };
+    }
+  }
+  try {
+    await fs10.access("/usr/bin/fuser", fs10.constants.X_OK);
+    const result = await execute("/usr/bin/fuser", ["--", port], {
+      timeout: 5e3,
+      maxBuffer: 65536,
+      windowsHide: true
+    });
+    if (!/^\s*(?:[1-9][0-9]*\s*)*$/.test(result.stdout))
+      throw new Error("Unexpected fuser output");
+    const rows = result.stdout.trim().split(/\s+/).filter(Boolean).map((pid) => `p${pid}`).join("\n");
+    return {
+      held_by_processes: parsePortHolders(rows),
+      process_check: "fuser",
+      process_check_complete: false
+    };
+  } catch {
+    return {
+      held_by_processes: [],
+      process_check: "unavailable",
+      process_check_complete: false
+    };
+  }
+}
+async function inspectPortDiagnostics(port, listed) {
+  if (!port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
+    throw new PlatformIOError("Invalid port name.", "SERIAL_ENDPOINT_INVALID");
+  if (process.platform === "win32") {
+    if (!/^(?:\\\\\.\\)?COM[1-9][0-9]{0,8}$/i.test(port))
+      throw new PlatformIOError(
+        "Expected a COM port.",
+        "SERIAL_ENDPOINT_INVALID"
+      );
+    return {
+      exists: listed,
+      in_device_list: listed,
+      permission: null,
+      held_by_processes: [],
+      process_check: "unavailable",
+      process_check_complete: false,
+      platform: process.platform
+    };
+  }
+  if (!path15.posix.isAbsolute(port) || !path15.posix.normalize(port).startsWith("/dev/"))
+    throw new PlatformIOError(
+      "Unix serial ports must be within /dev.",
+      "SERIAL_ENDPOINT_INVALID"
+    );
+  let canonical3;
+  try {
+    canonical3 = await fs10.realpath(port);
+  } catch (error2) {
+    const missing = error2.code === "ENOENT";
+    return {
+      exists: missing ? false : null,
+      in_device_list: listed,
+      permission: null,
+      held_by_processes: [],
+      process_check: "skipped",
+      process_check_complete: false,
+      platform: process.platform
+    };
+  }
+  if (!canonical3.startsWith("/dev/"))
+    throw new PlatformIOError(
+      "Serial alias escapes /dev.",
+      "SERIAL_ENDPOINT_INVALID"
+    );
+  const stat = await fs10.stat(canonical3);
+  if (!stat.isCharacterDevice())
+    throw new PlatformIOError(
+      "Port is not a character device.",
+      "SERIAL_ENDPOINT_INVALID"
+    );
+  const access2 = async (mode) => {
+    try {
+      await fs10.access(canonical3, mode);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  return {
+    exists: true,
+    in_device_list: listed,
+    permission: {
+      readable: await access2(fs10.constants.R_OK),
+      writable: await access2(fs10.constants.W_OK)
+    },
+    ...await holders(canonical3),
+    platform: process.platform
+  };
+}
+
+// src/tools/project-inspection.ts
+init_zod();
+init_platformio();
+import fs15 from "node:fs/promises";
+
 // src/core/policy/revision-guard.ts
-init_errors();
+init_errors2();
 function createPolicyRevisionGuard(workspaceDir) {
   const expected = loadEffectivePolicyState(workspaceDir).digest;
   return () => {
@@ -95408,22 +94795,494 @@ function createPolicyRevisionGuard(workspaceDir) {
   };
 }
 
-// src/tools/coredump-device.ts
+// src/core/project-inspection.ts
 init_zod();
-init_errors();
-
-// src/tools/partition-table.ts
-init_projects();
-import fs29 from "node:fs/promises";
-import path33 from "node:path";
 
 // src/core/esp-partition-framework.ts
-import fs19 from "node:fs/promises";
-import path24 from "node:path";
-init_errors();
+import fs14 from "node:fs/promises";
+import path19 from "node:path";
+
+// src/core/esp-partition-artifacts.ts
+init_errors2();
+import fs13 from "node:fs/promises";
+import path18 from "node:path";
+import { createHash as createHash2 } from "node:crypto";
+
+// src/core/esp-partitions.ts
+init_errors2();
+import { createHash } from "node:crypto";
+var SECTOR = 4096;
+var UINT32_END = 4294967296;
+var DATA_SUBTYPES = {
+  ota: 0,
+  phy: 1,
+  nvs: 2,
+  coredump: 3,
+  nvs_keys: 4,
+  efuse: 5,
+  undefined: 6,
+  esphttpd: 128,
+  fat: 129,
+  spiffs: 130,
+  littlefs: 131
+};
+function invalid(message) {
+  throw new PlatformIOError(message, "PARTITION_TABLE_INVALID");
+}
+function unsigned(value2, maximum, label) {
+  if (!Number.isSafeInteger(value2) || value2 < 0 || value2 > maximum)
+    invalid("Invalid " + label + ".");
+  return value2;
+}
+function parsePartitionNumber(text7) {
+  const match = /^(0x[0-9a-f]+|[0-9]+)([km])?$/i.exec(text7.trim());
+  if (!match) invalid("Invalid partition number.");
+  return unsigned(
+    Number(match[1]) * (match[2]?.toLowerCase() === "k" ? 1024 : match[2] ? 1048576 : 1),
+    UINT32_END,
+    "partition number"
+  );
+}
+function validateLocation(layout) {
+  unsigned(layout.tableOffset, UINT32_END - SECTOR, "partition table offset");
+  if (layout.tableOffset % SECTOR)
+    invalid("Partition table offset is not sector aligned.");
+  if (layout.flashSize !== void 0) {
+    unsigned(layout.flashSize, UINT32_END, "flash size");
+    if (layout.flashSize < layout.tableOffset + SECTOR)
+      invalid("Partition table exceeds flash size.");
+  }
+}
+function validateEspPartitions(parts, layout) {
+  validateLocation(layout);
+  if (parts.length > 95) invalid("Partition table exceeds the 95-entry limit.");
+  const names = /* @__PURE__ */ new Set();
+  let end = layout.tableOffset + SECTOR;
+  let otaCount = 0;
+  for (const part of [...parts].sort((a, b) => a.offset - b.offset)) {
+    if (!part.name || Buffer.byteLength(part.name, "utf8") > 16 || /[\x00-\x1f\x7f]/.test(part.name))
+      invalid("Invalid partition label.");
+    if (names.has(part.name)) invalid("Duplicate partition label.");
+    names.add(part.name);
+    unsigned(part.type, 255, "partition type");
+    unsigned(part.subtype, 255, "partition subtype");
+    unsigned(part.flags, 4294967295, "partition flags");
+    unsigned(part.offset, 4294967295, "partition offset");
+    unsigned(part.size, 4294967295, "partition size");
+    if (!part.size || part.offset + part.size > UINT32_END)
+      invalid("Invalid partition address range.");
+    if (part.offset < end)
+      invalid("Partition overlaps the table or another partition.");
+    if (part.offset % (part.type === 0 ? 65536 : SECTOR))
+      invalid("Partition offset is not aligned for its type.");
+    if (part.type === 0 && part.size % SECTOR)
+      invalid("Application size is not sector aligned.");
+    if (part.type === 1 && [0, 3].includes(part.subtype) && part.flags & 2)
+      invalid("OTA metadata and core-dump partitions cannot be read-only.");
+    if (part.type === 1 && part.subtype === 0) {
+      if (++otaCount > 1 || part.size !== 8192)
+        invalid("Invalid OTA metadata partition.");
+    }
+    end = part.offset + part.size;
+    if (layout.flashSize !== void 0 && end > layout.flashSize)
+      invalid("Partition exceeds flash size.");
+  }
+}
+function parseEspPartitionCsv(text7, layout) {
+  validateLocation(layout);
+  if (Buffer.byteLength(text7, "utf8") > 65536)
+    invalid("Partition CSV exceeds 64 KiB.");
+  const parts = [];
+  let end = layout.tableOffset + SECTOR;
+  for (const line of text7.replace(/^\uFEFF/, "").split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+    const fields = line.split(",").map((field2) => field2.trim());
+    if (fields.length < 5 || fields.length > 6)
+      invalid("Expected five or six CSV columns.");
+    const [name2, rawType, rawSubtype, offsetText, sizeText, flagText = ""] = fields;
+    const typeText = rawType.toLowerCase();
+    const subtypeText = rawSubtype.toLowerCase();
+    const type = typeText === "app" ? 0 : typeText === "data" ? 1 : parsePartitionNumber(typeText);
+    let subtype;
+    const ota = /^ota_([0-9]|1[0-5])$/.exec(subtypeText);
+    if (type !== 0 && !subtypeText) subtype = 6;
+    else if (type === 0 && subtypeText === "factory") subtype = 0;
+    else if (type === 0 && subtypeText === "test") subtype = 32;
+    else if (type === 0 && ota) subtype = 16 + Number(ota[1]);
+    else if (type === 1 && Object.hasOwn(DATA_SUBTYPES, subtypeText))
+      subtype = DATA_SUBTYPES[subtypeText];
+    else subtype = parsePartitionNumber(subtypeText);
+    const alignment = type === 0 ? 65536 : SECTOR;
+    const offset2 = offsetText ? parsePartitionNumber(offsetText) : Math.ceil(end / alignment) * alignment;
+    const size = sizeText.startsWith("-") ? parsePartitionNumber(sizeText.slice(1)) - offset2 : parsePartitionNumber(sizeText);
+    let flags = 0;
+    for (const flag of flagText.split(":").filter(Boolean)) {
+      if (flag === "encrypted") flags |= 1;
+      else if (flag === "readonly") flags |= 2;
+      else invalid("Unsupported partition flag.");
+    }
+    parts.push({ name: name2, type, subtype, offset: offset2, size, flags });
+    if (parts.length > 95)
+      invalid("Partition table exceeds the 95-entry limit.");
+    end = offset2 + size;
+  }
+  validateEspPartitions(parts, layout);
+  return parts;
+}
+function parseEspPartitionBinary(input, layout) {
+  validateLocation(layout);
+  const data = Buffer.from(input);
+  if (!data.length || data.length > SECTOR || data.length % 32)
+    invalid("Partition binary must contain 32-byte records within one sector.");
+  const parts = [];
+  let checksumSeen = false;
+  for (let index = 0; index < Math.min(data.length, 3072); index += 32) {
+    const record2 = data.subarray(index, index + 32);
+    if (record2.every((byte) => byte === 255)) {
+      if (!data.subarray(index, Math.min(data.length, 3072)).every((byte) => byte === 255))
+        invalid("Unexpected data after partition terminator.");
+      validateEspPartitions(parts, layout);
+      return parts;
+    }
+    if (record2.readUInt16LE(0) === 60395) {
+      if (checksumSeen || !record2.subarray(2, 16).every((byte) => byte === 255))
+        invalid("Invalid partition checksum record.");
+      if (!createHash("md5").update(data.subarray(0, index)).digest().equals(record2.subarray(16)))
+        invalid("Partition checksum mismatch.");
+      checksumSeen = true;
+      continue;
+    }
+    if (checksumSeen || record2.readUInt16LE(0) !== 20650)
+      invalid("Invalid partition record magic or record order.");
+    const label = record2.subarray(12, 28);
+    const zero = label.indexOf(0);
+    let name2;
+    try {
+      name2 = new TextDecoder("utf-8", { fatal: true }).decode(
+        zero < 0 ? label : label.subarray(0, zero)
+      );
+    } catch {
+      return invalid("Partition label is not valid UTF-8.");
+    }
+    parts.push({
+      name: name2,
+      type: record2[2],
+      subtype: record2[3],
+      offset: record2.readUInt32LE(4),
+      size: record2.readUInt32LE(8),
+      flags: record2.readUInt32LE(28)
+    });
+  }
+  return invalid("Partition binary is missing its terminator.");
+}
+
+// src/core/esp-partition-report.ts
+init_errors2();
+var dataNames = {
+  0: "ota",
+  1: "phy",
+  2: "nvs",
+  3: "coredump",
+  4: "nvs_keys",
+  5: "efuse",
+  6: "undefined",
+  128: "esphttpd",
+  129: "fat",
+  130: "spiffs",
+  131: "littlefs"
+};
+var hex = (value2) => "0x" + value2.toString(16);
+function projectEspPartition(part) {
+  const subtype = part.type === 0 ? part.subtype === 0 ? "factory" : part.subtype === 32 ? "test" : part.subtype >= 16 && part.subtype < 32 ? "ota_" + (part.subtype - 16) : hex(part.subtype) : part.type === 1 ? dataNames[part.subtype] ?? hex(part.subtype) : hex(part.subtype);
+  return {
+    name: part.name,
+    type: part.type === 0 ? "app" : part.type === 1 ? "data" : hex(part.type),
+    subtype,
+    offset: part.offset,
+    size: part.size,
+    flags: [
+      ...part.flags & 1 ? ["encrypted"] : [],
+      ...part.flags & 2 ? ["readonly"] : []
+    ],
+    unknown_flags: (part.flags & ~3) >>> 0,
+    offset_hex: hex(part.offset),
+    size_hex: hex(part.size),
+    end_hex: hex(part.offset + part.size)
+  };
+}
+function compareEspPartitions(expected, observed, layout) {
+  validateEspPartitions(expected, layout);
+  validateEspPartitions(observed, layout);
+  const wanted = new Map(expected.map((part) => [part.name, part]));
+  const actual = new Map(observed.map((part) => [part.name, part]));
+  const differences = [];
+  for (const [name2, part] of wanted) {
+    const other = actual.get(name2);
+    if (!other)
+      differences.push({
+        name: name2,
+        kind: "missing_on_device",
+        expected: projectEspPartition(part)
+      });
+    else {
+      const fields = ["type", "subtype", "offset", "size", "flags"].filter((field2) => part[field2] !== other[field2]);
+      if (fields.length)
+        differences.push({
+          name: name2,
+          kind: "changed",
+          fields,
+          expected: projectEspPartition(part),
+          device: projectEspPartition(other)
+        });
+    }
+  }
+  for (const [name2, part] of actual) {
+    if (!wanted.has(name2))
+      differences.push({
+        name: name2,
+        kind: "extra_on_device",
+        device: projectEspPartition(part)
+      });
+  }
+  const order = { missing_on_device: 0, changed: 1, extra_on_device: 2 };
+  return differences.sort(
+    (a, b) => order[a.kind] - order[b.kind] || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
+  );
+}
+function reportEspPartitions(parts, layout, firmwareSize) {
+  validateEspPartitions(parts, { tableOffset: layout.tableOffset });
+  if (layout.flashSize !== void 0 && (!Number.isSafeInteger(layout.flashSize) || layout.flashSize <= 0 || layout.flashSize > 4294967296))
+    throw new PlatformIOError("Invalid flash size.", "PARTITION_TABLE_INVALID");
+  if (firmwareSize !== void 0 && (!Number.isSafeInteger(firmwareSize) || firmwareSize < 0 || firmwareSize > 4294967295))
+    throw new PlatformIOError(
+      "Invalid firmware size.",
+      "PARTITION_TABLE_INVALID"
+    );
+  const issues = [];
+  const add = (severity, code, message, fix) => issues.push({ severity, code, message, fix });
+  const apps2 = parts.filter((part) => part.type === 0);
+  const slots = apps2.filter((part) => part.subtype >= 16 && part.subtype < 32);
+  const hasData = (subtype) => parts.some((part) => part.type === 1 && part.subtype === subtype);
+  const end = Math.max(
+    layout.tableOffset + 4096,
+    ...parts.map((part) => part.offset + part.size)
+  );
+  if (!parts.length)
+    add(
+      "error",
+      "empty_table",
+      "The table contains no partitions.",
+      "Select the project's effective partition table."
+    );
+  if (!apps2.length)
+    add(
+      "error",
+      "no_app",
+      "No application partition is present.",
+      "Add an application partition suitable for the selected chip."
+    );
+  if (slots.length && !hasData(0))
+    add(
+      "error",
+      "ota_without_otadata",
+      "OTA application slots have no OTA selection metadata.",
+      "Add a correctly sized OTA metadata partition."
+    );
+  if (!slots.length && hasData(0))
+    add(
+      "warning",
+      "otadata_without_ota",
+      "OTA selection metadata exists without OTA application slots.",
+      "Check whether OTA is intended for this layout."
+    );
+  if (slots.length === 1)
+    add(
+      "warning",
+      "single_ota_slot",
+      "Only one OTA application slot is available.",
+      "Review update recovery and add an alternate slot if needed."
+    );
+  if (new Set(slots.map((part) => part.size)).size > 1)
+    add(
+      "warning",
+      "uneven_ota_slots",
+      "OTA slots have different capacities.",
+      "Ensure each intended update fits its destination slot."
+    );
+  if (!hasData(2))
+    add(
+      "warning",
+      "no_nvs",
+      "The layout has no NVS partition.",
+      "Check application persistence and framework requirements."
+    );
+  if (!hasData(3))
+    add(
+      "info",
+      "no_coredump",
+      "No flash core-dump partition is present.",
+      "Configure crash storage if flash core dumps are required."
+    );
+  if (layout.flashSize !== void 0) {
+    if (end > layout.flashSize)
+      add(
+        "error",
+        "exceeds_flash",
+        "The layout extends beyond the supplied flash capacity.",
+        "Verify the actual chip capacity and partition sizes."
+      );
+    else if (layout.flashSize - end >= 1048576)
+      add(
+        "info",
+        "unused_flash",
+        String(layout.flashSize - end) + " trailing flash bytes are unassigned.",
+        "Review whether the remaining capacity should be allocated."
+      );
+  }
+  const fits = firmwareSize === void 0 ? [] : apps2.map((part) => ({
+    name: part.name,
+    size: part.size,
+    firmware_size: firmwareSize,
+    fits: firmwareSize <= part.size,
+    used_percent: Math.round(firmwareSize / part.size * 1e3) / 10
+  }));
+  if (fits.length) {
+    const limiting = fits.reduce((a, b) => a.size <= b.size ? a : b);
+    if (!limiting.fits)
+      add(
+        "error",
+        "app_too_big",
+        "Firmware exceeds app partition " + limiting.name + ".",
+        "Select the intended destination explicitly or reduce firmware size."
+      );
+    else if (limiting.used_percent >= 90)
+      add(
+        "warning",
+        "app_nearly_full",
+        "Firmware uses " + limiting.used_percent + "% of the smallest app partition.",
+        "Review space needed for future updates."
+      );
+    else
+      add(
+        "info",
+        "app_fits",
+        "Firmware fits all declared application partitions.",
+        ""
+      );
+  }
+  return {
+    ok: !issues.some((issue2) => issue2.severity === "error"),
+    table_offset: layout.tableOffset,
+    table_end: end,
+    flash_size: layout.flashSize ?? null,
+    firmware_size: firmwareSize ?? null,
+    partitions: parts.map(projectEspPartition),
+    application_fit: fits,
+    issues,
+    error_count: issues.filter((issue2) => issue2.severity === "error").length,
+    warning_count: issues.filter((issue2) => issue2.severity === "warning").length,
+    evidence: "offline_layout"
+  };
+}
+
+// src/core/esp-partition-artifacts.ts
+function contained(root, target) {
+  const relative = path18.relative(root, target);
+  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path18.sep) && !path18.isAbsolute(relative);
+}
+async function readPartitionArtifact(root, requested, limit) {
+  const lexical = path18.resolve(root, requested);
+  const canonical3 = await fs13.realpath(lexical);
+  if (!contained(root, canonical3))
+    throw new PlatformIOError(
+      "Partition artifact is outside the authorized workspace.",
+      "PARTITION_ARTIFACT_OUTSIDE_WORKSPACE"
+    );
+  const handle = await fs13.open(canonical3, "r");
+  try {
+    const before = await handle.stat();
+    if (!before.isFile() || before.size > limit)
+      throw new PlatformIOError(
+        "Partition artifact is not a bounded regular file.",
+        "PARTITION_ARTIFACT_INVALID"
+      );
+    const bytes = Buffer.alloc(before.size + 1);
+    let used = 0;
+    while (used < bytes.length) {
+      const read = await handle.read(bytes, used, bytes.length - used, used);
+      if (!read.bytesRead) break;
+      used += read.bytesRead;
+    }
+    const after = await handle.stat();
+    const current = await fs13.stat(canonical3);
+    const resolved = await fs13.realpath(lexical);
+    if (used !== before.size || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || before.ino !== current.ino || before.dev !== current.dev || current.size !== after.size || current.mtimeMs !== after.mtimeMs || resolved !== canonical3)
+      throw new PlatformIOError(
+        "Partition artifact changed during inspection; retry with a stable copy.",
+        "PARTITION_ARTIFACT_CHANGED"
+      );
+    const content = bytes.subarray(0, used);
+    return {
+      content,
+      identity: {
+        path: canonical3,
+        size: used,
+        sha256: createHash2("sha256").update(content).digest("hex")
+      }
+    };
+  } finally {
+    await handle.close();
+  }
+}
+async function inspectEspPartitionArtifacts(input) {
+  const root = await fs13.realpath(input.workspaceDir);
+  const table = await readPartitionArtifact(
+    input.trustedTableRoot ? await fs13.realpath(input.trustedTableRoot) : root,
+    input.tablePath,
+    input.format === "csv" ? 65536 : 4096
+  );
+  let text7;
+  if (input.format === "csv") {
+    try {
+      text7 = new TextDecoder("utf-8", { fatal: true }).decode(table.content);
+    } catch {
+      throw new PlatformIOError(
+        "Partition CSV is not valid UTF-8.",
+        "PARTITION_TABLE_INVALID"
+      );
+    }
+  }
+  const parts = input.format === "csv" ? parseEspPartitionCsv(text7, { tableOffset: input.layout.tableOffset }) : parseEspPartitionBinary(table.content, {
+    tableOffset: input.layout.tableOffset
+  });
+  const firmware = input.firmwarePath ? await readPartitionArtifact(root, input.firmwarePath, 128 * 1024 * 1024) : null;
+  const observed = input.observedTablePath ? await readPartitionArtifact(root, input.observedTablePath, 4096) : null;
+  const comparison = observed ? compareEspPartitions(
+    parts,
+    parseEspPartitionBinary(observed.content, {
+      tableOffset: input.layout.tableOffset
+    }),
+    { tableOffset: input.layout.tableOffset }
+  ) : null;
+  return {
+    ...reportEspPartitions(parts, input.layout, firmware?.identity.size),
+    partitionRecords: parts,
+    artifacts: {
+      table: table.identity,
+      firmware: firmware?.identity ?? null,
+      observed_table: observed?.identity ?? null
+    },
+    comparison,
+    // An offline copy can be stale; never label it a verified live-device match.
+    comparison_source: observed ? "offline_binary" : null
+  };
+}
+
+// src/core/esp-partition-framework.ts
+init_errors2();
 function within(root, target) {
-  const relative = path24.relative(root, target);
-  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path24.sep) && !path24.isAbsolute(relative);
+  const relative = path19.relative(root, target);
+  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path19.sep) && !path19.isAbsolute(relative);
 }
 function partitionFrameworkCandidates(includes) {
   const candidates = /* @__PURE__ */ new Set();
@@ -95432,7 +95291,7 @@ function partitionFrameworkCandidates(includes) {
     const match = /^(.*\/framework-(?:arduinoespressif32|espidf)(?:@[^/]+)?)(?:\/|$)/.exec(
       normalized
     );
-    if (match) candidates.add(path24.normalize(match[1]));
+    if (match) candidates.add(path19.normalize(match[1]));
   }
   if (candidates.size > 32)
     throw new PlatformIOError(
@@ -95442,19 +95301,19 @@ function partitionFrameworkCandidates(includes) {
   return [...candidates];
 }
 async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, projectDir) {
-  if (!filename || filename !== path24.basename(filename) || !/\.csv$/i.test(filename) || filename.length > 256 || /[\x00-\x1f\x7f]/.test(filename))
+  if (!filename || filename !== path19.basename(filename) || !/\.csv$/i.test(filename) || filename.length > 256 || /[\x00-\x1f\x7f]/.test(filename))
     throw new PlatformIOError(
       "Framework lookup requires one CSV filename.",
       "PARTITION_FRAMEWORK_INVALID"
     );
   const core = systemInfo?.core_dir?.value;
-  if (typeof core !== "string" || !path24.isAbsolute(core))
+  if (typeof core !== "string" || !path19.isAbsolute(core))
     throw new PlatformIOError(
       "Host Core package location is unavailable.",
       "PARTITION_FRAMEWORK_UNTRUSTED"
     );
-  const packages = await fs19.realpath(path24.join(core, "packages"));
-  const project = await fs19.realpath(projectDir);
+  const packages = await fs14.realpath(path19.join(core, "packages"));
+  const project = await fs14.realpath(projectDir);
   if (packages === project || within(project, packages) || within(packages, project))
     throw new PlatformIOError(
       "Framework installation overlaps the project workspace.",
@@ -95467,8 +95326,8 @@ async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, pr
     );
   const found = [];
   for (const candidate of new Set(candidates)) {
-    const root = await fs19.realpath(candidate);
-    if (!within(packages, root) || path24.relative(packages, root).split(path24.sep).length !== 1)
+    const root = await fs14.realpath(candidate);
+    if (!within(packages, root) || path19.relative(packages, root).split(path19.sep).length !== 1)
       throw new PlatformIOError(
         "Framework is outside registered host packages.",
         "PARTITION_FRAMEWORK_UNTRUSTED"
@@ -95496,7 +95355,7 @@ async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, pr
         "Framework registration does not match its manifest.",
         "PARTITION_FRAMEWORK_UNTRUSTED"
       );
-    const relative = path24.join(
+    const relative = path19.join(
       manifest.name === "framework-espidf" ? "components/partition_table" : "tools/partitions",
       filename
     );
@@ -95523,411 +95382,8 @@ async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, pr
   return unique[0];
 }
 
-// src/core/esp-flash-read.ts
-import fs27 from "node:fs/promises";
-init_zod();
-import path31 from "node:path";
-init_serial_endpoint();
-
-// src/utils/lock-manager.ts
-init_errors();
-init_events();
-import { randomUUID } from "node:crypto";
-var QueueEnforcementError = class extends PlatformIOError {
-  constructor(message, context) {
-    super(message, "QUEUE_ENFORCEMENT_FAILED", context);
-    this.name = "QueueEnforcementError";
-  }
-};
-var HardwareLockManager = class _HardwareLockManager {
-  static instance;
-  state = { isLocked: false };
-  constructor() {
-  }
-  /**
-   * Retrieves the global singleton instance
-   */
-  static getInstance() {
-    if (!_HardwareLockManager.instance) {
-      _HardwareLockManager.instance = new _HardwareLockManager();
-    }
-    return _HardwareLockManager.instance;
-  }
-  /**
-   * Explicitly claim the internal lock for a session.
-   * Throws if another session currently holds the lock.
-   */
-  acquireLock(sessionId, reason) {
-    if (this.state.isLocked && this.state.sessionId === sessionId) {
-      console.log(`Lock re-entry attempt by session ${sessionId}`);
-      return;
-    }
-    if (this.state.isLocked && this.state.sessionId !== sessionId) {
-      throw new QueueEnforcementError(
-        `Hardware is currently tied up by ${this.state.sessionId || "another session"}. If this is a stuck session, run the 'mcp_platformio_reset_server_state' tool.`,
-        {
-          activeSession: this.state.sessionId,
-          activeReason: this.state.reason
-        }
-      );
-    }
-    this.state = {
-      isLocked: true,
-      sessionId,
-      reason: reason || "Explicit Pipeline Lock",
-      lockedAt: Date.now()
-    };
-    try {
-      portalEvents.emitLockState(this.state);
-    } catch {
-    }
-  }
-  /**
-   * Release the explicit lock, if it matches the current session ID.
-   */
-  releaseLock(sessionId) {
-    if (this.state.isLocked && this.state.sessionId === sessionId) {
-      this.state = { isLocked: false };
-      try {
-        portalEvents.emitLockState(this.state);
-      } catch {
-      }
-    }
-  }
-  /**
-   * Get the current global lock state.
-   */
-  getLockStatus() {
-    return { ...this.state };
-  }
-  /**
-   * Validate that an operation can proceed.
-   * Operation can proceed if unlocked, or if the requester IS the locker.
-   */
-  requireLock(sessionId) {
-    if (this.state.isLocked && this.state.sessionId !== sessionId) {
-      throw new QueueEnforcementError(
-        `Hardware is currently tied up by session [${this.state.sessionId}]. If this is a stuck session, run the 'mcp_platformio_reset_server_state' tool.`,
-        {
-          activeSession: this.state.sessionId,
-          activeReason: this.state.reason,
-          action: "requireLock"
-        }
-      );
-    }
-  }
-  /**
-   * Implicit wrapping block for safe execution of a single task.
-   * Grabs the lock implicitly, awaits the job, then releases it.
-   */
-  async withImplicitLock(action) {
-    const implicitSessionId = `__IMPLICIT_${randomUUID()}__`;
-    this.acquireLock(implicitSessionId, "Implicit Tool Execution");
-    let cleanupPending = false;
-    try {
-      const result = await action();
-      return result;
-    } catch (error2) {
-      cleanupPending = error2 instanceof PlatformIOError && error2.context?.cleanupPending === true;
-      throw error2;
-    } finally {
-      if (!cleanupPending) this.releaseLock(implicitSessionId);
-    }
-  }
-};
-var hardwareLockManager = HardwareLockManager.getInstance();
-
-// src/core/esp-flash-read.ts
-init_spooler();
-init_errors();
-var schema = external_exports.object({
-  projectDir: external_exports.string().min(1).max(32768),
-  port: external_exports.string().min(1).max(512),
-  offset: external_exports.number().int().nonnegative().max(4294967295),
-  length: external_exports.number().int().positive().max(16 * 1024 * 1024),
-  approvalId: external_exports.string().max(256).optional(),
-  commandApprovalId: external_exports.string().max(256).optional()
-}).strict().refine(
-  (value2) => value2.offset + value2.length <= 4294967296,
-  "Flash range overflows."
-);
-async function readEspFlash(input, caller = {}) {
-  const request = schema.parse(input);
-  const projectDir = await fs27.realpath(request.projectDir);
-  const { commandApprovalId, ...operation } = request;
-  const args = { ...operation, projectDir };
-  const context = { ...caller, workspaceDir: projectDir };
-  const commandArgs = { ...args, approvalId: commandApprovalId };
-  for (const [name2, parameters] of [
-    ["esp_flash_read", args],
-    ["esp_flash_read_command", commandArgs]
-  ]) {
-    const plan = await planAction(name2, parameters, context);
-    if (plan.status !== "ready")
-      throw new PlatformIOError(
-        plan.reason,
-        plan.status === "requires_approval" ? "APPROVAL_REQUIRED" : "POLICY_DENIED",
-        { policyDecision: plan }
-      );
-  }
-  return dispatchAuthorizedAction("esp_flash_read", args, context, async () => {
-    const guard = createPolicyRevisionGuard(projectDir);
-    return dispatchAuthorizedAction(
-      "esp_flash_read_command",
-      commandArgs,
-      context,
-      async () => {
-        guard();
-        const endpoint = resolveSerialEndpoint(request.port);
-        return hardwareLockManager.withImplicitLock(async () => {
-          guard();
-          endpoint.revalidate();
-          const temporary = await createPrivateAnalysisDirectory();
-          const output = path31.join(temporary, "flash.bin");
-          let retain = false;
-          try {
-            guard();
-            endpoint.revalidate();
-            const result = await executeWithSpooling(
-              "pkg",
-              [
-                "exec",
-                "--",
-                "esptool.py",
-                "--port",
-                endpoint.canonicalPort,
-                "read_flash",
-                "0x" + request.offset.toString(16),
-                "0x" + request.length.toString(16),
-                output
-              ],
-              {
-                cwd: projectDir,
-                projectDir,
-                devicePort: endpoint.canonicalPort,
-                timeout: 3e5,
-                background: false,
-                artifactType: "debug"
-              }
-            );
-            guard();
-            if (!("exitCode" in result) || result.exitCode !== 0)
-              throw new PlatformIOError(
-                "ESP flash read failed; inspect the retained command log.",
-                "FLASH_READ_FAILED",
-                {
-                  logPath: "fullLogPath" in result ? result.fullLogPath : null
-                }
-              );
-            const artifact = await readPartitionArtifact(
-              await fs27.realpath(temporary),
-              output,
-              request.length
-            );
-            if (artifact.identity.size !== request.length)
-              throw new PlatformIOError(
-                "ESP flash read returned an incomplete range.",
-                "FLASH_READ_INCOMPLETE"
-              );
-            guard();
-            return {
-              bytes: artifact.content,
-              sha256: artifact.identity.sha256,
-              port: endpoint.canonicalPort,
-              offset: request.offset,
-              length: request.length,
-              logPath: result.fullLogPath
-            };
-          } catch (error2) {
-            retain = error2 instanceof PlatformIOError && error2.context?.cleanupPending === true;
-            throw error2;
-          } finally {
-            if (!retain)
-              await fs27.rm(temporary, { recursive: true, force: true });
-          }
-        });
-      }
-    );
-  });
-}
-
-// src/tools/partition-project.ts
-import path32 from "node:path";
-
-// src/tools/boards.ts
-init_zod();
-init_platformio();
-init_types2();
-init_validation();
-init_errors();
-var PioBoardsOutputSchema = external_exports.union([
-  external_exports.array(BoardInfoSchema),
-  external_exports.record(external_exports.string(), external_exports.array(BoardInfoSchema))
-]);
-function normalizeBoardsOutput(output) {
-  if (Array.isArray(output)) {
-    return output;
-  }
-  const flattened = [];
-  for (const platformBoards of Object.values(
-    output
-  )) {
-    flattened.push(...platformBoards);
-  }
-  return flattened;
-}
-async function listBoards(filter) {
-  try {
-    const args = [];
-    if (filter && filter.trim().length > 0) {
-      args.push(filter.trim());
-    }
-    const result = await platformioExecutor.executeWithJsonOutput(
-      "boards",
-      args,
-      PioBoardsOutputSchema,
-      { timeout: 3e4 }
-    );
-    const allBoards = normalizeBoardsOutput(result);
-    if (filter && filter.trim().length > 0) {
-      const filterLower = filter.trim().toLowerCase();
-      return allBoards.filter(
-        (board) => board.id.toLowerCase().includes(filterLower) || board.name.toLowerCase().includes(filterLower) || board.platform.toLowerCase().includes(filterLower) || board.mcu.toLowerCase().includes(filterLower) || board.frameworks?.some(
-          (fw) => fw.toLowerCase().includes(filterLower)
-        )
-      );
-    }
-    return allBoards;
-  } catch (error2) {
-    throw new PlatformIOError(
-      `Failed to list boards${filter ? ` with filter '${filter}'` : ""}: ${error2}`,
-      "LIST_BOARDS_FAILED",
-      { filter }
-    );
-  }
-}
-async function getBoardInfo(boardId) {
-  if (!validateBoardId(boardId)) {
-    throw new BoardNotFoundError(boardId);
-  }
-  try {
-    const result = await platformioExecutor.executeWithJsonOutput(
-      "boards",
-      [boardId],
-      PioBoardsOutputSchema,
-      { timeout: 3e4 }
-    );
-    const board = normalizeBoardsOutput(result).find((b) => b.id === boardId);
-    if (board) {
-      return board;
-    }
-    throw new BoardNotFoundError(boardId);
-  } catch (error2) {
-    if (error2 instanceof BoardNotFoundError) {
-      throw error2;
-    }
-    throw new PlatformIOError(
-      `Failed to get board info for '${boardId}': ${error2}`,
-      "GET_BOARD_INFO_FAILED",
-      { boardId }
-    );
-  }
-}
-
-// src/core/esp-partition-location.ts
-init_errors();
-function offset(value2) {
-  const parsed = typeof value2 === "string" ? parsePartitionNumber(value2) : value2;
-  if (typeof parsed !== "number" || !Number.isSafeInteger(parsed) || parsed < 0 || parsed > 4294963200 || parsed % 4096)
-    throw new PlatformIOError(
-      "Partition table offset must be an aligned flash address.",
-      "PARTITION_OFFSET_INVALID"
-    );
-  return parsed;
-}
-function partitionOffsetFromSdkconfig(text7) {
-  if (Buffer.byteLength(text7, "utf8") > 2 * 1024 * 1024)
-    throw new PlatformIOError(
-      "sdkconfig exceeds the inspection limit.",
-      "PARTITION_CONFIG_LIMIT"
-    );
-  const matches = text7.split(/\r?\n/).filter((line) => /^\s*CONFIG_PARTITION_TABLE_OFFSET\s*=/.test(line));
-  if (!matches.length) return null;
-  if (matches.length !== 1)
-    throw new PlatformIOError(
-      "Duplicate partition table offset in sdkconfig.",
-      "PARTITION_OFFSET_AMBIGUOUS"
-    );
-  const value2 = matches[0].slice(matches[0].indexOf("=") + 1).trim();
-  return {
-    source: "sdkconfig:CONFIG_PARTITION_TABLE_OFFSET",
-    offset: offset(value2)
-  };
-}
-function partitionOffsetFromFlashImages(images, tablePath, normalizePath) {
-  if (!Array.isArray(images) || images.length > 256)
-    throw new PlatformIOError(
-      "Invalid computed flash image inventory.",
-      "PARTITION_METADATA_INVALID"
-    );
-  const target = normalizePath(tablePath);
-  const matches = [];
-  for (const image of images) {
-    if (!image || typeof image !== "object" || Array.isArray(image))
-      throw new PlatformIOError(
-        "Invalid flash image entry.",
-        "PARTITION_METADATA_INVALID"
-      );
-    const record2 = image;
-    if (typeof record2.path !== "string" || record2.path.length > 32768)
-      throw new PlatformIOError(
-        "Invalid flash image path.",
-        "PARTITION_METADATA_INVALID"
-      );
-    if (normalizePath(record2.path) === target)
-      matches.push({
-        source: "metadata:extra.flash_images",
-        offset: offset(record2.offset)
-      });
-  }
-  if (matches.length > 1)
-    throw new PlatformIOError(
-      "Partition binary appears more than once in flash images.",
-      "PARTITION_OFFSET_AMBIGUOUS"
-    );
-  return matches[0] ?? null;
-}
-function resolvePartitionOffset(evidence, configuredUploadOffset) {
-  const entries = evidence.map((entry) => ({
-    source: entry.source,
-    offset: offset(entry.offset)
-  }));
-  if (configuredUploadOffset !== void 0 && configuredUploadOffset !== null)
-    entries.push({
-      source: "board_upload.partition_table_offset",
-      offset: offset(configuredUploadOffset)
-    });
-  if (!entries.length)
-    throw new PlatformIOError(
-      "Partition table location is unknown; provide its resolved offset or build metadata.",
-      "PARTITION_OFFSET_REQUIRED"
-    );
-  if (new Set(entries.map((entry) => entry.offset)).size !== 1)
-    throw new PlatformIOError(
-      "Partition table generation and upload offsets disagree.",
-      "PARTITION_OFFSET_CONFLICT"
-    );
-  return { tableOffset: entries[0].offset, evidence: entries };
-}
-
-// src/tools/project-inspection.ts
-init_zod();
-init_platformio();
-import fs28 from "node:fs/promises";
-
 // src/core/project-inspection.ts
-init_zod();
-init_errors();
+init_errors2();
 init_redact();
 var text = external_exports.string().max(65536);
 var value = external_exports.union([
@@ -96133,7 +95589,7 @@ function parseProjectMetadata(output, environment) {
 
 // src/tools/project-inspection.ts
 init_redact();
-init_errors();
+init_errors2();
 var base = {
   projectDir: external_exports.string().min(1).max(32768),
   approvalId: external_exports.string().optional()
@@ -96150,7 +95606,7 @@ async function executeProjectInspection(action, input, caller = {}, onAuthorized
       "UNKNOWN_ACTION"
     );
   const parsed = action === "project_envs" ? envSchema.parse(input) : metadataSchema2.parse(input);
-  const projectDir = await fs28.realpath(parsed.projectDir);
+  const projectDir = await fs15.realpath(parsed.projectDir);
   const params = { ...parsed, projectDir };
   const environment = "environment" in parsed ? parsed.environment : void 0;
   return dispatchAuthorizedAction(
@@ -96216,855 +95672,268 @@ async function executeProjectInspection(action, input, caller = {}, onAuthorized
   );
 }
 
-// src/tools/partition-project.ts
-init_errors();
-async function resolveProjectPartitionInputs(projectDir, environment, caller, approvalId) {
-  const report = await executeProjectInspection(
-    "project_envs",
-    { projectDir, approvalId },
-    caller
-  );
-  if (!report.ok || !("defaultEnvironments" in report) || !Array.isArray(report.envs))
-    throw new PlatformIOError(
-      "Cannot resolve project partition configuration.",
-      "PARTITION_CONFIG_UNAVAILABLE"
-    );
-  const envs = report.envs;
-  const selected = environment ?? (report.defaultEnvironments.length === 1 ? report.defaultEnvironments[0] : void 0);
-  const env = envs.find((entry) => entry.name === selected);
-  if (!env)
-    throw new PlatformIOError(
-      "Select one configured environment for partition inspection.",
-      "PARTITION_ENVIRONMENT_REQUIRED"
-    );
-  if (env.partitionTable !== null && (typeof env.partitionTable !== "string" || !env.partitionTable || env.partitionTable.length > 32768))
-    throw new PlatformIOError(
-      "Invalid configured partition file.",
-      "PARTITION_CONFIG_INVALID"
-    );
-  const frameworks = Array.isArray(env.framework) ? env.framework : typeof env.framework === "string" ? env.framework.split(",").map((value2) => value2.trim()) : [];
-  let sdkconfigPath;
-  const sdkconfigExplicit = env.sdkconfigPath !== void 0 && env.sdkconfigPath !== null;
-  if (sdkconfigExplicit) {
-    if (typeof env.sdkconfigPath !== "string" || !env.sdkconfigPath || env.sdkconfigPath.length > 32768 || /\$|%[^%]+%/.test(env.sdkconfigPath))
-      throw new PlatformIOError(
-        "SDK configuration path must be resolved within the workspace.",
-        "PARTITION_CONFIG_INVALID"
-      );
-    sdkconfigPath = env.sdkconfigPath;
-  } else if (frameworks.includes("espidf")) {
-    if (!/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,49}$/.test(env.name))
-      throw new PlatformIOError(
-        "Invalid SDK configuration environment name.",
-        "PARTITION_CONFIG_INVALID"
-      );
-    sdkconfigPath = "sdkconfig." + env.name;
-  }
-  let flashSize;
-  if (env.flashSize !== null) {
-    if (typeof env.flashSize !== "string" && typeof env.flashSize !== "number")
-      throw new PlatformIOError(
-        "Invalid configured flash size.",
-        "PARTITION_CONFIG_INVALID"
-      );
-    flashSize = typeof env.flashSize === "number" ? env.flashSize : parsePartitionNumber(env.flashSize.replace(/B$/i, ""));
-  }
-  return {
-    environment: env.name,
-    sdkconfigPath,
-    sdkconfigExplicit,
-    tablePath: env.partitionTable ?? "partitions.csv",
-    tableSource: env.partitionTable ? "board_build.partitions" : "project:partitions.csv",
-    uploadOffset: env.partitionTableUploadOffset,
-    flashSize,
-    board: env.board,
-    mcu: env.mcu
-  };
-}
-async function resolveBuildPartitionInputs(projectDir, environment, caller, approvalId, selectedTablePath) {
-  const report = await executeProjectInspection(
-    "project_metadata",
-    { projectDir, environment, approvalId },
-    caller
-  );
-  if (!report.ok || !("envs" in report) || Array.isArray(report.envs) || !report.envs)
-    throw new PlatformIOError(
-      "Build metadata is unavailable.",
-      "PARTITION_METADATA_UNAVAILABLE"
-    );
-  const entry = report.envs[environment];
-  if (!entry || !entry.extra || typeof entry.extra !== "object" || Array.isArray(entry.extra))
-    throw new PlatformIOError(
-      "Build metadata has no flash image inventory.",
-      "PARTITION_METADATA_UNAVAILABLE"
-    );
-  const images = entry.extra.flash_images;
-  if (!Array.isArray(images) || images.length > 256)
-    throw new PlatformIOError(
-      "Invalid flash image inventory.",
-      "PARTITION_METADATA_INVALID"
-    );
-  const normalize = (value2) => {
-    const resolved = path32.resolve(projectDir, value2);
-    return process.platform === "win32" ? resolved.toLowerCase() : resolved;
-  };
-  let selected = selectedTablePath;
-  if (!selected) {
-    const candidates = images.filter(
-      (image) => image && typeof image.path === "string" && path32.basename(image.path).toLowerCase() === "partitions.bin"
-    );
-    if (candidates.length !== 1)
-      throw new PlatformIOError(
-        "Select the partition binary explicitly; build metadata does not identify one unique partitions.bin.",
-        "PARTITION_METADATA_AMBIGUOUS"
-      );
-    selected = candidates[0].path;
-  }
-  const evidence = partitionOffsetFromFlashImages(images, selected, normalize);
-  if (!evidence)
-    throw new PlatformIOError(
-      "Selected partition binary is absent from the environment's flash images.",
-      "PARTITION_METADATA_MISMATCH"
-    );
-  return {
-    tablePath: selected,
-    offsetEvidence: evidence,
-    environment,
-    frameworkCandidates: entry.partitionFrameworkCandidates
-  };
-}
-async function resolvePartitionBoardInfo(projectDir, boardId, caller, approvalId) {
-  if (typeof boardId !== "string" || !boardId)
-    return { status: "unknown", flashSize: null, mcu: null };
-  try {
-    const board = await dispatchAuthorizedAction(
-      "get_board_info",
-      { projectDir, boardId, approvalId },
-      { ...caller, workspaceDir: projectDir },
-      () => getBoardInfo(boardId)
-    );
-    const flashSize = typeof board?.rom === "number" && Number.isSafeInteger(board.rom) && board.rom > 0 && board.rom <= 4294967296 ? board.rom : null;
-    return {
-      status: "catalogue",
-      flashSize,
-      mcu: typeof board?.mcu === "string" ? board.mcu : null
-    };
-  } catch (error2) {
-    const code = error2 instanceof PlatformIOError ? error2.code : "BOARD_LOOKUP_FAILED";
-    return {
-      status: code === "POLICY_DENIED" || code === "APPROVAL_REQUIRED" ? "not_authorized" : "unavailable",
-      flashSize: null,
-      mcu: null,
-      error_code: code
-    };
-  }
-}
+// src/tools/run-target.ts
+init_devices2();
 
-// src/tools/partition-table.ts
+// src/adapters/size-compat.ts
 init_zod();
-init_errors();
-var PartitionTableSchema = external_exports.object({
-  projectDir: external_exports.string().min(1).max(32768),
-  tablePath: external_exports.string().min(1).max(32768).optional(),
-  environment: external_exports.string().regex(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/).max(50).optional(),
-  configApprovalId: external_exports.string().max(256).optional(),
-  buildMetadata: external_exports.boolean().default(false),
-  metadataApprovalId: external_exports.string().max(256).optional(),
-  systemApprovalId: external_exports.string().max(256).optional(),
-  boardApprovalId: external_exports.string().max(256).optional(),
-  format: external_exports.enum(["csv", "binary"]).default("csv"),
-  tableOffset: external_exports.number().int().min(0).max(4294963200).optional(),
-  sdkconfigPath: external_exports.string().min(1).max(32768).optional(),
-  flashSize: external_exports.number().int().positive().max(4294967296).optional(),
-  firmwarePath: external_exports.string().min(1).max(32768).optional(),
-  observedTablePath: external_exports.string().min(1).max(32768).optional(),
-  readDevice: external_exports.boolean().default(false),
-  port: external_exports.string().min(1).max(512).optional(),
-  readApprovalId: external_exports.string().max(256).optional(),
-  commandApprovalId: external_exports.string().max(256).optional(),
-  approvalId: external_exports.string().max(256).optional()
-}).strict().refine(
-  (value2) => !value2.readDevice || Boolean(value2.port),
-  "An explicit serial port is required for a device read."
-);
-async function executePartitionTable(input, caller = {}, onAuthorized) {
-  const params = PartitionTableSchema.parse(input);
-  const projectDir = await fs29.realpath(params.projectDir);
-  const {
-    configApprovalId,
-    metadataApprovalId,
-    systemApprovalId,
-    boardApprovalId,
-    readApprovalId,
-    commandApprovalId,
-    ...operation
-  } = params;
-  return dispatchAuthorizedAction(
-    "partition_table",
-    { ...operation, projectDir },
-    { ...caller, workspaceDir: projectDir },
-    async () => {
-      const guard = createPolicyRevisionGuard(projectDir);
-      await onAuthorized?.();
-      guard();
-      const project = params.buildMetadata || params.tablePath === void 0 || params.environment !== void 0 ? await resolveProjectPartitionInputs(
-        projectDir,
-        params.environment,
-        { ...caller, workspaceDir: projectDir },
-        configApprovalId
-      ) : null;
-      guard();
-      const build = params.buildMetadata ? await resolveBuildPartitionInputs(
-        projectDir,
-        project.environment,
-        { ...caller, workspaceDir: projectDir },
-        metadataApprovalId,
-        params.format === "binary" ? params.tablePath : void 0
-      ) : null;
-      guard();
-      const evidence = [];
-      if (build) evidence.push(build.offsetEvidence);
-      if (params.tableOffset !== void 0)
-        evidence.push({
-          source: "explicit:tableOffset",
-          offset: params.tableOffset
-        });
-      const sdkconfigPath = params.sdkconfigPath ?? project?.sdkconfigPath;
-      let sdkconfig = null;
-      if (sdkconfigPath) {
-        try {
-          sdkconfig = await readPartitionArtifact(
-            projectDir,
-            sdkconfigPath,
-            2 * 1024 * 1024
-          );
-        } catch (error2) {
-          const optionalMissing = !params.sdkconfigPath && !project?.sdkconfigExplicit && error2.code === "ENOENT";
-          if (!optionalMissing) throw error2;
-        }
-      }
-      if (sdkconfig) {
-        let text7;
-        try {
-          text7 = new TextDecoder("utf-8", { fatal: true }).decode(
-            sdkconfig.content
-          );
-        } catch {
-          throw new PlatformIOError(
-            "sdkconfig is not valid UTF-8.",
-            "PARTITION_CONFIG_INVALID"
-          );
-        }
-        const setting = partitionOffsetFromSdkconfig(text7);
-        if (setting) evidence.push(setting);
-      }
-      const location = resolvePartitionOffset(evidence, project?.uploadOffset);
-      guard();
-      let tablePath = params.tablePath ?? build?.tablePath ?? project.tablePath;
-      let format = !params.tablePath && build ? "binary" : params.format;
-      let trustedTableRoot;
-      let framework = null;
-      let tableSource = params.tablePath ? "explicit:tablePath" : build ? "metadata:extra.flash_images" : project.tableSource;
-      if (!params.tablePath && build && project?.tableSource === "board_build.partitions") {
-        try {
-          await readPartitionArtifact(projectDir, project.tablePath, 65536);
-          tablePath = project.tablePath;
-          format = "csv";
-          tableSource = project.tableSource;
-        } catch (error2) {
-          if (error2.code !== "ENOENT") throw error2;
-          const system = await dispatchAuthorizedAction(
-            "system_info",
-            { projectDir, approvalId: systemApprovalId },
-            { ...caller, workspaceDir: projectDir },
-            getSystemInfo
-          );
-          guard();
-          framework = await resolveFrameworkPartitionCsv(
-            project.tablePath,
-            build.frameworkCandidates ?? [],
-            system,
-            projectDir
-          );
-          trustedTableRoot = framework.root;
-          tablePath = framework.tablePath;
-          format = "csv";
-          tableSource = "board_build.partitions (registered framework)";
-        }
-      }
-      guard();
-      let firmwarePath = params.firmwarePath;
-      if (!firmwarePath && build && path33.basename(build.tablePath).toLowerCase() === "partitions.bin") {
-        try {
-          const candidate = await fs29.realpath(
-            path33.resolve(
-              projectDir,
-              path33.dirname(build.tablePath),
-              "firmware.bin"
-            )
-          );
-          const relative = path33.relative(projectDir, candidate);
-          if (relative && relative !== ".." && !relative.startsWith(".." + path33.sep) && !path33.isAbsolute(relative) && (await fs29.stat(candidate)).isFile())
-            firmwarePath = candidate;
-        } catch (error2) {
-          if (error2.code !== "ENOENT") throw error2;
-        }
-      }
-      const boardInfo = project && ((params.flashSize ?? project.flashSize) === void 0 || project.mcu === null) ? await resolvePartitionBoardInfo(
-        projectDir,
-        project.board,
-        caller,
-        boardApprovalId
-      ) : null;
-      guard();
-      const flashSize = params.flashSize ?? project?.flashSize ?? boardInfo?.flashSize ?? void 0;
-      const flashSizeSource = params.flashSize !== void 0 ? "explicit:flashSize" : project?.flashSize !== void 0 ? "board_upload.flash_size" : boardInfo?.flashSize != null ? "board_catalogue" : "unknown";
-      const result = await inspectEspPartitionArtifacts({
-        workspaceDir: projectDir,
-        tablePath,
-        format,
-        trustedTableRoot,
-        layout: {
-          tableOffset: location.tableOffset,
-          flashSize
-        },
-        firmwarePath,
-        observedTablePath: params.observedTablePath ?? (format === "csv" && build ? build.tablePath : void 0)
-      });
-      guard();
-      let device = null;
-      if (params.readDevice) {
-        const read = await readEspFlash(
-          {
-            projectDir,
-            port: params.port,
-            offset: location.tableOffset,
-            length: 4096,
-            approvalId: readApprovalId,
-            commandApprovalId
-          },
-          { ...caller, workspaceDir: projectDir }
-        );
-        guard();
-        const observed = parseEspPartitionBinary(read.bytes, {
-          tableOffset: location.tableOffset
-        });
-        device = {
-          port: read.port,
-          erased: read.bytes.every((byte) => byte === 255),
-          partitions: observed.map(projectEspPartition),
-          diff: compareEspPartitions(result.partitionRecords, observed, {
-            tableOffset: location.tableOffset
-          }),
-          log_path: read.logPath,
-          sha256: read.sha256,
-          offset: read.offset
-        };
-      }
-      const mismatch = Boolean(
-        result.comparison?.length || device?.erased || device?.diff.length
-      );
-      const issues = [...result.issues];
-      if (result.comparison?.length)
-        issues.push({
-          severity: "error",
-          code: "offline_table_mismatch",
-          message: "The supplied binary comparison differs from the expected partition layout.",
-          fix: "Confirm both artifacts belong to the same build before flashing."
-        });
-      if (device?.erased)
-        issues.push({
-          severity: "error",
-          code: "device_table_erased",
-          message: "The selected device partition sector is erased.",
-          fix: "Verify the chip and table offset, then restore a complete approved firmware image."
-        });
-      else if (device?.diff.length)
-        issues.push({
-          severity: "error",
-          code: "device_table_mismatch",
-          message: "The observed device table differs from the inspected partition layout.",
-          fix: "Verify the selected device and rebuild or restore the intended complete flash layout."
-        });
-      const errorCount = issues.filter(
-        (issue2) => issue2.severity === "error"
-      ).length;
-      const { partitionRecords, ...publicResult } = result;
-      return {
-        ...publicResult,
-        device,
-        comparison_source: !params.observedTablePath && format === "csv" && build ? "build_binary" : publicResult.comparison_source,
-        issues,
-        error_count: errorCount,
-        environment: project?.environment ?? null,
-        table_source: tableSource,
-        framework_package: framework ? { name: framework.packageName, version: framework.packageVersion } : null,
-        board: project?.board ?? null,
-        mcu: project?.mcu ?? boardInfo?.mcu ?? null,
-        flash_size_source: flashSizeSource,
-        board_lookup: boardInfo,
-        offset_evidence: location.evidence,
-        sdkconfig_artifact: sdkconfig?.identity ?? null,
-        ok: result.ok && !mismatch,
-        summary: partitionRecords.length + " partition(s) inspected from offline artifacts. " + (mismatch ? "The compared partition layout differs or is erased. " : "") + errorCount + " layout error(s), " + result.warning_count + " warning(s)."
-      };
-    }
-  );
-}
 
-// src/core/analysis/esp-coredump-input.ts
-init_errors();
-import { createHash as createHash6, timingSafeEqual } from "node:crypto";
-var MAX_DUMP_BYTES = 16 * 1024 * 1024;
-var chips = {
-  0: "esp32",
-  2: "esp32s2",
-  9: "esp32s3",
-  5: "esp32c3",
-  12: "esp32c2",
-  13: "esp32c6",
-  16: "esp32h2",
-  18: "esp32p4"
-};
-var versions = {
-  2: { header: 20, checksum: "crc32", payload: "binary" },
-  3: { header: 24, checksum: "crc32", payload: "binary" },
-  256: { header: 20, checksum: "crc32", payload: "elf" },
-  257: { header: 20, checksum: "sha256", payload: "elf" },
-  258: { header: 24, checksum: "crc32", payload: "elf" },
-  259: { header: 24, checksum: "sha256", payload: "elf" }
-};
-var crcTable = Uint32Array.from({ length: 256 }, (_, value2) => {
-  let crc = value2;
-  for (let bit = 0; bit < 8; bit++)
-    crc = crc >>> 1 ^ (crc & 1 ? 3988292384 : 0);
-  return crc >>> 0;
-});
-function crc32(bytes) {
-  let crc = 4294967295;
-  for (const byte of bytes) crc = crc >>> 8 ^ crcTable[(crc ^ byte) & 255];
-  return (crc ^ 4294967295) >>> 0;
-}
-function inspectRawEspCoredump(input, encrypted = false) {
-  if (encrypted)
-    throw new PlatformIOError(
-      "Encrypted core dumps require a supported decryption workflow.",
-      "COREDUMP_ENCRYPTED"
-    );
-  if (input.byteLength > MAX_DUMP_BYTES)
-    throw new PlatformIOError(
-      "Core dump exceeds 16 MiB.",
-      "COREDUMP_INPUT_LIMIT"
-    );
-  if (!input.byteLength || input.every((byte) => byte === 255))
-    throw new PlatformIOError(
-      "No core dump is present in the supplied bytes.",
-      "COREDUMP_EMPTY"
-    );
-  if (input.byteLength < 16)
-    throw new PlatformIOError(
-      "Core dump header is truncated.",
-      "COREDUMP_TRUNCATED"
-    );
-  const bytes = Buffer.from(input);
-  const length = bytes.readUInt32LE(0);
-  if (!length)
-    throw new PlatformIOError(
-      "Core dump length is zero; no recorded crash is available.",
-      "COREDUMP_EMPTY"
-    );
-  const version2 = bytes.readUInt32LE(4), format = versions[version2 & 65535], chip = chips[version2 >>> 16];
-  if (!format || !chip)
-    throw new PlatformIOError(
-      "Unsupported raw core-dump version or chip; do not infer plaintext from unknown bytes.",
-      "COREDUMP_FORMAT_UNSUPPORTED"
-    );
-  const checksumLength = format.checksum === "sha256" ? 32 : 4;
-  if (length < format.header + checksumLength || length > bytes.length || length > MAX_DUMP_BYTES)
-    throw new PlatformIOError(
-      "Declared core-dump length is outside the supplied input.",
-      "COREDUMP_LENGTH_INVALID"
-    );
-  const payload = bytes.subarray(0, length - checksumLength);
-  const checksum = bytes.subarray(length - checksumLength, length);
-  const valid = format.checksum === "sha256" ? timingSafeEqual(createHash6("sha256").update(payload).digest(), checksum) : crc32(payload) === checksum.readUInt32LE(0);
-  if (!valid)
-    throw new PlatformIOError(
-      "Core-dump checksum does not match its declared bytes.",
-      "COREDUMP_CHECKSUM_MISMATCH"
-    );
-  if (format.payload === "elf" && (length - format.header - checksumLength < 4 || !bytes.subarray(format.header, format.header + 4).equals(Buffer.from([127, 69, 76, 70]))))
-    throw new PlatformIOError(
-      "Core-dump payload does not contain the declared ELF format.",
-      "COREDUMP_PAYLOAD_INVALID"
-    );
-  return {
-    bytes: bytes.subarray(0, length),
-    identity: {
-      sha256: createHash6("sha256").update(bytes.subarray(0, length)).digest("hex"),
-      input_sha256: createHash6("sha256").update(bytes).digest("hex"),
-      length,
-      input_length: bytes.length,
-      trailing_bytes: bytes.length - length,
-      version: version2,
-      chip,
-      payload_format: format.payload,
-      checksum: format.checksum,
-      task_count: bytes.readUInt32LE(8),
-      tcb_size: bytes.readUInt32LE(12),
-      segment_count: bytes.readUInt32LE(16),
-      chip_revision: format.header === 24 ? bytes.readUInt32LE(20) : null
-    }
-  };
-}
-function decodeEspCoredumpBase64(text7) {
-  if (Buffer.byteLength(text7, "utf8") > Math.ceil(MAX_DUMP_BYTES / 3) * 4 + 65536)
-    throw new PlatformIOError(
-      "Encoded core dump exceeds the input limit.",
-      "COREDUMP_INPUT_LIMIT"
-    );
-  const decodeChunk = (compact2) => {
-    if (!compact2 || compact2.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(compact2))
-      throw new PlatformIOError(
-        "Invalid base64 core dump.",
-        "COREDUMP_BASE64_INVALID"
-      );
-    const decoded2 = Buffer.from(compact2, "base64");
-    if (decoded2.toString("base64") !== compact2)
-      throw new PlatformIOError(
-        "Non-canonical base64 core dump.",
-        "COREDUMP_BASE64_INVALID"
-      );
-    return decoded2;
-  };
-  const compact = text7.replace(/[ \t\r\n]/g, "");
-  let decoded;
-  if (/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) {
-    decoded = decodeChunk(compact);
-  } else {
-    const lines2 = text7.split(/\r?\n/).map((line) => line.replace(/[ \t]/g, "")).filter(Boolean);
-    if (lines2.length > 65536)
-      throw new PlatformIOError(
-        "Too many encoded core-dump lines.",
-        "COREDUMP_INPUT_LIMIT"
-      );
-    const chunks = lines2.map(decodeChunk);
-    const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
-    if (length > MAX_DUMP_BYTES)
-      throw new PlatformIOError(
-        "Decoded core dump exceeds 16 MiB.",
-        "COREDUMP_INPUT_LIMIT"
-      );
-    decoded = Buffer.concat(chunks, length);
-  }
-  if (decoded.length > MAX_DUMP_BYTES)
-    throw new PlatformIOError(
-      "Decoded core dump exceeds 16 MiB.",
-      "COREDUMP_INPUT_LIMIT"
-    );
-  return decoded;
-}
+// src/tools/analysis.ts
+import crypto11 from "node:crypto";
 
-// src/core/analysis/esp-coredump-read.ts
-init_errors();
-async function readEspCoredumpPartition(input, caller = {}) {
-  const partition = input.partition;
-  if (partition.type !== 1 || partition.subtype !== 3 || !Number.isInteger(partition.offset) || partition.offset < 0 || partition.offset % 4096 || !Number.isInteger(partition.size) || partition.size < 24 || partition.size > 16 * 1024 * 1024 || partition.offset + partition.size > 4294967296 || !Number.isInteger(partition.flags) || partition.flags < 0 || partition.flags > 65535)
+// src/core/analysis/elf-archive.ts
+init_paths();
+init_errors2();
+import fs18 from "node:fs/promises";
+import { constants as constants2 } from "node:fs";
+import path21 from "node:path";
+import { createHash as createHash3, randomUUID } from "node:crypto";
+
+// src/core/analysis/elf-identity.ts
+init_errors2();
+import fs17 from "node:fs/promises";
+import crypto8 from "node:crypto";
+async function readElfIdentity(elfPath, expectedSha256) {
+  if (expectedSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(expectedSha256))
     throw new PlatformIOError(
-      "Select a valid bounded core-dump partition from the effective table.",
-      "COREDUMP_PARTITION_INVALID"
+      "Expected ELF hash must be SHA-256.",
+      "ANALYSIS_ELF_INVALID"
     );
-  if (partition.flags & 1)
-    throw new PlatformIOError(
-      "Encrypted core-dump partitions require a supported decryption workflow.",
-      "COREDUMP_ENCRYPTED"
-    );
-  const result = await readEspFlash(
-    {
-      projectDir: input.projectDir,
-      port: input.port,
-      offset: partition.offset,
-      length: partition.size,
-      approvalId: input.approvalId,
-      commandApprovalId: input.commandApprovalId
-    },
-    caller
-  );
-  const source = {
-    port: result.port,
-    offset: result.offset,
-    length: result.length,
-    sha256: result.sha256,
-    logPath: result.logPath,
-    partition: partition.name
-  };
+  const resolved = await fs17.realpath(elfPath);
+  const file = await fs17.open(resolved, "r");
   try {
-    const dump = inspectRawEspCoredump(result.bytes);
-    return {
-      present: true,
-      bytes: result.bytes,
-      identity: dump.identity,
-      source
-    };
-  } catch (error2) {
-    if (error2 instanceof PlatformIOError && error2.code === "COREDUMP_EMPTY")
-      return { present: false, source, bytes: result.bytes };
-    throw error2;
-  }
-}
-
-// src/tools/coredump-device.ts
-var destinationSchema = external_exports.object({
-  port: external_exports.string().min(1).max(512),
-  partitionName: external_exports.string().min(1).max(16).optional(),
-  approvalId: external_exports.string().max(256).optional(),
-  commandApprovalId: external_exports.string().max(256).optional()
-}).strict();
-async function acquireProjectCoredump(tableInput, destinationInput, caller = {}) {
-  const table = PartitionTableSchema.parse(tableInput);
-  const destination = destinationSchema.parse(destinationInput);
-  if (table.readDevice)
-    throw new PlatformIOError(
-      "Core acquisition uses project-table inspection; request live table comparison separately.",
-      "COREDUMP_TABLE_INPUT_INVALID"
-    );
-  const report = await executePartitionTable(table, caller);
-  const guard = createPolicyRevisionGuard(table.projectDir);
-  guard();
-  if (!report.ok || report.error_count || (report.comparison?.length ?? 0) > 0)
-    throw new PlatformIOError(
-      "Resolve partition layout errors before reading a core dump.",
-      "COREDUMP_LAYOUT_INVALID"
-    );
-  const candidates = report.partitions.filter(
-    (partition) => partition.type === "data" && partition.subtype === "coredump" && (!destination.partitionName || partition.name === destination.partitionName)
-  );
-  if (candidates.length !== 1)
-    throw new PlatformIOError(
-      candidates.length ? "Select an explicit core-dump partition name." : "No matching core-dump partition exists in the effective layout.",
-      candidates.length ? "COREDUMP_PARTITION_AMBIGUOUS" : "COREDUMP_PARTITION_MISSING"
-    );
-  const selected = candidates[0];
-  if (selected.unknown_flags)
-    throw new PlatformIOError(
-      "Core-dump partition has unsupported flags.",
-      "COREDUMP_PARTITION_INVALID"
-    );
-  const result = await readEspCoredumpPartition(
-    {
-      projectDir: table.projectDir,
-      ...destination,
-      partition: {
-        name: selected.name,
-        type: 1,
-        subtype: 3,
-        offset: selected.offset,
-        size: selected.size,
-        flags: (selected.flags.includes("encrypted") ? 1 : 0) | (selected.flags.includes("readonly") ? 2 : 0)
-      }
-    },
-    caller
-  );
-  guard();
-  return {
-    ...result,
-    layout: {
-      table: report.artifacts.table,
-      table_offset: report.table_offset,
-      environment: report.environment,
-      table_source: report.table_source,
-      evidence: report.evidence
-    }
-  };
-}
-
-// src/core/analysis/esp-coredump-artifact.ts
-import fs30 from "node:fs/promises";
-
-// src/core/analysis/esp-coredump-firmware.ts
-init_errors();
-function readEspCoredumpFirmwareIdentity(payload, version2) {
-  const bytes = Buffer.from(payload);
-  const invalid4 = (message) => {
-    throw new PlatformIOError(message, "COREDUMP_ELF_INVALID");
-  };
-  if (bytes.length < 52 || bytes.length > 16 * 1024 * 1024 || bytes.subarray(0, 7).toString("hex") !== "7f454c46010101")
-    return invalid4("Expected a bounded ELF32 little-endian core dump.");
-  if (bytes.readUInt16LE(16) !== 4 || bytes.readUInt32LE(20) !== 1 || bytes.readUInt16LE(40) !== 52)
-    return invalid4("Invalid core-dump ELF header.");
-  const machine = bytes.readUInt16LE(18);
-  const chip = version2 >>> 16;
-  const expectedMachine = [0, 2, 9].includes(chip) ? 94 : [5, 12, 13, 16, 18].includes(chip) ? 243 : null;
-  if (machine !== expectedMachine)
-    return invalid4("Core-dump ELF machine does not match its chip.");
-  const table = bytes.readUInt32LE(28), count2 = bytes.readUInt16LE(44);
-  if (!count2 || count2 > 4096 || bytes.readUInt16LE(42) !== 32 || table < 52 || table + count2 * 32 > bytes.length)
-    return invalid4("Invalid core-dump program-header table.");
-  let hash = null;
-  let notes = 0;
-  const ranges = [];
-  for (let index = 0; index < count2; index++) {
-    const header = table + index * 32;
-    const type = bytes.readUInt32LE(header), offset2 = bytes.readUInt32LE(header + 4), size = bytes.readUInt32LE(header + 16);
-    if (offset2 + size > bytes.length)
-      return invalid4("Core-dump segment extends outside the ELF.");
-    if (type !== 4 || !size) continue;
-    if (offset2 < table + count2 * 32 || ranges.some(([start, end]) => offset2 < end && offset2 + size > start))
-      return invalid4("Core-dump note segments overlap headers or each other.");
-    ranges.push([offset2, offset2 + size]);
-    let cursor = offset2;
-    while (cursor < offset2 + size) {
-      if (++notes > 4096 || cursor + 12 > offset2 + size)
-        return invalid4("Truncated or excessive core-dump notes.");
-      const nameSize = bytes.readUInt32LE(cursor), descSize = bytes.readUInt32LE(cursor + 4), noteType = bytes.readUInt32LE(cursor + 8);
-      const nameStart = cursor + 12, descStart = nameStart + Math.ceil(nameSize / 4) * 4;
-      const end = descStart + Math.ceil(descSize / 4) * 4;
-      if (end > offset2 + size)
-        return invalid4("Core-dump note exceeds its segment.");
-      const name2 = bytes.subarray(nameStart, nameStart + nameSize).toString("latin1").split("\0")[0];
-      if (name2 === "ESP_CORE_DUMP_INFO" && noteType === 8266) {
-        if (hash !== null || descSize < 68 || bytes.readUInt32LE(descStart) !== version2)
-          return invalid4(
-            "Duplicate, truncated or inconsistent ESP firmware identity note."
-          );
-        const rawHash = bytes.subarray(descStart + 4, descStart + 68);
-        const zero = rawHash.indexOf(0);
-        const prefix = rawHash.subarray(0, zero < 0 ? 64 : zero).toString("latin1");
-        if (!/^[a-fA-F0-9]{1,64}$/.test(prefix) || zero >= 0 && rawHash.subarray(zero).some((value2) => value2 !== 0))
-          return invalid4("Invalid ESP firmware hash prefix.");
-        hash = prefix.toLowerCase();
-      }
-      cursor = end;
-    }
-  }
-  return { elfSha256Prefix: hash, hashBits: (hash?.length ?? 0) * 4, machine };
-}
-function matchEspCoredumpFirmware(identity, elfSha256) {
-  if (!/^[a-f0-9]{64}$/i.test(elfSha256))
-    throw new PlatformIOError(
-      "Expected ELF identity must be SHA-256.",
-      "COREDUMP_IDENTITY_INVALID"
-    );
-  if (!identity.elfSha256Prefix)
-    return { status: "unavailable", hashBits: 0 };
-  if (!elfSha256.toLowerCase().startsWith(identity.elfSha256Prefix))
-    throw new PlatformIOError(
-      "Selected ELF does not match the firmware identity in the dump.",
-      "COREDUMP_ELF_MISMATCH"
-    );
-  return {
-    status: identity.hashBits === 256 ? "matched" : "prefix_matched",
-    hashBits: identity.hashBits
-  };
-}
-
-// src/core/analysis/esp-coredump-artifact.ts
-init_errors();
-async function readEspCoredumpArtifact(input) {
-  if (input.format !== "raw" && input.format !== "base64")
-    throw new PlatformIOError(
-      "Unsupported core-dump input encoding.",
-      "COREDUMP_FORMAT_UNSUPPORTED"
-    );
-  if (input.expectedInputSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(input.expectedInputSha256))
-    throw new PlatformIOError(
-      "Expected core-dump input hash must be SHA-256.",
-      "COREDUMP_IDENTITY_INVALID"
-    );
-  const root = await fs30.realpath(input.workspaceDir);
-  const limit = input.format === "raw" ? 16 * 1024 * 1024 : Math.ceil(16 * 1024 * 1024 / 3) * 4 + 65536;
-  const artifact = await readPartitionArtifact(root, input.dumpPath, limit);
-  if (input.expectedInputSha256 && artifact.identity.sha256 !== input.expectedInputSha256.toLowerCase())
-    throw new PlatformIOError(
-      "Core-dump file does not match the selected artifact.",
-      "COREDUMP_IDENTITY_MISMATCH"
-    );
-  let bytes = artifact.content;
-  if (input.format === "base64") {
-    let text7;
-    try {
-      text7 = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    } catch {
+    const before = await file.stat();
+    if (!before.isFile() || before.size < 52)
       throw new PlatformIOError(
-        "Encoded core dump is not valid UTF-8.",
-        "COREDUMP_BASE64_INVALID"
+        "Expected a regular ELF file with a complete header.",
+        "ANALYSIS_ELF_INVALID"
       );
+    if (before.size > 256 * 1024 * 1024)
+      throw new PlatformIOError("ELF exceeds 256 MiB.", "ANALYSIS_INPUT_LIMIT");
+    const header = Buffer.alloc(Math.min(64, before.size));
+    const { bytesRead } = await file.read(header, 0, header.length, 0);
+    if (bytesRead !== header.length || header.subarray(0, 4).toString("hex") !== "7f454c46" || ![1, 2].includes(header[4]) || ![1, 2].includes(header[5]) || header[6] !== 1)
+      throw new PlatformIOError(
+        "Invalid or unsupported ELF header.",
+        "ANALYSIS_ELF_INVALID"
+      );
+    const bits = header[4] === 1 ? 32 : 64;
+    const byteOrder = header[5] === 1 ? "little" : "big";
+    if (bits === 64 && bytesRead < 64)
+      throw new PlatformIOError(
+        "Truncated ELF64 header.",
+        "ANALYSIS_ELF_INVALID"
+      );
+    const u16 = (offset2) => byteOrder === "little" ? header.readUInt16LE(offset2) : header.readUInt16BE(offset2);
+    const version2 = byteOrder === "little" ? header.readUInt32LE(20) : header.readUInt32BE(20);
+    const type = u16(16);
+    if (version2 !== 1 || u16(bits === 32 ? 40 : 52) !== (bits === 32 ? 52 : 64) || ![2, 3].includes(type))
+      throw new PlatformIOError(
+        "ELF must be a supported executable or shared image.",
+        "ANALYSIS_ELF_INVALID"
+      );
+    const machine = u16(18);
+    const architectures = {
+      3: "x86",
+      40: "arm",
+      62: "x86_64",
+      94: "xtensa",
+      183: "aarch64",
+      243: "riscv"
+    };
+    const hash = crypto8.createHash("sha256");
+    const chunk = Buffer.alloc(64 * 1024);
+    let position = 0;
+    while (position < before.size) {
+      const read = await file.read(
+        chunk,
+        0,
+        Math.min(chunk.length, before.size - position),
+        position
+      );
+      if (!read.bytesRead)
+        throw new PlatformIOError(
+          "ELF changed while reading.",
+          "ANALYSIS_ELF_CHANGED"
+        );
+      hash.update(chunk.subarray(0, read.bytesRead));
+      position += read.bytesRead;
     }
-    bytes = decodeEspCoredumpBase64(text7);
+    const after = await file.stat();
+    if (after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs)
+      throw new PlatformIOError(
+        "ELF changed while reading.",
+        "ANALYSIS_ELF_CHANGED"
+      );
+    const sha256 = hash.digest("hex");
+    if (expectedSha256 && sha256 !== expectedSha256.toLowerCase())
+      throw new PlatformIOError(
+        "ELF does not match the selected firmware artifact.",
+        "ANALYSIS_ELF_MISMATCH"
+      );
+    return {
+      path: resolved,
+      sha256,
+      size: before.size,
+      bits,
+      byteOrder,
+      machine,
+      architecture: architectures[machine] ?? "unknown",
+      type: type === 2 ? "executable" : "shared"
+    };
+  } finally {
+    await file.close();
   }
-  return {
-    ...inspectEspCoredumpContent(bytes, input.encrypted),
-    source: { ...artifact.identity, format: input.format }
-  };
-}
-function inspectEspCoredumpContent(bytes, encrypted = false) {
-  const inspected = inspectRawEspCoredump(bytes, encrypted);
-  const formatVersion = inspected.identity.version & 65535;
-  const headerSize = formatVersion === 258 || formatVersion === 259 ? 24 : 20;
-  const checksumSize = inspected.identity.checksum === "sha256" ? 32 : 4;
-  const firmwareIdentity = inspected.identity.payload_format === "elf" ? readEspCoredumpFirmwareIdentity(
-    inspected.bytes.subarray(
-      headerSize,
-      inspected.bytes.length - checksumSize
-    ),
-    inspected.identity.version
-  ) : null;
-  return {
-    bytes: inspected.bytes,
-    identity: inspected.identity,
-    firmwareIdentity
-  };
-}
-function inspectCapturedEspCoredump(bytes, expectedInputSha256, encrypted = false) {
-  const dump = inspectEspCoredumpContent(bytes, encrypted);
-  if (expectedInputSha256 !== void 0 && (!/^[a-fA-F0-9]{64}$/.test(expectedInputSha256) || dump.identity.input_sha256 !== expectedInputSha256.toLowerCase()))
-    throw new PlatformIOError(
-      "Captured dump does not match the selected input identity.",
-      "COREDUMP_IDENTITY_MISMATCH"
-    );
-  return {
-    ...dump,
-    source: {
-      path: null,
-      size: bytes.byteLength,
-      sha256: dump.identity.input_sha256,
-      format: "raw"
-    }
-  };
 }
 
-// src/core/analysis/esp-coredump-debugger.ts
-init_errors();
-import fs38 from "node:fs/promises";
-import path42 from "node:path";
+// src/core/analysis/elf-archive.ts
+async function retainElfSnapshot(snapshot, expectedSha256, archiveRoot = path21.join(SERVER_DATA_DIR, "artifacts", "elf"), sourcePath = snapshot) {
+  const identity = await readElfIdentity(snapshot, expectedSha256);
+  archiveRoot = await sourceArchiveRoot(sourcePath, archiveRoot);
+  await fs18.mkdir(archiveRoot, { recursive: true, mode: 448 });
+  const rootState = await fs18.lstat(archiveRoot);
+  if (!rootState.isDirectory() || rootState.isSymbolicLink())
+    throw new PlatformIOError(
+      "ELF archive must be an owned directory.",
+      "ANALYSIS_ARCHIVE_INVALID"
+    );
+  const root = await fs18.realpath(archiveRoot);
+  const destination = path21.join(root, identity.sha256 + ".elf");
+  const temporary = path21.join(root, "." + randomUUID() + ".tmp");
+  try {
+    await fs18.copyFile(identity.path, temporary, constants2.COPYFILE_EXCL);
+    await fs18.chmod(temporary, 384);
+    await readElfIdentity(temporary, identity.sha256);
+    try {
+      await fs18.link(temporary, destination);
+    } catch (error2) {
+      if (error2.code !== "EEXIST") throw error2;
+    }
+    const stored = await fs18.lstat(destination);
+    if (!stored.isFile() || stored.isSymbolicLink())
+      throw new PlatformIOError(
+        "Invalid retained ELF object.",
+        "ANALYSIS_ARCHIVE_INVALID"
+      );
+    await readElfIdentity(destination, identity.sha256);
+    return destination;
+  } finally {
+    await fs18.unlink(temporary).catch((error2) => {
+      if (error2.code !== "ENOENT") throw error2;
+    });
+  }
+}
+async function sourceArchiveRoot(sourcePath, archiveRoot) {
+  const source = await fs18.realpath(sourcePath);
+  const key = createHash3("sha256").update(source).digest("hex");
+  return path21.join(archiveRoot, key);
+}
+async function resolveRetainedElf(sourcePath, sha256, archiveRoot = path21.join(SERVER_DATA_DIR, "artifacts", "elf")) {
+  if (!/^[a-f0-9]{64}$/i.test(sha256))
+    throw new PlatformIOError(
+      "Invalid retained ELF hash.",
+      "ANALYSIS_ELF_INVALID"
+    );
+  const root = await sourceArchiveRoot(sourcePath, archiveRoot);
+  const rootState = await fs18.lstat(root);
+  if (!rootState.isDirectory() || rootState.isSymbolicLink())
+    throw new PlatformIOError(
+      "Invalid retained ELF directory.",
+      "ANALYSIS_ARCHIVE_INVALID"
+    );
+  const canonicalRoot = await fs18.realpath(root);
+  const file = path21.join(canonicalRoot, sha256.toLowerCase() + ".elf");
+  const entry = await fs18.lstat(file);
+  if (!entry.isFile() || entry.isSymbolicLink())
+    throw new PlatformIOError(
+      "Invalid retained ELF object.",
+      "ANALYSIS_ARCHIVE_INVALID"
+    );
+  await readElfIdentity(file, sha256);
+  return file;
+}
+
+// src/tools/analysis.ts
+init_zod();
+init_projects();
+import fs26 from "node:fs/promises";
+
+// src/utils/command-log.ts
+init_paths();
+init_redact();
+init_errors2();
+import fs21 from "node:fs/promises";
+import path24 from "node:path";
+import crypto10 from "node:crypto";
+async function retainCommandLog(purpose, stdout, stderr) {
+  if (Buffer.byteLength(stdout) + Buffer.byteLength(stderr) > 16 * 1024 * 1024)
+    throw new PlatformIOError(
+      "Command log exceeds its bound.",
+      "COMMAND_LOG_LIMIT"
+    );
+  const output = redactSecretsInText(stdout + "\n" + stderr);
+  const directory = path24.join(SERVER_DATA_DIR, "command-logs");
+  await fs21.mkdir(directory, { recursive: true, mode: 448 });
+  const filename = path24.join(
+    directory,
+    `${purpose}-${crypto10.randomUUID()}.log`
+  );
+  await fs21.writeFile(filename, output, { flag: "wx", mode: 384 });
+  return filename;
+}
+async function readCommandOutput(filename) {
+  const handle = await fs21.open(filename, "r");
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size > 16 * 1024 * 1024)
+      throw new PlatformIOError("Command output exceeds the report limit", "COMMAND_LOG_LIMIT");
+    const buffer = Buffer.alloc(stat.size + 1);
+    let offset2 = 0;
+    while (offset2 < buffer.length) {
+      const read = await handle.read(buffer, offset2, buffer.length - offset2, offset2);
+      if (!read.bytesRead) break;
+      offset2 += read.bytesRead;
+    }
+    if (offset2 !== stat.size)
+      throw new PlatformIOError("Command output changed during collection", "COMMAND_LOG_CHANGED");
+    return redactSecretsInText(buffer.subarray(0, offset2).toString("utf8")).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+  } finally {
+    await handle.close();
+  }
+}
+
+// src/core/analysis/collect-build-context.ts
+init_platformio();
+init_validation();
+init_errors2();
 
 // src/core/debug/debug-discovery.ts
-init_errors();
-import fs32 from "node:fs/promises";
-import path36 from "node:path";
+init_errors2();
+import fs23 from "node:fs/promises";
+import path27 from "node:path";
 
 // src/core/analysis/build-metadata.ts
-init_errors();
-import path35 from "node:path";
+init_errors2();
+import path26 from "node:path";
 
 // src/core/analysis/toolchain-resolver.ts
-init_errors();
-import fs31 from "node:fs/promises";
-import path34 from "node:path";
+init_errors2();
+import fs22 from "node:fs/promises";
+import path25 from "node:path";
 function contained2(root, candidate) {
-  const relative = path34.relative(root, candidate);
-  return relative !== "" && relative !== ".." && !relative.startsWith(`..${path34.sep}`) && !path34.isAbsolute(relative);
+  const relative = path25.relative(root, candidate);
+  return relative !== "" && relative !== ".." && !relative.startsWith(`..${path25.sep}`) && !path25.isAbsolute(relative);
 }
 async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
-  if (!path34.isAbsolute(compilerPath) || !trustedRoots.length || trustedRoots.some((root2) => !path34.isAbsolute(root2)))
+  if (!path25.isAbsolute(compilerPath) || !trustedRoots.length || trustedRoots.some((root2) => !path25.isAbsolute(root2)))
     throw new PlatformIOError(
       "Analysis needs explicit absolute compiler and trusted-root paths.",
       "ANALYSIS_TOOLCHAIN_INVALID"
     );
-  const compiler = await fs31.realpath(compilerPath);
+  const compiler = await fs22.realpath(compilerPath);
   const roots = [
     ...new Set(
-      await Promise.all(trustedRoots.map((root2) => fs31.realpath(root2)))
+      await Promise.all(trustedRoots.map((root2) => fs22.realpath(root2)))
     )
   ];
   const matches = roots.filter((root2) => contained2(root2, compiler));
@@ -97074,11 +95943,11 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
       "ANALYSIS_TOOLCHAIN_UNTRUSTED"
     );
   const root = matches.sort((a, b) => b.length - a.length)[0];
-  const name2 = path34.basename(compiler);
+  const name2 = path25.basename(compiler);
   const match = name2.match(
     /^((?:[a-z0-9_]+-)*)(?:gcc|g\+\+|cc|c\+\+)(\.exe)?$/i
   );
-  if (!match || !(await fs31.stat(compiler)).isFile())
+  if (!match || !(await fs22.stat(compiler)).isFile())
     throw new PlatformIOError(
       "Expected a native GNU-compatible compiler path.",
       "ANALYSIS_TOOLCHAIN_INVALID"
@@ -97086,9 +95955,9 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
   const companion = async (tool) => {
     let candidate;
     try {
-      candidate = await fs31.realpath(
-        path34.join(
-          path34.dirname(compiler),
+      candidate = await fs22.realpath(
+        path25.join(
+          path25.dirname(compiler),
           `${match[1]}${tool}${match[2] ?? ""}`
         )
       );
@@ -97098,7 +95967,7 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
         "ANALYSIS_TOOL_UNAVAILABLE"
       );
     }
-    if (!contained2(root, candidate) || !(await fs31.stat(candidate)).isFile())
+    if (!contained2(root, candidate) || !(await fs22.stat(candidate)).isFile())
       throw new PlatformIOError(
         `The ${tool} utility escapes the selected toolchain root.`,
         "ANALYSIS_TOOLCHAIN_UNTRUSTED"
@@ -97148,9 +96017,9 @@ function selectBuildMetadata(output, environment) {
   const fields = entry;
   const absolutePath = (field2) => {
     const value2 = fields[field2];
-    if (typeof value2 !== "string" || !value2 || value2.length > 32768 || /[\x00-\x1f]/.test(value2) || !path35.isAbsolute(value2))
+    if (typeof value2 !== "string" || !value2 || value2.length > 32768 || /[\x00-\x1f]/.test(value2) || !path26.isAbsolute(value2))
       return invalid4(`Metadata ${field2} must be an absolute native path.`);
-    return path35.normalize(value2);
+    return path26.normalize(value2);
   };
   return {
     environment: selected,
@@ -97161,27 +96030,27 @@ function selectBuildMetadata(output, environment) {
 
 // src/core/debug/debug-discovery.ts
 function within2(root, file) {
-  const relative = path36.relative(root, file);
-  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path36.sep) && !path36.isAbsolute(relative);
+  const relative = path27.relative(root, file);
+  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path27.sep) && !path27.isAbsolute(relative);
 }
 async function resolveDebuggerExecutable(candidate, trustedRoots, projectDir) {
   const invalid4 = (message) => {
     throw new PlatformIOError(message, "GDB_EXECUTABLE_UNTRUSTED");
   };
-  if (!path36.isAbsolute(candidate) || !path36.isAbsolute(projectDir) || trustedRoots.length < 1 || trustedRoots.length > 32 || trustedRoots.some((root) => !path36.isAbsolute(root)))
+  if (!path27.isAbsolute(candidate) || !path27.isAbsolute(projectDir) || trustedRoots.length < 1 || trustedRoots.length > 32 || trustedRoots.some((root) => !path27.isAbsolute(root)))
     return invalid4("Debugger requires absolute host installation roots.");
   const [executable, project, roots] = await Promise.all([
-    fs32.realpath(candidate),
-    fs32.realpath(projectDir),
-    Promise.all(trustedRoots.map((root) => fs32.realpath(root)))
+    fs23.realpath(candidate),
+    fs23.realpath(projectDir),
+    Promise.all(trustedRoots.map((root) => fs23.realpath(root)))
   ]);
   for (const root of roots) {
-    if (root === path36.parse(root).root || root === project || within2(project, root) || within2(root, project) || !(await fs32.stat(root)).isDirectory())
+    if (root === path27.parse(root).root || root === project || within2(project, root) || within2(root, project) || !(await fs23.stat(root)).isDirectory())
       return invalid4(
         "Debugger installation roots cannot contain or belong to the project."
       );
   }
-  if (!roots.some((root) => within2(root, executable)) || !/^(?:[a-z0-9_]+-)*gdb(?:\.exe)?$/i.test(path36.basename(executable)) || !(await fs32.stat(executable)).isFile())
+  if (!roots.some((root) => within2(root, executable)) || !/^(?:[a-z0-9_]+-)*gdb(?:\.exe)?$/i.test(path27.basename(executable)) || !(await fs23.stat(executable)).isFile())
     return invalid4(
       "Debugger is not a native GDB within the trusted installation."
     );
@@ -97201,34 +96070,34 @@ async function discoverDebuggerRoots(debuggerPath, systemInfo, projectDir, envir
     } catch {
       return invalid4("PIO_MCP_DEBUGGER_ROOTS must be a JSON array.");
     }
-    if (!Array.isArray(roots) || roots.length < 1 || roots.length > 32 || roots.some((root2) => typeof root2 !== "string" || !path36.isAbsolute(root2)))
+    if (!Array.isArray(roots) || roots.length < 1 || roots.length > 32 || roots.some((root2) => typeof root2 !== "string" || !path27.isAbsolute(root2)))
       return invalid4(
         "Configure between 1 and 32 absolute debugger installation roots."
       );
     await resolveDebuggerExecutable(debuggerPath, roots, projectDir);
     return [
       ...new Set(
-        await Promise.all(roots.map((root2) => fs32.realpath(root2)))
+        await Promise.all(roots.map((root2) => fs23.realpath(root2)))
       )
     ];
   }
   const core = systemInfo?.core_dir?.value;
-  if (typeof core !== "string" || !path36.isAbsolute(core))
+  if (typeof core !== "string" || !path27.isAbsolute(core))
     return invalid4(
       "PlatformIO system info did not identify an absolute Core directory."
     );
-  const packages = await fs32.realpath(path36.join(core, "packages"));
-  const executable = await fs32.realpath(debuggerPath);
+  const packages = await fs23.realpath(path27.join(core, "packages"));
+  const executable = await fs23.realpath(debuggerPath);
   if (!within2(packages, executable))
     return invalid4(
       "Debugger is outside registered host packages; configure an operator root."
     );
-  const folder = path36.relative(packages, executable).split(path36.sep)[0];
-  const root = await fs32.realpath(path36.join(packages, folder));
+  const folder = path27.relative(packages, executable).split(path27.sep)[0];
+  const root = await fs23.realpath(path27.join(packages, folder));
   if (!within2(packages, root))
     return invalid4("Debugger package escapes the Core installation.");
   const readRecord = async (file) => {
-    const handle = await fs32.open(file, "r");
+    const handle = await fs23.open(file, "r");
     try {
       const stat = await handle.stat();
       if (!stat.isFile() || stat.size > 65536)
@@ -97249,8 +96118,8 @@ async function discoverDebuggerRoots(debuggerPath, systemInfo, projectDir, envir
   };
   try {
     const [manifest, record2] = await Promise.all([
-      readRecord(path36.join(root, "package.json")),
-      readRecord(path36.join(root, ".piopm"))
+      readRecord(path27.join(root, "package.json")),
+      readRecord(path27.join(root, ".piopm"))
     ]);
     if (typeof manifest.name !== "string" || !(manifest.name.startsWith("toolchain-") || /^tool-.*gdb(?:-|$)/.test(manifest.name)) || typeof manifest.version !== "string" || !manifest.version || record2.type !== "tool" || record2.name !== manifest.name || record2.version !== manifest.version)
       return invalid4(
@@ -97264,1080 +96133,7 @@ async function discoverDebuggerRoots(debuggerPath, systemInfo, projectDir, envir
   return [root];
 }
 
-// src/core/analysis/analysis-process.ts
-init_errors();
-import { execFile as execFile3 } from "node:child_process";
-import path37 from "node:path";
-async function runAnalysisProcess(executable, args, options = {}) {
-  const timeout = options.timeoutMs ?? 3e4;
-  const maxBuffer = options.maxOutputBytes ?? 16 * 1024 * 1024;
-  if (!path37.isAbsolute(executable) || /\.(?:cmd|bat|ps1|sh)$/i.test(executable))
-    throw new PlatformIOError(
-      "Analysis requires an absolute native executable path.",
-      "ANALYSIS_EXECUTABLE_INVALID"
-    );
-  if (!Number.isInteger(timeout) || timeout < 1 || timeout > 12e4 || !Number.isInteger(maxBuffer) || maxBuffer < 1 || maxBuffer > 32 * 1024 * 1024)
-    throw new PlatformIOError(
-      "Analysis process limits are invalid.",
-      "ANALYSIS_LIMIT_INVALID"
-    );
-  if (args.length > 8192 || args.some((arg) => typeof arg !== "string" || arg.includes("\0")) || args.reduce((total, arg) => total + Buffer.byteLength(arg), 0) > 256 * 1024)
-    throw new PlatformIOError(
-      "Analysis argument list is invalid or too large.",
-      "ANALYSIS_ARGUMENT_INVALID"
-    );
-  if (options.allowedExitCodes?.some(
-    (code) => !Number.isInteger(code) || code < 0 || code > 255
-  ))
-    throw new PlatformIOError(
-      "Invalid allowed exit code.",
-      "ANALYSIS_LIMIT_INVALID"
-    );
-  if (options.signal?.aborted)
-    throw new PlatformIOError("Analysis was cancelled.", "ANALYSIS_CANCELLED");
-  return new Promise((resolve, reject) => {
-    execFile3(
-      executable,
-      [...args],
-      {
-        cwd: options.cwd,
-        timeout,
-        maxBuffer,
-        signal: options.signal,
-        shell: false,
-        windowsHide: true,
-        encoding: "utf8",
-        killSignal: "SIGKILL",
-        env: { ...process.env, ...options.environment, LC_ALL: "C", LANG: "C" }
-      },
-      (error2, stdout, stderr) => {
-        if (!error2) {
-          resolve({ stdout, stderr });
-          return;
-        }
-        const code = error2.code;
-        if (typeof code === "number" && !error2.killed && !options.signal?.aborted && options.allowedExitCodes?.includes(code)) {
-          resolve({ stdout, stderr, exitCode: code });
-          return;
-        }
-        const failure = options.signal?.aborted || error2.name === "AbortError" ? "ANALYSIS_CANCELLED" : code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" ? "ANALYSIS_OUTPUT_LIMIT" : error2.killed ? "ANALYSIS_TIMEOUT" : code === "ENOENT" || code === "EACCES" ? "ANALYSIS_TOOL_UNAVAILABLE" : "ANALYSIS_TOOL_FAILED";
-        reject(
-          new PlatformIOError(
-            `Analysis utility failed (${failure}).`,
-            failure,
-            {
-              executable: path37.basename(executable),
-              exitCode: typeof code === "number" ? code : void 0
-            }
-          )
-        );
-      }
-    );
-  });
-}
-
-// src/core/analysis/esp-coredump-analysis.ts
-init_errors();
-import fs36 from "node:fs/promises";
-import path40 from "node:path";
-
-// src/core/analysis/elf-identity.ts
-init_errors();
-import fs33 from "node:fs/promises";
-import crypto11 from "node:crypto";
-async function readElfIdentity(elfPath, expectedSha256) {
-  if (expectedSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(expectedSha256))
-    throw new PlatformIOError(
-      "Expected ELF hash must be SHA-256.",
-      "ANALYSIS_ELF_INVALID"
-    );
-  const resolved = await fs33.realpath(elfPath);
-  const file = await fs33.open(resolved, "r");
-  try {
-    const before = await file.stat();
-    if (!before.isFile() || before.size < 52)
-      throw new PlatformIOError(
-        "Expected a regular ELF file with a complete header.",
-        "ANALYSIS_ELF_INVALID"
-      );
-    if (before.size > 256 * 1024 * 1024)
-      throw new PlatformIOError("ELF exceeds 256 MiB.", "ANALYSIS_INPUT_LIMIT");
-    const header = Buffer.alloc(Math.min(64, before.size));
-    const { bytesRead } = await file.read(header, 0, header.length, 0);
-    if (bytesRead !== header.length || header.subarray(0, 4).toString("hex") !== "7f454c46" || ![1, 2].includes(header[4]) || ![1, 2].includes(header[5]) || header[6] !== 1)
-      throw new PlatformIOError(
-        "Invalid or unsupported ELF header.",
-        "ANALYSIS_ELF_INVALID"
-      );
-    const bits = header[4] === 1 ? 32 : 64;
-    const byteOrder = header[5] === 1 ? "little" : "big";
-    if (bits === 64 && bytesRead < 64)
-      throw new PlatformIOError(
-        "Truncated ELF64 header.",
-        "ANALYSIS_ELF_INVALID"
-      );
-    const u16 = (offset2) => byteOrder === "little" ? header.readUInt16LE(offset2) : header.readUInt16BE(offset2);
-    const version2 = byteOrder === "little" ? header.readUInt32LE(20) : header.readUInt32BE(20);
-    const type = u16(16);
-    if (version2 !== 1 || u16(bits === 32 ? 40 : 52) !== (bits === 32 ? 52 : 64) || ![2, 3].includes(type))
-      throw new PlatformIOError(
-        "ELF must be a supported executable or shared image.",
-        "ANALYSIS_ELF_INVALID"
-      );
-    const machine = u16(18);
-    const architectures = {
-      3: "x86",
-      40: "arm",
-      62: "x86_64",
-      94: "xtensa",
-      183: "aarch64",
-      243: "riscv"
-    };
-    const hash = crypto11.createHash("sha256");
-    const chunk = Buffer.alloc(64 * 1024);
-    let position = 0;
-    while (position < before.size) {
-      const read = await file.read(
-        chunk,
-        0,
-        Math.min(chunk.length, before.size - position),
-        position
-      );
-      if (!read.bytesRead)
-        throw new PlatformIOError(
-          "ELF changed while reading.",
-          "ANALYSIS_ELF_CHANGED"
-        );
-      hash.update(chunk.subarray(0, read.bytesRead));
-      position += read.bytesRead;
-    }
-    const after = await file.stat();
-    if (after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs)
-      throw new PlatformIOError(
-        "ELF changed while reading.",
-        "ANALYSIS_ELF_CHANGED"
-      );
-    const sha256 = hash.digest("hex");
-    if (expectedSha256 && sha256 !== expectedSha256.toLowerCase())
-      throw new PlatformIOError(
-        "ELF does not match the selected firmware artifact.",
-        "ANALYSIS_ELF_MISMATCH"
-      );
-    return {
-      path: resolved,
-      sha256,
-      size: before.size,
-      bits,
-      byteOrder,
-      machine,
-      architecture: architectures[machine] ?? "unknown",
-      type: type === 2 ? "executable" : "shared"
-    };
-  } finally {
-    await file.close();
-  }
-}
-
-// src/core/analysis/elf-snapshot.ts
-import fs35 from "node:fs/promises";
-
-// src/core/analysis/elf-archive.ts
-init_paths();
-init_errors();
-import fs34 from "node:fs/promises";
-import { constants as constants2 } from "node:fs";
-import path38 from "node:path";
-import { createHash as createHash7, randomUUID as randomUUID3 } from "node:crypto";
-async function retainElfSnapshot(snapshot, expectedSha256, archiveRoot = path38.join(SERVER_DATA_DIR, "artifacts", "elf"), sourcePath = snapshot) {
-  const identity = await readElfIdentity(snapshot, expectedSha256);
-  archiveRoot = await sourceArchiveRoot(sourcePath, archiveRoot);
-  await fs34.mkdir(archiveRoot, { recursive: true, mode: 448 });
-  const rootState = await fs34.lstat(archiveRoot);
-  if (!rootState.isDirectory() || rootState.isSymbolicLink())
-    throw new PlatformIOError(
-      "ELF archive must be an owned directory.",
-      "ANALYSIS_ARCHIVE_INVALID"
-    );
-  const root = await fs34.realpath(archiveRoot);
-  const destination = path38.join(root, identity.sha256 + ".elf");
-  const temporary = path38.join(root, "." + randomUUID3() + ".tmp");
-  try {
-    await fs34.copyFile(identity.path, temporary, constants2.COPYFILE_EXCL);
-    await fs34.chmod(temporary, 384);
-    await readElfIdentity(temporary, identity.sha256);
-    try {
-      await fs34.link(temporary, destination);
-    } catch (error2) {
-      if (error2.code !== "EEXIST") throw error2;
-    }
-    const stored = await fs34.lstat(destination);
-    if (!stored.isFile() || stored.isSymbolicLink())
-      throw new PlatformIOError(
-        "Invalid retained ELF object.",
-        "ANALYSIS_ARCHIVE_INVALID"
-      );
-    await readElfIdentity(destination, identity.sha256);
-    return destination;
-  } finally {
-    await fs34.unlink(temporary).catch((error2) => {
-      if (error2.code !== "ENOENT") throw error2;
-    });
-  }
-}
-async function sourceArchiveRoot(sourcePath, archiveRoot) {
-  const source = await fs34.realpath(sourcePath);
-  const key = createHash7("sha256").update(source).digest("hex");
-  return path38.join(archiveRoot, key);
-}
-async function resolveRetainedElf(sourcePath, sha256, archiveRoot = path38.join(SERVER_DATA_DIR, "artifacts", "elf")) {
-  if (!/^[a-f0-9]{64}$/i.test(sha256))
-    throw new PlatformIOError(
-      "Invalid retained ELF hash.",
-      "ANALYSIS_ELF_INVALID"
-    );
-  const root = await sourceArchiveRoot(sourcePath, archiveRoot);
-  const rootState = await fs34.lstat(root);
-  if (!rootState.isDirectory() || rootState.isSymbolicLink())
-    throw new PlatformIOError(
-      "Invalid retained ELF directory.",
-      "ANALYSIS_ARCHIVE_INVALID"
-    );
-  const canonicalRoot = await fs34.realpath(root);
-  const file = path38.join(canonicalRoot, sha256.toLowerCase() + ".elf");
-  const entry = await fs34.lstat(file);
-  if (!entry.isFile() || entry.isSymbolicLink())
-    throw new PlatformIOError(
-      "Invalid retained ELF object.",
-      "ANALYSIS_ARCHIVE_INVALID"
-    );
-  await readElfIdentity(file, sha256);
-  return file;
-}
-
-// src/core/analysis/elf-snapshot.ts
-import os7 from "node:os";
-import path39 from "node:path";
-async function withElfSnapshot(elfPath, expectedSha256, analyze, sourcePath = elfPath) {
-  const identity = await readElfIdentity(elfPath, expectedSha256);
-  const directory = await fs35.mkdtemp(
-    path39.join(os7.tmpdir(), "pio-elf-analysis-")
-  );
-  try {
-    await fs35.chmod(directory, 448);
-    const snapshot = path39.join(directory, "firmware.elf");
-    await fs35.copyFile(identity.path, snapshot);
-    await readElfIdentity(snapshot, identity.sha256);
-    const archivePath = await retainElfSnapshot(
-      snapshot,
-      identity.sha256,
-      void 0,
-      sourcePath
-    );
-    return await analyze(snapshot, { ...identity, archivePath });
-  } finally {
-    await fs35.rm(directory, { recursive: true, force: true });
-  }
-}
-
-// src/core/analysis/esp-coredump-analysis.ts
-async function withEspCoredumpArtifacts(input, analyze, capturedBytes) {
-  input.validatePolicy();
-  const root = await fs36.realpath(input.workspaceDir);
-  const elf = await fs36.realpath(path40.resolve(root, input.elfPath));
-  const relative = path40.relative(root, elf);
-  if (!relative || relative === ".." || relative.startsWith(".." + path40.sep) || path40.isAbsolute(relative))
-    throw new PlatformIOError(
-      "Selected ELF is outside the authorized workspace.",
-      "COREDUMP_ELF_OUTSIDE_WORKSPACE"
-    );
-  const dump = capturedBytes === void 0 ? await readEspCoredumpArtifact({ ...input, workspaceDir: root }) : inspectCapturedEspCoredump(
-    capturedBytes,
-    input.expectedInputSha256,
-    input.encrypted
-  );
-  const identity = await readElfIdentity(elf, input.expectedElfSha256);
-  const machine = ["esp32", "esp32s2", "esp32s3"].includes(dump.identity.chip) ? 94 : 243;
-  if (identity.machine !== machine || identity.bits !== 32 || identity.byteOrder !== "little")
-    throw new PlatformIOError(
-      "Selected ELF target does not match the core-dump chip.",
-      "COREDUMP_ELF_TARGET_MISMATCH"
-    );
-  const correspondence = dump.firmwareIdentity ? matchEspCoredumpFirmware(dump.firmwareIdentity, identity.sha256) : { status: "unavailable", hashBits: 0 };
-  input.validatePolicy();
-  return withElfSnapshot(
-    elf,
-    identity.sha256,
-    async (snapshot, stableIdentity) => {
-      input.validatePolicy();
-      const result = await analyze({
-        dump,
-        elfPath: snapshot,
-        elfIdentity: stableIdentity,
-        correspondence
-      });
-      input.validatePolicy();
-      return result;
-    }
-  );
-}
-
-// src/core/analysis/esp-coredump-conversion.ts
-init_errors();
-import fs37 from "node:fs/promises";
-import path41 from "node:path";
-import { createHash as createHash8 } from "node:crypto";
-
-// src/core/analysis/esp-coredump-converter.ts
-var ESP_COREDUMP_VERSION = "1.10.0";
-var ESP_COREDUMP_CONVERTER = String.raw`
-import importlib.metadata
-import json
-import logging
-import os
-from pathlib import Path
-import sys
-import tempfile
-
-
-def main():
-    if importlib.metadata.version("esp-coredump") != "1.10.0":
-        raise ValueError("COREDUMP_TOOL_VERSION_MISMATCH")
-    if len(sys.argv) != 5:
-        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
-    raw, elf, staging = [Path(value) for value in sys.argv[1:4]]
-    machine = int(sys.argv[4])
-    if machine not in (94, 243):
-        raise ValueError("COREDUMP_ELF_TARGET_MISMATCH")
-    if not all(value.is_absolute() for value in (raw, elf, staging)):
-        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
-    staging = staging.resolve(strict=True)
-    raw = raw.resolve(strict=True)
-    elf = elf.resolve(strict=True)
-    if raw.parent != staging or not raw.is_file() or not elf.is_file():
-        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
-    if raw.stat().st_size > 16 * 1024 * 1024 or elf.stat().st_size > 256 * 1024 * 1024:
-        raise ValueError("COREDUMP_INPUT_LIMIT")
-    logging.disable(logging.CRITICAL)
-    from esp_coredump.corefile.loader import ESPCoreDumpFileLoader
-
-    class StagedLoader(ESPCoreDumpFileLoader):
-        def _create_temp_file(self):
-            descriptor, name = tempfile.mkstemp(prefix="converted-", suffix=".elf", dir=staging)
-            os.close(descriptor)
-            self.temp_files.append(name)
-            return name
-
-    loader = None
-    keep = None
-    try:
-        loader = StagedLoader(str(raw), is_b64=False)
-        loader.create_corefile(exe_name=str(elf), e_machine=machine)
-        output = Path(loader.core_elf_file).resolve(strict=True)
-        if output.parent != staging or not output.is_file() or output.stat().st_size > 32 * 1024 * 1024:
-            raise ValueError("COREDUMP_CONVERSION_INVALID")
-        with output.open("rb") as stream:
-            if stream.read(7) != bytes.fromhex("7f454c46010101"):
-                raise ValueError("COREDUMP_CONVERSION_INVALID")
-        keep = output
-        print(json.dumps({"core_path": str(output), "converter_version": "1.10.0"}))
-    finally:
-        if loader is not None:
-            for name in loader.temp_files:
-                candidate = Path(name)
-                if candidate.parent == staging and candidate != keep:
-                    candidate.unlink(missing_ok=True)
-
-
-try:
-    main()
-except importlib.metadata.PackageNotFoundError:
-    print(json.dumps({"error": "COREDUMP_TOOL_UNAVAILABLE"}))
-    sys.exit(2)
-except Exception as error:
-    code = str(error)
-    if code not in {
-        "COREDUMP_TOOL_VERSION_MISMATCH", "COREDUMP_CONVERTER_ARGUMENTS",
-        "COREDUMP_ELF_TARGET_MISMATCH", "COREDUMP_INPUT_LIMIT", "COREDUMP_CONVERSION_INVALID"
-    }:
-        code = "COREDUMP_CONVERSION_FAILED"
-    print(json.dumps({"error": code}))
-    sys.exit(2)
-`;
-
-// src/core/analysis/esp-coredump-conversion.ts
-async function withConvertedEspCoredump(artifacts, options, use) {
-  options.validatePolicy();
-  if (createHash8("sha256").update(artifacts.dump.bytes).digest("hex") !== artifacts.dump.identity.sha256)
-    throw new PlatformIOError(
-      "Core-dump bytes changed before conversion.",
-      "COREDUMP_IDENTITY_MISMATCH"
-    );
-  return withPrivateAnalysisDirectory(async (directory) => {
-    const raw = path41.join(directory, "dump.raw");
-    await fs37.writeFile(raw, artifacts.dump.bytes, { flag: "wx", mode: 384 });
-    options.validatePolicy();
-    const result = await runAnalysisProcess(
-      options.pythonExecutable,
-      [
-        "-I",
-        "-c",
-        ESP_COREDUMP_CONVERTER,
-        raw,
-        artifacts.elfPath,
-        directory,
-        String(artifacts.elfIdentity.machine)
-      ],
-      {
-        cwd: directory,
-        signal: options.signal,
-        timeoutMs: 6e4,
-        maxOutputBytes: 65536,
-        allowedExitCodes: [2]
-      }
-    );
-    let response;
-    try {
-      response = JSON.parse(result.stdout);
-    } catch {
-      throw new PlatformIOError(
-        "Converter returned an invalid response.",
-        "COREDUMP_CONVERSION_INVALID"
-      );
-    }
-    if (!response || typeof response !== "object")
-      throw new PlatformIOError(
-        "Converter returned an invalid response.",
-        "COREDUMP_CONVERSION_INVALID"
-      );
-    const report = response;
-    const errors = /* @__PURE__ */ new Set([
-      "COREDUMP_TOOL_UNAVAILABLE",
-      "COREDUMP_TOOL_VERSION_MISMATCH",
-      "COREDUMP_CONVERTER_ARGUMENTS",
-      "COREDUMP_ELF_TARGET_MISMATCH",
-      "COREDUMP_INPUT_LIMIT",
-      "COREDUMP_CONVERSION_INVALID",
-      "COREDUMP_CONVERSION_FAILED"
-    ]);
-    if (typeof report.error === "string" && errors.has(report.error))
-      throw new PlatformIOError(
-        "Optional core-dump conversion did not complete.",
-        report.error
-      );
-    if (result.exitCode || report.converter_version !== ESP_COREDUMP_VERSION || typeof report.core_path !== "string")
-      throw new PlatformIOError(
-        "Converter returned an invalid result.",
-        "COREDUMP_CONVERSION_INVALID"
-      );
-    const core = await readPartitionArtifact(
-      await fs37.realpath(directory),
-      report.core_path,
-      32 * 1024 * 1024
-    );
-    if (core.content.length < 52 || core.content.subarray(0, 7).toString("hex") !== "7f454c46010101" || core.content.readUInt16LE(16) !== 4 || core.content.readUInt16LE(18) !== artifacts.elfIdentity.machine)
-      throw new PlatformIOError(
-        "Converter output is not the expected core ELF.",
-        "COREDUMP_CONVERSION_INVALID"
-      );
-    options.validatePolicy();
-    const value2 = await use(core.identity.path, core.identity.sha256);
-    options.validatePolicy();
-    return value2;
-  });
-}
-
-// src/core/analysis/esp-coredump-report.ts
-init_errors();
-init_redact();
-function parseEspCoredumpReport(output) {
-  if (Buffer.byteLength(output, "utf8") > 4 * 1024 * 1024)
-    throw new PlatformIOError(
-      "Core-dump analyzer output exceeds 4 MiB.",
-      "COREDUMP_OUTPUT_LIMIT"
-    );
-  const cleaned = redactSecretsInText(output);
-  const backtrace = [];
-  const registers = /* @__PURE__ */ Object.create(null);
-  let crashedTask = null, reason = null;
-  let section = null;
-  let truncated = false;
-  for (const line of cleaned.split(/\r?\n/)) {
-    const value2 = line.trim();
-    const task = /^Crashed task(?: handle)?:\s*(.*)$/.exec(value2);
-    if (task) crashedTask = task[1].slice(0, 4096);
-    if (reason === null) {
-      const description = /^(?:Panic reason|Exception cause):\s*(.*)$/.exec(
-        value2
-      );
-      if (description) reason = description[1].slice(0, 4096);
-      else if (value2.startsWith("Program received signal") || value2.startsWith("Program terminated with signal") || value2.includes("panic'ed"))
-        reason = value2.slice(0, 4096);
-    }
-    const heading = /^={2,}\s*(.*?)\s*={2,}$/.exec(value2);
-    if (heading) {
-      const title = heading[1].toUpperCase();
-      section = title === "CURRENT THREAD STACK" ? "stack" : title === "CURRENT THREAD REGISTERS" ? "registers" : null;
-      continue;
-    }
-    if (section === "stack" && /^#[0-9]+\s/.test(value2)) {
-      if (backtrace.length < 256) backtrace.push(value2.slice(0, 4096));
-      else truncated = true;
-    }
-    if (section === "registers") {
-      const register = /^([A-Za-z][A-Za-z0-9_]{0,63})\s+(.+)$/.exec(value2);
-      if (register) {
-        if (Object.keys(registers).length < 128 || Object.hasOwn(registers, register[1]))
-          registers[register[1]] = register[2].slice(0, 4096);
-        else truncated = true;
-      }
-    }
-    if (value2.length > 4096) truncated = true;
-  }
-  return {
-    crashed_task: crashedTask,
-    reason,
-    backtrace,
-    registers,
-    output: cleaned.slice(-12e3),
-    truncated: truncated || cleaned.length > 12e3
-  };
-}
-
-// src/core/analysis/esp-coredump-debugger.ts
-function gdbFile(file) {
-  if (!path42.isAbsolute(file) || /[\x00-\x1f\x7f]/.test(file))
-    throw new PlatformIOError(
-      "Invalid core-analysis artifact path.",
-      "COREDUMP_PATH_INVALID"
-    );
-  return JSON.stringify(file.replace(/\\/g, "/"));
-}
-async function analyzeEspCoredump(input, options, capturedBytes) {
-  input.validatePolicy();
-  options.validatePolicy();
-  const debuggerExecutable = await resolveDebuggerExecutable(
-    options.debuggerExecutable,
-    options.trustedDebuggerRoots,
-    input.workspaceDir
-  );
-  return withEspCoredumpArtifacts(
-    input,
-    async (artifacts) => withConvertedEspCoredump(
-      artifacts,
-      options,
-      async (corePath, coreSha256) => {
-        const script = path42.join(path42.dirname(corePath), "report.gdb");
-        const coreName = path42.basename(corePath);
-        if (!/^[a-zA-Z0-9_.-]+$/.test(coreName))
-          throw new PlatformIOError(
-            "Invalid converted core filename.",
-            "COREDUMP_PATH_INVALID"
-          );
-        const commands = [
-          "set auto-load off",
-          "set may-call-functions off",
-          "set auto-solib-add off",
-          "set pagination off",
-          "set confirm off",
-          "set print elements 128",
-          "file " + gdbFile(artifacts.elfPath),
-          "core-file " + coreName,
-          "echo ==================== CURRENT THREAD REGISTERS ====================\\n",
-          "info registers",
-          "echo ==================== CURRENT THREAD STACK ====================\\n",
-          "backtrace 256",
-          "echo ==================== THREADS INFO ====================\\n",
-          "info threads"
-        ];
-        await fs38.writeFile(script, commands.join("\n") + "\n", {
-          flag: "wx",
-          mode: 384
-        });
-        options.validatePolicy();
-        const output = await runAnalysisProcess(
-          debuggerExecutable,
-          [
-            "-nx",
-            "-nh",
-            "--batch",
-            "--quiet",
-            "-iex",
-            "set auto-load off",
-            "-iex",
-            "set may-call-functions off",
-            "-x",
-            script
-          ],
-          {
-            cwd: path42.dirname(corePath),
-            signal: options.signal,
-            timeoutMs: 6e4,
-            maxOutputBytes: 4 * 1024 * 1024,
-            environment: { DEBUGINFOD_URLS: "" }
-          }
-        );
-        options.validatePolicy();
-        const report = parseEspCoredumpReport(output.stdout);
-        return {
-          ok: true,
-          ...report,
-          dump: {
-            source: artifacts.dump.source,
-            identity: artifacts.dump.identity
-          },
-          elf: artifacts.elfIdentity,
-          firmware_correspondence: artifacts.correspondence,
-          core_sha256: coreSha256,
-          debugger: debuggerExecutable,
-          stderr_present: output.stderr.length > 0
-        };
-      }
-    ),
-    capturedBytes
-  );
-}
-
-// src/core/analysis/esp-coredump-tools.ts
-init_errors();
-import fs39 from "node:fs/promises";
-import path43 from "node:path";
-async function resolveEspCoredumpTools(projectDir, environment = process.env) {
-  const python = environment.PIO_MCP_COREDUMP_PYTHON;
-  const debuggerPath = environment.PIO_MCP_COREDUMP_GDB;
-  if (!python || !debuggerPath)
-    throw new PlatformIOError(
-      "Configure PIO_MCP_COREDUMP_PYTHON and PIO_MCP_COREDUMP_GDB in the server environment; install the optional coredump dependencies explicitly.",
-      "COREDUMP_TOOLS_UNCONFIGURED"
-    );
-  if ([python, debuggerPath].some(
-    (value2) => !path43.isAbsolute(value2) || value2.length > 32768 || /[\x00-\x1f\x7f]/.test(value2)
-  ) || /\.(?:cmd|bat|ps1|sh)$/i.test(python))
-    throw new PlatformIOError(
-      "Core-dump tools require absolute native executable paths.",
-      "COREDUMP_TOOLS_INVALID"
-    );
-  const project = await fs39.realpath(projectDir);
-  const executable = await fs39.realpath(python);
-  const relative = path43.relative(project, executable);
-  if (!relative || relative !== ".." && !relative.startsWith(".." + path43.sep) && !path43.isAbsolute(relative) || !(await fs39.stat(executable)).isFile())
-    throw new PlatformIOError(
-      "The configured Python interpreter must be installed outside the workspace.",
-      "COREDUMP_TOOLS_INVALID"
-    );
-  const roots = await discoverDebuggerRoots(
-    debuggerPath,
-    null,
-    project,
-    environment
-  );
-  const debuggerExecutable = await resolveDebuggerExecutable(
-    debuggerPath,
-    roots,
-    project
-  );
-  return {
-    pythonExecutable: executable,
-    debuggerExecutable,
-    trustedDebuggerRoots: roots
-  };
-}
-
-// src/tools/coredump.ts
-var CoredumpSchema = external_exports.object({
-  projectDir: external_exports.string().min(1).max(32768),
-  dumpPath: external_exports.string().min(1).max(32768).optional(),
-  device: external_exports.object({
-    port: external_exports.string().min(1).max(512),
-    partitionName: external_exports.string().min(1).max(16).optional(),
-    table: PartitionTableSchema,
-    approvalId: external_exports.string().max(256).optional(),
-    commandApprovalId: external_exports.string().max(256).optional()
-  }).strict().optional(),
-  format: external_exports.enum(["raw", "base64"]).default("raw"),
-  analyze: external_exports.boolean().default(true),
-  outPath: external_exports.string().min(1).max(32768).optional(),
-  retainDump: external_exports.boolean().default(false),
-  exportApprovalId: external_exports.string().max(256).optional(),
-  elfPath: external_exports.string().min(1).max(32768).optional(),
-  expectedInputSha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
-  expectedElfSha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
-  encrypted: external_exports.boolean().default(false),
-  approvalId: external_exports.string().max(256).optional(),
-  commandApprovalId: external_exports.string().max(256).optional()
-}).strict().refine(
-  (value2) => !(value2.outPath && value2.retainDump),
-  "Select explicit export or managed retention, not both."
-).refine(
-  (value2) => !(value2.outPath || value2.retainDump) || !!value2.device,
-  "Dump export requires device acquisition."
-).refine(
-  (value2) => Boolean(value2.dumpPath) !== Boolean(value2.device),
-  "Select exactly one dump file or device acquisition."
-).refine(
-  (value2) => !value2.device || value2.format === "raw" && !value2.encrypted && !value2.device.table.readDevice,
-  "Device capture requires raw unencrypted input and an offline project table."
-).refine(
-  (value2) => !value2.analyze || !!value2.elfPath,
-  "An explicit ELF is required for analysis."
-);
-async function executeCoredump(input, caller = {}, onAuthorized) {
-  const request = CoredumpSchema.parse(input);
-  const projectDir = await fs40.realpath(request.projectDir);
-  if (request.device && await fs40.realpath(request.device.table.projectDir) !== projectDir)
-    throw new PlatformIOError(
-      "Partition inspection must use the same authorized project.",
-      "COREDUMP_TABLE_INPUT_INVALID"
-    );
-  const { commandApprovalId, exportApprovalId, ...operation } = request;
-  const stripGrants = (value2) => {
-    if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
-      return value2;
-    return Object.fromEntries(
-      Object.entries(value2).filter(([key]) => key !== "approvalId" && !key.endsWith("ApprovalId")).map(([key, nested]) => [key, stripGrants(nested)])
-    );
-  };
-  const args = {
-    ...operation,
-    device: stripGrants(operation.device),
-    projectDir
-  };
-  const commandArgs = { ...args, approvalId: commandApprovalId };
-  const exportArgs = { ...args, approvalId: exportApprovalId };
-  const context = { ...caller, workspaceDir: projectDir };
-  const stages = [
-    ["coredump_inspect", args]
-  ];
-  if (request.outPath || request.retainDump)
-    stages.push(["coredump_export", exportArgs]);
-  if (request.analyze) stages.push(["coredump_analyze", commandArgs]);
-  for (const [name2, parameters] of stages) {
-    const plan = await planAction(name2, parameters, context);
-    if (plan.status !== "ready")
-      throw new PlatformIOError(
-        plan.reason,
-        plan.status === "requires_approval" ? "APPROVAL_REQUIRED" : "POLICY_DENIED",
-        { policyDecision: plan }
-      );
-  }
-  return dispatchAuthorizedAction(
-    "coredump_inspect",
-    args,
-    context,
-    async () => {
-      const validatePolicy = createPolicyRevisionGuard(projectDir);
-      await onAuthorized?.();
-      validatePolicy();
-      const selection = {
-        ...request,
-        workspaceDir: projectDir,
-        dumpPath: request.dumpPath ?? ""
-      };
-      const execute3 = async () => {
-        validatePolicy();
-        const capture = request.device ? await acquireProjectCoredump(
-          request.device.table,
-          {
-            port: request.device.port,
-            partitionName: request.device.partitionName,
-            approvalId: request.device.approvalId,
-            commandApprovalId: request.device.commandApprovalId
-          },
-          caller
-        ) : null;
-        validatePolicy();
-        if (capture && request.expectedInputSha256 && createHash9("sha256").update(capture.bytes).digest("hex") !== request.expectedInputSha256.toLowerCase())
-          throw new PlatformIOError(
-            "Captured partition does not match the selected input identity.",
-            "COREDUMP_IDENTITY_MISMATCH"
-          );
-        const exported = (request.outPath || request.retainDump) && capture ? await dispatchAuthorizedAction(
-          "coredump_export",
-          exportArgs,
-          context,
-          async () => request.retainDump ? retainEspCoredump(capture.bytes) : exportEspCoredump(
-            projectDir,
-            request.outPath,
-            capture.bytes
-          )
-        ) : null;
-        validatePolicy();
-        if (capture && !capture.present)
-          return {
-            ok: false,
-            analyzed: false,
-            error: "no_coredump",
-            acquisition: capture.source,
-            layout: capture.layout,
-            dump_export: exported
-          };
-        const capturedBytes = capture?.present ? capture.bytes : void 0;
-        let tools = null;
-        let analysisUnavailable = null;
-        if (request.analyze) {
-          try {
-            tools = await resolveEspCoredumpTools(projectDir);
-          } catch (error2) {
-            if (!exported || !(error2 instanceof PlatformIOError) || error2.code !== "COREDUMP_TOOLS_UNCONFIGURED")
-              throw error2;
-            analysisUnavailable = error2.code;
-          }
-        }
-        if (!request.analyze || analysisUnavailable) {
-          const artifact = capturedBytes ? inspectCapturedEspCoredump(
-            capturedBytes,
-            request.expectedInputSha256
-          ) : await readEspCoredumpArtifact(selection);
-          validatePolicy();
-          return {
-            ok: true,
-            analyzed: false,
-            analysis_unavailable: analysisUnavailable,
-            source: artifact.source,
-            identity: artifact.identity,
-            firmwareIdentity: artifact.firmwareIdentity,
-            acquisition: capture?.source ?? null,
-            layout: capture?.layout ?? null,
-            dump_export: exported
-          };
-        }
-        const result = await analyzeEspCoredump(
-          { ...selection, elfPath: request.elfPath, validatePolicy },
-          { ...tools, validatePolicy },
-          capturedBytes
-        );
-        validatePolicy();
-        return {
-          ...result,
-          analyzed: true,
-          acquisition: capture?.source ?? null,
-          layout: capture?.layout ?? null,
-          dump_export: exported
-        };
-      };
-      return request.analyze ? dispatchAuthorizedAction(
-        "coredump_analyze",
-        commandArgs,
-        context,
-        execute3
-      ) : execute3();
-    }
-  );
-}
-
-// src/adapters/coredump-compat.ts
-init_zod();
-init_errors();
-import fs52 from "node:fs/promises";
-
-// src/tools/run-target.ts
-init_zod();
-
-// src/core/devices/port-diagnostics.ts
-init_errors();
-import fs41 from "node:fs/promises";
-import path44 from "node:path";
-import { execFile as execFile4 } from "node:child_process";
-import { promisify as promisify2 } from "node:util";
-var execute2 = promisify2(execFile4);
-function parsePortHolders(output) {
-  const holders2 = [];
-  let current;
-  for (const line of output.split(/\r?\n/)) {
-    if (/^p[1-9][0-9]{0,9}$/.test(line)) {
-      const pid = Number(line.slice(1));
-      if (pid > 2147483647 || pid === process.pid || holders2.some((row) => row.pid === pid)) {
-        current = void 0;
-        continue;
-      }
-      current = { pid, command: null };
-      holders2.push(current);
-      if (holders2.length > 64)
-        throw new PlatformIOError(
-          "Port holder report exceeds its limit.",
-          "PORT_DIAGNOSTICS_LIMIT"
-        );
-    } else if (line.startsWith("c") && current)
-      current.command = line.slice(1).replace(/[\x00-\x1f\x7f]/g, "").slice(0, 256);
-  }
-  return holders2;
-}
-async function holders(port) {
-  for (const command of ["/usr/sbin/lsof", "/usr/bin/lsof"]) {
-    try {
-      await fs41.access(command, fs41.constants.X_OK);
-      const result = await execute2(command, ["-Fpc", "--", port], {
-        timeout: 5e3,
-        maxBuffer: 65536,
-        windowsHide: true
-      });
-      return {
-        held_by_processes: parsePortHolders(result.stdout),
-        process_check: "lsof",
-        process_check_complete: !result.stderr.trim()
-      };
-    } catch (error2) {
-      const failure = error2;
-      if (failure.code === 1 && !failure.stderr?.trim() && !failure.stdout?.trim())
-        return {
-          held_by_processes: [],
-          process_check: "lsof",
-          process_check_complete: true
-        };
-    }
-  }
-  try {
-    await fs41.access("/usr/bin/fuser", fs41.constants.X_OK);
-    const result = await execute2("/usr/bin/fuser", ["--", port], {
-      timeout: 5e3,
-      maxBuffer: 65536,
-      windowsHide: true
-    });
-    if (!/^\s*(?:[1-9][0-9]*\s*)*$/.test(result.stdout))
-      throw new Error("Unexpected fuser output");
-    const rows = result.stdout.trim().split(/\s+/).filter(Boolean).map((pid) => `p${pid}`).join("\n");
-    return {
-      held_by_processes: parsePortHolders(rows),
-      process_check: "fuser",
-      process_check_complete: false
-    };
-  } catch {
-    return {
-      held_by_processes: [],
-      process_check: "unavailable",
-      process_check_complete: false
-    };
-  }
-}
-async function inspectPortDiagnostics(port, listed) {
-  if (!port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
-    throw new PlatformIOError("Invalid port name.", "SERIAL_ENDPOINT_INVALID");
-  if (process.platform === "win32") {
-    if (!/^(?:\\\\\.\\)?COM[1-9][0-9]{0,8}$/i.test(port))
-      throw new PlatformIOError(
-        "Expected a COM port.",
-        "SERIAL_ENDPOINT_INVALID"
-      );
-    return {
-      exists: listed,
-      in_device_list: listed,
-      permission: null,
-      held_by_processes: [],
-      process_check: "unavailable",
-      process_check_complete: false,
-      platform: process.platform
-    };
-  }
-  if (!path44.posix.isAbsolute(port) || !path44.posix.normalize(port).startsWith("/dev/"))
-    throw new PlatformIOError(
-      "Unix serial ports must be within /dev.",
-      "SERIAL_ENDPOINT_INVALID"
-    );
-  let canonical3;
-  try {
-    canonical3 = await fs41.realpath(port);
-  } catch (error2) {
-    const missing = error2.code === "ENOENT";
-    return {
-      exists: missing ? false : null,
-      in_device_list: listed,
-      permission: null,
-      held_by_processes: [],
-      process_check: "skipped",
-      process_check_complete: false,
-      platform: process.platform
-    };
-  }
-  if (!canonical3.startsWith("/dev/"))
-    throw new PlatformIOError(
-      "Serial alias escapes /dev.",
-      "SERIAL_ENDPOINT_INVALID"
-    );
-  const stat = await fs41.stat(canonical3);
-  if (!stat.isCharacterDevice())
-    throw new PlatformIOError(
-      "Port is not a character device.",
-      "SERIAL_ENDPOINT_INVALID"
-    );
-  const access2 = async (mode) => {
-    try {
-      await fs41.access(canonical3, mode);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  return {
-    exists: true,
-    in_device_list: listed,
-    permission: {
-      readable: await access2(fs41.constants.R_OK),
-      writable: await access2(fs41.constants.W_OK)
-    },
-    ...await holders(canonical3),
-    platform: process.platform
-  };
-}
-
-// src/tools/run-target.ts
-init_devices2();
-
-// src/adapters/size-compat.ts
-init_zod();
-
-// src/tools/analysis.ts
-import crypto13 from "node:crypto";
-init_zod();
-init_projects();
-import fs44 from "node:fs/promises";
-
-// src/utils/command-log.ts
-init_paths();
-init_redact();
-init_errors();
-import fs42 from "node:fs/promises";
-import path45 from "node:path";
-import crypto12 from "node:crypto";
-async function retainCommandLog(purpose, stdout, stderr) {
-  if (Buffer.byteLength(stdout) + Buffer.byteLength(stderr) > 16 * 1024 * 1024)
-    throw new PlatformIOError(
-      "Command log exceeds its bound.",
-      "COMMAND_LOG_LIMIT"
-    );
-  const output = redactSecretsInText(stdout + "\n" + stderr);
-  const directory = path45.join(SERVER_DATA_DIR, "command-logs");
-  await fs42.mkdir(directory, { recursive: true, mode: 448 });
-  const filename = path45.join(
-    directory,
-    `${purpose}-${crypto12.randomUUID()}.log`
-  );
-  await fs42.writeFile(filename, output, { flag: "wx", mode: 384 });
-  return filename;
-}
-async function readCommandOutput(filename) {
-  const handle = await fs42.open(filename, "r");
-  try {
-    const stat = await handle.stat();
-    if (!stat.isFile() || stat.size > 16 * 1024 * 1024)
-      throw new PlatformIOError("Command output exceeds the report limit", "COMMAND_LOG_LIMIT");
-    const buffer = Buffer.alloc(stat.size + 1);
-    let offset2 = 0;
-    while (offset2 < buffer.length) {
-      const read = await handle.read(buffer, offset2, buffer.length - offset2, offset2);
-      if (!read.bytesRead) break;
-      offset2 += read.bytesRead;
-    }
-    if (offset2 !== stat.size)
-      throw new PlatformIOError("Command output changed during collection", "COMMAND_LOG_CHANGED");
-    return redactSecretsInText(buffer.subarray(0, offset2).toString("utf8")).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
-  } finally {
-    await handle.close();
-  }
-}
-
 // src/core/analysis/collect-build-context.ts
-init_platformio();
-init_validation();
-init_errors();
 function scope(input) {
   if (!validateEnvironmentName(input.environment) || input.environment.startsWith("-"))
     throw new PlatformIOError(
@@ -98471,18 +96267,18 @@ async function collectProgramMemory(input, elfPath, caller = {}, authorization) 
 }
 
 // src/core/analysis/toolchain-discovery.ts
-init_errors();
-import fs43 from "node:fs/promises";
-import path46 from "node:path";
+init_errors2();
+import fs24 from "node:fs/promises";
+import path28 from "node:path";
 function inside(root, candidate) {
-  const relative = path46.relative(root, candidate);
-  return relative === "" || relative !== ".." && !relative.startsWith(`..${path46.sep}`) && !path46.isAbsolute(relative);
+  const relative = path28.relative(root, candidate);
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${path28.sep}`) && !path28.isAbsolute(relative);
 }
 async function packageDocument(file) {
-  const stat = await fs43.stat(file);
+  const stat = await fs24.stat(file);
   if (!stat.isFile() || stat.size > 65536)
     throw new Error("Invalid package record");
-  const value2 = JSON.parse(await fs43.readFile(file, "utf8"));
+  const value2 = JSON.parse(await fs24.readFile(file, "utf8"));
   if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
     throw new Error("Invalid package record");
   return value2;
@@ -98491,14 +96287,14 @@ async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectD
   const fail = (message) => {
     throw new PlatformIOError(message, "ANALYSIS_TOOLCHAIN_UNTRUSTED");
   };
-  const project = await fs43.realpath(projectDir);
+  const project = await fs24.realpath(projectDir);
   const validateRoot = async (root2) => {
-    if (typeof root2 !== "string" || !path46.isAbsolute(root2))
+    if (typeof root2 !== "string" || !path28.isAbsolute(root2))
       return fail(
         "Toolchain roots must be absolute operator installation paths."
       );
-    const real = await fs43.realpath(root2);
-    if (real === path46.parse(real).root || inside(project, real) || inside(real, project) || !(await fs43.stat(real)).isDirectory())
+    const real = await fs24.realpath(root2);
+    if (real === path28.parse(real).root || inside(project, real) || inside(real, project) || !(await fs24.stat(real)).isDirectory())
       return fail(
         "Toolchain installation roots cannot be filesystem roots or project-owned directories."
       );
@@ -98521,25 +96317,25 @@ async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectD
     return [...new Set(await Promise.all(roots.map(validateRoot)))];
   }
   const value2 = systemInfo?.core_dir?.value;
-  if (typeof value2 !== "string" || !path46.isAbsolute(value2))
+  if (typeof value2 !== "string" || !path28.isAbsolute(value2))
     return fail(
       "PlatformIO system info did not identify an absolute Core directory."
     );
-  const packages = await validateRoot(path46.join(value2, "packages"));
-  const compiler = await fs43.realpath(compilerPath);
+  const packages = await validateRoot(path28.join(value2, "packages"));
+  const compiler = await fs24.realpath(compilerPath);
   if (!inside(packages, compiler))
     return fail(
       "Compiler is outside registered host packages; configure an explicit operator root for custom tools."
     );
-  const relative = path46.relative(packages, compiler);
-  const folder = relative.split(path46.sep)[0];
-  const root = await validateRoot(path46.join(packages, folder));
+  const relative = path28.relative(packages, compiler);
+  const folder = relative.split(path28.sep)[0];
+  const root = await validateRoot(path28.join(packages, folder));
   if (!inside(packages, root) || !inside(root, compiler))
     return fail("Toolchain package escapes the host installation.");
   try {
     const [manifest, record2] = await Promise.all([
-      packageDocument(path46.join(root, "package.json")),
-      packageDocument(path46.join(root, ".piopm"))
+      packageDocument(path28.join(root, "package.json")),
+      packageDocument(path28.join(root, ".piopm"))
     ]);
     if (typeof manifest.name !== "string" || !manifest.name.startsWith("toolchain-") || record2.type !== "tool" || record2.name !== manifest.name || typeof manifest.version !== "string" || record2.version !== manifest.version)
       throw new Error("Unregistered compiler package");
@@ -98552,7 +96348,7 @@ async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectD
 }
 
 // src/core/analysis/platformio-memory.ts
-init_errors();
+init_errors2();
 function parsePlatformioMemory(output) {
   if (Buffer.byteLength(output) > 1024 * 1024)
     throw new PlatformIOError(
@@ -98590,10 +96386,10 @@ function parsePlatformioMemory(output) {
 
 // src/core/analysis/firmware-analysis.ts
 init_bounded_pattern();
-init_errors();
+init_errors2();
 
 // src/core/analysis/crash-parser.ts
-init_errors();
+init_errors2();
 var HEX = "0x[0-9a-fA-F]{6,16}";
 var MAX_ADDRESSES = 4096;
 function linesOf(text7) {
@@ -98736,8 +96532,8 @@ function parseAddr2line(output) {
 }
 
 // src/core/analysis/size-parser.ts
-init_errors();
-import path47 from "node:path";
+init_errors2();
+import path29 from "node:path";
 function lines(output) {
   if (Buffer.byteLength(output) > 16 * 1024 * 1024)
     throw new PlatformIOError(
@@ -98855,7 +96651,7 @@ function groupSymbolsByFile(symbols, projectDir) {
   for (const symbol of symbols) {
     let file = symbol.file ?? "<no debug info>";
     if (symbol.file && projectDir) {
-      const paths = /^[a-z]:[\\/]/i.test(projectDir) ? path47.win32 : path47.posix;
+      const paths = /^[a-z]:[\\/]/i.test(projectDir) ? path29.win32 : path29.posix;
       const relative = paths.relative(projectDir, symbol.file);
       if (relative && relative !== ".." && !relative.startsWith(`..${paths.sep}`) && !paths.isAbsolute(relative))
         file = relative;
@@ -98876,6 +96672,104 @@ function groupSymbolsByFile(symbols, projectDir) {
     totals.set(file, row);
   }
   return [...totals.values()].sort((a, b) => b.size - a.size);
+}
+
+// src/core/analysis/analysis-process.ts
+init_errors2();
+import { execFile as execFile3 } from "node:child_process";
+import path30 from "node:path";
+async function runAnalysisProcess(executable, args, options = {}) {
+  const timeout = options.timeoutMs ?? 3e4;
+  const maxBuffer = options.maxOutputBytes ?? 16 * 1024 * 1024;
+  if (!path30.isAbsolute(executable) || /\.(?:cmd|bat|ps1|sh)$/i.test(executable))
+    throw new PlatformIOError(
+      "Analysis requires an absolute native executable path.",
+      "ANALYSIS_EXECUTABLE_INVALID"
+    );
+  if (!Number.isInteger(timeout) || timeout < 1 || timeout > 12e4 || !Number.isInteger(maxBuffer) || maxBuffer < 1 || maxBuffer > 32 * 1024 * 1024)
+    throw new PlatformIOError(
+      "Analysis process limits are invalid.",
+      "ANALYSIS_LIMIT_INVALID"
+    );
+  if (args.length > 8192 || args.some((arg) => typeof arg !== "string" || arg.includes("\0")) || args.reduce((total, arg) => total + Buffer.byteLength(arg), 0) > 256 * 1024)
+    throw new PlatformIOError(
+      "Analysis argument list is invalid or too large.",
+      "ANALYSIS_ARGUMENT_INVALID"
+    );
+  if (options.allowedExitCodes?.some(
+    (code) => !Number.isInteger(code) || code < 0 || code > 255
+  ))
+    throw new PlatformIOError(
+      "Invalid allowed exit code.",
+      "ANALYSIS_LIMIT_INVALID"
+    );
+  if (options.signal?.aborted)
+    throw new PlatformIOError("Analysis was cancelled.", "ANALYSIS_CANCELLED");
+  return new Promise((resolve, reject) => {
+    execFile3(
+      executable,
+      [...args],
+      {
+        cwd: options.cwd,
+        timeout,
+        maxBuffer,
+        signal: options.signal,
+        shell: false,
+        windowsHide: true,
+        encoding: "utf8",
+        killSignal: "SIGKILL",
+        env: { ...process.env, ...options.environment, LC_ALL: "C", LANG: "C" }
+      },
+      (error2, stdout, stderr) => {
+        if (!error2) {
+          resolve({ stdout, stderr });
+          return;
+        }
+        const code = error2.code;
+        if (typeof code === "number" && !error2.killed && !options.signal?.aborted && options.allowedExitCodes?.includes(code)) {
+          resolve({ stdout, stderr, exitCode: code });
+          return;
+        }
+        const failure = options.signal?.aborted || error2.name === "AbortError" ? "ANALYSIS_CANCELLED" : code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" ? "ANALYSIS_OUTPUT_LIMIT" : error2.killed ? "ANALYSIS_TIMEOUT" : code === "ENOENT" || code === "EACCES" ? "ANALYSIS_TOOL_UNAVAILABLE" : "ANALYSIS_TOOL_FAILED";
+        reject(
+          new PlatformIOError(
+            `Analysis utility failed (${failure}).`,
+            failure,
+            {
+              executable: path30.basename(executable),
+              exitCode: typeof code === "number" ? code : void 0
+            }
+          )
+        );
+      }
+    );
+  });
+}
+
+// src/core/analysis/elf-snapshot.ts
+import fs25 from "node:fs/promises";
+import os4 from "node:os";
+import path31 from "node:path";
+async function withElfSnapshot(elfPath, expectedSha256, analyze, sourcePath = elfPath) {
+  const identity = await readElfIdentity(elfPath, expectedSha256);
+  const directory = await fs25.mkdtemp(
+    path31.join(os4.tmpdir(), "pio-elf-analysis-")
+  );
+  try {
+    await fs25.chmod(directory, 448);
+    const snapshot = path31.join(directory, "firmware.elf");
+    await fs25.copyFile(identity.path, snapshot);
+    await readElfIdentity(snapshot, identity.sha256);
+    const archivePath = await retainElfSnapshot(
+      snapshot,
+      identity.sha256,
+      void 0,
+      sourcePath
+    );
+    return await analyze(snapshot, { ...identity, archivePath });
+  } finally {
+    await fs25.rm(directory, { recursive: true, force: true });
+  }
 }
 
 // src/core/analysis/firmware-analysis.ts
@@ -99076,7 +96970,7 @@ var FirmwareSizeParamsSchema = external_exports.object({
   filter: external_exports.string().max(4096).optional()
 }).strict();
 async function resolveContext(input, caller, authorization) {
-  const projectDir = await fs44.realpath(input.projectDir);
+  const projectDir = await fs26.realpath(input.projectDir);
   const validatePolicy = createPolicyRevisionGuard(projectDir);
   const selected = {
     projectDir,
@@ -99110,10 +97004,10 @@ async function resolveContext(input, caller, authorization) {
   };
 }
 async function authorizedAnalysis(params, purpose, caller, onAuthorized, execute3) {
-  const projectDir = await fs44.realpath(params.projectDir);
+  const projectDir = await fs26.realpath(params.projectDir);
   const { approvalId, ...request } = params;
   const normalized = { ...request, projectDir };
-  const requestDigest = crypto13.createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
+  const requestDigest = crypto11.createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
   return withAuthorizedBuildCollection(
     {
       projectDir,
@@ -99162,24 +97056,104 @@ async function firmwareSizeReport(input, caller = {}, onAuthorized) {
   );
 }
 
+// src/tools/boards.ts
+init_zod();
+init_platformio();
+init_types2();
+init_validation();
+init_errors2();
+var PioBoardsOutputSchema = external_exports.union([
+  external_exports.array(BoardInfoSchema),
+  external_exports.record(external_exports.string(), external_exports.array(BoardInfoSchema))
+]);
+function normalizeBoardsOutput(output) {
+  if (Array.isArray(output)) {
+    return output;
+  }
+  const flattened = [];
+  for (const platformBoards of Object.values(
+    output
+  )) {
+    flattened.push(...platformBoards);
+  }
+  return flattened;
+}
+async function listBoards(filter) {
+  try {
+    const args = [];
+    if (filter && filter.trim().length > 0) {
+      args.push(filter.trim());
+    }
+    const result = await platformioExecutor.executeWithJsonOutput(
+      "boards",
+      args,
+      PioBoardsOutputSchema,
+      { timeout: 3e4 }
+    );
+    const allBoards = normalizeBoardsOutput(result);
+    if (filter && filter.trim().length > 0) {
+      const filterLower = filter.trim().toLowerCase();
+      return allBoards.filter(
+        (board) => board.id.toLowerCase().includes(filterLower) || board.name.toLowerCase().includes(filterLower) || board.platform.toLowerCase().includes(filterLower) || board.mcu.toLowerCase().includes(filterLower) || board.frameworks?.some(
+          (fw) => fw.toLowerCase().includes(filterLower)
+        )
+      );
+    }
+    return allBoards;
+  } catch (error2) {
+    throw new PlatformIOError(
+      `Failed to list boards${filter ? ` with filter '${filter}'` : ""}: ${error2}`,
+      "LIST_BOARDS_FAILED",
+      { filter }
+    );
+  }
+}
+async function getBoardInfo(boardId) {
+  if (!validateBoardId(boardId)) {
+    throw new BoardNotFoundError(boardId);
+  }
+  try {
+    const result = await platformioExecutor.executeWithJsonOutput(
+      "boards",
+      [boardId],
+      PioBoardsOutputSchema,
+      { timeout: 3e4 }
+    );
+    const board = normalizeBoardsOutput(result).find((b) => b.id === boardId);
+    if (board) {
+      return board;
+    }
+    throw new BoardNotFoundError(boardId);
+  } catch (error2) {
+    if (error2 instanceof BoardNotFoundError) {
+      throw error2;
+    }
+    throw new PlatformIOError(
+      `Failed to get board info for '${boardId}': ${error2}`,
+      "GET_BOARD_INFO_FAILED",
+      { boardId }
+    );
+  }
+}
+
 // src/adapters/compatibility-project.ts
-init_errors();
-import fs45 from "node:fs/promises";
-import os8 from "node:os";
-import path48 from "node:path";
+init_errors2();
+import fs27 from "node:fs/promises";
+import os5 from "node:os";
+import path32 from "node:path";
 async function resolveCompatibilityProject(requested, defaults) {
   let selected = requested || defaults.projectDir || defaults.cwd || process.cwd();
   if (selected === "~" || selected.startsWith("~/") || selected.startsWith("~\\"))
-    selected = path48.join(defaults.home ?? os8.homedir(), selected.slice(2));
+    selected = path32.join(defaults.home ?? os5.homedir(), selected.slice(2));
   else if (selected.startsWith("~"))
     throw new PlatformIOError(
       "Named-user home expansion is unsupported; pass an absolute project path.",
       "COMPAT_PROJECT_INVALID"
     );
-  const canonical3 = await fs45.realpath(
-    path48.resolve(defaults.cwd ?? process.cwd(), selected)
+  const canonical3 = await fs27.realpath(
+    path32.resolve(defaults.cwd ?? process.cwd(), selected)
   );
-  if (!(await fs45.stat(canonical3)).isDirectory() || !(await fs45.stat(path48.join(canonical3, "platformio.ini"))).isFile())
+  if (!(await fs27.stat(canonical3)).isDirectory() || !(await fs27.stat(path32.join(canonical3, "platformio.ini"))).isFile())
     throw new PlatformIOError(
       "Expected a PlatformIO project directory.",
       "COMPAT_PROJECT_INVALID"
@@ -99188,7 +97162,7 @@ async function resolveCompatibilityProject(requested, defaults) {
 }
 
 // src/adapters/size-compat.ts
-init_errors();
+init_errors2();
 async function executeSizeCompatibility(input, defaults, caller, onAuthorized) {
   const params = external_exports.object({
     project_dir: external_exports.string().min(1).max(32768).nullable().optional(),
@@ -99290,7 +97264,7 @@ async function executeSizeCompatibility(input, defaults, caller, onAuthorized) {
 
 // src/adapters/decode-compat.ts
 init_zod();
-init_errors();
+init_errors2();
 async function executeDecodeCompatibility(client, input, defaults, caller, onAuthorized) {
   const params = external_exports.object({
     project_dir: external_exports.string().min(1).max(32768).nullable().optional(),
@@ -99409,14 +97383,14 @@ init_zod();
 
 // src/adapters/monitor-start-compat.ts
 init_zod();
-import fs49 from "node:fs/promises";
-import path51 from "node:path";
+import fs34 from "node:fs/promises";
+import path38 from "node:path";
 
 // src/core/serial/verification-capture.ts
 init_zod();
 init_bounded_pattern();
 import { performance as performance2 } from "node:perf_hooks";
-import { setTimeout as delay2 } from "node:timers/promises";
+import { setTimeout as delay } from "node:timers/promises";
 
 // src/core/runtime-assertions.ts
 var RUNTIME_FAILURE_MATCHERS = [
@@ -99572,7 +97546,7 @@ async function captureSessionVerification(manager, owner, sessionId, input = {},
     }
     if (cancelled || closed && !read.moreAvailable || failureAt === void 0 && now >= deadline)
       break;
-    if (!read.lines.length) await delay2(1);
+    if (!read.lines.length) await delay(1);
   } while (true);
   await manager.read(owner, sessionId, {
     cursor,
@@ -99605,7 +97579,7 @@ async function captureSessionVerification(manager, owner, sessionId, input = {},
 // src/core/serial/memory-capture.ts
 init_zod();
 import { performance as performance3 } from "node:perf_hooks";
-import { setTimeout as delay3 } from "node:timers/promises";
+import { setTimeout as delay2 } from "node:timers/promises";
 
 // src/core/memory-report.ts
 init_bounded_pattern();
@@ -99613,7 +97587,7 @@ init_zod();
 
 // src/core/memory-telemetry-parser.ts
 init_zod();
-init_errors();
+init_errors2();
 function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
   const settings = external_exports.object({
     stackUnit: external_exports.enum(["bytes", "words"]).optional(),
@@ -99898,7 +97872,7 @@ function memoryFragmentation(freeBytes, largestBlockBytes) {
 }
 
 // src/core/memory-report.ts
-init_errors();
+init_errors2();
 function analyzeMemoryTelemetry(lines2, options = {}) {
   return analyzeParsedTelemetry(lines2, options);
 }
@@ -100102,7 +98076,7 @@ async function captureSessionMemory(manager, owner, sessionId, input = {}, signa
       limitReached = true;
     if (limitReached || last.readStatus === "cancelled" || last.state !== "open" && !last.moreAvailable || performance3.now() >= deadline && !last.moreAvailable)
       break;
-    if (last.lines.length === 0) await delay3(1);
+    if (last.lines.length === 0) await delay2(1);
   } while (true);
   const options = {
     stackUnit: args.stackUnit,
@@ -100139,7 +98113,7 @@ async function captureSessionMemory(manager, owner, sessionId, input = {}, signa
 }
 
 // src/core/serial/transient-memory-capture.ts
-init_errors();
+init_errors2();
 async function captureTransientMemory(service, owner, request, input = {}, signal) {
   const args = MemoryCaptureSchema.parse(input);
   if (signal?.aborted)
@@ -100185,8 +98159,8 @@ init_zod();
 import { performance as performance6 } from "node:perf_hooks";
 
 // src/core/devices/serial-discovery-binding.ts
-init_errors();
-import { createHash as createHash10 } from "node:crypto";
+init_errors2();
+import { createHash as createHash4 } from "node:crypto";
 function descriptor(record2) {
   for (const field2 of [
     record2.path,
@@ -100214,7 +98188,7 @@ function descriptor(record2) {
   }
   if (!record2.vendorId || !record2.productId || !record2.serialNumber)
     return void 0;
-  return createHash10("sha256").update(
+  return createHash4("sha256").update(
     JSON.stringify([
       record2.vendorId.toLowerCase(),
       record2.productId.toLowerCase(),
@@ -100281,7 +98255,7 @@ function bindSerialDiscovery(endpoint, records, resolve) {
 
 // src/core/serial/serial-redaction.ts
 init_redact();
-init_errors();
+init_errors2();
 var marker = "[REDACTED_SECRET]";
 var begin = /-----BEGIN ((?:RSA |EC |OPENSSH )?PRIVATE KEY|CERTIFICATE)-----/i;
 var SerialStreamRedactor = class {
@@ -100316,7 +98290,7 @@ var SerialStreamRedactor = class {
 };
 
 // src/core/serial/session-buffer.ts
-init_errors();
+init_errors2();
 init_bounded_pattern();
 import { StringDecoder } from "node:string_decoder";
 import { performance as performance4 } from "node:perf_hooks";
@@ -100705,8 +98679,8 @@ var SerialSessionBuffer = class {
 init_serial_endpoint();
 
 // src/core/serial/serial-backend.ts
-init_errors();
-import fs46 from "node:fs";
+init_errors2();
+import fs29 from "node:fs";
 async function loadSerialBackend() {
   if (Number(process.versions.node.split(".")[0]) < 20)
     throw new PlatformIOError(
@@ -100716,12 +98690,12 @@ async function loadSerialBackend() {
   try {
     const bundled = new URL("./native/serialport.cjs", import.meta.url);
     const nativeDirectory = new URL("./native/", import.meta.url);
-    if (fs46.existsSync(nativeDirectory) || new URL(import.meta.url).pathname.endsWith("/platformio-mcp.mjs")) {
-      if (!fs46.existsSync(bundled))
+    if (fs29.existsSync(nativeDirectory) || new URL(import.meta.url).pathname.endsWith("/platformio-mcp.mjs")) {
+      if (!fs29.existsSync(bundled))
         throw new Error("Packaged serial backend is missing");
       const target = process.platform === "darwin" ? "darwin-x64+arm64" : `${process.platform}-${process.arch}`;
       const prebuilds = new URL(`./prebuilds/${target}/`, import.meta.url);
-      if (!fs46.existsSync(prebuilds) || !fs46.readdirSync(prebuilds).some((file) => file.endsWith(".node")))
+      if (!fs29.existsSync(prebuilds) || !fs29.readdirSync(prebuilds).some((file) => file.endsWith(".node")))
         throw new Error("Packaged native target is missing");
       const loaded = await import(bundled.href);
       const backend = loaded.default ?? loaded;
@@ -100739,7 +98713,7 @@ async function loadSerialBackend() {
 }
 
 // src/core/serial/serial-transport.ts
-init_errors();
+init_errors2();
 function validateDirectSerialOptions(options) {
   const timeout = options.operationTimeoutMs ?? 5e3;
   if (typeof options.path !== "string" || !options.path || options.path.length > 512 || /[\x00-\x1f\x7f]/.test(options.path) || !Number.isSafeInteger(options.baudRate) || options.baudRate < 1 || options.baudRate > 4e6 || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 3e4)
@@ -101062,12 +99036,12 @@ async function createDirectSerialTransport(options, onData) {
 }
 
 // src/core/serial/session-policy.ts
-import fs48 from "node:fs";
-import path50 from "node:path";
+import fs33 from "node:fs";
+import path37 from "node:path";
 
 // src/core/devices/native-serial-discovery.ts
 init_zod();
-init_errors();
+init_errors2();
 var field = external_exports.string().max(512).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var recordsSchema = external_exports.array(
   external_exports.object({
@@ -101177,16 +99151,16 @@ var NativeSerialDiscovery = class {
 
 // src/core/serial/session-policy.ts
 import { AsyncLocalStorage as AsyncLocalStorage2 } from "node:async_hooks";
-import { createHash as createHash12 } from "node:crypto";
-init_errors();
+import { createHash as createHash7 } from "node:crypto";
+init_errors2();
 
 // src/core/serial/session-manager.ts
-import fs47 from "node:fs";
-import path49 from "node:path";
-import { createHash as createHash11, randomUUID as randomUUID4 } from "node:crypto";
+import fs32 from "node:fs";
+import path36 from "node:path";
+import { createHash as createHash6, randomUUID as randomUUID3 } from "node:crypto";
 import { performance as performance5 } from "node:perf_hooks";
 init_serial_endpoint();
-init_errors();
+init_errors2();
 init_device_lease();
 var SerialSessionManager = class {
   /** Require authorization at construction; there is no permissive default hook. */
@@ -101210,7 +99184,7 @@ var SerialSessionManager = class {
   makeTransport;
   /** Trusted adapters create one principal per authenticated client/session, never from caller-supplied IDs. */
   createOwner() {
-    const owner = Object.freeze({ id: randomUUID4() });
+    const owner = Object.freeze({ id: randomUUID3() });
     this.owners.add(owner);
     return owner;
   }
@@ -101305,13 +99279,13 @@ var SerialSessionManager = class {
   async start(owner, input) {
     this.requireActiveOwner(owner);
     validateDirectSerialOptions(input);
-    if (!path49.isAbsolute(input.projectDir))
+    if (!path36.isAbsolute(input.projectDir))
       throw new PlatformIOError(
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
-    const projectDir = fs47.realpathSync.native(input.projectDir);
-    if (!fs47.statSync(projectDir).isDirectory())
+    const projectDir = fs32.realpathSync.native(input.projectDir);
+    if (!fs32.statSync(projectDir).isDirectory())
       throw new PlatformIOError(
         "Serial project directory is not a directory.",
         "SERIAL_PROJECT_INVALID"
@@ -101336,7 +99310,7 @@ var SerialSessionManager = class {
     this.prune();
     this.requireCapacity();
     const session = {
-      id: randomUUID4(),
+      id: randomUUID3(),
       owner,
       buffer,
       startedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -101534,7 +99508,7 @@ var SerialSessionManager = class {
         path: request.path,
         baudRate: request.baudRate,
         ...bytes ? {
-          bytesHash: createHash11("sha256").update(bytes).digest("hex"),
+          bytesHash: createHash6("sha256").update(bytes).digest("hex"),
           byteLength: bytes.length
         } : {}
       })
@@ -101750,12 +99724,12 @@ var PolicySerialSessionService = class {
     validateDirectSerialOptions(input);
     new SerialSessionBuffer(input.buffer);
     const args = await validateVerificationCapture(options);
-    if (!path50.isAbsolute(input.projectDir))
+    if (!path37.isAbsolute(input.projectDir))
       throw new PlatformIOError(
         "Serial project must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
-    const projectDir = fs48.realpathSync.native(input.projectDir);
+    const projectDir = fs33.realpathSync.native(input.projectDir);
     const guard = createPolicyRevisionGuard(projectDir);
     const discoveryPlan = await planAction(
       "serial_startup_discovery",
@@ -101916,14 +99890,14 @@ var PolicySerialSessionService = class {
   async startWithDiscovery(owner, input) {
     const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
-    if (!path50.isAbsolute(input.projectDir))
+    if (!path37.isAbsolute(input.projectDir))
       throw new PlatformIOError(
         "Serial project must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
     const request = Object.freeze({
       ...input,
-      projectDir: fs48.realpathSync.native(input.projectDir),
+      projectDir: fs33.realpathSync.native(input.projectDir),
       buffer: input.buffer ? Object.freeze({ ...input.buffer }) : void 0
     });
     const context = this.context.getStore();
@@ -101963,13 +99937,13 @@ var PolicySerialSessionService = class {
   }
   /** Enumerate through one shared native provider under this request's canonical workspace policy. */
   async listSerialDevices(projectDir) {
-    if (!path50.isAbsolute(projectDir))
+    if (!path37.isAbsolute(projectDir))
       throw new PlatformIOError(
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
-    const canonical3 = fs48.realpathSync.native(projectDir);
-    if (!fs48.statSync(canonical3).isDirectory())
+    const canonical3 = fs33.realpathSync.native(projectDir);
+    if (!fs33.statSync(canonical3).isDirectory())
       throw new PlatformIOError(
         "Serial project directory is not a directory.",
         "SERIAL_PROJECT_INVALID"
@@ -101985,13 +99959,13 @@ var PolicySerialSessionService = class {
         "Session listing requires a trusted request context.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED"
       );
-    if (!path50.isAbsolute(projectDir))
+    if (!path37.isAbsolute(projectDir))
       throw new PlatformIOError(
         "Serial project must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
-    const canonical3 = fs48.realpathSync.native(projectDir);
-    if (!fs48.statSync(canonical3).isDirectory())
+    const canonical3 = fs33.realpathSync.native(projectDir);
+    if (!fs33.statSync(canonical3).isDirectory())
       throw new PlatformIOError(
         "Serial project must be a directory.",
         "SERIAL_PROJECT_INVALID"
@@ -102159,7 +100133,7 @@ var PolicySerialSessionService = class {
       ...context.caller,
       workspaceDir: request.projectDir,
       devicePort: request.path,
-      targetBindingDigest: createHash12("sha256").update(
+      targetBindingDigest: createHash7("sha256").update(
         JSON.stringify([
           [request.resource.kind, request.resource.identity],
           ...(request.additionalResources ?? []).map((resource) => [
@@ -102242,7 +100216,7 @@ var PolicySerialSessionService = class {
   }
 };
 function verificationDeviceBinding(request) {
-  return createHash12("sha256").update(
+  return createHash7("sha256").update(
     JSON.stringify([
       request.projectDir,
       request.path,
@@ -102263,7 +100237,7 @@ function verificationDeviceBinding(request) {
 
 // src/adapters/monitor-start-compat.ts
 init_devices2();
-init_errors();
+init_errors2();
 var MonitorStartCompatibilitySchema = external_exports.object({
   port: external_exports.string().min(1).max(512).nullable().optional(),
   baud: external_exports.number().int().min(1).max(4e6).nullable().optional(),
@@ -102278,9 +100252,10 @@ var MonitorStartCompatibilitySchema = external_exports.object({
 async function resolveMonitorRequest(input, defaults, caller, projectDevices) {
   const params = MonitorStartCompatibilitySchema.parse(input);
   const useConfig = !!(params.project_dir || defaults.projectDir || params.env);
-  const projectDir = useConfig ? await resolveCompatibilityProject(params.project_dir, defaults) : await fs49.realpath(path51.resolve(defaults.cwd ?? process.cwd()));
+  const projectDir = useConfig ? await resolveCompatibilityProject(params.project_dir, defaults) : await fs34.realpath(path38.resolve(defaults.cwd ?? process.cwd()));
   let port = params.port || void 0;
   let baud = params.baud || void 0;
+  let environment = params.env || void 0;
   if (useConfig) {
     const report = await executeProjectInspection(
       "project_envs",
@@ -102292,7 +100267,7 @@ async function resolveMonitorRequest(input, defaults, caller, projectDevices) {
         "Could not resolve monitor project configuration.",
         "PROJECT_CONFIG_INVALID"
       );
-    const environment = params.env || report.defaultEnvironments[0];
+    environment ||= report.defaultEnvironments[0] || (report.envs.length === 1 ? report.envs[0].name : void 0);
     const selected = report.envs.find((item) => item.name === environment);
     if (environment && !selected)
       throw new PlatformIOError(
@@ -102338,7 +100313,7 @@ async function resolveMonitorRequest(input, defaults, caller, projectDevices) {
     baudRate: baud ?? 115200,
     buffer: { maxLines: params.max_lines }
   };
-  return { params, request };
+  return { params, request, environment };
 }
 async function startCompatibilityMonitor(client, input, defaults, caller, projectDevices) {
   const { params, request } = await resolveMonitorRequest(
@@ -102384,7 +100359,7 @@ async function captureCompatibilityMonitor(client, input, defaults, caller, proj
 }
 
 // src/adapters/memory-compat.ts
-init_errors();
+init_errors2();
 function projectMemoryCompatibility(report, source) {
   const fragmentation = report.fragmentation;
   return {
@@ -102533,10 +100508,10 @@ async function executeMemoryCompatibility(client, input, defaults, caller, proje
 
 // src/adapters/device-compat.ts
 init_zod();
-import fs50 from "node:fs/promises";
-import path52 from "node:path";
+import fs35 from "node:fs/promises";
+import path39 from "node:path";
 init_devices2();
-init_errors();
+init_errors2();
 var DEVELOPMENT_BOARD_HINT = /CP210|CH34|CH9102|FTDI|FT23|Silicon Labs|SLAB|usbserial|usbmodem|wchusbserial|ttyUSB|ttyACM|ESP|Arduino|STLink|ST-Link|JLink|J-Link|CMSIS|DAPLink|Espressif|USB/i;
 var NOISE_PORT_HINT = /Bluetooth|debug-console|Jabra|AirPods|iPhone/i;
 function projectCompatibilityDevices(devices) {
@@ -102604,7 +100579,7 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
           guard2();
           const normalize = async (value2) => {
             if (process.platform !== "win32")
-              return fs50.realpath(value2).catch(() => value2);
+              return fs35.realpath(value2).catch(() => value2);
             const prefix = String.fromCharCode(92, 92, 46, 92);
             return (value2.startsWith(prefix) ? value2.slice(4) : value2).toUpperCase();
           };
@@ -102777,8 +100752,8 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
   }
   if (name2 === "pio_monitor_list") {
     const params2 = external_exports.object({ approval_id: external_exports.string().max(256).optional() }).strict().parse(input);
-    const projectDir2 = await fs50.realpath(
-      path52.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
+    const projectDir2 = await fs35.realpath(
+      path39.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
     );
     return client.run(
       { caller, approvalId: params2.approval_id },
@@ -102804,8 +100779,8 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
     approval_id: external_exports.string().max(256).optional(),
     monitor_approval_id: external_exports.string().max(256).optional()
   }).strict().parse(input);
-  const projectDir = await fs50.realpath(
-    path52.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
+  const projectDir = await fs35.realpath(
+    path39.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
   );
   const guard = createPolicyRevisionGuard(projectDir);
   return client.run(
@@ -103090,7 +101065,7 @@ function projectCompatibilitySession(session) {
 }
 
 // src/core/target-effects.ts
-init_errors();
+init_errors2();
 function classifyTargetEffects(target) {
   if (typeof target !== "string" || !target.trim() || target.length > 4096 || target.startsWith("-") || /[\x00-\x1f\x7f]/.test(target))
     throw new PlatformIOError("Invalid named target.", "TARGET_INVALID");
@@ -103138,12 +101113,122 @@ function dispatchAuthorizedTarget(target, args, caller, execute3) {
 
 // src/tools/run-target.ts
 init_serial_endpoint();
-init_errors();
+
+// src/utils/lock-manager.ts
+init_errors2();
+init_events();
+import { randomUUID as randomUUID4 } from "node:crypto";
+var QueueEnforcementError = class extends PlatformIOError {
+  constructor(message, context) {
+    super(message, "QUEUE_ENFORCEMENT_FAILED", context);
+    this.name = "QueueEnforcementError";
+  }
+};
+var HardwareLockManager = class _HardwareLockManager {
+  static instance;
+  state = { isLocked: false };
+  constructor() {
+  }
+  /**
+   * Retrieves the global singleton instance
+   */
+  static getInstance() {
+    if (!_HardwareLockManager.instance) {
+      _HardwareLockManager.instance = new _HardwareLockManager();
+    }
+    return _HardwareLockManager.instance;
+  }
+  /**
+   * Explicitly claim the internal lock for a session.
+   * Throws if another session currently holds the lock.
+   */
+  acquireLock(sessionId, reason) {
+    if (this.state.isLocked && this.state.sessionId === sessionId) {
+      console.log(`Lock re-entry attempt by session ${sessionId}`);
+      return;
+    }
+    if (this.state.isLocked && this.state.sessionId !== sessionId) {
+      throw new QueueEnforcementError(
+        `Hardware is currently tied up by ${this.state.sessionId || "another session"}. If this is a stuck session, run the 'mcp_platformio_reset_server_state' tool.`,
+        {
+          activeSession: this.state.sessionId,
+          activeReason: this.state.reason
+        }
+      );
+    }
+    this.state = {
+      isLocked: true,
+      sessionId,
+      reason: reason || "Explicit Pipeline Lock",
+      lockedAt: Date.now()
+    };
+    try {
+      portalEvents.emitLockState(this.state);
+    } catch {
+    }
+  }
+  /**
+   * Release the explicit lock, if it matches the current session ID.
+   */
+  releaseLock(sessionId) {
+    if (this.state.isLocked && this.state.sessionId === sessionId) {
+      this.state = { isLocked: false };
+      try {
+        portalEvents.emitLockState(this.state);
+      } catch {
+      }
+    }
+  }
+  /**
+   * Get the current global lock state.
+   */
+  getLockStatus() {
+    return { ...this.state };
+  }
+  /**
+   * Validate that an operation can proceed.
+   * Operation can proceed if unlocked, or if the requester IS the locker.
+   */
+  requireLock(sessionId) {
+    if (this.state.isLocked && this.state.sessionId !== sessionId) {
+      throw new QueueEnforcementError(
+        `Hardware is currently tied up by session [${this.state.sessionId}]. If this is a stuck session, run the 'mcp_platformio_reset_server_state' tool.`,
+        {
+          activeSession: this.state.sessionId,
+          activeReason: this.state.reason,
+          action: "requireLock"
+        }
+      );
+    }
+  }
+  /**
+   * Implicit wrapping block for safe execution of a single task.
+   * Grabs the lock implicitly, awaits the job, then releases it.
+   */
+  async withImplicitLock(action) {
+    const implicitSessionId = `__IMPLICIT_${randomUUID4()}__`;
+    this.acquireLock(implicitSessionId, "Implicit Tool Execution");
+    let cleanupPending = false;
+    try {
+      const result = await action();
+      return result;
+    } catch (error2) {
+      cleanupPending = error2 instanceof PlatformIOError && error2.context?.cleanupPending === true;
+      throw error2;
+    } finally {
+      if (!cleanupPending) this.releaseLock(implicitSessionId);
+    }
+  }
+};
+var hardwareLockManager = HardwareLockManager.getInstance();
+
+// src/tools/run-target.ts
+init_errors2();
 
 // src/core/analysis/check-report.ts
 init_zod();
-init_errors();
-import path53 from "node:path";
+init_errors2();
+import path40 from "node:path";
 var optionalText = external_exports.string().max(65536).nullable().optional();
 var defectSchema = external_exports.object({
   severity: external_exports.string().max(64).default("low"),
@@ -103207,7 +101292,7 @@ function summarizeCheckOutput(output, projectDir) {
         configurable: true
       });
       let file = defect.file || "";
-      const paths = /^[a-z]:[\\/]/i.test(projectDir) ? path53.win32 : path53.posix;
+      const paths = /^[a-z]:[\\/]/i.test(projectDir) ? path40.win32 : path40.posix;
       if (file && paths.isAbsolute(file)) {
         const relative = paths.relative(projectDir, file);
         if (relative !== ".." && !relative.startsWith(".." + paths.sep) && !paths.isAbsolute(relative))
@@ -103243,8 +101328,8 @@ function summarizeCheckOutput(output, projectDir) {
 init_platformio();
 init_spooler();
 init_validation();
-init_errors();
-init_errors();
+init_errors2();
+init_errors2();
 init_process_manager();
 init_tail();
 init_paths();
@@ -103252,8 +101337,8 @@ init_mcp_context();
 init_build_cache();
 init_logger();
 init_redact();
-import fs51 from "node:fs";
-import path54 from "node:path";
+import fs40 from "node:fs";
+import path44 from "node:path";
 import crypto14 from "node:crypto";
 
 // src/core/diagnostics/matchers.ts
@@ -103893,7 +101978,7 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
       status = cmd.status;
       logPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f) => Boolean(f));
       const latestLog = logPath || logPaths[logPaths.length - 1];
-      if (latestLog && fs51.existsSync(latestLog)) {
+      if (latestLog && fs40.existsSync(latestLog)) {
         try {
           const lines2 = await tailFileBounded(latestLog, 512 * 1024);
           output = lines2.slice(status === "running" ? -30 : -150).join("\n");
@@ -103908,10 +101993,10 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
       output = `Task ID not found: ${resolvedTaskId}`;
     }
   } else {
-    const logFile = path54.join(baseDir, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
+    const logFile = path44.join(baseDir, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
     const active = isBuildActive(projectDir);
     status = active ? "running" : "completed";
-    if (fs51.existsSync(logFile)) {
+    if (fs40.existsSync(logFile)) {
       logPaths = [logFile];
       try {
         const lines2 = await tailFileBounded(logFile, 512 * 1024);
@@ -103963,7 +102048,7 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
 
 // src/adapters/clean-compat.ts
 init_zod();
-init_errors();
+init_errors2();
 function executeCleanCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
   return executeRunCompatibility(
     "clean",
@@ -104549,7 +102634,2211 @@ async function diagnoseTargetPortFailure(port, code, projectDir, caller) {
   }
 }
 
+// src/adapters/upload-compat.ts
+var UploadCompatibilitySchema = RunTargetSchema.omit({ target: true });
+function executeUploadCompatibility(input, client, defaults = {}, caller = {}, onAuthorized) {
+  const params = UploadCompatibilitySchema.parse(input);
+  return executeNamedTarget(
+    { ...params, target: "upload" },
+    client,
+    defaults,
+    caller,
+    onAuthorized
+  );
+}
+
+// src/tools/flash-verification.ts
+init_serial_endpoint();
+init_errors2();
+var FlashVerificationSchema = external_exports.object({
+  projectDir: external_exports.string().min(1).max(32768),
+  environment: external_exports.string().regex(/^[a-zA-Z0-9_-]{1,50}$/),
+  uploadPort: external_exports.string().min(1).max(512),
+  monitorPort: external_exports.string().min(1).max(512),
+  baudRate: external_exports.number().int().min(1).max(4e6),
+  stopOpenSessions: external_exports.boolean().default(false),
+  verification: VerificationCaptureSchema.default({}),
+  workflowApprovalId: external_exports.string().max(256).optional(),
+  uploadApprovalId: external_exports.string().max(256).optional(),
+  openApprovalId: external_exports.string().max(256).optional(),
+  readApprovalId: external_exports.string().max(256).optional(),
+  preflightDiscoveryApprovalId: external_exports.string().max(256).optional(),
+  discoveryApprovalId: external_exports.string().max(256).optional()
+}).strict();
+async function executeFlashVerification(input, client, caller = {}, onAuthorized) {
+  const args = FlashVerificationSchema.parse(input);
+  await validateVerificationCapture(args.verification);
+  const guard = createPolicyRevisionGuard(args.projectDir);
+  const workflowArgs = {
+    projectDir: args.projectDir,
+    environment: args.environment,
+    uploadPort: args.uploadPort,
+    monitorPort: args.monitorPort,
+    baudRate: args.baudRate,
+    stopOpenSessions: args.stopOpenSessions,
+    verification: args.verification,
+    approvalId: args.workflowApprovalId
+  };
+  const workflowContext = { ...caller, workspaceDir: args.projectDir };
+  const permission = await planAction(
+    "flash_verification",
+    workflowArgs,
+    workflowContext
+  );
+  if (permission.status !== "ready")
+    throw new PlatformIOError(
+      permission.reason,
+      permission.status === "deny" ? "POLICY_DENIED" : "APPROVAL_REQUIRED",
+      { policyDecision: permission }
+    );
+  const monitorEndpoint = resolveSerialEndpoint(args.monitorPort);
+  const request = {
+    projectDir: args.projectDir,
+    path: args.monitorPort,
+    baudRate: args.baudRate
+  };
+  const context = {
+    caller,
+    approvalId: args.openApprovalId,
+    readApprovalId: args.readApprovalId
+  };
+  const selection = await client.run(
+    { ...context, discoveryApprovalId: args.preflightDiscoveryApprovalId },
+    (service, owner) => service.preflightVerificationCapture(
+      owner,
+      request,
+      args.verification,
+      args.discoveryApprovalId
+    )
+  );
+  guard();
+  return dispatchAuthorizedAction(
+    "flash_verification",
+    workflowArgs,
+    workflowContext,
+    async () => {
+      guard();
+      const started = performance.now();
+      const upload = await executeUploadCompatibility(
+        {
+          project_dir: args.projectDir,
+          env: args.environment,
+          upload_port: args.uploadPort,
+          stop_open_sessions: args.stopOpenSessions,
+          approval_id: args.uploadApprovalId
+        },
+        client,
+        {},
+        caller,
+        async () => {
+          await onAuthorized?.();
+          guard();
+          await client.run({ caller }, async (service, owner) => {
+            const held = service.sessions.list(owner).filter(
+              (session) => (!["stopped", "disconnected", "error"].includes(
+                session.state
+              ) || session.cleanupPending) && resolveSerialEndpoint(session.path).resource.identity === monitorEndpoint.resource.identity
+            );
+            if (held.length && !args.stopOpenSessions)
+              throw new PlatformIOError(
+                "An owned monitor holds the verification port.",
+                "TARGET_PORT_BUSY"
+              );
+            for (const session of held) {
+              guard();
+              const stopped = await service.sessions.stop(
+                owner,
+                session.sessionId
+              );
+              if (stopped.cleanupPending)
+                throw new PlatformIOError(
+                  "Verification monitor closure is unconfirmed.",
+                  "DEVICE_CLEANUP_PENDING",
+                  { cleanupPending: true }
+                );
+            }
+          });
+          guard();
+        }
+      );
+      guard();
+      const uploadSeconds = (performance.now() - started) / 1e3;
+      if (!upload.ok)
+        return {
+          ok: false,
+          verdict: "upload_failed",
+          upload,
+          upload_s: uploadSeconds,
+          port: selection.port,
+          baud: args.baudRate,
+          summary: "Upload failed; boot verification did not start."
+        };
+      const report = await client.run(
+        { ...context, discoveryApprovalId: args.discoveryApprovalId },
+        (service, owner) => service.captureVerificationOnce(
+          owner,
+          request,
+          args.verification,
+          void 0,
+          selection.deviceBinding
+        )
+      );
+      guard();
+      return {
+        ...report,
+        upload,
+        upload_s: uploadSeconds,
+        firmware_identity: "identity_unverified",
+        summary: report.verdict === "pass" ? "Upload succeeded and fresh boot output passed verification." : `Upload succeeded; boot verification returned ${report.verdict}.`
+      };
+    }
+  );
+}
+
+// src/adapters/flash-verification-compat.ts
+init_errors2();
+var FlashVerificationCompatibilitySchema = external_exports.object({
+  project_dir: external_exports.string().min(1).max(32768).nullish(),
+  env: external_exports.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).nullish(),
+  expect: VerificationCaptureSchema.shape.expect,
+  fail_on: external_exports.string().max(4096).default(
+    "Guru Meditation|panic'ed|abort\\(\\) was called|assert failed|HardFault|Hard Fault|BusFault|UsageFault|MemManage|stack overflow|Task watchdog|Brownout|CORRUPT HEAP|Backtrace:|rst:0x[0-9a-f]+ \\((?:SW_CPU_RESET|TG\\dWDT_SYS_RESET|RTCWDT_RTC_RESET|PANIC)"
+  ),
+  timeout_s: external_exports.number().finite().min(0).max(300).default(30),
+  upload_port: external_exports.string().min(1).max(512).nullish(),
+  monitor_port: external_exports.string().min(1).max(512).nullish(),
+  baud: external_exports.number().int().min(1).max(4e6).nullish(),
+  stop_open_sessions: external_exports.boolean().default(false),
+  max_lines: external_exports.number().int().min(1).max(1e4).default(500),
+  settle_s: external_exports.number().finite().min(0).max(20).default(1.5),
+  stability_window_s: external_exports.number().finite().min(0).max(60).default(10),
+  workflow_approval_id: external_exports.string().max(256).optional(),
+  approval_id: external_exports.string().max(256).optional(),
+  config_approval_id: external_exports.string().max(256).optional(),
+  selection_approval_id: external_exports.string().max(256).optional(),
+  monitor_approval_id: external_exports.string().max(256).optional(),
+  read_approval_id: external_exports.string().max(256).optional(),
+  preflight_discovery_approval_id: external_exports.string().max(256).optional(),
+  discovery_approval_id: external_exports.string().max(256).optional(),
+  decode_approval_id: external_exports.string().max(256).optional(),
+  decode_config_approval_id: external_exports.string().max(256).optional()
+}).strict();
+async function executeFlashVerificationCompatibility(input, client, defaults = {}, caller = {}, onAuthorized) {
+  const parsed = FlashVerificationCompatibilitySchema.safeParse(input);
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Invalid flash verification arguments.",
+      "COMPAT_ARGUMENT_INVALID"
+    );
+  const args = parsed.data;
+  const projectDir = await resolveCompatibilityProject(
+    args.project_dir,
+    defaults
+  );
+  const guard = createPolicyRevisionGuard(projectDir);
+  const resolved = await resolveMonitorRequest(
+    {
+      project_dir: projectDir,
+      env: args.env,
+      port: args.monitor_port || args.upload_port,
+      baud: args.baud,
+      config_approval_id: args.config_approval_id,
+      selection_approval_id: args.selection_approval_id
+    },
+    defaults,
+    caller,
+    projectCompatibilityDevices
+  );
+  if (!resolved.environment)
+    throw new PlatformIOError(
+      "Select one flash verification environment explicitly.",
+      "PROJECT_ENVIRONMENT_INVALID"
+    );
+  guard();
+  const report = await executeFlashVerification(
+    {
+      projectDir,
+      environment: resolved.environment,
+      uploadPort: args.upload_port || resolved.request.path,
+      monitorPort: resolved.request.path,
+      baudRate: resolved.request.baudRate,
+      stopOpenSessions: args.stop_open_sessions,
+      verification: {
+        expect: args.expect,
+        failOn: args.fail_on,
+        timeoutSeconds: args.timeout_s,
+        settleSeconds: args.settle_s * 1.5,
+        stabilityWindowSeconds: args.stability_window_s,
+        maxLines: args.max_lines
+      },
+      workflowApprovalId: args.workflow_approval_id,
+      uploadApprovalId: args.approval_id,
+      openApprovalId: args.monitor_approval_id,
+      readApprovalId: args.read_approval_id,
+      preflightDiscoveryApprovalId: args.preflight_discovery_approval_id,
+      discoveryApprovalId: args.discovery_approval_id
+    },
+    client,
+    caller,
+    onAuthorized
+  );
+  guard();
+  if (report.verdict !== "fail" || !("lines" in report)) return report;
+  let decoded;
+  try {
+    decoded = await executeDecodeCompatibility(
+      client,
+      {
+        project_dir: projectDir,
+        env: resolved.environment,
+        text: report.lines.join("\n"),
+        approval_id: args.decode_approval_id,
+        config_approval_id: args.decode_config_approval_id
+      },
+      defaults,
+      caller
+    );
+  } catch (error2) {
+    decoded = {
+      ok: false,
+      error: error2 instanceof PlatformIOError ? error2.code : "CRASH_DECODE_UNAVAILABLE",
+      summary: "Boot failure was captured; crash decoding is unavailable or requires separate permission."
+    };
+  }
+  guard();
+  return { ...report, decoded };
+}
+
+// src/core/analysis/esp-coredump-retention.ts
+var import_proper_lockfile6 = __toESM(require_proper_lockfile(), 1);
+init_paths();
+init_errors2();
+import fs42 from "node:fs/promises";
+import path46 from "node:path";
+import { createHash as createHash8 } from "node:crypto";
+
+// src/core/analysis/private-analysis-directory.ts
+init_errors2();
+import fs41 from "node:fs/promises";
+import os8 from "node:os";
+import path45 from "node:path";
+import { execFile as execFile4 } from "node:child_process";
+import { promisify as promisify2 } from "node:util";
+var execute2 = promisify2(execFile4);
+var WINDOWS_PRIVATE_ACL = String.raw`
+$ErrorActionPreference = 'Stop'
+$target = $env:PIO_PRIVATE_ANALYSIS_DIRECTORY
+$sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+$acl = New-Object System.Security.AccessControl.DirectorySecurity
+$acl.SetOwner($sid)
+$acl.SetAccessRuleProtection($true, $false)
+$rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')
+$acl.AddAccessRule($rule)
+[System.IO.Directory]::SetAccessControl($target, $acl)
+$actual = [System.IO.Directory]::GetAccessControl($target)
+if (-not $actual.AreAccessRulesProtected) { throw 'Unprotected analysis directory' }
+$rules = $actual.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])
+if ($rules.Count -ne 1 -or $rules[0].IdentityReference.Value -ne $sid.Value -or $rules[0].AccessControlType -ne 'Allow' -or $rules[0].FileSystemRights -ne 'FullControl') { throw 'Unexpected analysis ACL' }
+`;
+async function createPrivateAnalysisDirectory(parent = os8.tmpdir()) {
+  const directory = await fs41.mkdtemp(
+    path45.join(parent, "pio-private-analysis-")
+  );
+  try {
+    try {
+      if (process.platform === "win32") {
+        const systemRoot = process.env.SystemRoot;
+        if (!systemRoot || !path45.isAbsolute(systemRoot))
+          throw new Error("Windows system root unavailable");
+        await execute2(
+          path45.join(
+            systemRoot,
+            "System32",
+            "WindowsPowerShell",
+            "v1.0",
+            "powershell.exe"
+          ),
+          [
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-EncodedCommand",
+            Buffer.from(WINDOWS_PRIVATE_ACL, "utf16le").toString("base64")
+          ],
+          {
+            windowsHide: true,
+            timeout: 15e3,
+            maxBuffer: 16384,
+            env: { ...process.env, PIO_PRIVATE_ANALYSIS_DIRECTORY: directory }
+          }
+        );
+      } else {
+        await fs41.chmod(directory, 448);
+        const permissions = await fs41.stat(directory);
+        if ((permissions.mode & 511) !== 448 || process.getuid && permissions.uid !== process.getuid())
+          throw new Error("Unexpected analysis directory owner or permissions");
+      }
+    } catch {
+      throw new PlatformIOError(
+        "Cannot establish private analysis storage.",
+        "ANALYSIS_PRIVATE_STORAGE_UNAVAILABLE"
+      );
+    }
+    return directory;
+  } catch (error2) {
+    await fs41.rm(directory, { recursive: true, force: true });
+    throw error2;
+  }
+}
+async function withPrivateAnalysisDirectory(use, parent) {
+  const directory = await createPrivateAnalysisDirectory(parent);
+  try {
+    return await use(directory);
+  } finally {
+    await fs41.rm(directory, { recursive: true, force: true });
+  }
+}
+
+// src/core/analysis/esp-coredump-retention.ts
+var LIFETIME_MS = 24 * 60 * 60 * 1e3;
+var ROOT = path46.join(SERVER_DATA_DIR, "artifacts", "coredumps");
+var ENTRY = /^pio-private-analysis-[A-Za-z0-9]{6}$/;
+async function withStore(root, use) {
+  await fs42.mkdir(root, { recursive: true, mode: 448 });
+  const state = await fs42.lstat(root);
+  if (!state.isDirectory() || state.isSymbolicLink())
+    throw new PlatformIOError(
+      "Invalid core-dump retention store.",
+      "COREDUMP_STORE_INVALID"
+    );
+  const canonical3 = await fs42.realpath(root);
+  let release;
+  try {
+    release = await import_proper_lockfile6.default.lock(canonical3, { stale: 12e4, retries: 0 });
+  } catch {
+    throw new PlatformIOError(
+      "Core-dump retention store is busy.",
+      "COREDUMP_STORE_BUSY"
+    );
+  }
+  try {
+    return await use(canonical3);
+  } finally {
+    await release();
+  }
+}
+async function prune(root, now) {
+  const entries = (await fs42.readdir(root)).filter((name2) => ENTRY.test(name2));
+  let retained = 0;
+  for (const name2 of entries) {
+    const directory = path46.join(root, name2);
+    const stat = await fs42.lstat(directory);
+    if (!stat.isDirectory() || stat.isSymbolicLink())
+      throw new PlatformIOError(
+        "Invalid retained core-dump entry.",
+        "COREDUMP_STORE_INVALID"
+      );
+    let expires;
+    try {
+      const metadata = await readPartitionArtifact(
+        directory,
+        "record.json",
+        4096
+      );
+      const record2 = JSON.parse(metadata.content.toString("utf8"));
+      if (!Number.isSafeInteger(record2.createdAt) || !Number.isSafeInteger(record2.expiresAt) || record2.expiresAt - record2.createdAt !== LIFETIME_MS)
+        throw new Error("Invalid retention interval");
+      expires = record2.expiresAt;
+    } catch (error2) {
+      if (error2.code !== "ENOENT")
+        throw new PlatformIOError(
+          "Invalid core-dump retention record.",
+          "COREDUMP_STORE_INVALID"
+        );
+      expires = stat.birthtimeMs + LIFETIME_MS;
+    }
+    if (expires <= now)
+      await fs42.rm(directory, { recursive: true, force: true });
+    else retained++;
+  }
+  return retained;
+}
+async function pruneRetainedEspCoredumps(root = ROOT, now = Date.now()) {
+  return withStore(root, (canonical3) => prune(canonical3, now));
+}
+async function retainEspCoredump(input, root = ROOT, now = Date.now()) {
+  if (input.byteLength > 16 * 1024 * 1024 || !Number.isSafeInteger(now) || now < 0)
+    throw new PlatformIOError(
+      "Invalid core-dump retention input.",
+      "COREDUMP_INPUT_LIMIT"
+    );
+  return withStore(root, async (canonical3) => {
+    if (await prune(canonical3, now) >= 32)
+      throw new PlatformIOError(
+        "Core-dump retention has reached its 32-object limit.",
+        "COREDUMP_STORE_FULL"
+      );
+    const directory = await createPrivateAnalysisDirectory(canonical3);
+    try {
+      const bytes = Buffer.from(input);
+      const sha256 = createHash8("sha256").update(bytes).digest("hex");
+      const destination = path46.join(directory, "dump.bin");
+      const expiresAt = now + LIFETIME_MS;
+      await fs42.writeFile(destination, bytes, { flag: "wx", mode: 384 });
+      await fs42.writeFile(
+        path46.join(directory, "record.json"),
+        JSON.stringify({
+          createdAt: now,
+          expiresAt,
+          size: bytes.length,
+          sha256
+        }),
+        { flag: "wx", mode: 384 }
+      );
+      const timer = setTimeout(() => {
+        void pruneRetainedEspCoredumps(canonical3).catch(() => {
+        });
+      }, LIFETIME_MS);
+      timer.unref();
+      return {
+        path: destination,
+        size: bytes.length,
+        sha256,
+        expiresAt,
+        retention: "managed_24h"
+      };
+    } catch (error2) {
+      await fs42.rm(directory, { recursive: true, force: true });
+      throw error2;
+    }
+  });
+}
+async function startCoredumpRetentionCleanup(reportFailure, root = ROOT) {
+  let pending = null;
+  const sweep = () => {
+    if (pending) return pending;
+    pending = (async () => {
+      try {
+        try {
+          await fs42.access(root);
+        } catch (error2) {
+          if (error2.code === "ENOENT") return;
+          throw error2;
+        }
+        await pruneRetainedEspCoredumps(root);
+      } catch (error2) {
+        reportFailure(
+          error2 instanceof PlatformIOError ? error2.code ?? "COREDUMP_CLEANUP_FAILED" : "COREDUMP_CLEANUP_FAILED"
+        );
+      }
+    })().finally(() => {
+      pending = null;
+    });
+    return pending;
+  };
+  await sweep();
+  const timer = setInterval(() => {
+    void sweep();
+  }, 6e4);
+  timer.unref();
+  return async () => {
+    clearInterval(timer);
+    await pending;
+  };
+}
+
+// src/tools/coredump.ts
+import fs51 from "node:fs/promises";
+import { createHash as createHash12 } from "node:crypto";
+
+// src/core/analysis/esp-coredump-export.ts
+init_errors2();
+import fs43 from "node:fs/promises";
+import path47 from "node:path";
+import { createHash as createHash9 } from "node:crypto";
+async function exportEspCoredump(workspaceDir, destination, input) {
+  if (!destination || /[\x00-\x1f\x7f]/.test(destination) || input.byteLength > 16 * 1024 * 1024)
+    throw new PlatformIOError(
+      "Invalid dump export path or size.",
+      "COREDUMP_EXPORT_INVALID"
+    );
+  const root = await fs43.realpath(workspaceDir);
+  const target = path47.resolve(root, destination);
+  const parent = await fs43.realpath(path47.dirname(target));
+  const relative = path47.relative(root, parent);
+  if (relative === ".." || relative.startsWith(".." + path47.sep) || path47.isAbsolute(relative))
+    throw new PlatformIOError(
+      "Dump exports must remain in the authorized workspace.",
+      "COREDUMP_EXPORT_OUTSIDE_WORKSPACE"
+    );
+  const name2 = path47.basename(target);
+  if (name2 === "." || name2 === ".." || name2.includes(":"))
+    throw new PlatformIOError(
+      "Invalid dump export filename.",
+      "COREDUMP_EXPORT_INVALID"
+    );
+  const canonicalTarget = path47.join(parent, name2);
+  const bytes = Buffer.from(input);
+  const sha256 = createHash9("sha256").update(bytes).digest("hex");
+  return withPrivateAnalysisDirectory(async (directory) => {
+    const staged = path47.join(directory, "dump.bin");
+    await fs43.writeFile(staged, bytes, { flag: "wx", mode: 384 });
+    if (await fs43.realpath(path47.dirname(target)) !== parent)
+      throw new PlatformIOError(
+        "Dump export parent changed.",
+        "COREDUMP_EXPORT_CHANGED"
+      );
+    try {
+      await fs43.link(staged, canonicalTarget);
+    } catch (error2) {
+      throw new PlatformIOError(
+        error2.code === "EEXIST" ? "Dump export destination already exists." : "Cannot publish the private dump export.",
+        error2.code === "EEXIST" ? "COREDUMP_EXPORT_EXISTS" : "COREDUMP_EXPORT_FAILED"
+      );
+    }
+    return {
+      path: canonicalTarget,
+      size: bytes.length,
+      sha256,
+      retention: "user_managed"
+    };
+  }, parent);
+}
+
+// src/tools/coredump.ts
+init_zod();
+init_errors2();
+
+// src/tools/coredump-device.ts
+init_zod();
+init_errors2();
+
+// src/tools/partition-table.ts
+init_projects();
+import fs45 from "node:fs/promises";
+import path50 from "node:path";
+
+// src/core/esp-flash-read.ts
+import fs44 from "node:fs/promises";
+init_zod();
+import path48 from "node:path";
+init_serial_endpoint();
+init_spooler();
+init_errors2();
+var schema = external_exports.object({
+  projectDir: external_exports.string().min(1).max(32768),
+  port: external_exports.string().min(1).max(512),
+  offset: external_exports.number().int().nonnegative().max(4294967295),
+  length: external_exports.number().int().positive().max(16 * 1024 * 1024),
+  approvalId: external_exports.string().max(256).optional(),
+  commandApprovalId: external_exports.string().max(256).optional()
+}).strict().refine(
+  (value2) => value2.offset + value2.length <= 4294967296,
+  "Flash range overflows."
+);
+async function readEspFlash(input, caller = {}) {
+  const request = schema.parse(input);
+  const projectDir = await fs44.realpath(request.projectDir);
+  const { commandApprovalId, ...operation } = request;
+  const args = { ...operation, projectDir };
+  const context = { ...caller, workspaceDir: projectDir };
+  const commandArgs = { ...args, approvalId: commandApprovalId };
+  for (const [name2, parameters] of [
+    ["esp_flash_read", args],
+    ["esp_flash_read_command", commandArgs]
+  ]) {
+    const plan = await planAction(name2, parameters, context);
+    if (plan.status !== "ready")
+      throw new PlatformIOError(
+        plan.reason,
+        plan.status === "requires_approval" ? "APPROVAL_REQUIRED" : "POLICY_DENIED",
+        { policyDecision: plan }
+      );
+  }
+  return dispatchAuthorizedAction("esp_flash_read", args, context, async () => {
+    const guard = createPolicyRevisionGuard(projectDir);
+    return dispatchAuthorizedAction(
+      "esp_flash_read_command",
+      commandArgs,
+      context,
+      async () => {
+        guard();
+        const endpoint = resolveSerialEndpoint(request.port);
+        return hardwareLockManager.withImplicitLock(async () => {
+          guard();
+          endpoint.revalidate();
+          const temporary = await createPrivateAnalysisDirectory();
+          const output = path48.join(temporary, "flash.bin");
+          let retain = false;
+          try {
+            guard();
+            endpoint.revalidate();
+            const result = await executeWithSpooling(
+              "pkg",
+              [
+                "exec",
+                "--",
+                "esptool.py",
+                "--port",
+                endpoint.canonicalPort,
+                "read_flash",
+                "0x" + request.offset.toString(16),
+                "0x" + request.length.toString(16),
+                output
+              ],
+              {
+                cwd: projectDir,
+                projectDir,
+                devicePort: endpoint.canonicalPort,
+                timeout: 3e5,
+                background: false,
+                artifactType: "debug"
+              }
+            );
+            guard();
+            if (!("exitCode" in result) || result.exitCode !== 0)
+              throw new PlatformIOError(
+                "ESP flash read failed; inspect the retained command log.",
+                "FLASH_READ_FAILED",
+                {
+                  logPath: "fullLogPath" in result ? result.fullLogPath : null
+                }
+              );
+            const artifact = await readPartitionArtifact(
+              await fs44.realpath(temporary),
+              output,
+              request.length
+            );
+            if (artifact.identity.size !== request.length)
+              throw new PlatformIOError(
+                "ESP flash read returned an incomplete range.",
+                "FLASH_READ_INCOMPLETE"
+              );
+            guard();
+            return {
+              bytes: artifact.content,
+              sha256: artifact.identity.sha256,
+              port: endpoint.canonicalPort,
+              offset: request.offset,
+              length: request.length,
+              logPath: result.fullLogPath
+            };
+          } catch (error2) {
+            retain = error2 instanceof PlatformIOError && error2.context?.cleanupPending === true;
+            throw error2;
+          } finally {
+            if (!retain)
+              await fs44.rm(temporary, { recursive: true, force: true });
+          }
+        });
+      }
+    );
+  });
+}
+
+// src/tools/partition-project.ts
+import path49 from "node:path";
+
+// src/core/esp-partition-location.ts
+init_errors2();
+function offset(value2) {
+  const parsed = typeof value2 === "string" ? parsePartitionNumber(value2) : value2;
+  if (typeof parsed !== "number" || !Number.isSafeInteger(parsed) || parsed < 0 || parsed > 4294963200 || parsed % 4096)
+    throw new PlatformIOError(
+      "Partition table offset must be an aligned flash address.",
+      "PARTITION_OFFSET_INVALID"
+    );
+  return parsed;
+}
+function partitionOffsetFromSdkconfig(text7) {
+  if (Buffer.byteLength(text7, "utf8") > 2 * 1024 * 1024)
+    throw new PlatformIOError(
+      "sdkconfig exceeds the inspection limit.",
+      "PARTITION_CONFIG_LIMIT"
+    );
+  const matches = text7.split(/\r?\n/).filter((line) => /^\s*CONFIG_PARTITION_TABLE_OFFSET\s*=/.test(line));
+  if (!matches.length) return null;
+  if (matches.length !== 1)
+    throw new PlatformIOError(
+      "Duplicate partition table offset in sdkconfig.",
+      "PARTITION_OFFSET_AMBIGUOUS"
+    );
+  const value2 = matches[0].slice(matches[0].indexOf("=") + 1).trim();
+  return {
+    source: "sdkconfig:CONFIG_PARTITION_TABLE_OFFSET",
+    offset: offset(value2)
+  };
+}
+function partitionOffsetFromFlashImages(images, tablePath, normalizePath) {
+  if (!Array.isArray(images) || images.length > 256)
+    throw new PlatformIOError(
+      "Invalid computed flash image inventory.",
+      "PARTITION_METADATA_INVALID"
+    );
+  const target = normalizePath(tablePath);
+  const matches = [];
+  for (const image of images) {
+    if (!image || typeof image !== "object" || Array.isArray(image))
+      throw new PlatformIOError(
+        "Invalid flash image entry.",
+        "PARTITION_METADATA_INVALID"
+      );
+    const record2 = image;
+    if (typeof record2.path !== "string" || record2.path.length > 32768)
+      throw new PlatformIOError(
+        "Invalid flash image path.",
+        "PARTITION_METADATA_INVALID"
+      );
+    if (normalizePath(record2.path) === target)
+      matches.push({
+        source: "metadata:extra.flash_images",
+        offset: offset(record2.offset)
+      });
+  }
+  if (matches.length > 1)
+    throw new PlatformIOError(
+      "Partition binary appears more than once in flash images.",
+      "PARTITION_OFFSET_AMBIGUOUS"
+    );
+  return matches[0] ?? null;
+}
+function resolvePartitionOffset(evidence, configuredUploadOffset) {
+  const entries = evidence.map((entry) => ({
+    source: entry.source,
+    offset: offset(entry.offset)
+  }));
+  if (configuredUploadOffset !== void 0 && configuredUploadOffset !== null)
+    entries.push({
+      source: "board_upload.partition_table_offset",
+      offset: offset(configuredUploadOffset)
+    });
+  if (!entries.length)
+    throw new PlatformIOError(
+      "Partition table location is unknown; provide its resolved offset or build metadata.",
+      "PARTITION_OFFSET_REQUIRED"
+    );
+  if (new Set(entries.map((entry) => entry.offset)).size !== 1)
+    throw new PlatformIOError(
+      "Partition table generation and upload offsets disagree.",
+      "PARTITION_OFFSET_CONFLICT"
+    );
+  return { tableOffset: entries[0].offset, evidence: entries };
+}
+
+// src/tools/partition-project.ts
+init_errors2();
+async function resolveProjectPartitionInputs(projectDir, environment, caller, approvalId) {
+  const report = await executeProjectInspection(
+    "project_envs",
+    { projectDir, approvalId },
+    caller
+  );
+  if (!report.ok || !("defaultEnvironments" in report) || !Array.isArray(report.envs))
+    throw new PlatformIOError(
+      "Cannot resolve project partition configuration.",
+      "PARTITION_CONFIG_UNAVAILABLE"
+    );
+  const envs = report.envs;
+  const selected = environment ?? (report.defaultEnvironments.length === 1 ? report.defaultEnvironments[0] : void 0);
+  const env = envs.find((entry) => entry.name === selected);
+  if (!env)
+    throw new PlatformIOError(
+      "Select one configured environment for partition inspection.",
+      "PARTITION_ENVIRONMENT_REQUIRED"
+    );
+  if (env.partitionTable !== null && (typeof env.partitionTable !== "string" || !env.partitionTable || env.partitionTable.length > 32768))
+    throw new PlatformIOError(
+      "Invalid configured partition file.",
+      "PARTITION_CONFIG_INVALID"
+    );
+  const frameworks = Array.isArray(env.framework) ? env.framework : typeof env.framework === "string" ? env.framework.split(",").map((value2) => value2.trim()) : [];
+  let sdkconfigPath;
+  const sdkconfigExplicit = env.sdkconfigPath !== void 0 && env.sdkconfigPath !== null;
+  if (sdkconfigExplicit) {
+    if (typeof env.sdkconfigPath !== "string" || !env.sdkconfigPath || env.sdkconfigPath.length > 32768 || /\$|%[^%]+%/.test(env.sdkconfigPath))
+      throw new PlatformIOError(
+        "SDK configuration path must be resolved within the workspace.",
+        "PARTITION_CONFIG_INVALID"
+      );
+    sdkconfigPath = env.sdkconfigPath;
+  } else if (frameworks.includes("espidf")) {
+    if (!/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,49}$/.test(env.name))
+      throw new PlatformIOError(
+        "Invalid SDK configuration environment name.",
+        "PARTITION_CONFIG_INVALID"
+      );
+    sdkconfigPath = "sdkconfig." + env.name;
+  }
+  let flashSize;
+  if (env.flashSize !== null) {
+    if (typeof env.flashSize !== "string" && typeof env.flashSize !== "number")
+      throw new PlatformIOError(
+        "Invalid configured flash size.",
+        "PARTITION_CONFIG_INVALID"
+      );
+    flashSize = typeof env.flashSize === "number" ? env.flashSize : parsePartitionNumber(env.flashSize.replace(/B$/i, ""));
+  }
+  return {
+    environment: env.name,
+    sdkconfigPath,
+    sdkconfigExplicit,
+    tablePath: env.partitionTable ?? "partitions.csv",
+    tableSource: env.partitionTable ? "board_build.partitions" : "project:partitions.csv",
+    uploadOffset: env.partitionTableUploadOffset,
+    flashSize,
+    board: env.board,
+    mcu: env.mcu
+  };
+}
+async function resolveBuildPartitionInputs(projectDir, environment, caller, approvalId, selectedTablePath) {
+  const report = await executeProjectInspection(
+    "project_metadata",
+    { projectDir, environment, approvalId },
+    caller
+  );
+  if (!report.ok || !("envs" in report) || Array.isArray(report.envs) || !report.envs)
+    throw new PlatformIOError(
+      "Build metadata is unavailable.",
+      "PARTITION_METADATA_UNAVAILABLE"
+    );
+  const entry = report.envs[environment];
+  if (!entry || !entry.extra || typeof entry.extra !== "object" || Array.isArray(entry.extra))
+    throw new PlatformIOError(
+      "Build metadata has no flash image inventory.",
+      "PARTITION_METADATA_UNAVAILABLE"
+    );
+  const images = entry.extra.flash_images;
+  if (!Array.isArray(images) || images.length > 256)
+    throw new PlatformIOError(
+      "Invalid flash image inventory.",
+      "PARTITION_METADATA_INVALID"
+    );
+  const normalize = (value2) => {
+    const resolved = path49.resolve(projectDir, value2);
+    return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+  };
+  let selected = selectedTablePath;
+  if (!selected) {
+    const candidates = images.filter(
+      (image) => image && typeof image.path === "string" && path49.basename(image.path).toLowerCase() === "partitions.bin"
+    );
+    if (candidates.length !== 1)
+      throw new PlatformIOError(
+        "Select the partition binary explicitly; build metadata does not identify one unique partitions.bin.",
+        "PARTITION_METADATA_AMBIGUOUS"
+      );
+    selected = candidates[0].path;
+  }
+  const evidence = partitionOffsetFromFlashImages(images, selected, normalize);
+  if (!evidence)
+    throw new PlatformIOError(
+      "Selected partition binary is absent from the environment's flash images.",
+      "PARTITION_METADATA_MISMATCH"
+    );
+  return {
+    tablePath: selected,
+    offsetEvidence: evidence,
+    environment,
+    frameworkCandidates: entry.partitionFrameworkCandidates
+  };
+}
+async function resolvePartitionBoardInfo(projectDir, boardId, caller, approvalId) {
+  if (typeof boardId !== "string" || !boardId)
+    return { status: "unknown", flashSize: null, mcu: null };
+  try {
+    const board = await dispatchAuthorizedAction(
+      "get_board_info",
+      { projectDir, boardId, approvalId },
+      { ...caller, workspaceDir: projectDir },
+      () => getBoardInfo(boardId)
+    );
+    const flashSize = typeof board?.rom === "number" && Number.isSafeInteger(board.rom) && board.rom > 0 && board.rom <= 4294967296 ? board.rom : null;
+    return {
+      status: "catalogue",
+      flashSize,
+      mcu: typeof board?.mcu === "string" ? board.mcu : null
+    };
+  } catch (error2) {
+    const code = error2 instanceof PlatformIOError ? error2.code : "BOARD_LOOKUP_FAILED";
+    return {
+      status: code === "POLICY_DENIED" || code === "APPROVAL_REQUIRED" ? "not_authorized" : "unavailable",
+      flashSize: null,
+      mcu: null,
+      error_code: code
+    };
+  }
+}
+
+// src/tools/partition-table.ts
+init_zod();
+init_errors2();
+var PartitionTableSchema = external_exports.object({
+  projectDir: external_exports.string().min(1).max(32768),
+  tablePath: external_exports.string().min(1).max(32768).optional(),
+  environment: external_exports.string().regex(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/).max(50).optional(),
+  configApprovalId: external_exports.string().max(256).optional(),
+  buildMetadata: external_exports.boolean().default(false),
+  metadataApprovalId: external_exports.string().max(256).optional(),
+  systemApprovalId: external_exports.string().max(256).optional(),
+  boardApprovalId: external_exports.string().max(256).optional(),
+  format: external_exports.enum(["csv", "binary"]).default("csv"),
+  tableOffset: external_exports.number().int().min(0).max(4294963200).optional(),
+  sdkconfigPath: external_exports.string().min(1).max(32768).optional(),
+  flashSize: external_exports.number().int().positive().max(4294967296).optional(),
+  firmwarePath: external_exports.string().min(1).max(32768).optional(),
+  observedTablePath: external_exports.string().min(1).max(32768).optional(),
+  readDevice: external_exports.boolean().default(false),
+  port: external_exports.string().min(1).max(512).optional(),
+  readApprovalId: external_exports.string().max(256).optional(),
+  commandApprovalId: external_exports.string().max(256).optional(),
+  approvalId: external_exports.string().max(256).optional()
+}).strict().refine(
+  (value2) => !value2.readDevice || Boolean(value2.port),
+  "An explicit serial port is required for a device read."
+);
+async function executePartitionTable(input, caller = {}, onAuthorized) {
+  const params = PartitionTableSchema.parse(input);
+  const projectDir = await fs45.realpath(params.projectDir);
+  const {
+    configApprovalId,
+    metadataApprovalId,
+    systemApprovalId,
+    boardApprovalId,
+    readApprovalId,
+    commandApprovalId,
+    ...operation
+  } = params;
+  return dispatchAuthorizedAction(
+    "partition_table",
+    { ...operation, projectDir },
+    { ...caller, workspaceDir: projectDir },
+    async () => {
+      const guard = createPolicyRevisionGuard(projectDir);
+      await onAuthorized?.();
+      guard();
+      const project = params.buildMetadata || params.tablePath === void 0 || params.environment !== void 0 ? await resolveProjectPartitionInputs(
+        projectDir,
+        params.environment,
+        { ...caller, workspaceDir: projectDir },
+        configApprovalId
+      ) : null;
+      guard();
+      const build = params.buildMetadata ? await resolveBuildPartitionInputs(
+        projectDir,
+        project.environment,
+        { ...caller, workspaceDir: projectDir },
+        metadataApprovalId,
+        params.format === "binary" ? params.tablePath : void 0
+      ) : null;
+      guard();
+      const evidence = [];
+      if (build) evidence.push(build.offsetEvidence);
+      if (params.tableOffset !== void 0)
+        evidence.push({
+          source: "explicit:tableOffset",
+          offset: params.tableOffset
+        });
+      const sdkconfigPath = params.sdkconfigPath ?? project?.sdkconfigPath;
+      let sdkconfig = null;
+      if (sdkconfigPath) {
+        try {
+          sdkconfig = await readPartitionArtifact(
+            projectDir,
+            sdkconfigPath,
+            2 * 1024 * 1024
+          );
+        } catch (error2) {
+          const optionalMissing = !params.sdkconfigPath && !project?.sdkconfigExplicit && error2.code === "ENOENT";
+          if (!optionalMissing) throw error2;
+        }
+      }
+      if (sdkconfig) {
+        let text7;
+        try {
+          text7 = new TextDecoder("utf-8", { fatal: true }).decode(
+            sdkconfig.content
+          );
+        } catch {
+          throw new PlatformIOError(
+            "sdkconfig is not valid UTF-8.",
+            "PARTITION_CONFIG_INVALID"
+          );
+        }
+        const setting = partitionOffsetFromSdkconfig(text7);
+        if (setting) evidence.push(setting);
+      }
+      const location = resolvePartitionOffset(evidence, project?.uploadOffset);
+      guard();
+      let tablePath = params.tablePath ?? build?.tablePath ?? project.tablePath;
+      let format = !params.tablePath && build ? "binary" : params.format;
+      let trustedTableRoot;
+      let framework = null;
+      let tableSource = params.tablePath ? "explicit:tablePath" : build ? "metadata:extra.flash_images" : project.tableSource;
+      if (!params.tablePath && build && project?.tableSource === "board_build.partitions") {
+        try {
+          await readPartitionArtifact(projectDir, project.tablePath, 65536);
+          tablePath = project.tablePath;
+          format = "csv";
+          tableSource = project.tableSource;
+        } catch (error2) {
+          if (error2.code !== "ENOENT") throw error2;
+          const system = await dispatchAuthorizedAction(
+            "system_info",
+            { projectDir, approvalId: systemApprovalId },
+            { ...caller, workspaceDir: projectDir },
+            getSystemInfo
+          );
+          guard();
+          framework = await resolveFrameworkPartitionCsv(
+            project.tablePath,
+            build.frameworkCandidates ?? [],
+            system,
+            projectDir
+          );
+          trustedTableRoot = framework.root;
+          tablePath = framework.tablePath;
+          format = "csv";
+          tableSource = "board_build.partitions (registered framework)";
+        }
+      }
+      guard();
+      let firmwarePath = params.firmwarePath;
+      if (!firmwarePath && build && path50.basename(build.tablePath).toLowerCase() === "partitions.bin") {
+        try {
+          const candidate = await fs45.realpath(
+            path50.resolve(
+              projectDir,
+              path50.dirname(build.tablePath),
+              "firmware.bin"
+            )
+          );
+          const relative = path50.relative(projectDir, candidate);
+          if (relative && relative !== ".." && !relative.startsWith(".." + path50.sep) && !path50.isAbsolute(relative) && (await fs45.stat(candidate)).isFile())
+            firmwarePath = candidate;
+        } catch (error2) {
+          if (error2.code !== "ENOENT") throw error2;
+        }
+      }
+      const boardInfo = project && ((params.flashSize ?? project.flashSize) === void 0 || project.mcu === null) ? await resolvePartitionBoardInfo(
+        projectDir,
+        project.board,
+        caller,
+        boardApprovalId
+      ) : null;
+      guard();
+      const flashSize = params.flashSize ?? project?.flashSize ?? boardInfo?.flashSize ?? void 0;
+      const flashSizeSource = params.flashSize !== void 0 ? "explicit:flashSize" : project?.flashSize !== void 0 ? "board_upload.flash_size" : boardInfo?.flashSize != null ? "board_catalogue" : "unknown";
+      const result = await inspectEspPartitionArtifacts({
+        workspaceDir: projectDir,
+        tablePath,
+        format,
+        trustedTableRoot,
+        layout: {
+          tableOffset: location.tableOffset,
+          flashSize
+        },
+        firmwarePath,
+        observedTablePath: params.observedTablePath ?? (format === "csv" && build ? build.tablePath : void 0)
+      });
+      guard();
+      let device = null;
+      if (params.readDevice) {
+        const read = await readEspFlash(
+          {
+            projectDir,
+            port: params.port,
+            offset: location.tableOffset,
+            length: 4096,
+            approvalId: readApprovalId,
+            commandApprovalId
+          },
+          { ...caller, workspaceDir: projectDir }
+        );
+        guard();
+        const observed = parseEspPartitionBinary(read.bytes, {
+          tableOffset: location.tableOffset
+        });
+        device = {
+          port: read.port,
+          erased: read.bytes.every((byte) => byte === 255),
+          partitions: observed.map(projectEspPartition),
+          diff: compareEspPartitions(result.partitionRecords, observed, {
+            tableOffset: location.tableOffset
+          }),
+          log_path: read.logPath,
+          sha256: read.sha256,
+          offset: read.offset
+        };
+      }
+      const mismatch = Boolean(
+        result.comparison?.length || device?.erased || device?.diff.length
+      );
+      const issues = [...result.issues];
+      if (result.comparison?.length)
+        issues.push({
+          severity: "error",
+          code: "offline_table_mismatch",
+          message: "The supplied binary comparison differs from the expected partition layout.",
+          fix: "Confirm both artifacts belong to the same build before flashing."
+        });
+      if (device?.erased)
+        issues.push({
+          severity: "error",
+          code: "device_table_erased",
+          message: "The selected device partition sector is erased.",
+          fix: "Verify the chip and table offset, then restore a complete approved firmware image."
+        });
+      else if (device?.diff.length)
+        issues.push({
+          severity: "error",
+          code: "device_table_mismatch",
+          message: "The observed device table differs from the inspected partition layout.",
+          fix: "Verify the selected device and rebuild or restore the intended complete flash layout."
+        });
+      const errorCount = issues.filter(
+        (issue2) => issue2.severity === "error"
+      ).length;
+      const { partitionRecords, ...publicResult } = result;
+      return {
+        ...publicResult,
+        device,
+        comparison_source: !params.observedTablePath && format === "csv" && build ? "build_binary" : publicResult.comparison_source,
+        issues,
+        error_count: errorCount,
+        environment: project?.environment ?? null,
+        table_source: tableSource,
+        framework_package: framework ? { name: framework.packageName, version: framework.packageVersion } : null,
+        board: project?.board ?? null,
+        mcu: project?.mcu ?? boardInfo?.mcu ?? null,
+        flash_size_source: flashSizeSource,
+        board_lookup: boardInfo,
+        offset_evidence: location.evidence,
+        sdkconfig_artifact: sdkconfig?.identity ?? null,
+        ok: result.ok && !mismatch,
+        summary: partitionRecords.length + " partition(s) inspected from offline artifacts. " + (mismatch ? "The compared partition layout differs or is erased. " : "") + errorCount + " layout error(s), " + result.warning_count + " warning(s)."
+      };
+    }
+  );
+}
+
+// src/core/analysis/esp-coredump-input.ts
+init_errors2();
+import { createHash as createHash10, timingSafeEqual } from "node:crypto";
+var MAX_DUMP_BYTES = 16 * 1024 * 1024;
+var chips = {
+  0: "esp32",
+  2: "esp32s2",
+  9: "esp32s3",
+  5: "esp32c3",
+  12: "esp32c2",
+  13: "esp32c6",
+  16: "esp32h2",
+  18: "esp32p4"
+};
+var versions = {
+  2: { header: 20, checksum: "crc32", payload: "binary" },
+  3: { header: 24, checksum: "crc32", payload: "binary" },
+  256: { header: 20, checksum: "crc32", payload: "elf" },
+  257: { header: 20, checksum: "sha256", payload: "elf" },
+  258: { header: 24, checksum: "crc32", payload: "elf" },
+  259: { header: 24, checksum: "sha256", payload: "elf" }
+};
+var crcTable = Uint32Array.from({ length: 256 }, (_, value2) => {
+  let crc = value2;
+  for (let bit = 0; bit < 8; bit++)
+    crc = crc >>> 1 ^ (crc & 1 ? 3988292384 : 0);
+  return crc >>> 0;
+});
+function crc32(bytes) {
+  let crc = 4294967295;
+  for (const byte of bytes) crc = crc >>> 8 ^ crcTable[(crc ^ byte) & 255];
+  return (crc ^ 4294967295) >>> 0;
+}
+function inspectRawEspCoredump(input, encrypted = false) {
+  if (encrypted)
+    throw new PlatformIOError(
+      "Encrypted core dumps require a supported decryption workflow.",
+      "COREDUMP_ENCRYPTED"
+    );
+  if (input.byteLength > MAX_DUMP_BYTES)
+    throw new PlatformIOError(
+      "Core dump exceeds 16 MiB.",
+      "COREDUMP_INPUT_LIMIT"
+    );
+  if (!input.byteLength || input.every((byte) => byte === 255))
+    throw new PlatformIOError(
+      "No core dump is present in the supplied bytes.",
+      "COREDUMP_EMPTY"
+    );
+  if (input.byteLength < 16)
+    throw new PlatformIOError(
+      "Core dump header is truncated.",
+      "COREDUMP_TRUNCATED"
+    );
+  const bytes = Buffer.from(input);
+  const length = bytes.readUInt32LE(0);
+  if (!length)
+    throw new PlatformIOError(
+      "Core dump length is zero; no recorded crash is available.",
+      "COREDUMP_EMPTY"
+    );
+  const version2 = bytes.readUInt32LE(4), format = versions[version2 & 65535], chip = chips[version2 >>> 16];
+  if (!format || !chip)
+    throw new PlatformIOError(
+      "Unsupported raw core-dump version or chip; do not infer plaintext from unknown bytes.",
+      "COREDUMP_FORMAT_UNSUPPORTED"
+    );
+  const checksumLength = format.checksum === "sha256" ? 32 : 4;
+  if (length < format.header + checksumLength || length > bytes.length || length > MAX_DUMP_BYTES)
+    throw new PlatformIOError(
+      "Declared core-dump length is outside the supplied input.",
+      "COREDUMP_LENGTH_INVALID"
+    );
+  const payload = bytes.subarray(0, length - checksumLength);
+  const checksum = bytes.subarray(length - checksumLength, length);
+  const valid = format.checksum === "sha256" ? timingSafeEqual(createHash10("sha256").update(payload).digest(), checksum) : crc32(payload) === checksum.readUInt32LE(0);
+  if (!valid)
+    throw new PlatformIOError(
+      "Core-dump checksum does not match its declared bytes.",
+      "COREDUMP_CHECKSUM_MISMATCH"
+    );
+  if (format.payload === "elf" && (length - format.header - checksumLength < 4 || !bytes.subarray(format.header, format.header + 4).equals(Buffer.from([127, 69, 76, 70]))))
+    throw new PlatformIOError(
+      "Core-dump payload does not contain the declared ELF format.",
+      "COREDUMP_PAYLOAD_INVALID"
+    );
+  return {
+    bytes: bytes.subarray(0, length),
+    identity: {
+      sha256: createHash10("sha256").update(bytes.subarray(0, length)).digest("hex"),
+      input_sha256: createHash10("sha256").update(bytes).digest("hex"),
+      length,
+      input_length: bytes.length,
+      trailing_bytes: bytes.length - length,
+      version: version2,
+      chip,
+      payload_format: format.payload,
+      checksum: format.checksum,
+      task_count: bytes.readUInt32LE(8),
+      tcb_size: bytes.readUInt32LE(12),
+      segment_count: bytes.readUInt32LE(16),
+      chip_revision: format.header === 24 ? bytes.readUInt32LE(20) : null
+    }
+  };
+}
+function decodeEspCoredumpBase64(text7) {
+  if (Buffer.byteLength(text7, "utf8") > Math.ceil(MAX_DUMP_BYTES / 3) * 4 + 65536)
+    throw new PlatformIOError(
+      "Encoded core dump exceeds the input limit.",
+      "COREDUMP_INPUT_LIMIT"
+    );
+  const decodeChunk = (compact2) => {
+    if (!compact2 || compact2.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(compact2))
+      throw new PlatformIOError(
+        "Invalid base64 core dump.",
+        "COREDUMP_BASE64_INVALID"
+      );
+    const decoded2 = Buffer.from(compact2, "base64");
+    if (decoded2.toString("base64") !== compact2)
+      throw new PlatformIOError(
+        "Non-canonical base64 core dump.",
+        "COREDUMP_BASE64_INVALID"
+      );
+    return decoded2;
+  };
+  const compact = text7.replace(/[ \t\r\n]/g, "");
+  let decoded;
+  if (/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) {
+    decoded = decodeChunk(compact);
+  } else {
+    const lines2 = text7.split(/\r?\n/).map((line) => line.replace(/[ \t]/g, "")).filter(Boolean);
+    if (lines2.length > 65536)
+      throw new PlatformIOError(
+        "Too many encoded core-dump lines.",
+        "COREDUMP_INPUT_LIMIT"
+      );
+    const chunks = lines2.map(decodeChunk);
+    const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
+    if (length > MAX_DUMP_BYTES)
+      throw new PlatformIOError(
+        "Decoded core dump exceeds 16 MiB.",
+        "COREDUMP_INPUT_LIMIT"
+      );
+    decoded = Buffer.concat(chunks, length);
+  }
+  if (decoded.length > MAX_DUMP_BYTES)
+    throw new PlatformIOError(
+      "Decoded core dump exceeds 16 MiB.",
+      "COREDUMP_INPUT_LIMIT"
+    );
+  return decoded;
+}
+
+// src/core/analysis/esp-coredump-read.ts
+init_errors2();
+async function readEspCoredumpPartition(input, caller = {}) {
+  const partition = input.partition;
+  if (partition.type !== 1 || partition.subtype !== 3 || !Number.isInteger(partition.offset) || partition.offset < 0 || partition.offset % 4096 || !Number.isInteger(partition.size) || partition.size < 24 || partition.size > 16 * 1024 * 1024 || partition.offset + partition.size > 4294967296 || !Number.isInteger(partition.flags) || partition.flags < 0 || partition.flags > 65535)
+    throw new PlatformIOError(
+      "Select a valid bounded core-dump partition from the effective table.",
+      "COREDUMP_PARTITION_INVALID"
+    );
+  if (partition.flags & 1)
+    throw new PlatformIOError(
+      "Encrypted core-dump partitions require a supported decryption workflow.",
+      "COREDUMP_ENCRYPTED"
+    );
+  const result = await readEspFlash(
+    {
+      projectDir: input.projectDir,
+      port: input.port,
+      offset: partition.offset,
+      length: partition.size,
+      approvalId: input.approvalId,
+      commandApprovalId: input.commandApprovalId
+    },
+    caller
+  );
+  const source = {
+    port: result.port,
+    offset: result.offset,
+    length: result.length,
+    sha256: result.sha256,
+    logPath: result.logPath,
+    partition: partition.name
+  };
+  try {
+    const dump = inspectRawEspCoredump(result.bytes);
+    return {
+      present: true,
+      bytes: result.bytes,
+      identity: dump.identity,
+      source
+    };
+  } catch (error2) {
+    if (error2 instanceof PlatformIOError && error2.code === "COREDUMP_EMPTY")
+      return { present: false, source, bytes: result.bytes };
+    throw error2;
+  }
+}
+
+// src/tools/coredump-device.ts
+var destinationSchema = external_exports.object({
+  port: external_exports.string().min(1).max(512),
+  partitionName: external_exports.string().min(1).max(16).optional(),
+  approvalId: external_exports.string().max(256).optional(),
+  commandApprovalId: external_exports.string().max(256).optional()
+}).strict();
+async function acquireProjectCoredump(tableInput, destinationInput, caller = {}) {
+  const table = PartitionTableSchema.parse(tableInput);
+  const destination = destinationSchema.parse(destinationInput);
+  if (table.readDevice)
+    throw new PlatformIOError(
+      "Core acquisition uses project-table inspection; request live table comparison separately.",
+      "COREDUMP_TABLE_INPUT_INVALID"
+    );
+  const report = await executePartitionTable(table, caller);
+  const guard = createPolicyRevisionGuard(table.projectDir);
+  guard();
+  if (!report.ok || report.error_count || (report.comparison?.length ?? 0) > 0)
+    throw new PlatformIOError(
+      "Resolve partition layout errors before reading a core dump.",
+      "COREDUMP_LAYOUT_INVALID"
+    );
+  const candidates = report.partitions.filter(
+    (partition) => partition.type === "data" && partition.subtype === "coredump" && (!destination.partitionName || partition.name === destination.partitionName)
+  );
+  if (candidates.length !== 1)
+    throw new PlatformIOError(
+      candidates.length ? "Select an explicit core-dump partition name." : "No matching core-dump partition exists in the effective layout.",
+      candidates.length ? "COREDUMP_PARTITION_AMBIGUOUS" : "COREDUMP_PARTITION_MISSING"
+    );
+  const selected = candidates[0];
+  if (selected.unknown_flags)
+    throw new PlatformIOError(
+      "Core-dump partition has unsupported flags.",
+      "COREDUMP_PARTITION_INVALID"
+    );
+  const result = await readEspCoredumpPartition(
+    {
+      projectDir: table.projectDir,
+      ...destination,
+      partition: {
+        name: selected.name,
+        type: 1,
+        subtype: 3,
+        offset: selected.offset,
+        size: selected.size,
+        flags: (selected.flags.includes("encrypted") ? 1 : 0) | (selected.flags.includes("readonly") ? 2 : 0)
+      }
+    },
+    caller
+  );
+  guard();
+  return {
+    ...result,
+    layout: {
+      table: report.artifacts.table,
+      table_offset: report.table_offset,
+      environment: report.environment,
+      table_source: report.table_source,
+      evidence: report.evidence
+    }
+  };
+}
+
+// src/core/analysis/esp-coredump-artifact.ts
+import fs46 from "node:fs/promises";
+
+// src/core/analysis/esp-coredump-firmware.ts
+init_errors2();
+function readEspCoredumpFirmwareIdentity(payload, version2) {
+  const bytes = Buffer.from(payload);
+  const invalid4 = (message) => {
+    throw new PlatformIOError(message, "COREDUMP_ELF_INVALID");
+  };
+  if (bytes.length < 52 || bytes.length > 16 * 1024 * 1024 || bytes.subarray(0, 7).toString("hex") !== "7f454c46010101")
+    return invalid4("Expected a bounded ELF32 little-endian core dump.");
+  if (bytes.readUInt16LE(16) !== 4 || bytes.readUInt32LE(20) !== 1 || bytes.readUInt16LE(40) !== 52)
+    return invalid4("Invalid core-dump ELF header.");
+  const machine = bytes.readUInt16LE(18);
+  const chip = version2 >>> 16;
+  const expectedMachine = [0, 2, 9].includes(chip) ? 94 : [5, 12, 13, 16, 18].includes(chip) ? 243 : null;
+  if (machine !== expectedMachine)
+    return invalid4("Core-dump ELF machine does not match its chip.");
+  const table = bytes.readUInt32LE(28), count2 = bytes.readUInt16LE(44);
+  if (!count2 || count2 > 4096 || bytes.readUInt16LE(42) !== 32 || table < 52 || table + count2 * 32 > bytes.length)
+    return invalid4("Invalid core-dump program-header table.");
+  let hash = null;
+  let notes = 0;
+  const ranges = [];
+  for (let index = 0; index < count2; index++) {
+    const header = table + index * 32;
+    const type = bytes.readUInt32LE(header), offset2 = bytes.readUInt32LE(header + 4), size = bytes.readUInt32LE(header + 16);
+    if (offset2 + size > bytes.length)
+      return invalid4("Core-dump segment extends outside the ELF.");
+    if (type !== 4 || !size) continue;
+    if (offset2 < table + count2 * 32 || ranges.some(([start, end]) => offset2 < end && offset2 + size > start))
+      return invalid4("Core-dump note segments overlap headers or each other.");
+    ranges.push([offset2, offset2 + size]);
+    let cursor = offset2;
+    while (cursor < offset2 + size) {
+      if (++notes > 4096 || cursor + 12 > offset2 + size)
+        return invalid4("Truncated or excessive core-dump notes.");
+      const nameSize = bytes.readUInt32LE(cursor), descSize = bytes.readUInt32LE(cursor + 4), noteType = bytes.readUInt32LE(cursor + 8);
+      const nameStart = cursor + 12, descStart = nameStart + Math.ceil(nameSize / 4) * 4;
+      const end = descStart + Math.ceil(descSize / 4) * 4;
+      if (end > offset2 + size)
+        return invalid4("Core-dump note exceeds its segment.");
+      const name2 = bytes.subarray(nameStart, nameStart + nameSize).toString("latin1").split("\0")[0];
+      if (name2 === "ESP_CORE_DUMP_INFO" && noteType === 8266) {
+        if (hash !== null || descSize < 68 || bytes.readUInt32LE(descStart) !== version2)
+          return invalid4(
+            "Duplicate, truncated or inconsistent ESP firmware identity note."
+          );
+        const rawHash = bytes.subarray(descStart + 4, descStart + 68);
+        const zero = rawHash.indexOf(0);
+        const prefix = rawHash.subarray(0, zero < 0 ? 64 : zero).toString("latin1");
+        if (!/^[a-fA-F0-9]{1,64}$/.test(prefix) || zero >= 0 && rawHash.subarray(zero).some((value2) => value2 !== 0))
+          return invalid4("Invalid ESP firmware hash prefix.");
+        hash = prefix.toLowerCase();
+      }
+      cursor = end;
+    }
+  }
+  return { elfSha256Prefix: hash, hashBits: (hash?.length ?? 0) * 4, machine };
+}
+function matchEspCoredumpFirmware(identity, elfSha256) {
+  if (!/^[a-f0-9]{64}$/i.test(elfSha256))
+    throw new PlatformIOError(
+      "Expected ELF identity must be SHA-256.",
+      "COREDUMP_IDENTITY_INVALID"
+    );
+  if (!identity.elfSha256Prefix)
+    return { status: "unavailable", hashBits: 0 };
+  if (!elfSha256.toLowerCase().startsWith(identity.elfSha256Prefix))
+    throw new PlatformIOError(
+      "Selected ELF does not match the firmware identity in the dump.",
+      "COREDUMP_ELF_MISMATCH"
+    );
+  return {
+    status: identity.hashBits === 256 ? "matched" : "prefix_matched",
+    hashBits: identity.hashBits
+  };
+}
+
+// src/core/analysis/esp-coredump-artifact.ts
+init_errors2();
+async function readEspCoredumpArtifact(input) {
+  if (input.format !== "raw" && input.format !== "base64")
+    throw new PlatformIOError(
+      "Unsupported core-dump input encoding.",
+      "COREDUMP_FORMAT_UNSUPPORTED"
+    );
+  if (input.expectedInputSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(input.expectedInputSha256))
+    throw new PlatformIOError(
+      "Expected core-dump input hash must be SHA-256.",
+      "COREDUMP_IDENTITY_INVALID"
+    );
+  const root = await fs46.realpath(input.workspaceDir);
+  const limit = input.format === "raw" ? 16 * 1024 * 1024 : Math.ceil(16 * 1024 * 1024 / 3) * 4 + 65536;
+  const artifact = await readPartitionArtifact(root, input.dumpPath, limit);
+  if (input.expectedInputSha256 && artifact.identity.sha256 !== input.expectedInputSha256.toLowerCase())
+    throw new PlatformIOError(
+      "Core-dump file does not match the selected artifact.",
+      "COREDUMP_IDENTITY_MISMATCH"
+    );
+  let bytes = artifact.content;
+  if (input.format === "base64") {
+    let text7;
+    try {
+      text7 = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      throw new PlatformIOError(
+        "Encoded core dump is not valid UTF-8.",
+        "COREDUMP_BASE64_INVALID"
+      );
+    }
+    bytes = decodeEspCoredumpBase64(text7);
+  }
+  return {
+    ...inspectEspCoredumpContent(bytes, input.encrypted),
+    source: { ...artifact.identity, format: input.format }
+  };
+}
+function inspectEspCoredumpContent(bytes, encrypted = false) {
+  const inspected = inspectRawEspCoredump(bytes, encrypted);
+  const formatVersion = inspected.identity.version & 65535;
+  const headerSize = formatVersion === 258 || formatVersion === 259 ? 24 : 20;
+  const checksumSize = inspected.identity.checksum === "sha256" ? 32 : 4;
+  const firmwareIdentity = inspected.identity.payload_format === "elf" ? readEspCoredumpFirmwareIdentity(
+    inspected.bytes.subarray(
+      headerSize,
+      inspected.bytes.length - checksumSize
+    ),
+    inspected.identity.version
+  ) : null;
+  return {
+    bytes: inspected.bytes,
+    identity: inspected.identity,
+    firmwareIdentity
+  };
+}
+function inspectCapturedEspCoredump(bytes, expectedInputSha256, encrypted = false) {
+  const dump = inspectEspCoredumpContent(bytes, encrypted);
+  if (expectedInputSha256 !== void 0 && (!/^[a-fA-F0-9]{64}$/.test(expectedInputSha256) || dump.identity.input_sha256 !== expectedInputSha256.toLowerCase()))
+    throw new PlatformIOError(
+      "Captured dump does not match the selected input identity.",
+      "COREDUMP_IDENTITY_MISMATCH"
+    );
+  return {
+    ...dump,
+    source: {
+      path: null,
+      size: bytes.byteLength,
+      sha256: dump.identity.input_sha256,
+      format: "raw"
+    }
+  };
+}
+
+// src/core/analysis/esp-coredump-debugger.ts
+init_errors2();
+import fs49 from "node:fs/promises";
+import path53 from "node:path";
+
+// src/core/analysis/esp-coredump-analysis.ts
+init_errors2();
+import fs47 from "node:fs/promises";
+import path51 from "node:path";
+async function withEspCoredumpArtifacts(input, analyze, capturedBytes) {
+  input.validatePolicy();
+  const root = await fs47.realpath(input.workspaceDir);
+  const elf = await fs47.realpath(path51.resolve(root, input.elfPath));
+  const relative = path51.relative(root, elf);
+  if (!relative || relative === ".." || relative.startsWith(".." + path51.sep) || path51.isAbsolute(relative))
+    throw new PlatformIOError(
+      "Selected ELF is outside the authorized workspace.",
+      "COREDUMP_ELF_OUTSIDE_WORKSPACE"
+    );
+  const dump = capturedBytes === void 0 ? await readEspCoredumpArtifact({ ...input, workspaceDir: root }) : inspectCapturedEspCoredump(
+    capturedBytes,
+    input.expectedInputSha256,
+    input.encrypted
+  );
+  const identity = await readElfIdentity(elf, input.expectedElfSha256);
+  const machine = ["esp32", "esp32s2", "esp32s3"].includes(dump.identity.chip) ? 94 : 243;
+  if (identity.machine !== machine || identity.bits !== 32 || identity.byteOrder !== "little")
+    throw new PlatformIOError(
+      "Selected ELF target does not match the core-dump chip.",
+      "COREDUMP_ELF_TARGET_MISMATCH"
+    );
+  const correspondence = dump.firmwareIdentity ? matchEspCoredumpFirmware(dump.firmwareIdentity, identity.sha256) : { status: "unavailable", hashBits: 0 };
+  input.validatePolicy();
+  return withElfSnapshot(
+    elf,
+    identity.sha256,
+    async (snapshot, stableIdentity) => {
+      input.validatePolicy();
+      const result = await analyze({
+        dump,
+        elfPath: snapshot,
+        elfIdentity: stableIdentity,
+        correspondence
+      });
+      input.validatePolicy();
+      return result;
+    }
+  );
+}
+
+// src/core/analysis/esp-coredump-conversion.ts
+init_errors2();
+import fs48 from "node:fs/promises";
+import path52 from "node:path";
+import { createHash as createHash11 } from "node:crypto";
+
+// src/core/analysis/esp-coredump-converter.ts
+var ESP_COREDUMP_VERSION = "1.10.0";
+var ESP_COREDUMP_CONVERTER = String.raw`
+import importlib.metadata
+import json
+import logging
+import os
+from pathlib import Path
+import sys
+import tempfile
+
+
+def main():
+    if importlib.metadata.version("esp-coredump") != "1.10.0":
+        raise ValueError("COREDUMP_TOOL_VERSION_MISMATCH")
+    if len(sys.argv) != 5:
+        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
+    raw, elf, staging = [Path(value) for value in sys.argv[1:4]]
+    machine = int(sys.argv[4])
+    if machine not in (94, 243):
+        raise ValueError("COREDUMP_ELF_TARGET_MISMATCH")
+    if not all(value.is_absolute() for value in (raw, elf, staging)):
+        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
+    staging = staging.resolve(strict=True)
+    raw = raw.resolve(strict=True)
+    elf = elf.resolve(strict=True)
+    if raw.parent != staging or not raw.is_file() or not elf.is_file():
+        raise ValueError("COREDUMP_CONVERTER_ARGUMENTS")
+    if raw.stat().st_size > 16 * 1024 * 1024 or elf.stat().st_size > 256 * 1024 * 1024:
+        raise ValueError("COREDUMP_INPUT_LIMIT")
+    logging.disable(logging.CRITICAL)
+    from esp_coredump.corefile.loader import ESPCoreDumpFileLoader
+
+    class StagedLoader(ESPCoreDumpFileLoader):
+        def _create_temp_file(self):
+            descriptor, name = tempfile.mkstemp(prefix="converted-", suffix=".elf", dir=staging)
+            os.close(descriptor)
+            self.temp_files.append(name)
+            return name
+
+    loader = None
+    keep = None
+    try:
+        loader = StagedLoader(str(raw), is_b64=False)
+        loader.create_corefile(exe_name=str(elf), e_machine=machine)
+        output = Path(loader.core_elf_file).resolve(strict=True)
+        if output.parent != staging or not output.is_file() or output.stat().st_size > 32 * 1024 * 1024:
+            raise ValueError("COREDUMP_CONVERSION_INVALID")
+        with output.open("rb") as stream:
+            if stream.read(7) != bytes.fromhex("7f454c46010101"):
+                raise ValueError("COREDUMP_CONVERSION_INVALID")
+        keep = output
+        print(json.dumps({"core_path": str(output), "converter_version": "1.10.0"}))
+    finally:
+        if loader is not None:
+            for name in loader.temp_files:
+                candidate = Path(name)
+                if candidate.parent == staging and candidate != keep:
+                    candidate.unlink(missing_ok=True)
+
+
+try:
+    main()
+except importlib.metadata.PackageNotFoundError:
+    print(json.dumps({"error": "COREDUMP_TOOL_UNAVAILABLE"}))
+    sys.exit(2)
+except Exception as error:
+    code = str(error)
+    if code not in {
+        "COREDUMP_TOOL_VERSION_MISMATCH", "COREDUMP_CONVERTER_ARGUMENTS",
+        "COREDUMP_ELF_TARGET_MISMATCH", "COREDUMP_INPUT_LIMIT", "COREDUMP_CONVERSION_INVALID"
+    }:
+        code = "COREDUMP_CONVERSION_FAILED"
+    print(json.dumps({"error": code}))
+    sys.exit(2)
+`;
+
+// src/core/analysis/esp-coredump-conversion.ts
+async function withConvertedEspCoredump(artifacts, options, use) {
+  options.validatePolicy();
+  if (createHash11("sha256").update(artifacts.dump.bytes).digest("hex") !== artifacts.dump.identity.sha256)
+    throw new PlatformIOError(
+      "Core-dump bytes changed before conversion.",
+      "COREDUMP_IDENTITY_MISMATCH"
+    );
+  return withPrivateAnalysisDirectory(async (directory) => {
+    const raw = path52.join(directory, "dump.raw");
+    await fs48.writeFile(raw, artifacts.dump.bytes, { flag: "wx", mode: 384 });
+    options.validatePolicy();
+    const result = await runAnalysisProcess(
+      options.pythonExecutable,
+      [
+        "-I",
+        "-c",
+        ESP_COREDUMP_CONVERTER,
+        raw,
+        artifacts.elfPath,
+        directory,
+        String(artifacts.elfIdentity.machine)
+      ],
+      {
+        cwd: directory,
+        signal: options.signal,
+        timeoutMs: 6e4,
+        maxOutputBytes: 65536,
+        allowedExitCodes: [2]
+      }
+    );
+    let response;
+    try {
+      response = JSON.parse(result.stdout);
+    } catch {
+      throw new PlatformIOError(
+        "Converter returned an invalid response.",
+        "COREDUMP_CONVERSION_INVALID"
+      );
+    }
+    if (!response || typeof response !== "object")
+      throw new PlatformIOError(
+        "Converter returned an invalid response.",
+        "COREDUMP_CONVERSION_INVALID"
+      );
+    const report = response;
+    const errors = /* @__PURE__ */ new Set([
+      "COREDUMP_TOOL_UNAVAILABLE",
+      "COREDUMP_TOOL_VERSION_MISMATCH",
+      "COREDUMP_CONVERTER_ARGUMENTS",
+      "COREDUMP_ELF_TARGET_MISMATCH",
+      "COREDUMP_INPUT_LIMIT",
+      "COREDUMP_CONVERSION_INVALID",
+      "COREDUMP_CONVERSION_FAILED"
+    ]);
+    if (typeof report.error === "string" && errors.has(report.error))
+      throw new PlatformIOError(
+        "Optional core-dump conversion did not complete.",
+        report.error
+      );
+    if (result.exitCode || report.converter_version !== ESP_COREDUMP_VERSION || typeof report.core_path !== "string")
+      throw new PlatformIOError(
+        "Converter returned an invalid result.",
+        "COREDUMP_CONVERSION_INVALID"
+      );
+    const core = await readPartitionArtifact(
+      await fs48.realpath(directory),
+      report.core_path,
+      32 * 1024 * 1024
+    );
+    if (core.content.length < 52 || core.content.subarray(0, 7).toString("hex") !== "7f454c46010101" || core.content.readUInt16LE(16) !== 4 || core.content.readUInt16LE(18) !== artifacts.elfIdentity.machine)
+      throw new PlatformIOError(
+        "Converter output is not the expected core ELF.",
+        "COREDUMP_CONVERSION_INVALID"
+      );
+    options.validatePolicy();
+    const value2 = await use(core.identity.path, core.identity.sha256);
+    options.validatePolicy();
+    return value2;
+  });
+}
+
+// src/core/analysis/esp-coredump-report.ts
+init_errors2();
+init_redact();
+function parseEspCoredumpReport(output) {
+  if (Buffer.byteLength(output, "utf8") > 4 * 1024 * 1024)
+    throw new PlatformIOError(
+      "Core-dump analyzer output exceeds 4 MiB.",
+      "COREDUMP_OUTPUT_LIMIT"
+    );
+  const cleaned = redactSecretsInText(output);
+  const backtrace = [];
+  const registers = /* @__PURE__ */ Object.create(null);
+  let crashedTask = null, reason = null;
+  let section = null;
+  let truncated = false;
+  for (const line of cleaned.split(/\r?\n/)) {
+    const value2 = line.trim();
+    const task = /^Crashed task(?: handle)?:\s*(.*)$/.exec(value2);
+    if (task) crashedTask = task[1].slice(0, 4096);
+    if (reason === null) {
+      const description = /^(?:Panic reason|Exception cause):\s*(.*)$/.exec(
+        value2
+      );
+      if (description) reason = description[1].slice(0, 4096);
+      else if (value2.startsWith("Program received signal") || value2.startsWith("Program terminated with signal") || value2.includes("panic'ed"))
+        reason = value2.slice(0, 4096);
+    }
+    const heading = /^={2,}\s*(.*?)\s*={2,}$/.exec(value2);
+    if (heading) {
+      const title = heading[1].toUpperCase();
+      section = title === "CURRENT THREAD STACK" ? "stack" : title === "CURRENT THREAD REGISTERS" ? "registers" : null;
+      continue;
+    }
+    if (section === "stack" && /^#[0-9]+\s/.test(value2)) {
+      if (backtrace.length < 256) backtrace.push(value2.slice(0, 4096));
+      else truncated = true;
+    }
+    if (section === "registers") {
+      const register = /^([A-Za-z][A-Za-z0-9_]{0,63})\s+(.+)$/.exec(value2);
+      if (register) {
+        if (Object.keys(registers).length < 128 || Object.hasOwn(registers, register[1]))
+          registers[register[1]] = register[2].slice(0, 4096);
+        else truncated = true;
+      }
+    }
+    if (value2.length > 4096) truncated = true;
+  }
+  return {
+    crashed_task: crashedTask,
+    reason,
+    backtrace,
+    registers,
+    output: cleaned.slice(-12e3),
+    truncated: truncated || cleaned.length > 12e3
+  };
+}
+
+// src/core/analysis/esp-coredump-debugger.ts
+function gdbFile(file) {
+  if (!path53.isAbsolute(file) || /[\x00-\x1f\x7f]/.test(file))
+    throw new PlatformIOError(
+      "Invalid core-analysis artifact path.",
+      "COREDUMP_PATH_INVALID"
+    );
+  return JSON.stringify(file.replace(/\\/g, "/"));
+}
+async function analyzeEspCoredump(input, options, capturedBytes) {
+  input.validatePolicy();
+  options.validatePolicy();
+  const debuggerExecutable = await resolveDebuggerExecutable(
+    options.debuggerExecutable,
+    options.trustedDebuggerRoots,
+    input.workspaceDir
+  );
+  return withEspCoredumpArtifacts(
+    input,
+    async (artifacts) => withConvertedEspCoredump(
+      artifacts,
+      options,
+      async (corePath, coreSha256) => {
+        const script = path53.join(path53.dirname(corePath), "report.gdb");
+        const coreName = path53.basename(corePath);
+        if (!/^[a-zA-Z0-9_.-]+$/.test(coreName))
+          throw new PlatformIOError(
+            "Invalid converted core filename.",
+            "COREDUMP_PATH_INVALID"
+          );
+        const commands = [
+          "set auto-load off",
+          "set may-call-functions off",
+          "set auto-solib-add off",
+          "set pagination off",
+          "set confirm off",
+          "set print elements 128",
+          "file " + gdbFile(artifacts.elfPath),
+          "core-file " + coreName,
+          "echo ==================== CURRENT THREAD REGISTERS ====================\\n",
+          "info registers",
+          "echo ==================== CURRENT THREAD STACK ====================\\n",
+          "backtrace 256",
+          "echo ==================== THREADS INFO ====================\\n",
+          "info threads"
+        ];
+        await fs49.writeFile(script, commands.join("\n") + "\n", {
+          flag: "wx",
+          mode: 384
+        });
+        options.validatePolicy();
+        const output = await runAnalysisProcess(
+          debuggerExecutable,
+          [
+            "-nx",
+            "-nh",
+            "--batch",
+            "--quiet",
+            "-iex",
+            "set auto-load off",
+            "-iex",
+            "set may-call-functions off",
+            "-x",
+            script
+          ],
+          {
+            cwd: path53.dirname(corePath),
+            signal: options.signal,
+            timeoutMs: 6e4,
+            maxOutputBytes: 4 * 1024 * 1024,
+            environment: { DEBUGINFOD_URLS: "" }
+          }
+        );
+        options.validatePolicy();
+        const report = parseEspCoredumpReport(output.stdout);
+        return {
+          ok: true,
+          ...report,
+          dump: {
+            source: artifacts.dump.source,
+            identity: artifacts.dump.identity
+          },
+          elf: artifacts.elfIdentity,
+          firmware_correspondence: artifacts.correspondence,
+          core_sha256: coreSha256,
+          debugger: debuggerExecutable,
+          stderr_present: output.stderr.length > 0
+        };
+      }
+    ),
+    capturedBytes
+  );
+}
+
+// src/core/analysis/esp-coredump-tools.ts
+init_errors2();
+import fs50 from "node:fs/promises";
+import path54 from "node:path";
+async function resolveEspCoredumpTools(projectDir, environment = process.env) {
+  const python = environment.PIO_MCP_COREDUMP_PYTHON;
+  const debuggerPath = environment.PIO_MCP_COREDUMP_GDB;
+  if (!python || !debuggerPath)
+    throw new PlatformIOError(
+      "Configure PIO_MCP_COREDUMP_PYTHON and PIO_MCP_COREDUMP_GDB in the server environment; install the optional coredump dependencies explicitly.",
+      "COREDUMP_TOOLS_UNCONFIGURED"
+    );
+  if ([python, debuggerPath].some(
+    (value2) => !path54.isAbsolute(value2) || value2.length > 32768 || /[\x00-\x1f\x7f]/.test(value2)
+  ) || /\.(?:cmd|bat|ps1|sh)$/i.test(python))
+    throw new PlatformIOError(
+      "Core-dump tools require absolute native executable paths.",
+      "COREDUMP_TOOLS_INVALID"
+    );
+  const project = await fs50.realpath(projectDir);
+  const executable = await fs50.realpath(python);
+  const relative = path54.relative(project, executable);
+  if (!relative || relative !== ".." && !relative.startsWith(".." + path54.sep) && !path54.isAbsolute(relative) || !(await fs50.stat(executable)).isFile())
+    throw new PlatformIOError(
+      "The configured Python interpreter must be installed outside the workspace.",
+      "COREDUMP_TOOLS_INVALID"
+    );
+  const roots = await discoverDebuggerRoots(
+    debuggerPath,
+    null,
+    project,
+    environment
+  );
+  const debuggerExecutable = await resolveDebuggerExecutable(
+    debuggerPath,
+    roots,
+    project
+  );
+  return {
+    pythonExecutable: executable,
+    debuggerExecutable,
+    trustedDebuggerRoots: roots
+  };
+}
+
+// src/tools/coredump.ts
+var CoredumpSchema = external_exports.object({
+  projectDir: external_exports.string().min(1).max(32768),
+  dumpPath: external_exports.string().min(1).max(32768).optional(),
+  device: external_exports.object({
+    port: external_exports.string().min(1).max(512),
+    partitionName: external_exports.string().min(1).max(16).optional(),
+    table: PartitionTableSchema,
+    approvalId: external_exports.string().max(256).optional(),
+    commandApprovalId: external_exports.string().max(256).optional()
+  }).strict().optional(),
+  format: external_exports.enum(["raw", "base64"]).default("raw"),
+  analyze: external_exports.boolean().default(true),
+  outPath: external_exports.string().min(1).max(32768).optional(),
+  retainDump: external_exports.boolean().default(false),
+  exportApprovalId: external_exports.string().max(256).optional(),
+  elfPath: external_exports.string().min(1).max(32768).optional(),
+  expectedInputSha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
+  expectedElfSha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
+  encrypted: external_exports.boolean().default(false),
+  approvalId: external_exports.string().max(256).optional(),
+  commandApprovalId: external_exports.string().max(256).optional()
+}).strict().refine(
+  (value2) => !(value2.outPath && value2.retainDump),
+  "Select explicit export or managed retention, not both."
+).refine(
+  (value2) => !(value2.outPath || value2.retainDump) || !!value2.device,
+  "Dump export requires device acquisition."
+).refine(
+  (value2) => Boolean(value2.dumpPath) !== Boolean(value2.device),
+  "Select exactly one dump file or device acquisition."
+).refine(
+  (value2) => !value2.device || value2.format === "raw" && !value2.encrypted && !value2.device.table.readDevice,
+  "Device capture requires raw unencrypted input and an offline project table."
+).refine(
+  (value2) => !value2.analyze || !!value2.elfPath,
+  "An explicit ELF is required for analysis."
+);
+async function executeCoredump(input, caller = {}, onAuthorized) {
+  const request = CoredumpSchema.parse(input);
+  const projectDir = await fs51.realpath(request.projectDir);
+  if (request.device && await fs51.realpath(request.device.table.projectDir) !== projectDir)
+    throw new PlatformIOError(
+      "Partition inspection must use the same authorized project.",
+      "COREDUMP_TABLE_INPUT_INVALID"
+    );
+  const { commandApprovalId, exportApprovalId, ...operation } = request;
+  const stripGrants = (value2) => {
+    if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
+      return value2;
+    return Object.fromEntries(
+      Object.entries(value2).filter(([key]) => key !== "approvalId" && !key.endsWith("ApprovalId")).map(([key, nested]) => [key, stripGrants(nested)])
+    );
+  };
+  const args = {
+    ...operation,
+    device: stripGrants(operation.device),
+    projectDir
+  };
+  const commandArgs = { ...args, approvalId: commandApprovalId };
+  const exportArgs = { ...args, approvalId: exportApprovalId };
+  const context = { ...caller, workspaceDir: projectDir };
+  const stages = [
+    ["coredump_inspect", args]
+  ];
+  if (request.outPath || request.retainDump)
+    stages.push(["coredump_export", exportArgs]);
+  if (request.analyze) stages.push(["coredump_analyze", commandArgs]);
+  for (const [name2, parameters] of stages) {
+    const plan = await planAction(name2, parameters, context);
+    if (plan.status !== "ready")
+      throw new PlatformIOError(
+        plan.reason,
+        plan.status === "requires_approval" ? "APPROVAL_REQUIRED" : "POLICY_DENIED",
+        { policyDecision: plan }
+      );
+  }
+  return dispatchAuthorizedAction(
+    "coredump_inspect",
+    args,
+    context,
+    async () => {
+      const validatePolicy = createPolicyRevisionGuard(projectDir);
+      await onAuthorized?.();
+      validatePolicy();
+      const selection = {
+        ...request,
+        workspaceDir: projectDir,
+        dumpPath: request.dumpPath ?? ""
+      };
+      const execute3 = async () => {
+        validatePolicy();
+        const capture = request.device ? await acquireProjectCoredump(
+          request.device.table,
+          {
+            port: request.device.port,
+            partitionName: request.device.partitionName,
+            approvalId: request.device.approvalId,
+            commandApprovalId: request.device.commandApprovalId
+          },
+          caller
+        ) : null;
+        validatePolicy();
+        if (capture && request.expectedInputSha256 && createHash12("sha256").update(capture.bytes).digest("hex") !== request.expectedInputSha256.toLowerCase())
+          throw new PlatformIOError(
+            "Captured partition does not match the selected input identity.",
+            "COREDUMP_IDENTITY_MISMATCH"
+          );
+        const exported = (request.outPath || request.retainDump) && capture ? await dispatchAuthorizedAction(
+          "coredump_export",
+          exportArgs,
+          context,
+          async () => request.retainDump ? retainEspCoredump(capture.bytes) : exportEspCoredump(
+            projectDir,
+            request.outPath,
+            capture.bytes
+          )
+        ) : null;
+        validatePolicy();
+        if (capture && !capture.present)
+          return {
+            ok: false,
+            analyzed: false,
+            error: "no_coredump",
+            acquisition: capture.source,
+            layout: capture.layout,
+            dump_export: exported
+          };
+        const capturedBytes = capture?.present ? capture.bytes : void 0;
+        let tools = null;
+        let analysisUnavailable = null;
+        if (request.analyze) {
+          try {
+            tools = await resolveEspCoredumpTools(projectDir);
+          } catch (error2) {
+            if (!exported || !(error2 instanceof PlatformIOError) || error2.code !== "COREDUMP_TOOLS_UNCONFIGURED")
+              throw error2;
+            analysisUnavailable = error2.code;
+          }
+        }
+        if (!request.analyze || analysisUnavailable) {
+          const artifact = capturedBytes ? inspectCapturedEspCoredump(
+            capturedBytes,
+            request.expectedInputSha256
+          ) : await readEspCoredumpArtifact(selection);
+          validatePolicy();
+          return {
+            ok: true,
+            analyzed: false,
+            analysis_unavailable: analysisUnavailable,
+            source: artifact.source,
+            identity: artifact.identity,
+            firmwareIdentity: artifact.firmwareIdentity,
+            acquisition: capture?.source ?? null,
+            layout: capture?.layout ?? null,
+            dump_export: exported
+          };
+        }
+        const result = await analyzeEspCoredump(
+          { ...selection, elfPath: request.elfPath, validatePolicy },
+          { ...tools, validatePolicy },
+          capturedBytes
+        );
+        validatePolicy();
+        return {
+          ...result,
+          analyzed: true,
+          acquisition: capture?.source ?? null,
+          layout: capture?.layout ?? null,
+          dump_export: exported
+        };
+      };
+      return request.analyze ? dispatchAuthorizedAction(
+        "coredump_analyze",
+        commandArgs,
+        context,
+        execute3
+      ) : execute3();
+    }
+  );
+}
+
 // src/adapters/coredump-compat.ts
+init_zod();
+init_errors2();
+import fs52 from "node:fs/promises";
 var CoredumpCompatibilitySchema = external_exports.object({
   project_dir: external_exports.string().max(32768).nullish(),
   env: external_exports.string().regex(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,49}$/).nullish(),
@@ -104768,7 +105057,7 @@ init_platformio();
 init_projects();
 import fs53 from "node:fs/promises";
 import path55 from "node:path";
-init_errors();
+init_errors2();
 init_paths();
 async function executeSystemCompatibility(input, client, serverVersion, defaults = {}, caller = {}, onAuthorized) {
   const params = external_exports.object({
@@ -104867,19 +105156,6 @@ async function executeSystemCompatibility(input, client, serverVersion, defaults
   );
 }
 
-// src/adapters/upload-compat.ts
-var UploadCompatibilitySchema = RunTargetSchema.omit({ target: true });
-function executeUploadCompatibility(input, client, defaults = {}, caller = {}, onAuthorized) {
-  const params = UploadCompatibilitySchema.parse(input);
-  return executeNamedTarget(
-    { ...params, target: "upload" },
-    client,
-    defaults,
-    caller,
-    onAuthorized
-  );
-}
-
 // src/utils/shutdown-coordinator.ts
 var ShutdownCoordinator = class {
   tasks = /* @__PURE__ */ new Set();
@@ -104926,7 +105202,7 @@ function registerShutdownTask(task) {
 }
 
 // src/adapters/serial-client.ts
-init_errors();
+init_errors2();
 var SerialClientContext = class {
   constructor(service = new PolicySerialSessionService()) {
     this.service = service;
@@ -104982,7 +105258,7 @@ function readRuntimeVersion(entryUrl) {
 init_zod();
 
 // src/core/dependency-graph.ts
-init_errors();
+init_errors2();
 init_redact();
 function parseDependencyGraph(output) {
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
@@ -105072,7 +105348,7 @@ import path56 from "node:path";
 
 // src/core/dependency-manifest.ts
 init_zod();
-init_errors();
+init_errors2();
 init_redact();
 var nameSchema = external_exports.string().trim().min(1).max(512).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 function parseDependencyDeclaration(input) {
@@ -105168,7 +105444,7 @@ function parseDependencyManifest(text7, format) {
 }
 
 // src/core/dependency-project.ts
-init_errors();
+init_errors2();
 function list(value2) {
   if (value2 == null || value2 === "") return [];
   const values = typeof value2 === "string" ? value2.split(/\r?\n/) : value2;
@@ -105235,7 +105511,7 @@ function dependencyProjectInputs(projectDir, report, environment) {
 // src/core/dependency-inventory.ts
 import fs54 from "node:fs/promises";
 import path57 from "node:path";
-init_errors();
+init_errors2();
 async function collectDependencyInventory(roots, assertAuthorized) {
   if (roots.length > 64)
     throw new PlatformIOError("Too many library roots.", "DEPENDENCY_LIMIT");
@@ -105395,7 +105671,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
 
 // src/core/dependency-audit.ts
 init_zod();
-init_errors();
+init_errors2();
 var name = external_exports.string().min(1).max(512);
 var librarySchema = external_exports.object({
   name,
@@ -105529,7 +105805,7 @@ function auditDependencies(declaredInput, installedInput) {
 // src/tools/dependency-inspection.ts
 init_redact();
 init_platformio();
-init_errors();
+init_errors2();
 var schema3 = external_exports.object({
   projectDir: external_exports.string().min(1).max(32768),
   approvalId: external_exports.string().max(256).optional(),
@@ -105685,7 +105961,7 @@ function dependencyGraphFields(evidence) {
 }
 
 // src/adapters/dependency-compat.ts
-init_errors();
+init_errors2();
 var text2 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var schema4 = external_exports.object({
   project_dir: text2.nullable().optional(),
@@ -105836,7 +106112,7 @@ function compatibilityErrorResult(error2) {
 
 // src/adapters/board-compat.ts
 init_zod();
-init_errors();
+init_errors2();
 var text3 = external_exports.string().max(4096);
 var listSchema = external_exports.object({
   query: text3,
@@ -106234,6 +106510,72 @@ function withProjectCompatibility(base2) {
     },
     handler: (args, context) => context.dispatch("pio_run_target", args)
   });
+  const flashVerify = base2.get("agent_flash_monitor_verify");
+  if (!flashVerify || result.has("pio_flash_and_verify"))
+    throw new Error("Invalid flash verification compatibility registry");
+  const flashDefaults = FlashVerificationCompatibilitySchema.parse({});
+  result.set("pio_flash_and_verify", {
+    ...flashVerify,
+    name: "pio_flash_and_verify",
+    description: "Build and upload firmware, verify fresh owned serial boot output, and decode crashes when authorized. Preserves quiet-window/crash checks; reports incomplete evidence and unverified firmware identity explicitly.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        project_dir: { type: ["string", "null"], default: null },
+        env: { type: ["string", "null"], default: null },
+        expect: {
+          type: "string",
+          maxLength: 4096,
+          default: flashDefaults.expect
+        },
+        fail_on: {
+          type: "string",
+          maxLength: 4096,
+          default: flashDefaults.fail_on
+        },
+        timeout_s: { type: "number", minimum: 0, maximum: 300, default: 30 },
+        upload_port: { type: ["string", "null"], default: null },
+        monitor_port: { type: ["string", "null"], default: null },
+        baud: {
+          type: ["integer", "null"],
+          minimum: 1,
+          maximum: 4e6,
+          default: null
+        },
+        stop_open_sessions: { type: "boolean", default: false },
+        max_lines: {
+          type: "integer",
+          minimum: 1,
+          maximum: 1e4,
+          default: 500
+        },
+        settle_s: { type: "number", minimum: 0, maximum: 20, default: 1.5 },
+        stability_window_s: {
+          type: "number",
+          minimum: 0,
+          maximum: 60,
+          default: 10
+        },
+        ...Object.fromEntries(
+          [
+            "workflow_approval_id",
+            "approval_id",
+            "config_approval_id",
+            "selection_approval_id",
+            "monitor_approval_id",
+            "read_approval_id",
+            "preflight_discovery_approval_id",
+            "discovery_approval_id",
+            "decode_approval_id",
+            "decode_config_approval_id"
+          ].map((name2) => [name2, { type: "string", maxLength: 256 }])
+        )
+      }
+    },
+    handler: (args, context) => context.dispatch("pio_flash_and_verify", args)
+  });
   const upload = base2.get("upload_firmware");
   if (!upload || result.has("pio_upload"))
     throw new Error("Invalid firmware upload compatibility registry");
@@ -106286,11 +106628,11 @@ init_zod();
 import fs56 from "node:fs/promises";
 import path59 from "node:path";
 init_paths();
-init_errors();
+init_errors2();
 
 // src/core/analysis/test-report.ts
 init_zod();
-init_errors();
+init_errors2();
 var text4 = external_exports.string().max(65536).nullable().optional();
 var count = external_exports.number().int().nonnegative().max(1e6);
 var duration = external_exports.number().finite().nonnegative();
@@ -106441,7 +106783,7 @@ async function runTestsWithReport(projectDir, environment, compileOnly, options 
 }
 
 // src/adapters/test-compat.ts
-init_errors();
+init_errors2();
 async function executeTestCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
   const text7 = external_exports.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/);
   const params = external_exports.object({
@@ -106577,7 +106919,7 @@ import fs57 from "node:fs/promises";
 import path60 from "node:path";
 import os9 from "node:os";
 init_redact();
-init_errors();
+init_errors2();
 async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
   const params = external_exports.object({
     project_dir: external_exports.string().min(1).max(32768),
@@ -106708,7 +107050,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
 // src/adapters/project-compat.ts
 init_zod();
 import path61 from "node:path";
-init_errors();
+init_errors2();
 var text5 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var scope2 = {
   project_dir: text5.nullable().optional(),
@@ -106827,7 +107169,7 @@ async function executeProjectCompatibility(name2, input, defaults = {}, caller =
 }
 
 // src/adapters/compatibility-mode.ts
-init_errors();
+init_errors2();
 function parseCompatibilityLaunch(args, environment = process.env.PIO_MCP_COMPAT) {
   let selected;
   const remaining = [];
@@ -106934,20 +107276,20 @@ function withPackageCompatibility(base2) {
 
 // src/adapters/package-compat.ts
 init_zod();
-init_errors();
+init_errors2();
 
 // src/tools/packages.ts
 var import_proper_lockfile7 = __toESM(require_proper_lockfile(), 1);
 init_zod();
 init_platformio();
-init_errors();
+init_errors2();
 import fs58 from "node:fs/promises";
 import path62 from "node:path";
 import crypto15 from "node:crypto";
 init_redact();
 
 // src/core/package-config.ts
-init_errors();
+init_errors2();
 function uncomment(value2) {
   return value2.replace(/(^|\s)[#;].*$/, "").trim();
 }
@@ -107039,7 +107381,7 @@ function mergePackageConfiguration(before, after, options) {
 }
 
 // src/core/packages.ts
-init_errors();
+init_errors2();
 function linesFromOutput(output) {
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
     throw new PlatformIOError(
@@ -114600,8 +114942,8 @@ init_mcp_context();
 init_spooler();
 init_monitor();
 init_validation();
-init_errors();
-init_errors();
+init_errors2();
+init_errors2();
 init_monitor();
 init_semaphore();
 init_redact();
@@ -114856,7 +115198,7 @@ async function startMonitorCore(input) {
 init_command_registry();
 init_process_manager();
 init_monitor();
-init_errors();
+init_errors2();
 async function checkTaskStatusCore(input) {
   return checkTaskStatus(input.taskId, input.logPath, input.projectDir);
 }
@@ -114949,7 +115291,7 @@ async function cancelTaskCore(input) {
 
 // src/api/server.ts
 var import_express = __toESM(require_express2(), 1);
-init_errors();
+init_errors2();
 import { createServer } from "http";
 
 // node_modules/socket.io/wrapper.mjs
@@ -116501,7 +116843,7 @@ init_zod();
 init_platformio();
 init_types2();
 init_validation();
-init_errors();
+init_errors2();
 async function searchLibraries(query, limit) {
   if (!query || query.trim().length === 0) {
     throw new LibraryError("Search query is required");
@@ -117946,7 +118288,7 @@ init_devices2();
 
 // src/core/monitor-health.ts
 init_redact();
-init_errors();
+init_errors2();
 import crypto20 from "node:crypto";
 var MAX_PATTERN_LENGTH = 128;
 var MAX_EVIDENCE_BYTES = 8192;
@@ -119023,7 +119365,7 @@ async function agentMonitorHealth(input) {
 
 // src/index.ts
 init_platformio();
-init_errors();
+init_errors2();
 init_process_manager();
 init_paths();
 import fs69 from "node:fs";
@@ -120527,7 +120869,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name2
   );
-  const compatibilityTool = packageCompatibility || projectCompatibility || name2 === "pio_run_target" || name2 === "pio_upload" || name2 === "pio_partition_table" || name2 === "pio_coredump" || name2 === "pio_system_info" || dependencyCompatibility || boardCompatibility || deviceCompatibility;
+  const compatibilityTool = packageCompatibility || projectCompatibility || name2 === "pio_run_target" || name2 === "pio_upload" || name2 === "pio_flash_and_verify" || name2 === "pio_partition_table" || name2 === "pio_coredump" || name2 === "pio_system_info" || dependencyCompatibility || boardCompatibility || deviceCompatibility;
   const projectInspection = [
     "project_envs",
     "project_metadata",
@@ -120569,7 +120911,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const result = await mcpContext.run(
         { activityId, targetProjectDir },
         () => registeredTool.handler(args, {
-          dispatch: async (tool, parameters) => tool === "coredump" ? executeCoredump(parameters, caller, onAuthorized) : tool === "partition_table" ? executePartitionTable(parameters, caller, onAuthorized) : tool === "run_target" ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized) : tool === "pio_coredump" ? executeCoredumpCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_partition_table" ? executePartitionCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_system_info" ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload" ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_run_target" ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (deviceCompatibility ? executeDeviceCompatibility.bind(null, serialClient) : boardCompatibility ? executeBoardCompatibility : dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
+          dispatch: async (tool, parameters) => tool === "coredump" ? executeCoredump(parameters, caller, onAuthorized) : tool === "partition_table" ? executePartitionTable(parameters, caller, onAuthorized) : tool === "run_target" ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized) : tool === "pio_coredump" ? executeCoredumpCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_partition_table" ? executePartitionCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_system_info" ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_flash_and_verify" ? executeFlashVerificationCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload" ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_run_target" ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (deviceCompatibility ? executeDeviceCompatibility.bind(null, serialClient) : boardCompatibility ? executeBoardCompatibility : dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
             tool,
             parameters,
             {

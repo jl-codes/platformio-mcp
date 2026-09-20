@@ -1,4 +1,5 @@
 /** Register opt-in project aliases while preserving canonical permission metadata. */
+import { FlashVerificationCompatibilitySchema } from "./flash-verification-compat.js";
 import type { RegisteredTool } from "../mcp/tool-registry.js";
 
 /** Extend a canonical registry without changing its entries or granting additional permissions. */
@@ -267,6 +268,73 @@ export function withProjectCompatibility<TResult>(
       },
     },
     handler: (args, context) => context.dispatch("pio_run_target", args),
+  });
+  const flashVerify = base.get("agent_flash_monitor_verify");
+  if (!flashVerify || result.has("pio_flash_and_verify"))
+    throw new Error("Invalid flash verification compatibility registry");
+  const flashDefaults = FlashVerificationCompatibilitySchema.parse({});
+  result.set("pio_flash_and_verify", {
+    ...flashVerify,
+    name: "pio_flash_and_verify",
+    description:
+      "Build and upload firmware, verify fresh owned serial boot output, and decode crashes when authorized. Preserves quiet-window/crash checks; reports incomplete evidence and unverified firmware identity explicitly.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: [],
+      properties: {
+        project_dir: { type: ["string", "null"], default: null },
+        env: { type: ["string", "null"], default: null },
+        expect: {
+          type: "string",
+          maxLength: 4096,
+          default: flashDefaults.expect,
+        },
+        fail_on: {
+          type: "string",
+          maxLength: 4096,
+          default: flashDefaults.fail_on,
+        },
+        timeout_s: { type: "number", minimum: 0, maximum: 300, default: 30 },
+        upload_port: { type: ["string", "null"], default: null },
+        monitor_port: { type: ["string", "null"], default: null },
+        baud: {
+          type: ["integer", "null"],
+          minimum: 1,
+          maximum: 4000000,
+          default: null,
+        },
+        stop_open_sessions: { type: "boolean", default: false },
+        max_lines: {
+          type: "integer",
+          minimum: 1,
+          maximum: 10000,
+          default: 500,
+        },
+        settle_s: { type: "number", minimum: 0, maximum: 20, default: 1.5 },
+        stability_window_s: {
+          type: "number",
+          minimum: 0,
+          maximum: 60,
+          default: 10,
+        },
+        ...Object.fromEntries(
+          [
+            "workflow_approval_id",
+            "approval_id",
+            "config_approval_id",
+            "selection_approval_id",
+            "monitor_approval_id",
+            "read_approval_id",
+            "preflight_discovery_approval_id",
+            "discovery_approval_id",
+            "decode_approval_id",
+            "decode_config_approval_id",
+          ].map((name) => [name, { type: "string", maxLength: 256 }]),
+        ),
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_flash_and_verify", args),
   });
   const upload = base.get("upload_firmware");
   if (!upload || result.has("pio_upload"))

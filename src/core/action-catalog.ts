@@ -296,6 +296,8 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
 
 /** Implemented internal service actions; these are not advertised as MCP tools. */
 export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  pio_flash_and_verify: { ...MCP_ACTIONS.agent_flash_monitor_verify, policyAction: "flash_verification" },
+  flash_verification: { ...MCP_ACTIONS.agent_flash_monitor_verify, policyAction: "agent_flash_monitor_verify" },
   coredump_export: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
   coredump_inspect: { ...READ, policyAction: "coredump" },
   coredump_analyze: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
@@ -461,6 +463,7 @@ export function policyNamesForOperation(name: string): string[] {
   let current = name;
   while (!names.includes(current)) {
     names.push(current);
+    if (current === "flash_verification" && !names.includes("pio_flash_and_verify")) names.push("pio_flash_and_verify");
     if (current === name && Object.hasOwn(INTERNAL_ACTIONS, name) && name.startsWith("target_"))
       names.push("run_target", "pio_run_target");
     const parent = Object.hasOwn(MCP_ACTIONS, current)

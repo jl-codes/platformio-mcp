@@ -1,5 +1,9 @@
 /** Compose authorized upload and fresh owned boot capture for an already resolved project/environment. */
 import { z } from "zod";
+import {
+  dispatchAuthorizedAction,
+  planAction,
+} from "../core/action-dispatcher.js";
 import { SerialClientContext } from "../adapters/serial-client.js";
 import { executeUploadCompatibility } from "../adapters/upload-compat.js";
 import {
@@ -21,6 +25,7 @@ export const FlashVerificationSchema = z
     baudRate: z.number().int().min(1).max(4000000),
     stopOpenSessions: z.boolean().default(false),
     verification: VerificationCaptureSchema.default({}),
+    workflowApprovalId: z.string().max(256).optional(),
     uploadApprovalId: z.string().max(256).optional(),
     openApprovalId: z.string().max(256).optional(),
     readApprovalId: z.string().max(256).optional(),
@@ -34,10 +39,33 @@ export async function executeFlashVerification(
   input: z.input<typeof FlashVerificationSchema>,
   client: SerialClientContext,
   caller: PolicyEvaluationContext = {},
+  onAuthorized?: () => Promise<void>,
 ) {
   const args = FlashVerificationSchema.parse(input);
   await validateVerificationCapture(args.verification);
   const guard = createPolicyRevisionGuard(args.projectDir);
+  const workflowArgs = {
+    projectDir: args.projectDir,
+    environment: args.environment,
+    uploadPort: args.uploadPort,
+    monitorPort: args.monitorPort,
+    baudRate: args.baudRate,
+    stopOpenSessions: args.stopOpenSessions,
+    verification: args.verification,
+    approvalId: args.workflowApprovalId,
+  };
+  const workflowContext = { ...caller, workspaceDir: args.projectDir };
+  const permission = await planAction(
+    "flash_verification",
+    workflowArgs,
+    workflowContext,
+  );
+  if (permission.status !== "ready")
+    throw new PlatformIOError(
+      permission.reason,
+      permission.status === "deny" ? "POLICY_DENIED" : "APPROVAL_REQUIRED",
+      { policyDecision: permission },
+    );
   const monitorEndpoint = resolveSerialEndpoint(args.monitorPort);
   const request = {
     projectDir: args.projectDir,
@@ -60,81 +88,96 @@ export async function executeFlashVerification(
       ),
   );
   guard();
-  const started = performance.now();
-  const upload = await executeUploadCompatibility(
-    {
-      project_dir: args.projectDir,
-      env: args.environment,
-      upload_port: args.uploadPort,
-      stop_open_sessions: args.stopOpenSessions,
-      approval_id: args.uploadApprovalId,
-    },
-    client,
-    {},
-    caller,
+  return dispatchAuthorizedAction(
+    "flash_verification",
+    workflowArgs,
+    workflowContext,
     async () => {
-      // Called only inside canonical upload authorization, before any upload effect.
-      await client.run({ caller }, async (service, owner) => {
-        const held = service.sessions
-          .list(owner)
-          .filter(
-            (session) =>
-              (!["stopped", "disconnected", "error"].includes(session.state) ||
-                session.cleanupPending) &&
-              resolveSerialEndpoint(session.path).resource.identity ===
-                monitorEndpoint.resource.identity,
-          );
-        if (held.length && !args.stopOpenSessions)
-          throw new PlatformIOError(
-            "An owned monitor holds the verification port.",
-            "TARGET_PORT_BUSY",
-          );
-        for (const session of held) {
-          guard();
-          const stopped = await service.sessions.stop(owner, session.sessionId);
-          if (stopped.cleanupPending)
-            throw new PlatformIOError(
-              "Verification monitor closure is unconfirmed.",
-              "DEVICE_CLEANUP_PENDING",
-              { cleanupPending: true },
-            );
-        }
-      });
       guard();
+      const started = performance.now();
+      const upload = await executeUploadCompatibility(
+        {
+          project_dir: args.projectDir,
+          env: args.environment,
+          upload_port: args.uploadPort,
+          stop_open_sessions: args.stopOpenSessions,
+          approval_id: args.uploadApprovalId,
+        },
+        client,
+        {},
+        caller,
+        async () => {
+          // Called only inside canonical upload authorization, before any upload effect.
+          await onAuthorized?.();
+          guard();
+          await client.run({ caller }, async (service, owner) => {
+            const held = service.sessions
+              .list(owner)
+              .filter(
+                (session) =>
+                  (!["stopped", "disconnected", "error"].includes(
+                    session.state,
+                  ) ||
+                    session.cleanupPending) &&
+                  resolveSerialEndpoint(session.path).resource.identity ===
+                    monitorEndpoint.resource.identity,
+              );
+            if (held.length && !args.stopOpenSessions)
+              throw new PlatformIOError(
+                "An owned monitor holds the verification port.",
+                "TARGET_PORT_BUSY",
+              );
+            for (const session of held) {
+              guard();
+              const stopped = await service.sessions.stop(
+                owner,
+                session.sessionId,
+              );
+              if (stopped.cleanupPending)
+                throw new PlatformIOError(
+                  "Verification monitor closure is unconfirmed.",
+                  "DEVICE_CLEANUP_PENDING",
+                  { cleanupPending: true },
+                );
+            }
+          });
+          guard();
+        },
+      );
+      guard();
+      const uploadSeconds = (performance.now() - started) / 1000;
+      if (!upload.ok)
+        return {
+          ok: false,
+          verdict: "upload_failed" as const,
+          upload,
+          upload_s: uploadSeconds,
+          port: selection.port,
+          baud: args.baudRate,
+          summary: "Upload failed; boot verification did not start.",
+        };
+      const report = await client.run(
+        { ...context, discoveryApprovalId: args.discoveryApprovalId },
+        (service, owner) =>
+          service.captureVerificationOnce(
+            owner,
+            request,
+            args.verification,
+            undefined,
+            selection.deviceBinding,
+          ),
+      );
+      guard();
+      return {
+        ...report,
+        upload,
+        upload_s: uploadSeconds,
+        firmware_identity: "identity_unverified" as const,
+        summary:
+          report.verdict === "pass"
+            ? "Upload succeeded and fresh boot output passed verification."
+            : `Upload succeeded; boot verification returned ${report.verdict}.`,
+      };
     },
   );
-  guard();
-  const uploadSeconds = (performance.now() - started) / 1000;
-  if (!upload.ok)
-    return {
-      ok: false,
-      verdict: "upload_failed" as const,
-      upload,
-      upload_s: uploadSeconds,
-      port: selection.port,
-      baud: args.baudRate,
-      summary: "Upload failed; boot verification did not start.",
-    };
-  const report = await client.run(
-    { ...context, discoveryApprovalId: args.discoveryApprovalId },
-    (service, owner) =>
-      service.captureVerificationOnce(
-        owner,
-        request,
-        args.verification,
-        undefined,
-        selection.deviceBinding,
-      ),
-  );
-  guard();
-  return {
-    ...report,
-    upload,
-    upload_s: uploadSeconds,
-    firmware_identity: "identity_unverified" as const,
-    summary:
-      report.verdict === "pass"
-        ? "Upload succeeded and fresh boot output passed verification."
-        : `Upload succeeded; boot verification returned ${report.verdict}.`,
-  };
 }

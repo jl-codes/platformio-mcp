@@ -1305,3 +1305,10 @@ Added `executeFlashVerification` as the resolved-input orchestration boundary us
 32 focused orchestration and real serial-policy tests passed, including reuse of exact preflight grants after upload and rejection of device replacement. Typecheck/lint passed and the shared plugin runtime was rebuilt. The public reference adapter/registration, crash decode composition, immutable upload manifest/lease handoff, and physical acceptance remain incomplete; no additional public tool is claimed here.
 
 Both prior-head CI runs (35503371353 and 35503369571 at f7f07d38) succeeded, including Windows after splitting the four independent CLI checks. New-head CI remains pending after push. No publishing occurred.
+
+
+### 2026-09-20 — Public flash-and-verify adapter
+
+Registered opt-in `pio_flash_and_verify` over the shared upload/preflight/fresh-capture workflow, with reference defaults, project/port resolution, separate decoder grants, and best-effort crash decoding that preserves the boot verdict. The composite workflow now has an explicit policy boundary; concrete alias, legacy verifier and upload-category denials all block before flashing. Existing canonical APIs remain registered. Inventory: 57 canonical plus 34 reference tools = 91 with compatibility enabled. Six unregistered reference tools remain: four debugger tools, OTA upload and power profiling.
+
+Focused adapter/project/MCP tests passed (17 before adding the policy boundary). Following that change, ten adapter/MCP tests and six real-policy orchestration tests passed; the latter initially exposed a missing strict-validator entry for the new alias, which was fixed. Typecheck and changed-file lint passed; plugin rebuilt. Both previous-head CI runs 35503654187 and 35503652425 passed on 60ec0bd1. New-head CI and hardware acceptance remain pending. Firmware/image correspondence is explicitly unverified; full custody, immutable manifests, CLI exposure and PAR-12 acceptance are not claimed. No release published.

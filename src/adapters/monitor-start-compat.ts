@@ -52,6 +52,7 @@ export async function resolveMonitorRequest(
     : await fs.realpath(path.resolve(defaults.cwd ?? process.cwd()));
   let port = params.port || undefined;
   let baud = params.baud || undefined;
+  let environment = params.env || undefined;
   if (useConfig) {
     const report = await executeProjectInspection(
       "project_envs",
@@ -63,7 +64,9 @@ export async function resolveMonitorRequest(
         "Could not resolve monitor project configuration.",
         "PROJECT_CONFIG_INVALID",
       );
-    const environment = params.env || report.defaultEnvironments[0];
+    environment ||=
+      report.defaultEnvironments[0] ||
+      (report.envs.length === 1 ? report.envs[0].name : undefined);
     const selected = report.envs.find((item) => item.name === environment);
     if (environment && !selected)
       throw new PlatformIOError(
@@ -118,7 +121,7 @@ export async function resolveMonitorRequest(
     baudRate: baud ?? 115200,
     buffer: { maxLines: params.max_lines },
   };
-  return { params, request };
+  return { params, request, environment };
 }
 
 /** Resolve defaults and open one persistent owned monitor. */

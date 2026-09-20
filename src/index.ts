@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { executeFlashVerificationCompatibility } from "./adapters/flash-verification-compat.js";
 import { startCoredumpRetentionCleanup } from "./core/analysis/esp-coredump-retention.js";
 import { executeCoredump } from "./tools/coredump.js";
 import { executeCoredumpCompatibility } from "./adapters/coredump-compat.js";
@@ -1674,6 +1675,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     projectCompatibility ||
     name === "pio_run_target" ||
     name === "pio_upload" ||
+    name === "pio_flash_and_verify" ||
     name === "pio_partition_table" ||
     name === "pio_coredump" ||
     name === "pio_system_info" ||
@@ -1748,6 +1750,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   ? executePartitionCompatibility(parameters, {projectDir:compatibilityProjectDir,cwd:process.cwd()},caller,onAuthorized)
                 : tool === "pio_system_info"
                   ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
+                : tool === "pio_flash_and_verify"
+                  ? executeFlashVerificationCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
                 : tool === "pio_upload"
                   ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
                 : tool === "pio_run_target"
