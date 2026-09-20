@@ -1,0 +1,97 @@
+/** Startup composition must preserve retry scope and deny work after disconnect. */
+import { beforeEach, expect, it, vi } from "vitest";
+const mocks = vi.hoisted(() => ({
+  prepare: vi.fn(),
+  forget: vi.fn(),
+  close: vi.fn(),
+  start: vi.fn(),
+  inventory: vi.fn(),
+  project: vi.fn(),
+}));
+vi.mock("../src/core/debug/debug-preparation-cache.js", () => ({
+  DebugPreparationCache: class {
+    prepare = mocks.prepare;
+    forget = mocks.forget;
+    close = mocks.close;
+  },
+}));
+vi.mock("../src/core/debug/debug-local-startup.js", () => ({
+  startLocalPreparedDebugger: mocks.start,
+}));
+vi.mock("../src/adapters/compatibility-project.js", () => ({
+  resolveCompatibilityProject: mocks.project,
+}));
+vi.mock("../src/core/devices/debug-probe-discovery.js", () => ({
+  withDebugProbeDiscovery: async (
+    _project: unknown,
+    _approval: unknown,
+    _caller: unknown,
+    execute: (read: typeof mocks.inventory) => Promise<unknown>,
+  ) => execute(mocks.inventory),
+}));
+import { DebugCompatibilityClient } from "../src/adapters/debug-compat.js";
+beforeEach(() => {
+  vi.resetAllMocks();
+  mocks.project.mockResolvedValue("/project");
+  mocks.prepare.mockResolvedValue({
+    projectDir: "/project",
+    environment: "debug",
+    load: false,
+  });
+  mocks.forget.mockResolvedValue(undefined);
+  mocks.inventory.mockResolvedValue({ devices: [], unidentified: 0 });
+  mocks.start.mockResolvedValue("owned-id");
+});
+it("forwards load, selection and grants without accepting caller executable authority", async () => {
+  const confirm = vi.fn();
+  const client = new DebugCompatibilityClient(confirm);
+  const args = {
+    load: false,
+    timeout_s: 10,
+    probe: { serial_number: "1234" },
+    backend_host_approval_id: "host",
+    backend_target_approval_id: "target",
+  };
+  expect(await client.start(args)).toMatchObject({
+    session_id: "owned-id",
+    load: false,
+  });
+  expect(mocks.start.mock.calls[0][1]).toMatchObject({
+    timeoutMs: 10000,
+    selector: { serialNumber: "1234" },
+    confirmProbeReleased: confirm,
+    backendHostApprovalId: "host",
+    backendTargetApprovalId: "target",
+  });
+  expect(mocks.forget).toHaveBeenCalledOnce();
+  await expect(
+    client.start({ executable: "/untrusted/gdb" }),
+  ).rejects.toMatchObject({ code: "COMPAT_ARGUMENT_INVALID" });
+});
+it("keeps preparation checkpoints and stable timeout scope when startup requires approval", async () => {
+  mocks.start.mockRejectedValueOnce(new Error("approval pending"));
+  const client = new DebugCompatibilityClient(async () => false);
+  await expect(client.start({ timeout_s: 10 })).rejects.toThrow(
+    "approval pending",
+  );
+  expect(mocks.forget).not.toHaveBeenCalled();
+  await client.start({ timeout_s: 10, approval_id: "approved" });
+  expect(mocks.start.mock.calls.map((call) => call[1].timeoutMs)).toEqual([
+    10000, 10000,
+  ]);
+});
+it("refuses unidentified inventory and closes admission on disconnect", async () => {
+  mocks.inventory.mockResolvedValue({ devices: [], unidentified: 1 });
+  mocks.start.mockImplementation(async (_sessions, input) => {
+    await input.readInventory();
+    return "id";
+  });
+  const client = new DebugCompatibilityClient(async () => false);
+  await expect(client.start({})).rejects.toMatchObject({
+    code: "DEBUG_PROBE_IDENTITY_INVALID",
+  });
+  expect(await client.close()).toMatchObject({ cleanupPending: false });
+  await expect(client.start({})).rejects.toMatchObject({
+    code: "DEBUG_CLIENT_CLOSED",
+  });
+});
