@@ -46,7 +46,7 @@ it("reads the selected offset and treats erased flash as no recorded crash", asy
     present: false,
     source: { offset: 0x310000, port: "canonical" },
   });
-  expect(result).not.toHaveProperty("bytes");
+  expect(result.bytes).toEqual(Buffer.alloc(4096, 255));
   expect(readEspFlash).toHaveBeenCalledWith(
     expect.objectContaining({
       offset: 0x310000,

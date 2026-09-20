@@ -296,6 +296,7 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
 
 /** Implemented internal service actions; these are not advertised as MCP tools. */
 export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  coredump_export: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
   coredump_inspect: { ...READ, policyAction: "coredump" },
   coredump_analyze: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
   esp_flash_read: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },

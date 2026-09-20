@@ -72,7 +72,7 @@ export async function readEspCoredumpPartition(
     };
   } catch (error) {
     if (error instanceof PlatformIOError && error.code === "COREDUMP_EMPTY")
-      return { present: false as const, source };
+      return { present: false as const, source, bytes: result.bytes };
     throw error;
   }
 }

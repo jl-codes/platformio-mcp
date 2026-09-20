@@ -1,5 +1,6 @@
 /** Permission-gated offline core-dump handler shared by MCP and CLI adapters. */
 import fs from "node:fs/promises";
+import { exportEspCoredump } from "../core/analysis/esp-coredump-export.js";
 import { z } from "zod";
 import { PlatformIOError } from "../utils/errors.js";
 import {
@@ -34,6 +35,8 @@ export const CoredumpSchema = z
       .optional(),
     format: z.enum(["raw", "base64"]).default("raw"),
     analyze: z.boolean().default(true),
+    outPath: z.string().min(1).max(32768).optional(),
+    exportApprovalId: z.string().max(256).optional(),
     elfPath: z.string().min(1).max(32768).optional(),
     expectedInputSha256: z
       .string()
@@ -48,6 +51,10 @@ export const CoredumpSchema = z
     commandApprovalId: z.string().max(256).optional(),
   })
   .strict()
+  .refine(
+    (value) => !value.outPath || !!value.device,
+    "Dump export requires device acquisition.",
+  )
   .refine(
     (value) => Boolean(value.dumpPath) !== Boolean(value.device),
     "Select exactly one dump file or device acquisition.",
@@ -81,7 +88,7 @@ export async function executeCoredump(
       "Partition inspection must use the same authorized project.",
       "COREDUMP_TABLE_INPUT_INVALID",
     );
-  const { commandApprovalId, ...operation } = request;
+  const { commandApprovalId, exportApprovalId, ...operation } = request;
   const stripGrants = (value: unknown): unknown => {
     if (!value || typeof value !== "object" || Array.isArray(value))
       return value;
@@ -97,10 +104,12 @@ export async function executeCoredump(
     projectDir,
   };
   const commandArgs = { ...args, approvalId: commandApprovalId };
+  const exportArgs = { ...args, approvalId: exportApprovalId };
   const context = { ...caller, workspaceDir: projectDir };
   const stages: Array<[string, Record<string, unknown>]> = [
     ["coredump_inspect", args],
   ];
+  if (request.outPath) stages.push(["coredump_export", exportArgs]);
   if (request.analyze) stages.push(["coredump_analyze", commandArgs]);
   for (const [name, parameters] of stages) {
     const plan = await planAction(name, parameters, context);
@@ -144,6 +153,21 @@ export async function executeCoredump(
             )
           : null;
         validatePolicy();
+        const exported =
+          request.outPath && capture
+            ? await dispatchAuthorizedAction(
+                "coredump_export",
+                exportArgs,
+                context,
+                () =>
+                  exportEspCoredump(
+                    projectDir,
+                    request.outPath!,
+                    capture.bytes,
+                  ),
+              )
+            : null;
+        validatePolicy();
         if (capture && !capture.present)
           return {
             ok: false as const,
@@ -151,6 +175,7 @@ export async function executeCoredump(
             error: "no_coredump",
             acquisition: capture.source,
             layout: capture.layout,
+            dump_export: exported,
           };
         const capturedBytes = capture?.present ? capture.bytes : undefined;
         if (!request.analyze) {
@@ -169,6 +194,7 @@ export async function executeCoredump(
             firmwareIdentity: artifact.firmwareIdentity,
             acquisition: capture?.source ?? null,
             layout: capture?.layout ?? null,
+            dump_export: exported,
           };
         }
         const result = await analyzeEspCoredump(
@@ -182,6 +208,7 @@ export async function executeCoredump(
           analyzed: true as const,
           acquisition: capture?.source ?? null,
           layout: capture?.layout ?? null,
+          dump_export: exported,
         };
       };
       return request.analyze

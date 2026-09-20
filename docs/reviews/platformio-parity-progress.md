@@ -1178,3 +1178,8 @@ Added explicit port/partition/table selection, integer/boolean validation and se
 
 Added bounded exact-byte export into an existing authorized workspace directory, using private same-volume staging and exclusive hard-link publication. Existing destinations are never replaced; outside-workspace paths and alternate-stream names are rejected. Explicit exports have user-managed retention, distinct from temporary analysis data. Four real filesystem/privacy cases passed, including preservation of an existing destination; lint and TypeScript passed. Managed default retention, public export grants and the reference out_path adapter remain unfinished.
 
+
+### Authorized public dump export
+
+Integrated explicit outPath/exportApprovalId into device MCP/CLI requests. Export permission is preflighted before device access, captures preserve erased bytes internally, and empty results retain their failure status while returning only export metadata. Seventeen focused cases passed across export policy, core policy, effective-table selection and read selection (the export fixture required an explicit read-category allow). Lint and TypeScript passed; plugin runtime refreshed. Default managed retention and reference adapter remain incomplete.
+

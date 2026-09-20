@@ -39,6 +39,7 @@ it("uses the effective CSV offset and preserves its source hash", async () => {
   );
   vi.mocked(readEspCoredumpPartition).mockResolvedValueOnce({
     present: false,
+    bytes: Buffer.alloc(65536, 255),
     source: {
       port: "port",
       offset: 0x310000,
