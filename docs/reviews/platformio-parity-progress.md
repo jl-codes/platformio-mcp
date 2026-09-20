@@ -2079,3 +2079,7 @@ Expanded the per-name coverage report to include GitHub as its thirteenth channe
 ### OTA ICMP behavior aligned with the approved plan (2026-09-20)
 
 Removed the early host_unreachable return on negative ICMP. The pinned reference blocks at that point, but plan section 6 explicitly requires diagnostic-only reachability and forbids treating failed ping as proof that OTA is unavailable. The shared canonical/reference workflow now retains reachable=false and reachability_status while continuing to independently authorized build/transfer stages. Existing pinned IPv4 binding, probe permissions, transfer grants and runtime_verified=false remain unchanged. Documented this intentional reference deviation. Eleven focused OTA tests and TypeScript passed with mocked build/network operations; no live ping or upload was performed. Plugin rebuilt.
+
+### Dependency CLI test timing (2026-09-20)
+
+CI run 35533859317 timed out the dependency CLI case at five seconds while it sequentially launched three subprocesses, each individually allowed fifteen seconds. Split the two invalid-option invocations and concrete-denial invocation into independent twenty-second cases, retaining their exact argument/denial assertions and no-project-side-effect checks. All three affected cases passed locally; the remaining 23 cases were intentionally not rerun by the focused filter. Product timeout and policy behavior are unchanged.

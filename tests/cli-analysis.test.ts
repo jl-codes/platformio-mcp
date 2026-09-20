@@ -110,23 +110,23 @@ it("routes project metadata and target discovery through the shared CLI permissi
   expect(run("project-envs").errorType).toBe("PROJECT_INPUT_INVALID"); // This helper adds --environment, unsupported for the complete environment inventory.
 });
 
-it("rejects invalid dependency flags and honors concrete tool denial", () => {
-  expect(run("deps-check", "--build", "maybe").errorType).toBe(
-    "DEPENDENCY_INPUT_INVALID",
-  );
-  expect(run("deps-check", "--approve").errorType).toBe(
-    "DEPENDENCY_INPUT_INVALID",
-  );
+// Each child already has a 15-second deadline; do not put three sequential launches inside a 5-second test.
+it.each([["--build", "maybe"], ["--approve"]])(
+  "rejects invalid dependency flags %j before invoking PlatformIO",
+  (...flags) => {
+    expect(run("deps-check", ...flags).errorType).toBe("DEPENDENCY_INPUT_INVALID");
+    expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
+  },
+  20000,
+);
+it("honors concrete dependency tool denial", () => {
   fs.writeFileSync(
     path.join(project, ".pio-mcp-policy.json"),
-    JSON.stringify({
-      profile: "read_only",
-      overrides: { deny: ["deps_check"] },
-    }),
+    JSON.stringify({ profile: "read_only", overrides: { deny: ["deps_check"] } }),
   );
   expect(run("deps-check").errorType).toBe("PolicyDenied");
   expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
-});
+}, 20000);
 
 it.each(["clean", "check", "test"])(
   "routes %s CLI through canonical permission before execution",
