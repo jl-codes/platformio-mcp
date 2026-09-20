@@ -259,11 +259,14 @@ export async function resolveDebugConfiguration(
         },
       );
       guard();
-      return parseResolvedDebugConfiguration(
-        result.stdout,
-        projectDir,
-        input.environment,
-      );
+      return {
+        ...parseResolvedDebugConfiguration(
+          result.stdout,
+          projectDir,
+          input.environment,
+        ),
+        supervisorPython: executable,
+      };
     },
   );
 }

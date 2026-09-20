@@ -75,6 +75,7 @@ beforeEach(() => {
     initScript: "",
     generatedInitScript: "",
     generatedInitTemplate: "",
+    supervisorPython: path.join(root, "python.exe"),
     initCommands: [],
     extraCommands: [],
     loadCommands: ["load"],
