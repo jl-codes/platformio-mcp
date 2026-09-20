@@ -69,6 +69,31 @@ export interface UploadCaptureContext {
   trustedImageRoots?: readonly string[];
 }
 
+/** Read a bounded private capture for host installation resolution; every returned field remains untrusted data. */
+export async function readUploadCaptureRecord(
+  recordPath: string,
+  captureDirectory: string,
+) {
+  const root = await fs.realpath(captureDirectory);
+  const artifact = await readPartitionArtifact(
+    root,
+    recordPath,
+    2 * 1024 * 1024,
+  );
+  try {
+    return RecordSchema.parse(
+      JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(artifact.content),
+      ),
+    );
+  } catch {
+    throw new PlatformIOError(
+      "Invalid final upload capture record.",
+      "UPLOAD_CAPTURE_INVALID",
+    );
+  }
+}
+
 /**
  * Consume a private capture record without trusting it to choose the workspace or package roots.
  * The command is checked against host-selected tool and device identities. Manifest-bound authorization
@@ -87,24 +112,7 @@ export async function retainUploadCapture(
   };
   const root = await fs.realpath(selected.captureDirectory);
   const project = await fs.realpath(selected.projectDir);
-  const artifact = await readPartitionArtifact(
-    root,
-    recordPath,
-    2 * 1024 * 1024,
-  );
-  let record: z.infer<typeof RecordSchema>;
-  try {
-    record = RecordSchema.parse(
-      JSON.parse(
-        new TextDecoder("utf-8", { fatal: true }).decode(artifact.content),
-      ),
-    );
-  } catch {
-    throw new PlatformIOError(
-      "Invalid final upload capture record.",
-      "UPLOAD_CAPTURE_INVALID",
-    );
-  }
+  const record = await readUploadCaptureRecord(recordPath, root);
   if (
     (await fs.realpath(record.projectDir)) !== project ||
     record.environment !== selected.environment ||

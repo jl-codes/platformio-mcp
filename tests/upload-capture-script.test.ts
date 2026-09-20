@@ -27,12 +27,15 @@ boot = root / "boot.bin"
 app.write_bytes(b"app")
 elf.write_bytes(b"elf")
 boot.write_bytes(b"boot")
+compiler = root / "compiler.exe"
+compiler.write_bytes(b"fixture")
 class Node:
     def get_abspath(self): return str(app)
 class Env(dict):
     def subst(self, value, **kwargs):
         if value == self.original: return 'python esptool.py write_flash 0x1000 "' + str(boot) + '" 0x10000 "' + str(app) + '"'
         return self.get(value.lstrip("$"), value)
+    def WhereIs(self, value): return str(compiler) if value == "compiler" else None
     def Replace(self, **values): self.update(values)
     def GetProjectOptions(self): return {"board": "fixture", "secret": "never serialized"}
 env = Env(UPLOADCMD="original command", UPLOAD_PROTOCOL="esptool", PROJECT_DIR=str(root), PIOENV="fixture", CC="compiler", PROG_PATH=str(elf), ESP32_APP_OFFSET="0x10000", FLASH_EXTRA_IMAGES=[("0x1000", str(boot))])
@@ -45,6 +48,7 @@ record_path = root / "capture.json"
 encoded = record_path.read_text()
 record = json.loads(encoded)
 assert record["captureOnly"] is True
+assert record["compiler"] == str(compiler)
 assert record["argv"] == ["python", "esptool.py", "write_flash", "0x1000", str(boot), "0x10000", str(app)]
 for command in ["python tool.py & echo bad", "python tool.py | echo bad", "python tool.py > out", "python tool.py\nother"]:
     try:

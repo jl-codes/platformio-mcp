@@ -18,12 +18,7 @@ export interface CaptureTargetUploadInput {
   archiveRoot?: string;
 }
 
-/**
- * Run the real upload target with a final capture-and-stop hook, then retain the selected bytes.
- * The caller must authorize upload/build effects and retain device ownership: project scripts and
- * PlatformIO's pre-upload actions still execute. A captured record is not proof of a flashed device.
- * Unconfirmed process closure retains the private hook directory for the surviving child.
- */
+/** Run a capture with a host context already resolved by the caller. */
 export async function captureTargetUpload(input: CaptureTargetUploadInput) {
   const context = {
     ...input.context,
@@ -31,10 +26,53 @@ export async function captureTargetUpload(input: CaptureTargetUploadInput) {
     uploader: { ...input.context.uploader },
     trustedImageRoots: [...(input.context.trustedImageRoots ?? [])],
   };
-  const execution = { ...input.execution };
-  if (execution.uploadPort !== context.uploader.port || !context.environment)
+  if (input.execution.uploadPort !== context.uploader.port)
     throw new PlatformIOError(
-      "Capture requires the explicitly selected upload destination and environment.",
+      "Capture requires the selected upload destination.",
+      "UPLOAD_CAPTURE_INVALID",
+    );
+  return withTargetUploadCapture(
+    {
+      projectDir: context.projectDir,
+      environment: context.environment,
+      execution: input.execution,
+    },
+    (recordPath, directory) =>
+      retainUploadCapture(
+        recordPath,
+        { ...context, captureDirectory: directory },
+        input.archiveRoot,
+      ),
+  );
+}
+
+/** Host-only capture scope; public tools must authorize build/upload effects before entering. */
+export interface TargetUploadCaptureRequest {
+  projectDir: string;
+  environment: string;
+  execution: Omit<TargetExecutionOptions, "captureEnvironment" | "onResult">;
+}
+
+/**
+ * Execute the selected upload target with the final capture-and-stop hook. The host callback may
+ * resolve registered tools from the record and retain its bytes before private capture cleanup.
+ * Project and pre-upload scripts still execute, so this phase requires upload/build authorization.
+ * Unconfirmed child closure keeps the private directory; capture is never proof of a flashed device.
+ */
+export async function withTargetUploadCapture<T>(
+  input: TargetUploadCaptureRequest,
+  use: (recordPath: string, captureDirectory: string) => Promise<T>,
+): Promise<T> {
+  const projectDir = input.projectDir;
+  const environment = input.environment;
+  const execution = { ...input.execution };
+  if (
+    !path.isAbsolute(projectDir) ||
+    !/^[a-zA-Z0-9_-]{1,50}$/.test(environment) ||
+    !execution.uploadPort
+  )
+    throw new PlatformIOError(
+      "Capture requires an explicit project, environment and upload destination.",
       "UPLOAD_CAPTURE_INVALID",
     );
   const directory = await fs.realpath(await createPrivateAnalysisDirectory());
@@ -47,30 +85,20 @@ export async function captureTargetUpload(input: CaptureTargetUploadInput) {
       mode: 0o600,
     });
     let exitCode: number | undefined;
-    await buildTarget(
-      context.projectDir,
-      "upload",
-      context.environment,
-      false,
-      {
-        ...execution,
-        captureEnvironment: uploadCaptureEnvironment(scriptPath),
-        onResult: async (result) => {
-          exitCode = result.exitCode;
-        },
+    await buildTarget(projectDir, "upload", environment, false, {
+      ...execution,
+      captureEnvironment: uploadCaptureEnvironment(scriptPath),
+      onResult: async (result) => {
+        exitCode = result.exitCode;
       },
-    );
+    });
     // Core returns 1 for a failed SCons action; direct SCons may preserve the hook's status 86.
     if (exitCode !== 1 && exitCode !== 86)
       throw new PlatformIOError(
         "Upload target did not stop at the capture phase.",
         "UPLOAD_CAPTURE_FAILED",
       );
-    return await retainUploadCapture(
-      recordPath,
-      { ...context, captureDirectory: directory },
-      input.archiveRoot,
-    );
+    return await use(recordPath, directory);
   } catch (error) {
     cleanupPending =
       error instanceof PlatformIOError &&

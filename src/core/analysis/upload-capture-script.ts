@@ -112,13 +112,16 @@ def _capture_upload(target, source, env):
         raise ValueError("UPLOAD_CAPTURE_LIMIT")
     settings = json.dumps(env.GetProjectOptions(), sort_keys=True, default=str, separators=(",", ":"))
     command = env.subst(_ORIGINAL, target=target, source=source)
+    compiler = env.WhereIs(env.subst("$CC"))
+    if not compiler:
+        raise ValueError("UPLOAD_CAPTURE_COMPILER_UNRESOLVED")
     record = {
         "schemaVersion": 1, "captureOnly": True,
         "commandLine": command,
         "argv": _split_command(command),
         "projectDir": str(Path(env.subst("$PROJECT_DIR")).resolve(strict=True)),
         "environment": env.subst("$PIOENV"),
-        "compiler": env.subst("$CC"),
+        "compiler": str(Path(compiler).resolve(strict=True)),
         "buildSettingsSha256": hashlib.sha256(settings.encode("utf8")).hexdigest(),
         "elf": _artifact(env.subst("$PROG_PATH"), 256 * 1024 * 1024),
         "images": images,

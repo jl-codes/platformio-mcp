@@ -1814,3 +1814,19 @@ Eight focused approval/resume and connection lifecycle checks pass; TypeScript a
 scoped lint pass; the plugin runtime is refreshed. Public flash requests still need
 the staging/resume fields and selected-tool metadata connection. No release or
 physical upload has been performed by these changes.
+
+### Registered upload installation resolution
+
+The capture hook now resolves `$CC` through SCons `WhereIs`, so its compiler identity
+matches the absolute installed compiler instead of a bare command name. Host upload
+installation discovery validates package.json/.piopm name/version agreement, rejects
+project-owned interpreters and compilers, and does not guess between multiple uploader
+packages. It supplies registered image roots and the actual toolchain version without
+running package code. The local Core system-info tool reported Core 6.1.16 and Python
+3.14.4; read-only discovery resolved toolchain-xtensa-esp32s3 8.4.0+2021r2-patch5 and
+tool-esptoolpy under the host package installation (15 valid registered roots).
+`captureRegisteredUpload` connects the stopped target record to this discovery and
+retained manifest creation, avoiding a second metadata build. Five focused discovery/
+hook tests and sixteen capture/manifest regressions pass, alongside TypeScript and
+scoped lint. This is host workflow plumbing; public flash staging/resume wiring is
+still outstanding and no physical upload or publication is claimed.
