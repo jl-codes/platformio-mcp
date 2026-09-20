@@ -9,6 +9,12 @@ on:
         default: false
         type: boolean
 
+      publish_pypi:
+        description: Publish validated Python wheels using configured PyPI trusted publishers
+        required: true
+        default: false
+        type: boolean
+
 permissions:
   actions: read
   contents: write
@@ -109,7 +115,7 @@ jobs:
           package-manager-cache: false
 
       - name: Verify release tag matches package version
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_npm
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_npm || inputs.publish_pypi
         run: |
           expected_ref="refs/tags/v$(node -p "require('./package.json').version")"
           if [ "$GITHUB_REF" != "$expected_ref" ]; then
@@ -197,3 +203,54 @@ jobs:
           else
             gh release create "${{ github.ref_name }}" release-artifacts/* --generate-notes --verify-tag
           fi
+
+  publish_python:
+    name: Publish verified Python distributions
+    needs: build_release
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_pypi
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - name: Require recorded publisher configuration
+        env:
+          PUBLISHERS_VERIFIED: ${{ vars.PYPI_PUBLISHERS_VERIFIED }}
+        run: |
+          test "$PUBLISHERS_VERIFIED" = 'pio-agent-platformio,pio-agent,pio-mcp' || { echo 'Configure and verify all three PyPI trusted publishers and the protected pypi environment first.' >&2; exit 1; }
+      - name: Download immutable validated wheel set
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --name platformio-python-release --dir python-release-artifacts
+      - name: Check registry identities and stage absent artifacts
+        id: preflight
+        run: python scripts/pypi-release-identity.py python-release-artifacts --stage pypi-staging
+      - name: Publish canonical wheels with attestations
+        if: steps.preflight.outputs.canonical == 'true'
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
+        with:
+          packages-dir: pypi-staging/canonical/
+          attestations: true
+      - name: Verify canonical files before publishing aliases
+        run: python scripts/pypi-release-identity.py python-release-artifacts --verify pio-agent-platformio
+      - name: Publish functional aliases with attestations
+        if: steps.preflight.outputs.aliases == 'true'
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
+        with:
+          packages-dir: pypi-staging/aliases/
+          attestations: true
+      - name: Verify all published file identities
+        run: python scripts/pypi-release-identity.py python-release-artifacts --verify all
+      - name: Retain publication preflight
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pypi-publication-preflight
+          path: pypi-staging/preflight.json
+          if-no-files-found: warn
