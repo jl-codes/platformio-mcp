@@ -16,6 +16,20 @@ _packages_module = importlib.util.module_from_spec(_packages_spec)
 _packages_spec.loader.exec_module(_packages_module)
 
 
+
+def validate_alias_payload(archive, alias, metadata_directory):
+    """Reject substituted launchers and executable payload outside the alias's own module."""
+    module = alias["module"]
+    expected = {f"{module}/__init__.py", f"{module}/__main__.py", f"{module}/source.json"}
+    payload = {name for name in archive.namelist() if not name.startswith(metadata_directory + "/")}
+    if payload != expected:
+        raise ValueError("Alias contains missing or unexpected payload files")
+    for filename in ("__init__.py", "__main__.py"):
+        checked_in = (alias["directory"] / module / filename).read_bytes()
+        if archive.read(f"{module}/{filename}") != checked_in:
+            raise ValueError("Alias launcher differs from the checked-in release source")
+
+
 def validate(directory):
     """Reject missing hosts, wrong package identities, alias drift and altered payload files."""
     directory = Path(directory)
@@ -64,6 +78,7 @@ def validate(directory):
                 if not {"node/LICENSE", "runtime/cli.mjs", "licenses/javascript-inventory.json"}.issubset(paths):
                     raise ValueError("Required license inventory, Node license or CLI missing")
             else:
+                validate_alias_payload(archive, alias_specs[identity], metadata_files[0].rsplit("/", 1)[0])
                 if f"pio-agent-platformio=={version}" not in metadata.get_all("Requires-Dist",[]):
                     raise ValueError("Alias does not pin exact canonical release")
                 entry_files = [name for name in names if name.endswith('/entry_points.txt')]
