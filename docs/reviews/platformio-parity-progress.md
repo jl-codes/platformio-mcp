@@ -2104,3 +2104,7 @@ CI run 35533859317 timed out the dependency CLI case at five seconds while it se
 ### 2026-09-20: Native installed-wheel signal results
 
 Run 35536115719 completed all five native installed-wheel jobs successfully on source 1aae2a11e056a4242ad54a4c8ee032ee868a599d. Downloaded and inspected the actual reports: both SIGINT and SIGTERM shut down initialized 3.1.0 servers with exit code zero and stdin still open on Linux x64/arm64 and macOS x64/arm64. Windows explicitly records signals as not_verified. Complete source-bound reports and downloaded-file hashes are retained in native-python-signal-evidence.json. Container jobs were still running at capture; all publication inputs are false. This does not certify active hardware cleanup, minimum OS, full parity, Windows console behavior or deployment.
+
+### 2026-09-20: Completed signal-era distribution build
+
+Release artifact run 35536115719 completed successfully on source 1aae2a11e056a4242ad54a4c8ee032ee868a599d: all five native installs, amd64/arm64 native containers, and final release-artifact validation passed. All four publication inputs were false. Run/job and retained artifact identities are in distribution-signal-build-evidence.json; inspected native reports remain in native-python-signal-evidence.json. This is not final parity, physical, minimum-OS, Windows console-control, or public-registry acceptance.
