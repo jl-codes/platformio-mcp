@@ -732,3 +732,11 @@ Advertised pio_list_devices only in compatibility mode, combining canonical disc
 ## Public memory-watch adapter
 
 `pio_memory_watch` now routes existing-session collection through owner-scoped `captureMemory` and temporary collection through preauthorized `captureMemoryOnce` with shared project/port defaults. It projects reference field names while retaining explicit collection loss/limits, cleanup state and unknown-unit counts. Safety divergences are deliberate: fewer than three observations remain `insufficient_samples`, time rates remain null without actual observation timestamps, fragmentation uses paired observations, and unknown stack words are not assumed to be bytes. `duration_s` describes the actual collection window rather than the lifetime of an older session. Collection stops at bounded line/byte limits and reports incomplete status; this does not establish all reference behavioral fixtures or physical acceptance. A focused actual-buffer collection/projection check and TypeScript passed. Full final-revision acceptance remains pending.
+
+### Port diagnostics and explicit alias coverage
+
+Added opt-in `pio_port_diagnose` (75 compatibility-visible tools; 54 canonical unchanged). It resolves project defaults through existing authorization, separately authorizes device discovery and owned-session metadata, and checks the policy revision before returning diagnostics. OS inspection uses fixed executable paths, bounded output/time, and no serial open/close or process termination. Discovery failure is unknown; no observed holder does not prove exclusive access. Windows holder inspection remains unavailable. Linux/macOS command execution and full adapter acceptance remain unverified.
+
+Validation: TypeScript no-emit check passed; four focused port-diagnostics checks passed on Windows (holder parsing, output bound, invalid endpoint, Windows endpoint forms). No broad runtime smoke test was repeated.
+
+`distribution/README.md` now records all four user-requested aliases across each suitable channel and requires explicit published/equivalent/blocked accounting. This is release scope, not evidence of publication or ownership.

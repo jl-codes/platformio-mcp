@@ -2,8 +2,10 @@
  * Reference serial-device presentation without opening ports or asserting hardware identity.
  * Provides projectCompatibilityDevices for authorized discovery adapters.
  */
+import { inspectPortDiagnostics } from "../core/devices/port-diagnostics.js";
 import { executeMemoryCompatibility } from "./memory-compat.js";
 import {
+  resolveMonitorRequest,
   startCompatibilityMonitor,
   captureCompatibilityMonitor,
 } from "./monitor-start-compat.js";
@@ -67,6 +69,93 @@ export async function executeDeviceCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_port_diagnose") {
+    const params = z
+      .object({
+        port: z.string().min(1).max(512).nullable().optional(),
+        project_dir: z.string().min(1).max(32768).nullable().optional(),
+        env: z.string().min(1).max(50).nullable().optional(),
+        approval_id: z.string().max(256).optional(),
+        config_approval_id: z.string().max(256).optional(),
+        selection_approval_id: z.string().max(256).optional(),
+        monitor_approval_id: z.string().max(256).optional(),
+      })
+      .strict()
+      .parse(input);
+    const { monitor_approval_id, ...resolution } = params;
+    const { request } = await resolveMonitorRequest(
+      resolution,
+      defaults,
+      caller,
+      projectCompatibilityDevices,
+    );
+    const projectDir = request.projectDir;
+    const guard = createPolicyRevisionGuard(projectDir);
+    return client.run(
+      { caller, approvalId: monitor_approval_id },
+      (service, owner) =>
+        dispatchAuthorizedAction(
+          "list_devices",
+          { projectDir, approvalId: params.approval_id },
+          { ...caller, workspaceDir: projectDir },
+          async () => {
+            await onAuthorized?.();
+            const sessions = await service.listSessions(owner, projectDir);
+            guard();
+            const devices = await listDevicesCore().catch(() => null);
+            guard();
+            const normalize = async (value: string) => {
+              if (process.platform !== "win32")
+                return fs.realpath(value).catch(() => value);
+              const prefix = String.fromCharCode(92, 92, 46, 92);
+              return (
+                value.startsWith(prefix) ? value.slice(4) : value
+              ).toUpperCase();
+            };
+            const portKey = await normalize(request.path);
+            const listed =
+              devices === null
+                ? null
+                : (
+                    await Promise.all(
+                      devices.map(
+                        async (device) =>
+                          (await normalize(device.port)) === portKey,
+                      ),
+                    )
+                  ).some(Boolean);
+            const owned = (
+              await Promise.all(
+                sessions.map(async (session) => ({
+                  session,
+                  matches: (await normalize(session.path)) === portKey,
+                })),
+              )
+            ).find((row) => row.matches)?.session;
+            const diagnostics = await inspectPortDiagnostics(
+              request.path,
+              listed,
+            );
+            guard();
+            const hint = owned
+              ? `Stop owned monitor session ${owned.sessionId} before flashing.`
+              : diagnostics.held_by_processes.length
+                ? "Another process holds this port; close its serial connection before flashing."
+                : diagnostics.exists === false
+                  ? "Port was not found; check the connection and selected port."
+                  : "No owner was observed. This does not establish exclusive access; opening still requires authorization and a device lease.";
+            return {
+              ok: true,
+              summary: hint,
+              port: request.path,
+              ...diagnostics,
+              held_by_session: owned?.sessionId ?? null,
+              hint,
+            };
+          },
+        ),
+    );
+  }
   if (name === "pio_memory_watch")
     return executeMemoryCompatibility(
       client,
@@ -306,6 +395,26 @@ export function withDeviceCompatibility<TResult>(
       additionalProperties: false,
     },
     handler: (args, context) => context.dispatch("pio_list_devices", args),
+  });
+  result.set("pio_port_diagnose", {
+    ...source,
+    name: "pio_port_diagnose",
+    description:
+      "Inspect serial-port presence, permissions and observed holders without opening or closing the device. Missing holder evidence does not prove availability.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        port: { type: ["string", "null"], maxLength: 512 },
+        project_dir: { type: ["string", "null"], maxLength: 32768 },
+        env: { type: ["string", "null"], maxLength: 50 },
+        approval_id: { type: "string", maxLength: 256 },
+        config_approval_id: { type: "string", maxLength: 256 },
+        selection_approval_id: { type: "string", maxLength: 256 },
+        monitor_approval_id: { type: "string", maxLength: 256 },
+      },
+      additionalProperties: false,
+    },
+    handler: (args, context) => context.dispatch("pio_port_diagnose", args),
   });
   const startSource = base.get("start_monitor");
   if (!startSource || result.has("pio_monitor_start"))
