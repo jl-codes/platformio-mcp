@@ -816,3 +816,8 @@ The Python publisher resolver now requires one exact canonical PyPI identity wit
 
 The shared clean executor now supports validated environment selection and an explicit fullclean target while retaining the existing canonical clean target, timeout, background behavior and return shape. Invalid options fail before cache invalidation or command dispatch; valid cleanup still invalidates build cache and uses the existing spooler. TypeScript and three focused mocked checks passed. Plugin runtime rebuilt. The public pio_clean adapter and reference result/timeout projection remain pending; no native cleanup or hardware operation was performed.
 
+
+### Public cleanup compatibility adapter
+
+Added opt-in pio_clean, increasing the compatibility surface to 79 tools while preserving 54 canonical tools. Environment/fullclean parameters bind to canonical clean_project authorization; execution retains the shared implicit hardware lock and checks policy revisions around effects and disclosure. The adapter uses the reference two-minute clean timeout, collects completed logs with a 16 MiB limit, retains redacted output, reports nonzero exits, compiler diagnostics/counts, environment markers, memory lines and a 40-line tail. Existing canonical callers retain their timeout and return shape. TypeScript and seven focused mocked cleanup checks passed; bundled plugin rebuilt. Native cleanup, exact diagnostic ordering/summary/port-error parity, timeout response projection and full final-revision acceptance remain pending. No publication performed.
+

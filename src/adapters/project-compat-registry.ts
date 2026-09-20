@@ -70,5 +70,25 @@ export function withProjectCompatibility<TResult>(
     },
     handler: (args, context) => context.dispatch("pio_project_init", args),
   });
+  const clean = base.get("clean_project");
+  if (!clean || result.has("pio_clean"))
+    throw new Error("Invalid clean compatibility registry");
+  result.set("pio_clean", {
+    ...clean,
+    name: "pio_clean",
+    description:
+      "Clean selected build artifacts, optionally including dependencies. Canonical destructive cleanup permission applies.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], maxLength: 32768 },
+        env: { type: ["string", "null"], pattern: "^[a-zA-Z0-9_-]{1,50}$" },
+        full: { type: "boolean", default: false },
+        approval_id: { type: "string", maxLength: 256 },
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_clean", args),
+  });
   return result;
 }

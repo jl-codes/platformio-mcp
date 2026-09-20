@@ -52,7 +52,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 78 : 54);
+      expect(tools).toHaveLength(enabled ? 79 : 54);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -72,6 +72,7 @@ it.each([
         "pio_decode_backtrace",
         "pio_size_report",
         "pio_project_init",
+        "pio_clean",
       ]) {
         expect(tools.some((tool) => tool.name === name)).toBe(enabled);
       }

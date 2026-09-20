@@ -11,6 +11,7 @@
 
 import { loadEffectivePolicyState } from "../core/policy/load-policy.js";
 import { platformioExecutor } from "../platformio.js";
+import type { SpoolingForegroundResult } from "../utils/spooler.js";
 import { executeWithSpooling } from "../utils/spooler.js";
 import type { BuildResult, CleanResult } from "../types.js";
 import {
@@ -345,6 +346,8 @@ export async function runTests(
 export interface CleanProjectOptions {
   environment?: string; // Restrict cleanup to this validated environment.
   full?: boolean; // Request PlatformIO fullclean, including downloaded dependencies.
+  timeoutMs?: number; // Trusted adapter timeout; canonical default remains 60 seconds.
+  onResult?: (result: SpoolingForegroundResult) => Promise<void>; // Observe completed output before failure projection.
 }
 
 /**
@@ -372,6 +375,9 @@ export async function cleanProject(
   if (options.full !== undefined && typeof options.full !== "boolean") {
     throw new BuildError("Clean full option must be a boolean", { projectDir });
   }
+  if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 600000)) {
+    throw new BuildError("Clean timeout must be between 1 and 600000 milliseconds", { projectDir });
+  }
   const args = ["--target", options.full ? "fullclean" : "clean"];
   if (options.environment) args.push("--environment", options.environment);
 
@@ -387,7 +393,7 @@ export async function cleanProject(
       {
         cwd: validatedPath,
         projectDir: validatedPath,
-        timeout: 60000,
+        timeout: options.timeoutMs ?? 60000,
         background,
         rootCommandId
       },
@@ -397,12 +403,14 @@ export async function cleanProject(
       return result as unknown as CleanResult;
     }
 
+    await options.onResult?.(result);
     const success = result.exitCode === 0;
 
     if (!success) {
       throw new BuildError(`Clean failed: ${result.finalOutput}`, {
         projectDir,
         stderr: result.finalOutput,
+        exitCode: result.exitCode,
       });
     }
 

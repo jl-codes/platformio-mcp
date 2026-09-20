@@ -11035,14 +11035,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs52 = this.flowScalar(this.type);
+              const fs53 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs52, sep: [] });
+                map.items.push({ start, key: fs53, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs52);
+                this.stack.push(fs53);
               } else {
-                Object.assign(it, { key: fs52, sep: [] });
+                Object.assign(it, { key: fs53, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -11170,13 +11170,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs52 = this.flowScalar(this.type);
+              const fs53 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs52, sep: [] });
+                fc.items.push({ start: [], key: fs53, sep: [] });
               else if (it.sep)
-                this.stack.push(fs52);
+                this.stack.push(fs53);
               else
-                Object.assign(it, { key: fs52, sep: [] });
+                Object.assign(it, { key: fs53, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -11826,54 +11826,54 @@ var require_polyfills = __commonJS({
     }
     var chdir;
     module.exports = patch;
-    function patch(fs52) {
+    function patch(fs53) {
       if (constants2.hasOwnProperty("O_SYMLINK") && process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
-        patchLchmod(fs52);
+        patchLchmod(fs53);
       }
-      if (!fs52.lutimes) {
-        patchLutimes(fs52);
+      if (!fs53.lutimes) {
+        patchLutimes(fs53);
       }
-      fs52.chown = chownFix(fs52.chown);
-      fs52.fchown = chownFix(fs52.fchown);
-      fs52.lchown = chownFix(fs52.lchown);
-      fs52.chmod = chmodFix(fs52.chmod);
-      fs52.fchmod = chmodFix(fs52.fchmod);
-      fs52.lchmod = chmodFix(fs52.lchmod);
-      fs52.chownSync = chownFixSync(fs52.chownSync);
-      fs52.fchownSync = chownFixSync(fs52.fchownSync);
-      fs52.lchownSync = chownFixSync(fs52.lchownSync);
-      fs52.chmodSync = chmodFixSync(fs52.chmodSync);
-      fs52.fchmodSync = chmodFixSync(fs52.fchmodSync);
-      fs52.lchmodSync = chmodFixSync(fs52.lchmodSync);
-      fs52.stat = statFix(fs52.stat);
-      fs52.fstat = statFix(fs52.fstat);
-      fs52.lstat = statFix(fs52.lstat);
-      fs52.statSync = statFixSync(fs52.statSync);
-      fs52.fstatSync = statFixSync(fs52.fstatSync);
-      fs52.lstatSync = statFixSync(fs52.lstatSync);
-      if (fs52.chmod && !fs52.lchmod) {
-        fs52.lchmod = function(path53, mode, cb) {
+      fs53.chown = chownFix(fs53.chown);
+      fs53.fchown = chownFix(fs53.fchown);
+      fs53.lchown = chownFix(fs53.lchown);
+      fs53.chmod = chmodFix(fs53.chmod);
+      fs53.fchmod = chmodFix(fs53.fchmod);
+      fs53.lchmod = chmodFix(fs53.lchmod);
+      fs53.chownSync = chownFixSync(fs53.chownSync);
+      fs53.fchownSync = chownFixSync(fs53.fchownSync);
+      fs53.lchownSync = chownFixSync(fs53.lchownSync);
+      fs53.chmodSync = chmodFixSync(fs53.chmodSync);
+      fs53.fchmodSync = chmodFixSync(fs53.fchmodSync);
+      fs53.lchmodSync = chmodFixSync(fs53.lchmodSync);
+      fs53.stat = statFix(fs53.stat);
+      fs53.fstat = statFix(fs53.fstat);
+      fs53.lstat = statFix(fs53.lstat);
+      fs53.statSync = statFixSync(fs53.statSync);
+      fs53.fstatSync = statFixSync(fs53.fstatSync);
+      fs53.lstatSync = statFixSync(fs53.lstatSync);
+      if (fs53.chmod && !fs53.lchmod) {
+        fs53.lchmod = function(path53, mode, cb) {
           if (cb) process.nextTick(cb);
         };
-        fs52.lchmodSync = function() {
+        fs53.lchmodSync = function() {
         };
       }
-      if (fs52.chown && !fs52.lchown) {
-        fs52.lchown = function(path53, uid, gid, cb) {
+      if (fs53.chown && !fs53.lchown) {
+        fs53.lchown = function(path53, uid, gid, cb) {
           if (cb) process.nextTick(cb);
         };
-        fs52.lchownSync = function() {
+        fs53.lchownSync = function() {
         };
       }
       if (platform2 === "win32") {
-        fs52.rename = typeof fs52.rename !== "function" ? fs52.rename : (function(fs$rename) {
+        fs53.rename = typeof fs53.rename !== "function" ? fs53.rename : (function(fs$rename) {
           function rename(from, to, cb) {
             var start = Date.now();
             var backoff = 0;
             fs$rename(from, to, function CB(er) {
               if (er && (er.code === "EACCES" || er.code === "EPERM" || er.code === "EBUSY") && Date.now() - start < 6e4) {
                 setTimeout(function() {
-                  fs52.stat(to, function(stater, st) {
+                  fs53.stat(to, function(stater, st) {
                     if (stater && stater.code === "ENOENT")
                       fs$rename(from, to, CB);
                     else
@@ -11889,9 +11889,9 @@ var require_polyfills = __commonJS({
           }
           if (Object.setPrototypeOf) Object.setPrototypeOf(rename, fs$rename);
           return rename;
-        })(fs52.rename);
+        })(fs53.rename);
       }
-      fs52.read = typeof fs52.read !== "function" ? fs52.read : (function(fs$read) {
+      fs53.read = typeof fs53.read !== "function" ? fs53.read : (function(fs$read) {
         function read(fd, buffer, offset, length, position, callback_) {
           var callback;
           if (callback_ && typeof callback_ === "function") {
@@ -11899,22 +11899,22 @@ var require_polyfills = __commonJS({
             callback = function(er, _, __) {
               if (er && er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
-                return fs$read.call(fs52, fd, buffer, offset, length, position, callback);
+                return fs$read.call(fs53, fd, buffer, offset, length, position, callback);
               }
               callback_.apply(this, arguments);
             };
           }
-          return fs$read.call(fs52, fd, buffer, offset, length, position, callback);
+          return fs$read.call(fs53, fd, buffer, offset, length, position, callback);
         }
         if (Object.setPrototypeOf) Object.setPrototypeOf(read, fs$read);
         return read;
-      })(fs52.read);
-      fs52.readSync = typeof fs52.readSync !== "function" ? fs52.readSync : /* @__PURE__ */ (function(fs$readSync) {
+      })(fs53.read);
+      fs53.readSync = typeof fs53.readSync !== "function" ? fs53.readSync : /* @__PURE__ */ (function(fs$readSync) {
         return function(fd, buffer, offset, length, position) {
           var eagCounter = 0;
           while (true) {
             try {
-              return fs$readSync.call(fs52, fd, buffer, offset, length, position);
+              return fs$readSync.call(fs53, fd, buffer, offset, length, position);
             } catch (er) {
               if (er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
@@ -11924,10 +11924,10 @@ var require_polyfills = __commonJS({
             }
           }
         };
-      })(fs52.readSync);
-      function patchLchmod(fs53) {
-        fs53.lchmod = function(path53, mode, callback) {
-          fs53.open(
+      })(fs53.readSync);
+      function patchLchmod(fs54) {
+        fs54.lchmod = function(path53, mode, callback) {
+          fs54.open(
             path53,
             constants2.O_WRONLY | constants2.O_SYMLINK,
             mode,
@@ -11936,80 +11936,80 @@ var require_polyfills = __commonJS({
                 if (callback) callback(err);
                 return;
               }
-              fs53.fchmod(fd, mode, function(err2) {
-                fs53.close(fd, function(err22) {
+              fs54.fchmod(fd, mode, function(err2) {
+                fs54.close(fd, function(err22) {
                   if (callback) callback(err2 || err22);
                 });
               });
             }
           );
         };
-        fs53.lchmodSync = function(path53, mode) {
-          var fd = fs53.openSync(path53, constants2.O_WRONLY | constants2.O_SYMLINK, mode);
+        fs54.lchmodSync = function(path53, mode) {
+          var fd = fs54.openSync(path53, constants2.O_WRONLY | constants2.O_SYMLINK, mode);
           var threw = true;
           var ret;
           try {
-            ret = fs53.fchmodSync(fd, mode);
+            ret = fs54.fchmodSync(fd, mode);
             threw = false;
           } finally {
             if (threw) {
               try {
-                fs53.closeSync(fd);
+                fs54.closeSync(fd);
               } catch (er) {
               }
             } else {
-              fs53.closeSync(fd);
+              fs54.closeSync(fd);
             }
           }
           return ret;
         };
       }
-      function patchLutimes(fs53) {
-        if (constants2.hasOwnProperty("O_SYMLINK") && fs53.futimes) {
-          fs53.lutimes = function(path53, at, mt, cb) {
-            fs53.open(path53, constants2.O_SYMLINK, function(er, fd) {
+      function patchLutimes(fs54) {
+        if (constants2.hasOwnProperty("O_SYMLINK") && fs54.futimes) {
+          fs54.lutimes = function(path53, at, mt, cb) {
+            fs54.open(path53, constants2.O_SYMLINK, function(er, fd) {
               if (er) {
                 if (cb) cb(er);
                 return;
               }
-              fs53.futimes(fd, at, mt, function(er2) {
-                fs53.close(fd, function(er22) {
+              fs54.futimes(fd, at, mt, function(er2) {
+                fs54.close(fd, function(er22) {
                   if (cb) cb(er2 || er22);
                 });
               });
             });
           };
-          fs53.lutimesSync = function(path53, at, mt) {
-            var fd = fs53.openSync(path53, constants2.O_SYMLINK);
+          fs54.lutimesSync = function(path53, at, mt) {
+            var fd = fs54.openSync(path53, constants2.O_SYMLINK);
             var ret;
             var threw = true;
             try {
-              ret = fs53.futimesSync(fd, at, mt);
+              ret = fs54.futimesSync(fd, at, mt);
               threw = false;
             } finally {
               if (threw) {
                 try {
-                  fs53.closeSync(fd);
+                  fs54.closeSync(fd);
                 } catch (er) {
                 }
               } else {
-                fs53.closeSync(fd);
+                fs54.closeSync(fd);
               }
             }
             return ret;
           };
-        } else if (fs53.futimes) {
-          fs53.lutimes = function(_a, _b, _c, cb) {
+        } else if (fs54.futimes) {
+          fs54.lutimes = function(_a, _b, _c, cb) {
             if (cb) process.nextTick(cb);
           };
-          fs53.lutimesSync = function() {
+          fs54.lutimesSync = function() {
           };
         }
       }
       function chmodFix(orig) {
         if (!orig) return orig;
         return function(target, mode, cb) {
-          return orig.call(fs52, target, mode, function(er) {
+          return orig.call(fs53, target, mode, function(er) {
             if (chownErOk(er)) er = null;
             if (cb) cb.apply(this, arguments);
           });
@@ -12019,7 +12019,7 @@ var require_polyfills = __commonJS({
         if (!orig) return orig;
         return function(target, mode) {
           try {
-            return orig.call(fs52, target, mode);
+            return orig.call(fs53, target, mode);
           } catch (er) {
             if (!chownErOk(er)) throw er;
           }
@@ -12028,7 +12028,7 @@ var require_polyfills = __commonJS({
       function chownFix(orig) {
         if (!orig) return orig;
         return function(target, uid, gid, cb) {
-          return orig.call(fs52, target, uid, gid, function(er) {
+          return orig.call(fs53, target, uid, gid, function(er) {
             if (chownErOk(er)) er = null;
             if (cb) cb.apply(this, arguments);
           });
@@ -12038,7 +12038,7 @@ var require_polyfills = __commonJS({
         if (!orig) return orig;
         return function(target, uid, gid) {
           try {
-            return orig.call(fs52, target, uid, gid);
+            return orig.call(fs53, target, uid, gid);
           } catch (er) {
             if (!chownErOk(er)) throw er;
           }
@@ -12058,13 +12058,13 @@ var require_polyfills = __commonJS({
             }
             if (cb) cb.apply(this, arguments);
           }
-          return options ? orig.call(fs52, target, options, callback) : orig.call(fs52, target, callback);
+          return options ? orig.call(fs53, target, options, callback) : orig.call(fs53, target, callback);
         };
       }
       function statFixSync(orig) {
         if (!orig) return orig;
         return function(target, options) {
-          var stats = options ? orig.call(fs52, target, options) : orig.call(fs52, target);
+          var stats = options ? orig.call(fs53, target, options) : orig.call(fs53, target);
           if (stats) {
             if (stats.uid < 0) stats.uid += 4294967296;
             if (stats.gid < 0) stats.gid += 4294967296;
@@ -12093,7 +12093,7 @@ var require_legacy_streams = __commonJS({
   "node_modules/graceful-fs/legacy-streams.js"(exports, module) {
     var Stream = __require("stream").Stream;
     module.exports = legacy;
-    function legacy(fs52) {
+    function legacy(fs53) {
       return {
         ReadStream,
         WriteStream
@@ -12136,7 +12136,7 @@ var require_legacy_streams = __commonJS({
           });
           return;
         }
-        fs52.open(this.path, this.flags, this.mode, function(err, fd) {
+        fs53.open(this.path, this.flags, this.mode, function(err, fd) {
           if (err) {
             self.emit("error", err);
             self.readable = false;
@@ -12175,7 +12175,7 @@ var require_legacy_streams = __commonJS({
         this.busy = false;
         this._queue = [];
         if (this.fd === null) {
-          this._open = fs52.open;
+          this._open = fs53.open;
           this._queue.push([this._open, this.path, this.flags, this.mode, void 0]);
           this.flush();
         }
@@ -12210,7 +12210,7 @@ var require_clone = __commonJS({
 // node_modules/graceful-fs/graceful-fs.js
 var require_graceful_fs = __commonJS({
   "node_modules/graceful-fs/graceful-fs.js"(exports, module) {
-    var fs52 = __require("fs");
+    var fs53 = __require("fs");
     var polyfills = require_polyfills();
     var legacy = require_legacy_streams();
     var clone2 = require_clone();
@@ -12242,12 +12242,12 @@ var require_graceful_fs = __commonJS({
         m = "GFS4: " + m.split(/\n/).join("\nGFS4: ");
         console.error(m);
       };
-    if (!fs52[gracefulQueue]) {
+    if (!fs53[gracefulQueue]) {
       queue = global[gracefulQueue] || [];
-      publishQueue(fs52, queue);
-      fs52.close = (function(fs$close) {
+      publishQueue(fs53, queue);
+      fs53.close = (function(fs$close) {
         function close(fd, cb) {
-          return fs$close.call(fs52, fd, function(err) {
+          return fs$close.call(fs53, fd, function(err) {
             if (!err) {
               resetQueue();
             }
@@ -12259,40 +12259,40 @@ var require_graceful_fs = __commonJS({
           value: fs$close
         });
         return close;
-      })(fs52.close);
-      fs52.closeSync = (function(fs$closeSync) {
+      })(fs53.close);
+      fs53.closeSync = (function(fs$closeSync) {
         function closeSync(fd) {
-          fs$closeSync.apply(fs52, arguments);
+          fs$closeSync.apply(fs53, arguments);
           resetQueue();
         }
         Object.defineProperty(closeSync, previousSymbol, {
           value: fs$closeSync
         });
         return closeSync;
-      })(fs52.closeSync);
+      })(fs53.closeSync);
       if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || "")) {
         process.on("exit", function() {
-          debug(fs52[gracefulQueue]);
-          __require("assert").equal(fs52[gracefulQueue].length, 0);
+          debug(fs53[gracefulQueue]);
+          __require("assert").equal(fs53[gracefulQueue].length, 0);
         });
       }
     }
     var queue;
     if (!global[gracefulQueue]) {
-      publishQueue(global, fs52[gracefulQueue]);
+      publishQueue(global, fs53[gracefulQueue]);
     }
-    module.exports = patch(clone2(fs52));
-    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs52.__patched) {
-      module.exports = patch(fs52);
-      fs52.__patched = true;
+    module.exports = patch(clone2(fs53));
+    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs53.__patched) {
+      module.exports = patch(fs53);
+      fs53.__patched = true;
     }
-    function patch(fs53) {
-      polyfills(fs53);
-      fs53.gracefulify = patch;
-      fs53.createReadStream = createReadStream;
-      fs53.createWriteStream = createWriteStream;
-      var fs$readFile = fs53.readFile;
-      fs53.readFile = readFile;
+    function patch(fs54) {
+      polyfills(fs54);
+      fs54.gracefulify = patch;
+      fs54.createReadStream = createReadStream;
+      fs54.createWriteStream = createWriteStream;
+      var fs$readFile = fs54.readFile;
+      fs54.readFile = readFile;
       function readFile(path53, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
@@ -12308,8 +12308,8 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$writeFile = fs53.writeFile;
-      fs53.writeFile = writeFile;
+      var fs$writeFile = fs54.writeFile;
+      fs54.writeFile = writeFile;
       function writeFile(path53, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
@@ -12325,9 +12325,9 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$appendFile = fs53.appendFile;
+      var fs$appendFile = fs54.appendFile;
       if (fs$appendFile)
-        fs53.appendFile = appendFile;
+        fs54.appendFile = appendFile;
       function appendFile(path53, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
@@ -12343,9 +12343,9 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$copyFile = fs53.copyFile;
+      var fs$copyFile = fs54.copyFile;
       if (fs$copyFile)
-        fs53.copyFile = copyFile;
+        fs54.copyFile = copyFile;
       function copyFile(src, dest, flags, cb) {
         if (typeof flags === "function") {
           cb = flags;
@@ -12363,8 +12363,8 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$readdir = fs53.readdir;
-      fs53.readdir = readdir;
+      var fs$readdir = fs54.readdir;
+      fs54.readdir = readdir;
       var noReaddirOptionVersions = /^v[0-5]\./;
       function readdir(path53, options, cb) {
         if (typeof options === "function")
@@ -12405,21 +12405,21 @@ var require_graceful_fs = __commonJS({
         }
       }
       if (process.version.substr(0, 4) === "v0.8") {
-        var legStreams = legacy(fs53);
+        var legStreams = legacy(fs54);
         ReadStream = legStreams.ReadStream;
         WriteStream = legStreams.WriteStream;
       }
-      var fs$ReadStream = fs53.ReadStream;
+      var fs$ReadStream = fs54.ReadStream;
       if (fs$ReadStream) {
         ReadStream.prototype = Object.create(fs$ReadStream.prototype);
         ReadStream.prototype.open = ReadStream$open;
       }
-      var fs$WriteStream = fs53.WriteStream;
+      var fs$WriteStream = fs54.WriteStream;
       if (fs$WriteStream) {
         WriteStream.prototype = Object.create(fs$WriteStream.prototype);
         WriteStream.prototype.open = WriteStream$open;
       }
-      Object.defineProperty(fs53, "ReadStream", {
+      Object.defineProperty(fs54, "ReadStream", {
         get: function() {
           return ReadStream;
         },
@@ -12429,7 +12429,7 @@ var require_graceful_fs = __commonJS({
         enumerable: true,
         configurable: true
       });
-      Object.defineProperty(fs53, "WriteStream", {
+      Object.defineProperty(fs54, "WriteStream", {
         get: function() {
           return WriteStream;
         },
@@ -12440,7 +12440,7 @@ var require_graceful_fs = __commonJS({
         configurable: true
       });
       var FileReadStream = ReadStream;
-      Object.defineProperty(fs53, "FileReadStream", {
+      Object.defineProperty(fs54, "FileReadStream", {
         get: function() {
           return FileReadStream;
         },
@@ -12451,7 +12451,7 @@ var require_graceful_fs = __commonJS({
         configurable: true
       });
       var FileWriteStream = WriteStream;
-      Object.defineProperty(fs53, "FileWriteStream", {
+      Object.defineProperty(fs54, "FileWriteStream", {
         get: function() {
           return FileWriteStream;
         },
@@ -12500,13 +12500,13 @@ var require_graceful_fs = __commonJS({
         });
       }
       function createReadStream(path53, options) {
-        return new fs53.ReadStream(path53, options);
+        return new fs54.ReadStream(path53, options);
       }
       function createWriteStream(path53, options) {
-        return new fs53.WriteStream(path53, options);
+        return new fs54.WriteStream(path53, options);
       }
-      var fs$open = fs53.open;
-      fs53.open = open2;
+      var fs$open = fs54.open;
+      fs54.open = open2;
       function open2(path53, flags, mode, cb) {
         if (typeof mode === "function")
           cb = mode, mode = null;
@@ -12522,20 +12522,20 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      return fs53;
+      return fs54;
     }
     function enqueue(elem) {
       debug("ENQUEUE", elem[0].name, elem[1]);
-      fs52[gracefulQueue].push(elem);
+      fs53[gracefulQueue].push(elem);
       retry();
     }
     var retryTimer;
     function resetQueue() {
       var now = Date.now();
-      for (var i = 0; i < fs52[gracefulQueue].length; ++i) {
-        if (fs52[gracefulQueue][i].length > 2) {
-          fs52[gracefulQueue][i][3] = now;
-          fs52[gracefulQueue][i][4] = now;
+      for (var i = 0; i < fs53[gracefulQueue].length; ++i) {
+        if (fs53[gracefulQueue][i].length > 2) {
+          fs53[gracefulQueue][i][3] = now;
+          fs53[gracefulQueue][i][4] = now;
         }
       }
       retry();
@@ -12543,9 +12543,9 @@ var require_graceful_fs = __commonJS({
     function retry() {
       clearTimeout(retryTimer);
       retryTimer = void 0;
-      if (fs52[gracefulQueue].length === 0)
+      if (fs53[gracefulQueue].length === 0)
         return;
-      var elem = fs52[gracefulQueue].shift();
+      var elem = fs53[gracefulQueue].shift();
       var fn = elem[0];
       var args = elem[1];
       var err = elem[2];
@@ -12567,7 +12567,7 @@ var require_graceful_fs = __commonJS({
           debug("RETRY", fn.name, args);
           fn.apply(null, args.concat([startTime]));
         } else {
-          fs52[gracefulQueue].push(elem);
+          fs53[gracefulQueue].push(elem);
         }
       }
       if (retryTimer === void 0) {
@@ -13002,10 +13002,10 @@ var require_mtime_precision = __commonJS({
   "node_modules/proper-lockfile/lib/mtime-precision.js"(exports, module) {
     "use strict";
     var cacheSymbol = /* @__PURE__ */ Symbol();
-    function probe(file, fs52, callback) {
-      const cachedPrecision = fs52[cacheSymbol];
+    function probe(file, fs53, callback) {
+      const cachedPrecision = fs53[cacheSymbol];
       if (cachedPrecision) {
-        return fs52.stat(file, (err, stat) => {
+        return fs53.stat(file, (err, stat) => {
           if (err) {
             return callback(err);
           }
@@ -13013,16 +13013,16 @@ var require_mtime_precision = __commonJS({
         });
       }
       const mtime = new Date(Math.ceil(Date.now() / 1e3) * 1e3 + 5);
-      fs52.utimes(file, mtime, mtime, (err) => {
+      fs53.utimes(file, mtime, mtime, (err) => {
         if (err) {
           return callback(err);
         }
-        fs52.stat(file, (err2, stat) => {
+        fs53.stat(file, (err2, stat) => {
           if (err2) {
             return callback(err2);
           }
           const precision = stat.mtime.getTime() % 1e3 === 0 ? "s" : "ms";
-          Object.defineProperty(fs52, cacheSymbol, { value: precision });
+          Object.defineProperty(fs53, cacheSymbol, { value: precision });
           callback(null, stat.mtime, precision);
         });
       });
@@ -13044,7 +13044,7 @@ var require_lockfile = __commonJS({
   "node_modules/proper-lockfile/lib/lockfile.js"(exports, module) {
     "use strict";
     var path53 = __require("path");
-    var fs52 = require_graceful_fs();
+    var fs53 = require_graceful_fs();
     var retry = require_retry2();
     var onExit = require_signal_exit();
     var mtimePrecision = require_mtime_precision();
@@ -13175,7 +13175,7 @@ var require_lockfile = __commonJS({
         update: null,
         realpath: true,
         retries: 0,
-        fs: fs52,
+        fs: fs53,
         onCompromised: (err) => {
           throw err;
         },
@@ -13219,7 +13219,7 @@ var require_lockfile = __commonJS({
     }
     function unlock(file, options, callback) {
       options = {
-        fs: fs52,
+        fs: fs53,
         realpath: true,
         ...options
       };
@@ -13241,7 +13241,7 @@ var require_lockfile = __commonJS({
       options = {
         stale: 1e4,
         realpath: true,
-        fs: fs52,
+        fs: fs53,
         ...options
       };
       options.stale = Math.max(options.stale || 0, 2e3);
@@ -13280,16 +13280,16 @@ var require_lockfile = __commonJS({
 var require_adapter = __commonJS({
   "node_modules/proper-lockfile/lib/adapter.js"(exports, module) {
     "use strict";
-    var fs52 = require_graceful_fs();
-    function createSyncFs(fs53) {
+    var fs53 = require_graceful_fs();
+    function createSyncFs(fs54) {
       const methods = ["mkdir", "realpath", "stat", "rmdir", "utimes"];
-      const newFs = { ...fs53 };
+      const newFs = { ...fs54 };
       methods.forEach((method) => {
         newFs[method] = (...args) => {
           const callback = args.pop();
           let ret;
           try {
-            ret = fs53[`${method}Sync`](...args);
+            ret = fs54[`${method}Sync`](...args);
           } catch (err) {
             return callback(err);
           }
@@ -13327,7 +13327,7 @@ var require_adapter = __commonJS({
     }
     function toSyncOptions(options) {
       options = { ...options };
-      options.fs = createSyncFs(options.fs || fs52);
+      options.fs = createSyncFs(options.fs || fs53);
       if (typeof options.retries === "number" && options.retries > 0 || options.retries && typeof options.retries.retries === "number" && options.retries.retries > 0) {
         throw Object.assign(new Error("Cannot use retries with the sync api"), { code: "ESYNC" });
       }
@@ -15732,6 +15732,933 @@ var init_devices2 = __esm({
   "src/core/devices.ts"() {
     "use strict";
     init_devices();
+  }
+});
+
+// src/utils/owned-process-wait.ts
+function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
+  return new Promise((resolve, reject) => {
+    let settled = false, timedOut = false;
+    let escalation;
+    let deadline;
+    const cleanup = () => {
+      settled = true;
+      clearTimeout(timer);
+      clearTimeout(escalation);
+      clearTimeout(deadline);
+      proc.off("exit", exited);
+      proc.off("close", exited);
+      proc.off("error", failed);
+    };
+    const exited = (code) => {
+      if (settled) return;
+      cleanup();
+      if (timedOut)
+        reject(
+          new PlatformIOError(
+            `Command timed out after ${timeoutMs}ms`,
+            "COMMAND_TIMEOUT",
+            { cleanupPending: false }
+          )
+        );
+      else resolve(code ?? 1);
+    };
+    const failed = (error2) => {
+      if (settled) return;
+      cleanup();
+      reject(
+        new PlatformIOError(error2.message, "PROCESS_FAILED", {
+          cleanupPending: !!proc.pid && proc.exitCode === null && proc.signalCode === null
+        })
+      );
+    };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        proc.kill("SIGTERM");
+      } catch {
+      }
+      if (settled) return;
+      escalation = setTimeout(() => {
+        if (settled) return;
+        try {
+          proc.kill("SIGKILL");
+        } catch {
+        }
+        if (settled) return;
+        deadline = setTimeout(() => {
+          if (settled) return;
+          cleanup();
+          reject(
+            new PlatformIOError(
+              "Child termination could not be confirmed.",
+              "PROCESS_CLEANUP_PENDING",
+              { cleanupPending: true }
+            )
+          );
+        }, graceMs);
+      }, graceMs);
+    }, timeoutMs);
+    proc.once("exit", exited);
+    proc.once("close", exited);
+    proc.once("error", failed);
+    if (proc.exitCode !== null || proc.signalCode !== null)
+      exited(proc.exitCode);
+  });
+}
+var init_owned_process_wait = __esm({
+  "src/utils/owned-process-wait.ts"() {
+    "use strict";
+    init_errors2();
+  }
+});
+
+// node_modules/tree-kill/index.js
+var require_tree_kill = __commonJS({
+  "node_modules/tree-kill/index.js"(exports, module) {
+    "use strict";
+    var childProcess2 = __require("child_process");
+    var spawn2 = childProcess2.spawn;
+    var exec2 = childProcess2.exec;
+    module.exports = function(pid, signal, callback) {
+      if (typeof signal === "function" && callback === void 0) {
+        callback = signal;
+        signal = void 0;
+      }
+      pid = parseInt(pid);
+      if (Number.isNaN(pid)) {
+        if (callback) {
+          return callback(new Error("pid must be a number"));
+        } else {
+          throw new Error("pid must be a number");
+        }
+      }
+      var tree = {};
+      var pidsToProcess = {};
+      tree[pid] = [];
+      pidsToProcess[pid] = 1;
+      switch (process.platform) {
+        case "win32":
+          exec2("taskkill /pid " + pid + " /T /F", callback);
+          break;
+        case "darwin":
+          buildProcessTree(pid, tree, pidsToProcess, function(parentPid) {
+            return spawn2("pgrep", ["-P", parentPid]);
+          }, function() {
+            killAll(tree, signal, callback);
+          });
+          break;
+        // case 'sunos':
+        //     buildProcessTreeSunOS(pid, tree, pidsToProcess, function () {
+        //         killAll(tree, signal, callback);
+        //     });
+        //     break;
+        default:
+          buildProcessTree(pid, tree, pidsToProcess, function(parentPid) {
+            return spawn2("ps", ["-o", "pid", "--no-headers", "--ppid", parentPid]);
+          }, function() {
+            killAll(tree, signal, callback);
+          });
+          break;
+      }
+    };
+    function killAll(tree, signal, callback) {
+      var killed = {};
+      try {
+        Object.keys(tree).forEach(function(pid) {
+          tree[pid].forEach(function(pidpid) {
+            if (!killed[pidpid]) {
+              killPid(pidpid, signal);
+              killed[pidpid] = 1;
+            }
+          });
+          if (!killed[pid]) {
+            killPid(pid, signal);
+            killed[pid] = 1;
+          }
+        });
+      } catch (err) {
+        if (callback) {
+          return callback(err);
+        } else {
+          throw err;
+        }
+      }
+      if (callback) {
+        return callback();
+      }
+    }
+    function killPid(pid, signal) {
+      try {
+        process.kill(parseInt(pid, 10), signal);
+      } catch (err) {
+        if (err.code !== "ESRCH") throw err;
+      }
+    }
+    function buildProcessTree(parentPid, tree, pidsToProcess, spawnChildProcessesList, cb) {
+      var ps = spawnChildProcessesList(parentPid);
+      var allData = "";
+      ps.stdout.on("data", function(data) {
+        var data = data.toString("ascii");
+        allData += data;
+      });
+      var onClose = function(code) {
+        delete pidsToProcess[parentPid];
+        if (code != 0) {
+          if (Object.keys(pidsToProcess).length == 0) {
+            cb();
+          }
+          return;
+        }
+        allData.match(/\d+/g).forEach(function(pid) {
+          pid = parseInt(pid, 10);
+          tree[parentPid].push(pid);
+          tree[pid] = [];
+          pidsToProcess[pid] = 1;
+          buildProcessTree(pid, tree, pidsToProcess, spawnChildProcessesList, cb);
+        });
+      };
+      ps.on("close", onClose);
+    }
+  }
+});
+
+// src/utils/logger.ts
+import fs34 from "node:fs";
+import path39 from "node:path";
+async function logDiagnostic(msg, _projectDir) {
+  ensureGlobalDirs();
+  const diagLog = path39.join(SERVER_DATA_DIR, "server.log");
+  const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+  const line = `[${timestamp}] ${msg}
+`;
+  try {
+    await fs34.promises.appendFile(diagLog, line);
+  } catch {
+  }
+  console.error(msg);
+}
+var init_logger = __esm({
+  "src/utils/logger.ts"() {
+    "use strict";
+    init_paths();
+  }
+});
+
+// src/utils/process-manager.ts
+import fs35 from "node:fs";
+import { setTimeout as delay2 } from "node:timers/promises";
+import os7 from "node:os";
+import path40 from "node:path";
+import { execSync as execSync2 } from "node:child_process";
+import crypto12 from "node:crypto";
+function getPidsFilePath(projectDir, file = SERIAL_PIDS_FILE) {
+  if (file === SERIAL_PIDS_FILE) {
+    ensureGlobalDirs();
+    const dir = path40.join(SERVER_DATA_DIR, "serial_monitors");
+    if (!fs35.existsSync(dir)) fs35.mkdirSync(dir, { recursive: true });
+    return path40.join(dir, file);
+  } else if (file === BUILD_PIDS_FILE) {
+    const baseDir2 = projectDir || SERVER_DATA_DIR;
+    if (!projectDir) ensureGlobalDirs();
+    const dir = path40.join(baseDir2, WORKSPACE_DIR2, "tasks");
+    if (!fs35.existsSync(dir)) fs35.mkdirSync(dir, { recursive: true });
+    return path40.join(dir, file);
+  }
+  const baseDir = projectDir || SERVER_DATA_DIR;
+  if (!projectDir) ensureGlobalDirs();
+  return path40.join(baseDir, WORKSPACE_DIR2, LOCKS_DIR, file);
+}
+function readMonitorIdentities(pidsFile) {
+  const file = pidsFile + ".identities.json";
+  if (!fs35.existsSync(file)) return {};
+  if (fs35.statSync(file).size > 1024 * 1024)
+    throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
+  const value2 = JSON.parse(fs35.readFileSync(file, "utf8"));
+  if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
+    throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
+  return value2;
+}
+async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFile, taskId, commandDesc) {
+  const pidsFile = getPidsFilePath(projectDir);
+  const dir = path40.dirname(pidsFile);
+  if (!fs35.existsSync(dir)) fs35.mkdirSync(dir, { recursive: true });
+  if (!fs35.existsSync(pidsFile)) fs35.writeFileSync(pidsFile, "{}");
+  try {
+    const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let pids = {};
+      try {
+        pids = JSON.parse(fs35.readFileSync(pidsFile, "utf8"));
+      } catch {
+      }
+      const identities = readMonitorIdentities(pidsFile);
+      const observed = inspectProcessIdentity(pid);
+      if (observed.status === "running") identities[port] = observed.identity;
+      else delete identities[port];
+      fs35.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+      pids[port] = pid;
+      fs35.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+  try {
+    const commandId = rootCommandId || crypto12.randomUUID();
+    const effectiveTaskId = taskId || crypto12.randomUUID();
+    await registerCommand({
+      id: commandId,
+      commandDesc: `PIO Serial Monitor: ${port}`,
+      timestamp: Date.now(),
+      status: "running",
+      tasks: [{
+        taskId: effectiveTaskId,
+        type: "monitor",
+        status: "running",
+        port,
+        pid,
+        commandDesc,
+        logPaths: logFile ? [logFile] : []
+      }]
+    }, projectDir);
+  } catch (e) {
+    logDiagnostic(`[ProcessManager] Failed to register monitor command: ${e.message}`, projectDir);
+  }
+}
+async function unregisterPioMonitorPid(port, projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
+  if (fs35.existsSync(pidsFile)) {
+    try {
+      const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+      try {
+        const pids = JSON.parse(fs35.readFileSync(pidsFile, "utf8"));
+        if (pids[port]) {
+          delete pids[port];
+          const identities = readMonitorIdentities(pidsFile);
+          delete identities[port];
+          fs35.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+          fs35.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+        }
+      } finally {
+        await release();
+      }
+    } catch (e) {
+      throw new Error(`Registry contention timeout: ${e.message}`);
+    }
+  }
+  try {
+    const history = getCommandHistory(projectDir);
+    const activeCommand = [...history].reverse().find(
+      (cmd) => cmd.tasks?.some((a) => a.type === "monitor" && a.status === "running" && a.port === port)
+    );
+    if (activeCommand) {
+      const activeTask = activeCommand.tasks.find((a) => a.type === "monitor" && a.status === "running" && a.port === port);
+      if (activeTask) {
+        await updateTaskStatus(activeCommand.id, activeTask.taskId, { status: "terminated" }, projectDir);
+      }
+    }
+  } catch (e) {
+    logDiagnostic(`[ProcessManager] Failed to update monitor command status: ${e.message}`, projectDir);
+  }
+}
+async function killPioMonitorByPort(port, projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
+  if (!fs35.existsSync(pidsFile)) return false;
+  let stoppedPid;
+  const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+  try {
+    const pids = JSON.parse(fs35.readFileSync(pidsFile, "utf8"));
+    const pid = pids[port];
+    if (!pid) return false;
+    stoppedPid = pid;
+    const identity = readMonitorIdentities(pidsFile)[port];
+    const observation = inspectProcessIdentity(pid);
+    if (observation.status === "absent") {
+    } else {
+      if (!identity || identity.pid !== pid || compareProcessIdentity(identity, observation) !== "alive")
+        throw new PlatformIOError("Monitor process identity is unavailable or changed; refusing PID-only termination.", "PROCESS_IDENTITY_UNVERIFIED");
+      await new Promise((resolve, reject) => (0, import_tree_kill.default)(pid, "SIGKILL", (error2) => error2 ? reject(error2) : resolve()));
+      let confirmed = false;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if (compareProcessIdentity(identity, inspectProcessIdentity(pid)) === "stale") {
+          confirmed = true;
+          break;
+        }
+        await delay2(50);
+      }
+      if (!confirmed) throw new PlatformIOError("Monitor exit could not be confirmed.", "PROCESS_CLEANUP_PENDING");
+    }
+    delete pids[port];
+    const identities = readMonitorIdentities(pidsFile);
+    delete identities[port];
+    fs35.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+    fs35.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+  } finally {
+    await release();
+  }
+  const history = getCommandHistory(projectDir);
+  for (const command of history) {
+    for (const task of command.tasks ?? []) {
+      if (task.type === "monitor" && task.port === port && task.pid === stoppedPid && task.status === "running")
+        await updateTaskStatus(command.id, task.taskId, { status: "terminated" }, projectDir);
+    }
+  }
+  return true;
+}
+function isPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    if (os7.platform() !== "win32") {
+      try {
+        const stdout = execSync2(`ps -p ${pid} -o command=`, { encoding: "utf8" }).toLowerCase();
+        if (!stdout.includes("platformio") && !stdout.includes("pio") && !stdout.includes("python")) {
+          return false;
+        }
+        try {
+          const stat = execSync2(`ps -p ${pid} -o stat=`, { encoding: "utf8" }).trim().toUpperCase();
+          if (stat.startsWith("Z")) {
+            return false;
+          }
+        } catch {
+        }
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+function getActiveMonitorPids(projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
+  if (!fs35.existsSync(pidsFile)) return {};
+  try {
+    return JSON.parse(fs35.readFileSync(pidsFile, "utf8"));
+  } catch {
+    return {};
+  }
+}
+function isBuildActive(projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  if (!fs35.existsSync(pidsFile)) return false;
+  try {
+    const pids = JSON.parse(fs35.readFileSync(pidsFile, "utf8"));
+    for (const key of Object.keys(pids)) {
+      if (pids[key]?.type === "build" || key === "build") {
+        const targetPid = key === "build" ? pids[key] : Number(key);
+        if (isPidAlive(targetPid)) return true;
+      }
+    }
+  } catch {
+  }
+  return false;
+}
+async function registerBuildPid(pid, projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  const dir = path40.dirname(pidsFile);
+  if (!fs35.existsSync(dir)) fs35.mkdirSync(dir, { recursive: true });
+  if (!fs35.existsSync(pidsFile)) fs35.writeFileSync(pidsFile, "{}");
+  try {
+    const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let pids = {};
+      try {
+        pids = JSON.parse(fs35.readFileSync(pidsFile, "utf8"));
+      } catch {
+      }
+      pids[pid.toString()] = { type: "build", started: Date.now() };
+      fs35.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+}
+async function unregisterBuildPid(projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  if (!fs35.existsSync(pidsFile)) return;
+  try {
+    const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      const pids = JSON.parse(fs35.readFileSync(pidsFile, "utf8"));
+      let changed = false;
+      for (const key of Object.keys(pids)) {
+        if (pids[key]?.type === "build" || key === "build") {
+          delete pids[key];
+          changed = true;
+        }
+      }
+      if (changed) {
+        fs35.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+      }
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+}
+async function unregisterBuildPidValue(pid, projectDir) {
+  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  if (!fs35.existsSync(pidsFile)) return;
+  const release = await import_proper_lockfile5.default.lock(pidsFile, {
+    retries: { retries: 5, minTimeout: 50, maxTimeout: 200 }
+  });
+  try {
+    const pids = JSON.parse(fs35.readFileSync(pidsFile, "utf8"));
+    delete pids[String(pid)];
+    fs35.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+  } finally {
+    await release();
+  }
+}
+async function killTrackedTaskProcess(task, projectDir) {
+  if (!task.pid) return false;
+  const monitorPids = getActiveMonitorPids(projectDir);
+  const buildPidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
+  let buildPids = {};
+  if (fs35.existsSync(buildPidsFile)) {
+    try {
+      buildPids = JSON.parse(fs35.readFileSync(buildPidsFile, "utf8"));
+    } catch {
+      buildPids = {};
+    }
+  }
+  const trackedMonitor = task.type === "monitor" && Boolean(task.port) && monitorPids[task.port] === task.pid;
+  const trackedBuild = task.type !== "monitor" && Object.hasOwn(buildPids, String(task.pid));
+  if (!trackedMonitor && !trackedBuild) {
+    if (!isPidAlive(task.pid)) return false;
+    throw new Error(
+      `Refusing to terminate PID ${task.pid}; it is not owned by task ${task.taskId}.`
+    );
+  }
+  if (isPidAlive(task.pid)) {
+    await new Promise((resolve, reject) => {
+      (0, import_tree_kill.default)(task.pid, "SIGTERM", (error2) => {
+        if (error2) reject(error2);
+        else resolve();
+      });
+    });
+  }
+  if (trackedMonitor && task.port) {
+    await unregisterPioMonitorPid(task.port, projectDir);
+  } else if (trackedBuild) {
+    await unregisterBuildPidValue(task.pid, projectDir);
+  }
+  return true;
+}
+async function killAllTrackedProcesses(projectDir) {
+  const tasks = [];
+  for (const file of [SERIAL_PIDS_FILE, BUILD_PIDS_FILE]) {
+    const pidsFile = getPidsFilePath(projectDir, file);
+    if (fs35.existsSync(pidsFile)) {
+      try {
+        const pids = JSON.parse(fs35.readFileSync(pidsFile, "utf8"));
+        for (const key of Object.keys(pids)) {
+          let targetPid;
+          if (file === BUILD_PIDS_FILE) {
+            if (pids[key]?.type === "build" || key === "build") {
+              targetPid = key === "build" ? pids[key] : Number(key);
+            }
+          } else {
+            targetPid = pids[key];
+          }
+          if (targetPid) {
+            logDiagnostic(`[ProcessManager Diagnostic] Emergency killing tracked PID ${targetPid} via ${file}.`, projectDir);
+            const p = new Promise((res) => {
+              (0, import_tree_kill.default)(targetPid, "SIGKILL", () => res());
+            });
+            tasks.push(p);
+          }
+        }
+        fs35.unlinkSync(pidsFile);
+      } catch {
+      }
+    }
+  }
+  await Promise.all(tasks);
+  await sweepGhostTasks(projectDir);
+}
+async function sweepGhostTasks(projectDir) {
+  try {
+    const history = getCommandHistory(projectDir);
+    let changed = false;
+    for (const cmd of history) {
+      if (cmd.tasks) {
+        for (const task of cmd.tasks) {
+          if (task.status === "running") {
+            const pid = task.pid;
+            let isAlive = false;
+            if (pid && isPidAlive(pid)) {
+              isAlive = true;
+            }
+            if (!isAlive) {
+              await updateTaskStatus(cmd.id, task.taskId, { status: "terminated" }, projectDir);
+              logDiagnostic(`[Ghost Sweeper] Cleaned up orphaned ghost task ${task.taskId} (PID: ${pid || "Unknown"})`, projectDir);
+              changed = true;
+            }
+          }
+        }
+      }
+    }
+    if (changed) {
+      logDiagnostic(`[Ghost Sweeper] Successfully scrubbed stale background tasks from registry.`, projectDir);
+    }
+  } catch (e) {
+    logDiagnostic(`[Ghost Sweeper] Failed to sweep tasks: ${e.message}`, projectDir);
+  }
+}
+var import_tree_kill, import_proper_lockfile5, WORKSPACE_DIR2, LOCKS_DIR, SERIAL_PIDS_FILE, BUILD_PIDS_FILE;
+var init_process_manager = __esm({
+  "src/utils/process-manager.ts"() {
+    "use strict";
+    init_process_identity();
+    init_errors2();
+    import_tree_kill = __toESM(require_tree_kill(), 1);
+    import_proper_lockfile5 = __toESM(require_proper_lockfile(), 1);
+    init_logger();
+    init_command_registry();
+    init_paths();
+    WORKSPACE_DIR2 = ".pio-mcp-workspace";
+    LOCKS_DIR = "locks";
+    SERIAL_PIDS_FILE = "monitor-pids.json";
+    BUILD_PIDS_FILE = "active_tasks.json";
+  }
+});
+
+// src/utils/tail.ts
+import fs36 from "node:fs";
+async function tailFileBounded(filePath, maxBytes = 1024 * 1024) {
+  if (!fs36.existsSync(filePath)) {
+    return [];
+  }
+  const stat = await fs36.promises.stat(filePath);
+  if (stat.size === 0) return [];
+  const sizeToRead = Math.min(stat.size, maxBytes);
+  const startPos = stat.size - sizeToRead;
+  const stream = fs36.createReadStream(filePath, { start: startPos, encoding: "utf8" });
+  let content = "";
+  for await (const chunk of stream) {
+    content += chunk;
+  }
+  return content.split("\n");
+}
+var init_tail = __esm({
+  "src/utils/tail.ts"() {
+    "use strict";
+  }
+});
+
+// src/utils/spooler.ts
+import fs37 from "node:fs";
+import path41 from "node:path";
+import crypto13 from "node:crypto";
+function getLogDir(verb, projectDir) {
+  const baseDir = projectDir || SERVER_DATA_DIR;
+  if (!projectDir) ensureGlobalDirs();
+  return path41.join(baseDir, WORKSPACE_DIR3, "logs", verb);
+}
+function rotateLogs(targetDir, prefix, maxHistory = 30) {
+  if (!fs37.existsSync(targetDir)) return;
+  const files = fs37.readdirSync(targetDir).filter((f) => f.startsWith(prefix) && f.endsWith(".log")).map((f) => ({
+    name: f,
+    path: path41.join(targetDir, f),
+    ctime: fs37.statSync(path41.join(targetDir, f)).ctime.getTime()
+  })).sort((a, b) => b.ctime - a.ctime);
+  if (files.length > maxHistory) {
+    const toDelete = files.slice(maxHistory);
+    for (const f of toDelete) {
+      try {
+        fs37.unlinkSync(f.path);
+      } catch {
+      }
+    }
+  }
+}
+function rotateSpoolerStreams(verb, projectDir) {
+  const targetDir = getLogDir(verb, projectDir);
+  if (!fs37.existsSync(targetDir)) {
+    fs37.mkdirSync(targetDir, { recursive: true });
+  }
+  rotateLogs(targetDir, `${verb}-`, 30);
+  const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+  const shortHash = crypto13.randomBytes(4).toString("hex");
+  const logFile = path41.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
+  const latestLog = path41.join(targetDir, `latest-${verb}.log`);
+  return { logFile, latestLog };
+}
+function ensureLatestLogPointer(logFile, latestLog) {
+  try {
+    if (fs37.existsSync(latestLog)) fs37.unlinkSync(latestLog);
+  } catch {
+  }
+  try {
+    fs37.symlinkSync(logFile, latestLog);
+    return { mirrorLatest: false };
+  } catch {
+  }
+  try {
+    fs37.linkSync(logFile, latestLog);
+    return { mirrorLatest: false };
+  } catch {
+  }
+  try {
+    fs37.writeFileSync(latestLog, "");
+    return { mirrorLatest: true };
+  } catch {
+  }
+  return { mirrorLatest: false };
+}
+async function executeWithSpooling(command, args, options) {
+  const projectArea = options.projectDir ?? options.cwd;
+  if (isBuildActive(projectArea)) {
+    throw new Error("A build is already actively running for this project.");
+  }
+  const verb = options.artifactType || "build";
+  const { logFile, latestLog } = rotateSpoolerStreams(verb, projectArea);
+  const outFd = fs37.openSync(logFile, "a");
+  const proc = await platformioExecutor.spawn(command, args, {
+    cwd: options.cwd,
+    stdio: ["ignore", outFd, outFd],
+    detached: false
+  });
+  const ctx = mcpContext.getStore();
+  const commandId = options.rootCommandId || ctx?.activityId || crypto13.randomUUID();
+  const taskId = crypto13.randomUUID();
+  const artType = options.artifactType || "build";
+  const targetProjectArea = projectArea || ctx?.targetProjectDir;
+  if (proc.pid) {
+    logDiagnostic(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, targetProjectArea);
+    await registerBuildPid(proc.pid, targetProjectArea);
+    await registerCommand({
+      id: commandId,
+      commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
+      timestamp: Date.now(),
+      status: "running",
+      tasks: [{
+        taskId,
+        type: artType,
+        status: "running",
+        logPaths: [logFile],
+        pid: proc.pid,
+        commandDesc: `pio ${command} ${args.join(" ")}`
+      }]
+    }, targetProjectArea).catch((e) => logDiagnostic(`[Spooler] Registry fail: ${e.message}`, targetProjectArea));
+  }
+  const latestPointer = ensureLatestLogPointer(logFile, latestLog);
+  let fileOffset = 0;
+  let watcher = null;
+  portalEvents.clearTaskLog(targetProjectArea || "global", taskId, [logFile]);
+  try {
+    watcher = fs37.watch(logFile, (eventType) => {
+      if (eventType === "change") {
+        try {
+          const stat = fs37.statSync(logFile);
+          if (stat.size > fileOffset) {
+            const stream = fs37.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
+            stream.on("data", (chunk) => {
+              const text6 = chunk.toString();
+              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text6);
+              if (latestPointer.mirrorLatest) {
+                try {
+                  fs37.appendFileSync(latestLog, text6);
+                } catch {
+                }
+              }
+            });
+            fileOffset = stat.size;
+          }
+        } catch {
+        }
+      }
+    });
+    watcher.on("error", () => {
+    });
+  } catch {
+  }
+  const timeoutMs = options.timeout ?? (options.background ? 36e5 : 6e5);
+  if (options.background) {
+    const p = waitForOwnedProcess(proc, timeoutMs);
+    let cleanupPending = false;
+    p.catch((e) => {
+      cleanupPending = e?.context?.cleanupPending !== false;
+      console.error(`[Background Task Error]: ${e.message}`);
+      updateTaskStatus(commandId, taskId, { status: "error", error: e.message }, targetProjectArea).catch(() => {
+      });
+      return 1;
+    }).then(async (code) => {
+      let errorMessage2 = void 0;
+      if (code !== 0) {
+        try {
+          const lines2 = await tailFileBounded(logFile, 512 * 1024);
+          const errors = parseStderrErrors(lines2.join("\n"));
+          if (errors && errors.length > 0) errorMessage2 = errors[0];
+        } catch {
+        }
+      }
+      await updateTaskStatus(commandId, taskId, {
+        status: code === 0 ? "success" : "error",
+        exitCode: code,
+        ...errorMessage2 ? { error: errorMessage2 } : {}
+      }, targetProjectArea).catch(() => {
+      });
+      if (!cleanupPending) {
+        await unregisterBuildPid(targetProjectArea);
+        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      }
+      try {
+        fs37.closeSync(outFd);
+      } catch {
+      }
+      if (watcher) {
+        try {
+          const stat = fs37.statSync(logFile);
+          if (stat.size > fileOffset) {
+            const buffer = Buffer.alloc(stat.size - fileOffset);
+            const fd = fs37.openSync(logFile, "r");
+            fs37.readSync(fd, buffer, 0, buffer.length, fileOffset);
+            fs37.closeSync(fd);
+            portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
+            fileOffset = stat.size;
+          }
+        } catch {
+        }
+        try {
+          watcher.close();
+        } catch {
+        }
+      }
+      if (code === 0 && options.onSuccess) {
+        try {
+          await options.onSuccess();
+        } catch (e) {
+          console.error(`[Spooler Diagnostic] Background onSuccess hook failed: ${e.message}`);
+        }
+      }
+    });
+    return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
+  }
+  let exitCode;
+  try {
+    exitCode = await waitForOwnedProcess(proc, timeoutMs);
+  } catch (error2) {
+    const cleanupPending = !(error2 instanceof PlatformIOError) || error2.context?.cleanupPending !== false;
+    await updateTaskStatus(commandId, taskId, { status: "error", error: error2 instanceof Error ? error2.message : "Process failed." }, projectArea).catch(() => {
+    });
+    try {
+      if (!cleanupPending) {
+        await unregisterBuildPid(projectArea);
+        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      }
+    } finally {
+      try {
+        fs37.closeSync(outFd);
+      } catch {
+      }
+      try {
+        watcher?.close();
+      } catch {
+      }
+    }
+    throw error2;
+  }
+  let errorMessage = void 0;
+  if (exitCode !== 0) {
+    try {
+      const lines2 = await tailFileBounded(logFile, 512 * 1024);
+      const errors = parseStderrErrors(lines2.join("\n"));
+      if (errors && errors.length > 0) errorMessage = errors[0];
+    } catch {
+    }
+  }
+  await updateTaskStatus(commandId, taskId, {
+    status: exitCode === 0 ? "success" : "error",
+    exitCode,
+    ...errorMessage ? { error: errorMessage } : {}
+  }, projectArea).catch(() => {
+  });
+  await unregisterBuildPid(projectArea);
+  if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+  try {
+    fs37.closeSync(outFd);
+  } catch {
+  }
+  if (watcher) {
+    try {
+      const stat = fs37.statSync(logFile);
+      if (stat.size > fileOffset) {
+        const buffer = Buffer.alloc(stat.size - fileOffset);
+        const fd = fs37.openSync(logFile, "r");
+        fs37.readSync(fd, buffer, 0, buffer.length, fileOffset);
+        fs37.closeSync(fd);
+        portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
+        fileOffset = stat.size;
+      }
+    } catch {
+    }
+    try {
+      watcher.close();
+    } catch {
+    }
+  }
+  if (exitCode === 0 && options.onSuccess) {
+    try {
+      await options.onSuccess();
+    } catch (e) {
+      console.error(`[Spooler Diagnostic] onSuccess hook failed: ${e.message}`);
+    }
+  }
+  let finalOutput = "";
+  try {
+    const lines2 = await tailFileBounded(logFile, 512 * 1024);
+    finalOutput = lines2.slice(-150).join("\n");
+  } catch (e) {
+    finalOutput = `[Spooler Fetch Error] Could not parse log ending: ${e.message}`;
+  }
+  return { exitCode, finalOutput, fullLogPath: logFile };
+}
+function spoolLargeDataset(toolName, data, targetDir, threshold = 2e3) {
+  const stringified = JSON.stringify(data, null, 2);
+  if (stringified.length > threshold) {
+    const cacheDir = getLogDir(toolName, targetDir);
+    if (!fs37.existsSync(cacheDir)) {
+      fs37.mkdirSync(cacheDir, { recursive: true });
+    }
+    rotateLogs(cacheDir, `${toolName}-`, 30);
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+    const shortHash = crypto13.randomBytes(4).toString("hex");
+    const cacheFile = path41.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
+    const latestFile = path41.join(cacheDir, `latest-${toolName}.json`);
+    fs37.writeFileSync(cacheFile, stringified, "utf-8");
+    try {
+      if (fs37.existsSync(latestFile)) fs37.unlinkSync(latestFile);
+      fs37.symlinkSync(cacheFile, latestFile);
+    } catch {
+    }
+    return `Payload too large for context window. Full dataset successfully spooled to disk at ${cacheFile}. Please use your grep_search or view_file tools to query this file.`;
+  }
+  return data;
+}
+var WORKSPACE_DIR3;
+var init_spooler = __esm({
+  "src/utils/spooler.ts"() {
+    "use strict";
+    init_owned_process_wait();
+    init_platformio();
+    init_process_manager();
+    init_semaphore();
+    init_tail();
+    init_command_registry();
+    init_mcp_context();
+    init_errors2();
+    init_paths();
+    init_logger();
+    init_events();
+    WORKSPACE_DIR3 = ".pio-mcp-workspace";
   }
 });
 
@@ -22887,12 +23814,12 @@ var require_dist2 = __commonJS({
         throw new Error(`Unknown format "${name2}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs52, exportName) {
+    function addFormats(ajv, list2, fs53, exportName) {
       var _a;
       var _b;
       (_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 ? _a : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs52[f]);
+        ajv.addFormat(f, fs53[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -22900,936 +23827,9 @@ var require_dist2 = __commonJS({
   }
 });
 
-// src/utils/owned-process-wait.ts
-function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
-  return new Promise((resolve, reject) => {
-    let settled = false, timedOut = false;
-    let escalation;
-    let deadline;
-    const cleanup = () => {
-      settled = true;
-      clearTimeout(timer);
-      clearTimeout(escalation);
-      clearTimeout(deadline);
-      proc.off("exit", exited);
-      proc.off("close", exited);
-      proc.off("error", failed);
-    };
-    const exited = (code) => {
-      if (settled) return;
-      cleanup();
-      if (timedOut)
-        reject(
-          new PlatformIOError(
-            `Command timed out after ${timeoutMs}ms`,
-            "COMMAND_TIMEOUT",
-            { cleanupPending: false }
-          )
-        );
-      else resolve(code ?? 1);
-    };
-    const failed = (error2) => {
-      if (settled) return;
-      cleanup();
-      reject(
-        new PlatformIOError(error2.message, "PROCESS_FAILED", {
-          cleanupPending: !!proc.pid && proc.exitCode === null && proc.signalCode === null
-        })
-      );
-    };
-    const timer = setTimeout(() => {
-      timedOut = true;
-      try {
-        proc.kill("SIGTERM");
-      } catch {
-      }
-      if (settled) return;
-      escalation = setTimeout(() => {
-        if (settled) return;
-        try {
-          proc.kill("SIGKILL");
-        } catch {
-        }
-        if (settled) return;
-        deadline = setTimeout(() => {
-          if (settled) return;
-          cleanup();
-          reject(
-            new PlatformIOError(
-              "Child termination could not be confirmed.",
-              "PROCESS_CLEANUP_PENDING",
-              { cleanupPending: true }
-            )
-          );
-        }, graceMs);
-      }, graceMs);
-    }, timeoutMs);
-    proc.once("exit", exited);
-    proc.once("close", exited);
-    proc.once("error", failed);
-    if (proc.exitCode !== null || proc.signalCode !== null)
-      exited(proc.exitCode);
-  });
-}
-var init_owned_process_wait = __esm({
-  "src/utils/owned-process-wait.ts"() {
-    "use strict";
-    init_errors2();
-  }
-});
-
-// node_modules/tree-kill/index.js
-var require_tree_kill = __commonJS({
-  "node_modules/tree-kill/index.js"(exports, module) {
-    "use strict";
-    var childProcess2 = __require("child_process");
-    var spawn2 = childProcess2.spawn;
-    var exec2 = childProcess2.exec;
-    module.exports = function(pid, signal, callback) {
-      if (typeof signal === "function" && callback === void 0) {
-        callback = signal;
-        signal = void 0;
-      }
-      pid = parseInt(pid);
-      if (Number.isNaN(pid)) {
-        if (callback) {
-          return callback(new Error("pid must be a number"));
-        } else {
-          throw new Error("pid must be a number");
-        }
-      }
-      var tree = {};
-      var pidsToProcess = {};
-      tree[pid] = [];
-      pidsToProcess[pid] = 1;
-      switch (process.platform) {
-        case "win32":
-          exec2("taskkill /pid " + pid + " /T /F", callback);
-          break;
-        case "darwin":
-          buildProcessTree(pid, tree, pidsToProcess, function(parentPid) {
-            return spawn2("pgrep", ["-P", parentPid]);
-          }, function() {
-            killAll(tree, signal, callback);
-          });
-          break;
-        // case 'sunos':
-        //     buildProcessTreeSunOS(pid, tree, pidsToProcess, function () {
-        //         killAll(tree, signal, callback);
-        //     });
-        //     break;
-        default:
-          buildProcessTree(pid, tree, pidsToProcess, function(parentPid) {
-            return spawn2("ps", ["-o", "pid", "--no-headers", "--ppid", parentPid]);
-          }, function() {
-            killAll(tree, signal, callback);
-          });
-          break;
-      }
-    };
-    function killAll(tree, signal, callback) {
-      var killed = {};
-      try {
-        Object.keys(tree).forEach(function(pid) {
-          tree[pid].forEach(function(pidpid) {
-            if (!killed[pidpid]) {
-              killPid(pidpid, signal);
-              killed[pidpid] = 1;
-            }
-          });
-          if (!killed[pid]) {
-            killPid(pid, signal);
-            killed[pid] = 1;
-          }
-        });
-      } catch (err) {
-        if (callback) {
-          return callback(err);
-        } else {
-          throw err;
-        }
-      }
-      if (callback) {
-        return callback();
-      }
-    }
-    function killPid(pid, signal) {
-      try {
-        process.kill(parseInt(pid, 10), signal);
-      } catch (err) {
-        if (err.code !== "ESRCH") throw err;
-      }
-    }
-    function buildProcessTree(parentPid, tree, pidsToProcess, spawnChildProcessesList, cb) {
-      var ps = spawnChildProcessesList(parentPid);
-      var allData = "";
-      ps.stdout.on("data", function(data) {
-        var data = data.toString("ascii");
-        allData += data;
-      });
-      var onClose = function(code) {
-        delete pidsToProcess[parentPid];
-        if (code != 0) {
-          if (Object.keys(pidsToProcess).length == 0) {
-            cb();
-          }
-          return;
-        }
-        allData.match(/\d+/g).forEach(function(pid) {
-          pid = parseInt(pid, 10);
-          tree[parentPid].push(pid);
-          tree[pid] = [];
-          pidsToProcess[pid] = 1;
-          buildProcessTree(pid, tree, pidsToProcess, spawnChildProcessesList, cb);
-        });
-      };
-      ps.on("close", onClose);
-    }
-  }
-});
-
-// src/utils/logger.ts
-import fs36 from "node:fs";
-import path42 from "node:path";
-async function logDiagnostic(msg, _projectDir) {
-  ensureGlobalDirs();
-  const diagLog = path42.join(SERVER_DATA_DIR, "server.log");
-  const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-  const line = `[${timestamp}] ${msg}
-`;
-  try {
-    await fs36.promises.appendFile(diagLog, line);
-  } catch {
-  }
-  console.error(msg);
-}
-var init_logger = __esm({
-  "src/utils/logger.ts"() {
-    "use strict";
-    init_paths();
-  }
-});
-
-// src/utils/process-manager.ts
-import fs37 from "node:fs";
-import { setTimeout as delay2 } from "node:timers/promises";
-import os8 from "node:os";
-import path43 from "node:path";
-import { execSync as execSync2 } from "node:child_process";
-import crypto13 from "node:crypto";
-function getPidsFilePath(projectDir, file = SERIAL_PIDS_FILE) {
-  if (file === SERIAL_PIDS_FILE) {
-    ensureGlobalDirs();
-    const dir = path43.join(SERVER_DATA_DIR, "serial_monitors");
-    if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
-    return path43.join(dir, file);
-  } else if (file === BUILD_PIDS_FILE) {
-    const baseDir2 = projectDir || SERVER_DATA_DIR;
-    if (!projectDir) ensureGlobalDirs();
-    const dir = path43.join(baseDir2, WORKSPACE_DIR2, "tasks");
-    if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
-    return path43.join(dir, file);
-  }
-  const baseDir = projectDir || SERVER_DATA_DIR;
-  if (!projectDir) ensureGlobalDirs();
-  return path43.join(baseDir, WORKSPACE_DIR2, LOCKS_DIR, file);
-}
-function readMonitorIdentities(pidsFile) {
-  const file = pidsFile + ".identities.json";
-  if (!fs37.existsSync(file)) return {};
-  if (fs37.statSync(file).size > 1024 * 1024)
-    throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
-  const value2 = JSON.parse(fs37.readFileSync(file, "utf8"));
-  if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
-    throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
-  return value2;
-}
-async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFile, taskId, commandDesc) {
-  const pidsFile = getPidsFilePath(projectDir);
-  const dir = path43.dirname(pidsFile);
-  if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
-  if (!fs37.existsSync(pidsFile)) fs37.writeFileSync(pidsFile, "{}");
-  try {
-    const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let pids = {};
-      try {
-        pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
-      } catch {
-      }
-      const identities = readMonitorIdentities(pidsFile);
-      const observed = inspectProcessIdentity(pid);
-      if (observed.status === "running") identities[port] = observed.identity;
-      else delete identities[port];
-      fs37.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-      pids[port] = pid;
-      fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-  try {
-    const commandId = rootCommandId || crypto13.randomUUID();
-    const effectiveTaskId = taskId || crypto13.randomUUID();
-    await registerCommand({
-      id: commandId,
-      commandDesc: `PIO Serial Monitor: ${port}`,
-      timestamp: Date.now(),
-      status: "running",
-      tasks: [{
-        taskId: effectiveTaskId,
-        type: "monitor",
-        status: "running",
-        port,
-        pid,
-        commandDesc,
-        logPaths: logFile ? [logFile] : []
-      }]
-    }, projectDir);
-  } catch (e) {
-    logDiagnostic(`[ProcessManager] Failed to register monitor command: ${e.message}`, projectDir);
-  }
-}
-async function unregisterPioMonitorPid(port, projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (fs37.existsSync(pidsFile)) {
-    try {
-      const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-      try {
-        const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
-        if (pids[port]) {
-          delete pids[port];
-          const identities = readMonitorIdentities(pidsFile);
-          delete identities[port];
-          fs37.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-          fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-        }
-      } finally {
-        await release();
-      }
-    } catch (e) {
-      throw new Error(`Registry contention timeout: ${e.message}`);
-    }
-  }
-  try {
-    const history = getCommandHistory(projectDir);
-    const activeCommand = [...history].reverse().find(
-      (cmd) => cmd.tasks?.some((a) => a.type === "monitor" && a.status === "running" && a.port === port)
-    );
-    if (activeCommand) {
-      const activeTask = activeCommand.tasks.find((a) => a.type === "monitor" && a.status === "running" && a.port === port);
-      if (activeTask) {
-        await updateTaskStatus(activeCommand.id, activeTask.taskId, { status: "terminated" }, projectDir);
-      }
-    }
-  } catch (e) {
-    logDiagnostic(`[ProcessManager] Failed to update monitor command status: ${e.message}`, projectDir);
-  }
-}
-async function killPioMonitorByPort(port, projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (!fs37.existsSync(pidsFile)) return false;
-  let stoppedPid;
-  const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-  try {
-    const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
-    const pid = pids[port];
-    if (!pid) return false;
-    stoppedPid = pid;
-    const identity = readMonitorIdentities(pidsFile)[port];
-    const observation = inspectProcessIdentity(pid);
-    if (observation.status === "absent") {
-    } else {
-      if (!identity || identity.pid !== pid || compareProcessIdentity(identity, observation) !== "alive")
-        throw new PlatformIOError("Monitor process identity is unavailable or changed; refusing PID-only termination.", "PROCESS_IDENTITY_UNVERIFIED");
-      await new Promise((resolve, reject) => (0, import_tree_kill.default)(pid, "SIGKILL", (error2) => error2 ? reject(error2) : resolve()));
-      let confirmed = false;
-      for (let attempt = 0; attempt < 20; attempt++) {
-        if (compareProcessIdentity(identity, inspectProcessIdentity(pid)) === "stale") {
-          confirmed = true;
-          break;
-        }
-        await delay2(50);
-      }
-      if (!confirmed) throw new PlatformIOError("Monitor exit could not be confirmed.", "PROCESS_CLEANUP_PENDING");
-    }
-    delete pids[port];
-    const identities = readMonitorIdentities(pidsFile);
-    delete identities[port];
-    fs37.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-    fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-  } finally {
-    await release();
-  }
-  const history = getCommandHistory(projectDir);
-  for (const command of history) {
-    for (const task of command.tasks ?? []) {
-      if (task.type === "monitor" && task.port === port && task.pid === stoppedPid && task.status === "running")
-        await updateTaskStatus(command.id, task.taskId, { status: "terminated" }, projectDir);
-    }
-  }
-  return true;
-}
-function isPidAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    if (os8.platform() !== "win32") {
-      try {
-        const stdout = execSync2(`ps -p ${pid} -o command=`, { encoding: "utf8" }).toLowerCase();
-        if (!stdout.includes("platformio") && !stdout.includes("pio") && !stdout.includes("python")) {
-          return false;
-        }
-        try {
-          const stat = execSync2(`ps -p ${pid} -o stat=`, { encoding: "utf8" }).trim().toUpperCase();
-          if (stat.startsWith("Z")) {
-            return false;
-          }
-        } catch {
-        }
-      } catch {
-        return false;
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-function getActiveMonitorPids(projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (!fs37.existsSync(pidsFile)) return {};
-  try {
-    return JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
-  } catch {
-    return {};
-  }
-}
-function isBuildActive(projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs37.existsSync(pidsFile)) return false;
-  try {
-    const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
-    for (const key of Object.keys(pids)) {
-      if (pids[key]?.type === "build" || key === "build") {
-        const targetPid = key === "build" ? pids[key] : Number(key);
-        if (isPidAlive(targetPid)) return true;
-      }
-    }
-  } catch {
-  }
-  return false;
-}
-async function registerBuildPid(pid, projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  const dir = path43.dirname(pidsFile);
-  if (!fs37.existsSync(dir)) fs37.mkdirSync(dir, { recursive: true });
-  if (!fs37.existsSync(pidsFile)) fs37.writeFileSync(pidsFile, "{}");
-  try {
-    const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let pids = {};
-      try {
-        pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
-      } catch {
-      }
-      pids[pid.toString()] = { type: "build", started: Date.now() };
-      fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-}
-async function unregisterBuildPid(projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs37.existsSync(pidsFile)) return;
-  try {
-    const release = await import_proper_lockfile6.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
-      let changed = false;
-      for (const key of Object.keys(pids)) {
-        if (pids[key]?.type === "build" || key === "build") {
-          delete pids[key];
-          changed = true;
-        }
-      }
-      if (changed) {
-        fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-      }
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-}
-async function unregisterBuildPidValue(pid, projectDir) {
-  const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs37.existsSync(pidsFile)) return;
-  const release = await import_proper_lockfile6.default.lock(pidsFile, {
-    retries: { retries: 5, minTimeout: 50, maxTimeout: 200 }
-  });
-  try {
-    const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
-    delete pids[String(pid)];
-    fs37.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-  } finally {
-    await release();
-  }
-}
-async function killTrackedTaskProcess(task, projectDir) {
-  if (!task.pid) return false;
-  const monitorPids = getActiveMonitorPids(projectDir);
-  const buildPidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  let buildPids = {};
-  if (fs37.existsSync(buildPidsFile)) {
-    try {
-      buildPids = JSON.parse(fs37.readFileSync(buildPidsFile, "utf8"));
-    } catch {
-      buildPids = {};
-    }
-  }
-  const trackedMonitor = task.type === "monitor" && Boolean(task.port) && monitorPids[task.port] === task.pid;
-  const trackedBuild = task.type !== "monitor" && Object.hasOwn(buildPids, String(task.pid));
-  if (!trackedMonitor && !trackedBuild) {
-    if (!isPidAlive(task.pid)) return false;
-    throw new Error(
-      `Refusing to terminate PID ${task.pid}; it is not owned by task ${task.taskId}.`
-    );
-  }
-  if (isPidAlive(task.pid)) {
-    await new Promise((resolve, reject) => {
-      (0, import_tree_kill.default)(task.pid, "SIGTERM", (error2) => {
-        if (error2) reject(error2);
-        else resolve();
-      });
-    });
-  }
-  if (trackedMonitor && task.port) {
-    await unregisterPioMonitorPid(task.port, projectDir);
-  } else if (trackedBuild) {
-    await unregisterBuildPidValue(task.pid, projectDir);
-  }
-  return true;
-}
-async function killAllTrackedProcesses(projectDir) {
-  const tasks = [];
-  for (const file of [SERIAL_PIDS_FILE, BUILD_PIDS_FILE]) {
-    const pidsFile = getPidsFilePath(projectDir, file);
-    if (fs37.existsSync(pidsFile)) {
-      try {
-        const pids = JSON.parse(fs37.readFileSync(pidsFile, "utf8"));
-        for (const key of Object.keys(pids)) {
-          let targetPid;
-          if (file === BUILD_PIDS_FILE) {
-            if (pids[key]?.type === "build" || key === "build") {
-              targetPid = key === "build" ? pids[key] : Number(key);
-            }
-          } else {
-            targetPid = pids[key];
-          }
-          if (targetPid) {
-            logDiagnostic(`[ProcessManager Diagnostic] Emergency killing tracked PID ${targetPid} via ${file}.`, projectDir);
-            const p = new Promise((res) => {
-              (0, import_tree_kill.default)(targetPid, "SIGKILL", () => res());
-            });
-            tasks.push(p);
-          }
-        }
-        fs37.unlinkSync(pidsFile);
-      } catch {
-      }
-    }
-  }
-  await Promise.all(tasks);
-  await sweepGhostTasks(projectDir);
-}
-async function sweepGhostTasks(projectDir) {
-  try {
-    const history = getCommandHistory(projectDir);
-    let changed = false;
-    for (const cmd of history) {
-      if (cmd.tasks) {
-        for (const task of cmd.tasks) {
-          if (task.status === "running") {
-            const pid = task.pid;
-            let isAlive = false;
-            if (pid && isPidAlive(pid)) {
-              isAlive = true;
-            }
-            if (!isAlive) {
-              await updateTaskStatus(cmd.id, task.taskId, { status: "terminated" }, projectDir);
-              logDiagnostic(`[Ghost Sweeper] Cleaned up orphaned ghost task ${task.taskId} (PID: ${pid || "Unknown"})`, projectDir);
-              changed = true;
-            }
-          }
-        }
-      }
-    }
-    if (changed) {
-      logDiagnostic(`[Ghost Sweeper] Successfully scrubbed stale background tasks from registry.`, projectDir);
-    }
-  } catch (e) {
-    logDiagnostic(`[Ghost Sweeper] Failed to sweep tasks: ${e.message}`, projectDir);
-  }
-}
-var import_tree_kill, import_proper_lockfile6, WORKSPACE_DIR2, LOCKS_DIR, SERIAL_PIDS_FILE, BUILD_PIDS_FILE;
-var init_process_manager = __esm({
-  "src/utils/process-manager.ts"() {
-    "use strict";
-    init_process_identity();
-    init_errors2();
-    import_tree_kill = __toESM(require_tree_kill(), 1);
-    import_proper_lockfile6 = __toESM(require_proper_lockfile(), 1);
-    init_logger();
-    init_command_registry();
-    init_paths();
-    WORKSPACE_DIR2 = ".pio-mcp-workspace";
-    LOCKS_DIR = "locks";
-    SERIAL_PIDS_FILE = "monitor-pids.json";
-    BUILD_PIDS_FILE = "active_tasks.json";
-  }
-});
-
-// src/utils/tail.ts
-import fs38 from "node:fs";
-async function tailFileBounded(filePath, maxBytes = 1024 * 1024) {
-  if (!fs38.existsSync(filePath)) {
-    return [];
-  }
-  const stat = await fs38.promises.stat(filePath);
-  if (stat.size === 0) return [];
-  const sizeToRead = Math.min(stat.size, maxBytes);
-  const startPos = stat.size - sizeToRead;
-  const stream = fs38.createReadStream(filePath, { start: startPos, encoding: "utf8" });
-  let content = "";
-  for await (const chunk of stream) {
-    content += chunk;
-  }
-  return content.split("\n");
-}
-var init_tail = __esm({
-  "src/utils/tail.ts"() {
-    "use strict";
-  }
-});
-
-// src/utils/spooler.ts
-import fs39 from "node:fs";
-import path44 from "node:path";
-import crypto14 from "node:crypto";
-function getLogDir(verb, projectDir) {
-  const baseDir = projectDir || SERVER_DATA_DIR;
-  if (!projectDir) ensureGlobalDirs();
-  return path44.join(baseDir, WORKSPACE_DIR3, "logs", verb);
-}
-function rotateLogs(targetDir, prefix, maxHistory = 30) {
-  if (!fs39.existsSync(targetDir)) return;
-  const files = fs39.readdirSync(targetDir).filter((f) => f.startsWith(prefix) && f.endsWith(".log")).map((f) => ({
-    name: f,
-    path: path44.join(targetDir, f),
-    ctime: fs39.statSync(path44.join(targetDir, f)).ctime.getTime()
-  })).sort((a, b) => b.ctime - a.ctime);
-  if (files.length > maxHistory) {
-    const toDelete = files.slice(maxHistory);
-    for (const f of toDelete) {
-      try {
-        fs39.unlinkSync(f.path);
-      } catch {
-      }
-    }
-  }
-}
-function rotateSpoolerStreams(verb, projectDir) {
-  const targetDir = getLogDir(verb, projectDir);
-  if (!fs39.existsSync(targetDir)) {
-    fs39.mkdirSync(targetDir, { recursive: true });
-  }
-  rotateLogs(targetDir, `${verb}-`, 30);
-  const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-  const shortHash = crypto14.randomBytes(4).toString("hex");
-  const logFile = path44.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
-  const latestLog = path44.join(targetDir, `latest-${verb}.log`);
-  return { logFile, latestLog };
-}
-function ensureLatestLogPointer(logFile, latestLog) {
-  try {
-    if (fs39.existsSync(latestLog)) fs39.unlinkSync(latestLog);
-  } catch {
-  }
-  try {
-    fs39.symlinkSync(logFile, latestLog);
-    return { mirrorLatest: false };
-  } catch {
-  }
-  try {
-    fs39.linkSync(logFile, latestLog);
-    return { mirrorLatest: false };
-  } catch {
-  }
-  try {
-    fs39.writeFileSync(latestLog, "");
-    return { mirrorLatest: true };
-  } catch {
-  }
-  return { mirrorLatest: false };
-}
-async function executeWithSpooling(command, args, options) {
-  const projectArea = options.projectDir ?? options.cwd;
-  if (isBuildActive(projectArea)) {
-    throw new Error("A build is already actively running for this project.");
-  }
-  const verb = options.artifactType || "build";
-  const { logFile, latestLog } = rotateSpoolerStreams(verb, projectArea);
-  const outFd = fs39.openSync(logFile, "a");
-  const proc = await platformioExecutor.spawn(command, args, {
-    cwd: options.cwd,
-    stdio: ["ignore", outFd, outFd],
-    detached: false
-  });
-  const ctx = mcpContext.getStore();
-  const commandId = options.rootCommandId || ctx?.activityId || crypto14.randomUUID();
-  const taskId = crypto14.randomUUID();
-  const artType = options.artifactType || "build";
-  const targetProjectArea = projectArea || ctx?.targetProjectDir;
-  if (proc.pid) {
-    logDiagnostic(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, targetProjectArea);
-    await registerBuildPid(proc.pid, targetProjectArea);
-    await registerCommand({
-      id: commandId,
-      commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
-      timestamp: Date.now(),
-      status: "running",
-      tasks: [{
-        taskId,
-        type: artType,
-        status: "running",
-        logPaths: [logFile],
-        pid: proc.pid,
-        commandDesc: `pio ${command} ${args.join(" ")}`
-      }]
-    }, targetProjectArea).catch((e) => logDiagnostic(`[Spooler] Registry fail: ${e.message}`, targetProjectArea));
-  }
-  const latestPointer = ensureLatestLogPointer(logFile, latestLog);
-  let fileOffset = 0;
-  let watcher = null;
-  portalEvents.clearTaskLog(targetProjectArea || "global", taskId, [logFile]);
-  try {
-    watcher = fs39.watch(logFile, (eventType) => {
-      if (eventType === "change") {
-        try {
-          const stat = fs39.statSync(logFile);
-          if (stat.size > fileOffset) {
-            const stream = fs39.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
-            stream.on("data", (chunk) => {
-              const text6 = chunk.toString();
-              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text6);
-              if (latestPointer.mirrorLatest) {
-                try {
-                  fs39.appendFileSync(latestLog, text6);
-                } catch {
-                }
-              }
-            });
-            fileOffset = stat.size;
-          }
-        } catch {
-        }
-      }
-    });
-    watcher.on("error", () => {
-    });
-  } catch {
-  }
-  const timeoutMs = options.timeout ?? (options.background ? 36e5 : 6e5);
-  if (options.background) {
-    const p = waitForOwnedProcess(proc, timeoutMs);
-    let cleanupPending = false;
-    p.catch((e) => {
-      cleanupPending = e?.context?.cleanupPending !== false;
-      console.error(`[Background Task Error]: ${e.message}`);
-      updateTaskStatus(commandId, taskId, { status: "error", error: e.message }, targetProjectArea).catch(() => {
-      });
-      return 1;
-    }).then(async (code) => {
-      let errorMessage2 = void 0;
-      if (code !== 0) {
-        try {
-          const lines2 = await tailFileBounded(logFile, 512 * 1024);
-          const errors = parseStderrErrors(lines2.join("\n"));
-          if (errors && errors.length > 0) errorMessage2 = errors[0];
-        } catch {
-        }
-      }
-      await updateTaskStatus(commandId, taskId, {
-        status: code === 0 ? "success" : "error",
-        exitCode: code,
-        ...errorMessage2 ? { error: errorMessage2 } : {}
-      }, targetProjectArea).catch(() => {
-      });
-      if (!cleanupPending) {
-        await unregisterBuildPid(targetProjectArea);
-        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
-      }
-      try {
-        fs39.closeSync(outFd);
-      } catch {
-      }
-      if (watcher) {
-        try {
-          const stat = fs39.statSync(logFile);
-          if (stat.size > fileOffset) {
-            const buffer = Buffer.alloc(stat.size - fileOffset);
-            const fd = fs39.openSync(logFile, "r");
-            fs39.readSync(fd, buffer, 0, buffer.length, fileOffset);
-            fs39.closeSync(fd);
-            portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
-            fileOffset = stat.size;
-          }
-        } catch {
-        }
-        try {
-          watcher.close();
-        } catch {
-        }
-      }
-      if (code === 0 && options.onSuccess) {
-        try {
-          await options.onSuccess();
-        } catch (e) {
-          console.error(`[Spooler Diagnostic] Background onSuccess hook failed: ${e.message}`);
-        }
-      }
-    });
-    return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
-  }
-  let exitCode;
-  try {
-    exitCode = await waitForOwnedProcess(proc, timeoutMs);
-  } catch (error2) {
-    const cleanupPending = !(error2 instanceof PlatformIOError) || error2.context?.cleanupPending !== false;
-    await updateTaskStatus(commandId, taskId, { status: "error", error: error2 instanceof Error ? error2.message : "Process failed." }, projectArea).catch(() => {
-    });
-    try {
-      if (!cleanupPending) {
-        await unregisterBuildPid(projectArea);
-        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
-      }
-    } finally {
-      try {
-        fs39.closeSync(outFd);
-      } catch {
-      }
-      try {
-        watcher?.close();
-      } catch {
-      }
-    }
-    throw error2;
-  }
-  let errorMessage = void 0;
-  if (exitCode !== 0) {
-    try {
-      const lines2 = await tailFileBounded(logFile, 512 * 1024);
-      const errors = parseStderrErrors(lines2.join("\n"));
-      if (errors && errors.length > 0) errorMessage = errors[0];
-    } catch {
-    }
-  }
-  await updateTaskStatus(commandId, taskId, {
-    status: exitCode === 0 ? "success" : "error",
-    exitCode,
-    ...errorMessage ? { error: errorMessage } : {}
-  }, projectArea).catch(() => {
-  });
-  await unregisterBuildPid(projectArea);
-  if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
-  try {
-    fs39.closeSync(outFd);
-  } catch {
-  }
-  if (watcher) {
-    try {
-      const stat = fs39.statSync(logFile);
-      if (stat.size > fileOffset) {
-        const buffer = Buffer.alloc(stat.size - fileOffset);
-        const fd = fs39.openSync(logFile, "r");
-        fs39.readSync(fd, buffer, 0, buffer.length, fileOffset);
-        fs39.closeSync(fd);
-        portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
-        fileOffset = stat.size;
-      }
-    } catch {
-    }
-    try {
-      watcher.close();
-    } catch {
-    }
-  }
-  if (exitCode === 0 && options.onSuccess) {
-    try {
-      await options.onSuccess();
-    } catch (e) {
-      console.error(`[Spooler Diagnostic] onSuccess hook failed: ${e.message}`);
-    }
-  }
-  let finalOutput = "";
-  try {
-    const lines2 = await tailFileBounded(logFile, 512 * 1024);
-    finalOutput = lines2.slice(-150).join("\n");
-  } catch (e) {
-    finalOutput = `[Spooler Fetch Error] Could not parse log ending: ${e.message}`;
-  }
-  return { exitCode, finalOutput, fullLogPath: logFile };
-}
-function spoolLargeDataset(toolName, data, targetDir, threshold = 2e3) {
-  const stringified = JSON.stringify(data, null, 2);
-  if (stringified.length > threshold) {
-    const cacheDir = getLogDir(toolName, targetDir);
-    if (!fs39.existsSync(cacheDir)) {
-      fs39.mkdirSync(cacheDir, { recursive: true });
-    }
-    rotateLogs(cacheDir, `${toolName}-`, 30);
-    const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-    const shortHash = crypto14.randomBytes(4).toString("hex");
-    const cacheFile = path44.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
-    const latestFile = path44.join(cacheDir, `latest-${toolName}.json`);
-    fs39.writeFileSync(cacheFile, stringified, "utf-8");
-    try {
-      if (fs39.existsSync(latestFile)) fs39.unlinkSync(latestFile);
-      fs39.symlinkSync(cacheFile, latestFile);
-    } catch {
-    }
-    return `Payload too large for context window. Full dataset successfully spooled to disk at ${cacheFile}. Please use your grep_search or view_file tools to query this file.`;
-  }
-  return data;
-}
-var WORKSPACE_DIR3;
-var init_spooler = __esm({
-  "src/utils/spooler.ts"() {
-    "use strict";
-    init_owned_process_wait();
-    init_platformio();
-    init_process_manager();
-    init_semaphore();
-    init_tail();
-    init_command_registry();
-    init_mcp_context();
-    init_errors2();
-    init_paths();
-    init_logger();
-    init_events();
-    WORKSPACE_DIR3 = ".pio-mcp-workspace";
-  }
-});
-
 // src/core/target-resolution.ts
 import crypto16 from "node:crypto";
-import fs41 from "node:fs";
+import fs42 from "node:fs";
 import path46 from "node:path";
 function parseTargetEnvironments(iniText) {
   const environments = [];
@@ -23885,7 +23885,7 @@ function createBindingDigest(fields) {
 async function resolveTarget(input, discoveredDevices) {
   const projectDir = validateProjectPath(input.projectDir);
   const iniPath = path46.join(projectDir, "platformio.ini");
-  if (!fs41.existsSync(iniPath)) {
+  if (!fs42.existsSync(iniPath)) {
     return {
       success: false,
       status: "invalid_config",
@@ -23896,7 +23896,7 @@ async function resolveTarget(input, discoveredDevices) {
       nextSteps: ["Initialize or select a PlatformIO project, then resolve the target again."]
     };
   }
-  const parsed = parseTargetEnvironments(fs41.readFileSync(iniPath, "utf8"));
+  const parsed = parseTargetEnvironments(fs42.readFileSync(iniPath, "utf8"));
   let selectedEnvironment;
   if (input.environment) {
     selectedEnvironment = parsed.environments.find(
@@ -24129,7 +24129,7 @@ __export(monitor_exports, {
   startMonitor: () => startMonitor,
   stopMonitor: () => stopMonitor
 });
-import fs42 from "node:fs";
+import fs43 from "node:fs";
 import path47 from "node:path";
 import crypto17 from "node:crypto";
 function getSpoolerStates() {
@@ -24145,12 +24145,12 @@ function getSpoolerStates() {
 function emitNewLogBytes(port, daemon) {
   let fd;
   try {
-    const stat = fs42.statSync(daemon.logFile);
+    const stat = fs43.statSync(daemon.logFile);
     if (stat.size <= (daemon.fileOffset || 0)) return;
     const start = daemon.fileOffset || 0;
     const buffer = Buffer.alloc(stat.size - start);
-    fd = fs42.openSync(daemon.logFile, "r");
-    fs42.readSync(fd, buffer, 0, buffer.length, start);
+    fd = fs43.openSync(daemon.logFile, "r");
+    fs43.readSync(fd, buffer, 0, buffer.length, start);
     const text6 = buffer.toString();
     if (text6.length > 0) {
       portalEvents.emitSerialLog(port, text6, daemon.taskId);
@@ -24161,7 +24161,7 @@ function emitNewLogBytes(port, daemon) {
   } finally {
     if (fd !== void 0) {
       try {
-        fs42.closeSync(fd);
+        fs43.closeSync(fd);
       } catch {
       }
     }
@@ -24187,12 +24187,12 @@ async function stopMonitor(port, projectDir) {
     }
     if (daemon.watcher) {
       try {
-        const stat = fs42.statSync(daemon.logFile);
+        const stat = fs43.statSync(daemon.logFile);
         if (stat.size > (daemon.fileOffset || 0)) {
           const buffer = Buffer.alloc(stat.size - (daemon.fileOffset || 0));
-          const fd = fs42.openSync(daemon.logFile, "r");
-          fs42.readSync(fd, buffer, 0, buffer.length, daemon.fileOffset || 0);
-          fs42.closeSync(fd);
+          const fd = fs43.openSync(daemon.logFile, "r");
+          fs43.readSync(fd, buffer, 0, buffer.length, daemon.fileOffset || 0);
+          fs43.closeSync(fd);
           portalEvents.emitSerialLog(port, buffer.toString(), daemon.taskId);
         }
       } catch {
@@ -24226,7 +24226,7 @@ async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
     `[Spooler] Spawning pio monitor (Env: ${daemon.environment || "None"}) via executor for ${targetPort}`,
     projectDir
   );
-  const outFd = fs42.openSync(daemon.logFile, "a");
+  const outFd = fs43.openSync(daemon.logFile, "a");
   const proc = await platformioExecutor.spawn(
     "device",
     ["monitor", ...monitorArgs],
@@ -24251,11 +24251,11 @@ async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
   const targetDir = getLogDir("monitor", projectDir);
   const latestLog = path47.join(targetDir, "latest-monitor.log");
   try {
-    if (fs42.existsSync(latestLog)) fs42.unlinkSync(latestLog);
-    fs42.symlinkSync(daemon.logFile, latestLog);
+    if (fs43.existsSync(latestLog)) fs43.unlinkSync(latestLog);
+    fs43.symlinkSync(daemon.logFile, latestLog);
   } catch (e) {
     try {
-      fs42.linkSync(daemon.logFile, latestLog);
+      fs43.linkSync(daemon.logFile, latestLog);
     } catch {
       logDiagnostic(`[Spooler] Failed to link latest-monitor.log: ${e}`, projectDir);
     }
@@ -24271,7 +24271,7 @@ async function rehydrateMonitors() {
   let rehydrationCount = 0;
   const activeWorkspaces = [];
   for (const projectDir of workspaces) {
-    if (fs42.existsSync(projectDir)) {
+    if (fs43.existsSync(projectDir)) {
       activeWorkspaces.push(projectDir);
       if (isBuildActive(projectDir)) {
       }
@@ -24286,8 +24286,8 @@ async function rehydrateMonitors() {
             );
             let currentSize = 0;
             try {
-              if (fs42.existsSync(logFile)) {
-                currentSize = fs42.statSync(logFile).size;
+              if (fs43.existsSync(logFile)) {
+                currentSize = fs43.statSync(logFile).size;
               }
             } catch {
             }
@@ -24319,12 +24319,12 @@ async function rehydrateMonitors() {
             };
             activeDaemons[port] = daemon;
             try {
-              daemon.watcher = fs42.watch(logFile, (eventType) => {
+              daemon.watcher = fs43.watch(logFile, (eventType) => {
                 if (eventType === "change") {
                   try {
-                    const stat = fs42.statSync(logFile);
+                    const stat = fs43.statSync(logFile);
                     if (stat.size > (daemon.fileOffset || 0)) {
-                      const stream = fs42.createReadStream(logFile, {
+                      const stream = fs43.createReadStream(logFile, {
                         start: daemon.fileOffset || 0,
                         end: stat.size - 1
                       });
@@ -24397,8 +24397,8 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
       "PORT_BUSY"
     );
   const targetDir = getLogDir("monitor", projectDir);
-  if (!fs42.existsSync(targetDir)) {
-    fs42.mkdirSync(targetDir, { recursive: true });
+  if (!fs43.existsSync(targetDir)) {
+    fs43.mkdirSync(targetDir, { recursive: true });
   }
   const { logFile } = rotateSpoolerStreams("monitor", projectDir);
   portSemaphoreManager.claimPort(activePort, "Monitor Daemon");
@@ -24416,12 +24416,12 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
   activeDaemons[activePort] = daemon;
   await spawnPioMonitor(activePort, projectDir, effectiveCommandId);
   try {
-    daemon.watcher = fs42.watch(logFile, (eventType) => {
+    daemon.watcher = fs43.watch(logFile, (eventType) => {
       if (eventType === "change") {
         try {
-          const stat = fs42.statSync(logFile);
+          const stat = fs43.statSync(logFile);
           if (stat.size > (daemon.fileOffset || 0)) {
-            const stream = fs42.createReadStream(logFile, {
+            const stream = fs43.createReadStream(logFile, {
               start: daemon.fileOffset || 0,
               end: stat.size - 1
             });
@@ -24465,10 +24465,10 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
       }
     }
     if (cmd) {
-      targetPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f) => Boolean(f && fs42.existsSync(f)));
+      targetPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f) => Boolean(f && fs43.existsSync(f)));
     }
   } else if (logPath) {
-    if (fs42.existsSync(logPath)) {
+    if (fs43.existsSync(logPath)) {
       targetPaths = [logPath];
     }
   } else if (port && activeDaemons[port]) {
@@ -24476,7 +24476,7 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
   } else {
     const targetDir = getLogDir("monitor", projectDir);
     const targetFile = path47.join(targetDir, "latest-monitor.log");
-    if (fs42.existsSync(targetFile)) {
+    if (fs43.existsSync(targetFile)) {
       targetPaths = [targetFile];
     }
   }
@@ -24543,13 +24543,13 @@ function getMonitorStatus(port, projectDir) {
     let size = 0;
     let lastActivityAt = daemon.lastActivityAt;
     try {
-      const stats = fs42.statSync(daemon.logFile);
+      const stats = fs43.statSync(daemon.logFile);
       size = stats.size;
       lastActivityAt = lastActivityAt ?? stats.mtime.toISOString();
     } catch {
     }
     const trackedPid = trackedPids[activePort];
-    const stale = !fs42.existsSync(daemon.logFile) || trackedPid !== void 0 && !isPidAlive(trackedPid);
+    const stale = !fs43.existsSync(daemon.logFile) || trackedPid !== void 0 && !isPidAlive(trackedPid);
     return {
       state: stale ? "stale" : "active",
       port: activePort,
@@ -24570,7 +24570,7 @@ function getMonitorStatus(port, projectDir) {
   return { monitors: statuses };
 }
 function readSerialWindowFromFile(logPath, options = {}) {
-  const finalSize = fs42.statSync(logPath).size;
+  const finalSize = fs43.statSync(logPath).size;
   const requestedStart = options.cursor ? decodeMonitorCursor(options.cursor, logPath) : Math.max(0, options.startOffset ?? 0);
   if (requestedStart > finalSize) {
     throw new PlatformIOError(
@@ -24583,13 +24583,13 @@ function readSerialWindowFromFile(logPath, options = {}) {
   const bytesToRead = Math.max(0, finalSize - readStart);
   let content = "";
   if (bytesToRead > 0) {
-    const descriptor2 = fs42.openSync(logPath, "r");
+    const descriptor2 = fs43.openSync(logPath, "r");
     try {
       const buffer = Buffer.alloc(bytesToRead);
-      fs42.readSync(descriptor2, buffer, 0, bytesToRead, readStart);
+      fs43.readSync(descriptor2, buffer, 0, bytesToRead, readStart);
       content = redactSecretsInText(buffer.toString("utf8"));
     } finally {
-      fs42.closeSync(descriptor2);
+      fs43.closeSync(descriptor2);
     }
   }
   return {
@@ -24656,7 +24656,7 @@ async function captureSerialWindow(input) {
   try {
     let initialSize = 0;
     try {
-      initialSize = fs42.statSync(daemon.logFile).size;
+      initialSize = fs43.statSync(daemon.logFile).size;
     } catch {
     }
     const startOffset = input.cursor ? decodeMonitorCursor(input.cursor, daemon.logFile) : initialSize;
@@ -24664,7 +24664,7 @@ async function captureSerialWindow(input) {
       await new Promise((resolve) => setTimeout(resolve, durationMs));
     }
     try {
-      fs42.statSync(daemon.logFile);
+      fs43.statSync(daemon.logFile);
     } catch {
       throw new PlatformIOError(
         "The serial monitor log is unavailable.",
@@ -43722,7 +43722,7 @@ var require_view = __commonJS({
     "use strict";
     var debug = require_src()("express:view");
     var path53 = __require("node:path");
-    var fs52 = __require("node:fs");
+    var fs53 = __require("node:fs");
     var dirname = path53.dirname;
     var basename = path53.basename;
     var extname = path53.extname;
@@ -43802,7 +43802,7 @@ var require_view = __commonJS({
     function tryStat(path54) {
       debug('stat "%s"', path54);
       try {
-        return fs52.statSync(path54);
+        return fs53.statSync(path54);
       } catch (e) {
         return void 0;
       }
@@ -66665,7 +66665,7 @@ var require_send = __commonJS({
     var escapeHtml = require_escape_html();
     var etag = require_etag();
     var fresh = require_fresh();
-    var fs52 = __require("fs");
+    var fs53 = __require("fs");
     var mime = require_mime_types3();
     var ms = require_ms();
     var onFinished = require_on_finished();
@@ -66947,7 +66947,7 @@ var require_send = __commonJS({
       var i = 0;
       var self = this;
       debug('stat "%s"', path54);
-      fs52.stat(path54, function onstat(err, stat) {
+      fs53.stat(path54, function onstat(err, stat) {
         var pathEndsWithSep = path54[path54.length - 1] === sep;
         if (err && err.code === "ENOENT" && !extname(path54) && !pathEndsWithSep) {
           return next(err);
@@ -66964,7 +66964,7 @@ var require_send = __commonJS({
         }
         var p = path54 + "." + self._extensions[i++];
         debug('stat "%s"', p);
-        fs52.stat(p, function(err2, stat) {
+        fs53.stat(p, function(err2, stat) {
           if (err2) return next(err2);
           if (stat.isDirectory()) return next();
           self.emit("file", p, stat);
@@ -66982,7 +66982,7 @@ var require_send = __commonJS({
         }
         var p = join(path54, self._index[i]);
         debug('stat "%s"', p);
-        fs52.stat(p, function(err2, stat) {
+        fs53.stat(p, function(err2, stat) {
           if (err2) return next(err2);
           if (stat.isDirectory()) return next();
           self.emit("file", p, stat);
@@ -66994,7 +66994,7 @@ var require_send = __commonJS({
     SendStream.prototype.stream = function stream(path54, options) {
       var self = this;
       var res = this.res;
-      var stream2 = fs52.createReadStream(path54, options);
+      var stream2 = fs53.createReadStream(path54, options);
       this.emit("stream", stream2);
       stream2.pipe(res);
       function cleanup() {
@@ -100829,15 +100829,934 @@ function withProjectCompatibility(base2) {
     },
     handler: (args, context) => context.dispatch("pio_project_init", args)
   });
+  const clean = base2.get("clean_project");
+  if (!clean || result.has("pio_clean"))
+    throw new Error("Invalid clean compatibility registry");
+  result.set("pio_clean", {
+    ...clean,
+    name: "pio_clean",
+    description: "Clean selected build artifacts, optionally including dependencies. Canonical destructive cleanup permission applies.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], maxLength: 32768 },
+        env: { type: ["string", "null"], pattern: "^[a-zA-Z0-9_-]{1,50}$" },
+        full: { type: "boolean", default: false },
+        approval_id: { type: "string", maxLength: 256 }
+      }
+    },
+    handler: (args, context) => context.dispatch("pio_clean", args)
+  });
   return result;
+}
+
+// src/adapters/clean-compat.ts
+init_zod();
+import fs39 from "node:fs/promises";
+
+// src/tools/build.ts
+init_platformio();
+init_spooler();
+init_validation();
+init_errors2();
+init_errors2();
+init_process_manager();
+init_tail();
+init_paths();
+init_mcp_context();
+init_build_cache();
+init_logger();
+init_redact();
+import fs38 from "node:fs";
+import path42 from "node:path";
+import crypto14 from "node:crypto";
+
+// src/core/diagnostics/matchers.ts
+var buildMatchers = [
+  {
+    errorType: "MissingHeader",
+    pattern: /fatal error: .*: No such file or directory/i,
+    recommendedAction: "Install the missing library or fix the include path.",
+    severity: "error",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "MissingLibrary",
+    pattern: /library .* not found|library manager:.*not found|librarynotfound/i,
+    recommendedAction: "Install the missing library dependency or correct the `lib_deps` entry.",
+    severity: "error",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "SyntaxError",
+    pattern: /error: expected|error: stray|error: .* was not declared/i,
+    recommendedAction: "Inspect the referenced source line and patch the syntax or missing symbol.",
+    severity: "error",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "MemoryOverflow",
+    pattern: /region .* overflowed|RAM.*overflow|Flash.*overflow/i,
+    recommendedAction: "Reduce firmware size, change board config, or optimize memory usage.",
+    severity: "critical",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "LinkerError",
+    pattern: /undefined reference|ld returned/i,
+    recommendedAction: "Check missing symbols, library linkage, or build flags.",
+    severity: "error",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "UnknownBoard",
+    pattern: /unknown board|invalid board|board .* not found/i,
+    recommendedAction: "Check the PlatformIO board ID and update platformio.ini accordingly.",
+    severity: "error",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "WrongBoard",
+    pattern: /board .* is not compatible|board .* does not support/i,
+    recommendedAction: "Use a board and platform combination that supports the selected framework and upload target.",
+    severity: "error",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "UnknownFramework",
+    pattern: /unknown framework|framework .* not found/i,
+    recommendedAction: "Select a framework supported by the selected board and retry build.",
+    severity: "error",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "WrongFramework",
+    pattern: /framework .* not compatible with board|frameworks?: .*required/i,
+    recommendedAction: "Adjust the environment framework to one supported by the target board.",
+    severity: "error",
+    safeToAutoRetry: false
+  }
+];
+var uploadMatchers = [
+  {
+    errorType: "PortBusy",
+    pattern: /Resource busy|Access is denied|device or resource busy/i,
+    recommendedAction: "Release the serial port lock or stop the active monitor process.",
+    severity: "error",
+    safeToAutoRetry: true
+  },
+  {
+    errorType: "PermissionDenied",
+    pattern: /Permission denied|Operation not permitted|Access is denied/i,
+    recommendedAction: "Check serial device permissions or run the required permission setup.",
+    severity: "error",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "UploadSyncFailed",
+    pattern: /Failed to connect|Timed out waiting for packet|Invalid head of packet|A fatal error occurred: Failed to connect/i,
+    recommendedAction: "Put the board into bootloader mode, check cable, or retry upload.",
+    severity: "error",
+    safeToAutoRetry: true
+  },
+  {
+    errorType: "DeviceDisconnected",
+    pattern: /No such file or directory|device not found|could not open port|serial port not found|device has been disconnected/i,
+    recommendedAction: "Reconnect the device and re-run device discovery.",
+    severity: "error",
+    safeToAutoRetry: true
+  },
+  {
+    errorType: "Esp32StrappingPinRisk",
+    pattern: /ESP32 strapping pin risk|ESP32_STRAPPING_PIN_RISK/i,
+    recommendedAction: "Move application I/O off ESP32 strapping pins (for example GPIO25/26/27) and retry upload.",
+    severity: "critical",
+    safeToAutoRetry: false
+  }
+];
+var serialMatchers = [
+  {
+    errorType: "Brownout",
+    pattern: /brownout|brownout detector/i,
+    recommendedAction: "Check power supply, USB cable, and peak current draw.",
+    severity: "critical",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "BootLoop",
+    pattern: /rst:[^\n]*\n[\s\S]*rst:/i,
+    recommendedAction: "Device appears to be repeatedly rebooting. Inspect startup code and power stability.",
+    severity: "critical",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "WatchdogReset",
+    pattern: /watchdog|wdt|WDT reset|task watchdog/i,
+    recommendedAction: "Inspect blocking loops, task starvation, and interrupt behavior.",
+    severity: "error",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "PanicTrace",
+    pattern: /Guru Meditation|panic|stack trace|backtrace/i,
+    recommendedAction: "Extract the backtrace and map it to source lines if debug symbols are available.",
+    severity: "critical",
+    safeToAutoRetry: false
+  },
+  {
+    errorType: "NoSerialOutput",
+    pattern: /^\s*$/i,
+    recommendedAction: "No runtime output was observed. Check baud rate, wiring, and boot markers.",
+    severity: "warning",
+    safeToAutoRetry: true
+  }
+];
+
+// src/core/diagnostics/diagnose.ts
+function trimEvidence(log, pattern) {
+  const lines2 = log.split(/\r?\n/);
+  const matches = [];
+  for (const line of lines2) {
+    if (pattern.test(line)) {
+      matches.push(line.trim());
+      if (matches.length >= 4) break;
+    }
+  }
+  return matches;
+}
+function inferDefaultRecommendation(stage) {
+  if (stage === "build") return "Inspect compiler diagnostics and patch the smallest failing unit.";
+  if (stage === "upload") return "Verify port/cable/boot mode, then retry upload.";
+  if (stage === "monitor") return "Inspect runtime serial traces and confirm expected boot markers.";
+  if (stage === "test") return "Inspect test output and resolve the first failing assertion.";
+  if (stage === "device_discovery") return "Reconnect device and repeat discovery.";
+  return "Inspect raw logs and retry after applying a minimal fix.";
+}
+function diagnoseFromLog(stage, logText, matchers, opts) {
+  const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+  const normalized = logText || "";
+  const succeeded = opts?.successOverride ?? false;
+  if (succeeded) {
+    return {
+      success: true,
+      stage,
+      severity: "info",
+      summary: `${stage} completed successfully.`,
+      evidence: [],
+      recommendedAction: "Proceed to the next workflow step.",
+      safeToAutoRetry: true,
+      rawLogPath: opts?.rawLogPath,
+      taskId: opts?.taskId,
+      timestamp
+    };
+  }
+  for (const matcher of matchers) {
+    if (!matcher.pattern.test(normalized)) continue;
+    return {
+      success: false,
+      stage,
+      errorType: matcher.errorType,
+      severity: matcher.severity,
+      summary: `${stage} failed with ${matcher.errorType}.`,
+      evidence: trimEvidence(normalized, matcher.pattern),
+      recommendedAction: matcher.recommendedAction,
+      safeToAutoRetry: matcher.safeToAutoRetry,
+      rawLogPath: opts?.rawLogPath,
+      taskId: opts?.taskId,
+      timestamp
+    };
+  }
+  return {
+    success: false,
+    stage,
+    errorType: "Unknown",
+    severity: "error",
+    summary: `${stage} failed, but no known failure pattern matched.`,
+    evidence: normalized.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0).slice(-4),
+    recommendedAction: inferDefaultRecommendation(stage),
+    safeToAutoRetry: false,
+    rawLogPath: opts?.rawLogPath,
+    taskId: opts?.taskId,
+    timestamp
+  };
+}
+
+// src/core/diagnostics/build-diagnostics.ts
+function diagnoseBuildLog(logText, opts) {
+  return diagnoseFromLog("build", logText, buildMatchers, {
+    taskId: opts?.taskId,
+    rawLogPath: opts?.rawLogPath,
+    successOverride: opts?.success ?? false
+  });
+}
+
+// src/core/diagnostics/upload-diagnostics.ts
+function diagnoseUploadLog(logText, opts) {
+  return diagnoseFromLog("upload", logText, uploadMatchers, {
+    taskId: opts?.taskId,
+    rawLogPath: opts?.rawLogPath,
+    successOverride: opts?.success ?? false
+  });
+}
+
+// src/core/diagnostics/serial-diagnostics.ts
+function diagnoseSerialLog(logText, opts) {
+  return diagnoseFromLog("monitor", logText, serialMatchers, {
+    taskId: opts?.taskId,
+    rawLogPath: opts?.rawLogPath,
+    successOverride: opts?.success ?? false
+  });
+}
+
+// src/tools/build.ts
+init_command_registry();
+async function buildProject(projectDir, environment, verbose, background) {
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto14.randomUUID();
+  const validatedPath = validateProjectPath(projectDir);
+  if (environment && !validateEnvironmentName(environment)) {
+    throw new BuildError(`Invalid environment name: ${environment}`, {
+      environment
+    });
+  }
+  const envName = environment || "default";
+  if (!background && !verbose) {
+    const lookup = lookupBuildCache(validatedPath, envName);
+    if (lookup.hit) {
+      const cached2 = lookup.entry;
+      const tail = cached2.finalOutputTail || "(cached build \u2014 output omitted)";
+      const structuredErrors = parseStructuredBuildErrors(tail);
+      logDiagnostic(
+        `[buildProject] Cache hit for ${validatedPath} (env=${envName}, hash=${cached2.inputsHash.slice(0, 12)}\u2026) \u2014 skipping pio run`,
+        validatedPath
+      );
+      return {
+        success: true,
+        cacheHit: true,
+        environment: envName,
+        output: void 0,
+        errors: void 0,
+        structuredErrors,
+        nextSteps: deriveNextSteps([], true).concat([
+          "Build was served from MCP content-hash cache (no compilation work performed). Call `clean_project` or edit source files to force a rebuild."
+        ]),
+        ramUsageBytes: cached2.ramUsageBytes,
+        flashUsageBytes: cached2.flashUsageBytes,
+        firmwarePath: cached2.firmwarePath,
+        diagnostic: diagnoseBuildLog(tail, {
+          success: true
+        })
+      };
+    }
+  }
+  try {
+    const args = [];
+    if (environment) {
+      args.push("--environment", environment);
+    }
+    if (verbose) {
+      args.push("--verbose");
+    }
+    const result = await executeWithSpooling("run", args, {
+      cwd: validatedPath,
+      projectDir: validatedPath,
+      timeout: background ? 36e5 : 6e5,
+      // 1 hour for background, 10 mins for foreground
+      background,
+      rootCommandId
+    });
+    if ("status" in result) {
+      return result;
+    }
+    const success = result.exitCode === 0;
+    const safeOutput2 = redactSecretsInText(result.finalOutput);
+    const legacyErrors = success ? void 0 : parseStderrErrors(safeOutput2);
+    const structuredErrors = parseStructuredBuildErrors(safeOutput2);
+    const nextSteps = deriveNextSteps(
+      // Convert from internal StructuredBuildError to the JSON-friendly shape.
+      structuredErrors,
+      success
+    );
+    const diagnostic = diagnoseBuildLog(safeOutput2, {
+      rawLogPath: result.fullLogPath,
+      success
+    });
+    let ramUsageBytes;
+    let flashUsageBytes;
+    let firmwarePath;
+    if (success) {
+      const ramMatch = safeOutput2.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
+      if (ramMatch) ramUsageBytes = parseInt(ramMatch[1], 10);
+      const flashMatch = safeOutput2.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
+      if (flashMatch) flashUsageBytes = parseInt(flashMatch[1], 10);
+      firmwarePath = findFirmwareArtifact(validatedPath, envName);
+      const tail = safeOutput2.slice(-16 * 1024);
+      const postBuildLookup = lookupBuildCache(validatedPath, envName);
+      writeCache(validatedPath, {
+        inputsHash: postBuildLookup.inputsHash,
+        environment: envName,
+        builtAtMs: Date.now(),
+        firmwarePath,
+        ramUsageBytes,
+        flashUsageBytes,
+        finalOutputTail: tail
+      });
+    } else {
+      invalidateBuildCache(validatedPath);
+    }
+    return {
+      success,
+      cacheHit: false,
+      environment: envName,
+      output: success && !verbose ? void 0 : safeOutput2,
+      errors: legacyErrors,
+      structuredErrors,
+      nextSteps,
+      ramUsageBytes,
+      flashUsageBytes,
+      firmwarePath,
+      rawLogPath: result.fullLogPath,
+      diagnostic
+    };
+  } catch (error2) {
+    if (error2 instanceof PlatformIOError) {
+      throw new BuildError(`Build failed: ${error2.message}`, {
+        projectDir,
+        environment
+      });
+    }
+    throw new BuildError(`Failed to build project: ${error2}`, {
+      projectDir,
+      environment
+    });
+  }
+}
+async function checkProject(projectDir, environment, background) {
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto14.randomUUID();
+  const validatedPath = validateProjectPath(projectDir);
+  if (environment && !validateEnvironmentName(environment)) {
+    throw new BuildError(`Invalid environment name: ${environment}`, { environment });
+  }
+  try {
+    const args = [];
+    if (environment) {
+      args.push("--environment", environment);
+    }
+    const result = await executeWithSpooling("check", args, {
+      cwd: validatedPath,
+      projectDir: validatedPath,
+      timeout: background ? 36e5 : 6e5,
+      background,
+      rootCommandId,
+      artifactType: "check"
+      // "check" is handled cleanly by spooler
+    });
+    if ("status" in result) {
+      return result;
+    }
+    const success = result.exitCode === 0;
+    const errors = success ? void 0 : parseStderrErrors(result.finalOutput);
+    return {
+      success,
+      environment: environment || "default",
+      output: result.finalOutput,
+      errors
+    };
+  } catch (error2) {
+    if (error2 instanceof PlatformIOError) {
+      throw new BuildError(`Check failed: ${error2.message}`, { projectDir, environment });
+    }
+    throw new BuildError(`Failed to check project: ${error2}`, { projectDir, environment });
+  }
+}
+async function runTests(projectDir, environment, background, compileOnly) {
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto14.randomUUID();
+  const validatedPath = validateProjectPath(projectDir);
+  if (environment && !validateEnvironmentName(environment)) {
+    throw new BuildError(`Invalid environment name: ${environment}`, { environment });
+  }
+  if (compileOnly !== void 0 && typeof compileOnly !== "boolean") {
+    throw new BuildError("compileOnly must be a boolean", { projectDir });
+  }
+  const buildOnly = loadEffectivePolicyState(validatedPath).profile === "build_only";
+  try {
+    const args = [];
+    if (compileOnly || buildOnly) {
+      args.push("--without-uploading", "--without-testing");
+    }
+    if (environment) {
+      args.push("--environment", environment);
+    }
+    const result = await executeWithSpooling("test", args, {
+      cwd: validatedPath,
+      projectDir: validatedPath,
+      timeout: background ? 36e5 : 6e5,
+      background,
+      artifactType: "test",
+      rootCommandId
+    });
+    if ("status" in result) {
+      return result;
+    }
+    const success = result.exitCode === 0;
+    const errors = success ? void 0 : parseStderrErrors(result.finalOutput);
+    return {
+      success,
+      environment: environment || "default",
+      output: result.finalOutput,
+      errors
+    };
+  } catch (error2) {
+    if (error2 instanceof PlatformIOError) {
+      throw new BuildError(`Tests failed: ${error2.message}`, { projectDir, environment });
+    }
+    throw new BuildError(`Failed to run tests: ${error2}`, { projectDir, environment });
+  }
+}
+async function cleanProject(projectDir, background, options = {}) {
+  const rootCommandId = mcpContext.getStore()?.activityId || crypto14.randomUUID();
+  const validatedPath = validateProjectPath(projectDir);
+  if (options.environment !== void 0 && !validateEnvironmentName(options.environment)) {
+    throw new BuildError(`Invalid environment name: ${options.environment}`, {
+      environment: options.environment
+    });
+  }
+  if (options.full !== void 0 && typeof options.full !== "boolean") {
+    throw new BuildError("Clean full option must be a boolean", { projectDir });
+  }
+  if (options.timeoutMs !== void 0 && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 6e5)) {
+    throw new BuildError("Clean timeout must be between 1 and 600000 milliseconds", { projectDir });
+  }
+  const args = ["--target", options.full ? "fullclean" : "clean"];
+  if (options.environment) args.push("--environment", options.environment);
+  invalidateBuildCache(validatedPath);
+  try {
+    const result = await executeWithSpooling(
+      "run",
+      args,
+      {
+        cwd: validatedPath,
+        projectDir: validatedPath,
+        timeout: options.timeoutMs ?? 6e4,
+        background,
+        rootCommandId
+      }
+    );
+    if ("status" in result) {
+      return result;
+    }
+    await options.onResult?.(result);
+    const success = result.exitCode === 0;
+    if (!success) {
+      throw new BuildError(`Clean failed: ${result.finalOutput}`, {
+        projectDir,
+        stderr: result.finalOutput,
+        exitCode: result.exitCode
+      });
+    }
+    return {
+      success: true,
+      message: "Successfully cleaned build artifacts"
+    };
+  } catch (error2) {
+    if (error2 instanceof BuildError) {
+      throw error2;
+    }
+    throw new BuildError(`Failed to clean project: ${error2}`, { projectDir });
+  }
+}
+async function checkTaskStatus(taskId, logPath, projectDir) {
+  const baseDir = projectDir || SERVER_DATA_DIR;
+  if (!projectDir) ensureGlobalDirs();
+  let history = getCommandHistory(baseDir);
+  let resolvedTaskId = taskId;
+  if (!resolvedTaskId && logPath) {
+    for (const cmd of history) {
+      const match = cmd.tasks?.find((t) => t.logPaths?.includes(logPath));
+      if (match) {
+        resolvedTaskId = cmd.id;
+        break;
+      }
+    }
+  }
+  if (!resolvedTaskId) {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const cmd = history[i];
+      if (cmd.tasks && cmd.tasks.length > 0) {
+        resolvedTaskId = cmd.id;
+        break;
+      }
+    }
+  }
+  if (resolvedTaskId && !projectDir) {
+    const cmd = history.find((c) => c.id === resolvedTaskId);
+    if (!cmd) {
+      const crossResult = await findCommandAcrossWorkspaces(resolvedTaskId);
+      if (crossResult) {
+        history = crossResult.history;
+      }
+    }
+  }
+  let status = "completed";
+  let output = "No output available.";
+  let logPaths = [];
+  let diagnostic;
+  if (resolvedTaskId) {
+    const cmd = history.find((c) => c.id === resolvedTaskId);
+    if (cmd) {
+      status = cmd.status;
+      logPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f) => Boolean(f));
+      const latestLog = logPath || logPaths[logPaths.length - 1];
+      if (latestLog && fs38.existsSync(latestLog)) {
+        try {
+          const lines2 = await tailFileBounded(latestLog, 512 * 1024);
+          output = lines2.slice(status === "running" ? -30 : -150).join("\n");
+        } catch (e) {
+          output = `[Status Polling Error] Could not read log: ${e.message}`;
+        }
+      } else if (latestLog) {
+        output = `Log file not found: ${latestLog}`;
+      }
+    } else {
+      status = "failed";
+      output = `Task ID not found: ${resolvedTaskId}`;
+    }
+  } else {
+    const logFile = path42.join(baseDir, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
+    const active = isBuildActive(projectDir);
+    status = active ? "running" : "completed";
+    if (fs38.existsSync(logFile)) {
+      logPaths = [logFile];
+      try {
+        const lines2 = await tailFileBounded(logFile, 512 * 1024);
+        output = lines2.slice(active ? -30 : -150).join("\n");
+      } catch (e) {
+        output = `[Status Polling Error] Could not read log: ${e.message}`;
+      }
+    } else {
+      output = "No active task or build log found.";
+    }
+    if (!active && output.includes("FAILED")) status = "failed";
+    else if (!active && output.includes("Error:")) status = "failed";
+  }
+  const safeOutput2 = redactSecretsInText(output);
+  const effectiveLogPath = logPath || logPaths[logPaths.length - 1];
+  const normalizedStatus = status.toLowerCase();
+  const command = resolvedTaskId ? history.find((c) => c.id === resolvedTaskId) : void 0;
+  const taskType = command?.tasks?.[0]?.type ?? "build";
+  const successByStatus = normalizedStatus === "success" || normalizedStatus === "completed";
+  const failedByStatus = normalizedStatus === "error" || normalizedStatus === "failed" || normalizedStatus === "terminated";
+  if (taskType === "upload") {
+    diagnostic = diagnoseUploadLog(safeOutput2, {
+      taskId: resolvedTaskId,
+      rawLogPath: effectiveLogPath,
+      success: successByStatus && !failedByStatus
+    });
+  } else if (taskType === "monitor") {
+    diagnostic = diagnoseSerialLog(safeOutput2, {
+      taskId: resolvedTaskId,
+      rawLogPath: effectiveLogPath,
+      success: successByStatus && !failedByStatus
+    });
+  } else {
+    diagnostic = diagnoseBuildLog(safeOutput2, {
+      taskId: resolvedTaskId,
+      rawLogPath: effectiveLogPath,
+      success: successByStatus && !failedByStatus
+    });
+  }
+  return {
+    status: "success",
+    targetStatus: status,
+    taskId: resolvedTaskId,
+    logPaths,
+    output: safeOutput2,
+    diagnostic
+  };
+}
+
+// src/adapters/clean-compat.ts
+init_errors2();
+
+// src/utils/lock-manager.ts
+init_errors2();
+init_events();
+import { randomUUID as randomUUID3 } from "node:crypto";
+var QueueEnforcementError = class extends PlatformIOError {
+  constructor(message, context) {
+    super(message, "QUEUE_ENFORCEMENT_FAILED", context);
+    this.name = "QueueEnforcementError";
+  }
+};
+var HardwareLockManager = class _HardwareLockManager {
+  static instance;
+  state = { isLocked: false };
+  constructor() {
+  }
+  /**
+   * Retrieves the global singleton instance
+   */
+  static getInstance() {
+    if (!_HardwareLockManager.instance) {
+      _HardwareLockManager.instance = new _HardwareLockManager();
+    }
+    return _HardwareLockManager.instance;
+  }
+  /**
+   * Explicitly claim the internal lock for a session.
+   * Throws if another session currently holds the lock.
+   */
+  acquireLock(sessionId, reason) {
+    if (this.state.isLocked && this.state.sessionId === sessionId) {
+      console.log(`Lock re-entry attempt by session ${sessionId}`);
+      return;
+    }
+    if (this.state.isLocked && this.state.sessionId !== sessionId) {
+      throw new QueueEnforcementError(
+        `Hardware is currently tied up by ${this.state.sessionId || "another session"}. If this is a stuck session, run the 'mcp_platformio_reset_server_state' tool.`,
+        {
+          activeSession: this.state.sessionId,
+          activeReason: this.state.reason
+        }
+      );
+    }
+    this.state = {
+      isLocked: true,
+      sessionId,
+      reason: reason || "Explicit Pipeline Lock",
+      lockedAt: Date.now()
+    };
+    try {
+      portalEvents.emitLockState(this.state);
+    } catch {
+    }
+  }
+  /**
+   * Release the explicit lock, if it matches the current session ID.
+   */
+  releaseLock(sessionId) {
+    if (this.state.isLocked && this.state.sessionId === sessionId) {
+      this.state = { isLocked: false };
+      try {
+        portalEvents.emitLockState(this.state);
+      } catch {
+      }
+    }
+  }
+  /**
+   * Get the current global lock state.
+   */
+  getLockStatus() {
+    return { ...this.state };
+  }
+  /**
+   * Validate that an operation can proceed.
+   * Operation can proceed if unlocked, or if the requester IS the locker.
+   */
+  requireLock(sessionId) {
+    if (this.state.isLocked && this.state.sessionId !== sessionId) {
+      throw new QueueEnforcementError(
+        `Hardware is currently tied up by session [${this.state.sessionId}]. If this is a stuck session, run the 'mcp_platformio_reset_server_state' tool.`,
+        {
+          activeSession: this.state.sessionId,
+          activeReason: this.state.reason,
+          action: "requireLock"
+        }
+      );
+    }
+  }
+  /**
+   * Implicit wrapping block for safe execution of a single task.
+   * Grabs the lock implicitly, awaits the job, then releases it.
+   */
+  async withImplicitLock(action) {
+    const implicitSessionId = `__IMPLICIT_${randomUUID3()}__`;
+    this.acquireLock(implicitSessionId, "Implicit Tool Execution");
+    try {
+      const result = await action();
+      return result;
+    } finally {
+      this.releaseLock(implicitSessionId);
+    }
+  }
+};
+var hardwareLockManager = HardwareLockManager.getInstance();
+
+// src/adapters/clean-compat.ts
+init_redact();
+async function executeCleanCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
+  const params = external_exports.object({
+    project_dir: external_exports.string().max(32768).nullable().optional(),
+    env: external_exports.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).nullable().optional(),
+    full: external_exports.boolean().default(false),
+    approval_id: external_exports.string().max(256).optional()
+  }).strict().parse(input);
+  const projectDir = await resolveCompatibilityProject(
+    params.project_dir,
+    defaults
+  );
+  const environment = params.env ?? void 0;
+  return dispatchAuthorizedAction(
+    "clean_project",
+    {
+      projectDir,
+      environment,
+      full: params.full,
+      approvalId: params.approval_id
+    },
+    { ...caller, workspaceDir: projectDir },
+    async () => {
+      const guard = createPolicyRevisionGuard(projectDir);
+      await onAuthorized?.();
+      guard();
+      return hardwareLockManager.withImplicitLock(async () => {
+        guard();
+        const started = performance.now();
+        let completed;
+        try {
+          await cleanProject(projectDir, false, {
+            environment,
+            full: params.full,
+            timeoutMs: 12e4,
+            onResult: async (result) => {
+              guard();
+              const handle = await fs39.open(result.fullLogPath, "r");
+              let output;
+              try {
+                const stat = await handle.stat();
+                const limit = 16 * 1024 * 1024;
+                if (!stat.isFile() || stat.size > limit)
+                  throw new PlatformIOError(
+                    "Clean output exceeds the report limit",
+                    "COMMAND_LOG_LIMIT"
+                  );
+                const buffer = Buffer.alloc(stat.size + 1);
+                let offset = 0;
+                while (offset < buffer.length) {
+                  const read = await handle.read(
+                    buffer,
+                    offset,
+                    buffer.length - offset,
+                    offset
+                  );
+                  if (!read.bytesRead) break;
+                  offset += read.bytesRead;
+                }
+                if (offset > stat.size)
+                  throw new PlatformIOError(
+                    "Clean output changed during collection",
+                    "COMMAND_LOG_CHANGED"
+                  );
+                output = redactSecretsInText(
+                  buffer.subarray(0, offset).toString("utf8")
+                ).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+              } finally {
+                await handle.close();
+              }
+              guard();
+              const logPath = await retainCommandLog("clean", output, "");
+              completed = { exitCode: result.exitCode, output, logPath };
+            }
+          });
+        } catch (error2) {
+          if (!(error2 instanceof BuildError) || !completed || error2.context?.exitCode !== completed.exitCode)
+            throw error2;
+        }
+        guard();
+        if (!completed)
+          throw new PlatformIOError(
+            "Clean result was not collected",
+            "COMPAT_RESULT_INVALID"
+          );
+        return cleanCompatibilityResult(
+          completed,
+          environment,
+          (performance.now() - started) / 1e3
+        );
+      });
+    }
+  );
+}
+function cleanCompatibilityResult(result, environment, duration3) {
+  const lines2 = result.output.split(/\r?\n/);
+  const diagnostics = [];
+  const seen = /* @__PURE__ */ new Set();
+  const environments = [];
+  const memory = {};
+  let failed = false;
+  for (const line of lines2) {
+    const env = /^Processing (\S+) \(/.exec(line);
+    if (env) environments.push(env[1]);
+    if (/^=+ \[(FAILED|ERROR)\] Took /.test(line)) failed = true;
+    const mem = /^(RAM|Flash):\s+\[[=\s]*\]\s+([\d.]+)%\s+\(used (\d+) bytes from (\d+) bytes\)/.exec(
+      line
+    );
+    if (mem)
+      memory[mem[1].toLowerCase()] = {
+        percent: Number(mem[2]),
+        used_bytes: Number(mem[3]),
+        total_bytes: Number(mem[4])
+      };
+    const compiler = /^(.+?):(\d+):(?:(\d+):)?\s*(fatal error|error|warning|note):\s*(.*)$/.exec(
+      line
+    );
+    const linker = /(undefined reference to .*|symbol\(s\) not found.*|multiple definition of .*|region .* overflowed by .*)$/.exec(
+      line
+    );
+    const step = /^\*\*\* \[([^\]]+)\] (.*)$/.exec(line);
+    const diagnostic = compiler ? {
+      kind: compiler[4].replace("fatal ", ""),
+      file: compiler[1],
+      line: Number(compiler[2]),
+      column: compiler[3] ? Number(compiler[3]) : null,
+      message: compiler[5].trim()
+    } : linker ? {
+      kind: "error",
+      file: "<linker>",
+      line: 0,
+      column: null,
+      message: linker[1].trim()
+    } : step ? {
+      kind: "error",
+      file: step[1],
+      line: 0,
+      column: null,
+      message: `build step failed: ${step[2]}`
+    } : null;
+    if (diagnostic && !seen.has(JSON.stringify(diagnostic))) {
+      seen.add(JSON.stringify(diagnostic));
+      diagnostics.push(diagnostic);
+    }
+  }
+  const errors = diagnostics.filter((item) => item.kind === "error");
+  const warnings = diagnostics.filter((item) => item.kind === "warning");
+  const ok = result.exitCode === 0 && !failed;
+  const status = ok ? "success" : "failed";
+  const durationSeconds = Math.round(duration3 * 100) / 100;
+  return {
+    ok,
+    status,
+    summary: `clean ${status} for env ${environment || environments.join(",") || "default"} in ${durationSeconds}s.`,
+    environments,
+    errors: errors.slice(0, 50),
+    warnings: warnings.slice(0, 50),
+    error_count: errors.length,
+    warning_count: warnings.length,
+    memory,
+    duration_s: durationSeconds,
+    exit_code: result.exitCode,
+    log_path: result.logPath,
+    output_tail: lines2.slice(-40).join("\n"),
+    port_error: null
+  };
 }
 
 // src/adapters/init-compat.ts
 init_zod();
 init_projects();
-import fs34 from "node:fs/promises";
-import path39 from "node:path";
-import os7 from "node:os";
+import fs40 from "node:fs/promises";
+import path43 from "node:path";
+import os8 from "node:os";
 init_redact();
 init_errors2();
 async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
@@ -100851,13 +101770,13 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
   }).strict().parse(input);
   let requested = params.project_dir;
   if (requested === "~" || requested.startsWith("~/") || requested.startsWith("~\\"))
-    requested = path39.join(defaults.home ?? os7.homedir(), requested.slice(2));
+    requested = path43.join(defaults.home ?? os8.homedir(), requested.slice(2));
   else if (requested.startsWith("~"))
     throw new PlatformIOError(
       "Named-user home expansion is unsupported.",
       "COMPAT_PROJECT_INVALID"
     );
-  const projectDir = path39.resolve(defaults.cwd ?? process.cwd(), requested);
+  const projectDir = path43.resolve(defaults.cwd ?? process.cwd(), requested);
   const config2 = {
     board: params.board,
     framework: params.framework || void 0,
@@ -100907,18 +101826,18 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
           throw error2;
         }
         guard();
-        const root = await fs34.realpath(result.path);
+        const root = await fs40.realpath(result.path);
         let ini = "";
         try {
-          const filename = await fs34.realpath(
-            path39.join(root, "platformio.ini")
+          const filename = await fs40.realpath(
+            path43.join(root, "platformio.ini")
           );
-          if (path39.dirname(filename) !== root)
+          if (path43.dirname(filename) !== root)
             throw new PlatformIOError(
               "Generated configuration escapes the project.",
               "COMPAT_PROJECT_INVALID"
             );
-          const file = await fs34.open(filename, "r");
+          const file = await fs40.open(filename, "r");
           try {
             const stat = await file.stat();
             if (!stat.isFile() || stat.size > 1048576)
@@ -100947,7 +101866,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
         } catch (error2) {
           if (error2.code !== "ENOENT") throw error2;
         }
-        const items = (await fs34.readdir(root, { withFileTypes: true })).filter((item) => !item.name.startsWith("."));
+        const items = (await fs40.readdir(root, { withFileTypes: true })).filter((item) => !item.name.startsWith("."));
         if (items.length > 4096)
           throw new PlatformIOError(
             "Project layout exceeds report limits.",
@@ -100969,7 +101888,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
 
 // src/adapters/project-compat.ts
 init_zod();
-import path40 from "node:path";
+import path44 from "node:path";
 init_errors2();
 var text4 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var scope2 = {
@@ -101025,7 +101944,7 @@ function projectCompatibilityResult(result) {
       ...common,
       default_envs: result.defaultEnvironments,
       platformio_section: result.platformioSection,
-      platformio_ini_path: path40.join(result.projectDir, "platformio.ini"),
+      platformio_ini_path: path44.join(result.projectDir, "platformio.ini"),
       envs: result.envs.map((item) => ({
         name: item.name,
         board: item.board,
@@ -101067,6 +101986,8 @@ function projectCompatibilityResult(result) {
   );
 }
 async function executeProjectCompatibility(name2, input, defaults = {}, caller = {}, onAuthorized) {
+  if (name2 === "pio_clean")
+    return executeCleanCompatibility(input, defaults, caller, onAuthorized);
   if (name2 === "pio_project_init")
     return executeInitCompatibility(input, defaults, caller, onAuthorized);
   const request = await mapProjectCompatibilityRequest(name2, input, defaults);
@@ -101191,13 +102112,13 @@ init_zod();
 init_errors2();
 
 // src/tools/packages.ts
-var import_proper_lockfile5 = __toESM(require_proper_lockfile(), 1);
+var import_proper_lockfile6 = __toESM(require_proper_lockfile(), 1);
 init_zod();
 init_platformio();
 init_errors2();
-import fs35 from "node:fs/promises";
-import path41 from "node:path";
-import crypto12 from "node:crypto";
+import fs41 from "node:fs/promises";
+import path45 from "node:path";
+import crypto15 from "node:crypto";
 init_redact();
 
 // src/core/package-config.ts
@@ -101426,7 +102347,7 @@ function safeOutput(text6) {
   );
 }
 async function readConfiguration(projectDir) {
-  const file = await fs35.open(path41.join(projectDir, "platformio.ini"), "r").catch((error2) => {
+  const file = await fs41.open(path45.join(projectDir, "platformio.ini"), "r").catch((error2) => {
     if (error2.code === "ENOENT") return null;
     throw error2;
   });
@@ -101461,34 +102382,34 @@ async function readConfiguration(projectDir) {
   }
 }
 async function retainOutput(projectDir, output) {
-  const dir = path41.join(projectDir, ".pio-mcp-workspace", "logs", "packages");
+  const dir = path45.join(projectDir, ".pio-mcp-workspace", "logs", "packages");
   let current = projectDir;
   for (const component of [".pio-mcp-workspace", "logs", "packages"]) {
-    current = path41.join(current, component);
-    await fs35.mkdir(current, { mode: 448 }).catch((error2) => {
+    current = path45.join(current, component);
+    await fs41.mkdir(current, { mode: 448 }).catch((error2) => {
       if (error2.code !== "EEXIST") throw error2;
     });
-    const actual = await fs35.realpath(current);
-    const relative = path41.relative(projectDir, actual);
-    if (relative === ".." || relative.startsWith(`..${path41.sep}`) || path41.isAbsolute(relative))
+    const actual = await fs41.realpath(current);
+    const relative = path45.relative(projectDir, actual);
+    if (relative === ".." || relative.startsWith(`..${path45.sep}`) || path45.isAbsolute(relative))
       throw new PlatformIOError(
         "Package log directory escapes the project.",
         "PACKAGE_LOG_PATH_INVALID"
       );
   }
-  const file = path41.join(dir, `packages-${crypto12.randomUUID()}.log`);
-  await fs35.writeFile(file, output, { flag: "wx", mode: 384 });
+  const file = path45.join(dir, `packages-${crypto15.randomUUID()}.log`);
+  await fs41.writeFile(file, output, { flag: "wx", mode: 384 });
   const completed = [];
-  for (const entry of await fs35.readdir(dir, { withFileTypes: true })) {
+  for (const entry of await fs41.readdir(dir, { withFileTypes: true })) {
     if (!entry.isFile() || !/^packages-[a-f0-9-]{36}\.log$/.test(entry.name))
       continue;
-    const candidate = path41.join(dir, entry.name);
+    const candidate = path45.join(dir, entry.name);
     if (candidate === file) continue;
-    const stat = await fs35.lstat(candidate);
+    const stat = await fs41.lstat(candidate);
     if (stat.isFile()) completed.push({ path: candidate, time: stat.mtimeMs });
   }
   for (const stale of completed.sort((a, b) => b.time - a.time).slice(199))
-    await fs35.unlink(stale.path);
+    await fs41.unlink(stale.path);
   return file;
 }
 async function executePackageAction(action, input, caller = {}, onAuthorized, outputOptions = {}) {
@@ -101510,7 +102431,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
   const search = action === "pkg_search";
   const mutation = action === "pkg_install" || action === "pkg_uninstall";
   const parsed = search ? searchSchema.parse(input) : mutation ? mutationSchema.parse(input) : projectSchema.parse(input);
-  const projectDir = "projectDir" in parsed ? await fs35.realpath(parsed.projectDir) : void 0;
+  const projectDir = "projectDir" in parsed ? await fs41.realpath(parsed.projectDir) : void 0;
   const params = { ...parsed, ...projectDir ? { projectDir } : {} };
   if (params.spec !== void 0 && (/[a-z][a-z0-9+.-]*:\/\/[^\s/@]+@/i.test(params.spec) || /[?&](?:token|password|key|secret|signature)=/i.test(params.spec)))
     throw new PlatformIOError(
@@ -101525,18 +102446,18 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
     const validatePolicy = createPolicyRevisionGuard(context.workspaceDir);
     await onAuthorized?.();
     validatePolicy();
-    const release = projectDir ? await import_proper_lockfile5.default.lock(projectDir, {
+    const release = projectDir ? await import_proper_lockfile6.default.lock(projectDir, {
       realpath: true,
-      lockfilePath: path41.join(projectDir, ".pio-mcp-packages.lock"),
+      lockfilePath: path45.join(projectDir, ".pio-mcp-packages.lock"),
       retries: 0
     }) : void 0;
     try {
       validatePolicy();
       const before = projectDir ? await readConfiguration(projectDir) : null;
-      const configPath = projectDir && before !== null ? await fs35.realpath(path41.join(projectDir, "platformio.ini")) : void 0;
+      const configPath = projectDir && before !== null ? await fs41.realpath(path45.join(projectDir, "platformio.ini")) : void 0;
       if (projectDir && configPath) {
-        const relative = path41.relative(projectDir, configPath);
-        if (relative === ".." || relative.startsWith(`..${path41.sep}`) || path41.isAbsolute(relative))
+        const relative = path45.relative(projectDir, configPath);
+        if (relative === ".." || relative.startsWith(`..${path45.sep}`) || path45.isAbsolute(relative))
           throw new PlatformIOError(
             "Project configuration resolves outside the project.",
             "PACKAGE_CONFIG_CONFLICT"
@@ -101586,32 +102507,32 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
           keys
         });
         validatePolicy();
-        if (configPath !== await fs35.realpath(path41.join(projectDir, "platformio.ini")) || after !== await readConfiguration(projectDir))
+        if (configPath !== await fs41.realpath(path45.join(projectDir, "platformio.ini")) || after !== await readConfiguration(projectDir))
           throw new PlatformIOError(
             "Configuration changed concurrently; inspect it before retrying.",
             "PACKAGE_CONFIG_CONFLICT"
           );
         if (merged !== after) {
-          const temp = `${configPath}.${crypto12.randomUUID()}.tmp`;
+          const temp = `${configPath}.${crypto15.randomUUID()}.tmp`;
           try {
-            await fs35.writeFile(temp, merged, {
+            await fs41.writeFile(temp, merged, {
               flag: "wx",
-              mode: (await fs35.stat(configPath)).mode
+              mode: (await fs41.stat(configPath)).mode
             });
             if (after !== await readConfiguration(projectDir))
               throw new PlatformIOError(
                 "Configuration changed concurrently.",
                 "PACKAGE_CONFIG_CONFLICT"
               );
-            await fs35.rename(temp, configPath);
+            await fs41.rename(temp, configPath);
           } finally {
-            await fs35.unlink(temp).catch(() => {
+            await fs41.unlink(temp).catch(() => {
             });
           }
           after = merged;
         }
       }
-      const digest = (text6) => text6 === null ? null : crypto12.createHash("sha256").update(text6).digest("hex");
+      const digest = (text6) => text6 === null ? null : crypto15.createHash("sha256").update(text6).digest("hex");
       validatePolicy();
       const detail = action === "pkg_search" ? parsePackageSearch(safeOutput(result.stdout)) : action === "pkg_list" ? parsePackageList(safeOutput(result.stdout)) : void 0;
       const parsedOk = !detail || detail.parseStatus === "complete";
@@ -108849,621 +109770,6 @@ init_mcp_context();
 init_workspace_registry();
 init_projects();
 
-// src/tools/build.ts
-init_platformio();
-init_spooler();
-init_validation();
-init_errors2();
-init_errors2();
-init_process_manager();
-init_tail();
-init_paths();
-init_mcp_context();
-init_build_cache();
-init_logger();
-init_redact();
-import fs40 from "node:fs";
-import path45 from "node:path";
-import crypto15 from "node:crypto";
-
-// src/core/diagnostics/matchers.ts
-var buildMatchers = [
-  {
-    errorType: "MissingHeader",
-    pattern: /fatal error: .*: No such file or directory/i,
-    recommendedAction: "Install the missing library or fix the include path.",
-    severity: "error",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "MissingLibrary",
-    pattern: /library .* not found|library manager:.*not found|librarynotfound/i,
-    recommendedAction: "Install the missing library dependency or correct the `lib_deps` entry.",
-    severity: "error",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "SyntaxError",
-    pattern: /error: expected|error: stray|error: .* was not declared/i,
-    recommendedAction: "Inspect the referenced source line and patch the syntax or missing symbol.",
-    severity: "error",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "MemoryOverflow",
-    pattern: /region .* overflowed|RAM.*overflow|Flash.*overflow/i,
-    recommendedAction: "Reduce firmware size, change board config, or optimize memory usage.",
-    severity: "critical",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "LinkerError",
-    pattern: /undefined reference|ld returned/i,
-    recommendedAction: "Check missing symbols, library linkage, or build flags.",
-    severity: "error",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "UnknownBoard",
-    pattern: /unknown board|invalid board|board .* not found/i,
-    recommendedAction: "Check the PlatformIO board ID and update platformio.ini accordingly.",
-    severity: "error",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "WrongBoard",
-    pattern: /board .* is not compatible|board .* does not support/i,
-    recommendedAction: "Use a board and platform combination that supports the selected framework and upload target.",
-    severity: "error",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "UnknownFramework",
-    pattern: /unknown framework|framework .* not found/i,
-    recommendedAction: "Select a framework supported by the selected board and retry build.",
-    severity: "error",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "WrongFramework",
-    pattern: /framework .* not compatible with board|frameworks?: .*required/i,
-    recommendedAction: "Adjust the environment framework to one supported by the target board.",
-    severity: "error",
-    safeToAutoRetry: false
-  }
-];
-var uploadMatchers = [
-  {
-    errorType: "PortBusy",
-    pattern: /Resource busy|Access is denied|device or resource busy/i,
-    recommendedAction: "Release the serial port lock or stop the active monitor process.",
-    severity: "error",
-    safeToAutoRetry: true
-  },
-  {
-    errorType: "PermissionDenied",
-    pattern: /Permission denied|Operation not permitted|Access is denied/i,
-    recommendedAction: "Check serial device permissions or run the required permission setup.",
-    severity: "error",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "UploadSyncFailed",
-    pattern: /Failed to connect|Timed out waiting for packet|Invalid head of packet|A fatal error occurred: Failed to connect/i,
-    recommendedAction: "Put the board into bootloader mode, check cable, or retry upload.",
-    severity: "error",
-    safeToAutoRetry: true
-  },
-  {
-    errorType: "DeviceDisconnected",
-    pattern: /No such file or directory|device not found|could not open port|serial port not found|device has been disconnected/i,
-    recommendedAction: "Reconnect the device and re-run device discovery.",
-    severity: "error",
-    safeToAutoRetry: true
-  },
-  {
-    errorType: "Esp32StrappingPinRisk",
-    pattern: /ESP32 strapping pin risk|ESP32_STRAPPING_PIN_RISK/i,
-    recommendedAction: "Move application I/O off ESP32 strapping pins (for example GPIO25/26/27) and retry upload.",
-    severity: "critical",
-    safeToAutoRetry: false
-  }
-];
-var serialMatchers = [
-  {
-    errorType: "Brownout",
-    pattern: /brownout|brownout detector/i,
-    recommendedAction: "Check power supply, USB cable, and peak current draw.",
-    severity: "critical",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "BootLoop",
-    pattern: /rst:[^\n]*\n[\s\S]*rst:/i,
-    recommendedAction: "Device appears to be repeatedly rebooting. Inspect startup code and power stability.",
-    severity: "critical",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "WatchdogReset",
-    pattern: /watchdog|wdt|WDT reset|task watchdog/i,
-    recommendedAction: "Inspect blocking loops, task starvation, and interrupt behavior.",
-    severity: "error",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "PanicTrace",
-    pattern: /Guru Meditation|panic|stack trace|backtrace/i,
-    recommendedAction: "Extract the backtrace and map it to source lines if debug symbols are available.",
-    severity: "critical",
-    safeToAutoRetry: false
-  },
-  {
-    errorType: "NoSerialOutput",
-    pattern: /^\s*$/i,
-    recommendedAction: "No runtime output was observed. Check baud rate, wiring, and boot markers.",
-    severity: "warning",
-    safeToAutoRetry: true
-  }
-];
-
-// src/core/diagnostics/diagnose.ts
-function trimEvidence(log, pattern) {
-  const lines2 = log.split(/\r?\n/);
-  const matches = [];
-  for (const line of lines2) {
-    if (pattern.test(line)) {
-      matches.push(line.trim());
-      if (matches.length >= 4) break;
-    }
-  }
-  return matches;
-}
-function inferDefaultRecommendation(stage) {
-  if (stage === "build") return "Inspect compiler diagnostics and patch the smallest failing unit.";
-  if (stage === "upload") return "Verify port/cable/boot mode, then retry upload.";
-  if (stage === "monitor") return "Inspect runtime serial traces and confirm expected boot markers.";
-  if (stage === "test") return "Inspect test output and resolve the first failing assertion.";
-  if (stage === "device_discovery") return "Reconnect device and repeat discovery.";
-  return "Inspect raw logs and retry after applying a minimal fix.";
-}
-function diagnoseFromLog(stage, logText, matchers, opts) {
-  const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-  const normalized = logText || "";
-  const succeeded = opts?.successOverride ?? false;
-  if (succeeded) {
-    return {
-      success: true,
-      stage,
-      severity: "info",
-      summary: `${stage} completed successfully.`,
-      evidence: [],
-      recommendedAction: "Proceed to the next workflow step.",
-      safeToAutoRetry: true,
-      rawLogPath: opts?.rawLogPath,
-      taskId: opts?.taskId,
-      timestamp
-    };
-  }
-  for (const matcher of matchers) {
-    if (!matcher.pattern.test(normalized)) continue;
-    return {
-      success: false,
-      stage,
-      errorType: matcher.errorType,
-      severity: matcher.severity,
-      summary: `${stage} failed with ${matcher.errorType}.`,
-      evidence: trimEvidence(normalized, matcher.pattern),
-      recommendedAction: matcher.recommendedAction,
-      safeToAutoRetry: matcher.safeToAutoRetry,
-      rawLogPath: opts?.rawLogPath,
-      taskId: opts?.taskId,
-      timestamp
-    };
-  }
-  return {
-    success: false,
-    stage,
-    errorType: "Unknown",
-    severity: "error",
-    summary: `${stage} failed, but no known failure pattern matched.`,
-    evidence: normalized.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0).slice(-4),
-    recommendedAction: inferDefaultRecommendation(stage),
-    safeToAutoRetry: false,
-    rawLogPath: opts?.rawLogPath,
-    taskId: opts?.taskId,
-    timestamp
-  };
-}
-
-// src/core/diagnostics/build-diagnostics.ts
-function diagnoseBuildLog(logText, opts) {
-  return diagnoseFromLog("build", logText, buildMatchers, {
-    taskId: opts?.taskId,
-    rawLogPath: opts?.rawLogPath,
-    successOverride: opts?.success ?? false
-  });
-}
-
-// src/core/diagnostics/upload-diagnostics.ts
-function diagnoseUploadLog(logText, opts) {
-  return diagnoseFromLog("upload", logText, uploadMatchers, {
-    taskId: opts?.taskId,
-    rawLogPath: opts?.rawLogPath,
-    successOverride: opts?.success ?? false
-  });
-}
-
-// src/core/diagnostics/serial-diagnostics.ts
-function diagnoseSerialLog(logText, opts) {
-  return diagnoseFromLog("monitor", logText, serialMatchers, {
-    taskId: opts?.taskId,
-    rawLogPath: opts?.rawLogPath,
-    successOverride: opts?.success ?? false
-  });
-}
-
-// src/tools/build.ts
-init_command_registry();
-async function buildProject(projectDir, environment, verbose, background) {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto15.randomUUID();
-  const validatedPath = validateProjectPath(projectDir);
-  if (environment && !validateEnvironmentName(environment)) {
-    throw new BuildError(`Invalid environment name: ${environment}`, {
-      environment
-    });
-  }
-  const envName = environment || "default";
-  if (!background && !verbose) {
-    const lookup = lookupBuildCache(validatedPath, envName);
-    if (lookup.hit) {
-      const cached2 = lookup.entry;
-      const tail = cached2.finalOutputTail || "(cached build \u2014 output omitted)";
-      const structuredErrors = parseStructuredBuildErrors(tail);
-      logDiagnostic(
-        `[buildProject] Cache hit for ${validatedPath} (env=${envName}, hash=${cached2.inputsHash.slice(0, 12)}\u2026) \u2014 skipping pio run`,
-        validatedPath
-      );
-      return {
-        success: true,
-        cacheHit: true,
-        environment: envName,
-        output: void 0,
-        errors: void 0,
-        structuredErrors,
-        nextSteps: deriveNextSteps([], true).concat([
-          "Build was served from MCP content-hash cache (no compilation work performed). Call `clean_project` or edit source files to force a rebuild."
-        ]),
-        ramUsageBytes: cached2.ramUsageBytes,
-        flashUsageBytes: cached2.flashUsageBytes,
-        firmwarePath: cached2.firmwarePath,
-        diagnostic: diagnoseBuildLog(tail, {
-          success: true
-        })
-      };
-    }
-  }
-  try {
-    const args = [];
-    if (environment) {
-      args.push("--environment", environment);
-    }
-    if (verbose) {
-      args.push("--verbose");
-    }
-    const result = await executeWithSpooling("run", args, {
-      cwd: validatedPath,
-      projectDir: validatedPath,
-      timeout: background ? 36e5 : 6e5,
-      // 1 hour for background, 10 mins for foreground
-      background,
-      rootCommandId
-    });
-    if ("status" in result) {
-      return result;
-    }
-    const success = result.exitCode === 0;
-    const safeOutput2 = redactSecretsInText(result.finalOutput);
-    const legacyErrors = success ? void 0 : parseStderrErrors(safeOutput2);
-    const structuredErrors = parseStructuredBuildErrors(safeOutput2);
-    const nextSteps = deriveNextSteps(
-      // Convert from internal StructuredBuildError to the JSON-friendly shape.
-      structuredErrors,
-      success
-    );
-    const diagnostic = diagnoseBuildLog(safeOutput2, {
-      rawLogPath: result.fullLogPath,
-      success
-    });
-    let ramUsageBytes;
-    let flashUsageBytes;
-    let firmwarePath;
-    if (success) {
-      const ramMatch = safeOutput2.match(/RAM:.*?used\s+(\d+)\s+bytes/i);
-      if (ramMatch) ramUsageBytes = parseInt(ramMatch[1], 10);
-      const flashMatch = safeOutput2.match(/Flash:.*?used\s+(\d+)\s+bytes/i);
-      if (flashMatch) flashUsageBytes = parseInt(flashMatch[1], 10);
-      firmwarePath = findFirmwareArtifact(validatedPath, envName);
-      const tail = safeOutput2.slice(-16 * 1024);
-      const postBuildLookup = lookupBuildCache(validatedPath, envName);
-      writeCache(validatedPath, {
-        inputsHash: postBuildLookup.inputsHash,
-        environment: envName,
-        builtAtMs: Date.now(),
-        firmwarePath,
-        ramUsageBytes,
-        flashUsageBytes,
-        finalOutputTail: tail
-      });
-    } else {
-      invalidateBuildCache(validatedPath);
-    }
-    return {
-      success,
-      cacheHit: false,
-      environment: envName,
-      output: success && !verbose ? void 0 : safeOutput2,
-      errors: legacyErrors,
-      structuredErrors,
-      nextSteps,
-      ramUsageBytes,
-      flashUsageBytes,
-      firmwarePath,
-      rawLogPath: result.fullLogPath,
-      diagnostic
-    };
-  } catch (error2) {
-    if (error2 instanceof PlatformIOError) {
-      throw new BuildError(`Build failed: ${error2.message}`, {
-        projectDir,
-        environment
-      });
-    }
-    throw new BuildError(`Failed to build project: ${error2}`, {
-      projectDir,
-      environment
-    });
-  }
-}
-async function checkProject(projectDir, environment, background) {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto15.randomUUID();
-  const validatedPath = validateProjectPath(projectDir);
-  if (environment && !validateEnvironmentName(environment)) {
-    throw new BuildError(`Invalid environment name: ${environment}`, { environment });
-  }
-  try {
-    const args = [];
-    if (environment) {
-      args.push("--environment", environment);
-    }
-    const result = await executeWithSpooling("check", args, {
-      cwd: validatedPath,
-      projectDir: validatedPath,
-      timeout: background ? 36e5 : 6e5,
-      background,
-      rootCommandId,
-      artifactType: "check"
-      // "check" is handled cleanly by spooler
-    });
-    if ("status" in result) {
-      return result;
-    }
-    const success = result.exitCode === 0;
-    const errors = success ? void 0 : parseStderrErrors(result.finalOutput);
-    return {
-      success,
-      environment: environment || "default",
-      output: result.finalOutput,
-      errors
-    };
-  } catch (error2) {
-    if (error2 instanceof PlatformIOError) {
-      throw new BuildError(`Check failed: ${error2.message}`, { projectDir, environment });
-    }
-    throw new BuildError(`Failed to check project: ${error2}`, { projectDir, environment });
-  }
-}
-async function runTests(projectDir, environment, background, compileOnly) {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto15.randomUUID();
-  const validatedPath = validateProjectPath(projectDir);
-  if (environment && !validateEnvironmentName(environment)) {
-    throw new BuildError(`Invalid environment name: ${environment}`, { environment });
-  }
-  if (compileOnly !== void 0 && typeof compileOnly !== "boolean") {
-    throw new BuildError("compileOnly must be a boolean", { projectDir });
-  }
-  const buildOnly = loadEffectivePolicyState(validatedPath).profile === "build_only";
-  try {
-    const args = [];
-    if (compileOnly || buildOnly) {
-      args.push("--without-uploading", "--without-testing");
-    }
-    if (environment) {
-      args.push("--environment", environment);
-    }
-    const result = await executeWithSpooling("test", args, {
-      cwd: validatedPath,
-      projectDir: validatedPath,
-      timeout: background ? 36e5 : 6e5,
-      background,
-      artifactType: "test",
-      rootCommandId
-    });
-    if ("status" in result) {
-      return result;
-    }
-    const success = result.exitCode === 0;
-    const errors = success ? void 0 : parseStderrErrors(result.finalOutput);
-    return {
-      success,
-      environment: environment || "default",
-      output: result.finalOutput,
-      errors
-    };
-  } catch (error2) {
-    if (error2 instanceof PlatformIOError) {
-      throw new BuildError(`Tests failed: ${error2.message}`, { projectDir, environment });
-    }
-    throw new BuildError(`Failed to run tests: ${error2}`, { projectDir, environment });
-  }
-}
-async function cleanProject(projectDir, background, options = {}) {
-  const rootCommandId = mcpContext.getStore()?.activityId || crypto15.randomUUID();
-  const validatedPath = validateProjectPath(projectDir);
-  if (options.environment !== void 0 && !validateEnvironmentName(options.environment)) {
-    throw new BuildError(`Invalid environment name: ${options.environment}`, {
-      environment: options.environment
-    });
-  }
-  if (options.full !== void 0 && typeof options.full !== "boolean") {
-    throw new BuildError("Clean full option must be a boolean", { projectDir });
-  }
-  const args = ["--target", options.full ? "fullclean" : "clean"];
-  if (options.environment) args.push("--environment", options.environment);
-  invalidateBuildCache(validatedPath);
-  try {
-    const result = await executeWithSpooling(
-      "run",
-      args,
-      {
-        cwd: validatedPath,
-        projectDir: validatedPath,
-        timeout: 6e4,
-        background,
-        rootCommandId
-      }
-    );
-    if ("status" in result) {
-      return result;
-    }
-    const success = result.exitCode === 0;
-    if (!success) {
-      throw new BuildError(`Clean failed: ${result.finalOutput}`, {
-        projectDir,
-        stderr: result.finalOutput
-      });
-    }
-    return {
-      success: true,
-      message: "Successfully cleaned build artifacts"
-    };
-  } catch (error2) {
-    if (error2 instanceof BuildError) {
-      throw error2;
-    }
-    throw new BuildError(`Failed to clean project: ${error2}`, { projectDir });
-  }
-}
-async function checkTaskStatus(taskId, logPath, projectDir) {
-  const baseDir = projectDir || SERVER_DATA_DIR;
-  if (!projectDir) ensureGlobalDirs();
-  let history = getCommandHistory(baseDir);
-  let resolvedTaskId = taskId;
-  if (!resolvedTaskId && logPath) {
-    for (const cmd of history) {
-      const match = cmd.tasks?.find((t) => t.logPaths?.includes(logPath));
-      if (match) {
-        resolvedTaskId = cmd.id;
-        break;
-      }
-    }
-  }
-  if (!resolvedTaskId) {
-    for (let i = history.length - 1; i >= 0; i--) {
-      const cmd = history[i];
-      if (cmd.tasks && cmd.tasks.length > 0) {
-        resolvedTaskId = cmd.id;
-        break;
-      }
-    }
-  }
-  if (resolvedTaskId && !projectDir) {
-    const cmd = history.find((c) => c.id === resolvedTaskId);
-    if (!cmd) {
-      const crossResult = await findCommandAcrossWorkspaces(resolvedTaskId);
-      if (crossResult) {
-        history = crossResult.history;
-      }
-    }
-  }
-  let status = "completed";
-  let output = "No output available.";
-  let logPaths = [];
-  let diagnostic;
-  if (resolvedTaskId) {
-    const cmd = history.find((c) => c.id === resolvedTaskId);
-    if (cmd) {
-      status = cmd.status;
-      logPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f) => Boolean(f));
-      const latestLog = logPath || logPaths[logPaths.length - 1];
-      if (latestLog && fs40.existsSync(latestLog)) {
-        try {
-          const lines2 = await tailFileBounded(latestLog, 512 * 1024);
-          output = lines2.slice(status === "running" ? -30 : -150).join("\n");
-        } catch (e) {
-          output = `[Status Polling Error] Could not read log: ${e.message}`;
-        }
-      } else if (latestLog) {
-        output = `Log file not found: ${latestLog}`;
-      }
-    } else {
-      status = "failed";
-      output = `Task ID not found: ${resolvedTaskId}`;
-    }
-  } else {
-    const logFile = path45.join(baseDir, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
-    const active = isBuildActive(projectDir);
-    status = active ? "running" : "completed";
-    if (fs40.existsSync(logFile)) {
-      logPaths = [logFile];
-      try {
-        const lines2 = await tailFileBounded(logFile, 512 * 1024);
-        output = lines2.slice(active ? -30 : -150).join("\n");
-      } catch (e) {
-        output = `[Status Polling Error] Could not read log: ${e.message}`;
-      }
-    } else {
-      output = "No active task or build log found.";
-    }
-    if (!active && output.includes("FAILED")) status = "failed";
-    else if (!active && output.includes("Error:")) status = "failed";
-  }
-  const safeOutput2 = redactSecretsInText(output);
-  const effectiveLogPath = logPath || logPaths[logPaths.length - 1];
-  const normalizedStatus = status.toLowerCase();
-  const command = resolvedTaskId ? history.find((c) => c.id === resolvedTaskId) : void 0;
-  const taskType = command?.tasks?.[0]?.type ?? "build";
-  const successByStatus = normalizedStatus === "success" || normalizedStatus === "completed";
-  const failedByStatus = normalizedStatus === "error" || normalizedStatus === "failed" || normalizedStatus === "terminated";
-  if (taskType === "upload") {
-    diagnostic = diagnoseUploadLog(safeOutput2, {
-      taskId: resolvedTaskId,
-      rawLogPath: effectiveLogPath,
-      success: successByStatus && !failedByStatus
-    });
-  } else if (taskType === "monitor") {
-    diagnostic = diagnoseSerialLog(safeOutput2, {
-      taskId: resolvedTaskId,
-      rawLogPath: effectiveLogPath,
-      success: successByStatus && !failedByStatus
-    });
-  } else {
-    diagnostic = diagnoseBuildLog(safeOutput2, {
-      taskId: resolvedTaskId,
-      rawLogPath: effectiveLogPath,
-      success: successByStatus && !failedByStatus
-    });
-  }
-  return {
-    status: "success",
-    targetStatus: status,
-    taskId: resolvedTaskId,
-    logPaths,
-    output: safeOutput2,
-    diagnostic
-  };
-}
-
 // src/tools/upload.ts
 init_mcp_context();
 init_spooler();
@@ -109715,110 +110021,6 @@ init_projects();
 async function initProjectCore(input) {
   return initProject(input);
 }
-
-// src/utils/lock-manager.ts
-init_errors2();
-init_events();
-import { randomUUID as randomUUID3 } from "node:crypto";
-var QueueEnforcementError = class extends PlatformIOError {
-  constructor(message, context) {
-    super(message, "QUEUE_ENFORCEMENT_FAILED", context);
-    this.name = "QueueEnforcementError";
-  }
-};
-var HardwareLockManager = class _HardwareLockManager {
-  static instance;
-  state = { isLocked: false };
-  constructor() {
-  }
-  /**
-   * Retrieves the global singleton instance
-   */
-  static getInstance() {
-    if (!_HardwareLockManager.instance) {
-      _HardwareLockManager.instance = new _HardwareLockManager();
-    }
-    return _HardwareLockManager.instance;
-  }
-  /**
-   * Explicitly claim the internal lock for a session.
-   * Throws if another session currently holds the lock.
-   */
-  acquireLock(sessionId, reason) {
-    if (this.state.isLocked && this.state.sessionId === sessionId) {
-      console.log(`Lock re-entry attempt by session ${sessionId}`);
-      return;
-    }
-    if (this.state.isLocked && this.state.sessionId !== sessionId) {
-      throw new QueueEnforcementError(
-        `Hardware is currently tied up by ${this.state.sessionId || "another session"}. If this is a stuck session, run the 'mcp_platformio_reset_server_state' tool.`,
-        {
-          activeSession: this.state.sessionId,
-          activeReason: this.state.reason
-        }
-      );
-    }
-    this.state = {
-      isLocked: true,
-      sessionId,
-      reason: reason || "Explicit Pipeline Lock",
-      lockedAt: Date.now()
-    };
-    try {
-      portalEvents.emitLockState(this.state);
-    } catch {
-    }
-  }
-  /**
-   * Release the explicit lock, if it matches the current session ID.
-   */
-  releaseLock(sessionId) {
-    if (this.state.isLocked && this.state.sessionId === sessionId) {
-      this.state = { isLocked: false };
-      try {
-        portalEvents.emitLockState(this.state);
-      } catch {
-      }
-    }
-  }
-  /**
-   * Get the current global lock state.
-   */
-  getLockStatus() {
-    return { ...this.state };
-  }
-  /**
-   * Validate that an operation can proceed.
-   * Operation can proceed if unlocked, or if the requester IS the locker.
-   */
-  requireLock(sessionId) {
-    if (this.state.isLocked && this.state.sessionId !== sessionId) {
-      throw new QueueEnforcementError(
-        `Hardware is currently tied up by session [${this.state.sessionId}]. If this is a stuck session, run the 'mcp_platformio_reset_server_state' tool.`,
-        {
-          activeSession: this.state.sessionId,
-          activeReason: this.state.reason,
-          action: "requireLock"
-        }
-      );
-    }
-  }
-  /**
-   * Implicit wrapping block for safe execution of a single task.
-   * Grabs the lock implicitly, awaits the job, then releases it.
-   */
-  async withImplicitLock(action) {
-    const implicitSessionId = `__IMPLICIT_${randomUUID3()}__`;
-    this.acquireLock(implicitSessionId, "Implicit Tool Execution");
-    try {
-      const result = await action();
-      return result;
-    } finally {
-      this.releaseLock(implicitSessionId);
-    }
-  }
-};
-var hardwareLockManager = HardwareLockManager.getInstance();
 
 // src/core/build.ts
 async function buildProjectCore(input) {
@@ -110994,26 +111196,26 @@ import path48 from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 import { promisify as promisify6 } from "node:util";
 import childProcess from "node:child_process";
-import fs47, { constants as fsConstants2 } from "node:fs/promises";
+import fs48, { constants as fsConstants2 } from "node:fs/promises";
 
 // node_modules/wsl-utils/index.js
 import process4 from "node:process";
-import fs46, { constants as fsConstants } from "node:fs/promises";
+import fs47, { constants as fsConstants } from "node:fs/promises";
 
 // node_modules/is-wsl/index.js
 import process3 from "node:process";
 import os9 from "node:os";
-import fs45 from "node:fs";
+import fs46 from "node:fs";
 
 // node_modules/is-inside-container/index.js
-import fs44 from "node:fs";
+import fs45 from "node:fs";
 
 // node_modules/is-docker/index.js
-import fs43 from "node:fs";
+import fs44 from "node:fs";
 var isDockerCached;
 function hasDockerEnv() {
   try {
-    fs43.statSync("/.dockerenv");
+    fs44.statSync("/.dockerenv");
     return true;
   } catch {
     return false;
@@ -111021,7 +111223,7 @@ function hasDockerEnv() {
 }
 function hasDockerCGroup() {
   try {
-    return fs43.readFileSync("/proc/self/cgroup", "utf8").includes("docker");
+    return fs44.readFileSync("/proc/self/cgroup", "utf8").includes("docker");
   } catch {
     return false;
   }
@@ -111037,7 +111239,7 @@ function isDocker() {
 var cachedResult;
 var hasContainerEnv = () => {
   try {
-    fs44.statSync("/run/.containerenv");
+    fs45.statSync("/run/.containerenv");
     return true;
   } catch {
     return false;
@@ -111062,12 +111264,12 @@ var isWsl = () => {
     return true;
   }
   try {
-    if (fs45.readFileSync("/proc/version", "utf8").toLowerCase().includes("microsoft")) {
+    if (fs46.readFileSync("/proc/version", "utf8").toLowerCase().includes("microsoft")) {
       return !isInsideContainer();
     }
   } catch {
   }
-  if (fs45.existsSync("/proc/sys/fs/binfmt_misc/WSLInterop") || fs45.existsSync("/run/WSL")) {
+  if (fs46.existsSync("/proc/sys/fs/binfmt_misc/WSLInterop") || fs46.existsSync("/run/WSL")) {
     return !isInsideContainer();
   }
   return false;
@@ -111085,14 +111287,14 @@ var wslDrivesMountPoint = /* @__PURE__ */ (() => {
     const configFilePath = "/etc/wsl.conf";
     let isConfigFileExists = false;
     try {
-      await fs46.access(configFilePath, fsConstants.F_OK);
+      await fs47.access(configFilePath, fsConstants.F_OK);
       isConfigFileExists = true;
     } catch {
     }
     if (!isConfigFileExists) {
       return defaultMountPoint;
     }
-    const configContent = await fs46.readFile(configFilePath, { encoding: "utf8" });
+    const configContent = await fs47.readFile(configFilePath, { encoding: "utf8" });
     const configMountPoint = /(?<!#.*)root\s*=\s*(?<mountPoint>.*)/g.exec(configContent);
     if (!configMountPoint) {
       return defaultMountPoint;
@@ -111397,7 +111599,7 @@ var baseOpen = async (options) => {
       const isBundled = !__dirname4 || __dirname4 === "/";
       let exeLocalXdgOpen = false;
       try {
-        await fs47.access(localXdgOpenPath, fsConstants2.X_OK);
+        await fs48.access(localXdgOpenPath, fsConstants2.X_OK);
         exeLocalXdgOpen = true;
       } catch {
       }
@@ -111502,7 +111704,7 @@ defineLazyProperty(apps, "browserPrivate", () => "browserPrivate");
 var open_default = open;
 
 // src/api/server.ts
-import fs48 from "node:fs";
+import fs49 from "node:fs";
 init_process_manager();
 init_tail();
 init_command_registry();
@@ -111864,14 +112066,14 @@ function issueLaunchTicket(projectDir) {
 }
 function parseDeviceLocks() {
   const locks = [];
-  if (!fs48.existsSync(GLOBAL_LOCKS_DIR)) {
+  if (!fs49.existsSync(GLOBAL_LOCKS_DIR)) {
     return locks;
   }
-  for (const file of fs48.readdirSync(GLOBAL_LOCKS_DIR)) {
+  for (const file of fs49.readdirSync(GLOBAL_LOCKS_DIR)) {
     if (!file.endsWith(".json")) continue;
     const lockFile = path49.join(GLOBAL_LOCKS_DIR, file);
     try {
-      const payload = JSON.parse(fs48.readFileSync(lockFile, "utf8"));
+      const payload = JSON.parse(fs49.readFileSync(lockFile, "utf8"));
       const claim = payload?.current_claim ?? payload;
       locks.push({
         lockFile,
@@ -112134,10 +112336,10 @@ function startPortalServer(defaultPort = 8080) {
               taskId: task.taskId,
               type: task.type,
               logPath: firstLogPath,
-              exists: fs48.existsSync(firstLogPath)
+              exists: fs49.existsSync(firstLogPath)
             });
           }
-          if (!firstLogPath || !fs48.existsSync(firstLogPath)) {
+          if (!firstLogPath || !fs49.existsSync(firstLogPath)) {
             continue;
           }
           try {
@@ -112422,10 +112624,10 @@ function startPortalServer(defaultPort = 8080) {
           hardwareLockManager.releaseLock(status.sessionId);
         }
         try {
-          if (fs48.existsSync(GLOBAL_LOCKS_DIR)) {
-            for (const file of fs48.readdirSync(GLOBAL_LOCKS_DIR)) {
+          if (fs49.existsSync(GLOBAL_LOCKS_DIR)) {
+            for (const file of fs49.readdirSync(GLOBAL_LOCKS_DIR)) {
               if (file.endsWith(".json") || file.endsWith(".lock")) {
-                fs48.unlinkSync(path49.join(GLOBAL_LOCKS_DIR, file));
+                fs49.unlinkSync(path49.join(GLOBAL_LOCKS_DIR, file));
               }
             }
           }
@@ -112580,11 +112782,11 @@ function startPortalServer(defaultPort = 8080) {
         res.status(404).json({ error: "No log paths mapped for this task" });
         return;
       }
-      if (!fs48.existsSync(task.logPaths[0])) {
+      if (!fs49.existsSync(task.logPaths[0])) {
         res.status(404).json({ error: "Log file missing from disk" });
         return;
       }
-      const fileStream = fs48.createReadStream(task.logPaths[0]);
+      const fileStream = fs49.createReadStream(task.logPaths[0]);
       res.setHeader("Content-Type", "text/plain");
       fileStream.pipe(res);
     } catch (e) {
@@ -112781,7 +112983,7 @@ function startPortalServer(defaultPort = 8080) {
     const spoolers = getSpoolerStates();
     socket.emit("spooler_states", spoolers);
     for (const [port2, daemon] of Object.entries(spoolers)) {
-      if (daemon.logFile && fs48.existsSync(daemon.logFile)) {
+      if (daemon.logFile && fs49.existsSync(daemon.logFile)) {
         try {
           socket.emit("serial_clear", { port: port2, taskId: daemon.taskId });
           const lines2 = await tailFileBounded(daemon.logFile);
@@ -112811,7 +113013,7 @@ function startPortalServer(defaultPort = 8080) {
         ".pio-mcp-workspace",
         "agent_activities.jsonl"
       );
-      if (fs48.existsSync(activityLogPath)) {
+      if (fs49.existsSync(activityLogPath)) {
         try {
           const lines2 = await tailFileBounded(activityLogPath);
           const tailLines = lines2.slice(-100);
@@ -112830,7 +113032,7 @@ function startPortalServer(defaultPort = 8080) {
         "build",
         "latest-build.log"
       );
-      if (fs48.existsSync(latestBuildLog)) {
+      if (fs49.existsSync(latestBuildLog)) {
         socket.emit("build_state", {
           timestamp: Date.now(),
           logFile: latestBuildLog
@@ -112954,7 +113156,7 @@ async function getDashboardStatusCore(input) {
 }
 
 // src/tools/agent.ts
-import fs50 from "node:fs";
+import fs51 from "node:fs";
 import path51 from "node:path";
 
 // src/core/runtime-assertions.ts
@@ -113164,7 +113366,7 @@ function getBoardProfile(input) {
 init_build_cache();
 
 // src/utils/artifacts.ts
-import fs49 from "node:fs";
+import fs50 from "node:fs";
 import path50 from "node:path";
 var WORKSPACE_DIR4 = ".pio-mcp-workspace";
 var LAST_AGENT_REPORT_FILE = "lastAgentReport.json";
@@ -113180,21 +113382,21 @@ function getBoardReportPath(projectDir) {
 }
 function ensureArtifactsDir(projectDir) {
   const dir = getWorkspaceArtifactsDir(projectDir);
-  if (!fs49.existsSync(dir)) {
-    fs49.mkdirSync(dir, { recursive: true });
+  if (!fs50.existsSync(dir)) {
+    fs50.mkdirSync(dir, { recursive: true });
   }
 }
 function readJsonFile(filePath) {
-  if (!fs49.existsSync(filePath)) return null;
+  if (!fs50.existsSync(filePath)) return null;
   try {
-    const raw = fs49.readFileSync(filePath, "utf8");
+    const raw = fs50.readFileSync(filePath, "utf8");
     return JSON.parse(raw);
   } catch {
     return null;
   }
 }
 function writeJsonFile(filePath, payload) {
-  fs49.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
+  fs50.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
 }
 function writeLastAgentReport(projectDir, report) {
   ensureArtifactsDir(projectDir);
@@ -113259,23 +113461,23 @@ function parseEnvironmentsFromIni(iniText) {
 }
 function readProjectIniText(projectDir) {
   const iniPath = path51.join(projectDir, "platformio.ini");
-  if (!fs50.existsSync(iniPath)) return "";
+  if (!fs51.existsSync(iniPath)) return "";
   try {
-    return fs50.readFileSync(iniPath, "utf8");
+    return fs51.readFileSync(iniPath, "utf8");
   } catch {
     return "";
   }
 }
 function listSourceFiles2(projectDir) {
   const srcRoot = path51.join(projectDir, "src");
-  if (!fs50.existsSync(srcRoot)) return [];
+  if (!fs51.existsSync(srcRoot)) return [];
   const out = [];
   const stack = [srcRoot];
   while (stack.length > 0) {
     const current = stack.pop();
     let entries;
     try {
-      entries = fs50.readdirSync(current, { withFileTypes: true });
+      entries = fs51.readdirSync(current, { withFileTypes: true });
     } catch {
       continue;
     }
@@ -113338,11 +113540,11 @@ function persistAgentReport(projectDir, tool, success, summary, payload) {
 async function agentValidateProject(projectDir) {
   const validatedPath = validateProjectPath(projectDir);
   const iniPath = path51.join(validatedPath, "platformio.ini");
-  const hasPlatformioIni = fs50.existsSync(iniPath);
+  const hasPlatformioIni = fs51.existsSync(iniPath);
   let iniText = "";
   if (hasPlatformioIni) {
     try {
-      iniText = fs50.readFileSync(iniPath, "utf8");
+      iniText = fs51.readFileSync(iniPath, "utf8");
     } catch {
       iniText = "";
     }
@@ -113483,7 +113685,7 @@ async function agentBuildDiagnose(projectDir, environment, verbose, background) 
   return result;
 }
 function collectPinUsages(projectDir) {
-  const srcFiles = listSourceFiles2(projectDir).map((relPath) => path51.join(projectDir, relPath)).filter((absPath) => fs50.existsSync(absPath));
+  const srcFiles = listSourceFiles2(projectDir).map((relPath) => path51.join(projectDir, relPath)).filter((absPath) => fs51.existsSync(absPath));
   const usages = [];
   const macroMap = /* @__PURE__ */ new Map();
   const defineRegex = /^\s*#define\s+([A-Za-z_][A-Za-z0-9_]*)\s+(\d{1,2})\b/gm;
@@ -113491,7 +113693,7 @@ function collectPinUsages(projectDir) {
   for (const absPath of srcFiles) {
     let text6 = "";
     try {
-      text6 = fs50.readFileSync(absPath, "utf8");
+      text6 = fs51.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
@@ -113503,7 +113705,7 @@ function collectPinUsages(projectDir) {
   for (const absPath of srcFiles) {
     let text6 = "";
     try {
-      text6 = fs50.readFileSync(absPath, "utf8");
+      text6 = fs51.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
@@ -113638,10 +113840,10 @@ async function collectMonitorTail(logPath, timeoutSeconds) {
   let captured = "";
   let monitorSuccess = false;
   while (Date.now() < deadline) {
-    if (fs50.existsSync(logPath)) {
+    if (fs51.existsSync(logPath)) {
       monitorSuccess = true;
       try {
-        const content = fs50.readFileSync(logPath, "utf8");
+        const content = fs51.readFileSync(logPath, "utf8");
         if (content.length < lastKnownLength) {
           lastKnownLength = 0;
         }
@@ -114092,7 +114294,7 @@ init_platformio();
 init_errors2();
 init_process_manager();
 init_paths();
-import fs51 from "node:fs";
+import fs52 from "node:fs";
 init_logger();
 init_events();
 import path52 from "node:path";
@@ -115508,6 +115710,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name: name2 } = request.params;
   const packageCompatibility = name2.startsWith("pio_pkg_");
   const projectCompatibility = [
+    "pio_clean",
     "pio_project_init",
     "pio_project_envs",
     "pio_project_metadata",
@@ -115946,10 +116149,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 hardwareLockManager.releaseLock(status.sessionId);
               }
               try {
-                if (fs51.existsSync(GLOBAL_LOCKS_DIR)) {
-                  for (const file of fs51.readdirSync(GLOBAL_LOCKS_DIR)) {
+                if (fs52.existsSync(GLOBAL_LOCKS_DIR)) {
+                  for (const file of fs52.readdirSync(GLOBAL_LOCKS_DIR)) {
                     if (file.endsWith(".json") || file.endsWith(".lock")) {
-                      fs51.unlinkSync(path52.join(GLOBAL_LOCKS_DIR, file));
+                      fs52.unlinkSync(path52.join(GLOBAL_LOCKS_DIR, file));
                     }
                   }
                 }

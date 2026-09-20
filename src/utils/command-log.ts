@@ -8,7 +8,7 @@ import { PlatformIOError } from "./errors.js";
 
 /** Persist completed authorized-operation output without caller-controlled filenames or overwrite. */
 export async function retainCommandLog(
-  purpose: "initialization" | "program-size",
+  purpose: "initialization" | "program-size" | "clean",
   stdout: string,
   stderr: string,
 ): Promise<string> {
