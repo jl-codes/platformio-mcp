@@ -295,6 +295,8 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
 
 /** Implemented internal service actions; these are not advertised as MCP tools. */
 export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  coredump_inspect: { ...READ, policyAction: "get_project_config" },
+  coredump_analyze: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
   esp_flash_read: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
   esp_flash_read_command: { ...MCP_ACTIONS.upload_firmware, policyAction: "run_shell_command", riskLevel: "critical", openWorld: true },
   debugger_inspect: { ...READ, policyAction: "query_logs" },
@@ -468,3 +470,5 @@ export function policyNamesForOperation(name: string): string[] {
   }
   throw new Error(`Cyclic policy mapping for ${name}`);
 }
+
+

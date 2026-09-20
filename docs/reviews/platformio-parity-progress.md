@@ -1132,3 +1132,8 @@ Ran the actual esp-coredump 1.10.0 file converter on official v1.10.0 ESP32, ESP
 
 Added trusted-root debugger resolution and a fixed fail-fast command file disabling auto-load, target function calls and automatic shared-library loading before loading the stable ELF and converted core. DEBUGINFOD_URLS is cleared for offline symbol lookup. GDB command-file fail-fast behavior was checked against https://sourceware.org/gdb/current/onlinedocs/gdb.html/Command-Files.html. Real installed RISC-V GDB validation on the official C3 fixture returned five backtrace frames and 32 registers; reason remains null and stderr presence is disclosed. Compatibility fixes handle absent debuginfod commands in older GDB and its core-file filename parsing. Results recorded in esp-coredump-debugger-result.json. Lint and TypeScript passed; physical acceptance, complete reference report projection, public integration and broader debugger versions remain unfinished.
 
+
+### Core-dump shared authorization handler
+
+Added explicit server-environment Python/GDB selection, rejecting project-owned Python and reusing trusted debugger root validation. Added strict offline requests with separate artifact-read and critical host-execution preflights before grant consumption. Read-only inspection returns identities, never raw dump bytes. Three host-selection and three real policy cases passed after correcting the test enrollment store to sit outside its project; lint and TypeScript passed. The handler remains internal pending MCP/CLI registration; device acquisition and reference adapter remain unfinished.
+
