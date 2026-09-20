@@ -81856,7 +81856,7 @@ var require_websocket2 = __commonJS({
     var EventEmitter3 = __require("events");
     var https = __require("https");
     var http = __require("http");
-    var net = __require("net");
+    var net2 = __require("net");
     var tls = __require("tls");
     var { randomBytes, createHash: createHash17 } = __require("crypto");
     var { Duplex, Readable } = __require("stream");
@@ -82600,12 +82600,12 @@ var require_websocket2 = __commonJS({
     }
     function netConnect(options) {
       options.path = options.socketPath;
-      return net.connect(options);
+      return net2.connect(options);
     }
     function tlsConnect(options) {
       options.path = void 0;
       if (!options.servername && options.servername !== "") {
-        options.servername = net.isIP(options.host) ? "" : options.host;
+        options.servername = net2.isIP(options.host) ? "" : options.host;
       }
       return tls.connect(options);
     }
@@ -104693,6 +104693,94 @@ var DebugPreparationCache = class {
   }
 };
 
+// src/core/debug/debug-endpoint-custody.ts
+init_device_lease();
+init_errors2();
+import net from "node:net";
+async function assertDebugEndpointAvailable(port) {
+  const server2 = net.createServer((socket) => socket.destroy());
+  await new Promise((resolve, reject) => {
+    server2.once(
+      "error",
+      (error2) => reject(
+        new PlatformIOError(
+          "The configured local debugger endpoint is unavailable.",
+          "DEBUG_ENDPOINT_BUSY",
+          { port, reason: error2.code }
+        )
+      )
+    );
+    server2.listen({ host: "127.0.0.1", port, exclusive: true }, () => {
+      server2.close((error2) => error2 ? reject(error2) : resolve());
+    });
+  });
+}
+var DebugEndpointCustody = class {
+  /** Host-only callbacks obtain physical ownership and supplement real endpoint availability checks in fixtures. */
+  constructor(port, acquireProbe, store = new DeviceLeaseStore(), check2 = assertDebugEndpointAvailable) {
+    this.port = port;
+    this.acquireProbe = acquireProbe;
+    this.store = store;
+    this.check = check2;
+    if (!Number.isInteger(port) || port < 1 || port > 65535)
+      throw new PlatformIOError(
+        "Invalid local debugger port.",
+        "DEBUG_ENDPOINT_UNSUPPORTED"
+      );
+  }
+  port;
+  acquireProbe;
+  store;
+  check;
+  endpointLease;
+  probe;
+  started = false;
+  closed = false;
+  preparing = false;
+  /** Claim the shared endpoint before the probe and recheck the listener immediately before process handoff. */
+  async prepareSpawn() {
+    if (this.started || this.closed)
+      throw new PlatformIOError(
+        "Debugger endpoint custody cannot be reused.",
+        "DEBUG_CUSTODY_REUSED"
+      );
+    this.started = true;
+    this.preparing = true;
+    try {
+      this.endpointLease = this.store.acquire({
+        kind: "network",
+        identity: `debug-tcp:127.0.0.1:${this.port}`
+      });
+      await this.check(this.port);
+      this.probe = await this.acquireProbe();
+      await this.probe.prepareSpawn();
+      await this.check(this.port);
+      this.store.beginHandoff(this.endpointLease);
+    } finally {
+      this.preparing = false;
+    }
+  }
+  /** Call only after no child started or both owned descendant groups have closed; failed release stays retryable. */
+  releaseAfterExit() {
+    if (this.preparing)
+      throw new PlatformIOError(
+        "Debugger startup is still acquiring custody.",
+        "DEVICE_CLEANUP_PENDING",
+        { cleanupPending: true }
+      );
+    this.closed = true;
+    if (this.probe) {
+      this.probe.releaseAfterExit();
+      this.probe = void 0;
+    }
+    if (this.endpointLease) {
+      this.store.cancelHandoff(this.endpointLease);
+      this.store.release(this.endpointLease);
+      this.endpointLease = void 0;
+    }
+  }
+};
+
 // src/core/debug/debug-local-startup.ts
 init_errors2();
 
@@ -106834,24 +106922,29 @@ async function startLocalPreparedDebugger(sessions, input, caller = {}) {
           );
         acquired = true;
         let cached2 = true;
-        const held = await acquireDebugProbeCustody(
+        const custody = new DebugEndpointCustody(
+          backend.endpoint.port,
           async () => {
-            guard();
-            if (cached2) {
-              cached2 = false;
-              return inventory;
-            }
-            const refreshed = await input.readInventory();
-            guard();
-            return refreshed;
+            const held = await acquireDebugProbeCustody(
+              async () => {
+                guard();
+                if (cached2) {
+                  cached2 = false;
+                  return inventory;
+                }
+                const refreshed = await input.readInventory();
+                guard();
+                return refreshed;
+              },
+              selected.probe,
+              input.leaseStore
+            );
+            return held.custody;
           },
-          selected.probe,
-          input.leaseStore
+          input.leaseStore,
+          input.checkEndpoint
         );
-        return {
-          custody: held.custody,
-          confirmProbeReleased: input.confirmProbeReleased
-        };
+        return { custody, confirmProbeReleased: input.confirmProbeReleased };
       }
     },
     caller

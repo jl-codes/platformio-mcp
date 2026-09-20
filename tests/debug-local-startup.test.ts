@@ -59,6 +59,7 @@ function fixture() {
     confirmProbeReleased: vi.fn(async () => true),
     timeoutMs: 1000,
     leaseStore: store,
+    checkEndpoint: vi.fn(async () => {}),
   } as unknown as LocalDebuggerStartup;
   vi.mocked(prepareLocalDebugBackend).mockResolvedValue({
     options: {
@@ -80,8 +81,9 @@ it("defers custody until startup requests it and refreshes discovery only at han
       expect(selection.probeIdentity).toContain(probe.serialNumber);
       expect(selection.initialization?.template).toBe("monitor reset halt\n");
       const owned = await selection.acquireCustody();
-      expect(store.status(resource).status).toBe("owned");
+      expect(store.status(resource).status).toBe("unclaimed");
       await owned.custody.prepareSpawn();
+      expect(store.status(resource).status).toBe("unknown");
       expect(input.readInventory).toHaveBeenCalledTimes(2);
       expect(owned.confirmProbeReleased).toBe(input.confirmProbeReleased);
       owned.custody.releaseAfterExit();

@@ -1,4 +1,8 @@
 /** Join prepared firmware, authorized USB inventory and connection-owned debugger startup. */
+import {
+  DebugEndpointCustody,
+  type assertDebugEndpointAvailable,
+} from "./debug-endpoint-custody.js";
 import { PlatformIOError } from "../../utils/errors.js";
 import type { PolicyEvaluationContext } from "../policy/types.js";
 import { createPolicyRevisionGuard } from "../policy/revision-guard.js";
@@ -27,6 +31,7 @@ export interface LocalDebuggerStartup {
   backendHostApprovalId?: string;
   backendTargetApprovalId?: string;
   leaseStore?: DeviceLeaseStore; // Host/test-owned store only.
+  checkEndpoint?: typeof assertDebugEndpointAvailable; // Host/test capability, never a request argument.
 }
 
 /** Read once for selection and once at handoff; defer lease allocation until startup preflight succeeds. */
@@ -84,24 +89,29 @@ export async function startLocalPreparedDebugger(
           );
         acquired = true;
         let cached = true;
-        const held = await acquireDebugProbeCustody(
+        const custody = new DebugEndpointCustody(
+          backend.endpoint.port,
           async () => {
-            guard();
-            if (cached) {
-              cached = false;
-              return inventory;
-            }
-            const refreshed = await input.readInventory();
-            guard();
-            return refreshed;
+            const held = await acquireDebugProbeCustody(
+              async () => {
+                guard();
+                if (cached) {
+                  cached = false;
+                  return inventory;
+                }
+                const refreshed = await input.readInventory();
+                guard();
+                return refreshed;
+              },
+              selected.probe,
+              input.leaseStore,
+            );
+            return held.custody;
           },
-          selected.probe,
           input.leaseStore,
+          input.checkEndpoint,
         );
-        return {
-          custody: held.custody,
-          confirmProbeReleased: input.confirmProbeReleased,
-        };
+        return { custody, confirmProbeReleased: input.confirmProbeReleased };
       },
     },
     caller,
