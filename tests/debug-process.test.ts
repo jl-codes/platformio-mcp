@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import type { spawn } from "node:child_process";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
+import { DebugClientSessions } from "../src/core/debug/debug-client-sessions.js";
 import { DebugProcess } from "../src/core/debug/debug-process.js";
 let project: string;
 let install: string;
@@ -172,5 +173,24 @@ it("rejects project executables before spawn and releases unused custody", async
   });
   expect(f.launch).not.toHaveBeenCalled();
   expect(f.custody.prepareSpawn).not.toHaveBeenCalled();
+  expect(f.custody.releaseAfterExit).toHaveBeenCalledOnce();
+});
+
+it("keeps a failed initializer reachable for later probe cleanup", async () => {
+  const f = fixture(true);
+  f.confirmProbeReleased.mockResolvedValue(false);
+  const client = new DebugClientSessions();
+  await expect(
+    client.start(project, "native", () => DebugProcess.start(f.options)),
+  ).rejects.toMatchObject({
+    code: "GDB_START_FAILED",
+    context: { cleanupPending: true },
+  });
+  const [session] = client.list();
+  expect(session).toMatchObject({ closed: true, cleanupPending: true });
+  expect(f.custody.releaseAfterExit).not.toHaveBeenCalled();
+  f.confirmProbeReleased.mockResolvedValue(true);
+  await client.stop(session.session_id);
+  expect(client.list()).toEqual([]);
   expect(f.custody.releaseAfterExit).toHaveBeenCalledOnce();
 });

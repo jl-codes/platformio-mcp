@@ -1,4 +1,5 @@
 /** Per-connection debugger ownership, bounded startup capacity and retryable probe cleanup. */
+import { DebugStartupFailure } from "./debug-start-failure.js";
 import { randomUUID } from "node:crypto";
 import { PlatformIOError } from "../../utils/errors.js";
 import type { PolicyEvaluationContext } from "../policy/types.js";
@@ -28,7 +29,7 @@ export class DebugClientSessions {
   async start(
     projectDir: string,
     environment: string,
-    launch: () => Promise<OwnedDebugProcess>,
+    launch: (sessionId: string) => Promise<OwnedDebugProcess>,
   ): Promise<string> {
     if (this.closed)
       throw new PlatformIOError(
@@ -41,11 +42,11 @@ export class DebugClientSessions {
         "DEBUG_SESSION_LIMIT",
       );
     // Defer launch until its promise is tracked, including synchronous launch failures.
-    const pending = Promise.resolve().then(launch);
+    const id = randomUUID();
+    const pending = Promise.resolve().then(() => launch(id));
     this.starting.add(pending);
     try {
       const process = await pending;
-      const id = randomUUID();
       this.sessions.set(id, { process, projectDir, environment });
       if (this.closed) {
         await this.stop(id);
@@ -55,6 +56,20 @@ export class DebugClientSessions {
         );
       }
       return id;
+    } catch (error) {
+      if (error instanceof DebugStartupFailure) {
+        this.sessions.set(id, {
+          process: error.cleanupOwner(),
+          projectDir,
+          environment,
+        });
+        throw new PlatformIOError(
+          "Debugger startup failed; retry cleanup for the retained session.",
+          "GDB_START_FAILED",
+          { sessionId: id, cleanupPending: true },
+        );
+      }
+      throw error;
     } finally {
       this.starting.delete(pending);
     }

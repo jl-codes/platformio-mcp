@@ -1233,3 +1233,7 @@ Added selected-environment debugger metadata collection using the existing build
 ### Persistent debugger ELF ownership
 
 Added workspace-contained, hash-verified ELF retention in owner-private storage for persistent sessions. The retained bytes survive project rebuilds. A process wrapper releases the snapshot only after confirmed process/probe cleanup; cleanup failure preserves the artifact for retry. Three real filesystem/lifecycle cases passed on Windows, including outside-workspace rejection and expected-hash mismatch; TypeScript and lint passed. Startup orchestration and physical debugger acceptance remain unfinished.
+
+### Failed debugger startup custody retention
+
+Initialization failures with unconfirmed probe cleanup now carry an internal, non-serialized process capability. The connection registry retains that process under its preallocated session ID and returns bounded cleanup-pending diagnostics, allowing later stop/disconnect retries. Startup factories receive the ID before launch for subsequent authorization binding. Thirteen focused lifecycle/process cases passed, including failed MI initialization followed by successful later probe cleanup; TypeScript and lint passed. Public startup orchestration remains incomplete.

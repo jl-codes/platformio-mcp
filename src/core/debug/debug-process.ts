@@ -2,6 +2,7 @@
  * Own a GDB child, MI pipes and cleanup without confusing process exit with probe release.
  * Public adapters must authorize startup and resolve trusted executable/artifact/custody inputs.
  */
+import { DebugStartupFailure } from "./debug-start-failure.js";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
@@ -138,6 +139,7 @@ export class DebugProcess {
       return owner;
     } catch (error) {
       await owner.cleanupProcess().catch(() => {});
+      if (!owner.released) throw new DebugStartupFailure(owner);
       throw new PlatformIOError(
         error instanceof Error ? error.message : "Debugger startup failed.",
         "GDB_START_FAILED",
