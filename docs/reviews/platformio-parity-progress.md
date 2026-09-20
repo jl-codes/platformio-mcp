@@ -871,3 +871,8 @@ The launcher exposes minimum severity, source pattern, configured analyzer and d
 
 The existing test runner now accepts trusted inclusion/exclusion globs, separate upload/build switches, upload port, verbose output, report destination, timeout and completed-result callback. Compile-only/build-only still force both --without-uploading and --without-testing and omit upload-port selection; contradictory skip-building requests fail before execution. Outside build-only, without-uploading does not incorrectly imply that hardware is untouched. Existing defaults remain unchanged, and typed process custody errors survive the wrapper. TypeScript and ten focused mocked execution-mode checks passed; plugin rebuilt. Public pio_test routing, owned report lifecycle/per-case parsing, explicit device selection/lease coordination and native/hardware acceptance remain pending. No publication occurred.
 
+
+### Per-case test report parser
+
+Added a bounded parser for PlatformIO JSON test reports, retaining suite/environment/status/duration and case name/status/message-or-exception/source location. It rejects malformed/incomplete reports, unfinished case statuses and aggregate counters inconsistent with case evidence rather than declaring a false pass. Explicit zero-case reports retain zero cases. TypeScript and three focused parser checks passed. The stricter completeness rules require confirmation against native real reports before acceptance; report lifecycle and public adapter wiring remain pending. Parser is not yet reachable from the shipped runtime, so no unnecessary plugin rebuild was performed. No publication occurred.
+
