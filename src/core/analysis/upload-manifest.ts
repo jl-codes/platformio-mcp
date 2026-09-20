@@ -56,9 +56,29 @@ export type UploadManifestInput = z.input<typeof InputSchema>;
 export async function captureUploadManifest(
   input: UploadManifestInput,
   archiveRoot = path.join(SERVER_DATA_DIR, "artifacts", "upload"),
+  trustedImageRoots: readonly string[] = [], // Host-verified registered package roots, never MCP arguments.
 ) {
   const args = InputSchema.parse(input);
+  const selectedRoots = [...trustedImageRoots];
+  if (
+    selectedRoots.length > 128 ||
+    selectedRoots.some((root) => !path.isAbsolute(root))
+  )
+    throw new PlatformIOError(
+      "Invalid trusted upload image roots.",
+      "UPLOAD_MANIFEST_INVALID",
+    );
   const projectDir = await fs.realpath(args.projectDir);
+  const imageRoots = [projectDir];
+  for (const selected of selectedRoots) {
+    const root = await fs.realpath(selected);
+    if (!(await fs.stat(root)).isDirectory())
+      throw new PlatformIOError(
+        "Upload image root must be a directory.",
+        "UPLOAD_MANIFEST_INVALID",
+      );
+    imageRoots.push(root);
+  }
   const privateRoot = await fs.realpath(await createPrivateAnalysisDirectory());
   try {
     const elfSource = await readPartitionArtifact(
@@ -98,9 +118,25 @@ export async function captureUploadManifest(
     for (const selected of [...args.images].sort(
       (a, b) => a.offset - b.offset,
     )) {
+      const sourcePath = await fs.realpath(
+        path.resolve(projectDir, selected.path),
+      );
+      const sourceRoot = imageRoots.find((root) => {
+        const relative = path.relative(root, sourcePath);
+        return (
+          relative !== ".." &&
+          !relative.startsWith(".." + path.sep) &&
+          !path.isAbsolute(relative)
+        );
+      });
+      if (!sourceRoot)
+        throw new PlatformIOError(
+          "Upload image is outside the project and trusted packages.",
+          "PARTITION_ARTIFACT_OUTSIDE_WORKSPACE",
+        );
       const image = await retainOtaImage(
-        projectDir,
-        selected.path,
+        sourceRoot,
+        sourcePath,
         selected.sha256,
         path.join(archiveRoot, "images"),
       );

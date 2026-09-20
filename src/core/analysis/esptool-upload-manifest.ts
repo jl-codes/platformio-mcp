@@ -20,7 +20,9 @@ export async function captureEspUploadManifest(
   input: UploadManifestInput,
   expandedArgv: readonly string[],
   archiveRoot?: string,
+  trustedImageRoots: readonly string[] = [],
 ) {
+  const roots = [...trustedImageRoots];
   const argv = [...expandedArgv];
   const operands = parseEspUploadImageOperands(argv);
   const selected = {
@@ -64,6 +66,7 @@ export async function captureEspUploadManifest(
   const retained = await captureUploadManifest(
     { ...selected, uploadCommandSha256: commandSha256 },
     archiveRoot,
+    roots,
   );
   const manifest = retained.manifest;
   const rewritten = substituteEspUploadImages(

@@ -161,3 +161,18 @@ it("rejects a final uploader operand omitted from or inconsistent with the manif
     captureEspUploadManifest(input, argv, archive),
   ).rejects.toMatchObject({ code: "UPLOAD_MANIFEST_INVALID" });
 });
+
+it("allows external boot images only under explicitly trusted package roots", async () => {
+  const packageRoot = path.join(root, "registered-package");
+  await fs.mkdir(packageRoot);
+  const external = path.join(packageRoot, "boot.bin");
+  await fs.copyFile(input.images[1].path, external);
+  input.images[1].path = external;
+  await expect(captureUploadManifest(input, archive)).rejects.toMatchObject({
+    code: "PARTITION_ARTIFACT_OUTSIDE_WORKSPACE",
+  });
+  const saved = await captureUploadManifest(input, archive, [packageRoot]);
+  expect(saved.manifest.images[0].sourcePath).toBe(await fs.realpath(external));
+  await fs.rm(packageRoot, { recursive: true });
+  await saved.verify();
+});
