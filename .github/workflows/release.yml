@@ -53,9 +53,48 @@ jobs:
           path: python-release-artifacts
           if-no-files-found: error
 
+  accept_python:
+    name: Install Python wheels (${{ matrix.host }})
+    needs: build_python
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: win32-x64
+            runner: windows-2022
+          - host: darwin-arm64
+            runner: macos-14
+          - host: darwin-x64
+            runner: macos-15-intel
+          - host: linux-arm64
+            runner: ubuntu-24.04-arm
+          - host: linux-x64
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - name: Download this run's complete wheel set
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ github.run_id }}" --name platformio-python-release --dir python-release-artifacts
+      - name: Verify native installation and functional aliases
+        run: python scripts/accept-python-host.py python-release-artifacts "${{ matrix.host }}" "python-host-evidence/${{ matrix.host }}.json"
+      - name: Retain artifact-bound native acceptance
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-host-${{ matrix.host }}
+          path: python-host-evidence
+          if-no-files-found: error
+
   build_release:
     name: Build release artifacts
-    needs: build_python
+    needs: [build_python, accept_python]
     runs-on: ubuntu-latest
 
     steps:
@@ -129,7 +168,9 @@ jobs:
       - name: Collect validated Python wheels from this run
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download "$GITHUB_RUN_ID" --name platformio-python-release --dir release-artifacts
+        run: |
+          gh run download "$GITHUB_RUN_ID" --name platformio-python-release --dir release-artifacts
+          gh run download "$GITHUB_RUN_ID" --pattern 'python-host-*' --dir release-artifacts/python-host-evidence
 
       - name: Verify npm release identities before publication
         if: inputs.publish_npm

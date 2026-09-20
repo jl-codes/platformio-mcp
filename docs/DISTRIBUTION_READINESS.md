@@ -54,3 +54,10 @@ Namespace audits now reuse bounded cached observations from the output file, enf
 ## Maintainer-enabled namespace audit
 
 The Namespace audit workflow can be run manually. Weekly lookups are disabled unless the repository variable `NAMESPACE_AUDIT_ENABLED` is `true`. It restores the prior observation cache, performs bounded read-only lookups, saves the new evidence before reporting changes, and retains an artifact. New third-party/blocked/unknown states, repository or maintainer changes, and same-version integrity changes fail the reporting step for maintainer review. Routine version changes and unchanged observations do not fail it. No package installation, owner contact, claim or publication occurs. Release builds also retain current observations. The schedule has not been enabled or exercised by this work.
+
+
+### Native Python release gate
+
+The release workflow now requires local-wheel installation on Windows x64, macOS arm64/x64 and Linux arm64/x64 before its artifact/publication job can proceed. Runner labels follow [GitHub's hosted-runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners). Each job validates the complete wheel set against the checked-out source, installs the matching canonical wheel and both exact-version aliases without registry fallback, checks all three commands and both alias modules without global Node on PATH, verifies MCP stdio/EOF behavior, and verifies alias removal preserves the canonical command. Evidence records wheel SHA-256 identities, source commit and actual host details.
+
+This gate is implemented but has not yet run. It does not establish minimum-OS compatibility, signal forwarding, hardware behavior, publisher authority or public-registry installation acceptance. Those remain required separate release evidence.
