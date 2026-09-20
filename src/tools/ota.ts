@@ -1,4 +1,6 @@
 /** Authorized ESP OTA build, immutable image capture, fixed network selection and protocol reporting. */
+import { cleanCompatibilityResult } from "../adapters/clean-compat.js";
+import { redactSecretsInText } from "../core/policy/redact.js";
 import fs from "node:fs/promises";
 import { matchAndRetainOtaElf } from "../core/ota/ota-elf-match.js";
 import path from "node:path";
@@ -103,6 +105,8 @@ export async function executeOtaUpload(
     args.filesystem,
   );
   const auth = args.auth ?? configuration.auth;
+  const redactText = (value: string) =>
+    redactSecretsInText(auth ? value.split(auth).join("[REDACTED]") : value);
   const target = await dispatchAuthorizedAction(
     "list_devices",
     {
@@ -121,6 +125,7 @@ export async function executeOtaUpload(
   return hardwareLockManager.withImplicitLock(async () => {
     guard();
     let buildResult: Awaited<ReturnType<typeof buildTarget>> | undefined;
+    let buildReport: ReturnType<typeof cleanCompatibilityResult> | undefined;
     if (args.build)
       buildResult = await dispatchAuthorizedAction(
         "target_build",
@@ -140,11 +145,35 @@ export async function executeOtaUpload(
             args.filesystem ? "buildfs" : "buildprog",
             configuration.environment,
             false,
+            {
+              onResult: async (result) => {
+                guard();
+                const output = redactText(result.finalOutput);
+                buildReport = cleanCompatibilityResult(
+                  {
+                    exitCode: result.exitCode,
+                    output,
+                    logPath: result.fullLogPath ?? "",
+                  },
+                  configuration.environment,
+                  (performance.now() - started) / 1000,
+                  false,
+                  "build",
+                );
+              },
+            },
           );
         },
       );
+    // Preserve legacy build fields while preventing the selected credential from escaping through diagnostics.
+    if (buildResult)
+      buildResult = JSON.parse(
+        JSON.stringify(buildResult),
+        (_key, value: unknown) =>
+          typeof value === "string" ? redactText(value) : value,
+      ) as typeof buildResult;
     guard();
-    if (buildResult && !buildResult.success)
+    if (buildResult && (!buildResult.success || buildReport?.ok === false))
       return {
         ok: false,
         error: "build_failed",
@@ -152,6 +181,16 @@ export async function executeOtaUpload(
         build: buildResult,
         host: args.host,
         env: configuration.environment,
+        port: target.port,
+        target_host: target.address,
+        platform_family: configuration.family,
+        filesystem: args.filesystem,
+        memory: buildReport?.memory ?? {},
+        errors: buildReport?.errors.slice(0, 20) ?? [],
+        exit_code: buildReport?.exit_code ?? null,
+        output_tail: buildReport?.output_tail ?? "",
+        log_path: buildReport?.log_path || null,
+        duration_s: (performance.now() - started) / 1000,
         runtime_verified: false,
       };
     const tools = await dispatchAuthorizedAction(
@@ -287,7 +326,14 @@ export async function executeOtaUpload(
         duration_s: (performance.now() - started) / 1000,
         exit_code: result.exitCode,
         log_path: logPath,
-        output_tail: output.slice(-16000),
+        output_tail: output
+          .replace(/\r\n?/g, "\n")
+          .split("\n")
+          .slice(-40)
+          .join("\n")
+          .slice(-16000),
+        memory: buildReport?.memory ?? {},
+        errors: buildReport?.errors.slice(0, 20) ?? [],
         build: buildResult ?? null,
       };
     } catch (error) {

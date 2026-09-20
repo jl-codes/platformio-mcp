@@ -82,7 +82,13 @@ it("builds without uploading, snapshots the selected image and reports transfer 
     host: "192.0.2.8",
     auth: "private",
   });
-  expect(mocks.build).toHaveBeenCalledWith(project, "buildprog", "esp", false);
+  expect(mocks.build).toHaveBeenCalledWith(
+    project,
+    "buildprog",
+    "esp",
+    false,
+    expect.objectContaining({ onResult: expect.any(Function) }),
+  );
   expect(result).toMatchObject({
     ok: true,
     target_host: "192.0.2.8",
@@ -136,7 +142,13 @@ it("builds and selects the configured filesystem image", async () => {
       filesystem: true,
     }),
   ).toMatchObject({ ok: true, filesystem: true });
-  expect(mocks.build).toHaveBeenCalledWith(project, "buildfs", "esp", false);
+  expect(mocks.build).toHaveBeenCalledWith(
+    project,
+    "buildfs",
+    "esp",
+    false,
+    expect.objectContaining({ onResult: expect.any(Function) }),
+  );
   expect(mocks.transfer.mock.calls[0][0].filesystem).toBe(true);
 });
 
@@ -173,4 +185,63 @@ it("rejects a mismatched explicit ELF before transferring recognized firmware", 
     }),
   ).rejects.toMatchObject({ code: "OTA_ELF_MISMATCH" });
   expect(mocks.transfer).not.toHaveBeenCalled();
+});
+
+it("reports build memory and errors and rejects failure markers before OTA", async () => {
+  mocks.build.mockImplementationOnce(
+    async (_project, _target, _env, _verbose, options) => {
+      await options.onResult({
+        exitCode: 0,
+        fullLogPath: "build.log",
+        finalOutput:
+          "src/main.cpp:12:3: error: invalid private-token\nRAM: [= ] 10.0% (used 10 bytes from 100 bytes)\n========================= [FAILED] Took 1.00 seconds =========================",
+      });
+      return {
+        success: true,
+        output: "private-token",
+        errors: ["private-token"],
+      };
+    },
+  );
+  const result = await executeOtaUpload({
+    projectDir: project,
+    host: "192.0.2.8",
+    auth: "private-token",
+  });
+  expect(result).toMatchObject({
+    ok: false,
+    error: "build_failed",
+    memory: { ram: { used_bytes: 10, total_bytes: 100 } },
+    errors: [{ file: "src/main.cpp", line: 12, column: 3 }],
+    log_path: "build.log",
+  });
+  expect(JSON.stringify(result)).not.toContain("private-token");
+  expect(mocks.transfer).not.toHaveBeenCalled();
+});
+it("preserves memory on successful OTA and bounds the uploader tail to forty lines", async () => {
+  mocks.build.mockImplementationOnce(
+    async (_project, _target, _env, _verbose, options) => {
+      await options.onResult({
+        exitCode: 0,
+        fullLogPath: "build.log",
+        finalOutput: "Flash: [== ] 20.0% (used 20 bytes from 100 bytes)",
+      });
+      return { success: true };
+    },
+  );
+  mocks.transfer.mockResolvedValueOnce({
+    exitCode: 0,
+    stdout: "old-line\n".repeat(50) + "[INFO]: Success",
+    stderr: "",
+  });
+  const result = await executeOtaUpload({
+    projectDir: project,
+    host: "192.0.2.8",
+  });
+  expect(result).toMatchObject({
+    ok: true,
+    memory: { flash: { used_bytes: 20, total_bytes: 100 } },
+    errors: [],
+  });
+  expect(result.output_tail.split("\n")).toHaveLength(40);
 });

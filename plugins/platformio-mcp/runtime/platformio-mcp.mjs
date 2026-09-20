@@ -16240,6 +16240,40 @@ var init_projects = __esm({
   }
 });
 
+// src/core/devices/process-device-custody.ts
+function acquireProcessDeviceCustody(port, dependencies = {}) {
+  const store = dependencies.store ?? new DeviceLeaseStore();
+  const endpoint = (dependencies.resolve ?? resolveSerialEndpoint)(port);
+  const lease = store.acquire(endpoint.resource);
+  return {
+    revalidateSpawn: () => endpoint.revalidate(),
+    prepareSpawn() {
+      endpoint.revalidate();
+      store.beginHandoff(lease);
+    },
+    releaseAfterExit() {
+      try {
+        store.cancelHandoff(lease);
+        store.release(lease);
+      } catch (error2) {
+        throw new PlatformIOError(
+          error2 instanceof Error ? error2.message : "Device lease cleanup failed.",
+          "DEVICE_CLEANUP_PENDING",
+          { cleanupPending: true }
+        );
+      }
+    }
+  };
+}
+var init_process_device_custody = __esm({
+  "src/core/devices/process-device-custody.ts"() {
+    "use strict";
+    init_errors2();
+    init_device_lease();
+    init_serial_endpoint();
+  }
+});
+
 // src/utils/owned-process-wait.ts
 function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3, cancellation) {
   return new Promise((resolve, reject) => {
@@ -16328,40 +16362,6 @@ var init_owned_process_wait = __esm({
   "src/utils/owned-process-wait.ts"() {
     "use strict";
     init_errors2();
-  }
-});
-
-// src/core/devices/process-device-custody.ts
-function acquireProcessDeviceCustody(port, dependencies = {}) {
-  const store = dependencies.store ?? new DeviceLeaseStore();
-  const endpoint = (dependencies.resolve ?? resolveSerialEndpoint)(port);
-  const lease = store.acquire(endpoint.resource);
-  return {
-    revalidateSpawn: () => endpoint.revalidate(),
-    prepareSpawn() {
-      endpoint.revalidate();
-      store.beginHandoff(lease);
-    },
-    releaseAfterExit() {
-      try {
-        store.cancelHandoff(lease);
-        store.release(lease);
-      } catch (error2) {
-        throw new PlatformIOError(
-          error2 instanceof Error ? error2.message : "Device lease cleanup failed.",
-          "DEVICE_CLEANUP_PENDING",
-          { cleanupPending: true }
-        );
-      }
-    }
-  };
-}
-var init_process_device_custody = __esm({
-  "src/core/devices/process-device-custody.ts"() {
-    "use strict";
-    init_errors2();
-    init_device_lease();
-    init_serial_endpoint();
   }
 });
 
@@ -16476,16 +16476,16 @@ var require_tree_kill = __commonJS({
 });
 
 // src/utils/logger.ts
-import fs51 from "node:fs";
-import path65 from "node:path";
+import fs47 from "node:fs";
+import path59 from "node:path";
 async function logDiagnostic(msg, _projectDir) {
   ensureGlobalDirs();
-  const diagLog = path65.join(SERVER_DATA_DIR, "server.log");
+  const diagLog = path59.join(SERVER_DATA_DIR, "server.log");
   const timestamp = (/* @__PURE__ */ new Date()).toISOString();
   const line = `[${timestamp}] ${msg}
 `;
   try {
-    await fs51.promises.appendFile(diagLog, line);
+    await fs47.promises.appendFile(diagLog, line);
   } catch {
   }
   console.error(msg);
@@ -16498,59 +16498,59 @@ var init_logger = __esm({
 });
 
 // src/utils/process-manager.ts
-import fs52 from "node:fs";
+import fs48 from "node:fs";
 import { setTimeout as delay6 } from "node:timers/promises";
 import os9 from "node:os";
-import path66 from "node:path";
+import path60 from "node:path";
 import { execSync as execSync2 } from "node:child_process";
 import crypto12 from "node:crypto";
 function getPidsFilePath(projectDir, file = SERIAL_PIDS_FILE) {
   if (file === SERIAL_PIDS_FILE) {
     ensureGlobalDirs();
-    const dir = path66.join(SERVER_DATA_DIR, "serial_monitors");
-    if (!fs52.existsSync(dir)) fs52.mkdirSync(dir, { recursive: true });
-    return path66.join(dir, file);
+    const dir = path60.join(SERVER_DATA_DIR, "serial_monitors");
+    if (!fs48.existsSync(dir)) fs48.mkdirSync(dir, { recursive: true });
+    return path60.join(dir, file);
   } else if (file === BUILD_PIDS_FILE) {
     const baseDir2 = projectDir || SERVER_DATA_DIR;
     if (!projectDir) ensureGlobalDirs();
-    const dir = path66.join(baseDir2, WORKSPACE_DIR2, "tasks");
-    if (!fs52.existsSync(dir)) fs52.mkdirSync(dir, { recursive: true });
-    return path66.join(dir, file);
+    const dir = path60.join(baseDir2, WORKSPACE_DIR2, "tasks");
+    if (!fs48.existsSync(dir)) fs48.mkdirSync(dir, { recursive: true });
+    return path60.join(dir, file);
   }
   const baseDir = projectDir || SERVER_DATA_DIR;
   if (!projectDir) ensureGlobalDirs();
-  return path66.join(baseDir, WORKSPACE_DIR2, LOCKS_DIR, file);
+  return path60.join(baseDir, WORKSPACE_DIR2, LOCKS_DIR, file);
 }
 function readMonitorIdentities(pidsFile) {
   const file = pidsFile + ".identities.json";
-  if (!fs52.existsSync(file)) return {};
-  if (fs52.statSync(file).size > 1024 * 1024)
+  if (!fs48.existsSync(file)) return {};
+  if (fs48.statSync(file).size > 1024 * 1024)
     throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
-  const value2 = JSON.parse(fs52.readFileSync(file, "utf8"));
+  const value2 = JSON.parse(fs48.readFileSync(file, "utf8"));
   if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
     throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
   return value2;
 }
 async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFile, taskId, commandDesc) {
   const pidsFile = getPidsFilePath(projectDir);
-  const dir = path66.dirname(pidsFile);
-  if (!fs52.existsSync(dir)) fs52.mkdirSync(dir, { recursive: true });
-  if (!fs52.existsSync(pidsFile)) fs52.writeFileSync(pidsFile, "{}");
+  const dir = path60.dirname(pidsFile);
+  if (!fs48.existsSync(dir)) fs48.mkdirSync(dir, { recursive: true });
+  if (!fs48.existsSync(pidsFile)) fs48.writeFileSync(pidsFile, "{}");
   try {
     const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let pids = {};
       try {
-        pids = JSON.parse(fs52.readFileSync(pidsFile, "utf8"));
+        pids = JSON.parse(fs48.readFileSync(pidsFile, "utf8"));
       } catch {
       }
       const identities = readMonitorIdentities(pidsFile);
       const observed = inspectProcessIdentity(pid);
       if (observed.status === "running") identities[port] = observed.identity;
       else delete identities[port];
-      fs52.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+      fs48.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
       pids[port] = pid;
-      fs52.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+      fs48.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
     } finally {
       await release();
     }
@@ -16581,17 +16581,17 @@ async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFi
 }
 async function unregisterPioMonitorPid(port, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (fs52.existsSync(pidsFile)) {
+  if (fs48.existsSync(pidsFile)) {
     try {
       const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
       try {
-        const pids = JSON.parse(fs52.readFileSync(pidsFile, "utf8"));
+        const pids = JSON.parse(fs48.readFileSync(pidsFile, "utf8"));
         if (pids[port]) {
           delete pids[port];
           const identities = readMonitorIdentities(pidsFile);
           delete identities[port];
-          fs52.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-          fs52.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+          fs48.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+          fs48.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
         }
       } finally {
         await release();
@@ -16617,11 +16617,11 @@ async function unregisterPioMonitorPid(port, projectDir) {
 }
 async function killPioMonitorByPort(port, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (!fs52.existsSync(pidsFile)) return false;
+  if (!fs48.existsSync(pidsFile)) return false;
   let stoppedPid;
   const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
   try {
-    const pids = JSON.parse(fs52.readFileSync(pidsFile, "utf8"));
+    const pids = JSON.parse(fs48.readFileSync(pidsFile, "utf8"));
     const pid = pids[port];
     if (!pid) return false;
     stoppedPid = pid;
@@ -16645,8 +16645,8 @@ async function killPioMonitorByPort(port, projectDir) {
     delete pids[port];
     const identities = readMonitorIdentities(pidsFile);
     delete identities[port];
-    fs52.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-    fs52.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    fs48.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+    fs48.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
   } finally {
     await release();
   }
@@ -16686,18 +16686,18 @@ function isPidAlive(pid) {
 }
 function getActiveMonitorPids(projectDir) {
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  if (!fs52.existsSync(pidsFile)) return {};
+  if (!fs48.existsSync(pidsFile)) return {};
   try {
-    return JSON.parse(fs52.readFileSync(pidsFile, "utf8"));
+    return JSON.parse(fs48.readFileSync(pidsFile, "utf8"));
   } catch {
     return {};
   }
 }
 function isBuildActive(projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs52.existsSync(pidsFile)) return false;
+  if (!fs48.existsSync(pidsFile)) return false;
   try {
-    const pids = JSON.parse(fs52.readFileSync(pidsFile, "utf8"));
+    const pids = JSON.parse(fs48.readFileSync(pidsFile, "utf8"));
     for (const key of Object.keys(pids)) {
       if (pids[key]?.type === "build" || key === "build") {
         const targetPid = key === "build" ? pids[key] : Number(key);
@@ -16710,19 +16710,19 @@ function isBuildActive(projectDir) {
 }
 async function registerBuildPid(pid, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  const dir = path66.dirname(pidsFile);
-  if (!fs52.existsSync(dir)) fs52.mkdirSync(dir, { recursive: true });
-  if (!fs52.existsSync(pidsFile)) fs52.writeFileSync(pidsFile, "{}");
+  const dir = path60.dirname(pidsFile);
+  if (!fs48.existsSync(dir)) fs48.mkdirSync(dir, { recursive: true });
+  if (!fs48.existsSync(pidsFile)) fs48.writeFileSync(pidsFile, "{}");
   try {
     const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
       let pids = {};
       try {
-        pids = JSON.parse(fs52.readFileSync(pidsFile, "utf8"));
+        pids = JSON.parse(fs48.readFileSync(pidsFile, "utf8"));
       } catch {
       }
       pids[pid.toString()] = { type: "build", started: Date.now() };
-      fs52.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+      fs48.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
     } finally {
       await release();
     }
@@ -16732,11 +16732,11 @@ async function registerBuildPid(pid, projectDir) {
 }
 async function unregisterBuildPid(projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs52.existsSync(pidsFile)) return;
+  if (!fs48.existsSync(pidsFile)) return;
   try {
     const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
     try {
-      const pids = JSON.parse(fs52.readFileSync(pidsFile, "utf8"));
+      const pids = JSON.parse(fs48.readFileSync(pidsFile, "utf8"));
       let changed = false;
       for (const key of Object.keys(pids)) {
         if (pids[key]?.type === "build" || key === "build") {
@@ -16745,7 +16745,7 @@ async function unregisterBuildPid(projectDir) {
         }
       }
       if (changed) {
-        fs52.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+        fs48.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
       }
     } finally {
       await release();
@@ -16756,14 +16756,14 @@ async function unregisterBuildPid(projectDir) {
 }
 async function unregisterBuildPidValue(pid, projectDir) {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
-  if (!fs52.existsSync(pidsFile)) return;
+  if (!fs48.existsSync(pidsFile)) return;
   const release = await import_proper_lockfile5.default.lock(pidsFile, {
     retries: { retries: 5, minTimeout: 50, maxTimeout: 200 }
   });
   try {
-    const pids = JSON.parse(fs52.readFileSync(pidsFile, "utf8"));
+    const pids = JSON.parse(fs48.readFileSync(pidsFile, "utf8"));
     delete pids[String(pid)];
-    fs52.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    fs48.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
   } finally {
     await release();
   }
@@ -16773,9 +16773,9 @@ async function killTrackedTaskProcess(task, projectDir) {
   const monitorPids = getActiveMonitorPids(projectDir);
   const buildPidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
   let buildPids = {};
-  if (fs52.existsSync(buildPidsFile)) {
+  if (fs48.existsSync(buildPidsFile)) {
     try {
-      buildPids = JSON.parse(fs52.readFileSync(buildPidsFile, "utf8"));
+      buildPids = JSON.parse(fs48.readFileSync(buildPidsFile, "utf8"));
     } catch {
       buildPids = {};
     }
@@ -16807,9 +16807,9 @@ async function killAllTrackedProcesses(projectDir) {
   const tasks = [];
   for (const file of [SERIAL_PIDS_FILE, BUILD_PIDS_FILE]) {
     const pidsFile = getPidsFilePath(projectDir, file);
-    if (fs52.existsSync(pidsFile)) {
+    if (fs48.existsSync(pidsFile)) {
       try {
-        const pids = JSON.parse(fs52.readFileSync(pidsFile, "utf8"));
+        const pids = JSON.parse(fs48.readFileSync(pidsFile, "utf8"));
         for (const key of Object.keys(pids)) {
           let targetPid;
           if (file === BUILD_PIDS_FILE) {
@@ -16827,7 +16827,7 @@ async function killAllTrackedProcesses(projectDir) {
             tasks.push(p);
           }
         }
-        fs52.unlinkSync(pidsFile);
+        fs48.unlinkSync(pidsFile);
       } catch {
       }
     }
@@ -16883,16 +16883,16 @@ var init_process_manager = __esm({
 });
 
 // src/utils/tail.ts
-import fs53 from "node:fs";
+import fs49 from "node:fs";
 async function tailFileBounded(filePath, maxBytes = 1024 * 1024) {
-  if (!fs53.existsSync(filePath)) {
+  if (!fs49.existsSync(filePath)) {
     return [];
   }
-  const stat = await fs53.promises.stat(filePath);
+  const stat = await fs49.promises.stat(filePath);
   if (stat.size === 0) return [];
   const sizeToRead = Math.min(stat.size, maxBytes);
   const startPos = stat.size - sizeToRead;
-  const stream = fs53.createReadStream(filePath, { start: startPos, encoding: "utf8" });
+  const stream = fs49.createReadStream(filePath, { start: startPos, encoding: "utf8" });
   let content = "";
   for await (const chunk of stream) {
     content += chunk;
@@ -16906,26 +16906,26 @@ var init_tail = __esm({
 });
 
 // src/utils/spooler.ts
-import fs54 from "node:fs";
-import path67 from "node:path";
+import fs50 from "node:fs";
+import path61 from "node:path";
 import crypto13 from "node:crypto";
 function getLogDir(verb, projectDir) {
   const baseDir = projectDir || SERVER_DATA_DIR;
   if (!projectDir) ensureGlobalDirs();
-  return path67.join(baseDir, WORKSPACE_DIR3, "logs", verb);
+  return path61.join(baseDir, WORKSPACE_DIR3, "logs", verb);
 }
 function rotateLogs(targetDir, prefix, maxHistory = 30) {
-  if (!fs54.existsSync(targetDir)) return;
-  const files = fs54.readdirSync(targetDir).filter((f) => f.startsWith(prefix) && f.endsWith(".log")).map((f) => ({
+  if (!fs50.existsSync(targetDir)) return;
+  const files = fs50.readdirSync(targetDir).filter((f) => f.startsWith(prefix) && f.endsWith(".log")).map((f) => ({
     name: f,
-    path: path67.join(targetDir, f),
-    ctime: fs54.statSync(path67.join(targetDir, f)).ctime.getTime()
+    path: path61.join(targetDir, f),
+    ctime: fs50.statSync(path61.join(targetDir, f)).ctime.getTime()
   })).sort((a, b) => b.ctime - a.ctime);
   if (files.length > maxHistory) {
     const toDelete = files.slice(maxHistory);
     for (const f of toDelete) {
       try {
-        fs54.unlinkSync(f.path);
+        fs50.unlinkSync(f.path);
       } catch {
       }
     }
@@ -16933,33 +16933,33 @@ function rotateLogs(targetDir, prefix, maxHistory = 30) {
 }
 function rotateSpoolerStreams(verb, projectDir) {
   const targetDir = getLogDir(verb, projectDir);
-  if (!fs54.existsSync(targetDir)) {
-    fs54.mkdirSync(targetDir, { recursive: true });
+  if (!fs50.existsSync(targetDir)) {
+    fs50.mkdirSync(targetDir, { recursive: true });
   }
   rotateLogs(targetDir, `${verb}-`, 30);
   const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
   const shortHash = crypto13.randomBytes(4).toString("hex");
-  const logFile = path67.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
-  const latestLog = path67.join(targetDir, `latest-${verb}.log`);
+  const logFile = path61.join(targetDir, `${verb}-${timestamp}-${shortHash}.log`);
+  const latestLog = path61.join(targetDir, `latest-${verb}.log`);
   return { logFile, latestLog };
 }
 function ensureLatestLogPointer(logFile, latestLog) {
   try {
-    if (fs54.existsSync(latestLog)) fs54.unlinkSync(latestLog);
+    if (fs50.existsSync(latestLog)) fs50.unlinkSync(latestLog);
   } catch {
   }
   try {
-    fs54.symlinkSync(logFile, latestLog);
+    fs50.symlinkSync(logFile, latestLog);
     return { mirrorLatest: false };
   } catch {
   }
   try {
-    fs54.linkSync(logFile, latestLog);
+    fs50.linkSync(logFile, latestLog);
     return { mirrorLatest: false };
   } catch {
   }
   try {
-    fs54.writeFileSync(latestLog, "");
+    fs50.writeFileSync(latestLog, "");
     return { mirrorLatest: true };
   } catch {
   }
@@ -16972,7 +16972,7 @@ async function executeWithSpooling(command, args, options) {
   }
   const verb = options.artifactType || "build";
   const { logFile, latestLog } = rotateSpoolerStreams(verb, projectArea);
-  const outFd = fs54.openSync(logFile, "a");
+  const outFd = fs50.openSync(logFile, "a");
   let proc;
   let deviceCustody;
   try {
@@ -16993,7 +16993,7 @@ async function executeWithSpooling(command, args, options) {
     });
   } catch (error2) {
     try {
-      fs54.closeSync(outFd);
+      fs50.closeSync(outFd);
     } catch {
     }
     deviceCustody?.releaseAfterExit();
@@ -17055,7 +17055,7 @@ async function executeWithSpooling(command, args, options) {
       }
     } finally {
       try {
-        fs54.closeSync(outFd);
+        fs50.closeSync(outFd);
       } catch {
       }
     }
@@ -17070,18 +17070,18 @@ async function executeWithSpooling(command, args, options) {
   let watcher = null;
   portalEvents.clearTaskLog(targetProjectArea || "global", taskId, [logFile]);
   try {
-    watcher = fs54.watch(logFile, (eventType) => {
+    watcher = fs50.watch(logFile, (eventType) => {
       if (eventType === "change") {
         try {
-          const stat = fs54.statSync(logFile);
+          const stat = fs50.statSync(logFile);
           if (stat.size > fileOffset) {
-            const stream = fs54.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
+            const stream = fs50.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on("data", (chunk) => {
               const text8 = chunk.toString();
               portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text8);
               if (latestPointer.mirrorLatest) {
                 try {
-                  fs54.appendFileSync(latestLog, text8);
+                  fs50.appendFileSync(latestLog, text8);
                 } catch {
                 }
               }
@@ -17098,25 +17098,25 @@ async function executeWithSpooling(command, args, options) {
   }
   const closeOutput = () => {
     try {
-      fs54.closeSync(outFd);
+      fs50.closeSync(outFd);
     } catch {
     }
     if (watcher) {
       let fd;
       try {
-        const size = fs54.statSync(logFile).size;
+        const size = fs50.statSync(logFile).size;
         if (size > fileOffset) {
           const start = Math.max(fileOffset, size - 512 * 1024);
           const buffer = Buffer.alloc(size - start);
-          fd = fs54.openSync(logFile, "r");
-          const bytes = fs54.readSync(fd, buffer, 0, buffer.length, start);
+          fd = fs50.openSync(logFile, "r");
+          const bytes = fs50.readSync(fd, buffer, 0, buffer.length, start);
           portalEvents.emitTaskLog(targetProjectArea || "global", taskId, buffer.subarray(0, bytes).toString());
         }
       } catch {
       } finally {
         if (fd !== void 0) {
           try {
-            fs54.closeSync(fd);
+            fs50.closeSync(fd);
           } catch {
           }
         }
@@ -17237,18 +17237,18 @@ function spoolLargeDataset(toolName, data, targetDir, threshold2 = 2e3) {
   const stringified = JSON.stringify(data, null, 2);
   if (stringified.length > threshold2) {
     const cacheDir = getLogDir(toolName, targetDir);
-    if (!fs54.existsSync(cacheDir)) {
-      fs54.mkdirSync(cacheDir, { recursive: true });
+    if (!fs50.existsSync(cacheDir)) {
+      fs50.mkdirSync(cacheDir, { recursive: true });
     }
     rotateLogs(cacheDir, `${toolName}-`, 30);
     const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
     const shortHash = crypto13.randomBytes(4).toString("hex");
-    const cacheFile = path67.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
-    const latestFile = path67.join(cacheDir, `latest-${toolName}.json`);
-    fs54.writeFileSync(cacheFile, stringified, "utf-8");
+    const cacheFile = path61.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
+    const latestFile = path61.join(cacheDir, `latest-${toolName}.json`);
+    fs50.writeFileSync(cacheFile, stringified, "utf-8");
     try {
-      if (fs54.existsSync(latestFile)) fs54.unlinkSync(latestFile);
-      fs54.symlinkSync(cacheFile, latestFile);
+      if (fs50.existsSync(latestFile)) fs50.unlinkSync(latestFile);
+      fs50.symlinkSync(cacheFile, latestFile);
     } catch {
     }
     return `Payload too large for context window. Full dataset successfully spooled to disk at ${cacheFile}. Please use your grep_search or view_file tools to query this file.`;
@@ -108139,907 +108139,13 @@ function withDebugCompatibility(base2, canonical3 = false) {
 // src/adapters/ota-compat.ts
 init_zod();
 
-// src/tools/ota.ts
-import fs56 from "node:fs/promises";
-
-// src/core/ota/ota-elf-match.ts
-import fs47 from "node:fs/promises";
-import path58 from "node:path";
-init_errors2();
-async function matchAndRetainOtaElf(projectDir, elfPath, embeddedSha256, archiveRoot) {
-  if (!embeddedSha256 || !/^[a-f0-9]{64}$/.test(embeddedSha256))
-    throw new PlatformIOError(
-      "Selected image has no supported embedded ELF identity.",
-      "OTA_ELF_IDENTITY_UNAVAILABLE"
-    );
-  const project = await fs47.realpath(projectDir);
-  const source = await readPartitionArtifact(
-    project,
-    elfPath,
-    256 * 1024 * 1024
-  );
-  if (source.identity.sha256 !== embeddedSha256)
-    throw new PlatformIOError(
-      "Selected ELF does not match the OTA image's embedded identity.",
-      "OTA_ELF_MISMATCH"
-    );
-  const directory = await createPrivateAnalysisDirectory();
-  try {
-    const snapshot = path58.join(directory, "firmware.elf");
-    await fs47.writeFile(snapshot, source.content, { flag: "wx", mode: 384 });
-    const identity = await readElfIdentity(snapshot, embeddedSha256);
-    if (identity.bits !== 32 || !["xtensa", "riscv"].includes(identity.architecture))
-      throw new PlatformIOError(
-        "Selected ELF is not an ESP32 target image.",
-        "OTA_ELF_TARGET_INVALID"
-      );
-    const archivePath = await retainElfSnapshot(
-      snapshot,
-      embeddedSha256,
-      archiveRoot,
-      source.identity.path
-    );
-    return { ...identity, path: source.identity.path, archivePath };
-  } finally {
-    await fs47.rm(directory, { recursive: true, force: true });
-  }
-}
-
-// src/tools/ota.ts
+// src/adapters/clean-compat.ts
 init_zod();
-init_platformio();
-import path69 from "node:path";
-
-// src/core/ota/ota-options.ts
-init_zod();
-init_errors2();
-import { isIP as isIP4 } from "node:net";
-var OtaUploaderOptionsSchema = external_exports.object({
-  hostAddress: external_exports.string().refine((value2) => isIP4(value2) === 4).optional(),
-  hostPort: external_exports.number().int().min(1).max(65535).optional(),
-  invitationTimeoutSeconds: external_exports.number().int().min(1).max(60).optional()
-}).strict();
-function parseOtaUploaderOptions(flags, filesystem) {
-  const options = {};
-  const keys = {
-    "-I": "hostAddress",
-    "--host_ip": "hostAddress",
-    "-P": "hostPort",
-    "--host_port": "hostPort",
-    "-t": "invitationTimeoutSeconds",
-    "--timeout": "invitationTimeoutSeconds"
-  };
-  for (let index = 0; index < flags.length; index++) {
-    const flag = flags[index];
-    if (["-r", "--progress", "-d", "--debug"].includes(flag)) continue;
-    if (["-s", "--spiffs"].includes(flag)) {
-      if (!filesystem)
-        throw new PlatformIOError(
-          "Configured filesystem mode conflicts with the firmware request.",
-          "OTA_FLAGS_CONFLICT"
-        );
-      continue;
-    }
-    const equals = flag.indexOf("="), name2 = equals < 0 ? flag : flag.slice(0, equals);
-    const key = keys[name2];
-    if (!key)
-      throw new PlatformIOError(
-        "Unsupported OTA flag or attempt to override the bound target/image.",
-        "OTA_FLAGS_UNSUPPORTED"
-      );
-    const value2 = equals < 0 ? flags[++index] : flag.slice(equals + 1);
-    if (value2 === void 0 || Object.hasOwn(options, key) || key !== "hostAddress" && !/^\d+$/.test(value2))
-      throw new PlatformIOError(
-        "Invalid or repeated OTA uploader option.",
-        "OTA_CONFIG_INVALID"
-      );
-    options[key] = key === "hostAddress" ? value2 : Number(value2);
-  }
-  const parsed = OtaUploaderOptionsSchema.safeParse(options);
-  if (!parsed.success)
-    throw new PlatformIOError(
-      "Invalid OTA interface, port or invitation timeout.",
-      "OTA_CONFIG_INVALID"
-    );
-  return parsed.data;
-}
-
-// src/core/ota/ota-configuration.ts
-import path59 from "node:path";
-init_errors2();
-function selectOtaConfiguration(output, projectDir, environment) {
-  const publicView = parseProjectEnvironments(output);
-  const selected = environment ?? publicView.defaultEnvironments[0];
-  if (!selected || !/^[a-zA-Z0-9_-]{1,50}$/.test(selected) || !publicView.envs.some((item) => item.name === selected))
-    throw new PlatformIOError(
-      "Select one valid OTA environment.",
-      "OTA_ENVIRONMENT_INVALID"
-    );
-  const raw = JSON.parse(output);
-  const options = Object.fromEntries(
-    raw.find(([name2]) => name2 === "env:" + selected)[1]
-  );
-  const platform2 = options.platform;
-  const family = typeof platform2 === "string" && platform2.includes("espressif8266") ? "espressif8266" : typeof platform2 === "string" && platform2.includes("espressif32") ? "espressif32" : void 0;
-  if (!family)
-    throw new PlatformIOError(
-      "OTA requires an espressif32 or espressif8266 environment.",
-      "OTA_FAMILY_UNSUPPORTED"
-    );
-  const flagsInput = options.upload_flags;
-  const flags = flagsInput == null ? [] : typeof flagsInput === "string" ? flagsInput.split(/[\s,]+/).filter(Boolean) : Array.isArray(flagsInput) && flagsInput.every((item) => typeof item === "string") ? flagsInput.flatMap((item) => item.split(/\s+/).filter(Boolean)) : void 0;
-  if (!flags || flags.length > 256 || flags.some((item) => item.length > 4096 || /[\x00-\x1f\x7f]/.test(item)))
-    throw new PlatformIOError(
-      "Invalid OTA upload flags.",
-      "OTA_CONFIG_INVALID"
-    );
-  let auth, configuredPort;
-  const otherFlags = [];
-  for (let index = 0; index < flags.length; index++) {
-    const flag = flags[index];
-    const equals = flag.indexOf("=");
-    const name2 = equals < 0 ? flag : flag.slice(0, equals);
-    if (!["-a", "--auth", "-p", "--port"].includes(name2)) {
-      otherFlags.push(flag);
-      continue;
-    }
-    const value2 = equals < 0 ? flags[++index] : flag.slice(equals + 1);
-    if (value2 === void 0 || value2.startsWith("-") || /["']/.test(value2))
-      throw new PlatformIOError(
-        "OTA auth/port flags require an unambiguous value.",
-        "OTA_CONFIG_INVALID"
-      );
-    if (name2 === "-a" || name2 === "--auth") {
-      if (auth !== void 0 || value2.length > 1024)
-        throw new PlatformIOError(
-          "Duplicate or oversized OTA authentication flag.",
-          "OTA_CONFIG_INVALID"
-        );
-      auth = value2;
-    } else {
-      const parsed = Number(value2);
-      if (configuredPort !== void 0 || !/^\d+$/.test(value2) || !Number.isInteger(parsed) || parsed < 1 || parsed > 65535)
-        throw new PlatformIOError(
-          "Invalid or duplicate OTA port flag.",
-          "OTA_CONFIG_INVALID"
-        );
-      configuredPort = parsed;
-    }
-  }
-  const buildDirectory = publicView.platformioSection.build_dir ?? ".pio/build";
-  if (typeof buildDirectory !== "string" || !buildDirectory || /[\x00-\x1f\x7f]/.test(buildDirectory))
-    throw new PlatformIOError(
-      "Invalid OTA build directory.",
-      "OTA_CONFIG_INVALID"
-    );
-  const filesystem = options["board_build.filesystem"];
-  if (filesystem != null && !["spiffs", "littlefs", "fatfs"].includes(String(filesystem)))
-    throw new PlatformIOError(
-      "Select an explicit supported filesystem image.",
-      "OTA_FILESYSTEM_UNSUPPORTED"
-    );
-  return {
-    environment: selected,
-    family,
-    auth,
-    configuredPort: configuredPort ?? (family === "espressif32" ? 3232 : 8266),
-    otherFlags,
-    declaredProtocol: typeof options.upload_protocol === "string" ? options.upload_protocol : null,
-    buildDirectory: path59.resolve(projectDir, buildDirectory, selected),
-    filesystemImage: filesystem == null ? void 0 : String(filesystem) + ".bin"
-  };
-}
-
-// src/core/ota/ota-tools.ts
-import fs48 from "node:fs/promises";
-import path60 from "node:path";
-init_errors2();
-function within4(root, target) {
-  const relative = path60.relative(root, target);
-  return !relative || relative !== ".." && !relative.startsWith(".." + path60.sep) && !path60.isAbsolute(relative);
-}
-async function resolveOtaTools(projectDir, family, systemInfo, environment = process.env) {
-  const fields = systemInfo;
-  const python = environment.PIO_MCP_OTA_PYTHON ?? fields?.python_exe?.value;
-  const core = fields?.core_dir?.value;
-  const packagesInput = environment.PLATFORMIO_PACKAGES_DIR ?? (typeof core === "string" && path60.isAbsolute(core) ? path60.join(core, "packages") : void 0);
-  if (typeof python !== "string" || !path60.isAbsolute(python) || /[\x00-\x1f\x7f]/.test(python) || /\.(?:cmd|bat|ps1|sh)$/i.test(python) || !packagesInput || !path60.isAbsolute(packagesInput))
-    throw new PlatformIOError(
-      "Host Python or registered PlatformIO packages are unavailable; configure PIO_MCP_OTA_PYTHON if needed.",
-      "OTA_TOOLS_UNAVAILABLE"
-    );
-  const project = await fs48.realpath(projectDir), executable = await fs48.realpath(python), packages = await fs48.realpath(packagesInput);
-  if (within4(project, executable) || within4(project, packages) || within4(packages, project) || !(await fs48.stat(executable)).isFile())
-    throw new PlatformIOError(
-      "OTA tools must be installed outside the workspace.",
-      "OTA_TOOLS_UNTRUSTED"
-    );
-  if (!["espressif32", "espressif8266"].includes(family))
-    throw new PlatformIOError(
-      "Unsupported OTA framework family.",
-      "OTA_FAMILY_UNSUPPORTED"
-    );
-  const packageName = "framework-arduino" + family;
-  const root = await fs48.realpath(path60.join(packages, packageName));
-  if (!within4(packages, root) || path60.relative(packages, root).split(path60.sep).length !== 1)
-    throw new PlatformIOError(
-      "OTA framework is outside registered host packages.",
-      "OTA_TOOLS_UNTRUSTED"
-    );
-  const manifest = await readPartitionArtifact(root, "package.json", 65536);
-  const registration = await readPartitionArtifact(root, ".piopm", 65536);
-  let declared, registered;
-  try {
-    declared = JSON.parse(manifest.content.toString("utf8"));
-    registered = JSON.parse(registration.content.toString("utf8"));
-  } catch {
-    throw new PlatformIOError(
-      "Invalid OTA framework registration.",
-      "OTA_TOOLS_UNTRUSTED"
-    );
-  }
-  if (!declared || !registered || declared.name !== packageName || typeof declared.version !== "string" || !declared.version || registered.name !== declared.name || registered.version !== declared.version || registered.type !== "tool")
-    throw new PlatformIOError(
-      "OTA framework registration does not match its manifest.",
-      "OTA_TOOLS_UNTRUSTED"
-    );
-  const script = await readPartitionArtifact(
-    root,
-    "tools/espota.py",
-    1024 * 1024
-  );
-  return Object.freeze({
-    pythonExecutable: executable,
-    uploaderScript: script.identity.path,
-    uploaderSha256: script.identity.sha256,
-    packageName,
-    packageVersion: declared.version
-  });
-}
-
-// src/core/devices/ota-target.ts
-init_errors2();
-init_device_lease();
-import { lookup } from "node:dns/promises";
-import { isIP as isIP5 } from "node:net";
-async function resolveOtaTarget(host, port, resolve = (host2) => lookup(host2, { all: true, family: 4 })) {
-  if (typeof host !== "string" || !host || host.length > 253 || host !== host.trim() || !Number.isInteger(port) || port < 1 || port > 65535)
-    throw new PlatformIOError("Invalid OTA destination.", "OTA_TARGET_INVALID");
-  const name2 = host.toLowerCase().replace(/\.$/, "");
-  if (!isIP5(name2) && !name2.split(".").every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)))
-    throw new PlatformIOError(
-      "OTA host must be an IPv4 address or DNS name, without a URL, path or port.",
-      "OTA_TARGET_INVALID"
-    );
-  if (isIP5(name2) === 6)
-    throw new PlatformIOError(
-      "This OTA target resolver requires IPv4.",
-      "OTA_ADDRESS_UNSUPPORTED"
-    );
-  let addresses;
-  let timer;
-  try {
-    addresses = isIP5(name2) === 4 ? [{ address: name2, family: 4 }] : await Promise.race([
-      resolve(name2),
-      new Promise((_, reject) => {
-        timer = setTimeout(
-          () => reject(
-            new PlatformIOError(
-              "OTA name resolution timed out.",
-              "OTA_DNS_TIMEOUT"
-            )
-          ),
-          5e3
-        );
-      })
-    ]);
-  } catch (error2) {
-    if (error2 instanceof PlatformIOError) throw error2;
-    throw new PlatformIOError(
-      "OTA hostname could not be resolved.",
-      "OTA_HOST_NOT_FOUND"
-    );
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!Array.isArray(addresses) || addresses.length > 64)
-    throw new PlatformIOError(
-      "Invalid OTA DNS response.",
-      "OTA_TARGET_INVALID"
-    );
-  const unique = [
-    ...new Set(
-      addresses.filter((item) => item.family === 4 && isIP5(item.address) === 4).map((item) => item.address)
-    )
-  ];
-  if (unique.length !== 1)
-    throw new PlatformIOError(
-      "Select one OTA IPv4 address explicitly.",
-      "OTA_TARGET_AMBIGUOUS"
-    );
-  const address = unique[0];
-  const first = Number(address.split(".")[0]);
-  if (first === 0 || first >= 224 || address === "255.255.255.255")
-    throw new PlatformIOError(
-      "OTA requires a unicast destination.",
-      "OTA_TARGET_INVALID"
-    );
-  const resource = Object.freeze({
-    kind: "network",
-    identity: JSON.stringify(["ota", address])
-  });
-  return Object.freeze({ host: name2, address, port, resource });
-}
-function acquireOtaCustody(target, store = new DeviceLeaseStore()) {
-  if (isIP5(target.address) !== 4 || target.resource.kind !== "network" || target.resource.identity !== JSON.stringify(["ota", target.address]))
-    throw new PlatformIOError(
-      "Invalid OTA lease binding.",
-      "OTA_TARGET_INVALID"
-    );
-  const lease = store.acquire(target.resource);
-  let released = false;
-  return {
-    prepareSpawn() {
-      if (released)
-        throw new PlatformIOError(
-          "OTA custody is already released.",
-          "OTA_CUSTODY_CLOSED"
-        );
-      store.beginHandoff(lease);
-    },
-    releaseAfterExit() {
-      if (released) return;
-      try {
-        store.cancelHandoff(lease);
-        store.release(lease);
-        released = true;
-      } catch {
-        throw new PlatformIOError(
-          "OTA lease cleanup is unconfirmed.",
-          "OTA_CLEANUP_PENDING",
-          { cleanupPending: true }
-        );
-      }
-    }
-  };
-}
-
-// src/core/ota/ota-artifacts.ts
-import fs50 from "node:fs/promises";
-
-// src/core/ota/esp-app-identity.ts
-init_errors2();
-import { createHash as createHash11 } from "node:crypto";
-function readEspAppElfHash(image) {
-  if (image.length < 288 || image[0] !== 233 || image.readUInt32LE(32) !== 2882360370)
-    return null;
-  const invalid4 = () => new PlatformIOError(
-    "Invalid ESP application image structure or checksum.",
-    "OTA_APP_IMAGE_INVALID"
-  );
-  if (image[1] < 1 || image[1] > 16 || image[23] > 1 || image.readUInt32LE(28) < 256)
-    throw invalid4();
-  let position = 24;
-  let checksum = 239;
-  for (let index = 0; index < image[1]; index++) {
-    if (position + 8 > image.length) throw invalid4();
-    const size = image.readUInt32LE(position + 4);
-    position += 8;
-    if (size > image.length - position) throw invalid4();
-    for (let end = position + size; position < end; position++)
-      checksum ^= image[position];
-  }
-  const checksumOffset = Math.floor(position / 16) * 16 + 15;
-  if (checksumOffset >= image.length || image[checksumOffset] !== checksum)
-    throw invalid4();
-  if (image[23] === 1) {
-    const digestOffset = checksumOffset + 1;
-    if (digestOffset + 32 > image.length || !createHash11("sha256").update(image.subarray(0, digestOffset)).digest().equals(image.subarray(digestOffset, digestOffset + 32)))
-      throw invalid4();
-  }
-  const hash = image.subarray(176, 208);
-  return hash.every((value2) => value2 === 0) || hash.every((value2) => value2 === 255) ? null : hash.toString("hex");
-}
-
-// src/core/ota/ota-image-archive.ts
-init_paths();
-init_errors2();
-import fs49 from "node:fs/promises";
-import path61 from "node:path";
-import { createHash as createHash12, randomUUID as randomUUID8 } from "node:crypto";
-async function archiveOtaImage(snapshot, sourcePath, expectedSha256, archiveRoot = path61.join(SERVER_DATA_DIR, "artifacts", "ota")) {
-  const image = await readPartitionArtifact(
-    path61.dirname(snapshot),
-    snapshot,
-    64 * 1024 * 1024
-  );
-  if (image.identity.sha256 !== expectedSha256)
-    throw new PlatformIOError(
-      "OTA snapshot changed before archival.",
-      "OTA_IMAGE_CHANGED"
-    );
-  const scope5 = createHash12("sha256").update(sourcePath).digest("hex");
-  const directory = path61.join(archiveRoot, scope5);
-  await fs49.mkdir(directory, { recursive: true, mode: 448 });
-  const state = await fs49.lstat(directory);
-  if (!state.isDirectory() || state.isSymbolicLink())
-    throw new PlatformIOError(
-      "Invalid OTA archive directory.",
-      "OTA_ARCHIVE_INVALID"
-    );
-  const root = await fs49.realpath(directory);
-  const destination = path61.join(root, expectedSha256 + ".bin");
-  const temporary = path61.join(root, "." + randomUUID8() + ".tmp");
-  try {
-    await fs49.writeFile(temporary, image.content, { flag: "wx", mode: 384 });
-    try {
-      await fs49.link(temporary, destination);
-    } catch (error2) {
-      if (error2.code !== "EEXIST") throw error2;
-    }
-    const stored = await fs49.lstat(destination);
-    if (!stored.isFile() || stored.isSymbolicLink())
-      throw new PlatformIOError(
-        "Invalid OTA archive object.",
-        "OTA_ARCHIVE_INVALID"
-      );
-    const verified = await readPartitionArtifact(
-      root,
-      destination,
-      64 * 1024 * 1024
-    );
-    if (verified.identity.sha256 !== expectedSha256)
-      throw new PlatformIOError(
-        "Existing OTA archive object has changed.",
-        "OTA_ARCHIVE_INVALID"
-      );
-    return destination;
-  } finally {
-    await fs49.unlink(temporary).catch((error2) => {
-      if (error2.code !== "ENOENT") throw error2;
-    });
-  }
-}
-
-// src/core/ota/ota-artifacts.ts
-import path62 from "node:path";
-init_errors2();
-async function retainOtaImage(projectDir, imagePath, expectedSha256, archiveRoot) {
-  if (expectedSha256 !== void 0 && !/^[a-fA-F0-9]{64}$/.test(expectedSha256))
-    throw new PlatformIOError(
-      "Invalid expected OTA image hash.",
-      "OTA_IMAGE_INVALID"
-    );
-  const project = await fs50.realpath(projectDir);
-  const source = await readPartitionArtifact(
-    project,
-    imagePath,
-    64 * 1024 * 1024
-  );
-  if (!source.identity.size)
-    throw new PlatformIOError("OTA image is empty.", "OTA_IMAGE_INVALID");
-  if (expectedSha256 && source.identity.sha256 !== expectedSha256.toLowerCase())
-    throw new PlatformIOError(
-      "OTA image changed before capture.",
-      "OTA_IMAGE_CHANGED"
-    );
-  const directory = await fs50.realpath(await createPrivateAnalysisDirectory());
-  try {
-    const snapshot = path62.join(directory, "image.bin");
-    await fs50.writeFile(snapshot, source.content, { flag: "wx", mode: 384 });
-    const identity = Object.freeze({
-      ...source.identity,
-      path: snapshot,
-      sourcePath: source.identity.path,
-      embeddedElfSha256: readEspAppElfHash(source.content)
-    });
-    let releasing;
-    return Object.freeze({
-      path: snapshot,
-      identity,
-      async verify() {
-        const artifact = await readPartitionArtifact(
-          directory,
-          snapshot,
-          64 * 1024 * 1024
-        );
-        if (artifact.identity.sha256 !== identity.sha256 || artifact.identity.size !== identity.size)
-          throw new PlatformIOError(
-            "Retained OTA image changed.",
-            "OTA_IMAGE_CHANGED"
-          );
-      },
-      async archive() {
-        return archiveOtaImage(
-          snapshot,
-          identity.sourcePath,
-          identity.sha256,
-          archiveRoot
-        );
-      },
-      release() {
-        releasing ??= fs50.rm(directory, { recursive: true, force: true }).catch((error2) => {
-          releasing = void 0;
-          throw error2;
-        });
-        return releasing;
-      }
-    });
-  } catch (error2) {
-    await fs50.rm(directory, { recursive: true, force: true });
-    throw error2;
-  }
-}
-
-// src/core/ota/espota-process.ts
-init_owned_process_wait();
-init_errors2();
-import { spawn as spawn4 } from "node:child_process";
-import path63 from "node:path";
-import { isIP as isIP6 } from "node:net";
-var ESPOTA_BRIDGE = String.raw`
-import hashlib, json, logging, runpy, socket, sys
-request = json.loads(sys.stdin.buffer.read(65537))
-for filename, expected in [(request["image"], request["imageSha256"]), (request["script"], request["scriptSha256"])]:
-    digest = hashlib.sha256()
-    with open(filename, "rb") as artifact:
-        while True:
-            chunk = artifact.read(65536)
-            if not chunk:
-                break
-            digest.update(chunk)
-    if digest.hexdigest() != expected:
-        raise RuntimeError("OTA artifact changed before execution")
-sys.argv = [request["script"], "--ip", request["address"], "--port", str(request["port"]), "--file", request["image"], "--progress"]
-for key, flag in [("hostAddress", "--host_ip"), ("hostPort", "--host_port"), ("invitationTimeoutSeconds", "--timeout")]:
-    if key in request["options"]:
-        sys.argv += [flag, str(request["options"][key])]
-# INFO records contain the protocol completion marker. Suppress DEBUG option dumps containing auth.
-logging.basicConfig(level=logging.INFO, format="[%(levelname)s]: %(message)s")
-original_accept = socket.socket.accept
-original_recv = socket.socket.recv
-original_recvfrom = socket.socket.recvfrom
-def bound_accept(sock):
-    while True:
-        connection, peer = original_accept(sock)
-        if peer[0] == request["address"]:
-            return connection, peer
-        connection.close()
-def bound_recv(sock, size, flags=0):
-    if sock.type & socket.SOCK_DGRAM:
-        while True:
-            data, peer = original_recvfrom(sock, size, flags)
-            if peer[0] == request["address"] and peer[1] == request["port"]:
-                return data
-    return original_recv(sock, size, flags)
-socket.socket.accept = bound_accept
-socket.socket.recv = bound_recv
-if request["auth"] is not None:
-    sys.argv += ["--auth", request["auth"]]
-if request["filesystem"]:
-    sys.argv += ["--spiffs"]
-runpy.run_path(request["script"], run_name="__main__")
-`;
-async function runEspotaProcess(request) {
-  if ([request.pythonExecutable, request.uploaderScript, request.imagePath].some(
-    (value2) => typeof value2 !== "string" || !path63.isAbsolute(value2) || value2.length > 32768 || /[\x00-\x1f\x7f]/.test(value2)
-  ) || /\.(?:cmd|bat|ps1|sh)$/i.test(request.pythonExecutable) || isIP6(request.address) !== 4 || !Number.isInteger(request.port) || request.port < 1 || request.port > 65535 || !Number.isInteger(request.timeoutMs) || request.timeoutMs < 1 || request.timeoutMs > 6e5 || typeof request.filesystem !== "boolean" || !/^[a-f0-9]{64}$/.test(request.imageSha256) || !/^[a-f0-9]{64}$/.test(request.uploaderSha256) || request.auth !== void 0 && (typeof request.auth !== "string" || request.auth.length > 1024 || /[\x00-\x1f\x7f]/.test(request.auth)))
-    throw new PlatformIOError(
-      "Invalid resolved OTA execution request.",
-      "OTA_EXECUTION_INVALID"
-    );
-  const options = OtaUploaderOptionsSchema.safeParse(
-    request.uploaderOptions ?? {}
-  );
-  if (!options.success)
-    throw new PlatformIOError(
-      "Invalid OTA uploader options.",
-      "OTA_EXECUTION_INVALID"
-    );
-  const payload = JSON.stringify({
-    options: options.data,
-    script: request.uploaderScript,
-    image: request.imagePath,
-    imageSha256: request.imageSha256,
-    scriptSha256: request.uploaderSha256,
-    address: request.address,
-    port: request.port,
-    auth: request.auth ?? null,
-    filesystem: request.filesystem
-  });
-  if (Buffer.byteLength(payload) > 65536)
-    throw new PlatformIOError(
-      "OTA request exceeds the private input limit.",
-      "OTA_EXECUTION_INVALID"
-    );
-  if (request.signal?.aborted)
-    throw new PlatformIOError(
-      "OTA upload was cancelled before startup.",
-      "OTA_CANCELLED"
-    );
-  await request.custody.prepareSpawn();
-  let proc;
-  try {
-    proc = spawn4(request.pythonExecutable, ["-I", "-c", ESPOTA_BRIDGE], {
-      cwd: path63.dirname(request.imagePath),
-      shell: false,
-      windowsHide: true,
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUNBUFFERED: "1" }
-    });
-  } catch {
-    request.custody.releaseAfterExit();
-    throw new PlatformIOError(
-      "OTA uploader could not start.",
-      "OTA_PROCESS_FAILED"
-    );
-  }
-  const controller = new AbortController();
-  const abort = () => controller.abort();
-  request.signal?.addEventListener("abort", abort, { once: true });
-  if (request.signal?.aborted) abort();
-  let outputBytes = 0, limited = false, closed = false, inputFailed = false;
-  const stdout = [], stderr = [];
-  let resolveClosed;
-  const closure = new Promise((resolve) => {
-    resolveClosed = resolve;
-  });
-  proc.once("close", () => {
-    closed = true;
-    resolveClosed();
-  });
-  const collect = (destination) => (chunk) => {
-    if (limited) return;
-    outputBytes += chunk.length;
-    if (outputBytes > 1024 * 1024) {
-      limited = true;
-      controller.abort();
-      return;
-    }
-    destination.push(Buffer.from(chunk));
-  };
-  proc.stdout.on("data", collect(stdout));
-  proc.stderr.on("data", collect(stderr));
-  proc.stdin.on("error", () => {
-    inputFailed = true;
-    controller.abort();
-  });
-  const completion = waitForOwnedProcess(
-    proc,
-    request.timeoutMs,
-    1e3,
-    controller.signal
-  );
-  proc.stdin.end(payload);
-  let exitCode, failure;
-  try {
-    exitCode = await completion;
-  } catch (error2) {
-    failure = error2;
-  }
-  let closeTimer;
-  if (!closed)
-    await Promise.race([
-      closure,
-      new Promise((resolve) => {
-        closeTimer = setTimeout(resolve, 1e3);
-      })
-    ]);
-  clearTimeout(closeTimer);
-  request.signal?.removeEventListener("abort", abort);
-  if (!closed)
-    throw new PlatformIOError(
-      "OTA process cleanup is unconfirmed.",
-      "OTA_CLEANUP_PENDING",
-      { cleanupPending: true }
-    );
-  request.custody.releaseAfterExit();
-  if (limited)
-    throw new PlatformIOError(
-      "OTA uploader exceeded the output limit.",
-      "OTA_OUTPUT_LIMIT",
-      { cleanupPending: false }
-    );
-  if (inputFailed)
-    throw new PlatformIOError(
-      "OTA uploader rejected private input.",
-      "OTA_PROCESS_FAILED",
-      { cleanupPending: false }
-    );
-  if (failure)
-    throw new PlatformIOError(
-      "OTA uploader did not complete.",
-      request.signal?.aborted ? "OTA_CANCELLED" : failure instanceof PlatformIOError && failure.code === "COMMAND_TIMEOUT" ? "OTA_TIMEOUT" : "OTA_PROCESS_FAILED",
-      { cleanupPending: false }
-    );
-  const redact = (buffers) => {
-    let text8 = Buffer.concat(buffers).toString("utf8");
-    if (request.auth)
-      for (const secret of /* @__PURE__ */ new Set([
-        request.auth,
-        JSON.stringify(request.auth).slice(1, -1),
-        encodeURIComponent(request.auth)
-      ]))
-        text8 = text8.split(secret).join("[REDACTED]");
-    return text8;
-  };
-  return {
-    exitCode,
-    stdout: redact(stdout),
-    stderr: redact(stderr)
-  };
-}
-
-// src/core/ota/ota-transfer.ts
-init_errors2();
-async function executePreparedOtaTransfer(input, caller = {}, onAuthorized) {
-  const guard = createPolicyRevisionGuard(input.projectDir);
-  const operation = input.filesystem ? "ota_upload_filesystem" : "ota_upload_firmware";
-  const args = {
-    projectDir: input.projectDir,
-    environment: input.environment,
-    address: input.target.address,
-    port: input.target.port,
-    filesystem: input.filesystem,
-    uploaderOptions: input.uploaderOptions ?? {},
-    timeoutMs: input.timeoutMs,
-    authenticationProvided: input.auth !== void 0,
-    image: {
-      path: input.image.identity.sourcePath,
-      size: input.image.identity.size,
-      sha256: input.image.identity.sha256
-    },
-    elf: input.elfIdentity ? { path: input.elfIdentity.path, sha256: input.elfIdentity.sha256 } : null,
-    uploader: {
-      executable: input.tools.pythonExecutable,
-      script: input.tools.uploaderScript,
-      sha256: input.tools.uploaderSha256,
-      packageName: input.tools.packageName,
-      packageVersion: input.tools.packageVersion
-    }
-  };
-  const context = { ...caller, workspaceDir: input.projectDir };
-  for (const [stage, approvalId2] of [
-    [operation, input.approvalId],
-    ["ota_uploader_command", input.commandApprovalId]
-  ]) {
-    const plan = await planAction(stage, { ...args, approvalId: approvalId2 }, context);
-    if (plan.status !== "ready")
-      throw new PlatformIOError(
-        plan.reason,
-        plan.status === "deny" ? "POLICY_DENIED" : "APPROVAL_REQUIRED",
-        { policyDecision: plan }
-      );
-  }
-  return dispatchAuthorizedAction(
-    operation,
-    { ...args, approvalId: input.approvalId },
-    context,
-    () => dispatchAuthorizedAction(
-      "ota_uploader_command",
-      { ...args, approvalId: input.commandApprovalId },
-      context,
-      async () => {
-        await onAuthorized?.();
-        guard();
-        await input.image.verify();
-        guard();
-        const imageArchivePath = await input.image.archive();
-        guard();
-        const custody = acquireOtaCustody(input.target);
-        let cleanupPending = false;
-        try {
-          const result = await runEspotaProcess({
-            pythonExecutable: input.tools.pythonExecutable,
-            uploaderScript: input.tools.uploaderScript,
-            uploaderSha256: input.tools.uploaderSha256,
-            imagePath: input.image.path,
-            imageSha256: input.image.identity.sha256,
-            address: input.target.address,
-            port: input.target.port,
-            auth: input.auth,
-            filesystem: input.filesystem,
-            uploaderOptions: input.uploaderOptions,
-            timeoutMs: input.timeoutMs,
-            signal: input.signal,
-            custody
-          });
-          guard();
-          return {
-            ...result,
-            imageSha256: input.image.identity.sha256,
-            imageBytes: input.image.identity.size,
-            imageArchivePath,
-            address: input.target.address,
-            port: input.target.port,
-            runtimeVerified: false
-          };
-        } catch (error2) {
-          cleanupPending = error2 instanceof PlatformIOError && error2.context?.cleanupPending === true;
-          throw error2;
-        } finally {
-          if (!cleanupPending) custody.releaseAfterExit();
-        }
-      }
-    )
-  );
-}
-
-// src/core/ota/ota-report.ts
-init_errors2();
-var failures = [
-  [
-    /Host \S+ Not Found/,
-    "host_not_found",
-    "Resolve the board hostname or select its current IP address."
-  ],
-  [
-    /No response from the ESP/,
-    "no_response",
-    "Check the OTA UDP port, network path and running ArduinoOTA service."
-  ],
-  [
-    /Authentication Failed|No Answer to our Authentication/,
-    "auth_failed",
-    "Check the configured OTA credential."
-  ],
-  [
-    /Bad Answer:/,
-    "bad_answer",
-    "The selected service did not accept the OTA invitation."
-  ],
-  [
-    /No response from device/,
-    "no_callback",
-    "Check the board's TCP callback route and the host firewall."
-  ],
-  [
-    /Error Uploading/,
-    "transfer_failed",
-    "The transfer was interrupted; check the device and network before retrying."
-  ],
-  [
-    /Error response from device|No Result!/,
-    "device_rejected",
-    "Check image format, OTA partition capacity and device logs."
-  ],
-  [
-    /Please specify IP address or host name/,
-    "no_upload_port",
-    "Select an explicit OTA destination."
-  ]
-];
-function summarizeOtaTransfer(output, exitCode, timedOut = false) {
-  if (typeof output !== "string" || Buffer.byteLength(output) > 1024 * 1024 || !Number.isInteger(exitCode))
-    throw new PlatformIOError(
-      "Invalid OTA report input.",
-      "OTA_REPORT_INVALID"
-    );
-  const succeeded = /\[INFO\]: Success|Result: OK/.test(output);
-  const failure = failures.find(([pattern]) => pattern.test(output));
-  let progress = null;
-  for (const match of output.matchAll(/Uploading: \[=*[ =]*\] (\d{1,3})%/g)) {
-    const value2 = Number(match[1]);
-    if (value2 <= 100) progress = value2;
-  }
-  const ok = !timedOut && exitCode === 0 && succeeded && !failure;
-  return {
-    ok,
-    error: ok ? null : timedOut ? "timeout" : failure?.[1] ?? "upload_failed",
-    hint: ok ? "Observe the device separately to verify runtime health." : timedOut ? "The bounded upload deadline expired." : failure?.[2] ?? "Inspect the retained uploader log and image selection.",
-    progress_percent: progress,
-    auto_switched: output.includes("`upload_protocol` is switched to `espota`"),
-    runtime_verified: false
-  };
-}
-
-// src/tools/ota.ts
-init_errors2();
 
 // src/core/analysis/check-report.ts
 init_zod();
 init_errors2();
-import path64 from "node:path";
+import path58 from "node:path";
 var optionalText = external_exports.string().max(65536).nullable().optional();
 var defectSchema = external_exports.object({
   severity: external_exports.string().max(64).default("low"),
@@ -109103,7 +108209,7 @@ function summarizeCheckOutput(output, projectDir) {
         configurable: true
       });
       let file = defect.file || "";
-      const paths = /^[a-z]:[\\/]/i.test(projectDir) ? path64.win32 : path64.posix;
+      const paths = /^[a-z]:[\\/]/i.test(projectDir) ? path58.win32 : path58.posix;
       if (file && paths.isAbsolute(file)) {
         const relative = paths.relative(projectDir, file);
         if (relative !== ".." && !relative.startsWith(".." + paths.sep) && !paths.isAbsolute(relative))
@@ -109148,8 +108254,8 @@ init_mcp_context();
 init_build_cache();
 init_logger();
 init_redact();
-import fs55 from "node:fs";
-import path68 from "node:path";
+import fs51 from "node:fs";
+import path62 from "node:path";
 import crypto14 from "node:crypto";
 
 // src/core/diagnostics/matchers.ts
@@ -109792,7 +108898,7 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
       status = cmd.status;
       logPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f) => Boolean(f));
       const latestLog = logPath || logPaths[logPaths.length - 1];
-      if (latestLog && fs55.existsSync(latestLog)) {
+      if (latestLog && fs51.existsSync(latestLog)) {
         try {
           const lines2 = await tailFileBounded(latestLog, 512 * 1024);
           output = lines2.slice(status === "running" ? -30 : -150).join("\n");
@@ -109807,10 +108913,10 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
       output = `Task ID not found: ${resolvedTaskId}`;
     }
   } else {
-    const logFile = path68.join(baseDir, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
+    const logFile = path62.join(baseDir, ".pio-mcp-workspace", "logs", "build", "latest-build.log");
     const active = isBuildActive(projectDir);
     status = active ? "running" : "completed";
-    if (fs55.existsSync(logFile)) {
+    if (fs51.existsSync(logFile)) {
       logPaths = [logFile];
       try {
         const lines2 = await tailFileBounded(logFile, 512 * 1024);
@@ -109860,7 +108966,1228 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
   };
 }
 
+// src/adapters/clean-compat.ts
+init_errors2();
+function executeCleanCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
+  return executeRunCompatibility(
+    "clean",
+    input,
+    defaults,
+    caller,
+    onAuthorized
+  );
+}
+function executeBuildCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
+  return executeRunCompatibility(
+    "build",
+    input,
+    defaults,
+    caller,
+    onAuthorized
+  );
+}
+function executeCheckCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
+  return executeRunCompatibility(
+    "check",
+    input,
+    defaults,
+    caller,
+    onAuthorized
+  );
+}
+async function executeRunCompatibility(mode, input, defaults, caller, onAuthorized) {
+  const scope5 = {
+    project_dir: external_exports.string().max(32768).nullable().optional(),
+    env: external_exports.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).nullable().optional(),
+    approval_id: external_exports.string().max(256).optional()
+  };
+  const params = mode === "clean" ? external_exports.object({ ...scope5, full: external_exports.boolean().default(false) }).strict().parse(input) : mode === "check" ? external_exports.object({
+    ...scope5,
+    severity: external_exports.enum(["low", "medium", "high"]).default("medium"),
+    pattern: external_exports.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).nullable().optional(),
+    skip_packages: external_exports.boolean().default(true),
+    tool: external_exports.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).nullable().optional()
+  }).strict().parse(input) : external_exports.object({
+    ...scope5,
+    jobs: external_exports.number().int().min(1).max(1024).nullable().optional(),
+    verbose: external_exports.boolean().default(false)
+  }).strict().parse(input);
+  const timeoutMs = mode === "clean" ? 12e4 : 12e5;
+  const projectDir = await resolveCompatibilityProject(
+    params.project_dir,
+    defaults
+  );
+  const environment = params.env ?? void 0;
+  return dispatchAuthorizedAction(
+    mode === "build" ? "build_project" : mode === "check" ? "check_project" : "clean_project",
+    {
+      projectDir,
+      environment,
+      ..."full" in params ? { full: params.full } : "severity" in params ? {
+        severity: params.severity,
+        pattern: params.pattern ?? void 0,
+        skipPackages: params.skip_packages,
+        tool: params.tool ?? void 0,
+        jsonOutput: true
+      } : { jobs: params.jobs ?? void 0, verbose: params.verbose },
+      approvalId: params.approval_id
+    },
+    { ...caller, workspaceDir: projectDir },
+    async () => {
+      const guard = createPolicyRevisionGuard(projectDir);
+      await onAuthorized?.();
+      guard();
+      return hardwareLockManager.withImplicitLock(async () => {
+        guard();
+        const started = performance.now();
+        let completed;
+        const collect = async (exitCode, fullLogPath, timedOut2 = false) => {
+          guard();
+          let output = await readCommandOutput(fullLogPath);
+          guard();
+          if (timedOut2)
+            output += `
+[platformio-mcp] timed out after ${timeoutMs / 1e3}s`;
+          const logPath = await retainCommandLog(mode, output, "");
+          return { exitCode, output, logPath };
+        };
+        let timedOut = false;
+        try {
+          const onResult = async (result) => {
+            completed = await collect(result.exitCode, result.fullLogPath);
+          };
+          if ("full" in params) {
+            await cleanProject(projectDir, false, {
+              environment,
+              full: params.full,
+              timeoutMs,
+              onResult
+            });
+          } else if ("severity" in params) {
+            await checkProject(projectDir, environment, false, {
+              severity: params.severity,
+              pattern: params.pattern ?? void 0,
+              skipPackages: params.skip_packages,
+              tool: params.tool ?? void 0,
+              jsonOutput: true,
+              timeoutMs,
+              onResult
+            });
+          } else {
+            await buildProject(projectDir, environment, params.verbose, false, {
+              jobs: params.jobs ?? void 0,
+              forceExecution: true,
+              timeoutMs,
+              onResult
+            });
+          }
+        } catch (error2) {
+          if (error2 instanceof PlatformIOError && error2.code === "COMMAND_TIMEOUT" && error2.context?.cleanupPending === false && typeof error2.context.fullLogPath === "string") {
+            timedOut = true;
+            completed = await collect(-1, error2.context.fullLogPath, true);
+          } else if (!(error2 instanceof BuildError) || !completed || error2.context?.exitCode !== completed.exitCode)
+            throw error2;
+        }
+        guard();
+        if (!completed)
+          throw new PlatformIOError(
+            "Command result was not collected",
+            "COMPAT_RESULT_INVALID"
+          );
+        if ("severity" in params)
+          return checkCompatibilityResult(
+            completed,
+            projectDir,
+            params.severity,
+            timedOut
+          );
+        return cleanCompatibilityResult(
+          completed,
+          environment,
+          (performance.now() - started) / 1e3,
+          timedOut,
+          mode === "build" ? "build" : "clean"
+        );
+      });
+    }
+  );
+}
+function cleanCompatibilityResult(result, environment, duration4, timedOut = false, tool = "clean") {
+  const output = normalizeCleanOutput(result.output);
+  const lines2 = output.split("\n");
+  const diagnostics = [];
+  const seen = /* @__PURE__ */ new Set();
+  const linkerDiagnostics = [];
+  const stepDiagnostics = [];
+  const environments = [];
+  const memory = {};
+  let failed = false;
+  for (const line of lines2) {
+    const env = /^Processing (\S+) \(/.exec(line);
+    if (env) environments.push(env[1]);
+    if (/^=+ \[(FAILED|ERROR)\] Took /.test(line)) failed = true;
+    const mem = /^(RAM|Flash):\s+\[[=\s]*\]\s+([\d.]+)%\s+\(used (\d+) bytes from (\d+) bytes\)/.exec(
+      line
+    );
+    if (mem)
+      memory[mem[1].toLowerCase()] = {
+        percent: Number(mem[2]),
+        used_bytes: Number(mem[3]),
+        total_bytes: Number(mem[4])
+      };
+    const compiler = /^(.+?):(\d+):(?:(\d+):)?\s*(fatal error|error|warning|note):\s*(.*)$/.exec(
+      line
+    );
+    const linker = /(undefined reference to .*|symbol\(s\) not found.*|multiple definition of .*|region .* overflowed by .*)$/.exec(
+      line
+    );
+    const step = /^\*\*\* \[([^\]]+)\] (.*)$/.exec(line);
+    const candidates = [
+      compiler ? {
+        bucket: diagnostics,
+        key: JSON.stringify(["compiler", ...compiler.slice(1)]),
+        value: {
+          kind: compiler[4].replace("fatal ", ""),
+          file: compiler[1],
+          line: Number(compiler[2]),
+          column: compiler[3] ? Number(compiler[3]) : null,
+          message: compiler[5].trim()
+        }
+      } : null,
+      linker ? {
+        bucket: linkerDiagnostics,
+        key: JSON.stringify(["linker", linker[1].trim()]),
+        value: {
+          kind: "error",
+          file: "<linker>",
+          line: 0,
+          column: null,
+          message: linker[1].trim()
+        }
+      } : null,
+      step ? {
+        bucket: stepDiagnostics,
+        key: JSON.stringify(["scons", step[1], step[2]]),
+        value: {
+          kind: "error",
+          file: step[1],
+          line: 0,
+          column: null,
+          message: `build step failed: ${step[2]}`
+        }
+      } : null
+    ];
+    for (const candidate of candidates) {
+      if (candidate && !seen.has(candidate.key)) {
+        seen.add(candidate.key);
+        candidate.bucket.push(candidate.value);
+      }
+    }
+  }
+  diagnostics.push(...linkerDiagnostics, ...stepDiagnostics);
+  const errors = diagnostics.filter((item) => item.kind === "error");
+  const warnings = diagnostics.filter((item) => item.kind === "warning");
+  const ok = !timedOut && result.exitCode === 0 && !failed;
+  const status = timedOut ? "timeout" : ok ? "success" : "failed";
+  const durationSeconds = Math.round(duration4 * 100) / 100;
+  const summary = [
+    `${tool} ${status} for env ${environment || environments.join(",") || "default"} in ${durationSeconds}s.`
+  ];
+  if (errors.length)
+    summary.push(
+      `${errors.length} error(s); first: ${errors[0].file}:${errors[0].line}: ${errors[0].message}`
+    );
+  if (warnings.length) summary.push(`${warnings.length} warning(s).`);
+  if (Object.keys(memory).length)
+    summary.push(
+      `RAM ${(memory.ram?.percent ?? 0).toFixed(1)}%, Flash ${(memory.flash?.percent ?? 0).toFixed(1)}%.`
+    );
+  if (timedOut)
+    summary.push(
+      "The command timed out; first builds download toolchains and can take several minutes, retry once."
+    );
+  return {
+    ok,
+    status,
+    summary: summary.join(" "),
+    environments,
+    errors: errors.slice(0, 50),
+    warnings: warnings.slice(0, 50),
+    error_count: errors.length,
+    warning_count: warnings.length,
+    memory,
+    duration_s: durationSeconds,
+    exit_code: result.exitCode,
+    log_path: result.logPath,
+    output_tail: lines2.slice(-40).join("\n"),
+    port_error: ok ? null : classifyCleanPortError(output)
+  };
+}
+function normalizeCleanOutput(output) {
+  const lines2 = output.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r\n?/g, "\n").split("\n");
+  const result = [];
+  let banner = false;
+  for (const line of lines2) {
+    const stripped = line.trim();
+    if (/^\*{21,}$/.test(stripped)) {
+      banner = !banner;
+      continue;
+    }
+    if (banner || stripped === "Verbose mode can be enabled via `-v, --verbose` option" || stripped === "LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf")
+      continue;
+    result.push(line.trimEnd());
+  }
+  while (result.length && result.at(-1) === "") result.pop();
+  return result.join("\n");
+}
+function classifyCleanPortError(output) {
+  const patterns = [
+    [
+      "port_permission",
+      /PermissionError\(13|Access is denied|Permission denied|Errno 13/i
+    ],
+    [
+      "port_busy",
+      /Device or resource busy|Resource busy|Errno 16|port is busy|already in use/i
+    ],
+    [
+      "no_response",
+      /Timed out waiting for packet header|Failed to connect to ESP|No serial data received|Wrong boot mode|Invalid head of packet|programmer is not responding|not in sync|stk500_recv\(\)|stk500_getsync\(\)|Failed to open the debug port|No device found on/i
+    ],
+    [
+      "port_missing",
+      /could not open port|A fatal error occurred: Could not open|SerialException|No such file or directory: '?\/dev|Errno 2\b.*(?:tty|cu\.|COM)|FileNotFoundError.*(?:tty|cu\.|COM)|Could not find a port|No serial ports found/i
+    ]
+  ];
+  return patterns.find(([, pattern]) => pattern.test(output))?.[0] ?? null;
+}
+function checkCompatibilityResult(result, projectDir, severity, timedOut = false) {
+  const output = normalizeCleanOutput(result.output);
+  const failure = () => ({
+    ok: false,
+    error: "check_failed",
+    summary: `pio check did not return a complete valid report (exit ${result.exitCode}).`,
+    output_tail: output.split("\n").slice(-30).join("\n"),
+    log_path: result.logPath
+  });
+  if (timedOut) return { ...failure(), status: "timeout" };
+  let report;
+  try {
+    report = summarizeCheckOutput(output, projectDir);
+  } catch (error2) {
+    if (error2 instanceof PlatformIOError && error2.code?.startsWith("CHECK_REPORT_"))
+      return failure();
+    throw error2;
+  }
+  const failed = report.tools.filter((tool) => !tool.succeeded);
+  let summary = `${report.defect_count} defect(s) at severity >= ${severity}: ${report.by_severity.high} high, ${report.by_severity.medium} medium, ${report.by_severity.low} low.`;
+  if (report.defects.length) {
+    const defect = report.defects[0];
+    summary += ` Top: [${defect.severity}] ${defect.file}:${defect.line} ${defect.message}`;
+  }
+  if (failed.length)
+    summary += " Tool(s) failed: " + failed.map((tool) => `${tool.tool}(${tool.env})`).join(", ");
+  if (result.exitCode !== 0 && !report.tools.length) return failure();
+  return { ok: !failed.length, summary, ...report, log_path: result.logPath };
+}
+
 // src/tools/ota.ts
+init_redact();
+import fs56 from "node:fs/promises";
+
+// src/core/ota/ota-elf-match.ts
+import fs52 from "node:fs/promises";
+import path63 from "node:path";
+init_errors2();
+async function matchAndRetainOtaElf(projectDir, elfPath, embeddedSha256, archiveRoot) {
+  if (!embeddedSha256 || !/^[a-f0-9]{64}$/.test(embeddedSha256))
+    throw new PlatformIOError(
+      "Selected image has no supported embedded ELF identity.",
+      "OTA_ELF_IDENTITY_UNAVAILABLE"
+    );
+  const project = await fs52.realpath(projectDir);
+  const source = await readPartitionArtifact(
+    project,
+    elfPath,
+    256 * 1024 * 1024
+  );
+  if (source.identity.sha256 !== embeddedSha256)
+    throw new PlatformIOError(
+      "Selected ELF does not match the OTA image's embedded identity.",
+      "OTA_ELF_MISMATCH"
+    );
+  const directory = await createPrivateAnalysisDirectory();
+  try {
+    const snapshot = path63.join(directory, "firmware.elf");
+    await fs52.writeFile(snapshot, source.content, { flag: "wx", mode: 384 });
+    const identity = await readElfIdentity(snapshot, embeddedSha256);
+    if (identity.bits !== 32 || !["xtensa", "riscv"].includes(identity.architecture))
+      throw new PlatformIOError(
+        "Selected ELF is not an ESP32 target image.",
+        "OTA_ELF_TARGET_INVALID"
+      );
+    const archivePath = await retainElfSnapshot(
+      snapshot,
+      embeddedSha256,
+      archiveRoot,
+      source.identity.path
+    );
+    return { ...identity, path: source.identity.path, archivePath };
+  } finally {
+    await fs52.rm(directory, { recursive: true, force: true });
+  }
+}
+
+// src/tools/ota.ts
+init_zod();
+init_platformio();
+import path69 from "node:path";
+
+// src/core/ota/ota-options.ts
+init_zod();
+init_errors2();
+import { isIP as isIP4 } from "node:net";
+var OtaUploaderOptionsSchema = external_exports.object({
+  hostAddress: external_exports.string().refine((value2) => isIP4(value2) === 4).optional(),
+  hostPort: external_exports.number().int().min(1).max(65535).optional(),
+  invitationTimeoutSeconds: external_exports.number().int().min(1).max(60).optional()
+}).strict();
+function parseOtaUploaderOptions(flags, filesystem) {
+  const options = {};
+  const keys = {
+    "-I": "hostAddress",
+    "--host_ip": "hostAddress",
+    "-P": "hostPort",
+    "--host_port": "hostPort",
+    "-t": "invitationTimeoutSeconds",
+    "--timeout": "invitationTimeoutSeconds"
+  };
+  for (let index = 0; index < flags.length; index++) {
+    const flag = flags[index];
+    if (["-r", "--progress", "-d", "--debug"].includes(flag)) continue;
+    if (["-s", "--spiffs"].includes(flag)) {
+      if (!filesystem)
+        throw new PlatformIOError(
+          "Configured filesystem mode conflicts with the firmware request.",
+          "OTA_FLAGS_CONFLICT"
+        );
+      continue;
+    }
+    const equals = flag.indexOf("="), name2 = equals < 0 ? flag : flag.slice(0, equals);
+    const key = keys[name2];
+    if (!key)
+      throw new PlatformIOError(
+        "Unsupported OTA flag or attempt to override the bound target/image.",
+        "OTA_FLAGS_UNSUPPORTED"
+      );
+    const value2 = equals < 0 ? flags[++index] : flag.slice(equals + 1);
+    if (value2 === void 0 || Object.hasOwn(options, key) || key !== "hostAddress" && !/^\d+$/.test(value2))
+      throw new PlatformIOError(
+        "Invalid or repeated OTA uploader option.",
+        "OTA_CONFIG_INVALID"
+      );
+    options[key] = key === "hostAddress" ? value2 : Number(value2);
+  }
+  const parsed = OtaUploaderOptionsSchema.safeParse(options);
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Invalid OTA interface, port or invitation timeout.",
+      "OTA_CONFIG_INVALID"
+    );
+  return parsed.data;
+}
+
+// src/core/ota/ota-configuration.ts
+import path64 from "node:path";
+init_errors2();
+function selectOtaConfiguration(output, projectDir, environment) {
+  const publicView = parseProjectEnvironments(output);
+  const selected = environment ?? publicView.defaultEnvironments[0];
+  if (!selected || !/^[a-zA-Z0-9_-]{1,50}$/.test(selected) || !publicView.envs.some((item) => item.name === selected))
+    throw new PlatformIOError(
+      "Select one valid OTA environment.",
+      "OTA_ENVIRONMENT_INVALID"
+    );
+  const raw = JSON.parse(output);
+  const options = Object.fromEntries(
+    raw.find(([name2]) => name2 === "env:" + selected)[1]
+  );
+  const platform2 = options.platform;
+  const family = typeof platform2 === "string" && platform2.includes("espressif8266") ? "espressif8266" : typeof platform2 === "string" && platform2.includes("espressif32") ? "espressif32" : void 0;
+  if (!family)
+    throw new PlatformIOError(
+      "OTA requires an espressif32 or espressif8266 environment.",
+      "OTA_FAMILY_UNSUPPORTED"
+    );
+  const flagsInput = options.upload_flags;
+  const flags = flagsInput == null ? [] : typeof flagsInput === "string" ? flagsInput.split(/[\s,]+/).filter(Boolean) : Array.isArray(flagsInput) && flagsInput.every((item) => typeof item === "string") ? flagsInput.flatMap((item) => item.split(/\s+/).filter(Boolean)) : void 0;
+  if (!flags || flags.length > 256 || flags.some((item) => item.length > 4096 || /[\x00-\x1f\x7f]/.test(item)))
+    throw new PlatformIOError(
+      "Invalid OTA upload flags.",
+      "OTA_CONFIG_INVALID"
+    );
+  let auth, configuredPort;
+  const otherFlags = [];
+  for (let index = 0; index < flags.length; index++) {
+    const flag = flags[index];
+    const equals = flag.indexOf("=");
+    const name2 = equals < 0 ? flag : flag.slice(0, equals);
+    if (!["-a", "--auth", "-p", "--port"].includes(name2)) {
+      otherFlags.push(flag);
+      continue;
+    }
+    const value2 = equals < 0 ? flags[++index] : flag.slice(equals + 1);
+    if (value2 === void 0 || value2.startsWith("-") || /["']/.test(value2))
+      throw new PlatformIOError(
+        "OTA auth/port flags require an unambiguous value.",
+        "OTA_CONFIG_INVALID"
+      );
+    if (name2 === "-a" || name2 === "--auth") {
+      if (auth !== void 0 || value2.length > 1024)
+        throw new PlatformIOError(
+          "Duplicate or oversized OTA authentication flag.",
+          "OTA_CONFIG_INVALID"
+        );
+      auth = value2;
+    } else {
+      const parsed = Number(value2);
+      if (configuredPort !== void 0 || !/^\d+$/.test(value2) || !Number.isInteger(parsed) || parsed < 1 || parsed > 65535)
+        throw new PlatformIOError(
+          "Invalid or duplicate OTA port flag.",
+          "OTA_CONFIG_INVALID"
+        );
+      configuredPort = parsed;
+    }
+  }
+  const buildDirectory = publicView.platformioSection.build_dir ?? ".pio/build";
+  if (typeof buildDirectory !== "string" || !buildDirectory || /[\x00-\x1f\x7f]/.test(buildDirectory))
+    throw new PlatformIOError(
+      "Invalid OTA build directory.",
+      "OTA_CONFIG_INVALID"
+    );
+  const filesystem = options["board_build.filesystem"];
+  if (filesystem != null && !["spiffs", "littlefs", "fatfs"].includes(String(filesystem)))
+    throw new PlatformIOError(
+      "Select an explicit supported filesystem image.",
+      "OTA_FILESYSTEM_UNSUPPORTED"
+    );
+  return {
+    environment: selected,
+    family,
+    auth,
+    configuredPort: configuredPort ?? (family === "espressif32" ? 3232 : 8266),
+    otherFlags,
+    declaredProtocol: typeof options.upload_protocol === "string" ? options.upload_protocol : null,
+    buildDirectory: path64.resolve(projectDir, buildDirectory, selected),
+    filesystemImage: filesystem == null ? void 0 : String(filesystem) + ".bin"
+  };
+}
+
+// src/core/ota/ota-tools.ts
+import fs53 from "node:fs/promises";
+import path65 from "node:path";
+init_errors2();
+function within4(root, target) {
+  const relative = path65.relative(root, target);
+  return !relative || relative !== ".." && !relative.startsWith(".." + path65.sep) && !path65.isAbsolute(relative);
+}
+async function resolveOtaTools(projectDir, family, systemInfo, environment = process.env) {
+  const fields = systemInfo;
+  const python = environment.PIO_MCP_OTA_PYTHON ?? fields?.python_exe?.value;
+  const core = fields?.core_dir?.value;
+  const packagesInput = environment.PLATFORMIO_PACKAGES_DIR ?? (typeof core === "string" && path65.isAbsolute(core) ? path65.join(core, "packages") : void 0);
+  if (typeof python !== "string" || !path65.isAbsolute(python) || /[\x00-\x1f\x7f]/.test(python) || /\.(?:cmd|bat|ps1|sh)$/i.test(python) || !packagesInput || !path65.isAbsolute(packagesInput))
+    throw new PlatformIOError(
+      "Host Python or registered PlatformIO packages are unavailable; configure PIO_MCP_OTA_PYTHON if needed.",
+      "OTA_TOOLS_UNAVAILABLE"
+    );
+  const project = await fs53.realpath(projectDir), executable = await fs53.realpath(python), packages = await fs53.realpath(packagesInput);
+  if (within4(project, executable) || within4(project, packages) || within4(packages, project) || !(await fs53.stat(executable)).isFile())
+    throw new PlatformIOError(
+      "OTA tools must be installed outside the workspace.",
+      "OTA_TOOLS_UNTRUSTED"
+    );
+  if (!["espressif32", "espressif8266"].includes(family))
+    throw new PlatformIOError(
+      "Unsupported OTA framework family.",
+      "OTA_FAMILY_UNSUPPORTED"
+    );
+  const packageName = "framework-arduino" + family;
+  const root = await fs53.realpath(path65.join(packages, packageName));
+  if (!within4(packages, root) || path65.relative(packages, root).split(path65.sep).length !== 1)
+    throw new PlatformIOError(
+      "OTA framework is outside registered host packages.",
+      "OTA_TOOLS_UNTRUSTED"
+    );
+  const manifest = await readPartitionArtifact(root, "package.json", 65536);
+  const registration = await readPartitionArtifact(root, ".piopm", 65536);
+  let declared, registered;
+  try {
+    declared = JSON.parse(manifest.content.toString("utf8"));
+    registered = JSON.parse(registration.content.toString("utf8"));
+  } catch {
+    throw new PlatformIOError(
+      "Invalid OTA framework registration.",
+      "OTA_TOOLS_UNTRUSTED"
+    );
+  }
+  if (!declared || !registered || declared.name !== packageName || typeof declared.version !== "string" || !declared.version || registered.name !== declared.name || registered.version !== declared.version || registered.type !== "tool")
+    throw new PlatformIOError(
+      "OTA framework registration does not match its manifest.",
+      "OTA_TOOLS_UNTRUSTED"
+    );
+  const script = await readPartitionArtifact(
+    root,
+    "tools/espota.py",
+    1024 * 1024
+  );
+  return Object.freeze({
+    pythonExecutable: executable,
+    uploaderScript: script.identity.path,
+    uploaderSha256: script.identity.sha256,
+    packageName,
+    packageVersion: declared.version
+  });
+}
+
+// src/core/devices/ota-target.ts
+init_errors2();
+init_device_lease();
+import { lookup } from "node:dns/promises";
+import { isIP as isIP5 } from "node:net";
+async function resolveOtaTarget(host, port, resolve = (host2) => lookup(host2, { all: true, family: 4 })) {
+  if (typeof host !== "string" || !host || host.length > 253 || host !== host.trim() || !Number.isInteger(port) || port < 1 || port > 65535)
+    throw new PlatformIOError("Invalid OTA destination.", "OTA_TARGET_INVALID");
+  const name2 = host.toLowerCase().replace(/\.$/, "");
+  if (!isIP5(name2) && !name2.split(".").every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)))
+    throw new PlatformIOError(
+      "OTA host must be an IPv4 address or DNS name, without a URL, path or port.",
+      "OTA_TARGET_INVALID"
+    );
+  if (isIP5(name2) === 6)
+    throw new PlatformIOError(
+      "This OTA target resolver requires IPv4.",
+      "OTA_ADDRESS_UNSUPPORTED"
+    );
+  let addresses;
+  let timer;
+  try {
+    addresses = isIP5(name2) === 4 ? [{ address: name2, family: 4 }] : await Promise.race([
+      resolve(name2),
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(
+            new PlatformIOError(
+              "OTA name resolution timed out.",
+              "OTA_DNS_TIMEOUT"
+            )
+          ),
+          5e3
+        );
+      })
+    ]);
+  } catch (error2) {
+    if (error2 instanceof PlatformIOError) throw error2;
+    throw new PlatformIOError(
+      "OTA hostname could not be resolved.",
+      "OTA_HOST_NOT_FOUND"
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!Array.isArray(addresses) || addresses.length > 64)
+    throw new PlatformIOError(
+      "Invalid OTA DNS response.",
+      "OTA_TARGET_INVALID"
+    );
+  const unique = [
+    ...new Set(
+      addresses.filter((item) => item.family === 4 && isIP5(item.address) === 4).map((item) => item.address)
+    )
+  ];
+  if (unique.length !== 1)
+    throw new PlatformIOError(
+      "Select one OTA IPv4 address explicitly.",
+      "OTA_TARGET_AMBIGUOUS"
+    );
+  const address = unique[0];
+  const first = Number(address.split(".")[0]);
+  if (first === 0 || first >= 224 || address === "255.255.255.255")
+    throw new PlatformIOError(
+      "OTA requires a unicast destination.",
+      "OTA_TARGET_INVALID"
+    );
+  const resource = Object.freeze({
+    kind: "network",
+    identity: JSON.stringify(["ota", address])
+  });
+  return Object.freeze({ host: name2, address, port, resource });
+}
+function acquireOtaCustody(target, store = new DeviceLeaseStore()) {
+  if (isIP5(target.address) !== 4 || target.resource.kind !== "network" || target.resource.identity !== JSON.stringify(["ota", target.address]))
+    throw new PlatformIOError(
+      "Invalid OTA lease binding.",
+      "OTA_TARGET_INVALID"
+    );
+  const lease = store.acquire(target.resource);
+  let released = false;
+  return {
+    prepareSpawn() {
+      if (released)
+        throw new PlatformIOError(
+          "OTA custody is already released.",
+          "OTA_CUSTODY_CLOSED"
+        );
+      store.beginHandoff(lease);
+    },
+    releaseAfterExit() {
+      if (released) return;
+      try {
+        store.cancelHandoff(lease);
+        store.release(lease);
+        released = true;
+      } catch {
+        throw new PlatformIOError(
+          "OTA lease cleanup is unconfirmed.",
+          "OTA_CLEANUP_PENDING",
+          { cleanupPending: true }
+        );
+      }
+    }
+  };
+}
+
+// src/core/ota/ota-artifacts.ts
+import fs55 from "node:fs/promises";
+
+// src/core/ota/esp-app-identity.ts
+init_errors2();
+import { createHash as createHash11 } from "node:crypto";
+function readEspAppElfHash(image) {
+  if (image.length < 288 || image[0] !== 233 || image.readUInt32LE(32) !== 2882360370)
+    return null;
+  const invalid4 = () => new PlatformIOError(
+    "Invalid ESP application image structure or checksum.",
+    "OTA_APP_IMAGE_INVALID"
+  );
+  if (image[1] < 1 || image[1] > 16 || image[23] > 1 || image.readUInt32LE(28) < 256)
+    throw invalid4();
+  let position = 24;
+  let checksum = 239;
+  for (let index = 0; index < image[1]; index++) {
+    if (position + 8 > image.length) throw invalid4();
+    const size = image.readUInt32LE(position + 4);
+    position += 8;
+    if (size > image.length - position) throw invalid4();
+    for (let end = position + size; position < end; position++)
+      checksum ^= image[position];
+  }
+  const checksumOffset = Math.floor(position / 16) * 16 + 15;
+  if (checksumOffset >= image.length || image[checksumOffset] !== checksum)
+    throw invalid4();
+  if (image[23] === 1) {
+    const digestOffset = checksumOffset + 1;
+    if (digestOffset + 32 > image.length || !createHash11("sha256").update(image.subarray(0, digestOffset)).digest().equals(image.subarray(digestOffset, digestOffset + 32)))
+      throw invalid4();
+  }
+  const hash = image.subarray(176, 208);
+  return hash.every((value2) => value2 === 0) || hash.every((value2) => value2 === 255) ? null : hash.toString("hex");
+}
+
+// src/core/ota/ota-image-archive.ts
+init_paths();
+init_errors2();
+import fs54 from "node:fs/promises";
+import path66 from "node:path";
+import { createHash as createHash12, randomUUID as randomUUID8 } from "node:crypto";
+async function archiveOtaImage(snapshot, sourcePath, expectedSha256, archiveRoot = path66.join(SERVER_DATA_DIR, "artifacts", "ota")) {
+  const image = await readPartitionArtifact(
+    path66.dirname(snapshot),
+    snapshot,
+    64 * 1024 * 1024
+  );
+  if (image.identity.sha256 !== expectedSha256)
+    throw new PlatformIOError(
+      "OTA snapshot changed before archival.",
+      "OTA_IMAGE_CHANGED"
+    );
+  const scope5 = createHash12("sha256").update(sourcePath).digest("hex");
+  const directory = path66.join(archiveRoot, scope5);
+  await fs54.mkdir(directory, { recursive: true, mode: 448 });
+  const state = await fs54.lstat(directory);
+  if (!state.isDirectory() || state.isSymbolicLink())
+    throw new PlatformIOError(
+      "Invalid OTA archive directory.",
+      "OTA_ARCHIVE_INVALID"
+    );
+  const root = await fs54.realpath(directory);
+  const destination = path66.join(root, expectedSha256 + ".bin");
+  const temporary = path66.join(root, "." + randomUUID8() + ".tmp");
+  try {
+    await fs54.writeFile(temporary, image.content, { flag: "wx", mode: 384 });
+    try {
+      await fs54.link(temporary, destination);
+    } catch (error2) {
+      if (error2.code !== "EEXIST") throw error2;
+    }
+    const stored = await fs54.lstat(destination);
+    if (!stored.isFile() || stored.isSymbolicLink())
+      throw new PlatformIOError(
+        "Invalid OTA archive object.",
+        "OTA_ARCHIVE_INVALID"
+      );
+    const verified = await readPartitionArtifact(
+      root,
+      destination,
+      64 * 1024 * 1024
+    );
+    if (verified.identity.sha256 !== expectedSha256)
+      throw new PlatformIOError(
+        "Existing OTA archive object has changed.",
+        "OTA_ARCHIVE_INVALID"
+      );
+    return destination;
+  } finally {
+    await fs54.unlink(temporary).catch((error2) => {
+      if (error2.code !== "ENOENT") throw error2;
+    });
+  }
+}
+
+// src/core/ota/ota-artifacts.ts
+import path67 from "node:path";
+init_errors2();
+async function retainOtaImage(projectDir, imagePath, expectedSha256, archiveRoot) {
+  if (expectedSha256 !== void 0 && !/^[a-fA-F0-9]{64}$/.test(expectedSha256))
+    throw new PlatformIOError(
+      "Invalid expected OTA image hash.",
+      "OTA_IMAGE_INVALID"
+    );
+  const project = await fs55.realpath(projectDir);
+  const source = await readPartitionArtifact(
+    project,
+    imagePath,
+    64 * 1024 * 1024
+  );
+  if (!source.identity.size)
+    throw new PlatformIOError("OTA image is empty.", "OTA_IMAGE_INVALID");
+  if (expectedSha256 && source.identity.sha256 !== expectedSha256.toLowerCase())
+    throw new PlatformIOError(
+      "OTA image changed before capture.",
+      "OTA_IMAGE_CHANGED"
+    );
+  const directory = await fs55.realpath(await createPrivateAnalysisDirectory());
+  try {
+    const snapshot = path67.join(directory, "image.bin");
+    await fs55.writeFile(snapshot, source.content, { flag: "wx", mode: 384 });
+    const identity = Object.freeze({
+      ...source.identity,
+      path: snapshot,
+      sourcePath: source.identity.path,
+      embeddedElfSha256: readEspAppElfHash(source.content)
+    });
+    let releasing;
+    return Object.freeze({
+      path: snapshot,
+      identity,
+      async verify() {
+        const artifact = await readPartitionArtifact(
+          directory,
+          snapshot,
+          64 * 1024 * 1024
+        );
+        if (artifact.identity.sha256 !== identity.sha256 || artifact.identity.size !== identity.size)
+          throw new PlatformIOError(
+            "Retained OTA image changed.",
+            "OTA_IMAGE_CHANGED"
+          );
+      },
+      async archive() {
+        return archiveOtaImage(
+          snapshot,
+          identity.sourcePath,
+          identity.sha256,
+          archiveRoot
+        );
+      },
+      release() {
+        releasing ??= fs55.rm(directory, { recursive: true, force: true }).catch((error2) => {
+          releasing = void 0;
+          throw error2;
+        });
+        return releasing;
+      }
+    });
+  } catch (error2) {
+    await fs55.rm(directory, { recursive: true, force: true });
+    throw error2;
+  }
+}
+
+// src/core/ota/espota-process.ts
+init_owned_process_wait();
+init_errors2();
+import { spawn as spawn4 } from "node:child_process";
+import path68 from "node:path";
+import { isIP as isIP6 } from "node:net";
+var ESPOTA_BRIDGE = String.raw`
+import hashlib, json, logging, runpy, socket, sys
+request = json.loads(sys.stdin.buffer.read(65537))
+for filename, expected in [(request["image"], request["imageSha256"]), (request["script"], request["scriptSha256"])]:
+    digest = hashlib.sha256()
+    with open(filename, "rb") as artifact:
+        while True:
+            chunk = artifact.read(65536)
+            if not chunk:
+                break
+            digest.update(chunk)
+    if digest.hexdigest() != expected:
+        raise RuntimeError("OTA artifact changed before execution")
+sys.argv = [request["script"], "--ip", request["address"], "--port", str(request["port"]), "--file", request["image"], "--progress"]
+for key, flag in [("hostAddress", "--host_ip"), ("hostPort", "--host_port"), ("invitationTimeoutSeconds", "--timeout")]:
+    if key in request["options"]:
+        sys.argv += [flag, str(request["options"][key])]
+# INFO records contain the protocol completion marker. Suppress DEBUG option dumps containing auth.
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s]: %(message)s")
+original_accept = socket.socket.accept
+original_recv = socket.socket.recv
+original_recvfrom = socket.socket.recvfrom
+def bound_accept(sock):
+    while True:
+        connection, peer = original_accept(sock)
+        if peer[0] == request["address"]:
+            return connection, peer
+        connection.close()
+def bound_recv(sock, size, flags=0):
+    if sock.type & socket.SOCK_DGRAM:
+        while True:
+            data, peer = original_recvfrom(sock, size, flags)
+            if peer[0] == request["address"] and peer[1] == request["port"]:
+                return data
+    return original_recv(sock, size, flags)
+socket.socket.accept = bound_accept
+socket.socket.recv = bound_recv
+if request["auth"] is not None:
+    sys.argv += ["--auth", request["auth"]]
+if request["filesystem"]:
+    sys.argv += ["--spiffs"]
+runpy.run_path(request["script"], run_name="__main__")
+`;
+async function runEspotaProcess(request) {
+  if ([request.pythonExecutable, request.uploaderScript, request.imagePath].some(
+    (value2) => typeof value2 !== "string" || !path68.isAbsolute(value2) || value2.length > 32768 || /[\x00-\x1f\x7f]/.test(value2)
+  ) || /\.(?:cmd|bat|ps1|sh)$/i.test(request.pythonExecutable) || isIP6(request.address) !== 4 || !Number.isInteger(request.port) || request.port < 1 || request.port > 65535 || !Number.isInteger(request.timeoutMs) || request.timeoutMs < 1 || request.timeoutMs > 6e5 || typeof request.filesystem !== "boolean" || !/^[a-f0-9]{64}$/.test(request.imageSha256) || !/^[a-f0-9]{64}$/.test(request.uploaderSha256) || request.auth !== void 0 && (typeof request.auth !== "string" || request.auth.length > 1024 || /[\x00-\x1f\x7f]/.test(request.auth)))
+    throw new PlatformIOError(
+      "Invalid resolved OTA execution request.",
+      "OTA_EXECUTION_INVALID"
+    );
+  const options = OtaUploaderOptionsSchema.safeParse(
+    request.uploaderOptions ?? {}
+  );
+  if (!options.success)
+    throw new PlatformIOError(
+      "Invalid OTA uploader options.",
+      "OTA_EXECUTION_INVALID"
+    );
+  const payload = JSON.stringify({
+    options: options.data,
+    script: request.uploaderScript,
+    image: request.imagePath,
+    imageSha256: request.imageSha256,
+    scriptSha256: request.uploaderSha256,
+    address: request.address,
+    port: request.port,
+    auth: request.auth ?? null,
+    filesystem: request.filesystem
+  });
+  if (Buffer.byteLength(payload) > 65536)
+    throw new PlatformIOError(
+      "OTA request exceeds the private input limit.",
+      "OTA_EXECUTION_INVALID"
+    );
+  if (request.signal?.aborted)
+    throw new PlatformIOError(
+      "OTA upload was cancelled before startup.",
+      "OTA_CANCELLED"
+    );
+  await request.custody.prepareSpawn();
+  let proc;
+  try {
+    proc = spawn4(request.pythonExecutable, ["-I", "-c", ESPOTA_BRIDGE], {
+      cwd: path68.dirname(request.imagePath),
+      shell: false,
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUNBUFFERED: "1" }
+    });
+  } catch {
+    request.custody.releaseAfterExit();
+    throw new PlatformIOError(
+      "OTA uploader could not start.",
+      "OTA_PROCESS_FAILED"
+    );
+  }
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  request.signal?.addEventListener("abort", abort, { once: true });
+  if (request.signal?.aborted) abort();
+  let outputBytes = 0, limited = false, closed = false, inputFailed = false;
+  const stdout = [], stderr = [];
+  let resolveClosed;
+  const closure = new Promise((resolve) => {
+    resolveClosed = resolve;
+  });
+  proc.once("close", () => {
+    closed = true;
+    resolveClosed();
+  });
+  const collect = (destination) => (chunk) => {
+    if (limited) return;
+    outputBytes += chunk.length;
+    if (outputBytes > 1024 * 1024) {
+      limited = true;
+      controller.abort();
+      return;
+    }
+    destination.push(Buffer.from(chunk));
+  };
+  proc.stdout.on("data", collect(stdout));
+  proc.stderr.on("data", collect(stderr));
+  proc.stdin.on("error", () => {
+    inputFailed = true;
+    controller.abort();
+  });
+  const completion = waitForOwnedProcess(
+    proc,
+    request.timeoutMs,
+    1e3,
+    controller.signal
+  );
+  proc.stdin.end(payload);
+  let exitCode, failure;
+  try {
+    exitCode = await completion;
+  } catch (error2) {
+    failure = error2;
+  }
+  let closeTimer;
+  if (!closed)
+    await Promise.race([
+      closure,
+      new Promise((resolve) => {
+        closeTimer = setTimeout(resolve, 1e3);
+      })
+    ]);
+  clearTimeout(closeTimer);
+  request.signal?.removeEventListener("abort", abort);
+  if (!closed)
+    throw new PlatformIOError(
+      "OTA process cleanup is unconfirmed.",
+      "OTA_CLEANUP_PENDING",
+      { cleanupPending: true }
+    );
+  request.custody.releaseAfterExit();
+  if (limited)
+    throw new PlatformIOError(
+      "OTA uploader exceeded the output limit.",
+      "OTA_OUTPUT_LIMIT",
+      { cleanupPending: false }
+    );
+  if (inputFailed)
+    throw new PlatformIOError(
+      "OTA uploader rejected private input.",
+      "OTA_PROCESS_FAILED",
+      { cleanupPending: false }
+    );
+  if (failure)
+    throw new PlatformIOError(
+      "OTA uploader did not complete.",
+      request.signal?.aborted ? "OTA_CANCELLED" : failure instanceof PlatformIOError && failure.code === "COMMAND_TIMEOUT" ? "OTA_TIMEOUT" : "OTA_PROCESS_FAILED",
+      { cleanupPending: false }
+    );
+  const redact = (buffers) => {
+    let text8 = Buffer.concat(buffers).toString("utf8");
+    if (request.auth)
+      for (const secret of /* @__PURE__ */ new Set([
+        request.auth,
+        JSON.stringify(request.auth).slice(1, -1),
+        encodeURIComponent(request.auth)
+      ]))
+        text8 = text8.split(secret).join("[REDACTED]");
+    return text8;
+  };
+  return {
+    exitCode,
+    stdout: redact(stdout),
+    stderr: redact(stderr)
+  };
+}
+
+// src/core/ota/ota-transfer.ts
+init_errors2();
+async function executePreparedOtaTransfer(input, caller = {}, onAuthorized) {
+  const guard = createPolicyRevisionGuard(input.projectDir);
+  const operation = input.filesystem ? "ota_upload_filesystem" : "ota_upload_firmware";
+  const args = {
+    projectDir: input.projectDir,
+    environment: input.environment,
+    address: input.target.address,
+    port: input.target.port,
+    filesystem: input.filesystem,
+    uploaderOptions: input.uploaderOptions ?? {},
+    timeoutMs: input.timeoutMs,
+    authenticationProvided: input.auth !== void 0,
+    image: {
+      path: input.image.identity.sourcePath,
+      size: input.image.identity.size,
+      sha256: input.image.identity.sha256
+    },
+    elf: input.elfIdentity ? { path: input.elfIdentity.path, sha256: input.elfIdentity.sha256 } : null,
+    uploader: {
+      executable: input.tools.pythonExecutable,
+      script: input.tools.uploaderScript,
+      sha256: input.tools.uploaderSha256,
+      packageName: input.tools.packageName,
+      packageVersion: input.tools.packageVersion
+    }
+  };
+  const context = { ...caller, workspaceDir: input.projectDir };
+  for (const [stage, approvalId2] of [
+    [operation, input.approvalId],
+    ["ota_uploader_command", input.commandApprovalId]
+  ]) {
+    const plan = await planAction(stage, { ...args, approvalId: approvalId2 }, context);
+    if (plan.status !== "ready")
+      throw new PlatformIOError(
+        plan.reason,
+        plan.status === "deny" ? "POLICY_DENIED" : "APPROVAL_REQUIRED",
+        { policyDecision: plan }
+      );
+  }
+  return dispatchAuthorizedAction(
+    operation,
+    { ...args, approvalId: input.approvalId },
+    context,
+    () => dispatchAuthorizedAction(
+      "ota_uploader_command",
+      { ...args, approvalId: input.commandApprovalId },
+      context,
+      async () => {
+        await onAuthorized?.();
+        guard();
+        await input.image.verify();
+        guard();
+        const imageArchivePath = await input.image.archive();
+        guard();
+        const custody = acquireOtaCustody(input.target);
+        let cleanupPending = false;
+        try {
+          const result = await runEspotaProcess({
+            pythonExecutable: input.tools.pythonExecutable,
+            uploaderScript: input.tools.uploaderScript,
+            uploaderSha256: input.tools.uploaderSha256,
+            imagePath: input.image.path,
+            imageSha256: input.image.identity.sha256,
+            address: input.target.address,
+            port: input.target.port,
+            auth: input.auth,
+            filesystem: input.filesystem,
+            uploaderOptions: input.uploaderOptions,
+            timeoutMs: input.timeoutMs,
+            signal: input.signal,
+            custody
+          });
+          guard();
+          return {
+            ...result,
+            imageSha256: input.image.identity.sha256,
+            imageBytes: input.image.identity.size,
+            imageArchivePath,
+            address: input.target.address,
+            port: input.target.port,
+            runtimeVerified: false
+          };
+        } catch (error2) {
+          cleanupPending = error2 instanceof PlatformIOError && error2.context?.cleanupPending === true;
+          throw error2;
+        } finally {
+          if (!cleanupPending) custody.releaseAfterExit();
+        }
+      }
+    )
+  );
+}
+
+// src/core/ota/ota-report.ts
+init_errors2();
+var failures = [
+  [
+    /Host \S+ Not Found/,
+    "host_not_found",
+    "Resolve the board hostname or select its current IP address."
+  ],
+  [
+    /No response from the ESP/,
+    "no_response",
+    "Check the OTA UDP port, network path and running ArduinoOTA service."
+  ],
+  [
+    /Authentication Failed|No Answer to our Authentication/,
+    "auth_failed",
+    "Check the configured OTA credential."
+  ],
+  [
+    /Bad Answer:/,
+    "bad_answer",
+    "The selected service did not accept the OTA invitation."
+  ],
+  [
+    /No response from device/,
+    "no_callback",
+    "Check the board's TCP callback route and the host firewall."
+  ],
+  [
+    /Error Uploading/,
+    "transfer_failed",
+    "The transfer was interrupted; check the device and network before retrying."
+  ],
+  [
+    /Error response from device|No Result!/,
+    "device_rejected",
+    "Check image format, OTA partition capacity and device logs."
+  ],
+  [
+    /Please specify IP address or host name/,
+    "no_upload_port",
+    "Select an explicit OTA destination."
+  ]
+];
+function summarizeOtaTransfer(output, exitCode, timedOut = false) {
+  if (typeof output !== "string" || Buffer.byteLength(output) > 1024 * 1024 || !Number.isInteger(exitCode))
+    throw new PlatformIOError(
+      "Invalid OTA report input.",
+      "OTA_REPORT_INVALID"
+    );
+  const succeeded = /\[INFO\]: Success|Result: OK/.test(output);
+  const failure = failures.find(([pattern]) => pattern.test(output));
+  let progress = null;
+  for (const match of output.matchAll(/Uploading: \[=*[ =]*\] (\d{1,3})%/g)) {
+    const value2 = Number(match[1]);
+    if (value2 <= 100) progress = value2;
+  }
+  const ok = !timedOut && exitCode === 0 && succeeded && !failure;
+  return {
+    ok,
+    error: ok ? null : timedOut ? "timeout" : failure?.[1] ?? "upload_failed",
+    hint: ok ? "Observe the device separately to verify runtime health." : timedOut ? "The bounded upload deadline expired." : failure?.[2] ?? "Inspect the retained uploader log and image selection.",
+    progress_percent: progress,
+    auto_switched: output.includes("`upload_protocol` is switched to `espota`"),
+    runtime_verified: false
+  };
+}
+
+// src/tools/ota.ts
+init_errors2();
 init_projects();
 var OtaUploadSchema = external_exports.object({
   projectDir: external_exports.string().min(1).max(32768),
@@ -109924,6 +110251,7 @@ async function executeOtaUpload(input, caller = {}, onAuthorized) {
     args.filesystem
   );
   const auth = args.auth ?? configuration.auth;
+  const redactText = (value2) => redactSecretsInText(auth ? value2.split(auth).join("[REDACTED]") : value2);
   const target = await dispatchAuthorizedAction(
     "list_devices",
     {
@@ -109941,6 +110269,7 @@ async function executeOtaUpload(input, caller = {}, onAuthorized) {
   return hardwareLockManager.withImplicitLock(async () => {
     guard();
     let buildResult;
+    let buildReport;
     if (args.build)
       buildResult = await dispatchAuthorizedAction(
         "target_build",
@@ -109959,12 +110288,34 @@ async function executeOtaUpload(input, caller = {}, onAuthorized) {
             projectDir,
             args.filesystem ? "buildfs" : "buildprog",
             configuration.environment,
-            false
+            false,
+            {
+              onResult: async (result) => {
+                guard();
+                const output = redactText(result.finalOutput);
+                buildReport = cleanCompatibilityResult(
+                  {
+                    exitCode: result.exitCode,
+                    output,
+                    logPath: result.fullLogPath ?? ""
+                  },
+                  configuration.environment,
+                  (performance.now() - started) / 1e3,
+                  false,
+                  "build"
+                );
+              }
+            }
           );
         }
       );
+    if (buildResult)
+      buildResult = JSON.parse(
+        JSON.stringify(buildResult),
+        (_key, value2) => typeof value2 === "string" ? redactText(value2) : value2
+      );
     guard();
-    if (buildResult && !buildResult.success)
+    if (buildResult && (!buildResult.success || buildReport?.ok === false))
       return {
         ok: false,
         error: "build_failed",
@@ -109972,6 +110323,16 @@ async function executeOtaUpload(input, caller = {}, onAuthorized) {
         build: buildResult,
         host: args.host,
         env: configuration.environment,
+        port: target.port,
+        target_host: target.address,
+        platform_family: configuration.family,
+        filesystem: args.filesystem,
+        memory: buildReport?.memory ?? {},
+        errors: buildReport?.errors.slice(0, 20) ?? [],
+        exit_code: buildReport?.exit_code ?? null,
+        output_tail: buildReport?.output_tail ?? "",
+        log_path: buildReport?.log_path || null,
+        duration_s: (performance.now() - started) / 1e3,
         runtime_verified: false
       };
     const tools = await dispatchAuthorizedAction(
@@ -110097,7 +110458,9 @@ async function executeOtaUpload(input, caller = {}, onAuthorized) {
         duration_s: (performance.now() - started) / 1e3,
         exit_code: result.exitCode,
         log_path: logPath,
-        output_tail: output.slice(-16e3),
+        output_tail: output.replace(/\r\n?/g, "\n").split("\n").slice(-40).join("\n").slice(-16e3),
+        memory: buildReport?.memory ?? {},
+        errors: buildReport?.errors.slice(0, 20) ?? [],
         build: buildResult ?? null
       };
     } catch (error2) {
@@ -111455,334 +111818,6 @@ function dispatchAuthorizedTarget(target, args, caller, execute3) {
 // src/tools/run-target.ts
 init_serial_endpoint();
 init_errors2();
-
-// src/adapters/clean-compat.ts
-init_zod();
-init_errors2();
-function executeCleanCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
-  return executeRunCompatibility(
-    "clean",
-    input,
-    defaults,
-    caller,
-    onAuthorized
-  );
-}
-function executeBuildCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
-  return executeRunCompatibility(
-    "build",
-    input,
-    defaults,
-    caller,
-    onAuthorized
-  );
-}
-function executeCheckCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
-  return executeRunCompatibility(
-    "check",
-    input,
-    defaults,
-    caller,
-    onAuthorized
-  );
-}
-async function executeRunCompatibility(mode, input, defaults, caller, onAuthorized) {
-  const scope5 = {
-    project_dir: external_exports.string().max(32768).nullable().optional(),
-    env: external_exports.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).nullable().optional(),
-    approval_id: external_exports.string().max(256).optional()
-  };
-  const params = mode === "clean" ? external_exports.object({ ...scope5, full: external_exports.boolean().default(false) }).strict().parse(input) : mode === "check" ? external_exports.object({
-    ...scope5,
-    severity: external_exports.enum(["low", "medium", "high"]).default("medium"),
-    pattern: external_exports.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).nullable().optional(),
-    skip_packages: external_exports.boolean().default(true),
-    tool: external_exports.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).nullable().optional()
-  }).strict().parse(input) : external_exports.object({
-    ...scope5,
-    jobs: external_exports.number().int().min(1).max(1024).nullable().optional(),
-    verbose: external_exports.boolean().default(false)
-  }).strict().parse(input);
-  const timeoutMs = mode === "clean" ? 12e4 : 12e5;
-  const projectDir = await resolveCompatibilityProject(
-    params.project_dir,
-    defaults
-  );
-  const environment = params.env ?? void 0;
-  return dispatchAuthorizedAction(
-    mode === "build" ? "build_project" : mode === "check" ? "check_project" : "clean_project",
-    {
-      projectDir,
-      environment,
-      ..."full" in params ? { full: params.full } : "severity" in params ? {
-        severity: params.severity,
-        pattern: params.pattern ?? void 0,
-        skipPackages: params.skip_packages,
-        tool: params.tool ?? void 0,
-        jsonOutput: true
-      } : { jobs: params.jobs ?? void 0, verbose: params.verbose },
-      approvalId: params.approval_id
-    },
-    { ...caller, workspaceDir: projectDir },
-    async () => {
-      const guard = createPolicyRevisionGuard(projectDir);
-      await onAuthorized?.();
-      guard();
-      return hardwareLockManager.withImplicitLock(async () => {
-        guard();
-        const started = performance.now();
-        let completed;
-        const collect = async (exitCode, fullLogPath, timedOut2 = false) => {
-          guard();
-          let output = await readCommandOutput(fullLogPath);
-          guard();
-          if (timedOut2)
-            output += `
-[platformio-mcp] timed out after ${timeoutMs / 1e3}s`;
-          const logPath = await retainCommandLog(mode, output, "");
-          return { exitCode, output, logPath };
-        };
-        let timedOut = false;
-        try {
-          const onResult = async (result) => {
-            completed = await collect(result.exitCode, result.fullLogPath);
-          };
-          if ("full" in params) {
-            await cleanProject(projectDir, false, {
-              environment,
-              full: params.full,
-              timeoutMs,
-              onResult
-            });
-          } else if ("severity" in params) {
-            await checkProject(projectDir, environment, false, {
-              severity: params.severity,
-              pattern: params.pattern ?? void 0,
-              skipPackages: params.skip_packages,
-              tool: params.tool ?? void 0,
-              jsonOutput: true,
-              timeoutMs,
-              onResult
-            });
-          } else {
-            await buildProject(projectDir, environment, params.verbose, false, {
-              jobs: params.jobs ?? void 0,
-              forceExecution: true,
-              timeoutMs,
-              onResult
-            });
-          }
-        } catch (error2) {
-          if (error2 instanceof PlatformIOError && error2.code === "COMMAND_TIMEOUT" && error2.context?.cleanupPending === false && typeof error2.context.fullLogPath === "string") {
-            timedOut = true;
-            completed = await collect(-1, error2.context.fullLogPath, true);
-          } else if (!(error2 instanceof BuildError) || !completed || error2.context?.exitCode !== completed.exitCode)
-            throw error2;
-        }
-        guard();
-        if (!completed)
-          throw new PlatformIOError(
-            "Command result was not collected",
-            "COMPAT_RESULT_INVALID"
-          );
-        if ("severity" in params)
-          return checkCompatibilityResult(
-            completed,
-            projectDir,
-            params.severity,
-            timedOut
-          );
-        return cleanCompatibilityResult(
-          completed,
-          environment,
-          (performance.now() - started) / 1e3,
-          timedOut,
-          mode === "build" ? "build" : "clean"
-        );
-      });
-    }
-  );
-}
-function cleanCompatibilityResult(result, environment, duration4, timedOut = false, tool = "clean") {
-  const output = normalizeCleanOutput(result.output);
-  const lines2 = output.split("\n");
-  const diagnostics = [];
-  const seen = /* @__PURE__ */ new Set();
-  const linkerDiagnostics = [];
-  const stepDiagnostics = [];
-  const environments = [];
-  const memory = {};
-  let failed = false;
-  for (const line of lines2) {
-    const env = /^Processing (\S+) \(/.exec(line);
-    if (env) environments.push(env[1]);
-    if (/^=+ \[(FAILED|ERROR)\] Took /.test(line)) failed = true;
-    const mem = /^(RAM|Flash):\s+\[[=\s]*\]\s+([\d.]+)%\s+\(used (\d+) bytes from (\d+) bytes\)/.exec(
-      line
-    );
-    if (mem)
-      memory[mem[1].toLowerCase()] = {
-        percent: Number(mem[2]),
-        used_bytes: Number(mem[3]),
-        total_bytes: Number(mem[4])
-      };
-    const compiler = /^(.+?):(\d+):(?:(\d+):)?\s*(fatal error|error|warning|note):\s*(.*)$/.exec(
-      line
-    );
-    const linker = /(undefined reference to .*|symbol\(s\) not found.*|multiple definition of .*|region .* overflowed by .*)$/.exec(
-      line
-    );
-    const step = /^\*\*\* \[([^\]]+)\] (.*)$/.exec(line);
-    const candidates = [
-      compiler ? {
-        bucket: diagnostics,
-        key: JSON.stringify(["compiler", ...compiler.slice(1)]),
-        value: {
-          kind: compiler[4].replace("fatal ", ""),
-          file: compiler[1],
-          line: Number(compiler[2]),
-          column: compiler[3] ? Number(compiler[3]) : null,
-          message: compiler[5].trim()
-        }
-      } : null,
-      linker ? {
-        bucket: linkerDiagnostics,
-        key: JSON.stringify(["linker", linker[1].trim()]),
-        value: {
-          kind: "error",
-          file: "<linker>",
-          line: 0,
-          column: null,
-          message: linker[1].trim()
-        }
-      } : null,
-      step ? {
-        bucket: stepDiagnostics,
-        key: JSON.stringify(["scons", step[1], step[2]]),
-        value: {
-          kind: "error",
-          file: step[1],
-          line: 0,
-          column: null,
-          message: `build step failed: ${step[2]}`
-        }
-      } : null
-    ];
-    for (const candidate of candidates) {
-      if (candidate && !seen.has(candidate.key)) {
-        seen.add(candidate.key);
-        candidate.bucket.push(candidate.value);
-      }
-    }
-  }
-  diagnostics.push(...linkerDiagnostics, ...stepDiagnostics);
-  const errors = diagnostics.filter((item) => item.kind === "error");
-  const warnings = diagnostics.filter((item) => item.kind === "warning");
-  const ok = !timedOut && result.exitCode === 0 && !failed;
-  const status = timedOut ? "timeout" : ok ? "success" : "failed";
-  const durationSeconds = Math.round(duration4 * 100) / 100;
-  const summary = [
-    `${tool} ${status} for env ${environment || environments.join(",") || "default"} in ${durationSeconds}s.`
-  ];
-  if (errors.length)
-    summary.push(
-      `${errors.length} error(s); first: ${errors[0].file}:${errors[0].line}: ${errors[0].message}`
-    );
-  if (warnings.length) summary.push(`${warnings.length} warning(s).`);
-  if (Object.keys(memory).length)
-    summary.push(
-      `RAM ${(memory.ram?.percent ?? 0).toFixed(1)}%, Flash ${(memory.flash?.percent ?? 0).toFixed(1)}%.`
-    );
-  if (timedOut)
-    summary.push(
-      "The command timed out; first builds download toolchains and can take several minutes, retry once."
-    );
-  return {
-    ok,
-    status,
-    summary: summary.join(" "),
-    environments,
-    errors: errors.slice(0, 50),
-    warnings: warnings.slice(0, 50),
-    error_count: errors.length,
-    warning_count: warnings.length,
-    memory,
-    duration_s: durationSeconds,
-    exit_code: result.exitCode,
-    log_path: result.logPath,
-    output_tail: lines2.slice(-40).join("\n"),
-    port_error: ok ? null : classifyCleanPortError(output)
-  };
-}
-function normalizeCleanOutput(output) {
-  const lines2 = output.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r\n?/g, "\n").split("\n");
-  const result = [];
-  let banner = false;
-  for (const line of lines2) {
-    const stripped = line.trim();
-    if (/^\*{21,}$/.test(stripped)) {
-      banner = !banner;
-      continue;
-    }
-    if (banner || stripped === "Verbose mode can be enabled via `-v, --verbose` option" || stripped === "LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf")
-      continue;
-    result.push(line.trimEnd());
-  }
-  while (result.length && result.at(-1) === "") result.pop();
-  return result.join("\n");
-}
-function classifyCleanPortError(output) {
-  const patterns = [
-    [
-      "port_permission",
-      /PermissionError\(13|Access is denied|Permission denied|Errno 13/i
-    ],
-    [
-      "port_busy",
-      /Device or resource busy|Resource busy|Errno 16|port is busy|already in use/i
-    ],
-    [
-      "no_response",
-      /Timed out waiting for packet header|Failed to connect to ESP|No serial data received|Wrong boot mode|Invalid head of packet|programmer is not responding|not in sync|stk500_recv\(\)|stk500_getsync\(\)|Failed to open the debug port|No device found on/i
-    ],
-    [
-      "port_missing",
-      /could not open port|A fatal error occurred: Could not open|SerialException|No such file or directory: '?\/dev|Errno 2\b.*(?:tty|cu\.|COM)|FileNotFoundError.*(?:tty|cu\.|COM)|Could not find a port|No serial ports found/i
-    ]
-  ];
-  return patterns.find(([, pattern]) => pattern.test(output))?.[0] ?? null;
-}
-function checkCompatibilityResult(result, projectDir, severity, timedOut = false) {
-  const output = normalizeCleanOutput(result.output);
-  const failure = () => ({
-    ok: false,
-    error: "check_failed",
-    summary: `pio check did not return a complete valid report (exit ${result.exitCode}).`,
-    output_tail: output.split("\n").slice(-30).join("\n"),
-    log_path: result.logPath
-  });
-  if (timedOut) return { ...failure(), status: "timeout" };
-  let report;
-  try {
-    report = summarizeCheckOutput(output, projectDir);
-  } catch (error2) {
-    if (error2 instanceof PlatformIOError && error2.code?.startsWith("CHECK_REPORT_"))
-      return failure();
-    throw error2;
-  }
-  const failed = report.tools.filter((tool) => !tool.succeeded);
-  let summary = `${report.defect_count} defect(s) at severity >= ${severity}: ${report.by_severity.high} high, ${report.by_severity.medium} medium, ${report.by_severity.low} low.`;
-  if (report.defects.length) {
-    const defect = report.defects[0];
-    summary += ` Top: [${defect.severity}] ${defect.file}:${defect.line} ${defect.message}`;
-  }
-  if (failed.length)
-    summary += " Tool(s) failed: " + failed.map((tool) => `${tool.tool}(${tool.env})`).join(", ");
-  if (result.exitCode !== 0 && !report.tools.length) return failure();
-  return { ok: !failed.length, summary, ...report, log_path: result.logPath };
-}
-
-// src/tools/run-target.ts
 var RunTargetSchema = external_exports.object({
   target: external_exports.string().min(1).max(4096).regex(/^[^-\x00-\x1f\x7f][^\x00-\x1f\x7f]*$/),
   project_dir: external_exports.string().max(32768).nullable().optional(),
