@@ -1173,3 +1173,8 @@ MCP coredump now selects exactly one offline dump or explicit device/table acqui
 
 Added explicit port/partition/table selection, integer/boolean validation and separate read/table/analysis grants to the coredump CLI. Device-only options without a port are rejected rather than silently ignored; no-crash results set an unsuccessful exit status. TypeScript and lint passed. An actual CLI invocation returned COREDUMP_INPUT_INVALID before hardware access for missing-port input. Reference pio_coredump adapter, retained output and physical acceptance remain outstanding.
 
+
+### Explicit private dump export foundation
+
+Added bounded exact-byte export into an existing authorized workspace directory, using private same-volume staging and exclusive hard-link publication. Existing destinations are never replaced; outside-workspace paths and alternate-stream names are rejected. Explicit exports have user-managed retention, distinct from temporary analysis data. Four real filesystem/privacy cases passed, including preservation of an existing destination; lint and TypeScript passed. Managed default retention, public export grants and the reference out_path adapter remain unfinished.
+

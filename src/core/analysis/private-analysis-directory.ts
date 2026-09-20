@@ -24,9 +24,11 @@ if ($rules.Count -ne 1 -or $rules[0].IdentityReference.Value -ne $sid.Value -or 
 `;
 
 /** Create an owner-only directory before writing sensitive bytes; fail closed if permissions cannot be set. */
-export async function createPrivateAnalysisDirectory(): Promise<string> {
+export async function createPrivateAnalysisDirectory(
+  parent = os.tmpdir(),
+): Promise<string> {
   const directory = await fs.mkdtemp(
-    path.join(os.tmpdir(), "pio-private-analysis-"),
+    path.join(parent, "pio-private-analysis-"),
   );
   try {
     try {
@@ -81,8 +83,9 @@ export async function createPrivateAnalysisDirectory(): Promise<string> {
 /** Keep sensitive files private for a callback and remove them after all consumers stop. */
 export async function withPrivateAnalysisDirectory<T>(
   use: (directory: string) => Promise<T>,
+  parent?: string, // Host-resolved staging parent, never an unchecked tool argument.
 ): Promise<T> {
-  const directory = await createPrivateAnalysisDirectory();
+  const directory = await createPrivateAnalysisDirectory(parent);
   try {
     return await use(directory);
   } finally {
