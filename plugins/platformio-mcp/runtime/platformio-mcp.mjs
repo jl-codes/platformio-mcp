@@ -11537,7 +11537,7 @@ Troubleshooting:
 2. Verify internet connection
 3. Try updating library registry: pio lib update`;
   }
-  if (error2 instanceof PlatformIOError2) {
+  if (error2 instanceof PlatformIOError) {
     let message = error2.message;
     if (error2.context) {
       message += "\n\nContext: " + JSON.stringify(error2.context, null, 2);
@@ -11729,11 +11729,11 @@ function isPlatformIONotFoundError(error2) {
   }
   return false;
 }
-var PlatformIOError2, PlatformIONotInstalledError, BoardNotFoundError, ProjectInitError, BuildError, UploadError, LibraryError, CommandTimeoutError;
+var PlatformIOError, PlatformIONotInstalledError, BoardNotFoundError, ProjectInitError, BuildError, UploadError, LibraryError, CommandTimeoutError;
 var init_errors2 = __esm({
   "src/utils/errors.ts"() {
     "use strict";
-    PlatformIOError2 = class extends Error {
+    PlatformIOError = class extends Error {
       constructor(message, code, context) {
         super(message);
         this.code = code;
@@ -11744,13 +11744,13 @@ var init_errors2 = __esm({
       code;
       context;
     };
-    PlatformIONotInstalledError = class extends PlatformIOError2 {
+    PlatformIONotInstalledError = class extends PlatformIOError {
       constructor(message = "PlatformIO CLI is not installed or not found in PATH") {
         super(message, "PLATFORMIO_NOT_INSTALLED");
         this.name = "PlatformIONotInstalledError";
       }
     };
-    BoardNotFoundError = class extends PlatformIOError2 {
+    BoardNotFoundError = class extends PlatformIOError {
       constructor(boardId) {
         super(
           `Board '${boardId}' not found in PlatformIO registry`,
@@ -11760,31 +11760,31 @@ var init_errors2 = __esm({
         this.name = "BoardNotFoundError";
       }
     };
-    ProjectInitError = class extends PlatformIOError2 {
+    ProjectInitError = class extends PlatformIOError {
       constructor(message, context) {
         super(message, "PROJECT_INIT_FAILED", context);
         this.name = "ProjectInitError";
       }
     };
-    BuildError = class extends PlatformIOError2 {
+    BuildError = class extends PlatformIOError {
       constructor(message, context) {
         super(message, "BUILD_FAILED", context);
         this.name = "BuildError";
       }
     };
-    UploadError = class extends PlatformIOError2 {
+    UploadError = class extends PlatformIOError {
       constructor(message, context) {
         super(message, "UPLOAD_FAILED", context);
         this.name = "UploadError";
       }
     };
-    LibraryError = class extends PlatformIOError2 {
+    LibraryError = class extends PlatformIOError {
       constructor(message, context) {
         super(message, "LIBRARY_ERROR", context);
         this.name = "LibraryError";
       }
     };
-    CommandTimeoutError = class extends PlatformIOError2 {
+    CommandTimeoutError = class extends PlatformIOError {
       constructor(command, timeout) {
         super(
           `Command '${command}' timed out after ${timeout}ms`,
@@ -14004,21 +14004,21 @@ async function execPioCommand(args, options = {}) {
 }
 function parsePioJsonOutput(output, schema3) {
   if (!output || output.trim().length === 0) {
-    throw new PlatformIOError2("Empty output from PlatformIO command");
+    throw new PlatformIOError("Empty output from PlatformIO command");
   }
   try {
     const parsed = JSON.parse(output);
     return schema3.parse(parsed);
   } catch (error2) {
     if (error2 instanceof external_exports.ZodError) {
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         `Failed to parse PlatformIO output: ${error2.message}`,
         "PARSE_ERROR",
         { zodError: error2.issues, output: output.substring(0, 500) }
       );
     }
     if (error2 instanceof SyntaxError) {
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         `Invalid JSON output from PlatformIO: ${error2.message}`,
         "INVALID_JSON",
         { output: output.substring(0, 500) }
@@ -14045,12 +14045,12 @@ async function getPlatformIOVersion() {
       const match = result.stdout.match(/version\s+([\d\.]+)/i);
       return match ? match[1] : result.stdout.trim();
     }
-    throw new PlatformIOError2("Failed to get PlatformIO version");
+    throw new PlatformIOError("Failed to get PlatformIO version");
   } catch (error2) {
     if (error2 instanceof PlatformIONotInstalledError) {
       throw error2;
     }
-    throw new PlatformIOError2("Failed to get PlatformIO version");
+    throw new PlatformIOError("Failed to get PlatformIO version");
   }
 }
 function resolvePioPath() {
@@ -14182,7 +14182,7 @@ var init_platformio = __esm({
         }
         const result = await this.execute(command, fullArgs, options);
         if (result.exitCode !== 0) {
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             `PlatformIO command failed: ${command} ${args.join(" ")}`,
             "COMMAND_FAILED",
             { stderr: result.stderr, exitCode: result.exitCode }
@@ -15023,13 +15023,13 @@ async function listDevices() {
       return enrichedDevice;
     });
   } catch (error2) {
-    if (error2 instanceof PlatformIOError2) {
+    if (error2 instanceof PlatformIOError) {
       const errorMessage = error2.message.toLowerCase();
       if (errorMessage.includes("no devices") || errorMessage.includes("empty")) {
         return [];
       }
     }
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Failed to list devices: ${error2}`,
       "LIST_DEVICES_FAILED"
     );
@@ -15452,7 +15452,7 @@ function regexSource(pattern, translate) {
     if (pattern[i] === "\\") {
       i++;
       if (/[AZzGRNUae]/.test(pattern[i] ?? ""))
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Unsupported Python regex escape; use the documented ECMAScript subset.",
           "PATTERN_UNSUPPORTED"
         );
@@ -15462,13 +15462,13 @@ function regexSource(pattern, translate) {
 }
 async function runBoundedPattern(lines2, pattern, options = {}, extract = false) {
   if (typeof pattern !== "string" || pattern.length > 4096 || lines2.length > 1e4 || lines2.some((line) => typeof line !== "string") || lines2.reduce((sum, line) => sum + Buffer.byteLength(line), 0) > 1024 * 1024) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Pattern matching is limited to 4096 pattern characters, 10000 lines and 1 MiB of input.",
       "PATTERN_INPUT_LIMIT"
     );
   }
   if (options.mode !== void 0 && options.mode !== "literal" && options.mode !== "regex")
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Unknown pattern matching mode.",
       "PATTERN_INVALID"
     );
@@ -15483,13 +15483,13 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
   }
   const timeoutMs = options.timeoutMs ?? 1e3;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2e3)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Regex timeout must be between 1 and 2000 ms.",
       "PATTERN_INVALID"
     );
   const source = regexSource(pattern, options.pythonNamedGroups ?? false);
   if (activeRegexWorkers >= 4)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Regex worker capacity is busy; retry after current searches finish.",
       "PATTERN_BUSY"
     );
@@ -15525,7 +15525,7 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
     };
     timer = setTimeout(
       () => finish(
-        new PlatformIOError2(
+        new PlatformIOError(
           "Regex worker exceeded its startup deadline.",
           "PATTERN_WORKER_STARTUP_TIMEOUT"
         )
@@ -15542,7 +15542,7 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
           clearTimeout(timer);
           timer = setTimeout(
             () => finish(
-              new PlatformIOError2(
+              new PlatformIOError(
                 "Regex exceeded its execution deadline.",
                 "PATTERN_TIMEOUT"
               )
@@ -15554,16 +15554,16 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
         }
         if (!executing)
           return finish(
-            new PlatformIOError2(
+            new PlatformIOError(
               "Unexpected regex worker response.",
               "PATTERN_WORKER_FAILED"
             )
           );
         finish(
-          message.limit ? new PlatformIOError2(
+          message.limit ? new PlatformIOError(
             "Named capture output exceeds limits.",
             "PATTERN_OUTPUT_LIMIT"
-          ) : message.invalid ? new PlatformIOError2(
+          ) : message.invalid ? new PlatformIOError(
             "Invalid or unsupported regular expression.",
             "PATTERN_INVALID"
           ) : void 0,
@@ -15574,13 +15574,13 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
     worker.once(
       "error",
       () => finish(
-        new PlatformIOError2("Regex worker failed.", "PATTERN_WORKER_FAILED")
+        new PlatformIOError("Regex worker failed.", "PATTERN_WORKER_FAILED")
       )
     );
     worker.once("exit", () => {
       if (!settled)
         finish(
-          new PlatformIOError2(
+          new PlatformIOError(
             "Regex worker exited before returning a result.",
             "PATTERN_WORKER_FAILED"
           )
@@ -15640,7 +15640,7 @@ function linuxStartToken(stat, bootId, pid) {
   const fields = stat.slice(end + 1).trim().split(/\s+/);
   const start = fields[19];
   if (stat.length > 8192 || end < 0 || !stat.startsWith(`${pid} (`) || !/^[0-9]+$/.test(start ?? "") || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(bootId.trim()))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid Linux process identity.",
       "PROCESS_IDENTITY_INVALID"
     );
@@ -15648,7 +15648,7 @@ function linuxStartToken(stat, bootId, pid) {
 }
 function inspectProcessIdentity(pid) {
   if (!Number.isSafeInteger(pid) || pid < 1 || pid > 2147483647)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid process ID.",
       "PROCESS_IDENTITY_INVALID"
     );
@@ -15765,7 +15765,7 @@ function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
       cleanup();
       if (timedOut)
         reject(
-          new PlatformIOError2(
+          new PlatformIOError(
             `Command timed out after ${timeoutMs}ms`,
             "COMMAND_TIMEOUT",
             { cleanupPending: false }
@@ -15777,7 +15777,7 @@ function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
       if (settled) return;
       cleanup();
       reject(
-        new PlatformIOError2(error2.message, "PROCESS_FAILED", {
+        new PlatformIOError(error2.message, "PROCESS_FAILED", {
           cleanupPending: !!proc.pid && proc.exitCode === null && proc.signalCode === null
         })
       );
@@ -15800,7 +15800,7 @@ function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
           if (settled) return;
           cleanup();
           reject(
-            new PlatformIOError2(
+            new PlatformIOError(
               "Child termination could not be confirmed.",
               "PROCESS_CLEANUP_PENDING",
               { cleanupPending: true }
@@ -15983,10 +15983,10 @@ function readMonitorIdentities(pidsFile) {
   const file = pidsFile + ".identities.json";
   if (!fs35.existsSync(file)) return {};
   if (fs35.statSync(file).size > 1024 * 1024)
-    throw new PlatformIOError2("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
+    throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
   const value2 = JSON.parse(fs35.readFileSync(file, "utf8"));
   if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
-    throw new PlatformIOError2("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
+    throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
   return value2;
 }
 async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFile, taskId, commandDesc) {
@@ -16088,7 +16088,7 @@ async function killPioMonitorByPort(port, projectDir) {
     if (observation.status === "absent") {
     } else {
       if (!identity || identity.pid !== pid || compareProcessIdentity(identity, observation) !== "alive")
-        throw new PlatformIOError2("Monitor process identity is unavailable or changed; refusing PID-only termination.", "PROCESS_IDENTITY_UNVERIFIED");
+        throw new PlatformIOError("Monitor process identity is unavailable or changed; refusing PID-only termination.", "PROCESS_IDENTITY_UNVERIFIED");
       await new Promise((resolve, reject) => (0, import_tree_kill.default)(pid, "SIGKILL", (error2) => error2 ? reject(error2) : resolve()));
       let confirmed = false;
       for (let attempt = 0; attempt < 20; attempt++) {
@@ -16098,7 +16098,7 @@ async function killPioMonitorByPort(port, projectDir) {
         }
         await delay2(50);
       }
-      if (!confirmed) throw new PlatformIOError2("Monitor exit could not be confirmed.", "PROCESS_CLEANUP_PENDING");
+      if (!confirmed) throw new PlatformIOError("Monitor exit could not be confirmed.", "PROCESS_CLEANUP_PENDING");
     }
     delete pids[port];
     const identities = readMonitorIdentities(pidsFile);
@@ -16556,7 +16556,7 @@ async function executeWithSpooling(command, args, options) {
   try {
     exitCode = await waitForOwnedProcess(proc, timeoutMs);
   } catch (error2) {
-    const cleanupPending = !(error2 instanceof PlatformIOError2) || error2.context?.cleanupPending !== false;
+    const cleanupPending = !(error2 instanceof PlatformIOError) || error2.context?.cleanupPending !== false;
     await updateTaskStatus(commandId, taskId, { status: "error", error: error2 instanceof Error ? error2.message : "Process failed." }, projectArea).catch(() => {
     });
     try {
@@ -16574,8 +16574,8 @@ async function executeWithSpooling(command, args, options) {
       } catch {
       }
     }
-    if (error2 instanceof PlatformIOError2)
-      throw new PlatformIOError2(error2.message, error2.code, { ...error2.context, cleanupPending, fullLogPath: logFile });
+    if (error2 instanceof PlatformIOError)
+      throw new PlatformIOError(error2.message, error2.code, { ...error2.context, cleanupPending, fullLogPath: logFile });
     throw error2;
   }
   let errorMessage = void 0;
@@ -24058,13 +24058,13 @@ async function verifyTargetBinding(binding, input) {
     expiresAt: binding.expiresAt
   });
   if (expectedDigest !== binding.digest) {
-    throw new PlatformIOError2("Target binding digest is invalid.", "STALE_TARGET_BINDING");
+    throw new PlatformIOError("Target binding digest is invalid.", "STALE_TARGET_BINDING");
   }
   if (new Date(binding.expiresAt).getTime() <= Date.now()) {
-    throw new PlatformIOError2("Target binding has expired.", "STALE_TARGET_BINDING");
+    throw new PlatformIOError("Target binding has expired.", "STALE_TARGET_BINDING");
   }
   if (binding.projectDir !== projectDir || binding.environment !== input.environment) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Target binding does not match the current project and environment.",
       "STALE_TARGET_BINDING"
     );
@@ -24074,7 +24074,7 @@ async function verifyTargetBinding(binding, input) {
     (device) => fingerprintDevice(device) === binding.deviceFingerprint
   );
   if (matching.length !== 1) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       matching.length === 0 ? "The bound device is no longer attached." : "The bound device identity is ambiguous.",
       matching.length === 0 ? "STALE_TARGET_BINDING" : "AMBIGUOUS_TARGET"
     );
@@ -24106,7 +24106,7 @@ async function resolveWriteTarget(input) {
   });
   if (!resolved.success || !resolved.environment || !resolved.port || !resolved.binding) {
     const errorCode = resolved.status === "ambiguous" ? "AMBIGUOUS_TARGET" : resolved.status === "unavailable" ? "TARGET_UNAVAILABLE" : "INVALID_TARGET_CONFIG";
-    throw new PlatformIOError2(resolved.summary, errorCode, {
+    throw new PlatformIOError(resolved.summary, errorCode, {
       candidates: resolved.candidates,
       nextSteps: resolved.nextSteps
     });
@@ -24384,7 +24384,7 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
   if (!activePort) {
     const defaultDevice = await getFirstDevice();
     if (!defaultDevice)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "No serial devices detected to monitor.",
         "PORT_NOT_FOUND"
       );
@@ -24396,15 +24396,15 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
     activeHwid = matchedDevice?.hwid || null;
   }
   if (!validateSerialPort(activePort))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Invalid serial port format: ${activePort}`,
       "INVALID_PORT"
     );
   if (baud && !validateBaudRate(baud))
-    throw new PlatformIOError2(`Invalid baud rate: ${baud}`, "INVALID_BAUD");
+    throw new PlatformIOError(`Invalid baud rate: ${baud}`, "INVALID_BAUD");
   await stopMonitor(activePort, projectDir);
   if (portSemaphoreManager.isPortClaimed(activePort))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Port is currently locked: ${activePort}`,
       "PORT_BUSY"
     );
@@ -24509,7 +24509,7 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
     } catch (error2) {
       return {
         success: false,
-        code: error2 instanceof PlatformIOError2 ? error2.code : "PATTERN_WORKER_FAILED",
+        code: error2 instanceof PlatformIOError ? error2.code : "PATTERN_WORKER_FAILED",
         content: error2 instanceof Error ? error2.message : "Pattern matching failed."
       };
     }
@@ -24541,7 +24541,7 @@ function decodeMonitorCursor(cursor, logPath) {
     }
     return payload.offset;
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "The serial cursor is invalid or belongs to an expired monitor log.",
       "CURSOR_EXPIRED"
     );
@@ -24585,7 +24585,7 @@ function readSerialWindowFromFile(logPath, options = {}) {
   const finalSize = fs43.statSync(logPath).size;
   const requestedStart = options.cursor ? decodeMonitorCursor(options.cursor, logPath) : Math.max(0, options.startOffset ?? 0);
   if (requestedStart > finalSize) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "The serial cursor predates the current rotated monitor log.",
       "CURSOR_EXPIRED"
     );
@@ -24627,7 +24627,7 @@ async function captureSerialWindow(input) {
       ([, daemon2]) => path49.resolve(daemon2.projectDir ?? "") === projectDir
     ).map(([activePort]) => activePort);
     if (matchingPorts.length > 1) {
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Multiple active monitors match this project; specify one exact port.",
         "AMBIGUOUS_TARGET"
       );
@@ -24646,13 +24646,13 @@ async function captureSerialWindow(input) {
   }
   const daemon = activeDaemons[selectedPort];
   if (!daemon) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Serial monitor did not become available for capture.",
       "MONITOR_UNAVAILABLE"
     );
   }
   if (captureLeases.has(selectedPort)) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `A bounded capture is already running on ${selectedPort}.`,
       "OVERLAPPING_RUN"
     );
@@ -24678,7 +24678,7 @@ async function captureSerialWindow(input) {
     try {
       fs43.statSync(daemon.logFile);
     } catch {
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "The serial monitor log is unavailable.",
         "MONITOR_UNAVAILABLE"
       );
@@ -92531,7 +92531,7 @@ var PolicyDocumentSchema = external_exports.union([
   PolicyOverridesSchema
 ]);
 var MAX_POLICY_BYTES = 64 * 1024;
-var PolicyConfigError = class extends PlatformIOError2 {
+var PolicyConfigError = class extends PlatformIOError {
   /** Creates an actionable configuration error without exposing source contents. */
   constructor(source, detail) {
     super(`Invalid policy at ${source}: ${detail}`, "POLICY_CONFIG_INVALID", {
@@ -93030,7 +93030,7 @@ function createPolicyRevisionGuard(workspaceDir) {
   const expected = loadEffectivePolicyState(workspaceDir).digest;
   return () => {
     if (loadEffectivePolicyState(workspaceDir).digest !== expected)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Policy or project enrollment changed during execution; start a new authorized operation.",
         "POLICY_CHANGED"
       );
@@ -93076,7 +93076,7 @@ function readApprovals(file = approvalsFile()) {
     text7 = fs11.readFileSync(file, "utf8");
   } catch (error2) {
     if (error2.code === "ENOENT") return [];
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Approval storage is unreadable or exceeds its size limit.",
       "APPROVAL_STORE_INVALID"
     );
@@ -93084,7 +93084,7 @@ function readApprovals(file = approvalsFile()) {
   try {
     return external_exports.array(ApprovalRecordSchema).parse(JSON.parse(text7));
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Approval storage is malformed; operator repair is required.",
       "APPROVAL_STORE_INVALID"
     );
@@ -93116,7 +93116,7 @@ function mutate(operation) {
       retries: 0
     });
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Approval storage is busy or unavailable; retry the operation.",
       "APPROVAL_STORE_BUSY"
     );
@@ -93154,7 +93154,7 @@ function listApprovalRequests(opts) {
 function createApprovalRequest(input) {
   const minutes = input.expiresInMinutes ?? 30;
   if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Approval lifetime must be between zero and 1440 minutes.",
       "APPROVAL_LIFETIME_INVALID"
     );
@@ -93182,7 +93182,7 @@ function transition(id, status) {
     const record2 = currentState(records[index], file);
     if (record2.status !== "pending" && !(status === "denied" && record2.status === "approved")) {
       if (record2.status === status) return record2;
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         `Approval is ${record2.status} and cannot become ${status}.`,
         "APPROVAL_TRANSITION_INVALID"
       );
@@ -93331,7 +93331,7 @@ import path16 from "node:path";
 var MAX_STATE_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
 function validateAutomationKey(automationKey) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u.test(automationKey)) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "automationKey must be 1-80 letters, numbers, underscores, or hyphens.",
       "AUTOMATION_POLICY_DENIED"
     );
@@ -93366,20 +93366,20 @@ function readAutomationStateRecord(projectDir, automationKey, allowStale) {
   try {
     state = JSON.parse(fs13.readFileSync(statePath, "utf8"));
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Automation '${automationKey}' state is malformed and requires operator review.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   const updatedAt = new Date(state.updatedAt).getTime();
   if (state.schemaVersion !== 1 || state.automationKey !== automationKey || !Number.isFinite(updatedAt) || !Number.isInteger(state.consecutiveFailures) || state.consecutiveFailures < 0 || !Number.isInteger(state.consecutiveHardwareWrites) || state.consecutiveHardwareWrites < 0) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Automation '${automationKey}' state cannot be verified and requires operator review.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (!allowStale && Date.now() - updatedAt > MAX_STATE_AGE_MS) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Automation '${automationKey}' write budget is stale and requires operator review.`,
       "AUTOMATION_POLICY_DENIED"
     );
@@ -93494,7 +93494,7 @@ async function withAutomationStateLock(projectDir, automationKey, operation) {
       realpath: false
     });
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Automation '${automationKey}' is already running.`,
       "OVERLAPPING_RUN"
     );
@@ -93557,7 +93557,7 @@ function loadLabRunnerPolicy(projectDir) {
       fs14.readFileSync(policyPath, "utf8")
     );
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "The lab-runner automation policy is malformed.",
       "AUTOMATION_POLICY_DENIED"
     );
@@ -93567,57 +93567,57 @@ function validateAutomationScope(input) {
   validateAutomationKey(input.automationKey);
   const projectDir = validateProjectPath(input.projectDir);
   if (projectDir === path17.parse(projectDir).root) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Automation cannot target a filesystem root.",
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (input.environment?.includes("*")) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Automation target selectors must be exact and cannot contain wildcards.",
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (!Number.isFinite(input.maxRunDurationSeconds) || input.maxRunDurationSeconds < 1 || input.maxRunDurationSeconds > 900) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Automation runs must have a maximum duration between 1 and 900 seconds.",
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (ALWAYS_DENIED_ACTIONS.has(input.action)) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Action '${input.action}' is never allowed in unattended automation.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   const writeOperation = WRITE_ACTIONS.has(input.action);
   if (!writeOperation && !SAFE_SCHEDULED_ACTIONS.has(input.action)) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Action '${input.action}' is not available to unattended automation.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (ENVIRONMENT_SCOPED_ACTIONS.has(input.action) && !input.environment) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Action '${input.action}' requires an exact PlatformIO environment.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if ((writeOperation || DEVICE_BOUND_ACTIONS.has(input.action)) && !input.targetBinding) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Action '${input.action}' requires a current physical target binding.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (input.targetBinding) {
     if (input.targetBinding.port.includes("*") || input.targetBinding.deviceFingerprint.includes("*")) {
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Automation target selectors must be exact and cannot contain wildcards.",
         "AUTOMATION_POLICY_DENIED"
       );
     }
     if (path17.resolve(input.targetBinding.projectDir) !== projectDir || input.targetBinding.environment !== input.environment || new Date(input.targetBinding.expiresAt).getTime() <= Date.now()) {
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Automation target binding is expired or outside the requested scope.",
         "AUTOMATION_POLICY_DENIED"
       );
@@ -93632,19 +93632,19 @@ function validateAutomationScope(input) {
   }
   const policy = loadLabRunnerPolicy(projectDir);
   if (!policy?.enabled || policy.profile !== "lab_runner" || !policy.allowedOperations.includes(input.action) || policy.environment !== input.environment || policy.deviceFingerprint !== input.targetBinding.deviceFingerprint || new Date(policy.expiresAt).getTime() <= Date.now()) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Unattended hardware writes require a current, exact lab-runner policy.",
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (input.maxRunDurationSeconds > policy.maxRunDurationSeconds) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Requested run duration exceeds the lab-runner policy.",
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if ((input.consecutiveFlashes ?? 0) >= policy.maxConsecutiveFlashes) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "The lab-runner consecutive flash limit has been reached.",
       "AUTOMATION_POLICY_DENIED"
     );
@@ -93652,7 +93652,7 @@ function validateAutomationScope(input) {
   if (input.lastFlashAt) {
     const elapsedSeconds = (Date.now() - new Date(input.lastFlashAt).getTime()) / 1e3;
     if (elapsedSeconds < policy.cooldownSeconds) {
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "The lab-runner flash cooldown has not elapsed.",
         "AUTOMATION_POLICY_DENIED"
       );
@@ -93675,7 +93675,7 @@ async function reserveAutomationWriteBudget(input) {
         lastFlashAt: state.lastHardwareWriteAt
       });
       if (!scope5.writeOperation) {
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Only hardware-changing automation actions consume a write budget.",
           "AUTOMATION_POLICY_DENIED"
         );
@@ -93703,7 +93703,7 @@ import crypto8 from "node:crypto";
 import path18 from "node:path";
 function canonical2(value2, depth = 0) {
   if (depth > 32)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Approval arguments exceed the nesting limit.",
       "APPROVAL_SCOPE_INVALID"
     );
@@ -93718,7 +93718,7 @@ function canonical2(value2, depth = 0) {
       (key) => `${JSON.stringify(key)}:${canonical2(value2[key], depth + 1)}`
     ).join(",")}}`;
   }
-  throw new PlatformIOError2(
+  throw new PlatformIOError(
     "Approval arguments must contain finite JSON values.",
     "APPROVAL_SCOPE_INVALID"
   );
@@ -93741,7 +93741,7 @@ function approvalScopeDigest(action, args, policyDigest, context) {
     actorClass: context.actorClass ?? (context.actor === "system" ? "system" : "interactive")
   });
   if (Buffer.byteLength(encoded) > 256 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Approval arguments exceed the 256 KiB limit.",
       "APPROVAL_SCOPE_INVALID"
     );
@@ -94029,7 +94029,7 @@ init_errors2();
 async function dispatchAuthorizedAction(name2, args, context, execute2) {
   const decision2 = await authorizeAction(name2, args, context);
   if (decision2.status !== "allow")
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       decision2.reason,
       decision2.status === "requires_approval" ? "APPROVAL_REQUIRED" : "POLICY_DENIED",
       { policyDecision: decision2 }
@@ -94039,7 +94039,7 @@ async function dispatchAuthorizedAction(name2, args, context, execute2) {
 async function authorizeAction(name2, args, context) {
   const action = name2 === "start_pio_home" ? "run_shell_command" : policyNamesForOperation(name2).at(-1);
   if (!Object.hasOwn(actionRiskLevels, action))
-    throw new PlatformIOError2(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
+    throw new PlatformIOError(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
   return evaluatePolicy(action, args, {
     ...context,
     operationName: name2
@@ -94048,7 +94048,7 @@ async function authorizeAction(name2, args, context) {
 async function planAction(name2, args, context) {
   const action = name2 === "start_pio_home" ? "run_shell_command" : policyNamesForOperation(name2).at(-1);
   if (!Object.hasOwn(actionRiskLevels, action))
-    throw new PlatformIOError2(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
+    throw new PlatformIOError(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
   return planPolicy(action, args, { ...context, operationName: name2 });
 }
 
@@ -94061,7 +94061,7 @@ import path20 from "node:path";
 import crypto9 from "node:crypto";
 async function retainCommandLog(purpose, stdout, stderr) {
   if (Buffer.byteLength(stdout) + Buffer.byteLength(stderr) > 16 * 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Command log exceeds its bound.",
       "COMMAND_LOG_LIMIT"
     );
@@ -94080,7 +94080,7 @@ async function readCommandOutput(filename) {
   try {
     const stat = await handle.stat();
     if (!stat.isFile() || stat.size > 16 * 1024 * 1024)
-      throw new PlatformIOError2("Command output exceeds the report limit", "COMMAND_LOG_LIMIT");
+      throw new PlatformIOError("Command output exceeds the report limit", "COMMAND_LOG_LIMIT");
     const buffer = Buffer.alloc(stat.size + 1);
     let offset = 0;
     while (offset < buffer.length) {
@@ -94089,7 +94089,7 @@ async function readCommandOutput(filename) {
       offset += read.bytesRead;
     }
     if (offset !== stat.size)
-      throw new PlatformIOError2("Command output changed during collection", "COMMAND_LOG_CHANGED");
+      throw new PlatformIOError("Command output changed during collection", "COMMAND_LOG_CHANGED");
     return redactSecretsInText(buffer.subarray(0, offset).toString("utf8")).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
   } finally {
     await handle.close();
@@ -94115,7 +94115,7 @@ function contained(root, candidate) {
 }
 async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
   if (!path21.isAbsolute(compilerPath) || !trustedRoots.length || trustedRoots.some((root2) => !path21.isAbsolute(root2)))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Analysis needs explicit absolute compiler and trusted-root paths.",
       "ANALYSIS_TOOLCHAIN_INVALID"
     );
@@ -94127,7 +94127,7 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
   ];
   const matches = roots.filter((root2) => contained(root2, compiler));
   if (!matches.length)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Compiler is outside the trusted toolchain roots.",
       "ANALYSIS_TOOLCHAIN_UNTRUSTED"
     );
@@ -94137,7 +94137,7 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
     /^((?:[a-z0-9_]+-)*)(?:gcc|g\+\+|cc|c\+\+)(\.exe)?$/i
   );
   if (!match || !(await fs16.stat(compiler)).isFile())
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Expected a native GNU-compatible compiler path.",
       "ANALYSIS_TOOLCHAIN_INVALID"
     );
@@ -94151,13 +94151,13 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
         )
       );
     } catch {
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         `The selected toolchain is missing ${tool}.`,
         "ANALYSIS_TOOL_UNAVAILABLE"
       );
     }
     if (!contained(root, candidate) || !(await fs16.stat(candidate)).isFile())
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         `The ${tool} utility escapes the selected toolchain root.`,
         "ANALYSIS_TOOLCHAIN_UNTRUSTED"
       );
@@ -94174,7 +94174,7 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
 // src/core/analysis/build-metadata.ts
 function selectBuildMetadata(output, environment) {
   const invalid3 = (message) => {
-    throw new PlatformIOError2(message, "ANALYSIS_METADATA_INVALID");
+    throw new PlatformIOError(message, "ANALYSIS_METADATA_INVALID");
   };
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
     invalid3("Project metadata exceeds 10 MiB.");
@@ -94193,7 +94193,7 @@ function selectBuildMetadata(output, environment) {
   if (environment !== void 0 && (!environment || environment.length > 256 || /[\x00-\x1f]/.test(environment)))
     invalid3("Invalid selected environment.");
   if (environment === void 0 && names.length !== 1)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Select an explicit environment for analysis; project metadata contains multiple environments.",
       "ANALYSIS_ENVIRONMENT_REQUIRED"
     );
@@ -94223,7 +94223,7 @@ import fs17 from "node:fs/promises";
 import crypto10 from "node:crypto";
 async function readElfIdentity(elfPath, expectedSha256) {
   if (expectedSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(expectedSha256))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Expected ELF hash must be SHA-256.",
       "ANALYSIS_ELF_INVALID"
     );
@@ -94232,23 +94232,23 @@ async function readElfIdentity(elfPath, expectedSha256) {
   try {
     const before = await file.stat();
     if (!before.isFile() || before.size < 52)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Expected a regular ELF file with a complete header.",
         "ANALYSIS_ELF_INVALID"
       );
     if (before.size > 256 * 1024 * 1024)
-      throw new PlatformIOError2("ELF exceeds 256 MiB.", "ANALYSIS_INPUT_LIMIT");
+      throw new PlatformIOError("ELF exceeds 256 MiB.", "ANALYSIS_INPUT_LIMIT");
     const header = Buffer.alloc(Math.min(64, before.size));
     const { bytesRead } = await file.read(header, 0, header.length, 0);
     if (bytesRead !== header.length || header.subarray(0, 4).toString("hex") !== "7f454c46" || ![1, 2].includes(header[4]) || ![1, 2].includes(header[5]) || header[6] !== 1)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid or unsupported ELF header.",
         "ANALYSIS_ELF_INVALID"
       );
     const bits = header[4] === 1 ? 32 : 64;
     const byteOrder = header[5] === 1 ? "little" : "big";
     if (bits === 64 && bytesRead < 64)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Truncated ELF64 header.",
         "ANALYSIS_ELF_INVALID"
       );
@@ -94256,7 +94256,7 @@ async function readElfIdentity(elfPath, expectedSha256) {
     const version2 = byteOrder === "little" ? header.readUInt32LE(20) : header.readUInt32BE(20);
     const type = u16(16);
     if (version2 !== 1 || u16(bits === 32 ? 40 : 52) !== (bits === 32 ? 52 : 64) || ![2, 3].includes(type))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "ELF must be a supported executable or shared image.",
         "ANALYSIS_ELF_INVALID"
       );
@@ -94280,7 +94280,7 @@ async function readElfIdentity(elfPath, expectedSha256) {
         position
       );
       if (!read.bytesRead)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "ELF changed while reading.",
           "ANALYSIS_ELF_CHANGED"
         );
@@ -94289,13 +94289,13 @@ async function readElfIdentity(elfPath, expectedSha256) {
     }
     const after = await file.stat();
     if (after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "ELF changed while reading.",
         "ANALYSIS_ELF_CHANGED"
       );
     const sha256 = hash.digest("hex");
     if (expectedSha256 && sha256 !== expectedSha256.toLowerCase())
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "ELF does not match the selected firmware artifact.",
         "ANALYSIS_ELF_MISMATCH"
       );
@@ -94317,7 +94317,7 @@ async function readElfIdentity(elfPath, expectedSha256) {
 // src/core/analysis/collect-build-context.ts
 function scope(input) {
   if (!validateEnvironmentName(input.environment) || input.environment.startsWith("-"))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Select a valid explicit build environment.",
       "ANALYSIS_ENVIRONMENT_REQUIRED"
     );
@@ -94367,7 +94367,7 @@ async function collectionStage(input, args, caller, authorization, execute2) {
   const state = collectionAuthorities.get(authorization);
   const purpose = String(args.analysisPurpose);
   if (!state || authorization.projectDir !== input.projectDir || authorization.environment !== input.environment || !state.stages.has(purpose))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Analysis collection authority is invalid, expired or already used.",
       "ANALYSIS_AUTHORITY_INVALID"
     );
@@ -94393,7 +94393,7 @@ async function collectBuildMetadata(input, caller = {}, authorization) {
         { cwd: selected.projectDir, timeout: 6e5 }
       );
       if (result.exitCode !== 0)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "PlatformIO metadata collection failed.",
           "ANALYSIS_METADATA_FAILED"
         );
@@ -94452,7 +94452,7 @@ async function packageDocument(file) {
 }
 async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectDir, environment = process.env) {
   const fail = (message) => {
-    throw new PlatformIOError2(message, "ANALYSIS_TOOLCHAIN_UNTRUSTED");
+    throw new PlatformIOError(message, "ANALYSIS_TOOLCHAIN_UNTRUSTED");
   };
   const project = await fs18.realpath(projectDir);
   const validateRoot = async (root2) => {
@@ -94518,7 +94518,7 @@ async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectD
 init_errors2();
 function parsePlatformioMemory(output) {
   if (Buffer.byteLength(output) > 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Memory accounting output exceeds 1 MiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
@@ -94536,13 +94536,13 @@ function parsePlatformioMemory(output) {
       percent: Number(percentage)
     };
     if (!Number.isSafeInteger(region.usedBytes) || !Number.isSafeInteger(region.totalBytes) || region.totalBytes <= 0 || !Number.isFinite(region.percent) || Math.abs(region.percent - 100 * region.usedBytes / region.totalBytes) > 0.11)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid or inconsistent PlatformIO memory accounting.",
         "ANALYSIS_MEMORY_INVALID"
       );
     const key = name2.toLowerCase();
     if (regions[key])
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Multiple size-check results require explicit environment isolation.",
         "ANALYSIS_MEMORY_AMBIGUOUS"
       );
@@ -94561,13 +94561,13 @@ var HEX = "0x[0-9a-fA-F]{6,16}";
 var MAX_ADDRESSES = 4096;
 function linesOf(text7) {
   if (Buffer.byteLength(text7) > 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Analysis text exceeds 1 MiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
   const lines2 = text7.split(/\r?\n/);
   if (lines2.some((line) => line.length > 16384))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Analysis line exceeds 16 KiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
@@ -94575,7 +94575,7 @@ function linesOf(text7) {
 }
 function normalizeAddress(address) {
   if (!/^0x[0-9a-f]{1,16}$/i.test(address))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid hexadecimal address.",
       "ANALYSIS_ADDRESS_INVALID"
     );
@@ -94605,7 +94605,7 @@ function extractCrash(text7, includeAllHex = false) {
     const key = `${address}:${role}`;
     if (seen.has(key)) return;
     if (seen.size >= MAX_ADDRESSES)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Crash exceeds the address limit.",
         "ANALYSIS_INPUT_LIMIT"
       );
@@ -94684,7 +94684,7 @@ function parseAddr2line(output) {
         inlined: []
       };
       if (frames.size >= MAX_ADDRESSES && !frames.has(address))
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Symbol output exceeds the address limit.",
           "ANALYSIS_INPUT_LIMIT"
         );
@@ -94703,13 +94703,13 @@ init_errors2();
 import path24 from "node:path";
 function lines(output) {
   if (Buffer.byteLength(output) > 16 * 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Size output exceeds 16 MiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
   const result = output.split(/\r?\n/);
   if (result.length > 1e5 || result.some((line) => line.length > 16384))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Size output exceeds line limits.",
       "ANALYSIS_INPUT_LIMIT"
     );
@@ -94717,7 +94717,7 @@ function lines(output) {
 }
 function exact(value2) {
   if (value2 < 0n || value2 > BigInt(Number.MAX_SAFE_INTEGER))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Size exceeds exact numeric range.",
       "ANALYSIS_SIZE_INVALID"
     );
@@ -94763,7 +94763,7 @@ function parseSizeTotals(output) {
     if (!match) continue;
     const [text7, data, bss, total] = match.slice(1).map(BigInt);
     if (text7 + data + bss !== total)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Inconsistent GNU size totals.",
         "ANALYSIS_SIZE_INVALID"
       );
@@ -94776,7 +94776,7 @@ function parseSizeTotals(output) {
     });
   }
   if (rows.length > 1)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Expected size totals for exactly one ELF image.",
       "ANALYSIS_SIZE_INVALID"
     );
@@ -94849,22 +94849,22 @@ async function runAnalysisProcess(executable, args, options = {}) {
   const timeout = options.timeoutMs ?? 3e4;
   const maxBuffer = options.maxOutputBytes ?? 16 * 1024 * 1024;
   if (!path25.isAbsolute(executable) || /\.(?:cmd|bat|ps1|sh)$/i.test(executable))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Analysis requires an absolute native executable path.",
       "ANALYSIS_EXECUTABLE_INVALID"
     );
   if (!Number.isInteger(timeout) || timeout < 1 || timeout > 12e4 || !Number.isInteger(maxBuffer) || maxBuffer < 1 || maxBuffer > 32 * 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Analysis process limits are invalid.",
       "ANALYSIS_LIMIT_INVALID"
     );
   if (args.length > 8192 || args.some((arg) => typeof arg !== "string" || arg.includes("\0")) || args.reduce((total, arg) => total + Buffer.byteLength(arg), 0) > 256 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Analysis argument list is invalid or too large.",
       "ANALYSIS_ARGUMENT_INVALID"
     );
   if (options.signal?.aborted)
-    throw new PlatformIOError2("Analysis was cancelled.", "ANALYSIS_CANCELLED");
+    throw new PlatformIOError("Analysis was cancelled.", "ANALYSIS_CANCELLED");
   return new Promise((resolve, reject) => {
     execFile2(
       executable,
@@ -94888,7 +94888,7 @@ async function runAnalysisProcess(executable, args, options = {}) {
         const code = error2.code;
         const failure = options.signal?.aborted || error2.name === "AbortError" ? "ANALYSIS_CANCELLED" : code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" ? "ANALYSIS_OUTPUT_LIMIT" : error2.killed ? "ANALYSIS_TIMEOUT" : code === "ENOENT" || code === "EACCES" ? "ANALYSIS_TOOL_UNAVAILABLE" : "ANALYSIS_TOOL_FAILED";
         reject(
-          new PlatformIOError2(
+          new PlatformIOError(
             `Analysis utility failed (${failure}).`,
             failure,
             {
@@ -94927,7 +94927,7 @@ function executionOptions(context, deadline) {
   context.validatePolicy?.();
   const timeoutMs = deadline - Date.now();
   if (timeoutMs <= 0)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Analysis report exceeded its execution deadline.",
       "ANALYSIS_TIMEOUT"
     );
@@ -94993,7 +94993,7 @@ async function filterSizeSymbols(symbols, pattern, deadline) {
   const flush = async () => {
     const remaining = deadline - Date.now();
     if (remaining <= 0)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Analysis report exceeded its execution deadline.",
         "ANALYSIS_TIMEOUT"
       );
@@ -95024,7 +95024,7 @@ async function filterSizeSymbols(symbols, pattern, deadline) {
 async function reportFirmwareSize(context, top = 25, filter) {
   context.validatePolicy?.();
   if (!Number.isInteger(top) || top < 1 || top > 1e3)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Top-symbol count must be between 1 and 1000.",
       "ANALYSIS_ARGUMENT_INVALID"
     );
@@ -95039,7 +95039,7 @@ async function reportFirmwareSize(context, top = 25, filter) {
     async (snapshot, identity) => {
       const evidence = context.memoryEvidence;
       if (evidence && (evidence.environment !== context.environment || evidence.elfSha256 !== identity.sha256)) {
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Memory accounting does not match the selected environment and ELF.",
           "ANALYSIS_MEMORY_MISMATCH"
         );
@@ -95064,7 +95064,7 @@ async function reportFirmwareSize(context, top = 25, filter) {
       const sections = parseSizeSections(sectionsOutput.stdout);
       const totals = parseSizeTotals(totalsOutput.stdout);
       if (!totals)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "GNU size did not produce totals for the selected image.",
           "ANALYSIS_SIZE_INVALID"
         );
@@ -95256,7 +95256,7 @@ var metadataSchema = external_exports.record(
 );
 function readJson(output) {
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Project output exceeds 10 MiB.",
       "PROJECT_OUTPUT_LIMIT"
     );
@@ -95264,7 +95264,7 @@ function readJson(output) {
   try {
     raw = JSON.parse(output);
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Project output is not valid JSON.",
       "PROJECT_OUTPUT_INVALID"
     );
@@ -95272,7 +95272,7 @@ function readJson(output) {
   let nodes = 0;
   const clean = (item, depth) => {
     if (++nodes > 1e5 || depth > 24)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Project output exceeds structural limits.",
         "PROJECT_OUTPUT_LIMIT"
       );
@@ -95295,14 +95295,14 @@ function readJson(output) {
 function parseProjectEnvironments(output) {
   const parsed = configSchema.safeParse(readJson(output));
   if (!parsed.success)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Unexpected computed configuration shape.",
       "PROJECT_CONFIG_INVALID"
     );
   const sections = /* @__PURE__ */ new Map();
   for (const [name2, options] of parsed.data) {
     if (sections.has(name2) || new Set(options.map(([key]) => key)).size !== options.length)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Duplicate computed configuration section or option.",
         "PROJECT_CONFIG_INVALID"
       );
@@ -95335,7 +95335,7 @@ function parseProjectEnvironments(output) {
     extends: options.extends ?? []
   }));
   if (envs.length > 256 || envs.some((env) => !env.name))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid environment inventory.",
       "PROJECT_CONFIG_INVALID"
     );
@@ -95343,7 +95343,7 @@ function parseProjectEnvironments(output) {
   const rawDefaults = platformioSection.default_envs;
   const defaults = typeof rawDefaults === "string" ? rawDefaults.split(/[,\r\n]/).map((item) => item.trim()).filter(Boolean) : Array.isArray(rawDefaults) ? rawDefaults : rawDefaults == null ? [] : void 0;
   if (!defaults || defaults.some((name2) => !envs.some((env) => env.name === name2)))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Default environments do not match the resolved inventory.",
       "PROJECT_CONFIG_INVALID"
     );
@@ -95356,20 +95356,20 @@ function parseProjectEnvironments(output) {
 function parseProjectMetadata(output, environment) {
   const parsed = metadataSchema.safeParse(readJson(output));
   if (!parsed.success)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Unexpected build metadata shape.",
       "PROJECT_METADATA_INVALID"
     );
   const entries = Object.entries(parsed.data);
   if (entries.length < 1 || entries.length > 256 || environment && (entries.length !== 1 || entries[0][0] !== environment))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Metadata does not match the selected environments.",
       "PROJECT_METADATA_INVALID"
     );
   const envs = Object.fromEntries(
     entries.map(([name2, item]) => {
       if (!name2 || item.env_name && item.env_name !== name2)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Metadata environment identity disagrees with its key.",
           "PROJECT_METADATA_INVALID"
         );
@@ -95422,7 +95422,7 @@ var metadataSchema2 = external_exports.object({
 }).strict();
 async function executeProjectInspection(action, input, caller = {}, onAuthorized) {
   if (!["project_envs", "project_metadata", "list_targets"].includes(action))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Unknown project inspection operation.",
       "UNKNOWN_ACTION"
     );
@@ -95538,7 +95538,7 @@ async function listBoards(filter) {
     }
     return allBoards;
   } catch (error2) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Failed to list boards${filter ? ` with filter '${filter}'` : ""}: ${error2}`,
       "LIST_BOARDS_FAILED",
       { filter }
@@ -95565,7 +95565,7 @@ async function getBoardInfo(boardId) {
     if (error2 instanceof BoardNotFoundError) {
       throw error2;
     }
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Failed to get board info for '${boardId}': ${error2}`,
       "GET_BOARD_INFO_FAILED",
       { boardId }
@@ -95583,7 +95583,7 @@ async function resolveCompatibilityProject(requested, defaults) {
   if (selected === "~" || selected.startsWith("~/") || selected.startsWith("~\\"))
     selected = path27.join(defaults.home ?? os5.homedir(), selected.slice(2));
   else if (selected.startsWith("~"))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Named-user home expansion is unsupported; pass an absolute project path.",
       "COMPAT_PROJECT_INVALID"
     );
@@ -95591,7 +95591,7 @@ async function resolveCompatibilityProject(requested, defaults) {
     path27.resolve(defaults.cwd ?? process.cwd(), selected)
   );
   if (!(await fs22.stat(canonical3)).isDirectory() || !(await fs22.stat(path27.join(canonical3, "platformio.ini"))).isFile())
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Expected a PlatformIO project directory.",
       "COMPAT_PROJECT_INVALID"
     );
@@ -95623,14 +95623,14 @@ async function executeSizeCompatibility(input, defaults, caller, onAuthorized) {
   );
   guard();
   if (!configuration.ok || !("defaultEnvironments" in configuration))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Could not resolve size-report environment.",
       "PROJECT_CONFIG_INVALID"
     );
   const environment = params.env || configuration.defaultEnvironments[0] || (configuration.envs.length === 1 ? configuration.envs[0].name : void 0);
   const selected = configuration.envs.find((item) => item.name === environment);
   if (!environment || !selected)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Select a valid size-report environment.",
       "PROJECT_ENVIRONMENT_INVALID"
     );
@@ -95716,7 +95716,7 @@ async function executeDecodeCompatibility(client, input, defaults, caller, onAut
   }).strict().parse(input);
   const decode = async (text7, collection) => {
     if (!text7.trim())
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Pass crash text or an owned monitor session containing output.",
         "ANALYSIS_ARGUMENT_INVALID"
       );
@@ -95741,13 +95741,13 @@ async function executeDecodeCompatibility(client, input, defaults, caller, onAut
     );
     guard();
     if (!configuration.ok || !("defaultEnvironments" in configuration))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Could not resolve analysis environment.",
         "PROJECT_CONFIG_INVALID"
       );
     const environment = params.env || configuration.defaultEnvironments[0] || (configuration.envs.length === 1 ? configuration.envs[0].name : void 0);
     if (!environment || !configuration.envs.some((item) => item.name === environment))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Select a valid analysis environment explicitly.",
         "PROJECT_ENVIRONMENT_INVALID"
       );
@@ -95832,7 +95832,7 @@ function parsePortHolders(output) {
       current = { pid, command: null };
       holders2.push(current);
       if (holders2.length > 64)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Port holder report exceeds its limit.",
           "PORT_DIAGNOSTICS_LIMIT"
         );
@@ -95890,10 +95890,10 @@ async function holders(port) {
 }
 async function inspectPortDiagnostics(port, listed) {
   if (!port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
-    throw new PlatformIOError2("Invalid port name.", "SERIAL_ENDPOINT_INVALID");
+    throw new PlatformIOError("Invalid port name.", "SERIAL_ENDPOINT_INVALID");
   if (process.platform === "win32") {
     if (!/^(?:\\\\\.\\)?COM[1-9][0-9]{0,8}$/i.test(port))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Expected a COM port.",
         "SERIAL_ENDPOINT_INVALID"
       );
@@ -95908,7 +95908,7 @@ async function inspectPortDiagnostics(port, listed) {
     };
   }
   if (!path28.posix.isAbsolute(port) || !path28.posix.normalize(port).startsWith("/dev/"))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Unix serial ports must be within /dev.",
       "SERIAL_ENDPOINT_INVALID"
     );
@@ -95928,13 +95928,13 @@ async function inspectPortDiagnostics(port, listed) {
     };
   }
   if (!canonical3.startsWith("/dev/"))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Serial alias escapes /dev.",
       "SERIAL_ENDPOINT_INVALID"
     );
   const stat = await fs23.stat(canonical3);
   if (!stat.isCharacterDevice())
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Port is not a character device.",
       "SERIAL_ENDPOINT_INVALID"
     );
@@ -95984,12 +95984,12 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
     stackWordBytes: external_exports.number().int().min(1).max(16).optional()
   }).strict().parse(options);
   if (settings.stackUnit === "words" && settings.stackWordBytes === void 0)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Word-valued stack telemetry requires stackWordBytes.",
       "MEMORY_UNIT_REQUIRED"
     );
   if (lines2.length > 1e4 || lines2.some((line) => typeof line !== "string" || line.length > 16384) || lines2.reduce((size, line) => size + Buffer.byteLength(line), 0) > 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Telemetry exceeds line or byte limits.",
       "MEMORY_TELEMETRY_LIMIT"
     );
@@ -95998,12 +95998,12 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
   const add = (line, metric, raw, unit, task, scale = 1) => {
     const value2 = Number(raw) * scale;
     if (!Number.isSafeInteger(value2) || value2 < 0)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Telemetry value is outside integer bounds.",
         "MEMORY_VALUE_INVALID"
       );
     if (samples.length >= 1e4)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Telemetry exceeds observation limits.",
         "MEMORY_TELEMETRY_LIMIT"
       );
@@ -96274,7 +96274,7 @@ function analyzeParsedTelemetry(lines2, options, custom3) {
     elapsedSeconds: external_exports.array(external_exports.number().finite().nonnegative()).max(1e4).optional()
   }).strict().parse(options);
   if (settings.elapsedSeconds && settings.elapsedSeconds.length !== lines2.length)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Telemetry timestamps must correspond to every input line.",
       "MEMORY_TIMESTAMPS_INVALID"
     );
@@ -96306,7 +96306,7 @@ function analyzeParsedTelemetry(lines2, options, custom3) {
       values2.push(sample);
       tasks.set(sample.task, values2);
       if (tasks.size > 256)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Telemetry exceeds 256 tasks.",
           "MEMORY_TELEMETRY_LIMIT"
         );
@@ -96320,7 +96320,7 @@ function analyzeParsedTelemetry(lines2, options, custom3) {
     });
     series.set(sample.metric, values);
     if (series.size > 256)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Telemetry exceeds 256 metrics.",
         "MEMORY_TELEMETRY_LIMIT"
       );
@@ -96379,7 +96379,7 @@ async function analyzeMemoryTelemetryPattern(lines2, pattern, options = {}) {
   });
   const samples = captures.map((capture) => {
     if (!/^\d+$/.test(capture.value))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Custom telemetry requires nonnegative integer byte values.",
         "MEMORY_VALUE_INVALID"
       );
@@ -96394,13 +96394,13 @@ async function analyzeMemoryTelemetryPattern(lines2, pattern, options = {}) {
     };
     const factor = unit === "word" || unit === "words" ? options.stackWordBytes : Object.hasOwn(factors, unit) ? factors[unit] : void 0;
     if (factor === void 0)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Custom telemetry unit is unknown or needs an explicit word size.",
         "MEMORY_UNIT_REQUIRED"
       );
     const value2 = Number(capture.value) * factor;
     if (!Number.isSafeInteger(value2))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Custom telemetry exceeds integer bounds.",
         "MEMORY_VALUE_INVALID"
       );
@@ -96507,7 +96507,7 @@ init_errors2();
 async function captureTransientMemory(service, owner, request, input = {}, signal) {
   const args = MemoryCaptureSchema.parse(input);
   if (signal?.aborted)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Memory capture was cancelled before startup.",
       "SERIAL_CANCELLED"
     );
@@ -96522,11 +96522,11 @@ async function captureTransientMemory(service, owner, request, input = {}, signa
     );
   } catch (error2) {
     const stopped2 = await service.sessions.stop(owner, started.sessionId);
-    throw new PlatformIOError2(
-      error2 instanceof PlatformIOError2 ? error2.message : "Memory capture failed.",
-      error2 instanceof PlatformIOError2 ? error2.code : "MEMORY_CAPTURE_FAILED",
+    throw new PlatformIOError(
+      error2 instanceof PlatformIOError ? error2.message : "Memory capture failed.",
+      error2 instanceof PlatformIOError ? error2.code : "MEMORY_CAPTURE_FAILED",
       {
-        ...error2 instanceof PlatformIOError2 ? error2.context : {},
+        ...error2 instanceof PlatformIOError ? error2.context : {},
         sessionId: started.sessionId,
         cleanupPending: stopped2.cleanupPending
       }
@@ -96554,7 +96554,7 @@ import fs24 from "node:fs";
 import path29 from "node:path";
 function validatePort(port) {
   if (typeof port !== "string" || !port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid serial endpoint name.",
       "SERIAL_ENDPOINT_INVALID"
     );
@@ -96576,7 +96576,7 @@ function resolveSerialEndpoint(port, options = {}) {
       const name2 = port.startsWith(localPrefix) ? port.slice(localPrefix.length) : port;
       const match = /^COM([1-9][0-9]{0,8})$/i.exec(name2);
       if (!match)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Expected a COM port or its local device-path spelling.",
           "SERIAL_ENDPOINT_INVALID"
         );
@@ -96589,12 +96589,12 @@ function resolveSerialEndpoint(port, options = {}) {
       };
     }
     if (platform2 !== "linux" && platform2 !== "darwin")
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial endpoint identity is unavailable on this platform.",
         "SERIAL_ENDPOINT_UNSUPPORTED"
       );
     if (!path29.posix.isAbsolute(port) || !path29.posix.normalize(port).startsWith("/dev/"))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Unix serial endpoints must resolve within /dev.",
         "SERIAL_ENDPOINT_INVALID"
       );
@@ -96604,20 +96604,20 @@ function resolveSerialEndpoint(port, options = {}) {
       canonicalPort = realpath(port);
       validatePort(canonicalPort);
       if (!path29.posix.isAbsolute(canonicalPort) || !path29.posix.normalize(canonicalPort).startsWith("/dev/"))
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Serial alias resolves outside /dev.",
           "SERIAL_ENDPOINT_INVALID"
         );
       metadata = stat(canonicalPort);
     } catch (error2) {
-      if (error2 instanceof PlatformIOError2) throw error2;
-      throw new PlatformIOError2(
+      if (error2 instanceof PlatformIOError) throw error2;
+      throw new PlatformIOError(
         "Serial endpoint metadata is unavailable.",
         "SERIAL_ENDPOINT_UNAVAILABLE"
       );
     }
     if (!metadata.characterDevice || typeof metadata.deviceNumber !== "bigint" || metadata.deviceNumber < 0n || metadata.deviceNumber > 0xffffffffffffffffn)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial endpoint is not a valid character device.",
         "SERIAL_ENDPOINT_INVALID"
       );
@@ -96627,7 +96627,7 @@ function resolveSerialEndpoint(port, options = {}) {
         canonicalPort
       );
       if (!match)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Expected a Darwin callout/dial-in serial endpoint.",
           "SERIAL_ENDPOINT_INVALID"
         );
@@ -96661,7 +96661,7 @@ function resolveSerialEndpoint(port, options = {}) {
     revalidate() {
       const current = snapshot();
       if (current.canonicalPort !== expected.canonicalPort || current.identity !== expected.identity || current.deviceNumber !== expected.deviceNumber)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Serial endpoint changed after selection; resolve and authorize again.",
           "SERIAL_ENDPOINT_CHANGED"
         );
@@ -96674,7 +96674,7 @@ init_errors2();
 import fs25 from "node:fs";
 async function loadSerialBackend() {
   if (Number(process.versions.node.split(".")[0]) < 20)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Direct serial support requires Node 20 or newer.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -96696,7 +96696,7 @@ async function loadSerialBackend() {
     }
     return await import("serialport");
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "The pinned native serial backend is unavailable on this installation.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -96708,7 +96708,7 @@ init_errors2();
 function validateDirectSerialOptions(options) {
   const timeout = options.operationTimeoutMs ?? 5e3;
   if (typeof options.path !== "string" || !options.path || options.path.length > 512 || /[\x00-\x1f\x7f]/.test(options.path) || !Number.isSafeInteger(options.baudRate) || options.baudRate < 1 || options.baudRate > 4e6 || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 3e4)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid direct serial options.",
       "SERIAL_TRANSPORT_ARGUMENT_INVALID"
     );
@@ -96721,7 +96721,7 @@ var DirectSerialTransport = class {
     this.onData = onData;
     this.timeout = validateDirectSerialOptions(options);
     if (port.isOpen || port.opening || port.closing)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial transport requires an unopened binding.",
         "SERIAL_TRANSPORT_ARGUMENT_INVALID"
       );
@@ -96735,7 +96735,7 @@ var DirectSerialTransport = class {
       if (this.terminal) return;
       if (!Buffer.isBuffer(bytes)) {
         this.fail(
-          new PlatformIOError2(
+          new PlatformIOError(
             "Serial binding returned non-binary data.",
             "SERIAL_TRANSPORT_FAILED"
           )
@@ -96747,7 +96747,7 @@ var DirectSerialTransport = class {
           this.onData(bytes.subarray(offset, offset + 65536));
       } catch {
         this.fail(
-          new PlatformIOError2(
+          new PlatformIOError(
             "Serial data consumer failed.",
             "SERIAL_TRANSPORT_FAILED"
           )
@@ -96757,7 +96757,7 @@ var DirectSerialTransport = class {
     port.on(
       "error",
       () => this.fail(
-        new PlatformIOError2(
+        new PlatformIOError(
           "Serial transport failed.",
           "SERIAL_TRANSPORT_FAILED"
         )
@@ -96790,7 +96790,7 @@ var DirectSerialTransport = class {
   /** Open once; a late success after timeout/stop is immediately closed and never becomes usable. */
   async open() {
     if (this.current !== "idle" || this.terminal)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial transport cannot be reopened.",
         "SERIAL_TRANSPORT_STATE_INVALID"
       );
@@ -96801,7 +96801,7 @@ var DirectSerialTransport = class {
         this.port.open((error2) => {
           this.opening = false;
           if (error2) {
-            const failure = new PlatformIOError2(
+            const failure = new PlatformIOError(
               "Could not open serial port.",
               "SERIAL_OPEN_FAILED"
             );
@@ -96811,7 +96811,7 @@ var DirectSerialTransport = class {
           } else if (this.terminal) {
             this.requestClose();
             done(
-              new PlatformIOError2(
+              new PlatformIOError(
                 "Serial open was cancelled.",
                 "SERIAL_CLOSED"
               )
@@ -96823,7 +96823,7 @@ var DirectSerialTransport = class {
         });
       } catch {
         this.opening = false;
-        const failure = new PlatformIOError2(
+        const failure = new PlatformIOError(
           "Could not open serial port.",
           "SERIAL_OPEN_FAILED"
         );
@@ -96836,14 +96836,14 @@ var DirectSerialTransport = class {
   /** Write at most 64 KiB once, then wait for OS drain. This does not assert device-level acknowledgement. */
   async write(bytes) {
     if (!Buffer.isBuffer(bytes) || bytes.length > 65536)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial writes are limited to 64 KiB.",
         "SERIAL_WRITE_LIMIT"
       );
     if (this.state !== "open" || !this.port.isOpen)
-      throw new PlatformIOError2("Serial port is not open.", "SERIAL_CLOSED");
+      throw new PlatformIOError("Serial port is not open.", "SERIAL_CLOSED");
     if (this.writing)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "A serial write is already in progress.",
         "SERIAL_WRITE_BUSY"
       );
@@ -96855,14 +96855,14 @@ var DirectSerialTransport = class {
         this.port.write(copy, (error2) => {
           if (error2)
             return done(
-              new PlatformIOError2(
+              new PlatformIOError(
                 "Serial write failed; some bytes may have been sent.",
                 "SERIAL_WRITE_FAILED"
               )
             );
           if (this.terminal)
             return done(
-              new PlatformIOError2(
+              new PlatformIOError(
                 "Serial connection closed during write.",
                 "SERIAL_CLOSED"
               )
@@ -96870,7 +96870,7 @@ var DirectSerialTransport = class {
           try {
             this.port.drain(
               (drainError) => done(
-                drainError ? new PlatformIOError2(
+                drainError ? new PlatformIOError(
                   "Serial drain failed; some bytes may have been sent.",
                   "SERIAL_WRITE_FAILED"
                 ) : void 0
@@ -96878,7 +96878,7 @@ var DirectSerialTransport = class {
             );
           } catch {
             done(
-              new PlatformIOError2(
+              new PlatformIOError(
                 "Serial drain failed.",
                 "SERIAL_WRITE_FAILED"
               )
@@ -96895,7 +96895,7 @@ var DirectSerialTransport = class {
   async close() {
     this.markTerminal("stopped");
     this.abortPending(
-      new PlatformIOError2("Serial operation stopped.", "SERIAL_CLOSED")
+      new PlatformIOError("Serial operation stopped.", "SERIAL_CLOSED")
     );
     if (this.closeAttempt) return this.closeAttempt.promise;
     this.requestClose();
@@ -96909,7 +96909,7 @@ var DirectSerialTransport = class {
     const timer = setTimeout(() => {
       this.closeAttempt = void 0;
       reject(
-        new PlatformIOError2(
+        new PlatformIOError(
           "Serial closure is not confirmed; retain the device lease.",
           "SERIAL_CLOSE_TIMEOUT"
         )
@@ -96933,7 +96933,7 @@ var DirectSerialTransport = class {
       };
       const timer = setTimeout(
         () => finish(
-          new PlatformIOError2(
+          new PlatformIOError(
             "Serial operation timed out; effects may be partial.",
             timeoutCode
           )
@@ -96945,7 +96945,7 @@ var DirectSerialTransport = class {
         start(finish);
       } catch {
         finish(
-          new PlatformIOError2(
+          new PlatformIOError(
             "Serial operation failed.",
             "SERIAL_TRANSPORT_FAILED"
           )
@@ -96991,7 +96991,7 @@ var DirectSerialTransport = class {
     this.closing = false;
     this.markTerminal("stopped");
     this.abortPending(
-      new PlatformIOError2("Serial connection closed.", "SERIAL_CLOSED")
+      new PlatformIOError("Serial connection closed.", "SERIAL_CLOSED")
     );
     this.resolveClosed();
     if (this.closeAttempt) {
@@ -97004,7 +97004,7 @@ var DirectSerialTransport = class {
 async function createDirectSerialTransport(options, onData) {
   validateDirectSerialOptions(options);
   if (Number(process.versions.node.split(".")[0]) < 20)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Direct serial transport requires Node 20 or newer; the PlatformIO monitor remains available.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -97019,7 +97019,7 @@ async function createDirectSerialTransport(options, onData) {
     });
     return new DirectSerialTransport(port, options, onData);
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "The pinned serialport native backend is unavailable on this installation.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -97044,7 +97044,7 @@ var recordsSchema = external_exports.array(
 ).max(1024);
 async function loadBackend() {
   if (Number(process.versions.node.split(".")[0]) < 20)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Native serial discovery requires Node 20 or newer.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -97052,7 +97052,7 @@ async function loadBackend() {
     const { SerialPort } = await loadSerialBackend();
     return { list: () => SerialPort.list() };
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "The native serial backend is unavailable.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -97067,7 +97067,7 @@ var NativeSerialDiscovery = class {
   constructor(options) {
     this.timeoutMs = options.timeoutMs ?? 5e3;
     if (!Number.isSafeInteger(this.timeoutMs) || this.timeoutMs < 1 || this.timeoutMs > 3e4 || typeof options.authorize !== "function")
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid serial discovery configuration.",
         "SERIAL_DISCOVERY_INVALID"
       );
@@ -97077,7 +97077,7 @@ var NativeSerialDiscovery = class {
   /** Return only validated identity fields; permissions errors and enumeration failures never become an empty list. */
   async list() {
     if (this.active)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial discovery is already pending.",
         "SERIAL_DISCOVERY_BUSY"
       );
@@ -97088,7 +97088,7 @@ var NativeSerialDiscovery = class {
       try {
         const guard = await this.authorize();
         if (typeof guard !== "function")
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Discovery authorization returned no guard.",
             "SERIAL_AUTHORIZATION_REQUIRED"
           );
@@ -97102,7 +97102,7 @@ var NativeSerialDiscovery = class {
         guard();
         const parsed = recordsSchema.safeParse(raw);
         if (!parsed.success)
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Native discovery returned invalid metadata.",
             "SERIAL_DISCOVERY_INVALID"
           );
@@ -97110,8 +97110,8 @@ var NativeSerialDiscovery = class {
           parsed.data.map((record2) => Object.freeze(record2))
         );
       } catch (error2) {
-        if (error2 instanceof PlatformIOError2) throw error2;
-        throw new PlatformIOError2(
+        if (error2 instanceof PlatformIOError) throw error2;
+        throw new PlatformIOError(
           "Native serial enumeration failed.",
           "SERIAL_DISCOVERY_FAILED"
         );
@@ -97126,7 +97126,7 @@ var NativeSerialDiscovery = class {
           timer = setTimeout(() => {
             expired = true;
             reject(
-              new PlatformIOError2(
+              new PlatformIOError(
                 "Native serial enumeration timed out.",
                 "SERIAL_DISCOVERY_TIMEOUT"
               )
@@ -97162,19 +97162,19 @@ function descriptor(record2) {
     record2.serialNumber
   ]) {
     if (field2 !== void 0 && (typeof field2 !== "string" || field2.length > 512 || /[\x00-\x1f\x7f]/.test(field2)))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid serial discovery metadata.",
         "SERIAL_DISCOVERY_INVALID"
       );
   }
   if (!record2.path)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Missing serial discovery path.",
       "SERIAL_DISCOVERY_INVALID"
     );
   for (const id of [record2.vendorId, record2.productId]) {
     if (id !== void 0 && !/^[0-9a-f]{4}$/i.test(id))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid USB identifier.",
         "SERIAL_DISCOVERY_INVALID"
       );
@@ -97192,13 +97192,13 @@ function descriptor(record2) {
 function bindSerialDiscovery(endpoint, records, resolve) {
   const inspect = (snapshot) => {
     if (!Array.isArray(snapshot) || snapshot.length > 1024)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid serial discovery snapshot.",
         "SERIAL_DISCOVERY_INVALID"
       );
     const normalized = snapshot.map((record2) => {
       if (!record2 || typeof record2 !== "object")
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Invalid serial discovery entry.",
           "SERIAL_DISCOVERY_INVALID"
         );
@@ -97209,13 +97209,13 @@ function bindSerialDiscovery(endpoint, records, resolve) {
       (record2) => record2.endpoint === endpoint.resource.identity
     );
     if (!matches.length)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Selected serial endpoint is absent from discovery.",
         "SERIAL_DEVICE_UNAVAILABLE"
       );
     const identities = new Set(matches.map((record2) => record2.usb));
     if (identities.size !== 1)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Conflicting discovery metadata for the selected endpoint.",
         "SERIAL_DEVICE_AMBIGUOUS"
       );
@@ -97223,7 +97223,7 @@ function bindSerialDiscovery(endpoint, records, resolve) {
     if (usb && normalized.some(
       (record2) => record2.usb === usb && record2.endpoint !== endpoint.resource.identity
     ))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "USB identity is shared by multiple endpoints.",
         "SERIAL_DEVICE_AMBIGUOUS"
       );
@@ -97238,7 +97238,7 @@ function bindSerialDiscovery(endpoint, records, resolve) {
     revalidate(snapshot) {
       endpoint.revalidate();
       if (inspect(snapshot) !== expected)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Serial discovery identity changed; select and authorize again.",
           "SERIAL_DEVICE_CHANGED"
         );
@@ -97265,7 +97265,7 @@ function stableDeviceLeaseRoot() {
 }
 function resourceKey(resource) {
   if (!resource || !["serial", "probe"].includes(resource.kind) || typeof resource.identity !== "string" || !resource.identity.trim() || resource.identity.length > 1024 || /[\x00-\x1f\x7f]/.test(resource.identity))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid physical resource identity.",
       "DEVICE_IDENTITY_INVALID"
     );
@@ -97321,7 +97321,7 @@ var DeviceLeaseStore = class {
       const previous = this.readRecord(key);
       if (previous) {
         if (previous.handoffPending)
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Device custody handoff is unresolved; automatic stale recovery is disabled.",
             "DEVICE_HANDOFF_PENDING"
           );
@@ -97330,7 +97330,7 @@ var DeviceLeaseStore = class {
           this.inspect(previous.owner.pid)
         );
         if (status !== "stale")
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             status === "alive" ? "Physical resource is already owned." : "Physical resource ownership cannot be verified.",
             status === "alive" ? "DEVICE_BUSY" : "DEVICE_OWNER_UNKNOWN"
           );
@@ -97353,7 +97353,7 @@ var DeviceLeaseStore = class {
     this.withGate(key, () => {
       const current = this.requirePersistedOwner(key, held);
       if (current.handoffPending)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Device handoff is already pending.",
           "DEVICE_HANDOFF_PENDING"
         );
@@ -97380,14 +97380,14 @@ var DeviceLeaseStore = class {
     const held = this.requireHandle(lease);
     const key = resourceKey(held.resource);
     if (!validProcessIdentity(target) || target.platform !== held.owner.platform || target.pid === held.owner.pid)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid lease transfer target.",
         "DEVICE_TRANSFER_INVALID"
       );
     return this.withGate(key, () => {
       const current = this.requirePersistedOwner(key, held);
       if (compareProcessIdentity(target, this.inspect(target.pid)) !== "alive")
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Lease transfer target is unavailable or its process identity changed.",
           "DEVICE_TRANSFER_INVALID"
         );
@@ -97411,7 +97411,7 @@ var DeviceLeaseStore = class {
   finishTransfer(ticket) {
     const transferred = this.transfers.get(ticket);
     if (!transferred)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Unknown or completed transfer receipt.",
         "DEVICE_TRANSFER_INVALID"
       );
@@ -97422,7 +97422,7 @@ var DeviceLeaseStore = class {
         current.owner,
         this.inspect(current.owner.pid)
       ) !== "stale")
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Transferred child exit is not confirmed.",
           "DEVICE_OWNER_UNKNOWN"
         );
@@ -97437,7 +97437,7 @@ var DeviceLeaseStore = class {
   adopt(ticket) {
     const key = resourceKey(ticket?.resource);
     if (typeof ticket.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(ticket.nonce))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid lease transfer ticket.",
         "DEVICE_TRANSFER_INVALID"
       );
@@ -97445,7 +97445,7 @@ var DeviceLeaseStore = class {
     return this.withGate(key, () => {
       const current = this.readRecord(key);
       if (!current || current.nonce !== ticket.nonce || !sameProcessIdentity(current.owner, owner))
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Lease transfer ticket is stale or belongs to another process.",
           "DEVICE_TRANSFER_INVALID"
         );
@@ -97461,7 +97461,7 @@ var DeviceLeaseStore = class {
     this.withGate(key, () => {
       const current = this.requirePersistedOwner(key, held);
       if (current.handoffPending)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Cannot release unresolved child custody.",
           "DEVICE_HANDOFF_PENDING"
         );
@@ -97480,7 +97480,7 @@ var DeviceLeaseStore = class {
   requireHandle(lease) {
     const held = this.held.get(lease);
     if (!held)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Unknown or already released device lease.",
         "DEVICE_LEASE_NOT_OWNED"
       );
@@ -97489,7 +97489,7 @@ var DeviceLeaseStore = class {
   requirePersistedOwner(key, held) {
     const current = this.readRecord(key);
     if (!current || current.nonce !== held.nonce || !sameProcessIdentity(current.owner, held.owner))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Device lease ownership changed; refusing mutation.",
         "DEVICE_LEASE_NOT_OWNED"
       );
@@ -97499,7 +97499,7 @@ var DeviceLeaseStore = class {
     if (this.owner) return this.owner;
     const observation = this.inspect(process.pid);
     if (observation.status !== "running" || observation.identity.pid !== process.pid || !validProcessIdentity(observation.identity))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Cannot establish this process's start identity.",
         "DEVICE_OWNER_UNKNOWN"
       );
@@ -97519,14 +97519,14 @@ var DeviceLeaseStore = class {
       }
       const stat = fs27.lstatSync(current);
       if (!stat.isDirectory() || stat.isSymbolicLink())
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Device lease directory must not contain symlinks.",
           "DEVICE_LEASE_PATH_INVALID"
         );
     }
     const rootStat = fs27.statSync(this.root);
     if (process.platform !== "win32" && (rootStat.uid !== process.getuid?.() || (rootStat.mode & 18) !== 0))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Device lease directory must be owned by this user and not writable by others.",
         "DEVICE_LEASE_PATH_INVALID"
       );
@@ -97538,7 +97538,7 @@ var DeviceLeaseStore = class {
       fs27.mkdirSync(gate, { mode: 448 });
     } catch (error2) {
       if (error2.code === "EEXIST")
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Device lease update is busy or interrupted; retry, then inspect the gate if it persists.",
           "DEVICE_LEASE_GATE_BUSY"
         );
@@ -97560,7 +97560,7 @@ var DeviceLeaseStore = class {
       throw error2;
     }
     if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 8192)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid device lease record.",
         "DEVICE_LEASE_CORRUPT"
       );
@@ -97570,7 +97570,7 @@ var DeviceLeaseStore = class {
         throw new Error("Invalid lease schema");
       return record2;
     } catch {
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid device lease record; ownership is not assumed stale.",
         "DEVICE_LEASE_CORRUPT"
       );
@@ -97640,7 +97640,7 @@ import { StringDecoder } from "node:string_decoder";
 import { performance as performance3 } from "node:perf_hooks";
 function boundedInteger(value2, min, max, field2) {
   if (!Number.isSafeInteger(value2) || value2 < min || value2 > max)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Invalid serial ${field2}; expected ${min} through ${max}.`,
       "SERIAL_BUFFER_ARGUMENT_INVALID"
     );
@@ -97697,13 +97697,13 @@ var SerialSessionBuffer = class {
   append(chunk) {
     if (this.state !== "open") return false;
     if (!Buffer.isBuffer(chunk) || chunk.length > 1024 * 1024)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial chunks must be buffers no larger than 1 MiB.",
         "SERIAL_BUFFER_INPUT_LIMIT"
       );
     if (!chunk.length) return true;
     if (this.received > Number.MAX_SAFE_INTEGER - chunk.length)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial byte counter exhausted.",
         "SERIAL_BUFFER_COUNTER_LIMIT"
       );
@@ -97716,7 +97716,7 @@ var SerialSessionBuffer = class {
   close(state = "stopped", error2) {
     if (this.state !== "open") return;
     if (!["stopped", "disconnected", "error"].includes(state) || error2 !== void 0 && (typeof error2 !== "string" || error2.length > 4096))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid serial close state or error text.",
         "SERIAL_BUFFER_ARGUMENT_INVALID"
       );
@@ -97947,7 +97947,7 @@ var SerialSessionBuffer = class {
   }
   finishLine() {
     if (this.nextCursor === Number.MAX_SAFE_INTEGER)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial line cursor exhausted.",
         "SERIAL_BUFFER_COUNTER_LIMIT"
       );
@@ -97999,7 +97999,7 @@ var SerialSessionBuffer = class {
   /** Install the waiter before rechecking revision to avoid a lost arrival during async matching. */
   waitForChange(revision, timeout, signal) {
     if (this.waiters.size >= 32)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Too many pending serial readers.",
         "SERIAL_READ_BUSY"
       );
@@ -98025,7 +98025,7 @@ var SerialSessionManager = class {
   constructor(dependencies) {
     this.dependencies = dependencies;
     if (typeof dependencies.authorize !== "function")
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial session authorization is required.",
         "SERIAL_AUTHORIZATION_REQUIRED"
       );
@@ -98053,7 +98053,7 @@ var SerialSessionManager = class {
     return () => {
       this.requireActiveOwner(owner);
       if ((this.ownerStops.get(owner) ?? 0) !== generation)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Serial startup was stopped.",
           "SERIAL_CLOSED"
         );
@@ -98093,7 +98093,7 @@ var SerialSessionManager = class {
         resolve
       );
       if ((this.ownerStops.get(owner) ?? 0) !== stopGeneration)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Serial discovery was stopped.",
           "SERIAL_CLOSED"
         );
@@ -98119,7 +98119,7 @@ var SerialSessionManager = class {
         );
       this.requireActiveOwner(owner);
       if ((this.ownerStops.get(owner) ?? 0) !== stopGeneration)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Serial startup was stopped during preflight.",
           "SERIAL_CLOSED"
         );
@@ -98138,18 +98138,18 @@ var SerialSessionManager = class {
     this.requireActiveOwner(owner);
     validateDirectSerialOptions(input);
     if (!path32.isAbsolute(input.projectDir))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
     const projectDir = fs28.realpathSync.native(input.projectDir);
     if (!fs28.statSync(projectDir).isDirectory())
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial project directory is not a directory.",
         "SERIAL_PROJECT_INVALID"
       );
     if (input.additionalResources !== void 0 && (!Array.isArray(input.additionalResources) || input.additionalResources.length > 2))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Too many serial identity scopes.",
         "SERIAL_RESOURCE_INVALID"
       );
@@ -98160,7 +98160,7 @@ var SerialSessionManager = class {
     );
     const resources = [input.resource, ...additionalResources];
     if (resources.some((resource) => resource.kind !== "serial") || new Set(resources.map((resource) => resource.identity)).size !== resources.length)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial identity scopes must be distinct serial resources.",
         "SERIAL_RESOURCE_INVALID"
       );
@@ -98244,11 +98244,11 @@ var SerialSessionManager = class {
         session.confirmedClosed = true;
         this.releaseLease(session);
       }
-      throw new PlatformIOError2(
-        error2 instanceof PlatformIOError2 ? error2.message : "Serial session could not start.",
-        error2 instanceof PlatformIOError2 ? error2.code : "SERIAL_SESSION_FAILED",
+      throw new PlatformIOError(
+        error2 instanceof PlatformIOError ? error2.message : "Serial session could not start.",
+        error2 instanceof PlatformIOError ? error2.code : "SERIAL_SESSION_FAILED",
         {
-          ...error2 instanceof PlatformIOError2 ? error2.context : {},
+          ...error2 instanceof PlatformIOError ? error2.context : {},
           sessionId: session.id,
           cleanupPending: session.leases.length > 0
         }
@@ -98271,7 +98271,7 @@ var SerialSessionManager = class {
   async write(owner, id, bytes) {
     const session = this.requireSession(owner, id);
     if (!Buffer.isBuffer(bytes) || bytes.length > 65536)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial writes are limited to 64 KiB.",
         "SERIAL_WRITE_LIMIT"
       );
@@ -98282,7 +98282,7 @@ var SerialSessionManager = class {
     this.requireActiveOwner(owner);
     guard();
     if (!session.transport)
-      throw new PlatformIOError2("Serial session is not open.", "SERIAL_CLOSED");
+      throw new PlatformIOError("Serial session is not open.", "SERIAL_CLOSED");
     return session.transport.write(copy);
   }
   /** Owned process-only cleanup remains available when policy is invalid or permission was revoked. */
@@ -98311,7 +98311,7 @@ var SerialSessionManager = class {
   forget(owner, id) {
     const session = this.requireSession(owner, id);
     if (this.cleanupPending(session))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial cleanup is still pending.",
         "SERIAL_CLEANUP_PENDING"
       );
@@ -98325,11 +98325,11 @@ var SerialSessionManager = class {
       read = await this.read(owner, started.sessionId, options);
     } catch (error2) {
       const stopped = await this.stop(owner, started.sessionId);
-      throw new PlatformIOError2(
-        error2 instanceof PlatformIOError2 ? error2.message : "Serial capture failed.",
-        error2 instanceof PlatformIOError2 ? error2.code : "SERIAL_CAPTURE_FAILED",
+      throw new PlatformIOError(
+        error2 instanceof PlatformIOError ? error2.message : "Serial capture failed.",
+        error2 instanceof PlatformIOError ? error2.code : "SERIAL_CAPTURE_FAILED",
         {
-          ...error2 instanceof PlatformIOError2 ? error2.context : {},
+          ...error2 instanceof PlatformIOError ? error2.context : {},
           sessionId: started.sessionId,
           cleanupPending: stopped.cleanupPending
         }
@@ -98372,7 +98372,7 @@ var SerialSessionManager = class {
       })
     );
     if (typeof guard !== "function")
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial authorization did not return a revision guard.",
         "SERIAL_AUTHORIZATION_REQUIRED"
       );
@@ -98387,7 +98387,7 @@ var SerialSessionManager = class {
         new Promise((_, reject) => {
           timer = setTimeout(
             () => reject(
-              new PlatformIOError2(
+              new PlatformIOError(
                 "Serial endpoint verification timed out.",
                 "SERIAL_DISCOVERY_TIMEOUT"
               )
@@ -98415,7 +98415,7 @@ var SerialSessionManager = class {
     if (this.pendingDiscovery + [...this.sessions.values()].filter(
       (session) => this.cleanupPending(session)
     ).length >= 8)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial session capacity is full; close an owned session first.",
         "SERIAL_SESSION_LIMIT"
       );
@@ -98423,14 +98423,14 @@ var SerialSessionManager = class {
   requireActiveOwner(owner) {
     this.requireOwner(owner);
     if (this.disconnectedOwners.has(owner))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial client disconnected.",
         "SERIAL_OWNER_DISCONNECTED"
       );
   }
   requireOwner(owner) {
     if (!this.owners.has(owner))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Unknown serial session owner.",
         "SERIAL_SESSION_NOT_OWNED"
       );
@@ -98440,7 +98440,7 @@ var SerialSessionManager = class {
     this.prune();
     const session = this.sessions.get(id);
     if (!session || session.owner !== owner)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial session is unavailable to this owner.",
         "SERIAL_SESSION_NOT_OWNED"
       );
@@ -98448,7 +98448,7 @@ var SerialSessionManager = class {
   }
   ensureNotStopped(session) {
     if (session.stopRequested)
-      throw new PlatformIOError2("Serial session was stopped.", "SERIAL_CLOSED");
+      throw new PlatformIOError("Serial session was stopped.", "SERIAL_CLOSED");
   }
   releaseLease(session) {
     if (!session.confirmedClosed) return;
@@ -98559,11 +98559,11 @@ var PolicySerialSessionService = class {
           });
         } catch (error2) {
           const stopped2 = await this.sessions.stop(owner, started.sessionId);
-          throw new PlatformIOError2(
-            error2 instanceof PlatformIOError2 ? error2.message : "Monitor capture failed.",
-            error2 instanceof PlatformIOError2 ? error2.code : "SERIAL_CAPTURE_FAILED",
+          throw new PlatformIOError(
+            error2 instanceof PlatformIOError ? error2.message : "Monitor capture failed.",
+            error2 instanceof PlatformIOError ? error2.code : "SERIAL_CAPTURE_FAILED",
             {
-              ...error2 instanceof PlatformIOError2 ? error2.context : {},
+              ...error2 instanceof PlatformIOError ? error2.context : {},
               sessionId: started.sessionId,
               cleanupPending: stopped2.cleanupPending
             }
@@ -98622,7 +98622,7 @@ var PolicySerialSessionService = class {
     const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
     if (!path33.isAbsolute(input.projectDir))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial project must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
@@ -98633,7 +98633,7 @@ var PolicySerialSessionService = class {
     });
     const context = this.context.getStore();
     if (!context)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Trusted request context required.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED"
       );
@@ -98669,13 +98669,13 @@ var PolicySerialSessionService = class {
   /** Enumerate through one shared native provider under this request's canonical workspace policy. */
   async listSerialDevices(projectDir) {
     if (!path33.isAbsolute(projectDir))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
     const canonical3 = fs29.realpathSync.native(projectDir);
     if (!fs29.statSync(canonical3).isDirectory())
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial project directory is not a directory.",
         "SERIAL_PROJECT_INVALID"
       );
@@ -98686,18 +98686,18 @@ var PolicySerialSessionService = class {
     this.sessions.list(owner);
     const context = this.context.getStore();
     if (!context)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Session listing requires a trusted request context.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED"
       );
     if (!path33.isAbsolute(projectDir))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial project must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
     const canonical3 = fs29.realpathSync.native(projectDir);
     if (!fs29.statSync(canonical3).isDirectory())
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial project must be a directory.",
         "SERIAL_PROJECT_INVALID"
       );
@@ -98713,7 +98713,7 @@ var PolicySerialSessionService = class {
       { ...context.caller, workspaceDir: canonical3 },
       async () => {
         if (!check2)
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Policy changed during session listing.",
             "POLICY_CHANGED"
           );
@@ -98729,7 +98729,7 @@ var PolicySerialSessionService = class {
     const context = this.context.getStore();
     const projectDir = this.discoveryProject.getStore();
     if (!context || !projectDir)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial discovery requires a trusted request context.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED"
       );
@@ -98737,7 +98737,7 @@ var PolicySerialSessionService = class {
     if (batch) {
       const guard = () => {
         if (!batch.active || batch.projectDir !== projectDir || performance5.now() > batch.expiresAt)
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Startup discovery scope expired.",
             "SERIAL_DISCOVERY_SCOPE_INVALID"
           );
@@ -98745,7 +98745,7 @@ var PolicySerialSessionService = class {
       };
       guard();
       if (batch.remaining-- <= 0)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Startup discovery limit exceeded.",
           "SERIAL_DISCOVERY_SCOPE_INVALID"
         );
@@ -98763,7 +98763,7 @@ var PolicySerialSessionService = class {
       { ...context.caller, workspaceDir: projectDir },
       async () => {
         if (!check2)
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Policy changed during discovery authorization.",
             "POLICY_CHANGED"
           );
@@ -98780,7 +98780,7 @@ var PolicySerialSessionService = class {
       context.discoveryApprovalId
     ]) {
       if (id !== void 0 && (typeof id !== "string" || !id || id.length > 256))
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Invalid serial approval identifier.",
           "APPROVAL_SCOPE_INVALID"
         );
@@ -98798,7 +98798,7 @@ var PolicySerialSessionService = class {
   async authorize(request) {
     const context = this.context.getStore();
     if (!context)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial operations require a trusted request context.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED"
       );
@@ -98806,7 +98806,7 @@ var PolicySerialSessionService = class {
     const scopedRead = scope5 && request.operation === "read" && request.sessionId === scope5.sessionId;
     const checkScope = () => {
       if (scopedRead && (!scope5.active || performance5.now() > scope5.expiresAt))
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Memory capture authorization scope expired.",
           "SERIAL_CAPTURE_SCOPE_INVALID"
         );
@@ -98824,7 +98824,7 @@ var PolicySerialSessionService = class {
     }
     const transient = this.transientMemoryScope.getStore();
     if (transient && !transient.active)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Transient memory scope expired.",
         "SERIAL_CAPTURE_SCOPE_INVALID"
       );
@@ -98836,7 +98836,7 @@ var PolicySerialSessionService = class {
     );
     const binding = JSON.stringify(deviceRequest);
     if (transient && request.operation === "read" && transient.binding !== binding)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Transient memory device identity changed.",
         "SERIAL_CAPTURE_SCOPE_INVALID"
       );
@@ -98882,7 +98882,7 @@ var PolicySerialSessionService = class {
       );
       const decisions = { opening, reading };
       if (opening.status !== "ready" || reading.status !== "ready")
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "One-shot capture needs opening and reading permissions before startup.",
           opening.status === "deny" || reading.status === "deny" ? "POLICY_DENIED" : "APPROVAL_REQUIRED",
           { decisions }
@@ -98895,7 +98895,7 @@ var PolicySerialSessionService = class {
       caller,
       async () => {
         if (!check2)
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Policy changed while authorizing serial operation.",
             "POLICY_CHANGED"
           );
@@ -98943,14 +98943,14 @@ async function resolveMonitorRequest(input, defaults, caller, projectDevices) {
       caller
     );
     if (!report.ok || !("defaultEnvironments" in report))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Could not resolve monitor project configuration.",
         "PROJECT_CONFIG_INVALID"
       );
     const environment = params.env || report.defaultEnvironments[0];
     const selected = report.envs.find((item) => item.name === environment);
     if (environment && !selected)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Monitor environment does not exist.",
         "PROJECT_ENVIRONMENT_INVALID"
       );
@@ -98962,7 +98962,7 @@ async function resolveMonitorRequest(input, defaults, caller, projectDevices) {
     if (!baud && selected?.monitorSpeed != null && selected.monitorSpeed !== "") {
       const speed = selected.monitorSpeed;
       if (typeof speed !== "number" && (typeof speed !== "string" || !/^\d+$/.test(speed)))
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Invalid configured monitor speed.",
           "SERIAL_TRANSPORT_ARGUMENT_INVALID"
         );
@@ -98979,7 +98979,7 @@ async function resolveMonitorRequest(input, defaults, caller, projectDevices) {
         const rows = projectDevices(await listDevicesCore());
         guard();
         if (rows.likely_ports.length !== 1)
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             rows.likely_ports.length ? "Several candidate ports; pass port explicitly." : "No likely development-board port; pass port explicitly.",
             "SERIAL_PORT_SELECTION_REQUIRED"
           );
@@ -99116,7 +99116,7 @@ async function executeMemoryCompatibility(client, input, defaults, caller, proje
     read_approval_id: external_exports.string().max(256).optional()
   }).parse(input);
   if (params.stack_unit === "words" && params.stack_word_bytes === void 0)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Word-valued stack telemetry requires stack_word_bytes.",
       "MEMORY_UNIT_REQUIRED"
     );
@@ -99149,7 +99149,7 @@ async function executeMemoryCompatibility(client, input, defaults, caller, proje
         const report = await service.captureMemory(owner, session_id, options);
         const session = service.sessions.list(owner).find((item) => item.sessionId === session_id);
         if (!session)
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Owned memory session is no longer available.",
             "SERIAL_SESSION_NOT_FOUND"
           );
@@ -99396,7 +99396,7 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
       "utf8"
     );
     if (bytes.length > 65536)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial writes are limited to 64 KiB including the newline.",
         "SERIAL_WRITE_LIMIT"
       );
@@ -99451,7 +99451,7 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
     );
   }
   if (name2 !== "pio_list_devices")
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Unknown device compatibility tool.",
       "COMPAT_TOOL_UNKNOWN"
     );
@@ -99757,13 +99757,13 @@ var SerialClientContext = class {
   /** Execute a trusted adapter under isolated request approvals and this connection's owner capability. */
   async run(context, execute2) {
     if (this.closed)
-      throw new PlatformIOError2("Serial client disconnected.", "SERIAL_CLOSED");
+      throw new PlatformIOError("Serial client disconnected.", "SERIAL_CLOSED");
     const result = await this.service.run(
       context,
       () => execute2(this.service, this.owner)
     );
     if (this.closed)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Serial client disconnected before result delivery.",
         "SERIAL_CLOSED"
       );
@@ -99804,13 +99804,13 @@ init_errors2();
 init_redact();
 function parseDependencyGraph(output) {
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Dependency build output exceeds 10 MiB.",
       "DEPENDENCY_GRAPH_LIMIT"
     );
   const lines2 = redactSecretsInText(output).replace(/\x1b\[[0-9;]*m/g, "").split(/\r?\n/);
   if (lines2.length > 1e5 || lines2.some((line) => line.length > 16384))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Dependency build output exceeds line limits.",
       "DEPENDENCY_GRAPH_LIMIT"
     );
@@ -99859,7 +99859,7 @@ function parseDependencyGraph(output) {
       continue;
     }
     if (++nodes > 4096)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Dependency graph exceeds 4096 nodes.",
         "DEPENDENCY_GRAPH_LIMIT"
       );
@@ -99895,7 +99895,7 @@ init_redact();
 var nameSchema = external_exports.string().trim().min(1).max(512).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 function parseDependencyDeclaration(input) {
   if (input.length > 4096 || /[\x00-\x1f\x7f]/.test(input))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid dependency declaration.",
       "DEPENDENCY_SPEC_INVALID"
     );
@@ -99919,7 +99919,7 @@ function parseDependencyDeclaration(input) {
 }
 function parseDependencyManifest(text7, format) {
   if (Buffer.byteLength(text7) > 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Library manifest exceeds 1 MiB.",
       "DEPENDENCY_MANIFEST_LIMIT"
     );
@@ -99978,7 +99978,7 @@ function parseDependencyManifest(text7, format) {
       dependencies: [...new Set(dependencies)]
     };
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid library manifest; dependency evidence is incomplete.",
       "DEPENDENCY_MANIFEST_INVALID"
     );
@@ -99993,7 +99993,7 @@ function list(value2) {
   if (!Array.isArray(values) || values.length > 2048 || values.some(
     (item) => typeof item !== "string" || item.length > 4096 || /[\x00-\x1f\x7f]/.test(item)
   ))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid resolved dependency configuration.",
       "DEPENDENCY_CONFIG_INVALID"
     );
@@ -100003,7 +100003,7 @@ function dependencyProjectInputs(projectDir, report, environment) {
   const selected = environment ?? report.defaultEnvironments[0];
   const env = report.envs.find((item) => item.name === selected);
   if (!env || !/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,49}$/.test(env.name))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "No valid selected environment for dependency inspection.",
       "DEPENDENCY_ENVIRONMENT_INVALID"
     );
@@ -100011,7 +100011,7 @@ function dependencyProjectInputs(projectDir, report, environment) {
   const settingPath = (value2, fallback) => {
     if (value2 == null) return path36.join(project, fallback);
     if (typeof value2 !== "string" || !value2.trim() || value2.length > 32768 || /[\x00-\x1f\x7f]/.test(value2))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Invalid resolved library directory.",
         "DEPENDENCY_CONFIG_INVALID"
       );
@@ -100019,7 +100019,7 @@ function dependencyProjectInputs(projectDir, report, environment) {
   };
   const extras = list(env.libraryExtraDirectories);
   if (extras.length > 62)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Too many library search directories.",
       "DEPENDENCY_LIMIT"
     );
@@ -100056,7 +100056,7 @@ import path37 from "node:path";
 init_errors2();
 async function collectDependencyInventory(roots, assertAuthorized) {
   if (roots.length > 64)
-    throw new PlatformIOError2("Too many library roots.", "DEPENDENCY_LIMIT");
+    throw new PlatformIOError("Too many library roots.", "DEPENDENCY_LIMIT");
   let authorizationFailed = false;
   const check2 = (directory) => {
     try {
@@ -100093,7 +100093,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
     }
     for await (const entry of handle) {
       if (++entries > 4096)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Library inventory exceeds 4096 entries.",
           "DEPENDENCY_LIMIT"
         );
@@ -100109,7 +100109,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
       }
       if (!entry.isDirectory()) continue;
       if (libraries.length >= 2048)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Library inventory exceeds 2048 libraries.",
           "DEPENDENCY_LIMIT"
         );
@@ -100137,7 +100137,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
           break;
         }
         if (info.size > 1024 * 1024 || bytes + info.size > 16 * 1024 * 1024)
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Library manifest byte budget exceeded.",
             "DEPENDENCY_LIMIT"
           );
@@ -100164,7 +100164,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
             }
             bytes += used;
             if (used > 1024 * 1024 || bytes > 16 * 1024 * 1024)
-              throw new PlatformIOError2(
+              throw new PlatformIOError(
                 "Library manifest byte budget exceeded.",
                 "DEPENDENCY_LIMIT"
               );
@@ -100178,11 +100178,11 @@ async function collectDependencyInventory(roots, assertAuthorized) {
           }
         } catch (error2) {
           if (authorizationFailed) throw error2;
-          if (error2 instanceof PlatformIOError2 && error2.code === "DEPENDENCY_LIMIT")
+          if (error2 instanceof PlatformIOError && error2.code === "DEPENDENCY_LIMIT")
             throw error2;
           diagnostics.push({
             path: manifestPath,
-            code: error2 instanceof PlatformIOError2 ? error2.code ?? "MANIFEST_UNREADABLE" : "MANIFEST_UNREADABLE"
+            code: error2 instanceof PlatformIOError ? error2.code ?? "MANIFEST_UNREADABLE" : "MANIFEST_UNREADABLE"
           });
         }
         break;
@@ -100233,7 +100233,7 @@ function auditDependencies(declaredInput, installedInput) {
   const declared = external_exports.array(declarationSchema).max(2048).parse(declaredInput);
   const installed2 = external_exports.array(librarySchema).max(2048).parse(installedInput);
   if (installed2.reduce((sum, lib) => sum + lib.dependencies.length, 0) > 16384)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Dependency graph exceeds 16384 edges.",
       "DEPENDENCY_LIMIT"
     );
@@ -100377,7 +100377,7 @@ async function inspectDependencies(input, caller = {}, onAuthorized) {
       );
       check2();
       if (!configuration.ok || !("defaultEnvironments" in configuration))
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Cannot audit dependencies without resolved configuration.",
           "DEPENDENCY_CONFIG_UNAVAILABLE"
         );
@@ -100418,7 +100418,7 @@ async function inspectDependencies(input, caller = {}, onAuthorized) {
               const relative = path38.relative(root, target);
               return relative === "" || !relative.startsWith(`..${path38.sep}`) && relative !== ".." && !path38.isAbsolute(relative);
             }))
-              throw new PlatformIOError2(
+              throw new PlatformIOError(
                 "Library path moved outside the authorized roots.",
                 "DEPENDENCY_SCOPE_CHANGED"
               );
@@ -100516,13 +100516,13 @@ var schema2 = external_exports.object({
 }).strict();
 async function executeDependencyCompatibility(name2, input, defaults = {}, caller = {}, onAuthorized) {
   if (name2 !== "pio_deps_check")
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Unknown dependency compatibility tool.",
       "COMPAT_TOOL_UNKNOWN"
     );
   const parsed = schema2.safeParse(input);
   if (!parsed.success)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid dependency compatibility arguments.",
       "COMPAT_ARGUMENT_INVALID"
     );
@@ -100688,7 +100688,7 @@ async function executeBoardCompatibility(name2, input, _defaults = {}, caller = 
     const params2 = listSchema.parse(input);
     const query = params2.query.trim().toLowerCase();
     if (!query && !params2.platform && !params2.framework)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Give a query or platform/framework filter.",
         "COMPAT_ARGUMENT_INVALID"
       );
@@ -100730,7 +100730,7 @@ async function executeBoardCompatibility(name2, input, _defaults = {}, caller = 
     );
   }
   if (name2 !== "pio_board_info")
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Unknown board compatibility tool.",
       "COMPAT_TOOL_UNKNOWN"
     );
@@ -100958,13 +100958,13 @@ var reportSchema = external_exports.array(
 ).max(1024);
 function summarizeCheckOutput(output, projectDir) {
   if (Buffer.byteLength(output) > 16 * 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Static analysis report exceeds 16 MiB",
       "CHECK_REPORT_LIMIT"
     );
   const start = output.indexOf("[");
   if (start < 0)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Static analysis returned no JSON report",
       "CHECK_REPORT_INVALID"
     );
@@ -100972,14 +100972,14 @@ function summarizeCheckOutput(output, projectDir) {
   try {
     raw = JSON.parse(output.slice(start).trim());
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Static analysis returned malformed JSON",
       "CHECK_REPORT_INVALID"
     );
   }
   const parsed = reportSchema.safeParse(raw);
   if (!parsed.success)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Static analysis report has an invalid shape",
       "CHECK_REPORT_INVALID"
     );
@@ -101403,7 +101403,7 @@ async function buildProject(projectDir, environment, verbose, background, execut
       diagnostic
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError2) {
+    if (error2 instanceof PlatformIOError) {
       throw error2;
     }
     throw new BuildError(`Failed to build project: ${error2}`, {
@@ -101464,7 +101464,7 @@ async function checkProject(projectDir, environment, background, options = {}) {
       ...analysisReport ? { analysisReport, rawLogPath: result.fullLogPath } : {}
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError2) {
+    if (error2 instanceof PlatformIOError) {
       throw error2;
     }
     throw new BuildError(`Failed to check project: ${error2}`, { projectDir, environment });
@@ -101525,7 +101525,7 @@ async function runTests(projectDir, environment, background, compileOnly, option
       errors
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError2) {
+    if (error2 instanceof PlatformIOError) {
       throw error2;
     }
     throw new BuildError(`Failed to run tests: ${error2}`, { projectDir, environment });
@@ -101577,7 +101577,7 @@ async function cleanProject(projectDir, background, options = {}) {
       message: "Successfully cleaned build artifacts"
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError2) {
+    if (error2 instanceof PlatformIOError) {
       throw error2;
     }
     throw new BuildError(`Failed to clean project: ${error2}`, { projectDir });
@@ -101700,7 +101700,7 @@ init_errors2();
 init_errors2();
 init_events();
 import { randomUUID as randomUUID3 } from "node:crypto";
-var QueueEnforcementError = class extends PlatformIOError2 {
+var QueueEnforcementError = class extends PlatformIOError {
   constructor(message, context) {
     super(message, "QUEUE_ENFORCEMENT_FAILED", context);
     this.name = "QueueEnforcementError";
@@ -101795,7 +101795,7 @@ var HardwareLockManager = class _HardwareLockManager {
       const result = await action();
       return result;
     } catch (error2) {
-      cleanupPending = error2 instanceof PlatformIOError2 && error2.context?.cleanupPending === true;
+      cleanupPending = error2 instanceof PlatformIOError && error2.context?.cleanupPending === true;
       throw error2;
     } finally {
       if (!cleanupPending) this.releaseLock(implicitSessionId);
@@ -101919,7 +101919,7 @@ async function executeRunCompatibility(mode, input, defaults, caller, onAuthoriz
             });
           }
         } catch (error2) {
-          if (error2 instanceof PlatformIOError2 && error2.code === "COMMAND_TIMEOUT" && error2.context?.cleanupPending === false && typeof error2.context.fullLogPath === "string") {
+          if (error2 instanceof PlatformIOError && error2.code === "COMMAND_TIMEOUT" && error2.context?.cleanupPending === false && typeof error2.context.fullLogPath === "string") {
             timedOut = true;
             completed = await collect(-1, error2.context.fullLogPath, true);
           } else if (!(error2 instanceof BuildError) || !completed || error2.context?.exitCode !== completed.exitCode)
@@ -101927,7 +101927,7 @@ async function executeRunCompatibility(mode, input, defaults, caller, onAuthoriz
         }
         guard();
         if (!completed)
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Command result was not collected",
             "COMPAT_RESULT_INVALID"
           );
@@ -102112,7 +102112,7 @@ function checkCompatibilityResult(result, projectDir, severity, timedOut = false
   try {
     report = summarizeCheckOutput(output, projectDir);
   } catch (error2) {
-    if (error2 instanceof PlatformIOError2 && error2.code?.startsWith("CHECK_REPORT_"))
+    if (error2 instanceof PlatformIOError && error2.code?.startsWith("CHECK_REPORT_"))
       return failure();
     throw error2;
   }
@@ -102149,7 +102149,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
   if (requested === "~" || requested.startsWith("~/") || requested.startsWith("~\\"))
     requested = path44.join(defaults.home ?? os8.homedir(), requested.slice(2));
   else if (requested.startsWith("~"))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Named-user home expansion is unsupported.",
       "COMPAT_PROJECT_INVALID"
     );
@@ -102210,7 +102210,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
             path44.join(root, "platformio.ini")
           );
           if (path44.dirname(filename) !== root)
-            throw new PlatformIOError2(
+            throw new PlatformIOError(
               "Generated configuration escapes the project.",
               "COMPAT_PROJECT_INVALID"
             );
@@ -102218,7 +102218,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
           try {
             const stat = await file.stat();
             if (!stat.isFile() || stat.size > 1048576)
-              throw new PlatformIOError2(
+              throw new PlatformIOError(
                 "Generated configuration exceeds report limits.",
                 "COMPAT_RESULT_LIMIT"
               );
@@ -102230,7 +102230,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
               0
             );
             if (bytesRead > 1048576)
-              throw new PlatformIOError2(
+              throw new PlatformIOError(
                 "Generated configuration exceeds report limits.",
                 "COMPAT_RESULT_LIMIT"
               );
@@ -102245,7 +102245,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
         }
         const items = (await fs39.readdir(root, { withFileTypes: true })).filter((item) => !item.name.startsWith("."));
         if (items.length > 4096)
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Project layout exceeds report limits.",
             "COMPAT_RESULT_LIMIT"
           );
@@ -102279,13 +102279,13 @@ var schemas = {
 };
 async function mapProjectCompatibilityRequest(name2, input, defaults = {}) {
   if (!Object.hasOwn(schemas, name2))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Unknown project compatibility tool.",
       "COMPAT_TOOL_UNKNOWN"
     );
   const parsed = schemas[name2].safeParse(input);
   if (!parsed.success)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid project compatibility arguments.",
       "COMPAT_ARGUMENT_INVALID"
     );
@@ -102357,7 +102357,7 @@ function projectCompatibilityResult(result) {
         ])
       )
     };
-  throw new PlatformIOError2(
+  throw new PlatformIOError(
     "Unexpected project compatibility result.",
     "COMPAT_RESULT_INVALID"
   );
@@ -102417,7 +102417,7 @@ function parseCompatibilityLaunch(args, environment = process.env.PIO_MCP_COMPAT
   };
 }
 function invalid(message) {
-  return new PlatformIOError2(message, "COMPAT_CONFIG_INVALID");
+  return new PlatformIOError(message, "COMPAT_CONFIG_INVALID");
 }
 
 // src/adapters/package-compat-registry.ts
@@ -102508,7 +102508,7 @@ function uncomment(value2) {
   return value2.replace(/(^|\s)[#;].*$/, "").trim();
 }
 function invalid2() {
-  throw new PlatformIOError2(
+  throw new PlatformIOError(
     "Package configuration has ambiguous syntax or unexpected non-dependency changes; inspect platformio.ini before retrying.",
     "PACKAGE_CONFIG_CONFLICT"
   );
@@ -102598,13 +102598,13 @@ function mergePackageConfiguration(before, after, options) {
 init_errors2();
 function linesFromOutput(output) {
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Package output exceeds 10 MiB.",
       "PACKAGE_OUTPUT_LIMIT"
     );
   const lines2 = output.replace(/\x1b\[[0-9;]*m/g, "").split(/\r?\n/);
   if (lines2.length > 1e5 || lines2.some((line) => line.length > 16384))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Package output exceeds line limits.",
       "PACKAGE_OUTPUT_LIMIT"
     );
@@ -102736,7 +102736,7 @@ async function readConfiguration(projectDir) {
   try {
     const stat = await file.stat();
     if (!stat.isFile() || stat.size > 1024 * 1024)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Project configuration exceeds 1 MiB or is not a regular file.",
         "PACKAGE_CONFIG_INVALID"
       );
@@ -102753,7 +102753,7 @@ async function readConfiguration(projectDir) {
       length += read.bytesRead;
     }
     if (length > 1024 * 1024)
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Project configuration grew beyond 1 MiB.",
         "PACKAGE_CONFIG_INVALID"
       );
@@ -102773,7 +102773,7 @@ async function retainOutput(projectDir, output) {
     const actual = await fs40.realpath(current);
     const relative = path46.relative(projectDir, actual);
     if (relative === ".." || relative.startsWith(`..${path46.sep}`) || path46.isAbsolute(relative))
-      throw new PlatformIOError2(
+      throw new PlatformIOError(
         "Package log directory escapes the project.",
         "PACKAGE_LOG_PATH_INVALID"
       );
@@ -102796,7 +102796,7 @@ async function retainOutput(projectDir, output) {
 async function executePackageAction(action, input, caller = {}, onAuthorized, outputOptions = {}) {
   const tailLines = outputOptions.tailLines ?? 40;
   if (tailLines !== 40 && tailLines !== 60)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid package output limit.",
       "PACKAGE_OUTPUT_LIMIT"
     );
@@ -102808,14 +102808,14 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
     "pkg_outdated",
     "pkg_update"
   ].includes(action))
-    throw new PlatformIOError2("Unknown package operation.", "UNKNOWN_ACTION");
+    throw new PlatformIOError("Unknown package operation.", "UNKNOWN_ACTION");
   const search = action === "pkg_search";
   const mutation = action === "pkg_install" || action === "pkg_uninstall";
   const parsed = search ? searchSchema.parse(input) : mutation ? mutationSchema.parse(input) : projectSchema.parse(input);
   const projectDir = "projectDir" in parsed ? await fs40.realpath(parsed.projectDir) : void 0;
   const params = { ...parsed, ...projectDir ? { projectDir } : {} };
   if (params.spec !== void 0 && (/[a-z][a-z0-9+.-]*:\/\/[^\s/@]+@/i.test(params.spec) || /[?&](?:token|password|key|secret|signature)=/i.test(params.spec)))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Use an external credential helper instead of credentials in package URLs.",
       "PACKAGE_SPEC_SECRET"
     );
@@ -102839,7 +102839,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
       if (projectDir && configPath) {
         const relative = path46.relative(projectDir, configPath);
         if (relative === ".." || relative.startsWith(`..${path46.sep}`) || path46.isAbsolute(relative))
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Project configuration resolves outside the project.",
             "PACKAGE_CONFIG_CONFLICT"
           );
@@ -102868,7 +102868,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
         timeout: search ? 9e4 : action === "pkg_install" || action === "pkg_update" ? 9e5 : 3e5
       });
       if (!Number.isInteger(result.exitCode))
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Package command did not return a numeric exit status.",
           "PACKAGE_PROCESS_ERROR"
         );
@@ -102876,7 +102876,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
         [result.stdout, result.stderr].filter(Boolean).join("\n")
       );
       if (Buffer.byteLength(output) > 20 * 1024 * 1024)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Package output exceeds 20 MiB.",
           "PACKAGE_OUTPUT_LIMIT"
         );
@@ -102889,7 +102889,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
         });
         validatePolicy();
         if (configPath !== await fs40.realpath(path46.join(projectDir, "platformio.ini")) || after !== await readConfiguration(projectDir))
-          throw new PlatformIOError2(
+          throw new PlatformIOError(
             "Configuration changed concurrently; inspect it before retrying.",
             "PACKAGE_CONFIG_CONFLICT"
           );
@@ -102901,7 +102901,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
               mode: (await fs40.stat(configPath)).mode
             });
             if (after !== await readConfiguration(projectDir))
-              throw new PlatformIOError2(
+              throw new PlatformIOError(
                 "Configuration changed concurrently.",
                 "PACKAGE_CONFIG_CONFLICT"
               );
@@ -102976,13 +102976,13 @@ var schemas2 = {
 };
 async function mapPackageCompatibilityRequest(name2, input, defaults = {}) {
   if (!Object.hasOwn(schemas2, name2))
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Unknown package compatibility tool.",
       "COMPAT_TOOL_UNKNOWN"
     );
   const parsed = schemas2[name2].safeParse(input);
   if (!parsed.success)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Invalid package compatibility arguments.",
       "COMPAT_ARGUMENT_INVALID"
     );
@@ -110191,7 +110191,7 @@ var reportSchema2 = external_exports.object({
 });
 function summarizeTestOutput(output) {
   if (Buffer.byteLength(output) > 16 * 1024 * 1024)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Test report exceeds 16 MiB",
       "TEST_REPORT_LIMIT"
     );
@@ -110199,20 +110199,20 @@ function summarizeTestOutput(output) {
   try {
     raw = JSON.parse(output);
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Test runner returned no valid JSON report",
       "TEST_REPORT_INVALID"
     );
   }
   const parsed = reportSchema2.safeParse(raw);
   if (!parsed.success)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Test report has an invalid or incomplete shape",
       "TEST_REPORT_INVALID"
     );
   const report = parsed.data;
   if (report.failure_nums + report.error_nums + report.skipped_nums > report.testcase_nums)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Test report counters contradict the total",
       "TEST_REPORT_INVALID"
     );
@@ -110238,7 +110238,7 @@ function summarizeTestOutput(output) {
     0
   );
   if (observedTotal !== report.testcase_nums || observed.FAILED !== report.failure_nums || observed.ERRORED !== report.error_nums || observed.SKIPPED !== report.skipped_nums)
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "Test case statuses contradict the report counters",
       "TEST_REPORT_INVALID"
     );
@@ -110268,7 +110268,7 @@ async function runTestsWithReport(projectDir, environment, compileOnly, options 
     try {
       const stat = await fs41.lstat(reportPath);
       if (!stat.isFile() || stat.isSymbolicLink())
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "Test report is not a regular file",
           "TEST_REPORT_INVALID"
         );
@@ -110281,18 +110281,18 @@ async function runTestsWithReport(projectDir, environment, compileOnly, options 
         testReport
       };
     } catch (error2) {
-      if (error2 instanceof PlatformIOError2 || error2.code === "ENOENT")
+      if (error2 instanceof PlatformIOError || error2.code === "ENOENT")
         return {
           ...result,
           success: false,
-          testReportError: error2 instanceof PlatformIOError2 ? error2.code ?? "TEST_REPORT_INVALID" : "TEST_REPORT_MISSING"
+          testReportError: error2 instanceof PlatformIOError ? error2.code ?? "TEST_REPORT_INVALID" : "TEST_REPORT_MISSING"
         };
       throw error2;
     }
   } catch (error2) {
-    if (error2 instanceof PlatformIOError2 && error2.context?.cleanupPending === true) {
+    if (error2 instanceof PlatformIOError && error2.context?.cleanupPending === true) {
       retain = true;
-      throw new PlatformIOError2(error2.message, error2.code, {
+      throw new PlatformIOError(error2.message, error2.code, {
         ...error2.context,
         retainedReportPath: reportPath
       });
@@ -110337,7 +110337,7 @@ async function uploadFilesystem(projectDir, port, environment, verbose, backgrou
     if (!activePort) {
       const device = await getFirstDevice2();
       if (!device)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "No serial devices detected for upload.",
           "PORT_NOT_FOUND"
         );
@@ -110416,7 +110416,7 @@ async function uploadFilesystem(projectDir, port, environment, verbose, backgrou
       diagnostic
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError2) {
+    if (error2 instanceof PlatformIOError) {
       throw new UploadError(`Filesystem upload failed: ${error2.message}`, {
         projectDir,
         port,
@@ -110448,7 +110448,7 @@ async function uploadFirmware(projectDir, port, environment, verbose, background
     if (!activePort) {
       const device = await getFirstDevice2();
       if (!device)
-        throw new PlatformIOError2(
+        throw new PlatformIOError(
           "No serial devices detected for upload.",
           "PORT_NOT_FOUND"
         );
@@ -110527,7 +110527,7 @@ async function uploadFirmware(projectDir, port, environment, verbose, background
       diagnostic
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError2) {
+    if (error2 instanceof PlatformIOError) {
       throw new UploadError(`Upload failed: ${error2.message}`, {
         projectDir,
         port,
@@ -110653,7 +110653,7 @@ async function resolveTask(taskId, projectDir) {
   }
   const running = command.tasks.filter((task) => task.status === "running");
   if (running.length !== 1) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Command ${command.id} does not identify exactly one running task.`,
       "AMBIGUOUS_TASK"
     );
@@ -112358,7 +112358,7 @@ async function listInstalledLibraries(projectDir) {
     }
     return Array.from(uniqueLibs.values());
   } catch (error2) {
-    if (error2 instanceof PlatformIOError2) {
+    if (error2 instanceof PlatformIOError) {
       const errorMessage = error2.message.toLowerCase();
       if (errorMessage.includes("no libraries") || errorMessage.includes("empty")) {
         return [];
@@ -113122,7 +113122,7 @@ function startPortalServer(defaultPort = 8080) {
       );
       res.json(result);
     } catch (e) {
-      if (e instanceof PlatformIOError2 && (e.code === "APPROVAL_REQUIRED" || e.code === "POLICY_DENIED")) {
+      if (e instanceof PlatformIOError && (e.code === "APPROVAL_REQUIRED" || e.code === "POLICY_DENIED")) {
         res.status(e.code === "APPROVAL_REQUIRED" ? 409 : 403).json({ success: false, error: e.message, ...e.context });
         return;
       }
@@ -113759,7 +113759,7 @@ var MAX_PATTERN_LENGTH = 128;
 var MAX_EVIDENCE_BYTES = 8192;
 function compileBoundedPattern(pattern) {
   if (!pattern || pattern.length > MAX_PATTERN_LENGTH) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       `Monitor patterns must be 1-${MAX_PATTERN_LENGTH} characters.`,
       "UNSAFE_PATTERN"
     );
@@ -113769,7 +113769,7 @@ function compileBoundedPattern(pattern) {
   }
   const source = pattern.slice(3);
   if (!source || /\(\?[=!<]/u.test(source) || /\\[1-9]/u.test(source) || /(?:\*|\+|\{\d+(?:,\d*)?\})(?:\s*)(?:\*|\+|\{)/u.test(source)) {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "The requested regular expression uses an unsafe construct.",
       "UNSAFE_PATTERN"
     );
@@ -113777,7 +113777,7 @@ function compileBoundedPattern(pattern) {
   try {
     return new RegExp(source, "iu");
   } catch {
-    throw new PlatformIOError2(
+    throw new PlatformIOError(
       "The requested monitor regular expression is invalid.",
       "UNSAFE_PATTERN"
     );

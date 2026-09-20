@@ -881,3 +881,6 @@ Added a bounded parser for PlatformIO JSON test reports, retaining suite/environ
 
 Added private unique foreground test-report files, bounded redacted parsing and nonrecursive cleanup of the owned file/empty directory after completion. Unconfirmed process termination retains the destination and propagates cleanupPending with retainedReportPath. Missing/invalid report data cannot override command success into a passing result. Canonical run_tests accepts structuredReport for foreground calls under its existing authorization/lock; existing defaults are preserved, and background+structuredReport is explicitly rejected pending lifecycle support. TypeScript and six focused mocked report/parser checks passed; plugin rebuilt. Public pio_test, target/lease integration and real native/hardware report acceptance remain pending. No publication performed.
 
+
+Canonical report integration initially failed TypeScript because the entry point lacked the error-class import. Added the import; TypeScript then passed and the plugin was rebuilt with the correction.
+

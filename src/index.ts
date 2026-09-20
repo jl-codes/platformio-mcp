@@ -140,7 +140,7 @@ import {
   agentMonitorHealth,
 } from "./tools/agent.js";
 import { checkPlatformIOInstalled } from "./platformio.js";
-import { formatPlatformIOError } from "./utils/errors.js";
+import { formatPlatformIOError, PlatformIOError } from "./utils/errors.js";
 import { hardwareLockManager } from "./utils/lock-manager.js";
 import { killAllTrackedProcesses } from "./utils/process-manager.js";
 import { GLOBAL_LOCKS_DIR } from "./utils/paths.js";
