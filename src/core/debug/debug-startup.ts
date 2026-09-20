@@ -9,6 +9,8 @@ import type {
 } from "./debug-client-sessions.js";
 import { DebugProcess, type DebugProcessOptions } from "./debug-process.js";
 import { retainDebugElf, ownDebugElf } from "./debug-elf.js";
+import { startDebuggerWithBackend } from "./debug-backend-session.js";
+import type { DebugBackendProcessOptions } from "./debug-backend-process.js";
 import { DebugStartupFailure } from "./debug-start-failure.js";
 import {
   preflightDebuggerTarget,
@@ -25,6 +27,12 @@ export interface PreparedDebuggerStartup {
   trustedDebuggerRoots: readonly string[];
   target: Omit<DebugTargetSelection, "projectDir" | "sessionId">;
   approvalId?: string;
+  backend?: {
+    options: DebugBackendProcessOptions;
+    readyPattern: string;
+    hostApprovalId?: string;
+    targetApprovalId?: string;
+  };
   acquireCustody: () => Promise<
     Pick<DebugProcessOptions, "custody" | "confirmProbeReleased">
   >;
@@ -36,6 +44,13 @@ export function startPreparedDebugger(
   selection: PreparedDebuggerStartup,
   caller: PolicyEvaluationContext = {},
 ): Promise<string> {
+  const backendScope = selection.backend
+    ? {
+        command: selection.backend.options.command,
+        pythonExecutable: selection.backend.options.pythonExecutable,
+        readyPattern: selection.backend.readyPattern,
+      }
+    : undefined;
   const requestIdentity = createHash("sha256")
     .update(
       JSON.stringify({
@@ -49,6 +64,7 @@ export function startPreparedDebugger(
         port: selection.target.port,
         load: selection.target.load,
         timeoutMs: selection.target.timeoutMs ?? 90000,
+        backend: backendScope,
       }),
     )
     .digest("hex");
@@ -72,6 +88,7 @@ export function startPreparedDebugger(
         host: target.host,
         port: target.port,
         load: target.load,
+        backend: backendScope,
         approvalId: selection.approvalId,
       };
       return dispatchAuthorizedAction(
@@ -91,14 +108,28 @@ export function startPreparedDebugger(
             guard();
             const custody = await selection.acquireCustody();
             // DebugProcess owns release from this point, including spawn/initialization failure.
-            const process = await DebugProcess.start({
+            const debuggerOptions: DebugProcessOptions = {
               ...custody,
               executable: selection.executable,
               trustedDebuggerRoots: selection.trustedDebuggerRoots,
               projectDir: selection.projectDir,
               elfPath: elf.path,
               startupTimeoutMs: target.timeoutMs,
-            });
+            };
+            const process = selection.backend
+              ? await startDebuggerWithBackend(
+                  {
+                    debugger: debuggerOptions,
+                    backend: selection.backend.options,
+                    readyPattern: selection.backend.readyPattern,
+                    sessionId,
+                    timeoutMs: target.timeoutMs ?? 90000,
+                    hostApprovalId: selection.backend.hostApprovalId,
+                    targetApprovalId: selection.backend.targetApprovalId,
+                  },
+                  caller,
+                )
+              : await DebugProcess.start(debuggerOptions);
             owned = ownDebugElf(process, elf);
             guard();
             await process.attach(target, caller);

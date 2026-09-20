@@ -1388,3 +1388,11 @@ Added Linux/macOS process-group supervision with a live guardian retaining the g
 Added worker-bounded readiness matching over only the owned backend output. Empty-match expressions are rejected; exit/failure, cancellation, deadline and current policy are checked before accepting evidence. Added explicit OpenOCD adapter serial selection with Tcl quoting and loopback GDB endpoint configuration, disabling unused Tcl/Telnet listeners. Explicit competing serial/init commands are rejected; configuration files remain trusted executable Tcl requiring the separate host-code grant. This binding is not yet applied to J-Link/ST-Link standalone backends. Fourteen focused readiness/binding cases passed.
 
 Native lifecycle CI at d984499a passed Windows and Linux; macOS exposed a PermissionError after the backend started. The supervisor now retains ownership and polls through permission-denied group observations until ESRCH, rather than treating that observation as success or immediate terminal failure. Bounded phase/errno diagnostics identify any remaining failure. A new native macOS result is still required; no macOS success is claimed.
+
+
+### Joint backend and GDB startup ownership (2026-09-20)
+
+Connected optional supervised backends to the existing prepared debugger startup. Backend configuration participates in stable startup/approval identity. Backend host-code and target effects are both planned before consuming either grant, then dispatched before probe handoff. Readiness precedes GDB creation. GDB cleanup now confirms backend descendant cleanup before releasing the shared probe lease. Failed backend startup retains a connection-owned cleanup capability if release is uncertain; a GDB startup failure retains its existing owner, including the backend cleanup callback. Four focused composition cases passed alongside TypeScript/lint; full public debugger registration and target-specific initialization remain pending.
+
+
+CI confirmation: both 35507080260 and 35507077976 passed on 6444c9c7. The native backend parent/grandchild lifecycle fixture passed Windows, Linux and macOS, including the Node owner path. This confirms the macOS cleanup observation fix for that fixture, not physical debugger/probe acceptance.
