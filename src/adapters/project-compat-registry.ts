@@ -138,5 +138,34 @@ export function withProjectCompatibility<TResult>(
     },
     handler: (args, context) => context.dispatch("pio_check", args),
   });
+  const test = base.get("run_tests");
+  if (!test || result.has("pio_test"))
+    throw new Error("Invalid test compatibility registry");
+  result.set("pio_test", {
+    ...test,
+    name: "pio_test",
+    description:
+      "Run PlatformIO tests with per-case results. Embedded tests can upload and open hardware; canonical high-risk test permission applies. Build-only policy disables upload and test execution.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], maxLength: 32768 },
+        env: { type: ["string", "null"], pattern: "^[a-zA-Z0-9_-]{1,50}$" },
+        filter: { type: ["string", "null"], minLength: 1, maxLength: 4096 },
+        ignore: { type: ["string", "null"], minLength: 1, maxLength: 4096 },
+        without_uploading: { type: "boolean", default: false },
+        without_building: { type: "boolean", default: false },
+        upload_port: {
+          type: ["string", "null"],
+          minLength: 1,
+          maxLength: 4096,
+        },
+        verbose: { type: "boolean", default: false },
+        approval_id: { type: "string", maxLength: 256 },
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_test", args),
+  });
   return result;
 }

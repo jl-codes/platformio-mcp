@@ -1,4 +1,5 @@
 /** Adapt pinned project inspection vocabulary to the existing authorized canonical services. */
+import { executeTestCompatibility } from "./test-compat.js";
 import {
   executeBuildCompatibility,
   executeCheckCompatibility,
@@ -145,6 +146,8 @@ export async function executeProjectCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_test")
+    return executeTestCompatibility(input, defaults, caller, onAuthorized);
   if (name === "pio_check")
     return executeCheckCompatibility(input, defaults, caller, onAuthorized);
   if (name === "pio_build")

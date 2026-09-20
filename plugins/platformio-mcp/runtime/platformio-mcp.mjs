@@ -100926,11 +100926,43 @@ function withProjectCompatibility(base2) {
     },
     handler: (args, context) => context.dispatch("pio_check", args)
   });
+  const test = base2.get("run_tests");
+  if (!test || result.has("pio_test"))
+    throw new Error("Invalid test compatibility registry");
+  result.set("pio_test", {
+    ...test,
+    name: "pio_test",
+    description: "Run PlatformIO tests with per-case results. Embedded tests can upload and open hardware; canonical high-risk test permission applies. Build-only policy disables upload and test execution.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], maxLength: 32768 },
+        env: { type: ["string", "null"], pattern: "^[a-zA-Z0-9_-]{1,50}$" },
+        filter: { type: ["string", "null"], minLength: 1, maxLength: 4096 },
+        ignore: { type: ["string", "null"], minLength: 1, maxLength: 4096 },
+        without_uploading: { type: "boolean", default: false },
+        without_building: { type: "boolean", default: false },
+        upload_port: {
+          type: ["string", "null"],
+          minLength: 1,
+          maxLength: 4096
+        },
+        verbose: { type: "boolean", default: false },
+        approval_id: { type: "string", maxLength: 256 }
+      }
+    },
+    handler: (args, context) => context.dispatch("pio_test", args)
+  });
   return result;
 }
 
-// src/adapters/clean-compat.ts
+// src/adapters/test-compat.ts
 init_zod();
+
+// src/core/test-report-execution.ts
+import fs39 from "node:fs/promises";
+import path44 from "node:path";
 
 // src/core/analysis/check-report.ts
 init_zod();
@@ -101693,8 +101725,161 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
   };
 }
 
-// src/adapters/clean-compat.ts
+// src/core/test-report-execution.ts
+init_paths();
 init_errors2();
+
+// src/core/analysis/test-report.ts
+init_zod();
+init_errors2();
+var text4 = external_exports.string().max(65536).nullable().optional();
+var count = external_exports.number().int().nonnegative().max(1e6);
+var duration = external_exports.number().finite().nonnegative();
+var testCase = external_exports.object({
+  name: text4,
+  status: external_exports.enum(["PASSED", "FAILED", "ERRORED", "SKIPPED", "WARNED"]),
+  message: text4,
+  exception: text4,
+  source: external_exports.object({
+    file: text4,
+    line: external_exports.number().int().nonnegative().nullable().optional()
+  }).nullable().optional()
+});
+var reportSchema2 = external_exports.object({
+  testcase_nums: count,
+  failure_nums: count,
+  error_nums: count,
+  skipped_nums: count,
+  duration,
+  test_suites: external_exports.array(
+    external_exports.object({
+      env_name: text4,
+      test_name: text4,
+      status: external_exports.string().min(1).max(64),
+      duration: duration.default(0),
+      test_cases: external_exports.array(testCase).max(1e5)
+    })
+  ).max(1024)
+});
+function summarizeTestOutput(output) {
+  if (Buffer.byteLength(output) > 16 * 1024 * 1024)
+    throw new PlatformIOError(
+      "Test report exceeds 16 MiB",
+      "TEST_REPORT_LIMIT"
+    );
+  let raw;
+  try {
+    raw = JSON.parse(output);
+  } catch {
+    throw new PlatformIOError(
+      "Test runner returned no valid JSON report",
+      "TEST_REPORT_INVALID"
+    );
+  }
+  const parsed = reportSchema2.safeParse(raw);
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Test report has an invalid or incomplete shape",
+      "TEST_REPORT_INVALID"
+    );
+  const report = parsed.data;
+  if (report.failure_nums + report.error_nums + report.skipped_nums > report.testcase_nums)
+    throw new PlatformIOError(
+      "Test report counters contradict the total",
+      "TEST_REPORT_INVALID"
+    );
+  const observed = { PASSED: 0, FAILED: 0, ERRORED: 0, SKIPPED: 0, WARNED: 0 };
+  const suites = report.test_suites.map((suite) => ({
+    env: suite.env_name ?? null,
+    test: suite.test_name ?? null,
+    status: suite.status,
+    duration_s: Math.round(suite.duration * 100) / 100,
+    cases: suite.test_cases.map((item) => {
+      observed[item.status]++;
+      return {
+        name: item.name ?? null,
+        status: item.status,
+        message: item.message || item.exception || null,
+        file: item.source?.file ?? null,
+        line: item.source?.line ?? null
+      };
+    })
+  }));
+  const observedTotal = Object.values(observed).reduce(
+    (sum, value2) => sum + value2,
+    0
+  );
+  if (observedTotal !== report.testcase_nums || observed.FAILED !== report.failure_nums || observed.ERRORED !== report.error_nums || observed.SKIPPED !== report.skipped_nums)
+    throw new PlatformIOError(
+      "Test case statuses contradict the report counters",
+      "TEST_REPORT_INVALID"
+    );
+  return {
+    total: report.testcase_nums,
+    failed: report.failure_nums,
+    errored: report.error_nums,
+    skipped: report.skipped_nums,
+    warned: observed.WARNED,
+    duration_s: Math.round(report.duration * 100) / 100,
+    suites
+  };
+}
+
+// src/core/test-report-execution.ts
+async function runTestsWithReport(projectDir, environment, compileOnly, options = {}) {
+  const parent = path44.join(SERVER_DATA_DIR, "test-reports");
+  await fs39.mkdir(parent, { recursive: true, mode: 448 });
+  const directory = await fs39.mkdtemp(path44.join(parent, "run-"));
+  const reportPath = path44.join(directory, "report.json");
+  let retain = false;
+  try {
+    await fs39.writeFile(reportPath, "", { flag: "wx", mode: 384 });
+    const result = await runTests(projectDir, environment, false, compileOnly, {
+      ...options,
+      reportPath
+    });
+    try {
+      const stat = await fs39.lstat(reportPath);
+      if (!stat.isFile() || stat.isSymbolicLink())
+        throw new PlatformIOError(
+          "Test report is not a regular file",
+          "TEST_REPORT_INVALID"
+        );
+      const testReport = summarizeTestOutput(
+        await readCommandOutput(reportPath)
+      );
+      return {
+        ...result,
+        success: result.success === true && testReport.failed === 0 && testReport.errored === 0,
+        testReport
+      };
+    } catch (error2) {
+      if (error2 instanceof PlatformIOError || error2.code === "ENOENT")
+        return {
+          ...result,
+          success: false,
+          testReportError: error2 instanceof PlatformIOError ? error2.code ?? "TEST_REPORT_INVALID" : "TEST_REPORT_MISSING"
+        };
+      throw error2;
+    }
+  } catch (error2) {
+    if (error2 instanceof PlatformIOError && error2.context?.cleanupPending === true) {
+      retain = true;
+      throw new PlatformIOError(error2.message, error2.code, {
+        ...error2.context,
+        retainedReportPath: reportPath
+      });
+    }
+    throw error2;
+  } finally {
+    if (!retain) {
+      await fs39.unlink(reportPath).catch((error2) => {
+        if (error2.code !== "ENOENT") throw error2;
+      });
+      await fs39.rmdir(directory);
+    }
+  }
+}
 
 // src/utils/lock-manager.ts
 init_errors2();
@@ -101804,7 +101989,12 @@ var HardwareLockManager = class _HardwareLockManager {
 };
 var hardwareLockManager = HardwareLockManager.getInstance();
 
+// src/adapters/test-compat.ts
+init_errors2();
+
 // src/adapters/clean-compat.ts
+init_zod();
+init_errors2();
 function executeCleanCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
   return executeRunCompatibility(
     "clean",
@@ -102128,11 +102318,113 @@ function checkCompatibilityResult(result, projectDir, severity, timedOut = false
   return { ok: !failed.length, summary, ...report, log_path: result.logPath };
 }
 
+// src/adapters/test-compat.ts
+async function executeTestCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
+  const text7 = external_exports.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/);
+  const params = external_exports.object({
+    project_dir: external_exports.string().max(32768).nullable().optional(),
+    env: external_exports.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).nullable().optional(),
+    filter: text7.nullable().optional(),
+    ignore: text7.nullable().optional(),
+    without_uploading: external_exports.boolean().default(false),
+    without_building: external_exports.boolean().default(false),
+    upload_port: text7.nullable().optional(),
+    verbose: external_exports.boolean().default(false),
+    approval_id: external_exports.string().max(256).optional()
+  }).strict().parse(input);
+  const projectDir = await resolveCompatibilityProject(
+    params.project_dir,
+    defaults
+  );
+  const environment = params.env ?? void 0;
+  const options = {
+    filter: params.filter ?? void 0,
+    ignore: params.ignore ?? void 0,
+    withoutUploading: params.without_uploading,
+    withoutBuilding: params.without_building,
+    uploadPort: params.upload_port ?? void 0,
+    verbose: params.verbose
+  };
+  return dispatchAuthorizedAction(
+    "run_tests",
+    { projectDir, environment, ...options, approvalId: params.approval_id },
+    { ...caller, workspaceDir: projectDir },
+    async () => {
+      const guard = createPolicyRevisionGuard(projectDir);
+      await onAuthorized?.();
+      guard();
+      return hardwareLockManager.withImplicitLock(async () => {
+        guard();
+        let captured;
+        const result = await runTestsWithReport(
+          projectDir,
+          environment,
+          void 0,
+          {
+            ...options,
+            timeoutMs: 12e5,
+            onResult: async (execution) => {
+              guard();
+              const output = await readCommandOutput(execution.fullLogPath);
+              guard();
+              captured = {
+                exitCode: execution.exitCode,
+                output,
+                logPath: await retainCommandLog("test", output, "")
+              };
+            }
+          }
+        );
+        guard();
+        if (!captured)
+          throw new PlatformIOError(
+            "Test output was not collected",
+            "COMPAT_RESULT_INVALID"
+          );
+        const diagnostics = cleanCompatibilityResult(captured, environment, 0);
+        const report = result.testReport;
+        if (!report)
+          return {
+            ok: false,
+            status: "error",
+            summary: `pio test produced no valid report (exit ${captured.exitCode}). See output_tail.`,
+            report_error: result.testReportError ?? "TEST_REPORT_MISSING",
+            build_errors: diagnostics.errors,
+            output_tail: diagnostics.output_tail,
+            log_path: captured.logPath
+          };
+        const failedCases = report.suites.flatMap((suite) => suite.cases).filter(
+          (item) => item.status === "FAILED" || item.status === "ERRORED"
+        );
+        const ok = result.success === true && !report.failed && !report.errored;
+        const passed = report.total - report.failed - report.errored - report.skipped - report.warned;
+        let summary = `${report.total} test case(s): ${passed} passed, ${report.failed} failed, ${report.errored} errored, ${report.skipped} skipped${report.warned ? `, ${report.warned} warned` : ""} in ${report.duration_s}s.`;
+        if (failedCases.length) {
+          const first = failedCases[0];
+          summary += ` First failure: ${first.name}` + (first.file ? ` at ${first.file}:${first.line}` : "") + (first.message ? `: ${first.message}` : "");
+        }
+        if (diagnostics.error_count)
+          summary += ` ${diagnostics.error_count} build error(s) in output.`;
+        return {
+          ok,
+          status: ok ? "passed" : "failed",
+          summary,
+          ...report,
+          build_errors: diagnostics.errors.slice(0, 20),
+          exit_code: captured.exitCode,
+          log_path: captured.logPath,
+          output_tail: diagnostics.output_tail.split("\n").slice(-30).join("\n")
+        };
+      });
+    }
+  );
+}
+
 // src/adapters/init-compat.ts
 init_zod();
 init_projects();
-import fs39 from "node:fs/promises";
-import path44 from "node:path";
+import fs40 from "node:fs/promises";
+import path45 from "node:path";
 import os8 from "node:os";
 init_redact();
 init_errors2();
@@ -102147,13 +102439,13 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
   }).strict().parse(input);
   let requested = params.project_dir;
   if (requested === "~" || requested.startsWith("~/") || requested.startsWith("~\\"))
-    requested = path44.join(defaults.home ?? os8.homedir(), requested.slice(2));
+    requested = path45.join(defaults.home ?? os8.homedir(), requested.slice(2));
   else if (requested.startsWith("~"))
     throw new PlatformIOError(
       "Named-user home expansion is unsupported.",
       "COMPAT_PROJECT_INVALID"
     );
-  const projectDir = path44.resolve(defaults.cwd ?? process.cwd(), requested);
+  const projectDir = path45.resolve(defaults.cwd ?? process.cwd(), requested);
   const config2 = {
     board: params.board,
     framework: params.framework || void 0,
@@ -102203,18 +102495,18 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
           throw error2;
         }
         guard();
-        const root = await fs39.realpath(result.path);
+        const root = await fs40.realpath(result.path);
         let ini = "";
         try {
-          const filename = await fs39.realpath(
-            path44.join(root, "platformio.ini")
+          const filename = await fs40.realpath(
+            path45.join(root, "platformio.ini")
           );
-          if (path44.dirname(filename) !== root)
+          if (path45.dirname(filename) !== root)
             throw new PlatformIOError(
               "Generated configuration escapes the project.",
               "COMPAT_PROJECT_INVALID"
             );
-          const file = await fs39.open(filename, "r");
+          const file = await fs40.open(filename, "r");
           try {
             const stat = await file.stat();
             if (!stat.isFile() || stat.size > 1048576)
@@ -102243,7 +102535,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
         } catch (error2) {
           if (error2.code !== "ENOENT") throw error2;
         }
-        const items = (await fs39.readdir(root, { withFileTypes: true })).filter((item) => !item.name.startsWith("."));
+        const items = (await fs40.readdir(root, { withFileTypes: true })).filter((item) => !item.name.startsWith("."));
         if (items.length > 4096)
           throw new PlatformIOError(
             "Project layout exceeds report limits.",
@@ -102265,17 +102557,17 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
 
 // src/adapters/project-compat.ts
 init_zod();
-import path45 from "node:path";
+import path46 from "node:path";
 init_errors2();
-var text4 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
+var text5 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var scope2 = {
-  project_dir: text4.nullable().optional(),
-  approval_id: text4.optional()
+  project_dir: text5.nullable().optional(),
+  approval_id: text5.optional()
 };
 var schemas = {
   pio_project_envs: external_exports.object(scope2).strict(),
-  pio_list_targets: external_exports.object({ ...scope2, env: text4.nullable().optional() }).strict(),
-  pio_project_metadata: external_exports.object({ ...scope2, env: text4.nullable().optional() }).strict()
+  pio_list_targets: external_exports.object({ ...scope2, env: text5.nullable().optional() }).strict(),
+  pio_project_metadata: external_exports.object({ ...scope2, env: text5.nullable().optional() }).strict()
 };
 async function mapProjectCompatibilityRequest(name2, input, defaults = {}) {
   if (!Object.hasOwn(schemas, name2))
@@ -102321,7 +102613,7 @@ function projectCompatibilityResult(result) {
       ...common,
       default_envs: result.defaultEnvironments,
       platformio_section: result.platformioSection,
-      platformio_ini_path: path45.join(result.projectDir, "platformio.ini"),
+      platformio_ini_path: path46.join(result.projectDir, "platformio.ini"),
       envs: result.envs.map((item) => ({
         name: item.name,
         board: item.board,
@@ -102363,6 +102655,8 @@ function projectCompatibilityResult(result) {
   );
 }
 async function executeProjectCompatibility(name2, input, defaults = {}, caller = {}, onAuthorized) {
+  if (name2 === "pio_test")
+    return executeTestCompatibility(input, defaults, caller, onAuthorized);
   if (name2 === "pio_check")
     return executeCheckCompatibility(input, defaults, caller, onAuthorized);
   if (name2 === "pio_build")
@@ -102497,8 +102791,8 @@ var import_proper_lockfile6 = __toESM(require_proper_lockfile(), 1);
 init_zod();
 init_platformio();
 init_errors2();
-import fs40 from "node:fs/promises";
-import path46 from "node:path";
+import fs41 from "node:fs/promises";
+import path47 from "node:path";
 import crypto15 from "node:crypto";
 init_redact();
 
@@ -102728,7 +103022,7 @@ function safeOutput(text7) {
   );
 }
 async function readConfiguration(projectDir) {
-  const file = await fs40.open(path46.join(projectDir, "platformio.ini"), "r").catch((error2) => {
+  const file = await fs41.open(path47.join(projectDir, "platformio.ini"), "r").catch((error2) => {
     if (error2.code === "ENOENT") return null;
     throw error2;
   });
@@ -102763,34 +103057,34 @@ async function readConfiguration(projectDir) {
   }
 }
 async function retainOutput(projectDir, output) {
-  const dir = path46.join(projectDir, ".pio-mcp-workspace", "logs", "packages");
+  const dir = path47.join(projectDir, ".pio-mcp-workspace", "logs", "packages");
   let current = projectDir;
   for (const component of [".pio-mcp-workspace", "logs", "packages"]) {
-    current = path46.join(current, component);
-    await fs40.mkdir(current, { mode: 448 }).catch((error2) => {
+    current = path47.join(current, component);
+    await fs41.mkdir(current, { mode: 448 }).catch((error2) => {
       if (error2.code !== "EEXIST") throw error2;
     });
-    const actual = await fs40.realpath(current);
-    const relative = path46.relative(projectDir, actual);
-    if (relative === ".." || relative.startsWith(`..${path46.sep}`) || path46.isAbsolute(relative))
+    const actual = await fs41.realpath(current);
+    const relative = path47.relative(projectDir, actual);
+    if (relative === ".." || relative.startsWith(`..${path47.sep}`) || path47.isAbsolute(relative))
       throw new PlatformIOError(
         "Package log directory escapes the project.",
         "PACKAGE_LOG_PATH_INVALID"
       );
   }
-  const file = path46.join(dir, `packages-${crypto15.randomUUID()}.log`);
-  await fs40.writeFile(file, output, { flag: "wx", mode: 384 });
+  const file = path47.join(dir, `packages-${crypto15.randomUUID()}.log`);
+  await fs41.writeFile(file, output, { flag: "wx", mode: 384 });
   const completed = [];
-  for (const entry of await fs40.readdir(dir, { withFileTypes: true })) {
+  for (const entry of await fs41.readdir(dir, { withFileTypes: true })) {
     if (!entry.isFile() || !/^packages-[a-f0-9-]{36}\.log$/.test(entry.name))
       continue;
-    const candidate = path46.join(dir, entry.name);
+    const candidate = path47.join(dir, entry.name);
     if (candidate === file) continue;
-    const stat = await fs40.lstat(candidate);
+    const stat = await fs41.lstat(candidate);
     if (stat.isFile()) completed.push({ path: candidate, time: stat.mtimeMs });
   }
   for (const stale of completed.sort((a, b) => b.time - a.time).slice(199))
-    await fs40.unlink(stale.path);
+    await fs41.unlink(stale.path);
   return file;
 }
 async function executePackageAction(action, input, caller = {}, onAuthorized, outputOptions = {}) {
@@ -102812,7 +103106,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
   const search = action === "pkg_search";
   const mutation = action === "pkg_install" || action === "pkg_uninstall";
   const parsed = search ? searchSchema.parse(input) : mutation ? mutationSchema.parse(input) : projectSchema.parse(input);
-  const projectDir = "projectDir" in parsed ? await fs40.realpath(parsed.projectDir) : void 0;
+  const projectDir = "projectDir" in parsed ? await fs41.realpath(parsed.projectDir) : void 0;
   const params = { ...parsed, ...projectDir ? { projectDir } : {} };
   if (params.spec !== void 0 && (/[a-z][a-z0-9+.-]*:\/\/[^\s/@]+@/i.test(params.spec) || /[?&](?:token|password|key|secret|signature)=/i.test(params.spec)))
     throw new PlatformIOError(
@@ -102829,16 +103123,16 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
     validatePolicy();
     const release = projectDir ? await import_proper_lockfile6.default.lock(projectDir, {
       realpath: true,
-      lockfilePath: path46.join(projectDir, ".pio-mcp-packages.lock"),
+      lockfilePath: path47.join(projectDir, ".pio-mcp-packages.lock"),
       retries: 0
     }) : void 0;
     try {
       validatePolicy();
       const before = projectDir ? await readConfiguration(projectDir) : null;
-      const configPath = projectDir && before !== null ? await fs40.realpath(path46.join(projectDir, "platformio.ini")) : void 0;
+      const configPath = projectDir && before !== null ? await fs41.realpath(path47.join(projectDir, "platformio.ini")) : void 0;
       if (projectDir && configPath) {
-        const relative = path46.relative(projectDir, configPath);
-        if (relative === ".." || relative.startsWith(`..${path46.sep}`) || path46.isAbsolute(relative))
+        const relative = path47.relative(projectDir, configPath);
+        if (relative === ".." || relative.startsWith(`..${path47.sep}`) || path47.isAbsolute(relative))
           throw new PlatformIOError(
             "Project configuration resolves outside the project.",
             "PACKAGE_CONFIG_CONFLICT"
@@ -102888,7 +103182,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
           keys
         });
         validatePolicy();
-        if (configPath !== await fs40.realpath(path46.join(projectDir, "platformio.ini")) || after !== await readConfiguration(projectDir))
+        if (configPath !== await fs41.realpath(path47.join(projectDir, "platformio.ini")) || after !== await readConfiguration(projectDir))
           throw new PlatformIOError(
             "Configuration changed concurrently; inspect it before retrying.",
             "PACKAGE_CONFIG_CONFLICT"
@@ -102896,18 +103190,18 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
         if (merged !== after) {
           const temp = `${configPath}.${crypto15.randomUUID()}.tmp`;
           try {
-            await fs40.writeFile(temp, merged, {
+            await fs41.writeFile(temp, merged, {
               flag: "wx",
-              mode: (await fs40.stat(configPath)).mode
+              mode: (await fs41.stat(configPath)).mode
             });
             if (after !== await readConfiguration(projectDir))
               throw new PlatformIOError(
                 "Configuration changed concurrently.",
                 "PACKAGE_CONFIG_CONFLICT"
               );
-            await fs40.rename(temp, configPath);
+            await fs41.rename(temp, configPath);
           } finally {
-            await fs40.unlink(temp).catch(() => {
+            await fs41.unlink(temp).catch(() => {
             });
           }
           after = merged;
@@ -102946,28 +103240,28 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
 }
 
 // src/adapters/package-compat.ts
-var text5 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
+var text6 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var scope4 = {
-  project_dir: text5.nullable().optional(),
-  env: text5.nullable().optional(),
-  approval_id: text5.optional()
+  project_dir: text6.nullable().optional(),
+  env: text6.nullable().optional(),
+  approval_id: text6.optional()
 };
 var kind2 = external_exports.enum(["library", "platform", "tool"]).default("library");
 var schemas2 = {
   pio_pkg_search: external_exports.object({
-    query: text5,
+    query: text6,
     type: kind2,
     page: external_exports.number().int().min(1).max(1e5).default(1),
-    approval_id: text5.optional()
+    approval_id: text6.optional()
   }).strict(),
   pio_pkg_install: external_exports.object({
     ...scope4,
-    spec: text5.refine((value2) => value2.length > 0),
+    spec: text6.refine((value2) => value2.length > 0),
     type: kind2
   }).strict(),
   pio_pkg_uninstall: external_exports.object({
     ...scope4,
-    spec: text5.refine((value2) => value2.length > 0),
+    spec: text6.refine((value2) => value2.length > 0),
     type: kind2
   }).strict(),
   pio_pkg_list: external_exports.object(scope4).strict(),
@@ -103774,7 +104068,7 @@ var ulid = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$/;
 var xid = /^[0-9a-vA-V]{20}$/;
 var ksuid = /^[A-Za-z0-9]{27}$/;
 var nanoid = /^[a-zA-Z0-9_-]{21}$/;
-var duration = /^P(?:(\d+W)|(?!.*W)(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+([.,]\d+)?S)?)?)$/;
+var duration2 = /^P(?:(\d+W)|(?!.*W)(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+([.,]\d+)?S)?)?)$/;
 var guid = /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
 var uuid = (version2) => {
   if (!version2)
@@ -104483,7 +104777,7 @@ var $ZodISOTime = /* @__PURE__ */ $constructor("$ZodISOTime", (inst, def) => {
   $ZodStringFormat.init(inst, def);
 });
 var $ZodISODuration = /* @__PURE__ */ $constructor("$ZodISODuration", (inst, def) => {
-  def.pattern ?? (def.pattern = duration);
+  def.pattern ?? (def.pattern = duration2);
   $ZodStringFormat.init(inst, def);
 });
 var $ZodIPv4 = /* @__PURE__ */ $constructor("$ZodIPv4", (inst, def) => {
@@ -106168,7 +106462,7 @@ __export(iso_exports, {
   ZodISOTime: () => ZodISOTime,
   date: () => date2,
   datetime: () => datetime2,
-  duration: () => duration2,
+  duration: () => duration3,
   time: () => time2
 });
 var ZodISODateTime = /* @__PURE__ */ $constructor("ZodISODateTime", (inst, def) => {
@@ -106196,7 +106490,7 @@ var ZodISODuration = /* @__PURE__ */ $constructor("ZodISODuration", (inst, def) 
   $ZodISODuration.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
-function duration2(params) {
+function duration3(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
@@ -106358,7 +106652,7 @@ var ZodString2 = /* @__PURE__ */ $constructor("ZodString", (inst, def) => {
   inst.datetime = (params) => inst.check(datetime2(params));
   inst.date = (params) => inst.check(date2(params));
   inst.time = (params) => inst.check(time2(params));
-  inst.duration = (params) => inst.check(duration2(params));
+  inst.duration = (params) => inst.check(duration3(params));
 });
 function string2(params) {
   return _string(ZodString2, params);
@@ -110150,164 +110444,6 @@ init_command_registry();
 init_mcp_context();
 init_workspace_registry();
 init_projects();
-
-// src/core/test-report-execution.ts
-import fs41 from "node:fs/promises";
-import path47 from "node:path";
-init_paths();
-init_errors2();
-
-// src/core/analysis/test-report.ts
-init_zod();
-init_errors2();
-var text6 = external_exports.string().max(65536).nullable().optional();
-var count = external_exports.number().int().nonnegative().max(1e6);
-var duration3 = external_exports.number().finite().nonnegative();
-var testCase = external_exports.object({
-  name: text6,
-  status: external_exports.enum(["PASSED", "FAILED", "ERRORED", "SKIPPED", "WARNED"]),
-  message: text6,
-  exception: text6,
-  source: external_exports.object({
-    file: text6,
-    line: external_exports.number().int().nonnegative().nullable().optional()
-  }).nullable().optional()
-});
-var reportSchema2 = external_exports.object({
-  testcase_nums: count,
-  failure_nums: count,
-  error_nums: count,
-  skipped_nums: count,
-  duration: duration3,
-  test_suites: external_exports.array(
-    external_exports.object({
-      env_name: text6,
-      test_name: text6,
-      status: external_exports.string().min(1).max(64),
-      duration: duration3.default(0),
-      test_cases: external_exports.array(testCase).max(1e5)
-    })
-  ).max(1024)
-});
-function summarizeTestOutput(output) {
-  if (Buffer.byteLength(output) > 16 * 1024 * 1024)
-    throw new PlatformIOError(
-      "Test report exceeds 16 MiB",
-      "TEST_REPORT_LIMIT"
-    );
-  let raw;
-  try {
-    raw = JSON.parse(output);
-  } catch {
-    throw new PlatformIOError(
-      "Test runner returned no valid JSON report",
-      "TEST_REPORT_INVALID"
-    );
-  }
-  const parsed = reportSchema2.safeParse(raw);
-  if (!parsed.success)
-    throw new PlatformIOError(
-      "Test report has an invalid or incomplete shape",
-      "TEST_REPORT_INVALID"
-    );
-  const report = parsed.data;
-  if (report.failure_nums + report.error_nums + report.skipped_nums > report.testcase_nums)
-    throw new PlatformIOError(
-      "Test report counters contradict the total",
-      "TEST_REPORT_INVALID"
-    );
-  const observed = { PASSED: 0, FAILED: 0, ERRORED: 0, SKIPPED: 0, WARNED: 0 };
-  const suites = report.test_suites.map((suite) => ({
-    env: suite.env_name ?? null,
-    test: suite.test_name ?? null,
-    status: suite.status,
-    duration_s: Math.round(suite.duration * 100) / 100,
-    cases: suite.test_cases.map((item) => {
-      observed[item.status]++;
-      return {
-        name: item.name ?? null,
-        status: item.status,
-        message: item.message || item.exception || null,
-        file: item.source?.file ?? null,
-        line: item.source?.line ?? null
-      };
-    })
-  }));
-  const observedTotal = Object.values(observed).reduce(
-    (sum, value2) => sum + value2,
-    0
-  );
-  if (observedTotal !== report.testcase_nums || observed.FAILED !== report.failure_nums || observed.ERRORED !== report.error_nums || observed.SKIPPED !== report.skipped_nums)
-    throw new PlatformIOError(
-      "Test case statuses contradict the report counters",
-      "TEST_REPORT_INVALID"
-    );
-  return {
-    total: report.testcase_nums,
-    failed: report.failure_nums,
-    errored: report.error_nums,
-    skipped: report.skipped_nums,
-    warned: observed.WARNED,
-    duration_s: Math.round(report.duration * 100) / 100,
-    suites
-  };
-}
-
-// src/core/test-report-execution.ts
-async function runTestsWithReport(projectDir, environment, compileOnly, options = {}) {
-  const parent = path47.join(SERVER_DATA_DIR, "test-reports");
-  await fs41.mkdir(parent, { recursive: true, mode: 448 });
-  const directory = await fs41.mkdtemp(path47.join(parent, "run-"));
-  const reportPath = path47.join(directory, "report.json");
-  let retain = false;
-  try {
-    await fs41.writeFile(reportPath, "", { flag: "wx", mode: 384 });
-    const result = await runTests(projectDir, environment, false, compileOnly, {
-      ...options,
-      reportPath
-    });
-    try {
-      const stat = await fs41.lstat(reportPath);
-      if (!stat.isFile() || stat.isSymbolicLink())
-        throw new PlatformIOError(
-          "Test report is not a regular file",
-          "TEST_REPORT_INVALID"
-        );
-      const testReport = summarizeTestOutput(
-        await readCommandOutput(reportPath)
-      );
-      return {
-        ...result,
-        success: result.success === true && testReport.failed === 0 && testReport.errored === 0,
-        testReport
-      };
-    } catch (error2) {
-      if (error2 instanceof PlatformIOError || error2.code === "ENOENT")
-        return {
-          ...result,
-          success: false,
-          testReportError: error2 instanceof PlatformIOError ? error2.code ?? "TEST_REPORT_INVALID" : "TEST_REPORT_MISSING"
-        };
-      throw error2;
-    }
-  } catch (error2) {
-    if (error2 instanceof PlatformIOError && error2.context?.cleanupPending === true) {
-      retain = true;
-      throw new PlatformIOError(error2.message, error2.code, {
-        ...error2.context,
-        retainedReportPath: reportPath
-      });
-    }
-    throw error2;
-  } finally {
-    if (!retain) {
-      await fs41.unlink(reportPath).catch((error2) => {
-        if (error2.code !== "ENOENT") throw error2;
-      });
-      await fs41.rmdir(directory);
-    }
-  }
-}
 
 // src/tools/upload.ts
 init_mcp_context();
@@ -116260,6 +116396,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name: name2 } = request.params;
   const packageCompatibility = name2.startsWith("pio_pkg_");
   const projectCompatibility = [
+    "pio_test",
     "pio_check",
     "pio_build",
     "pio_clean",

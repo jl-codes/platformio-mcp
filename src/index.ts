@@ -1591,6 +1591,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name } = request.params;
   const packageCompatibility = name.startsWith("pio_pkg_");
   const projectCompatibility = [
+    "pio_test",
     "pio_check",
     "pio_build",
     "pio_clean",
