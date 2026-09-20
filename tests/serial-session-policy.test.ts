@@ -943,3 +943,37 @@ it("rejects an invalid power pattern before opening any port", async () => {
   ).rejects.toMatchObject({ code: "PATTERN_INVALID" });
   expect(f.transport).not.toHaveBeenCalled();
 });
+
+it("binds a power trigger grant to its pattern and leaves the firmware monitor open", async () => {
+  const f = fixture();
+  f.policy({
+    profile: "monitor_only",
+    overrides: { approval_required: ["serial_session_read"] },
+  });
+  const session = await f.service.run({}, () =>
+    f.service.sessions.start(f.owner, f.request),
+  );
+  const run = (readApprovalId?: string, trigger = "READY") =>
+    f.service.run({ readApprovalId }, () =>
+      f.service.waitPowerTrigger(f.owner, session.sessionId, {
+        trigger,
+        seconds: 0.01,
+      }),
+    );
+  const id = await approval(run());
+  approveRequest(id);
+  await expect(run(id, "OTHER")).rejects.toMatchObject({
+    code: "APPROVAL_REQUIRED",
+  });
+  expect(getApproval(id)?.status).toBe("approved");
+  await expect(run(id)).rejects.toMatchObject({
+    code: "POWER_TRIGGER_TIMEOUT",
+  });
+  expect(getApproval(id)?.status).toBe("consumed");
+  expect(
+    f.service.sessions
+      .list(f.owner)
+      .find((entry) => entry.sessionId === session.sessionId)?.state,
+  ).toBe("open");
+  expect(f.transport).toHaveBeenCalledOnce();
+});

@@ -2,6 +2,7 @@
  * Real policy-dispatcher integration for the owned serial session service.
  * Provides PolicySerialSessionService with request-local approvals and existing permission-source resolution.
  */
+import { waitForPowerTrigger, PowerTriggerSchema } from "./power-trigger.js";
 import {
   captureSessionVerification,
   VerificationCaptureSchema,
@@ -379,12 +380,43 @@ export class PolicySerialSessionService {
     sessionId: string;
     input:
       | ReturnType<typeof MemoryCaptureSchema.parse>
-      | ReturnType<typeof PowerCaptureSchema.parse>;
-    kind?: "power";
+      | ReturnType<typeof PowerCaptureSchema.parse>
+      | ReturnType<typeof PowerTriggerSchema.parse>;
+    kind?: "power" | "power_trigger";
     active: boolean;
     expiresAt: number;
     guard?: () => void;
   }>();
+
+  /** Wait on fresh owned firmware output under one bounded read grant, without opening or closing ports. */
+  async waitPowerTrigger(
+    owner: SerialSessionOwner,
+    sessionId: string,
+    input: z.input<typeof PowerTriggerSchema>,
+    signal?: AbortSignal,
+  ) {
+    const args = PowerTriggerSchema.parse(input);
+    const scope = {
+      sessionId,
+      input: args,
+      kind: "power_trigger" as const,
+      active: true,
+      expiresAt: performance.now() + args.seconds * 1000 + 30000,
+    };
+    return this.memoryReadScope.run(scope, async () => {
+      try {
+        return await waitForPowerTrigger(
+          this.sessions,
+          owner,
+          sessionId,
+          args,
+          signal,
+        );
+      } finally {
+        scope.active = false;
+      }
+    });
+  }
 
   /** Consume one scoped meter-read grant and retain policy revision checks through final disclosure. */
   async capturePower(
@@ -766,8 +798,11 @@ export class PolicySerialSessionService {
           : context.approvalId,
       ...(scopedRead
         ? {
-            [scope.kind === "power" ? "powerCapture" : "memoryCapture"]:
-              scope.input,
+            [scope.kind === "power_trigger"
+              ? "powerTrigger"
+              : scope.kind === "power"
+                ? "powerCapture"
+                : "memoryCapture"]: scope.input,
           }
         : {}),
     };

@@ -103722,11 +103722,121 @@ init_zod();
 import fs50 from "node:fs/promises";
 import path63 from "node:path";
 
+// src/core/serial/power-trigger.ts
+init_zod();
+init_bounded_pattern();
+init_errors2();
+import { performance as performance2 } from "node:perf_hooks";
+import { setTimeout as delay3 } from "node:timers/promises";
+var PowerTriggerSchema = external_exports.object({
+  trigger: external_exports.string().min(1).max(4096),
+  seconds: external_exports.number().finite().positive().max(600).default(10)
+}).strict();
+async function waitForPowerTrigger(manager, owner, sessionId2, input, signal) {
+  const args = PowerTriggerSchema.parse(input);
+  const selected = manager.list(owner).find((session2) => session2.sessionId === sessionId2);
+  if (!selected)
+    throw new PlatformIOError(
+      "Trigger monitor is not owned by this connection.",
+      "SERIAL_SESSION_NOT_FOUND"
+    );
+  if (selected.state !== "open")
+    throw new PlatformIOError(
+      "Trigger monitor is not open.",
+      "POWER_TRIGGER_CLOSED"
+    );
+  let cursor = selected.nextCursor, lines2 = 0, bytes = 0;
+  await matchBoundedLines([], args.trigger, {
+    mode: "regex",
+    pythonNamedGroups: true
+  });
+  const started = performance2.now(), deadline = started + args.seconds * 1e3;
+  while (performance2.now() < deadline) {
+    if (signal?.aborted)
+      throw new PlatformIOError(
+        "Power trigger wait cancelled.",
+        "SERIAL_CANCELLED"
+      );
+    const page = await manager.read(owner, sessionId2, {
+      cursor,
+      maxLines: Math.min(500, 1e4 - lines2),
+      maxBytes: 65536,
+      timeoutMs: Math.min(
+        250,
+        Math.max(0, Math.ceil(deadline - performance2.now()))
+      ),
+      signal
+    });
+    if (page.readStatus === "cancelled" || signal?.aborted)
+      throw new PlatformIOError(
+        "Power trigger wait cancelled.",
+        "SERIAL_CANCELLED"
+      );
+    if (page.droppedLines || page.lineTruncatedBytes.some((count2) => count2 > 0) || page.redactionOutputMayBeTruncated)
+      throw new PlatformIOError(
+        "Trigger evidence was dropped or truncated; no measurement started.",
+        "POWER_TRIGGER_LOSS"
+      );
+    cursor = page.cursor;
+    lines2 += page.lines.length;
+    bytes += page.lines.reduce((sum, line) => sum + Buffer.byteLength(line), 0);
+    if (bytes > 1024 * 1024)
+      throw new PlatformIOError(
+        "Trigger wait exceeded its byte budget.",
+        "POWER_TRIGGER_LIMIT"
+      );
+    const matches = await matchBoundedLines(page.lines, args.trigger, {
+      mode: "regex",
+      pythonNamedGroups: true
+    });
+    if (matches.length) {
+      const final = await manager.read(owner, sessionId2, {
+        cursor,
+        maxLines: 1,
+        maxBytes: 65536,
+        timeoutMs: 0,
+        signal
+      });
+      if (final.readStatus === "cancelled" || signal?.aborted)
+        throw new PlatformIOError(
+          "Power trigger wait cancelled.",
+          "SERIAL_CANCELLED"
+        );
+      if (final.state !== "open" || final.error)
+        throw new PlatformIOError(
+          "Trigger monitor closed before measurement could start.",
+          "POWER_TRIGGER_CLOSED"
+        );
+      return {
+        trigger_line: page.lines[matches[0]],
+        trigger_offset_s: (performance2.now() - started) / 1e3,
+        trigger_session_id: sessionId2,
+        trigger_cursor: page.cursor - page.lines.length + matches[0]
+      };
+    }
+    if (page.state !== "open" || page.error)
+      throw new PlatformIOError(
+        "Trigger monitor closed before a matching line.",
+        "POWER_TRIGGER_CLOSED"
+      );
+    if (lines2 >= 1e4 || bytes >= 1024 * 1024)
+      throw new PlatformIOError(
+        "Trigger wait exceeded its evidence budget.",
+        "POWER_TRIGGER_LIMIT"
+      );
+    if (!page.lines.length) await delay3(1);
+  }
+  throw new PlatformIOError(
+    "Power trigger did not arrive within the requested interval; no measurement started.",
+    "POWER_TRIGGER_TIMEOUT"
+  );
+}
+
 // src/core/serial/verification-capture.ts
 init_zod();
 init_bounded_pattern();
-import { performance as performance2 } from "node:perf_hooks";
-import { setTimeout as delay3 } from "node:timers/promises";
+import { performance as performance3 } from "node:perf_hooks";
+import { setTimeout as delay4 } from "node:timers/promises";
 
 // src/core/runtime-assertions.ts
 var RUNTIME_FAILURE_MATCHERS = [
@@ -103804,7 +103914,7 @@ async function validateVerificationCapture(input) {
 }
 async function captureSessionVerification(manager, owner, sessionId2, input = {}, signal) {
   const args = await validateVerificationCapture(input);
-  const started = performance2.now();
+  const started = performance3.now();
   const deadline = started + args.timeoutSeconds * 1e3;
   const lines2 = [];
   let cursor = 0, bytes = 0, lineCount = 0, droppedLines = 0, truncatedBytes = 0;
@@ -103824,7 +103934,7 @@ async function captureSessionVerification(manager, owner, sessionId2, input = {}
       maxBytes: 1024 * 1024,
       timeoutMs: Math.min(
         1e3,
-        Math.max(0, Math.ceil(end - performance2.now()))
+        Math.max(0, Math.ceil(end - performance3.now()))
       ),
       signal
     });
@@ -103841,7 +103951,7 @@ async function captureSessionVerification(manager, owner, sessionId2, input = {}
     cancelled ||= read.readStatus === "cancelled" || !!signal?.aborted;
     closed = read.state !== "open";
     portError = read.error ?? portError;
-    if (read.lines.length || read.partial) lastOutput = performance2.now();
+    if (read.lines.length || read.partial) lastOutput = performance3.now();
     const passes = await matchBoundedLines(read.lines, args.expect, {
       mode: "regex",
       pythonNamedGroups: true
@@ -103870,10 +103980,10 @@ async function captureSessionVerification(manager, owner, sessionId2, input = {}
     resetCount += (read.lines.join("\n").match(/rst:/gi) ?? []).length;
     if (resetCount >= 2) runtimeFailures.add("BootLoop");
     if (failureLine !== null || runtimeFailures.size > 0) {
-      failureAt ??= performance2.now();
+      failureAt ??= performance3.now();
       verdict = "fail";
     }
-    const now = performance2.now();
+    const now = performance3.now();
     if (failureAt !== void 0 && now >= failureAt + args.settleSeconds * 1e3)
       break;
     if (failureAt === void 0 && matchedLine !== null && (now - lastOutput) / 1e3 >= args.stabilityWindowSeconds && !read.moreAvailable) {
@@ -103882,7 +103992,7 @@ async function captureSessionVerification(manager, owner, sessionId2, input = {}
     }
     if (cancelled || closed && !read.moreAvailable || failureAt === void 0 && now >= deadline)
       break;
-    if (!read.lines.length) await delay3(1);
+    if (!read.lines.length) await delay4(1);
   } while (true);
   await manager.read(owner, sessionId2, {
     cursor,
@@ -103900,7 +104010,7 @@ async function captureSessionVerification(manager, owner, sessionId2, input = {}
     fail_on: args.failOn,
     lines: lines2,
     line_count: lineCount,
-    verify_s: (performance2.now() - started) / 1e3,
+    verify_s: (performance3.now() - started) / 1e3,
     port_error: portError,
     dropped_lines: droppedLines,
     truncated_bytes: truncatedBytes,
@@ -103914,8 +104024,8 @@ async function captureSessionVerification(manager, owner, sessionId2, input = {}
 
 // src/core/serial/power-capture.ts
 init_zod();
-import { performance as performance3 } from "node:perf_hooks";
-import { setTimeout as delay4 } from "node:timers/promises";
+import { performance as performance4 } from "node:perf_hooks";
+import { setTimeout as delay5 } from "node:timers/promises";
 
 // src/core/power/power-analysis.ts
 init_zod();
@@ -104120,7 +104230,7 @@ async function validatePowerCapture(input = {}) {
 }
 async function captureSessionPower(manager, owner, sessionId2, input = {}, signal) {
   const args = await validatePowerCapture(input);
-  const started = performance3.now(), deadline = started + args.seconds * 1e3;
+  const started = performance4.now(), deadline = started + args.seconds * 1e3;
   const samples = [], volts = [];
   let cursor = args.cursor, bytes = 0, lineCount = 0, unparsed = 0, dropped = 0, truncated = 0;
   let limit = false, redacted = false, redactionClipped = false;
@@ -104132,11 +104242,11 @@ async function captureSessionPower(manager, owner, sessionId2, input = {}, signa
       maxBytes: 65536,
       timeoutMs: Math.min(
         250,
-        Math.max(0, Math.ceil(deadline - performance3.now()))
+        Math.max(0, Math.ceil(deadline - performance4.now()))
       ),
       signal
     });
-    const elapsedSeconds = (performance3.now() - started) / 1e3;
+    const elapsedSeconds = (performance4.now() - started) / 1e3;
     dropped += last.droppedLines;
     redacted ||= last.redactionApplied;
     redactionClipped ||= last.redactionOutputMayBeTruncated;
@@ -104160,9 +104270,9 @@ async function captureSessionPower(manager, owner, sessionId2, input = {}, signa
       if (sample.voltageMv !== null) volts.push(sample.voltageMv);
     }
     limit ||= lineCount >= args.maxLines || bytes >= 1024 * 1024;
-    if (limit || last.readStatus === "cancelled" || signal?.aborted || last.state !== "open" || performance3.now() >= deadline)
+    if (limit || last.readStatus === "cancelled" || signal?.aborted || last.state !== "open" || performance4.now() >= deadline)
       break;
-    if (!lines2.length) await delay4(1);
+    if (!lines2.length) await delay5(1);
   } while (true);
   const final = await manager.read(owner, sessionId2, {
     cursor,
@@ -104188,7 +104298,7 @@ async function captureSessionPower(manager, owner, sessionId2, input = {}, signa
     cursor,
     lineCount,
     unparsedLines: unparsed,
-    collectionDurationSeconds: (performance3.now() - started) / 1e3,
+    collectionDurationSeconds: (performance4.now() - started) / 1e3,
     timingBasis: "host_read_observation",
     voltageSource: args.voltageMv !== void 0 ? "argument" : volts.length ? "serial_mean" : "unknown",
     state: final.state,
@@ -104206,8 +104316,8 @@ async function captureSessionPower(manager, owner, sessionId2, input = {}, signa
 
 // src/core/serial/memory-capture.ts
 init_zod();
-import { performance as performance4 } from "node:perf_hooks";
-import { setTimeout as delay5 } from "node:timers/promises";
+import { performance as performance5 } from "node:perf_hooks";
+import { setTimeout as delay6 } from "node:timers/promises";
 
 // src/core/memory-report.ts
 init_bounded_pattern();
@@ -104667,7 +104777,7 @@ var MemoryCaptureSchema = external_exports.object({
 }).strict();
 async function captureSessionMemory(manager, owner, sessionId2, input = {}, signal) {
   const args = MemoryCaptureSchema.parse(input);
-  const started = performance4.now();
+  const started = performance5.now();
   const deadline = started + args.seconds * 1e3;
   const lines2 = [];
   let bytes = 0, cursor = args.cursor, droppedLines = 0, truncatedBytes = 0;
@@ -104675,7 +104785,7 @@ async function captureSessionMemory(manager, owner, sessionId2, input = {}, sign
   let last;
   let limitReached = false;
   do {
-    const remaining = Math.max(0, deadline - performance4.now());
+    const remaining = Math.max(0, deadline - performance5.now());
     last = await manager.read(owner, sessionId2, {
       cursor,
       maxLines: Math.min(500, args.maxLines - lines2.length),
@@ -104702,9 +104812,9 @@ async function captureSessionMemory(manager, owner, sessionId2, input = {}, sign
     cursor = last.cursor - last.lines.length + accepted;
     if (lines2.length >= args.maxLines || bytes >= 1024 * 1024)
       limitReached = true;
-    if (limitReached || last.readStatus === "cancelled" || last.state !== "open" && !last.moreAvailable || performance4.now() >= deadline && !last.moreAvailable)
+    if (limitReached || last.readStatus === "cancelled" || last.state !== "open" && !last.moreAvailable || performance5.now() >= deadline && !last.moreAvailable)
       break;
-    if (last.lines.length === 0) await delay5(1);
+    if (last.lines.length === 0) await delay6(1);
   } while (true);
   const options = {
     stackUnit: args.stackUnit,
@@ -104726,7 +104836,7 @@ async function captureSessionMemory(manager, owner, sessionId2, input = {}, sign
     ok: !portError && !cancelled && !terminalError,
     sessionId: sessionId2,
     cursor,
-    durationSeconds: (performance4.now() - started) / 1e3,
+    durationSeconds: (performance5.now() - started) / 1e3,
     portError,
     state: final.state,
     cancelled,
@@ -104784,7 +104894,7 @@ async function captureTransientMemory(service, owner, request, input = {}, signa
 
 // src/core/serial/session-policy.ts
 init_zod();
-import { performance as performance7 } from "node:perf_hooks";
+import { performance as performance8 } from "node:perf_hooks";
 
 // src/core/devices/serial-discovery-binding.ts
 init_errors2();
@@ -104921,7 +105031,7 @@ var SerialStreamRedactor = class {
 init_errors2();
 init_bounded_pattern();
 import { StringDecoder as StringDecoder4 } from "node:string_decoder";
-import { performance as performance5 } from "node:perf_hooks";
+import { performance as performance6 } from "node:perf_hooks";
 function boundedInteger(value2, min, max, field3) {
   if (!Number.isSafeInteger(value2) || value2 < min || value2 > max)
     throw new PlatformIOError(
@@ -105092,7 +105202,7 @@ var SerialSessionBuffer = class {
       12e4,
       "timeoutMs"
     );
-    const deadline = performance5.now() + timeout3;
+    const deadline = performance6.now() + timeout3;
     const result = (view, status, matched = false) => ({
       ...view,
       state: this.state,
@@ -105123,7 +105233,7 @@ var SerialSessionBuffer = class {
           true
         );
       if (this.revision !== revision) {
-        if (performance5.now() >= deadline)
+        if (performance6.now() >= deadline)
           return result(
             this.snapshot(options),
             this.state === "open" ? "timeout" : "closed"
@@ -105133,7 +105243,7 @@ var SerialSessionBuffer = class {
       if (this.state !== "open") return result(view, "closed");
       if (view.moreAvailable || view.lines.length >= (options.maxLines ?? 500) || options.waitFor === void 0 && (view.lines.length > 0 || view.partial.length > 0))
         return result(view, "ready");
-      const remaining = deadline - performance5.now();
+      const remaining = deadline - performance6.now();
       if (remaining <= 0)
         return result(view, timeout3 > 0 ? "timeout" : view.readStatus);
       await this.waitForChange(revision, remaining, options.signal);
@@ -105147,7 +105257,7 @@ var SerialSessionBuffer = class {
       12e4,
       "timeoutMs"
     );
-    const deadline = performance5.now() + timeout3;
+    const deadline = performance6.now() + timeout3;
     while (true) {
       const revision = this.revision;
       const view = this.snapshot(options);
@@ -105180,7 +105290,7 @@ var SerialSessionBuffer = class {
       }
       const cancelled = !!options.signal?.aborted;
       const matched = matchedLine !== null;
-      const expired = performance5.now() >= deadline;
+      const expired = performance6.now() >= deadline;
       if (cancelled || matched || view.state !== "open" || expired || !options.waitFor && rows.length > 0) {
         const count2 = matched ? Math.min(view.lines.length, matchedLine - first + 1) : view.lines.length;
         const cursor = first + count2;
@@ -105198,7 +105308,7 @@ var SerialSessionBuffer = class {
       if (revision !== this.revision) continue;
       await this.waitForChange(
         revision,
-        Math.max(0, deadline - performance5.now()),
+        Math.max(0, deadline - performance6.now()),
         options.signal
       );
     }
@@ -105786,7 +105896,7 @@ init_errors2();
 import fs48 from "node:fs";
 import path61 from "node:path";
 import { createHash as createHash9, randomUUID as randomUUID6 } from "node:crypto";
-import { performance as performance6 } from "node:perf_hooks";
+import { performance as performance7 } from "node:perf_hooks";
 init_serial_endpoint();
 init_errors2();
 init_device_lease();
@@ -106239,7 +106349,7 @@ var SerialSessionManager = class {
   }
   markEnded(session2) {
     if (!this.cleanupPending(session2)) {
-      session2.endedAt ??= performance6.now();
+      session2.endedAt ??= performance7.now();
       this.prune();
     }
   }
@@ -106263,7 +106373,7 @@ var SerialSessionManager = class {
     const completed = [...this.sessions.values()].filter((session2) => session2.endedAt !== void 0).sort((a, b) => a.endedAt - b.endedAt);
     for (let index = 0; index < completed.length; index++) {
       const session2 = completed[index];
-      if (performance6.now() - session2.endedAt > 6e5 || index < completed.length - 16)
+      if (performance7.now() - session2.endedAt > 6e5 || index < completed.length - 16)
         this.sessions.delete(session2.id);
     }
   }
@@ -106483,7 +106593,7 @@ var PolicySerialSessionService = class {
       input: args,
       purpose: "boot_verification",
       active: true,
-      expiresAt: performance7.now() + (args.timeoutSeconds + args.settleSeconds + 30) * 1e3
+      expiresAt: performance8.now() + (args.timeoutSeconds + args.settleSeconds + 30) * 1e3
     };
     return this.transientMemoryScope.run(scope5, async () => {
       try {
@@ -106525,6 +106635,30 @@ var PolicySerialSessionService = class {
     });
   }
   memoryReadScope = new AsyncLocalStorage2();
+  /** Wait on fresh owned firmware output under one bounded read grant, without opening or closing ports. */
+  async waitPowerTrigger(owner, sessionId2, input, signal) {
+    const args = PowerTriggerSchema.parse(input);
+    const scope5 = {
+      sessionId: sessionId2,
+      input: args,
+      kind: "power_trigger",
+      active: true,
+      expiresAt: performance8.now() + args.seconds * 1e3 + 3e4
+    };
+    return this.memoryReadScope.run(scope5, async () => {
+      try {
+        return await waitForPowerTrigger(
+          this.sessions,
+          owner,
+          sessionId2,
+          args,
+          signal
+        );
+      } finally {
+        scope5.active = false;
+      }
+    });
+  }
   /** Consume one scoped meter-read grant and retain policy revision checks through final disclosure. */
   async capturePower(owner, sessionId2, input = {}, signal) {
     const args = PowerCaptureSchema.parse(input);
@@ -106533,7 +106667,7 @@ var PolicySerialSessionService = class {
       input: args,
       kind: "power",
       active: true,
-      expiresAt: performance7.now() + args.seconds * 1e3 + 3e4
+      expiresAt: performance8.now() + args.seconds * 1e3 + 3e4
     };
     return this.memoryReadScope.run(scope5, async () => {
       try {
@@ -106556,7 +106690,7 @@ var PolicySerialSessionService = class {
       sessionId: sessionId2,
       input: args,
       active: true,
-      expiresAt: performance7.now() + 315e3
+      expiresAt: performance8.now() + 315e3
     };
     return this.memoryReadScope.run(scope5, async () => {
       try {
@@ -106621,7 +106755,7 @@ var PolicySerialSessionService = class {
           projectDir: request.projectDir,
           remaining: 4,
           active: true,
-          expiresAt: performance7.now() + 3e4,
+          expiresAt: performance8.now() + 3e4,
           guard
         };
         try {
@@ -106708,7 +106842,7 @@ var PolicySerialSessionService = class {
     const batch = this.discoveryBatch.getStore();
     if (batch) {
       const guard = () => {
-        if (!batch.active || batch.projectDir !== projectDir || performance7.now() > batch.expiresAt)
+        if (!batch.active || batch.projectDir !== projectDir || performance8.now() > batch.expiresAt)
           throw new PlatformIOError(
             "Startup discovery scope expired.",
             "SERIAL_DISCOVERY_SCOPE_INVALID"
@@ -106777,7 +106911,7 @@ var PolicySerialSessionService = class {
     const scope5 = this.memoryReadScope.getStore();
     const scopedRead = scope5 && request.operation === "read" && request.sessionId === scope5.sessionId;
     const checkScope = () => {
-      if (scopedRead && (!scope5.active || performance7.now() > scope5.expiresAt))
+      if (scopedRead && (!scope5.active || performance8.now() > scope5.expiresAt))
         throw new PlatformIOError(
           "Memory capture authorization scope expired.",
           "SERIAL_CAPTURE_SCOPE_INVALID"
@@ -106795,7 +106929,7 @@ var PolicySerialSessionService = class {
       if (!(error2 instanceof PolicyConfigError)) throw error2;
     }
     const transient = this.transientMemoryScope.getStore();
-    if (transient && (!transient.active || transient.expiresAt !== void 0 && performance7.now() > transient.expiresAt))
+    if (transient && (!transient.active || transient.expiresAt !== void 0 && performance8.now() > transient.expiresAt))
       throw new PlatformIOError(
         "Transient memory scope expired.",
         "SERIAL_CAPTURE_SCOPE_INVALID"
@@ -106826,7 +106960,7 @@ var PolicySerialSessionService = class {
       port: request.path,
       approvalId: request.operation === "read" ? context.readApprovalId ?? context.approvalId : context.approvalId,
       ...scopedRead ? {
-        [scope5.kind === "power" ? "powerCapture" : "memoryCapture"]: scope5.input
+        [scope5.kind === "power_trigger" ? "powerTrigger" : scope5.kind === "power" ? "powerCapture" : "memoryCapture"]: scope5.input
       } : {}
     };
     if (transient) {
@@ -106896,7 +107030,7 @@ var PolicySerialSessionService = class {
         if (transient?.purpose === "boot_verification" && request.operation === "read") {
           const revision = check2;
           const guard = () => {
-            if (!transient.active || performance7.now() > transient.expiresAt)
+            if (!transient.active || performance8.now() > transient.expiresAt)
               throw new PlatformIOError(
                 "Boot verification scope expired.",
                 "SERIAL_CAPTURE_SCOPE_INVALID"
