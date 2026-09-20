@@ -1023,3 +1023,7 @@ Registered pio_upload as a strict fixed-upload adapter over the shared target ex
 ### System information compatibility
 
 Added pio_system_info through canonical system, policy and owned-session permissions. Missing Core and absent metadata are explicit. Focused permission/report regressions and TypeScript validation passed. Corrected the named-target denial fixture to use the supported overrides schema. The prior pushed revision passed CI. npm publisher forkbomb is authenticated with read-write access to platformio-mcp, pio-mcp and pio-agent; no packages were published. Full parity and release acceptance remain incomplete.
+
+### Offline ESP partition parsing
+
+Added bounded CSV/binary partition parsing with an explicitly supplied table offset, typed numeric records, MD5 verification, erased terminators, overlap/overflow/alignment checks, OTA metadata constraints and writable core-dump enforcement. Format cross-checked against https://raw.githubusercontent.com/espressif/esp-idf/v5.3.2/components/partition_table/gen_esp32part.py. Twenty-six focused parser cases and TypeScript validation passed without executing PlatformIO or hardware. This internal module is not yet registered as a public capability: effective project/framework layout resolution, comparison/reporting, permission-controlled device reads and physical acceptance remain outstanding. This is implementation progress, not PAR completion.
