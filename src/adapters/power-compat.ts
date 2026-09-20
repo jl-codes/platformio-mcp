@@ -24,6 +24,7 @@ export async function executePowerCompatibility(
   input: unknown,
   defaults: CompatibilityProjectDefaults,
   caller: PolicyEvaluationContext,
+  operationName: "power_profile" | "pio_power_profile" = "pio_power_profile",
 ) {
   const raw = z.record(z.unknown()).parse(input);
   if (raw.operation === "cleanup") {
@@ -67,7 +68,7 @@ export async function executePowerCompatibility(
     Object.entries(params).filter(([key]) => !key.endsWith("approval_id")),
   );
   return dispatchAuthorizedAction(
-    "pio_power_profile",
+    operationName,
     { ...scope, projectDir, approvalId },
     { ...caller, workspaceDir: projectDir },
     async () =>

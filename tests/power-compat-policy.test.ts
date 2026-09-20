@@ -20,7 +20,7 @@ afterEach(async () => {
   vi.unstubAllEnvs();
   await fs.rm(root, { recursive: true, force: true });
 });
-it.each(["pio_power_profile", "start_monitor"])(
+it.each(["pio_power_profile", "power_profile", "start_monitor"])(
   "honors %s denial before serial or meter execution",
   async (denied) => {
     await fs.writeFile(
@@ -59,6 +59,50 @@ it.each(["pio_power_profile", "start_monitor"])(
           {},
         ),
       ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+    if (denied !== "pio_power_profile")
+      await expect(
+        executePowerCompatibility(
+          serial,
+          meter,
+          { source: "serial", port: "FAKE" },
+          { projectDir: project },
+          {},
+          "power_profile",
+        ),
+      ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+    expect(run).not.toHaveBeenCalled();
+    expect(serialRun).not.toHaveBeenCalled();
+  },
+);
+
+it.each(["power_profile", "pio_power_profile"] as const)(
+  "%s cannot bypass canonical approval requirements",
+  async (operation) => {
+    await fs.writeFile(
+      path.join(root, "policy.json"),
+      JSON.stringify({
+        profile: "lab_admin",
+        overrides: {
+          allow: ["start_monitor"],
+          deny: [],
+          approval_required: ["power_profile"],
+          audit_all_agent_actions: false,
+        },
+      }),
+    );
+    const meter = new PowerMeterClient();
+    const run = vi.spyOn(meter, "run");
+    const serialRun = vi.fn();
+    await expect(
+      executePowerCompatibility(
+        { run: serialRun } as unknown as SerialClientContext,
+        meter,
+        { source: "serial", port: "FAKE" },
+        { projectDir: project },
+        {},
+        operation,
+      ),
+    ).rejects.toMatchObject({ code: "APPROVAL_REQUIRED" });
     expect(run).not.toHaveBeenCalled();
     expect(serialRun).not.toHaveBeenCalled();
   },

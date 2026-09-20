@@ -1619,3 +1619,8 @@ Run 35515440936 passed installation, every functional alias, MCP stdio/EOF and a
 ### Container dependency build correction
 
 Both native container jobs in run 35515440936 failed because PlatformIO 6.1.16 has only a source distribution and the image required wheels for every dependency. The image now installs hash-pinned setuptools 84.0.0, wheel 0.48.0 and packaging 26.3, then permits only PlatformIO to build from its existing hash-pinned source with build isolation disabled. Other dependencies still require wheels and hashes. Official PyPI metadata supplied the build-tool wheel hashes. A fresh no-cache local source build succeeded and the full locked dependency set resolved; this is not native Linux container acceptance. The minimal context and Docker allowlist include the new build-tool lock.
+
+
+### Canonical power profiling in normal mode
+
+Added power_profile to the default MCP surface using the same serial/PPK2 implementation as pio_power_profile. Compatibility mode retains the reference alias. The alias inherits canonical deny and approval rules through power_profile -> start_monitor, while lower meter host/source permissions remain independent. Owned cleanup remains available without a new measurement grant. Real stdio checks cover listing/calling the canonical tool with compatibility disabled and enabled. The registry now advertises 58 tools normally and 98 with all 40 reference names enabled. This closes the MCP exposure gap for power profiling; CLI/dashboard and remaining PPK2 behavior/physical acceptance are still outstanding.

@@ -53,7 +53,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 97 : 57);
+      expect(tools).toHaveLength(enabled ? 98 : 58);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -92,6 +92,15 @@ it.each([
       ]) {
         expect(tools.some((tool) => tool.name === name)).toBe(enabled);
       }
+      expect(tools.some((tool) => tool.name === "power_profile")).toBe(true);
+      const canonicalPowerList = await client.callTool({
+        name: "power_profile",
+        arguments: { operation: "list" },
+      });
+      expect(canonicalPowerList.structuredContent).toMatchObject({
+        ok: true,
+        operations: [],
+      });
       if (enabled) {
         const powerList = await client.callTool({
           name: "pio_power_profile",

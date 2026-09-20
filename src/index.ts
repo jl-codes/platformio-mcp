@@ -1691,7 +1691,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   );
   const debugCompatibility = ["pio_debug_start", "pio_debug_cmd", "pio_debug_list", "pio_debug_stop"].includes(name);
   const compatibilityTool =
-    name === "pio_power_profile" ||
+    name === "power_profile" || name === "pio_power_profile" ||
     debugCompatibility ||
     packageCompatibility ||
     projectCompatibility ||
@@ -1761,8 +1761,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         () =>
           registeredTool.handler(args, {
             dispatch: async (tool, parameters) =>
-              tool === "pio_power_profile"
-                ? executePowerCompatibility(serialClient, powerClient, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller)
+              tool === "power_profile" || tool === "pio_power_profile"
+                ? executePowerCompatibility(serialClient, powerClient, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, tool)
                 : tool === "pio_debug_start"
                 ? debugClient.start(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller)
                 : tool === "pio_debug_cmd" || tool === "pio_debug_list" || tool === "pio_debug_stop"
@@ -2765,6 +2765,7 @@ async function main() {
   // ---------------------------------------------------------------------------
   const compatibility = parseCompatibilityLaunch(process.argv.slice(2));
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
+  toolRegistry = withPowerCompatibility(toolRegistry, "power_profile");
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
     toolRegistry = withPowerCompatibility(withDebugCompatibility(withDependencyCompatibility(

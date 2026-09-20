@@ -92643,10 +92643,9 @@ var require_ip_address = __commonJS({
 });
 
 // src/adapters/power-compat-registry.ts
-function withPowerCompatibility(base2) {
-  const result = new Map(base2), name2 = "pio_power_profile";
-  if (result.has(name2))
-    throw new Error(`Duplicate compatibility tool: ${name2}`);
+function withPowerCompatibility(base2, name2 = "pio_power_profile") {
+  const result = new Map(base2);
+  if (result.has(name2)) throw new Error(`Duplicate power tool: ${name2}`);
   result.set(name2, {
     name: name2,
     description: "Collect bounded serial current samples or PPK2 meter windows. PPK2 requires explicit mode, voltage/current limits, meter port and DUT port plus configured PIO_MCP_PPK2_ENV. Source mode requires independent power permission. operation=list/cleanup inspects or retries this connection's retained meter cleanup. PPK2 trigger coexistence and ambiguous multi-interface devices are not yet supported; physical acceptance is pending.",
@@ -93018,7 +93017,8 @@ var MCP_ACTIONS = {
   }
 };
 var INTERNAL_ACTIONS = {
-  pio_power_profile: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", riskLevel: "critical", destructive: true, idempotent: false },
+  power_profile: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", riskLevel: "critical", destructive: true, idempotent: false },
+  pio_power_profile: { ...MCP_ACTIONS.start_monitor, policyAction: "power_profile", riskLevel: "critical", destructive: true, idempotent: false },
   power_meter_measure: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", idempotent: false },
   power_source: { riskLevel: "critical", readOnly: false, destructive: true, idempotent: false, openWorld: false },
   power_meter_command: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
@@ -103644,7 +103644,7 @@ function projectCompatibilitySession(session2) {
 }
 
 // src/adapters/power-compat.ts
-async function executePowerCompatibility(serial, meter, input, defaults, caller) {
+async function executePowerCompatibility(serial, meter, input, defaults, caller, operationName = "pio_power_profile") {
   const raw = external_exports.record(external_exports.unknown()).parse(input);
   if (raw.operation === "cleanup") {
     const args = external_exports.object({
@@ -103674,7 +103674,7 @@ async function executePowerCompatibility(serial, meter, input, defaults, caller)
     Object.entries(params).filter(([key]) => !key.endsWith("approval_id"))
   );
   return dispatchAuthorizedAction(
-    "pio_power_profile",
+    operationName,
     { ...scope5, projectDir, approvalId: approvalId2 },
     { ...caller, workspaceDir: projectDir },
     async () => params.source === "ppk2" ? meter.run(params, defaults, caller) : executeSerialPowerCompatibility(
@@ -128205,7 +128205,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     name2
   );
   const debugCompatibility = ["pio_debug_start", "pio_debug_cmd", "pio_debug_list", "pio_debug_stop"].includes(name2);
-  const compatibilityTool = name2 === "pio_power_profile" || debugCompatibility || packageCompatibility || projectCompatibility || name2 === "pio_run_target" || name2 === "pio_upload" || name2 === "pio_flash_and_verify" || name2 === "pio_upload_ota" || name2 === "pio_partition_table" || name2 === "pio_coredump" || name2 === "pio_system_info" || dependencyCompatibility || boardCompatibility || deviceCompatibility;
+  const compatibilityTool = name2 === "power_profile" || name2 === "pio_power_profile" || debugCompatibility || packageCompatibility || projectCompatibility || name2 === "pio_run_target" || name2 === "pio_upload" || name2 === "pio_flash_and_verify" || name2 === "pio_upload_ota" || name2 === "pio_partition_table" || name2 === "pio_coredump" || name2 === "pio_system_info" || dependencyCompatibility || boardCompatibility || deviceCompatibility;
   const projectInspection = [
     "project_envs",
     "project_metadata",
@@ -128247,7 +128247,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const result = await mcpContext.run(
         { activityId, targetProjectDir },
         () => registeredTool.handler(args, {
-          dispatch: async (tool, parameters) => tool === "pio_power_profile" ? executePowerCompatibility(serialClient, powerClient, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller) : tool === "pio_debug_start" ? debugClient.start(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller) : tool === "pio_debug_cmd" || tool === "pio_debug_list" || tool === "pio_debug_stop" ? debugClient.execute(tool, parameters, caller) : tool === "coredump" ? executeCoredump(parameters, caller, onAuthorized) : tool === "partition_table" ? executePartitionTable(parameters, caller, onAuthorized) : tool === "run_target" ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized) : tool === "pio_coredump" ? executeCoredumpCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_partition_table" ? executePartitionCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_system_info" ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload_ota" ? executeOtaCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_flash_and_verify" ? executeFlashVerificationCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload" ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_run_target" ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (deviceCompatibility ? executeDeviceCompatibility.bind(null, serialClient) : boardCompatibility ? executeBoardCompatibility : dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
+          dispatch: async (tool, parameters) => tool === "power_profile" || tool === "pio_power_profile" ? executePowerCompatibility(serialClient, powerClient, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, tool) : tool === "pio_debug_start" ? debugClient.start(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller) : tool === "pio_debug_cmd" || tool === "pio_debug_list" || tool === "pio_debug_stop" ? debugClient.execute(tool, parameters, caller) : tool === "coredump" ? executeCoredump(parameters, caller, onAuthorized) : tool === "partition_table" ? executePartitionTable(parameters, caller, onAuthorized) : tool === "run_target" ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized) : tool === "pio_coredump" ? executeCoredumpCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_partition_table" ? executePartitionCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_system_info" ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload_ota" ? executeOtaCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_flash_and_verify" ? executeFlashVerificationCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload" ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_run_target" ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (deviceCompatibility ? executeDeviceCompatibility.bind(null, serialClient) : boardCompatibility ? executeBoardCompatibility : dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
             tool,
             parameters,
             {
@@ -129071,6 +129071,7 @@ ENV VARS:
 async function main() {
   const compatibility = parseCompatibilityLaunch(process.argv.slice(2));
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
+  toolRegistry = withPowerCompatibility(toolRegistry, "power_profile");
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
     toolRegistry = withPowerCompatibility(withDebugCompatibility(withDependencyCompatibility(

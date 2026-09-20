@@ -1,13 +1,12 @@
-/** Register functional serial and PPK2 power routing only in compatibility mode. */
+/** Register canonical power profiling and its opt-in reference alias over one implementation. */
 import type { RegisteredTool } from "../mcp/tool-registry.js";
 /** Public schema never exposes interpreter paths, identity assertions or custody capabilities. */
 export function withPowerCompatibility<TResult>(
   base: ReadonlyMap<string, RegisteredTool<TResult>>,
+  name: "power_profile" | "pio_power_profile" = "pio_power_profile",
 ): ReadonlyMap<string, RegisteredTool<TResult>> {
-  const result = new Map(base),
-    name = "pio_power_profile";
-  if (result.has(name))
-    throw new Error(`Duplicate compatibility tool: ${name}`);
+  const result = new Map(base);
+  if (result.has(name)) throw new Error(`Duplicate power tool: ${name}`);
   result.set(name, {
     name,
     description:
