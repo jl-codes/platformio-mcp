@@ -37,13 +37,21 @@ class Env(dict):
     def GetProjectOptions(self): return {"board": "fixture", "secret": "never serialized"}
 env = Env(UPLOADCMD="original command", UPLOAD_PROTOCOL="esptool", PROJECT_DIR=str(root), PIOENV="fixture", CC="compiler", PROG_PATH=str(elf), ESP32_APP_OFFSET="0x10000", FLASH_EXTRA_IMAGES=[("0x1000", str(boot))])
 env.original = env["UPLOADCMD"]
-exec(PROGRAM, {"env": env, "Import": lambda name: None})
+scope = {"env": env, "Import": lambda name: None}
+exec(PROGRAM, scope)
 assert callable(env["UPLOADCMD"])
 assert env["UPLOADCMD"]([], [Node()], env) == 86
 record_path = root / "capture.json"
 encoded = record_path.read_text()
 record = json.loads(encoded)
 assert record["captureOnly"] is True
+assert record["argv"] == ["python", "esptool.py", "write_flash", "0x1000", str(boot), "0x10000", str(app)]
+for command in ["python tool.py & echo bad", "python tool.py | echo bad", "python tool.py > out", "python tool.py\nother"]:
+    try:
+        scope["_split_command"](command)
+        raise AssertionError("shell command accepted")
+    except ValueError:
+        pass
 assert record["images"][0]["offset"] == 0x1000
 assert record["images"][1]["sha256"] == hashlib.sha256(b"app").hexdigest()
 assert record["elf"]["sha256"] == hashlib.sha256(b"elf").hexdigest()

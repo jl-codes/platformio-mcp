@@ -9,13 +9,63 @@ export function createUploadCaptureScript(recordPath: string): string {
       "Capture record path must be host-resolved.",
       "UPLOAD_MANIFEST_INVALID",
     );
-  return `import hashlib, json, os, stat
+  return String.raw`import hashlib, json, os, stat, shlex
 from pathlib import Path
 Import("env")
 _RECORD = json.loads(${JSON.stringify(JSON.stringify(recordPath))})
 _ORIGINAL = env.get("UPLOADCMD")
 if env.subst("$UPLOAD_PROTOCOL") != "esptool" or not isinstance(_ORIGINAL, str):
     raise ValueError("UPLOAD_CAPTURE_UNSUPPORTED")
+
+def _split_command(command):
+    limit = 32767 if os.name == "nt" else 1024 * 1024
+    if not command.strip() or len(command) > limit or any(ord(char) < 32 or ord(char) == 127 for char in command):
+        raise ValueError("UPLOAD_COMMAND_UNSUPPORTED")
+    if os.name == "nt":
+        # cmd expansions/operators are not equivalent to direct argv execution.
+        if any(char in command for char in "%!^&|<>"):
+            raise ValueError("UPLOAD_COMMAND_UNSUPPORTED")
+        import ctypes
+        argc = ctypes.c_int()
+        shell = ctypes.WinDLL("shell32", use_last_error=True)
+        parse = shell.CommandLineToArgvW
+        parse.argtypes = [ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_int)]
+        parse.restype = ctypes.POINTER(ctypes.c_wchar_p)
+        pointer = parse(command.lstrip(), ctypes.byref(argc))
+        if not pointer:
+            raise ValueError("UPLOAD_COMMAND_UNSUPPORTED")
+        try:
+            if argc.value < 1 or argc.value > 256:
+                raise ValueError("UPLOAD_COMMAND_UNSUPPORTED")
+            argv = [pointer[index] for index in range(argc.value)]
+        finally:
+            free = ctypes.WinDLL("kernel32").LocalFree
+            free.argtypes = [ctypes.c_void_p]
+            free.restype = ctypes.c_void_p
+            free(pointer)
+    else:
+        quote = None
+        escaped = False
+        for char in command:
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\" and quote != "'":
+                escaped = True
+                continue
+            if quote == "'":
+                if char == "'": quote = None
+                continue
+            if char in "\"'":
+                if quote == char: quote = None
+                elif quote is None: quote = char
+                continue
+            if char in (chr(96), "$") or (quote is None and char in ";&|<>()*?[]{}~#"):
+                raise ValueError("UPLOAD_COMMAND_UNSUPPORTED")
+        argv = shlex.split(command, posix=True)
+    if not argv or len(argv) > 256 or any(not arg for arg in argv):
+        raise ValueError("UPLOAD_COMMAND_UNSUPPORTED")
+    return argv
 
 def _artifact(value, maximum):
     source = Path(str(value)).resolve(strict=True)
@@ -61,9 +111,11 @@ def _capture_upload(target, source, env):
     if any(item["offset"] < 0 or item["offset"] + item["size"] > 0x100000000 for item in images):
         raise ValueError("UPLOAD_CAPTURE_LIMIT")
     settings = json.dumps(env.GetProjectOptions(), sort_keys=True, default=str, separators=(",", ":"))
+    command = env.subst(_ORIGINAL, target=target, source=source)
     record = {
         "schemaVersion": 1, "captureOnly": True,
-        "commandLine": env.subst(_ORIGINAL, target=target, source=source),
+        "commandLine": command,
+        "argv": _split_command(command),
         "projectDir": str(Path(env.subst("$PROJECT_DIR")).resolve(strict=True)),
         "environment": env.subst("$PIOENV"),
         "compiler": env.subst("$CC"),
