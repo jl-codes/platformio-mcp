@@ -110165,7 +110165,7 @@ var count = external_exports.number().int().nonnegative().max(1e6);
 var duration3 = external_exports.number().finite().nonnegative();
 var testCase = external_exports.object({
   name: text6,
-  status: external_exports.enum(["PASSED", "FAILED", "ERRORED", "SKIPPED"]),
+  status: external_exports.enum(["PASSED", "FAILED", "ERRORED", "SKIPPED", "WARNED"]),
   message: text6,
   exception: text6,
   source: external_exports.object({
@@ -110216,7 +110216,7 @@ function summarizeTestOutput(output) {
       "Test report counters contradict the total",
       "TEST_REPORT_INVALID"
     );
-  const observed = { PASSED: 0, FAILED: 0, ERRORED: 0, SKIPPED: 0 };
+  const observed = { PASSED: 0, FAILED: 0, ERRORED: 0, SKIPPED: 0, WARNED: 0 };
   const suites = report.test_suites.map((suite) => ({
     env: suite.env_name ?? null,
     test: suite.test_name ?? null,
@@ -110247,6 +110247,7 @@ function summarizeTestOutput(output) {
     failed: report.failure_nums,
     errored: report.error_nums,
     skipped: report.skipped_nums,
+    warned: observed.WARNED,
     duration_s: Math.round(report.duration * 100) / 100,
     suites
   };

@@ -7,7 +7,7 @@ const count = z.number().int().nonnegative().max(1000000);
 const duration = z.number().finite().nonnegative();
 const testCase = z.object({
   name: text,
-  status: z.enum(["PASSED", "FAILED", "ERRORED", "SKIPPED"]),
+  status: z.enum(["PASSED", "FAILED", "ERRORED", "SKIPPED", "WARNED"]),
   message: text,
   exception: text,
   source: z
@@ -68,7 +68,7 @@ export function summarizeTestOutput(output: string) {
       "Test report counters contradict the total",
       "TEST_REPORT_INVALID",
     );
-  const observed = { PASSED: 0, FAILED: 0, ERRORED: 0, SKIPPED: 0 };
+  const observed = { PASSED: 0, FAILED: 0, ERRORED: 0, SKIPPED: 0, WARNED: 0 };
   const suites = report.test_suites.map((suite) => ({
     env: suite.env_name ?? null,
     test: suite.test_name ?? null,
@@ -104,6 +104,7 @@ export function summarizeTestOutput(output: string) {
     failed: report.failure_nums,
     errored: report.error_nums,
     skipped: report.skipped_nums,
+    warned: observed.WARNED,
     duration_s: Math.round(report.duration * 100) / 100,
     suites,
   };

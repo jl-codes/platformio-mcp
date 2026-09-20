@@ -72,3 +72,13 @@ test("accepts explicitly empty test runs without inventing executed cases", () =
     ),
   ).toMatchObject({ total: 0, suites: [] });
 });
+
+
+test("accepts upstream WARNED cases without losing their distinct status", () => {
+  const report = { testcase_nums: 1, failure_nums: 0, error_nums: 0, skipped_nums: 0, duration: 0,
+    test_suites: [{ env_name: "native", test_name: "warnings", status: "SKIPPED", duration: 0,
+      test_cases: [{ name: "runner warning", status: "WARNED", message: "No tests collected" }] }] };
+  const result = summarizeTestOutput(JSON.stringify(report));
+  expect(result).toMatchObject({ total: 1, warned: 1, failed: 0, skipped: 0 });
+  expect(result.suites[0].cases[0].status).toBe("WARNED");
+});

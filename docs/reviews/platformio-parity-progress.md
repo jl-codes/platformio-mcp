@@ -884,3 +884,8 @@ Added private unique foreground test-report files, bounded redacted parsing and 
 
 Canonical report integration initially failed TypeScript because the entry point lacked the error-class import. Added the import; TypeScript then passed and the plugin was rebuilt with the correction.
 
+
+### Test report source-format verification
+
+Read PlatformIO Core 6.1.16 test result and JSON serializer source, recording immutable commit/blob identities in platformio-test-report-source.json. Found and corrected valid WARNED cases previously rejected by the parser; warned cases remain distinct and an additional warned count prevents downstream consumers from assuming every nonfailed/nonskipped case passed. Aggregate totals include these cases in upstream source. TypeScript and seven focused report/lifecycle checks passed; plugin rebuilt. Source inspection is not native execution evidence, and public test adapter/lease integration remains unfinished.
+
