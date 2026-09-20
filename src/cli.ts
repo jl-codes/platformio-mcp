@@ -370,9 +370,11 @@ async function runCliCommand(command: string, rawArgs: string[]) {
 
   try {
     if (command === "partition-table") {
-      const allowed = new Set(["json", "project-dir", "table-path", "format", "table-offset", "sdkconfig-path", "environment", "config-approval-id", "flash-size", "firmware-path", "observed-table-path", "approval-id"]);
+      const allowed = new Set(["json", "project-dir", "table-path", "format", "table-offset", "sdkconfig-path", "build-metadata", "metadata-approval-id", "environment", "config-approval-id", "flash-size", "firmware-path", "observed-table-path", "approval-id"]);
       if (positionals.length || Object.keys(options).some((key) => !allowed.has(key)))
         throw new PlatformIOError("Unknown partition inspection argument.", "PARTITION_INPUT_INVALID");
+      if (options["build-metadata"] !== undefined && ![true, false, "true", "false"].includes(options["build-metadata"]))
+        throw new PlatformIOError("--build-metadata must be true or false.", "PARTITION_INPUT_INVALID");
       const numberOption = (key: string) => {
         const value = asString(options[key]);
         if (value === undefined) return undefined;
@@ -384,6 +386,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         projectDir: projectDirForPolicy, tablePath: asString(options["table-path"]),
         format: asString(options.format), tableOffset: numberOption("table-offset"),
         sdkconfigPath: asString(options["sdkconfig-path"]),
+        buildMetadata: asBoolean(options["build-metadata"]) ?? false, metadataApprovalId: asString(options["metadata-approval-id"]),
         environment: asString(options.environment), configApprovalId: asString(options["config-approval-id"]),
         flashSize: numberOption("flash-size"), firmwarePath: asString(options["firmware-path"]),
         observedTablePath: asString(options["observed-table-path"]), approvalId: asString(options["approval-id"]),

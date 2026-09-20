@@ -1047,3 +1047,7 @@ Connected existing sdkconfig offset extraction to canonical partition_table and 
 ### Configured project partition workflow
 
 Public partition inspection now resolves configured environment CSV paths, upload offsets and flash sizes through authorized Core configuration inspection. Explicit/default environment selection rejects ambiguity; explicit offline paths retain their existing behavior. Eight focused workflow cases and TypeScript validation passed without PlatformIO execution. Framework package defaults, generated layout evidence, live reads and reference adapter completion remain outstanding.
+
+### Authorized build-derived partition identity
+
+Added opt-in buildMetadata resolution through project_metadata, preserving its build permission before Core execution. Matches selected environment flash-image evidence, rejects ambiguous binaries and combines metadata offsets with configuration/explicit evidence. MCP safety annotations now reflect optional project script execution. Eleven focused metadata/workflow tests and TypeScript passed. CI run 35496158937 for prior commit 52f26758 remained live at inspection; this change is saved locally to avoid cancelling it. Metadata generation does not certify binary freshness; device reads and full reference acceptance remain pending.

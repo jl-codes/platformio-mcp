@@ -299,7 +299,7 @@ const toolDefinitions: ToolDefinition[] = [
   },
   {
     name: "partition_table",
-    description: "Inspect explicit offline ESP partition artifacts and firmware fit. Requires the resolved table offset; does not build or read a device.",
+    description: "Inspect ESP partition artifacts and firmware fit. Optional buildMetadata requires build permission and can execute project scripts. Does not read a device.",
     inputSchema: {
       type: "object", required: ["projectDir"], additionalProperties: false,
       properties: {
@@ -310,6 +310,8 @@ const toolDefinitions: ToolDefinition[] = [
         format: { type: "string", enum: ["csv", "binary"], default: "csv" },
         tableOffset: { type: "integer", minimum: 0, maximum: 4294963200 },
         sdkconfigPath: { type: "string", minLength: 1, maxLength: 32768 },
+        buildMetadata: { type: "boolean", default: false, description: "Generate build metadata under build permission; may execute project scripts." },
+        metadataApprovalId: { type: "string", maxLength: 256 },
         flashSize: { type: "integer", minimum: 1, maximum: 4294967296 },
         firmwarePath: { type: "string", minLength: 1, maxLength: 32768 },
         observedTablePath: { type: "string", minLength: 1, maxLength: 32768 },

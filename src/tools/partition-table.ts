@@ -3,7 +3,10 @@
  * Explicit artifact paths and table offsets avoid hidden compilation or framework guesses.
  */
 import fs from "node:fs/promises";
-import { resolveProjectPartitionInputs } from "./partition-project.js";
+import {
+  resolveProjectPartitionInputs,
+  resolveBuildPartitionInputs,
+} from "./partition-project.js";
 import { z } from "zod";
 import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
@@ -31,6 +34,8 @@ export const PartitionTableSchema = z
       .max(50)
       .optional(),
     configApprovalId: z.string().max(256).optional(),
+    buildMetadata: z.boolean().default(false),
+    metadataApprovalId: z.string().max(256).optional(),
     format: z.enum(["csv", "binary"]).default("csv"),
     tableOffset: z.number().int().min(0).max(0xfffff000).optional(),
     sdkconfigPath: z.string().min(1).max(32768).optional(),
@@ -58,7 +63,9 @@ export async function executePartitionTable(
       await onAuthorized?.();
       guard();
       const project =
-        params.tablePath === undefined || params.environment !== undefined
+        params.buildMetadata ||
+        params.tablePath === undefined ||
+        params.environment !== undefined
           ? await resolveProjectPartitionInputs(
               projectDir,
               params.environment,
@@ -67,7 +74,18 @@ export async function executePartitionTable(
             )
           : null;
       guard();
+      const build = params.buildMetadata
+        ? await resolveBuildPartitionInputs(
+            projectDir,
+            project!.environment,
+            { ...caller, workspaceDir: projectDir },
+            params.metadataApprovalId,
+            params.format === "binary" ? params.tablePath : undefined,
+          )
+        : null;
+      guard();
       const evidence: PartitionOffsetEvidence[] = [];
+      if (build) evidence.push(build.offsetEvidence);
       if (params.tableOffset !== undefined)
         evidence.push({
           source: "explicit:tableOffset",
@@ -99,8 +117,8 @@ export async function executePartitionTable(
       guard();
       const result = await inspectEspPartitionArtifacts({
         workspaceDir: projectDir,
-        tablePath: params.tablePath ?? project!.tablePath,
-        format: params.format,
+        tablePath: params.tablePath ?? build?.tablePath ?? project!.tablePath,
+        format: !params.tablePath && build ? "binary" : params.format,
         layout: {
           tableOffset: location.tableOffset,
           flashSize: params.flashSize ?? project?.flashSize,
