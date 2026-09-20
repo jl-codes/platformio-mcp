@@ -2,6 +2,11 @@
  * Own a GDB child, MI pipes and cleanup without confusing process exit with probe release.
  * Public adapters must authorize startup and resolve trusted executable/artifact/custody inputs.
  */
+import {
+  executeDebugInitialization,
+  type DebugInitializationInput,
+} from "./debug-init-execution.js";
+import type { DebugInitArtifact } from "./debug-init-artifact.js";
 import { DebugStartupFailure } from "./debug-start-failure.js";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import path from "node:path";
@@ -160,6 +165,20 @@ export class DebugProcess {
     return attachDebuggerTarget(
       this.transport,
       { ...selection, projectDir: this.options.projectDir },
+      caller,
+    );
+  }
+
+  /** Execute Core initialization under this owner's actual project identity. */
+  initialize(
+    artifact: DebugInitArtifact,
+    input: Omit<DebugInitializationInput, "projectDir">,
+    caller: PolicyEvaluationContext,
+  ) {
+    return executeDebugInitialization(
+      this.transport,
+      artifact,
+      { ...input, projectDir: this.options.projectDir },
       caller,
     );
   }

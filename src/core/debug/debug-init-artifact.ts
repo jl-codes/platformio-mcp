@@ -39,6 +39,38 @@ export async function retainDebugInitialization(
   return retainInitialization(script, binding);
 }
 
+/** Describe a validated template before allocating artifacts or acquiring probe custody. */
+export function describeDebugInitializationTemplate(
+  template: string,
+  binding: DebugInitBinding,
+  elfPath: string,
+): Pick<DebugInitArtifact, "authorization" | "binding"> {
+  bindDebugInitializationTemplate(template, {
+    elfPath,
+    host: binding.host,
+    port: binding.port,
+  });
+  if (
+    !/^[a-f0-9]{64}$/i.test(binding.elfSha256) ||
+    typeof binding.load !== "boolean"
+  )
+    throw new PlatformIOError(
+      "Invalid debugger initialization binding.",
+      "DEBUG_INIT_ARTIFACT_INVALID",
+    );
+  return Object.freeze({
+    binding: Object.freeze({
+      ...binding,
+      elfSha256: binding.elfSha256.toLowerCase(),
+    }),
+    authorization: Object.freeze({
+      kind: "template" as const,
+      sha256: createHash("sha256").update(template, "utf8").digest("hex"),
+      size: Buffer.byteLength(template),
+    }),
+  });
+}
+
 /** Bind trusted Core placeholders; approvals identify the template and firmware, not random private paths. */
 export async function retainDebugInitializationTemplate(
   template: string,

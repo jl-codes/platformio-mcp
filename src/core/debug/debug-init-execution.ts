@@ -9,20 +9,21 @@ import {
   type DebugInitArtifact,
 } from "./debug-init-artifact.js";
 
-/** Source command text remains private; approval scope uses stable content and startup identities, never a random staging path. */
-export async function executeDebugInitialization(
-  transport: GdbMiSession,
-  artifact: DebugInitArtifact,
-  input: {
-    projectDir: string;
-    sessionId: string;
-    timeoutMs: number;
-    hostApprovalId?: string;
-    targetApprovalId?: string;
-  },
+/** Stable startup scope shared by preflight and execution. */
+export interface DebugInitializationInput {
+  projectDir: string;
+  sessionId: string;
+  timeoutMs: number;
+  hostApprovalId?: string;
+  targetApprovalId?: string;
+}
+
+/** Plan both privileges before startup effects; this does not consume either grant. */
+export async function preflightDebugInitialization(
+  artifact: Pick<DebugInitArtifact, "authorization" | "binding">,
+  input: DebugInitializationInput,
   caller: PolicyEvaluationContext = {},
-): Promise<void> {
-  assertDebugInitArtifact(artifact);
+) {
   if (
     !input.sessionId ||
     !Number.isSafeInteger(input.timeoutMs) ||
@@ -64,6 +65,22 @@ export async function executeDebugInitialization(
         { policyDecision: plan },
       );
   }
+  return { stages, context };
+}
+
+/** Source only an active retained capability, rechecking authorization and exact bytes at execution. */
+export async function executeDebugInitialization(
+  transport: GdbMiSession,
+  artifact: DebugInitArtifact,
+  input: DebugInitializationInput,
+  caller: PolicyEvaluationContext = {},
+): Promise<void> {
+  assertDebugInitArtifact(artifact);
+  const { stages, context } = await preflightDebugInitialization(
+    artifact,
+    input,
+    caller,
+  );
   const guard = createPolicyRevisionGuard(input.projectDir);
   await dispatchAuthorizedAction(
     stages[0].action,

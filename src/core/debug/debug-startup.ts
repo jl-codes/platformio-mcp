@@ -11,6 +11,13 @@ import { DebugProcess, type DebugProcessOptions } from "./debug-process.js";
 import { retainDebugElf, ownDebugElf } from "./debug-elf.js";
 import { startDebuggerWithBackend } from "./debug-backend-session.js";
 import type { DebugBackendProcessOptions } from "./debug-backend-process.js";
+import {
+  describeDebugInitializationTemplate,
+  retainDebugInitializationTemplate,
+  ownDebugInitialization,
+  type DebugInitArtifact,
+} from "./debug-init-artifact.js";
+import { preflightDebugInitialization } from "./debug-init-execution.js";
 import { DebugStartupFailure } from "./debug-start-failure.js";
 import {
   preflightDebuggerTarget,
@@ -27,6 +34,11 @@ export interface PreparedDebuggerStartup {
   trustedDebuggerRoots: readonly string[];
   target: Omit<DebugTargetSelection, "projectDir" | "sessionId">;
   approvalId?: string;
+  initialization?: {
+    template: string;
+    hostApprovalId?: string;
+    targetApprovalId?: string;
+  };
   backend?: {
     options: DebugBackendProcessOptions;
     readyPattern: string;
@@ -51,6 +63,19 @@ export function startPreparedDebugger(
         readyPattern: selection.backend.readyPattern,
       }
     : undefined;
+  const initialization = selection.initialization;
+  const initDescriptor = initialization
+    ? describeDebugInitializationTemplate(
+        initialization.template,
+        {
+          elfSha256: selection.expectedElfSha256,
+          host: selection.target.host,
+          port: selection.target.port,
+          load: selection.target.load,
+        },
+        selection.elfPath,
+      )
+    : undefined;
   const requestIdentity = createHash("sha256")
     .update(
       JSON.stringify({
@@ -65,6 +90,7 @@ export function startPreparedDebugger(
         load: selection.target.load,
         timeoutMs: selection.target.timeoutMs ?? 90000,
         backend: backendScope,
+        initialization: initDescriptor,
         beforeLoadCommands: selection.target.beforeLoadCommands?.map((entry) =>
           entry.command.trim(),
         ),
@@ -84,7 +110,16 @@ export function startPreparedDebugger(
         projectDir: selection.projectDir,
         sessionId,
       };
-      await preflightDebuggerTarget(target, caller);
+      const initInput = {
+        projectDir: selection.projectDir,
+        sessionId,
+        timeoutMs: target.timeoutMs ?? 90000,
+        hostApprovalId: initialization?.hostApprovalId,
+        targetApprovalId: initialization?.targetApprovalId,
+      };
+      if (initDescriptor)
+        await preflightDebugInitialization(initDescriptor, initInput, caller);
+      else await preflightDebuggerTarget(target, caller);
       const args = {
         projectDir: selection.projectDir,
         environment: selection.environment,
@@ -95,6 +130,7 @@ export function startPreparedDebugger(
         port: target.port,
         load: target.load,
         backend: backendScope,
+        initialization: initDescriptor,
         approvalId: selection.approvalId,
       };
       return dispatchAuthorizedAction(
@@ -110,8 +146,17 @@ export function startPreparedDebugger(
             selection.expectedElfSha256,
           );
           let owned: OwnedDebugProcess | undefined;
+          let initArtifact: DebugInitArtifact | undefined;
           try {
             guard();
+            if (initialization && initDescriptor) {
+              initArtifact = await retainDebugInitializationTemplate(
+                initialization.template,
+                initDescriptor.binding,
+                elf.path,
+              );
+              guard();
+            }
             const custody = await selection.acquireCustody();
             // DebugProcess owns release from this point, including spawn/initialization failure.
             const debuggerOptions: DebugProcessOptions = {
@@ -136,15 +181,27 @@ export function startPreparedDebugger(
                   caller,
                 )
               : await DebugProcess.start(debuggerOptions);
-            owned = ownDebugElf(process, elf);
+            owned = ownDebugElf(
+              initArtifact
+                ? ownDebugInitialization(process, initArtifact)
+                : process,
+              elf,
+            );
             guard();
-            await process.attach(target, caller);
+            if (initArtifact)
+              await process.initialize(initArtifact, initInput, caller);
+            else await process.attach(target, caller);
             guard();
             return owned;
           } catch (error) {
             if (error instanceof DebugStartupFailure)
               throw new DebugStartupFailure(
-                ownDebugElf(error.cleanupOwner(), elf),
+                ownDebugElf(
+                  initArtifact
+                    ? ownDebugInitialization(error.cleanupOwner(), initArtifact)
+                    : error.cleanupOwner(),
+                  elf,
+                ),
               );
             if (owned) {
               try {
@@ -153,6 +210,7 @@ export function startPreparedDebugger(
                 throw new DebugStartupFailure(owned);
               }
             } else {
+              await initArtifact?.release();
               await elf.release();
             }
             throw error;
