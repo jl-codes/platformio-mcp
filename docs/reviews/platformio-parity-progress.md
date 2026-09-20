@@ -1353,3 +1353,8 @@ Both prior-head CI runs 35505106601 and 35505104039 passed at 5bead67c. Public i
 ### Authorized debugger detach lifecycle (2026-09-20)
 
 Added detach-and-stop to the connection-owned debugger registry. Detach is dispatched through the existing target-effect authorization with the owned session ID and its separate grant. Only an acknowledged MI done result proceeds to process cleanup; permission denial, timeout, closure or an error retains recovery ownership. Concurrent commands/stops cannot report a process-only stop as successful target detach. Disconnect waits for an outstanding detach and independently retries process cleanup, without requiring target-effect permission. Fourteen focused registry tests and TypeScript passed. This remains an internal composition step: public debugger startup/backend integration and physical probe acceptance are still incomplete.
+
+
+### Debugger computed configuration (2026-09-20)
+
+Added bounded, read-authorized Core configuration collection and pinned-reference debugger environment selection: explicit environment, first debug default, first default, with all declared environments used when defaults are absent. Unknown and option-like environments, duplicate configuration sections, malformed tool settings, and failed collection are rejected. No build, debugger script, backend or probe operation is authorized by configuration selection. Seven focused cases, TypeScript and lint passed, including concrete get_project_config denial before Core invocation. Backend launch/configuration integration and public debugger tools remain outstanding.
