@@ -1102,3 +1102,8 @@ Added bounded workspace-contained raw/base64 input loading, strict UTF-8 decodin
 
 Offline ELF-envelope loading now validates ELF32 core headers, chip/machine agreement, bounded program headers and note segments, then extracts the unique ESP_CORE_DUMP_INFO firmware SHA-256 prefix. Matching distinguishes full hash, partial prefix and absent evidence; mismatches fail. Format checked against Espressif esp-coredump v1.10.0 corefile/elf.py and corefile/loader.py. Fifteen focused artifact/identity cases, lint and TypeScript passed. Analyzer execution, complete immutable ELF binding, sensitive-data retention and public integration remain outstanding.
 
+
+### Stable core-dump analysis inputs
+
+Added workspace-contained ELF selection, chip/ELF target checks, embedded hash correspondence and hash-verified ELF snapshots with permission revalidation around analysis. Dump bytes remain in memory; no raw dump is archived by this helper. Four focused cases passed for rebuild stability, wrong-target rejection, failure cleanup and revoked permission; lint and TypeScript passed. Both CI runs 35497993818 and 35497991890 passed at 48b5ef47. Optional analyzer execution, private staging/retention and public integration remain incomplete.
+
