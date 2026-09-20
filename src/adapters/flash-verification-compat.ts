@@ -1,4 +1,5 @@
 /** Reference flash-and-verify parameters over the shared upload, fresh capture and crash-decoding workflows. */
+import { planAction } from "../core/action-dispatcher.js";
 import { z } from "zod";
 import { executeFlashVerification } from "../tools/flash-verification.js";
 import { VerificationCaptureSchema } from "../core/serial/verification-capture.js";
@@ -70,6 +71,14 @@ export async function executeFlashVerificationCompatibility(
     defaults,
   );
   const guard = createPolicyRevisionGuard(projectDir);
+  const permission = await planAction(
+    "flash_verification",
+    { projectDir },
+    { ...caller, workspaceDir: projectDir },
+  );
+  if (permission.status === "deny")
+    throw new PlatformIOError(permission.reason, "POLICY_DENIED");
+  guard();
   const resolved = await resolveMonitorRequest(
     {
       project_dir: projectDir,

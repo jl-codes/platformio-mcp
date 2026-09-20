@@ -2,10 +2,12 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { SerialClientContext } from "../src/adapters/serial-client.js";
 const mocks = vi.hoisted(() => ({
+  plan: vi.fn(),
   resolve: vi.fn(),
   execute: vi.fn(),
   decode: vi.fn(),
 }));
+vi.mock("../src/core/action-dispatcher.js", () => ({ planAction: mocks.plan }));
 vi.mock("../src/adapters/compatibility-project.js", () => ({
   resolveCompatibilityProject: async () => "project",
 }));
@@ -28,6 +30,7 @@ import {
 const client = {} as SerialClientContext;
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.plan.mockResolvedValue({ status: "ready" });
   mocks.resolve.mockResolvedValue({
     environment: "esp",
     request: { path: "monitor", baudRate: 74880 },
@@ -142,4 +145,16 @@ it("retains the pinned default fault signatures", () => {
     "HardFault",
   ])
     expect(pattern.test(line)).toBe(true);
+});
+
+it("rejects a denied flash workflow before configuration or device discovery", async () => {
+  mocks.plan.mockResolvedValueOnce({
+    status: "deny",
+    reason: "operator denied upload",
+  });
+  await expect(
+    executeFlashVerificationCompatibility({}, client),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(mocks.resolve).not.toHaveBeenCalled();
+  expect(mocks.execute).not.toHaveBeenCalled();
 });

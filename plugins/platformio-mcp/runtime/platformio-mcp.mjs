@@ -110987,6 +110987,14 @@ async function executeFlashVerificationCompatibility(input, client, defaults = {
     defaults
   );
   const guard = createPolicyRevisionGuard(projectDir);
+  const permission = await planAction(
+    "flash_verification",
+    { projectDir },
+    { ...caller, workspaceDir: projectDir }
+  );
+  if (permission.status === "deny")
+    throw new PlatformIOError(permission.reason, "POLICY_DENIED");
+  guard();
   const resolved = await resolveMonitorRequest(
     {
       project_dir: projectDir,
