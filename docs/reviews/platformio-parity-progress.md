@@ -1092,3 +1092,8 @@ Added bounded raw framing for supported v0.2/v0.3 and v1.0-v1.3 envelopes, CRC32
 
 CI 35497560904 and 35497559003 exposed lexical versus canonical path mismatches on Windows and macOS. Firmware discovery now resolves the existing candidate before enforcing workspace containment, handling Windows short paths and symlinked temporary directories while rejecting outside targets. The failing focused regression, targeted lint and TypeScript passed locally. Full CI remains required on the corrected commit; no physical acceptance or publication is claimed.
 
+
+### Offline core-dump artifact loading
+
+Added bounded workspace-contained raw/base64 input loading, strict UTF-8 decoding, optional exact source-file SHA-256 enforcement and separate source/envelope identities. Four focused cases passed; targeted lint passed and TypeScript passed after correcting a Buffer generic inference mismatch. No analyzer execution, private retention, ELF correspondence or public-tool acceptance is claimed by this internal loader.
+
