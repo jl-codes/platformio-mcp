@@ -23,7 +23,7 @@ export async function buildPythonRuntime(destination) {
   const cliBuild = await build({...common, entryPoints:[path.join(root,"src/cli.ts")], outfile:path.join(output,"runtime/cli.mjs"), external:["serialport"]});
   // Preserve dynamic installer/validator paths used by the original CLI.
   const installerBuild = await build({...common, entryPoints:[path.join(root,"scripts/installers/index.js")], outfile:path.join(output,"scripts/installers/index.js"), external:["../validate-codex-plugin.mjs"]});
-  for (const name of ["validate-codex-plugin.mjs", "serial-runtime-contract.mjs"])
+  for (const name of ["validate-codex-plugin.mjs", "serial-runtime-contract.mjs", "setup-ppk2.py"])
     cpSync(path.join(root,"scripts",name),path.join(output,"scripts",name));
   cpSync(plugin,path.join(output,"plugins/platformio-mcp"),{recursive:true});
   mkdirSync(path.join(output,".agents/plugins"),{recursive:true});

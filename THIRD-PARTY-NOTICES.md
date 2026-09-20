@@ -45,3 +45,7 @@ SOFTWARE.
 ## MCP Registry validation schema (development tooling)
 
 `distribution/mcp-server.schema.json` is copied from the official Model Context Protocol Registry at the commit and path recorded in `distribution/mcp-schema-source.json`. Its SHA-256 is checked by the validator. The upstream license is preserved in `distribution/MCP-REGISTRY-LICENSE`; the schema is used for release validation and is not bundled in the npm runtime.
+
+## Optional PPK2 Python dependency
+
+The explicit `scripts/setup-ppk2.py` operator command installs `ppk2-api` 0.9.2 (PyPI metadata: GPLv2) and `pyserial` 3.5 into a separately created virtual environment. These Python dependencies are not bundled into the npm/plugin/wheel runtime. Installation downloads their published wheels, verifies pinned SHA-256 hashes, and preserves the wheel metadata and license files in that environment. Upstream sources and package metadata: https://github.com/IRNAS/ppk2-api-python and https://pypi.org/project/ppk2-api/0.9.2/; https://github.com/pyserial/pyserial and https://pypi.org/project/pyserial/3.5/.

@@ -134,3 +134,9 @@ Registration is not full debugger acceptance: physical ESP/Cortex probe evidence
 The internal PPK2 operation preflights `power_meter_command` (under `run_shell_command`) and either `power_meter_measure` (under `start_monitor`) or the independent `power_source` permission. Source permission is not inherited from upload, monitor, or host-command permissions. An operator must explicitly configure `power_source` in `approval_required` or `allow`; it is otherwise denied. Request-bound approvals include the meter and DUT resource identities, interpreter, measurement/source mode, voltage, software current-trip threshold, and duration. The current limit is a software trip, not a hardware current regulator.
 
 The retained operation owner cancels collection on policy revision and remains available for cleanup retries. This internal service is not yet the public `pio_power_profile` tool: trusted meter/DUT discovery, optional dependency setup, connection ownership, public routing, and physical acceptance remain incomplete.
+
+### Explicit optional PPK2 dependency setup
+
+Run `python -I scripts/setup-ppk2.py <new-environment-directory>` using a trusted host Python. The parent directory must exist; the environment directory must not. The command installs only hash-pinned binary wheels for `ppk2-api==0.9.2` and `pyserial==3.5` from PyPI, then checks isolated imports, package versions and required API methods without opening hardware. It writes `ppk2-setup.json` only after validation succeeds. Failed installations are left for operator inspection and cannot be reused by rerunning this command. Measurement requests never install dependencies automatically.
+
+The setup script is included in npm, plugin and Python runtime packaging. Its environment is not automatically trusted or selected by the still-incomplete public PPK2 adapter. Import success is dependency evidence only, not device identity, voltage/current approval, or physical acceptance.

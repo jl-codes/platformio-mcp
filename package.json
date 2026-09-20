@@ -21,6 +21,7 @@
     "plugins/platformio-mcp/tool-coverage.json",
     "web/dist",
     "scripts/installers",
+    "scripts/setup-ppk2.py",
     "scripts/validate-codex-plugin.mjs",
     "scripts/serial-runtime-contract.mjs",
     "LICENSE",

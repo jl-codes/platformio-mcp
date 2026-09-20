@@ -46,6 +46,7 @@ const SOURCE_SKILLS = [
 
 /** Binary assets copied from the repository's maintained artwork. */
 const ASSET_COPIES = [
+  ["scripts/setup-ppk2.py", "scripts/setup-ppk2.py"],
   ["docs/assets/pio_agent.png", "assets/icon.png"],
   ["docs/assets/pio_agent.png", "assets/logo.png"],
   ["docs/assets/pio_agent.png", "assets/logo-dark.png"],
