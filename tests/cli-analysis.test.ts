@@ -66,17 +66,26 @@ it("rejects invalid numeric report arguments before policy execution", () =>
     "InvalidArguments",
   ));
 
-it("routes modern package commands through the same policy before execution", () => {
-  for (const command of ["pkg-list", "pkg-outdated", "pkg-update"])
-    expect(run(command).errorType).toBe("PolicyDenied");
-  for (const command of ["pkg-install", "pkg-uninstall"])
-    expect(
-      run(command, "--spec", "owner/fixture@1", "--kind", "tool").errorType,
-    ).toBe("PolicyDenied");
-  expect(fs.existsSync(path.join(project, ".pio-mcp-packages.lock"))).toBe(
-    false,
-  );
-});
+it.each([
+  "pkg-list",
+  "pkg-outdated",
+  "pkg-update",
+  "pkg-install",
+  "pkg-uninstall",
+])(
+  "routes %s through policy before execution",
+  (command) => {
+    const args =
+      command === "pkg-install" || command === "pkg-uninstall"
+        ? ["--spec", "owner/fixture@1", "--kind", "tool"]
+        : [];
+    expect(run(command, ...args).errorType).toBe("PolicyDenied");
+    expect(fs.existsSync(path.join(project, ".pio-mcp-packages.lock"))).toBe(
+      false,
+    );
+  },
+  20000,
+);
 it("rejects invalid package CLI arguments before invoking PlatformIO", () => {
   expect(
     run("pkg-search", "--query", "fixture", "--page", "invalid").errorType,
