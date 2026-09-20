@@ -631,3 +631,7 @@ Foreground process failures now record task failure and close local log descript
 ### Legacy monitor termination identity
 
 New monitor registrations retain OS process-start identity beside the compatible numeric PID registry. Termination holds the registry lock, rejects unverified/reused identities without signalling, and confirms stale/absent process identity before removing tracking. Signal failure preserves records. stopMonitor releases a port claim only after tracked termination succeeds, and retains daemon state on termination errors. Updated the API process fixture to real EventEmitter lifecycle semantics. TypeScript compilation, 27 monitor/process/API tests, rebuilt plugin validation and npm validation pass. Legacy monitor records without identity fail closed while live; operator recovery/migration remains necessary. This does not yet establish atomic shared lease release, descendant custody, or full legacy lock migration.
+
+### Runtime floor and CI fixture correction
+
+Canonical and both npm alias engine declarations now require Node >=20, matching the native serial runtime, with the root lockfile and README aligned. The remaining build child-process fixture now uses EventEmitter lifecycle events and exit metadata. Both failed CI runs at ee1490d9 contained only the API/build proc.once fixture failures; those cases now pass locally. TypeScript checking, 28 targeted build/API/custody tests, and all npm package validations pass. Full new-head CI remains to be observed; no release has been published.

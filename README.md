@@ -192,7 +192,7 @@ Specifications:
 ## Development
 
 Prerequisites:
-- Node.js >= 18
+- Node.js >= 20 (including the bundled direct-serial runtime)
 - PlatformIO Core CLI ([install guide](https://platformio.org/install/cli))
 
 Local setup:
