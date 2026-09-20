@@ -1,0 +1,29 @@
+{
+  "isolatedCoreImport": true,
+  "coreVersion": "6.1.16",
+  "pythonVersion": "3.14.4",
+  "generationFragmentSha256": "d2ad750da2b8a37d3a9628827fd7889ddaeb7c86957d5b2bd2ba6a5a2ee25078",
+  "cases": [
+    {
+      "customInitialization": false,
+      "load": false,
+      "templateSha256": "6eb7bda0f7d49268f7230038be9b404644b97203145fc5b4c3a059874e80bf96"
+    },
+    {
+      "customInitialization": false,
+      "load": true,
+      "templateSha256": "daf47c1e21a2773b3ed8efaf8ab9456d2e1adcff21294608c403170fc5479242"
+    },
+    {
+      "customInitialization": true,
+      "load": false,
+      "templateSha256": "3da17a6fff4d41ed18def4c93dea4b772b6f1ec84fddeeb2233c6c263ad2f35d"
+    },
+    {
+      "customInitialization": true,
+      "load": true,
+      "templateSha256": "52a6cb4c5d91771e854ec60c09904200f447832d4b72fda5a353ca7c168dc4f8"
+    }
+  ],
+  "scope": "Installed Core generator and reveal_patterns with inert configuration fixtures; no resolver package hooks, backend, GDB process or hardware execution"
+}

@@ -16,8 +16,19 @@ import { parseDebugServerCommand } from "./debug-server-config.js";
 // Uses Core's configuration API, as in platformio-core v6.1.18 debug/cli.py.
 // Deliberately does not invoke _run, GDBClientProcess, or preload/upload helpers.
 const resolutionScript = String.raw`
-import contextlib, json, os, sys, tempfile
+import contextlib, importlib.util, json, os, site, sys, tempfile
 from types import SimpleNamespace
+# -I excludes user site packages; accept the host Python's conventional installation
+# only when it is disjoint from the project, without processing executable .pth files.
+if importlib.util.find_spec("platformio") is None:
+    user_site = os.path.realpath(site.getusersitepackages())
+    project = os.path.realpath(os.getcwd())
+    try:
+        common = os.path.commonpath([user_site, project])
+    except ValueError:
+        common = None
+    if common not in (user_site, project) and os.path.isdir(user_site):
+        sys.path.append(user_site)
 with contextlib.redirect_stdout(sys.stderr):
     from platformio.project.config import ProjectConfig
     from platformio.platform.factory import PlatformFactory
