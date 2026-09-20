@@ -3,7 +3,7 @@
 /** Internal Python bridge; callers must authorize and validate executable/cwd/argv before sending one JSON line. */
 export const WINDOWS_BACKEND_SUPERVISOR = String.raw`
 import ctypes as c, ctypes.wintypes as w
-import json, msvcrt, os, subprocess, sys, threading, time
+import base64, json, msvcrt, os, queue, subprocess, sys, threading, time
 
 k = c.WinDLL("kernel32", use_last_error=True)
 SIZE = c.c_size_t
@@ -45,8 +45,9 @@ get_exit = api("GetExitCodeProcess", w.BOOL, [w.HANDLE, c.POINTER(w.DWORD)])
 
 def check(ok):
     if not ok: raise c.WinError(c.get_last_error())
+emit_lock = threading.Lock()
 def emit(event, **fields):
-    print(json.dumps(dict(event=event, **fields)), flush=True)
+    with emit_lock: print(json.dumps(dict(event=event, **fields)), flush=True)
 
 job = None
 attributes = None
@@ -54,6 +55,8 @@ attributes_initialized = False
 process = ProcessInfo()
 launched = False
 confirmed = False
+input_write = output_read = output_write = None
+output_thread = None
 try:
     line = sys.stdin.buffer.readline(262145)
     if len(line) > 262144 or not line.endswith(b"\n"): raise ValueError("invalid request")
@@ -62,6 +65,12 @@ try:
     if not isinstance(executable, str) or not os.path.isabs(executable) or not isinstance(cwd, str) or not os.path.isabs(cwd): raise ValueError("invalid paths")
     if os.path.splitext(executable)[1].lower() != ".exe": raise ValueError("native executable required")
     if not isinstance(args, list) or len(args) > 256 or any(not isinstance(arg, str) or "\0" in arg for arg in args): raise ValueError("invalid arguments")
+    interactive = request.get("interactive", False)
+    if not isinstance(interactive, bool): raise ValueError("invalid interactive mode")
+    if interactive:
+        input_read, input_write = os.pipe()
+        output_read, output_write = os.pipe()
+        for fd in (input_read, input_write, output_read, output_write): msvcrt.setmode(fd, os.O_BINARY)
     command = subprocess.list2cmdline([executable] + args)
     if len(command) > 32766: raise ValueError("command too long")
     job = create_job(None, None); check(job)
@@ -75,32 +84,68 @@ try:
     jobs = (w.HANDLE * 1)(job)
     # PROC_THREAD_ATTRIBUTE_JOB_LIST makes assignment atomic with process creation.
     check(update_attribute(attributes, 0, 0x2000D, jobs, c.sizeof(jobs), None, None))
-    with open(os.devnull, "rb") as null_input:
+    with (os.fdopen(input_read, "rb") if interactive else open(os.devnull, "rb")) as null_input:
         input_handle = msvcrt.get_osfhandle(null_input.fileno())
-        output_handle = msvcrt.get_osfhandle(sys.stderr.fileno())
-        os.set_handle_inheritable(input_handle, True)
-        os.set_handle_inheritable(output_handle, True)
-        inherited = (w.HANDLE * 2)(input_handle, output_handle)
+        diagnostic_handle = msvcrt.get_osfhandle(sys.stderr.fileno())
+        output_handle = msvcrt.get_osfhandle(output_write) if interactive else diagnostic_handle
+        handles = list(dict.fromkeys([input_handle, output_handle, diagnostic_handle]))
+        for handle in handles: os.set_handle_inheritable(handle, True)
+        inherited = (w.HANDLE * len(handles))(*handles)
         check(update_attribute(attributes, 0, 0x20002, inherited, c.sizeof(inherited), None, None))
         startup = StartupEx(); startup.startup.cb = c.sizeof(startup)
         startup.startup.flags = 0x100  # STARTF_USESTDHANDLES
         startup.startup.stdin = input_handle
         startup.startup.stdout = output_handle
-        startup.startup.stderr = output_handle
+        startup.startup.stderr = diagnostic_handle
         startup.attributes = c.cast(attributes, c.c_void_p)
         try:
             check(create_process(executable, c.create_unicode_buffer(command), None, None, True,
                                  0x08080000, None, cwd, c.byref(startup), c.byref(process)))
             launched = True
         finally:
-            os.set_handle_inheritable(output_handle, False)
+            for handle in handles: os.set_handle_inheritable(handle, False)
+            if output_write is not None:
+                os.close(output_write); output_write = None
     close_handle(process.thread); process.thread = None
     emit("started", pid=process.pid)
     stop = threading.Event()
+    pending_input = queue.Queue(maxsize=32)
+    def write_child():
+        try:
+            while True:
+                data = pending_input.get()
+                while data:
+                    written = os.write(input_write, data)
+                    if written < 1: raise RuntimeError("stdin closed")
+                    data = data[written:]
+        except BaseException: stop.set()
+    def read_child():
+        try:
+            while True:
+                data = os.read(output_read, 1024)
+                if not data: break
+                emit("stdout", data=base64.b64encode(data).decode("ascii"))
+        except BaseException: stop.set()
     def watch_owner():
-        # EOF on parent death and any explicit stop byte both request shutdown.
-        try: sys.stdin.buffer.read(1)
+        try:
+            if not interactive:
+                sys.stdin.buffer.read(1)
+                return
+            while True:
+                line = sys.stdin.buffer.readline(100000)
+                if not line: break
+                if not line.endswith(b"\n"): raise ValueError("stdin message limit")
+                message = json.loads(line)
+                if message.get("event") != "stdin": raise ValueError("invalid stdin message")
+                data = base64.b64decode(message["data"], validate=True)
+                if not data or len(data) > 65536: raise ValueError("stdin byte limit")
+                pending_input.put_nowait(data)
+        except BaseException: pass
         finally: stop.set()
+    if interactive:
+        threading.Thread(target=write_child, daemon=True).start()
+        output_thread = threading.Thread(target=read_child, daemon=True)
+        output_thread.start()
     threading.Thread(target=watch_owner, daemon=True).start()
     while not stop.is_set():
         status = wait_process(process.process, 50)
@@ -117,6 +162,9 @@ try:
             confirmed = True
             break
         time.sleep(0.02)
+    if output_thread:
+        output_thread.join(1)
+        if output_thread.is_alive(): confirmed = False
     emit("stopped", cleanupConfirmed=confirmed, exitCode=None if exit_code.value == 259 else exit_code.value)
 except BaseException as error:
     # No command paths, arguments, environment or backend logs enter the control protocol.
@@ -126,6 +174,10 @@ finally:
     if process.process: close_handle(process.process)
     if attributes_initialized: delete_attributes(attributes)
     if job: close_handle(job)
+    for fd in (input_write, output_read, output_write):
+        if fd is not None:
+            try: os.close(fd)
+            except OSError: pass
 # A daemon stdin reader must not retain Python's buffered-IO lock during interpreter finalization.
 sys.stdout.flush()
 os._exit(0 if confirmed else 1)

@@ -1,8 +1,8 @@
 {
-  "observedAt": "2026-09-20T11:04:37.884Z",
+  "observedAt": "2026-09-20T11:57:39.462Z",
   "platform": "win32",
   "physicalDeviceContacted": false,
-  "supervisorSha256": "83c25830ac12dd6a42aaa29c6011f0de78ff983ec2439ab7204070227b4ce8b6",
+  "supervisorSha256": "e2adfb763e8abf88e41ef0fd424be9a7d3231c6f69989d709945a26e6d002bcc",
   "results": [
     {
       "mode": "stop",
@@ -24,6 +24,14 @@
     },
     {
       "mode": "node_owner",
+      "cleanupConfirmed": true,
+      "rootExited": true,
+      "descendantExited": true
+    },
+    {
+      "mode": "interactive_node_owner",
+      "inputEchoed": true,
+      "outputCannotForgeControl": true,
       "cleanupConfirmed": true,
       "rootExited": true,
       "descendantExited": true

@@ -24,6 +24,9 @@ await fs.writeFile(
   `import json, subprocess, sys, time
 child = subprocess.Popen([sys.executable, "-I", "-c", "import time; time.sleep(60)"])
 print(json.dumps(dict(descendantPid=child.pid)), flush=True)
+if sys.argv[1] == "interactive":
+    print(sys.stdin.readline().strip(), flush=True)
+    print(json.dumps(dict(event="stopped", cleanupConfirmed=True)), flush=True)
 if sys.argv[1] != "natural": time.sleep(60)
 `,
 );
@@ -133,6 +136,59 @@ try {
     });
   } finally {
     await owner.cleanupProcess();
+  }
+  if (process.platform === "win32") {
+    let output = "";
+    const interactive = new DebugBackendProcess({
+      pythonExecutable: python,
+      command: {
+        executable: python,
+        cwd: root,
+        arguments: ["-I", fixture, "interactive"],
+      },
+      onStdout: (data) => {
+        output += data.toString("utf8");
+      },
+    });
+    try {
+      await interactive.waitStarted();
+      await interactive.writeStdin(Buffer.from("42-stack-list-frames\n"));
+      const deadline = Date.now() + 5000;
+      while (
+        !output.includes('"cleanupConfirmed": true') &&
+        Date.now() < deadline
+      )
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      assert(
+        /42-stack-list-frames\r?\n/.test(output),
+        "interactive echo missing: " + output,
+      );
+      assert(
+        output.includes('"cleanupConfirmed": true'),
+        "fixture output missing",
+      );
+      assert.equal(
+        interactive.state().cleanupPending,
+        true,
+        "child output must not forge supervisor state",
+      );
+      const descendant = JSON.parse(output.split(/\r?\n/)[0]).descendantPid;
+      const pid = interactive.state().pid!;
+      await interactive.cleanupProcess();
+      assert.equal(interactive.state().cleanupPending, false);
+      for (const candidate of [pid, descendant])
+        assert.throws(() => process.kill(candidate, 0), { code: "ESRCH" });
+      results.push({
+        mode: "interactive_node_owner",
+        inputEchoed: true,
+        outputCannotForgeControl: true,
+        cleanupConfirmed: true,
+        rootExited: true,
+        descendantExited: true,
+      });
+    } finally {
+      await interactive.cleanupProcess();
+    }
   }
   const evidence = {
     observedAt: new Date().toISOString(),

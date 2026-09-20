@@ -11,6 +11,7 @@ import { POSIX_BACKEND_SUPERVISOR } from "./posix-backend-supervisor.js";
 export interface DebugBackendProcessOptions {
   pythonExecutable: string;
   command: DebugServerCommand;
+  onStdout?: (data: Buffer) => void; // Trusted interactive MI consumer; Windows supervision currently supports this channel.
   launch?: typeof spawn; // Trusted host/test dependency only.
 }
 
@@ -33,9 +34,17 @@ export class DebugBackendProcess {
   private outputBytes = 0;
   private backendPid?: number;
   private cleanupAttempt?: Promise<void>;
+  private readonly onStdout?: (data: Buffer) => void;
+  private interactiveBytes = 0;
 
   /** Spawn only after host-code/target authorization, executable trust and probe custody are established. */
   constructor(options: DebugBackendProcessOptions) {
+    if (options.onStdout && process.platform !== "win32")
+      throw new PlatformIOError(
+        "Interactive debug supervision is not implemented on this host yet.",
+        "DEBUG_INTERACTIVE_UNSUPPORTED",
+      );
+    this.onStdout = options.onStdout;
     if (
       !path.isAbsolute(options.pythonExecutable) ||
       /[\x00-\x1f\x7f]/.test(options.pythonExecutable) ||
@@ -110,7 +119,35 @@ export class DebugBackendProcess {
       }
       this.resolveClosed();
     });
-    this.child.stdin.write(JSON.stringify(command) + "\n");
+    this.child.stdin.write(
+      JSON.stringify({ ...command, interactive: Boolean(this.onStdout) }) +
+        "\n",
+    );
+  }
+
+  /** Send bounded stdin data through the supervisor, never through a shell or its stop channel. */
+  writeStdin(data: Buffer): Promise<void> {
+    if (
+      !this.onStdout ||
+      !this.started ||
+      this.closed ||
+      this.failed ||
+      !data.length ||
+      data.length > 65536
+    )
+      return Promise.reject(
+        new PlatformIOError(
+          "Interactive debugger input is unavailable or exceeds its limit.",
+          "DEBUG_INTERACTIVE_INPUT_INVALID",
+        ),
+      );
+    return new Promise((resolve, reject) => {
+      this.child.stdin.write(
+        JSON.stringify({ event: "stdin", data: data.toString("base64") }) +
+          "\n",
+        (error) => (error ? reject(error) : resolve()),
+      );
+    });
   }
 
   /** Await process creation, not protocol readiness; failures leave this cleanup owner available. */
@@ -186,8 +223,7 @@ export class DebugBackendProcess {
   }
 
   private readControl(data: Buffer) {
-    this.controlBytes += data.length;
-    if (this.controlBytes > 16384) {
+    if (this.protocol.length + data.length > 2 * 1024 * 1024) {
       this.protocolFailed = true;
       this.fail();
       return;
@@ -200,6 +236,27 @@ export class DebugBackendProcess {
       try {
         const event = JSON.parse(line);
         if (this.terminal) throw new Error("Control event after completion");
+        if (event.event === "stdout") {
+          if (
+            !this.onStdout ||
+            !this.started ||
+            typeof event.data !== "string" ||
+            event.data.length > 2048
+          )
+            throw new Error("Invalid interactive output");
+          const bytes = Buffer.from(event.data, "base64");
+          if (!bytes.length || bytes.toString("base64") !== event.data)
+            throw new Error("Invalid output encoding");
+          this.interactiveBytes += bytes.length;
+          if (this.interactiveBytes > 1024 * 1024) {
+            this.fail();
+            continue;
+          }
+          this.onStdout(bytes);
+          continue;
+        }
+        this.controlBytes += Buffer.byteLength(line) + 1;
+        if (this.controlBytes > 16384) throw new Error("Control output limit");
         if (
           event.event === "started" &&
           !this.started &&
@@ -233,6 +290,10 @@ export class DebugBackendProcess {
         this.protocolFailed = true;
         this.fail();
       }
+    }
+    if (this.protocol.length > 16384) {
+      this.protocolFailed = true;
+      this.fail();
     }
   }
 
