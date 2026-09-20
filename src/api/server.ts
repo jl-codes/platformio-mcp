@@ -16,6 +16,7 @@
  * - /api/spooler/*: Manage background serial telemetry listeners
  * - /api/logs: Retrieve full background task log streams
  */
+import { registerShutdownTask } from "../utils/shutdown-coordinator.js";
 import express from "express";
 import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
 import { PlatformIOError } from "../utils/errors.js";
@@ -1794,8 +1795,7 @@ export function startPortalServer(defaultPort = 8080) {
     if (closed) return;
     closed = true;
     clearInterval(hardwarePollTimer);
-    process.off("SIGINT", cleanup);
-    process.off("SIGTERM", cleanup);
+    unregisterShutdown();
     await new Promise<void>((resolve) => {
       io.close(() => resolve());
     });
@@ -1808,12 +1808,7 @@ export function startPortalServer(defaultPort = 8080) {
     activePortalStatus.port = 0;
     activePortalStatus.browserOpened = false;
   };
-  const cleanup = () => {
-    void close().finally(() => process.exit(0));
-  };
-
-  process.on("SIGINT", cleanup);
-  process.on("SIGTERM", cleanup);
+  const unregisterShutdown = registerShutdownTask(close);
 
   return { app, httpServer, io, authToken: PORTAL_AUTH_TOKEN, close };
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { registerShutdownTask } from "./utils/shutdown-coordinator.js";
 import {
   executeDeviceCompatibility,
   withDeviceCompatibility,
@@ -1540,6 +1541,13 @@ const toolDefinitions: ToolDefinition[] = [
 
 // stdio serves one trusted client connection; owner capabilities never come from tool arguments.
 const serialClient = new SerialClientContext();
+registerShutdownTask(async () => {
+  const sessions = await serialClient.close();
+  if (sessions.some(session => session.cleanupPending)) {
+    await logDiag("Serial shutdown cleanup remains pending; device ownership is retained.");
+    throw new Error("Serial shutdown closure unconfirmed");
+  }
+});
 server.onclose = () => {
   void serialClient
     .close()

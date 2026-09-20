@@ -764,3 +764,9 @@ All five alias wheels built with pinned tooling in an isolated local environment
 Added `aliases:sync` and `aliases:check` for all seven functional npm alias packages (including scoped candidates). The synchronizer validates the full edit set, updates only version/exact canonical dependency pins, and never promotes candidates or changes authority flags. The release gate checks alignment; current version 3.0.0 passed without edits. Python versions already derive from the canonical manifest.
 
 CI run 35486482416 exited 137 on macOS immediately after process-manager cleanup logged emergency termination of fixture PID 20000. Inspection found that cleanup restored real `process.kill` before calling termination and did not mock `tree-kill`. Corrected test isolation to mock tree termination and retain the process mock through cleanup. All three focused process-manager checks passed locally. This addresses the observed termination path; a subsequent completed CI run is still needed to establish host-wide success.
+
+### Coordinated serial and dashboard shutdown
+
+Replaced independent dashboard signal exit with shared shutdown coordination. SIGINT/SIGTERM now await both dashboard closure and owned serial-session cleanup, coalesce repeated signals, report failure when serial closure remains unconfirmed, and bound an unresponsive shutdown at 15 seconds with failure status. Unconfirmed device leases are not released by this coordinator. Three focused coordinator checks passed and TypeScript passed; the plugin bundle was rebuilt. Native signal delivery and real transport shutdown acceptance remain pending.
+
+Read-only deployment access check: local `npm whoami` returned HTTP 401; GitHub reported no repository environments and no repository variables. Thus local npm authority and protected PyPI/MCP/GHCR publisher configuration are not established. No publication was attempted. These external prerequisites do not prevent continuing implementation.

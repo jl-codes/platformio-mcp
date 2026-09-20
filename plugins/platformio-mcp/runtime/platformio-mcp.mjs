@@ -92027,6 +92027,51 @@ var require_ip_address = __commonJS({
   }
 });
 
+// src/utils/shutdown-coordinator.ts
+var ShutdownCoordinator = class {
+  tasks = /* @__PURE__ */ new Set();
+  closing;
+  /** Register one subsystem cleanup and return its disposal function. */
+  register(task) {
+    this.tasks.add(task);
+    return () => {
+      this.tasks.delete(task);
+    };
+  }
+  /** Run every registered cleanup once; any rejected cleanup makes shutdown unsuccessful. */
+  close() {
+    if (!this.closing) {
+      this.closing = Promise.allSettled(
+        [...this.tasks].map((task) => Promise.resolve().then(task))
+      ).then(
+        (results) => results.some((result) => result.status === "rejected") ? 1 : 0
+      );
+    }
+    return this.closing;
+  }
+};
+var shutdown = new ShutdownCoordinator();
+var installed = false;
+function registerShutdownTask(task) {
+  if (!installed) {
+    installed = true;
+    let handling = false;
+    const handle = () => {
+      if (handling) return;
+      handling = true;
+      const deadline = setTimeout(() => process.exit(1), 15e3);
+      deadline.unref();
+      void shutdown.close().then((code) => {
+        clearTimeout(deadline);
+        process.exit(code);
+      });
+    };
+    process.on("SIGINT", handle);
+    process.on("SIGTERM", handle);
+  }
+  return shutdown.register(task);
+}
+
 // src/core/devices/port-diagnostics.ts
 init_errors();
 import fs from "node:fs/promises";
@@ -98650,15 +98695,15 @@ var declarationSchema = external_exports.object({
 }).strict();
 function auditDependencies(declaredInput, installedInput) {
   const declared = external_exports.array(declarationSchema).max(2048).parse(declaredInput);
-  const installed = external_exports.array(librarySchema).max(2048).parse(installedInput);
-  if (installed.reduce((sum, lib) => sum + lib.dependencies.length, 0) > 16384)
+  const installed2 = external_exports.array(librarySchema).max(2048).parse(installedInput);
+  if (installed2.reduce((sum, lib) => sum + lib.dependencies.length, 0) > 16384)
     throw new PlatformIOError(
       "Dependency graph exceeds 16384 edges.",
       "DEPENDENCY_LIMIT"
     );
   const issues = [];
   const groups = /* @__PURE__ */ new Map();
-  for (const lib of installed) {
+  for (const lib of installed2) {
     const key = lib.name.toLowerCase();
     groups.set(key, [...groups.get(key) ?? [], lib]);
   }
@@ -98685,7 +98730,7 @@ function auditDependencies(declaredInput, installedInput) {
         paths: [],
         message: "Registry declaration has no version constraint; fresh resolution can change."
       });
-    if (spec.name && !installed.some((lib) => matches(spec, lib)))
+    if (spec.name && !installed2.some((lib) => matches(spec, lib)))
       issues.push({
         severity: "warning",
         kind: "not_installed",
@@ -98696,11 +98741,11 @@ function auditDependencies(declaredInput, installedInput) {
       });
   }
   const dependedOn = new Set(
-    installed.flatMap(
+    installed2.flatMap(
       (lib) => lib.dependencies.map((dep) => dep.toLowerCase())
     )
   );
-  for (const lib of installed)
+  for (const lib of installed2)
     if (lib.source === "libdeps" && !["unity", "googletest", "doctest", "catch2"].includes(
       lib.name.toLowerCase()
     ) && !declared.some((spec) => matches(spec, lib)) && !dependedOn.has(lib.name.toLowerCase()) && !dependedOn.has(lib.directoryName.toLowerCase()))
@@ -112402,8 +112447,7 @@ function startPortalServer(defaultPort = 8080) {
     if (closed) return;
     closed = true;
     clearInterval(hardwarePollTimer);
-    process.off("SIGINT", cleanup);
-    process.off("SIGTERM", cleanup);
+    unregisterShutdown();
     await new Promise((resolve) => {
       io2.close(() => resolve());
     });
@@ -112416,11 +112460,7 @@ function startPortalServer(defaultPort = 8080) {
     activePortalStatus.port = 0;
     activePortalStatus.browserOpened = false;
   };
-  const cleanup = () => {
-    void close().finally(() => process.exit(0));
-  };
-  process.on("SIGINT", cleanup);
-  process.on("SIGTERM", cleanup);
+  const unregisterShutdown = registerShutdownTask(close);
   return { app, httpServer, io: io2, authToken: PORTAL_AUTH_TOKEN, close };
 }
 
@@ -114956,6 +114996,13 @@ var toolDefinitions = [
   }
 ];
 var serialClient = new SerialClientContext();
+registerShutdownTask(async () => {
+  const sessions = await serialClient.close();
+  if (sessions.some((session) => session.cleanupPending)) {
+    await logDiagnostic("Serial shutdown cleanup remains pending; device ownership is retained.");
+    throw new Error("Serial shutdown closure unconfirmed");
+  }
+});
 server.onclose = () => {
   void serialClient.close().then((sessions) => {
     if (sessions.some((session) => session.cleanupPending))
