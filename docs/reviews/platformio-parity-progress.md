@@ -1754,3 +1754,14 @@ One Windows CI duplicate timed out starting the fake-converter harness while the
 The generated esptool capture action replaces the lazy `$UPLOADCMD` at execution time, records final command text, application/extra-image offsets and hashes, ELF, environment, compiler selection and a hash of effective project settings. It returns status 86 so neither the original write command nor subsequent upload actions execute. The hook writes a private exclusive record, bounds reads and rejects changed/nonregular artifacts. Its final command text still needs platform-aware parsing and host validation before retained-path execution is wired in.
 
 The stdlib-only hook harness passed. The actual installed SCons 4.8.1 lazy/list-action engine also captured synthetic inputs, returned status 86 and skipped later actions; `upload-capture-scons-evidence.json` records implementation identity and limitations. No PlatformIO build or hardware ran. The manifest layer now permits external image files only under explicit host-verified registered package roots; the default remains project-contained, and retained package images survive package removal. Eleven manifest tests, TypeScript and scoped lint passed. These additions do not establish completed serial upload identity or physical acceptance.
+
+### Capture record ingestion
+
+The host can now consume the bounded private SCons capture record through
+`retainUploadCapture`, reject a different project/environment/compiler, and retain
+the exact argv image operands through the existing manifest archive. Toolchain
+identity and allowed package roots come from host context, not record fields.
+Focused regression confirms context rejection creates no archive and accepted
+retention survives source removal. This adapter does not validate the executable,
+port or options, grant permission, launch an uploader, or establish hardware parity;
+those live workflow connections remain required.

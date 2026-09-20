@@ -176,3 +176,55 @@ it("allows external boot images only under explicitly trusted package roots", as
   await fs.rm(packageRoot, { recursive: true });
   await saved.verify();
 });
+
+it("binds a capture record to host context before retaining its exact upload operands", async () => {
+  const { retainUploadCapture } =
+    await import("../src/core/analysis/upload-capture-record.js");
+  const captureDirectory = path.join(root, "capture");
+  await fs.mkdir(captureDirectory);
+  const recordPath = path.join(captureDirectory, "selection.json");
+  const argv = [
+    "python",
+    "esptool.py",
+    "write_flash",
+    ...input.images.flatMap((image) => [String(image.offset), image.path]),
+  ];
+  const record = {
+    schemaVersion: 1,
+    captureOnly: true,
+    commandLine: "captured display text",
+    argv,
+    projectDir: project,
+    environment: input.environment,
+    compiler: "verified compiler",
+    buildSettingsSha256: input.buildSettingsSha256,
+    elf: { ...input.elf, size: (await fs.stat(input.elf.path)).size },
+    images: await Promise.all(
+      input.images.map(async (image) => ({
+        ...image,
+        size: (await fs.stat(image.path)).size,
+      })),
+    ),
+  };
+  await fs.writeFile(recordPath, JSON.stringify(record));
+  const context = {
+    captureDirectory,
+    projectDir: project,
+    environment: input.environment,
+    compiler: record.compiler,
+    toolchain: input.toolchain,
+  };
+  await expect(
+    retainUploadCapture(
+      recordPath,
+      { ...context, environment: "other" },
+      archive,
+    ),
+  ).rejects.toMatchObject({ code: "UPLOAD_CAPTURE_CONTEXT_CHANGED" });
+  await expect(fs.stat(archive)).rejects.toMatchObject({ code: "ENOENT" });
+  const saved = await retainUploadCapture(recordPath, context, archive);
+  expect(saved.manifest.elfCorrespondence).toBe("embedded_hash_match");
+  expect(saved.arguments).not.toContain(input.images[0].path);
+  await fs.rm(project, { recursive: true });
+  await saved.verify();
+});
