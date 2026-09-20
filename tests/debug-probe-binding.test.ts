@@ -75,3 +75,12 @@ it("rejects unrelated backend executables and nonlocal endpoints", () => {
       port: 3333,
     });
 });
+
+it.each(["-cinit", "-cadapter serial other", "--command=init"])(
+  "rejects attached command option %s",
+  (option) => {
+    expect(() =>
+      bindOpenOcdProbe({ ...command, arguments: [option] }, probe, 3333),
+    ).toThrow();
+  },
+);

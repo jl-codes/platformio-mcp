@@ -66,13 +66,15 @@ export function bindOpenOcdProbe(
   for (let index = 0; index < normalized.arguments.length; index++) {
     const option = normalized.arguments[index];
     if (
-      option === "-c" ||
+      option.startsWith("-c") ||
       option === "--command" ||
       option.startsWith("--command=")
     ) {
       const text = option.startsWith("--command=")
         ? option.slice(10)
-        : normalized.arguments[++index];
+        : option.startsWith("-c") && option.length > 2
+          ? option.slice(2)
+          : normalized.arguments[++index];
       if (
         text === undefined ||
         /(?:^|[;\n])\s*(?:init|reset|halt|resume|program|flash|adapter\s+serial|ftdi_serial|hla_serial|cmsis_dap_serial|jlink\s+serial|st-link\s+serial)(?:\s|$)/i.test(
