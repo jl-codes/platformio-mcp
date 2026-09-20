@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { executeUploadCompatibility } from "./adapters/upload-compat.js";
 import { executeNamedTarget, executeRunTargetAction } from "./tools/run-target.js";
 import { registerShutdownTask } from "./utils/shutdown-coordinator.js";
 import {
@@ -1637,6 +1638,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     packageCompatibility ||
     projectCompatibility ||
     name === "pio_run_target" ||
+    name === "pio_upload" ||
     dependencyCompatibility ||
     boardCompatibility ||
     deviceCompatibility;
@@ -1696,6 +1698,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             dispatch: async (tool, parameters) =>
               tool === "run_target"
                 ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized)
+                : tool === "pio_upload"
+                  ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
                 : tool === "pio_run_target"
                   ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
                 : tool === "deps_check"

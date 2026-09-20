@@ -221,6 +221,10 @@
     ],
     "deps_check": [
       "platformio-debug"
+    ],
+    "run_target": [
+      "pio-manager",
+      "platformio-debug"
     ]
   }
 }

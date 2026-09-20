@@ -192,5 +192,29 @@ export function withProjectCompatibility<TResult>(
     },
     handler: (args, context) => context.dispatch("pio_run_target", args),
   });
+  const upload = base.get("upload_firmware");
+  if (!upload || result.has("pio_upload"))
+    throw new Error("Invalid firmware upload compatibility registry");
+  result.set("pio_upload", {
+    ...upload,
+    name: "pio_upload",
+    description:
+      "Build and upload firmware through shared upload permissions and caller-owned serial cleanup.",
+    inputSchema: {
+      type: "object",
+      required: [],
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], default: null },
+        env: { type: ["string", "null"], default: null },
+        upload_port: { type: ["string", "null"], default: null },
+        stop_open_sessions: { type: "boolean", default: false },
+        approval_id: { type: "string" },
+        config_approval_id: { type: "string" },
+        selection_approval_id: { type: "string" },
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_upload", args),
+  });
   return result;
 }

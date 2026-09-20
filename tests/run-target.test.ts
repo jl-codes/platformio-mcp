@@ -9,6 +9,7 @@ import {
   resolveTargetSerialSelection,
 } from "../src/tools/run-target.js";
 import { inspectPortDiagnostics } from "../src/core/devices/port-diagnostics.js";
+import { executeUploadCompatibility } from "../src/adapters/upload-compat.js";
 import { executeProjectInspection } from "../src/tools/project-inspection.js";
 import { listDevicesCore } from "../src/core/devices.js";
 import { readCommandOutput } from "../src/utils/command-log.js";
@@ -348,4 +349,25 @@ it("retains a failed upload result when optional port diagnosis fails", async ()
     log_path: "retained.log",
     port_diagnosis: { port: "COM9", diagnosis_status: "unavailable" },
   });
+});
+
+it("upload compatibility cannot inject a different target", () => {
+  expect(() =>
+    executeUploadCompatibility(
+      {
+        project_dir: project,
+        target: "erase",
+      },
+      {} as SerialClientContext,
+    ),
+  ).toThrow();
+  expect(buildTarget).not.toHaveBeenCalled();
+});
+it("upload compatibility obeys the same upload permission before session cleanup", async () => {
+  const client = { run: vi.fn() } as unknown as SerialClientContext;
+  await expect(
+    executeUploadCompatibility({ project_dir: project }, client),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(client.run).not.toHaveBeenCalled();
+  expect(buildTarget).not.toHaveBeenCalled();
 });

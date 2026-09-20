@@ -1015,3 +1015,7 @@ Added CLI run-target with strict flags and canonical executor mapping, without a
 ### Target port-failure reporting
 
 Failed device targets now expose the classified port error and an actionable diagnosis while preserving exit code, log path and output. Host port observations require separate list_devices permission; denied/unavailable diagnosis leaves the original execution failure intact and unknown presence remains null. Fifteen focused workflow checks plus the new full-executor failed-upload/diagnostic-failure regression passed; TypeScript passed. No hardware ran. Full network/probe/artifact and physical parity remains unfinished.
+
+### Firmware upload compatibility and registry inventories
+
+Registered pio_upload as a strict fixed-upload adapter over the shared target executor, preserving the existing canonical upload_firmware tool. Two focused cases verified target injection rejection and upload-policy denial before session effects; TypeScript passed. Canonical inventory remains 55; compatibility inventory becomes 85 (30 optional aliases). CI 35494668456 exposed stale 54-tool fixtures, an omitted run_target registry fixture and missing plugin skill coverage; those inventories now include the new canonical tool. Network/probe destinations, complete artifact binding and physical acceptance remain outstanding.

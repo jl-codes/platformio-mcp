@@ -101524,6 +101524,19 @@ async function diagnoseTargetPortFailure(port, code, projectDir, caller) {
   }
 }
 
+// src/adapters/upload-compat.ts
+var UploadCompatibilitySchema = RunTargetSchema.omit({ target: true });
+function executeUploadCompatibility(input, client, defaults = {}, caller = {}, onAuthorized) {
+  const params = UploadCompatibilitySchema.parse(input);
+  return executeNamedTarget(
+    { ...params, target: "upload" },
+    client,
+    defaults,
+    caller,
+    onAuthorized
+  );
+}
+
 // src/utils/shutdown-coordinator.ts
 var ShutdownCoordinator = class {
   tasks = /* @__PURE__ */ new Set();
@@ -102803,6 +102816,29 @@ function withProjectCompatibility(base2) {
       }
     },
     handler: (args, context) => context.dispatch("pio_run_target", args)
+  });
+  const upload = base2.get("upload_firmware");
+  if (!upload || result.has("pio_upload"))
+    throw new Error("Invalid firmware upload compatibility registry");
+  result.set("pio_upload", {
+    ...upload,
+    name: "pio_upload",
+    description: "Build and upload firmware through shared upload permissions and caller-owned serial cleanup.",
+    inputSchema: {
+      type: "object",
+      required: [],
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], default: null },
+        env: { type: ["string", "null"], default: null },
+        upload_port: { type: ["string", "null"], default: null },
+        stop_open_sessions: { type: "boolean", default: false },
+        approval_id: { type: "string" },
+        config_approval_id: { type: "string" },
+        selection_approval_id: { type: "string" }
+      }
+    },
+    handler: (args, context) => context.dispatch("pio_upload", args)
   });
   return result;
 }
@@ -117076,7 +117112,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name2
   );
-  const compatibilityTool = packageCompatibility || projectCompatibility || name2 === "pio_run_target" || dependencyCompatibility || boardCompatibility || deviceCompatibility;
+  const compatibilityTool = packageCompatibility || projectCompatibility || name2 === "pio_run_target" || name2 === "pio_upload" || dependencyCompatibility || boardCompatibility || deviceCompatibility;
   const projectInspection = [
     "project_envs",
     "project_metadata",
@@ -117118,7 +117154,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const result = await mcpContext.run(
         { activityId, targetProjectDir },
         () => registeredTool.handler(args, {
-          dispatch: async (tool, parameters) => tool === "run_target" ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized) : tool === "pio_run_target" ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (deviceCompatibility ? executeDeviceCompatibility.bind(null, serialClient) : boardCompatibility ? executeBoardCompatibility : dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
+          dispatch: async (tool, parameters) => tool === "run_target" ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized) : tool === "pio_upload" ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_run_target" ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (deviceCompatibility ? executeDeviceCompatibility.bind(null, serialClient) : boardCompatibility ? executeBoardCompatibility : dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
             tool,
             parameters,
             {
