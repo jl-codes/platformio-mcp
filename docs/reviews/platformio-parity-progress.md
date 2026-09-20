@@ -1979,3 +1979,12 @@ eight are candidates and two are existing published alias identities. Both new
 candidate tarballs packed successfully, and four publication identity/inventory checks
 passed. Coverage regenerated from existing observations without registry claims.
 Both CI runs 35529268929 and 35529266740 passed on preceding 2644a28e.
+
+### 2026-09-20: current distribution validation and pre-merge evidence trigger
+
+Started non-publishing Release run 35529831694 on 6a2e9566 for the prepared 3.1.0
+wheel/container set; all four publisher inputs are explicitly false. The run was
+observed actively building wheels. GitHub rejected manual config-acceptance dispatch
+with HTTP 404 because the new workflow is absent from the default branch. Added a
+read-only, path-filtered pull_request trigger so relevant changes produce the POL-05
+packet before merge. No merge, tag, environment or publishing permission was changed.

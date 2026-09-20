@@ -134,7 +134,7 @@ The manual **Assemble parity acceptance** workflow now provides the Actions arti
 
 ### Installer evidence producer
 
-The manual **Installer configuration acceptance** workflow runs the complete Codex
+The **Installer configuration acceptance** workflow (path-filtered pull requests, plus manual dispatch after it reaches the default branch) runs the complete Codex
 configuration installer regression suite and emits one `platformio-parity-evidence`
 packet for `POL-05`. It requires a clean tracked checkout and unchanged commit, retains
 the actual JSON test report, command output and tested installer/test sources, and
