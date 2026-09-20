@@ -437,3 +437,29 @@ it("revokes a scoped memory capture when policy changes during collection", asyn
   f.policy({ profile: "read_only" });
   await assertion;
 });
+
+it("keeps explicit read grants separate from opening grants", async () => {
+  const f = fixture();
+  f.policy({
+    profile: "monitor_only",
+    overrides: {
+      approval_required: ["serial_session_start", "serial_session_read"],
+    },
+  });
+  const open = (approvalId?: string, readApprovalId?: string) =>
+    f.service.run({ approvalId, readApprovalId }, () =>
+      f.service.sessions.start(f.owner, f.request),
+    );
+  const openId = await approval(open());
+  approveRequest(openId);
+  await approval(open(undefined, openId));
+  const started = await open(openId);
+  const capture = (readApprovalId?: string) =>
+    f.service.run({ approvalId: openId, readApprovalId }, () =>
+      f.service.captureMemory(f.owner, started.sessionId, { seconds: 0 }),
+    );
+  const readId = await approval(capture());
+  approveRequest(readId);
+  expect(await capture(readId)).toMatchObject({ ok: true });
+  await approval(capture(readId));
+});

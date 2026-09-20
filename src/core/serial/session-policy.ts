@@ -30,6 +30,7 @@ import {
 /** Trusted adapter context; only a scoped approval ID may originate in validated public arguments. */
 export interface SerialPolicyRequestContext {
   approvalId?: string;
+  readApprovalId?: string; // Separate read grant for composite open/read operations.
   discoveryApprovalId?: string; // Separate one-use list_devices grant.
   caller?: PolicyEvaluationContext;
 }
@@ -243,7 +244,11 @@ export class PolicySerialSessionService {
     context: SerialPolicyRequestContext,
     execute: () => Promise<T>,
   ): Promise<T> {
-    for (const id of [context.approvalId, context.discoveryApprovalId]) {
+    for (const id of [
+      context.approvalId,
+      context.readApprovalId,
+      context.discoveryApprovalId,
+    ]) {
       if (
         id !== undefined &&
         (typeof id !== "string" || !id || id.length > 256)
@@ -256,6 +261,7 @@ export class PolicySerialSessionService {
     return this.context.run(
       Object.freeze({
         approvalId: context.approvalId,
+        readApprovalId: context.readApprovalId,
         discoveryApprovalId: context.discoveryApprovalId,
         caller: Object.freeze({ ...context.caller }),
       }),
@@ -302,7 +308,10 @@ export class PolicySerialSessionService {
       {
         ...request,
         port: request.path,
-        approvalId: context.approvalId,
+        approvalId:
+          request.operation === "read"
+            ? (context.readApprovalId ?? context.approvalId)
+            : context.approvalId,
         ...(scopedRead ? { memoryCapture: scope.input } : {}),
       },
       {
