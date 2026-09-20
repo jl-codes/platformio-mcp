@@ -607,3 +607,7 @@ Trusted serial request contexts now accept a separate readApprovalId; opening an
 ### Discovered startup preflight boundary
 
 Added a trusted, deadline-bounded preflight hook after endpoint/USB identity resolution and before transport construction or device-lease acquisition. The prepared request and identity metadata are frozen; ownership stop generation is checked again after preflight. Existing startup still revalidates physical identity before opening. TypeScript checking and 49 session/policy tests pass, including a preflight approval challenge with no transport and owner cancellation during preflight. Composite non-consuming approval planning and transient capture wiring remain incomplete; this hook alone does not fix one-shot approval retries.
+
+### Non-consuming permission planning
+
+Added planAction/planPolicy as explicit internal planning entrypoints. They use the same concrete-operation policy and approval scope but return ready rather than allow, inspect matching unexpired grants without consuming them, and skip scheduled write reservations and execution audit events. Missing grants create normal pending challenges. Execution remains dispatchAuthorizedAction/evaluatePolicy and consumes grants/reservations normally; no caller argument enables planning mode. TypeScript compilation and 82 policy, approval, dispatcher, automation and serial-policy tests pass. Rebuilt plugin and npm package validation pass (560 canonical package files). Composite transient capture orchestration is still pending.

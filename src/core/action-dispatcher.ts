@@ -3,7 +3,11 @@
  * Provides dispatchAuthorizedAction so adapters cannot execute callbacks before policy allows them.
  */
 import { policyNamesForOperation, actionRiskLevels } from "./action-catalog.js";
-import { evaluatePolicy } from "./policy/evaluate-policy.js";
+import {
+  evaluatePolicy,
+  planPolicy,
+  type PolicyPlan,
+} from "./policy/evaluate-policy.js";
 import type {
   PolicyDecision,
   PolicyEvaluationContext,
@@ -53,4 +57,19 @@ export async function authorizeAction(
     ...context,
     operationName: name,
   });
+}
+
+/** Inspect a concrete operation's approval readiness; callers must still dispatch before executing. */
+export async function planAction(
+  name: string,
+  args: Record<string, unknown>,
+  context: PolicyEvaluationContext,
+): Promise<PolicyPlan> {
+  const action =
+    name === "start_pio_home"
+      ? "run_shell_command"
+      : policyNamesForOperation(name).at(-1)!;
+  if (!Object.hasOwn(actionRiskLevels, action))
+    throw new PlatformIOError(`Unknown operation: ${name}`, "UNKNOWN_ACTION");
+  return planPolicy(action, args, { ...context, operationName: name });
 }

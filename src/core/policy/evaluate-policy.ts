@@ -2,7 +2,11 @@
 import { policyNamesForOperation } from "../action-catalog.js";
 import path from "node:path";
 import { actionRiskLevels, deniedActionPatterns } from "./default-policy.js";
-import { createApprovalRequest, consumeApproval } from "./approvals.js";
+import {
+  createApprovalRequest,
+  consumeApproval,
+  getApproval,
+} from "./approvals.js";
 import { appendAuditEvent } from "./audit-log.js";
 import {
   reserveAutomationWriteBudget,
@@ -60,10 +64,38 @@ function decision(
   };
 }
 
+/** Authorize execution, consuming any matching one-use grant and scheduled write reservation. */
 export async function evaluatePolicy(
   actionName: string,
   args: Record<string, unknown>,
   context: PolicyEvaluationContext = {},
+): Promise<PolicyDecision> {
+  return evaluatePolicyInternal(actionName, args, context, false);
+}
+
+/** Planning evidence is deliberately not an execution authorization. */
+export type PolicyPlan = Omit<PolicyDecision, "status"> & {
+  status: "ready" | "deny" | "requires_approval";
+};
+
+/** Check policy and create missing challenges without consuming grants or reserving hardware writes. */
+export async function planPolicy(
+  actionName: string,
+  args: Record<string, unknown>,
+  context: PolicyEvaluationContext = {},
+): Promise<PolicyPlan> {
+  const result = await evaluatePolicyInternal(actionName, args, context, true);
+  return {
+    ...result,
+    status: result.status === "allow" ? "ready" : result.status,
+  };
+}
+
+async function evaluatePolicyInternal(
+  actionName: string,
+  args: Record<string, unknown>,
+  context: PolicyEvaluationContext,
+  planning: boolean,
 ): Promise<PolicyDecision> {
   const action = normalizeActionName(actionName);
   const riskLevel = riskForAction(action);
@@ -141,7 +173,7 @@ export async function evaluatePolicy(
           ? error.message
           : "Unattended automation scope was denied.";
       const denied = decision("deny", reason, action, riskLevel);
-      if (policy.audit_all_agent_actions) {
+      if (!planning && policy.audit_all_agent_actions) {
         appendAuditEvent({
           action,
           status: "denied",
@@ -157,7 +189,8 @@ export async function evaluatePolicy(
   const reserveScheduledWrite = async (): Promise<
     PolicyDecision | undefined
   > => {
-    if (!scheduledScopeInput || !scheduledWriteOperation) return undefined;
+    if (planning || !scheduledScopeInput || !scheduledWriteOperation)
+      return undefined;
     try {
       await reserveAutomationWriteBudget(scheduledScopeInput);
       return undefined;
@@ -167,7 +200,7 @@ export async function evaluatePolicy(
           ? error.message
           : "Unattended hardware-write budget was denied.";
       const denied = decision("deny", reason, action, riskLevel);
-      if (policy.audit_all_agent_actions) {
+      if (!planning && policy.audit_all_agent_actions) {
         appendAuditEvent({
           action,
           status: "denied",
@@ -191,7 +224,7 @@ export async function evaluatePolicy(
       action,
       riskLevel,
     );
-    if (policy.audit_all_agent_actions) {
+    if (!planning && policy.audit_all_agent_actions) {
       appendAuditEvent({
         action,
         status: "denied",
@@ -214,7 +247,7 @@ export async function evaluatePolicy(
       action,
       riskLevel,
     );
-    if (policy.audit_all_agent_actions) {
+    if (!planning && policy.audit_all_agent_actions) {
       appendAuditEvent({
         action,
         status: "denied",
@@ -238,7 +271,7 @@ export async function evaluatePolicy(
         action,
         riskLevel,
       );
-      if (policy.audit_all_agent_actions) {
+      if (!planning && policy.audit_all_agent_actions) {
         appendAuditEvent({
           action,
           status: "denied",
@@ -272,7 +305,14 @@ export async function evaluatePolicy(
       typeof args.approvalId === "string" ? args.approvalId : undefined;
 
     if (explicitApprovalId) {
-      const request = consumeApproval(explicitApprovalId, scopeDigest);
+      const candidate = planning ? getApproval(explicitApprovalId) : undefined;
+      const request = planning
+        ? candidate?.status === "approved" &&
+          candidate.expiresAt &&
+          candidate.scopeDigest === scopeDigest
+          ? candidate
+          : undefined
+        : consumeApproval(explicitApprovalId, scopeDigest);
       if (request) {
         const reservationDenied = await reserveScheduledWrite();
         if (reservationDenied) return reservationDenied;
@@ -283,7 +323,7 @@ export async function evaluatePolicy(
           riskLevel,
           explicitApprovalId,
         );
-        if (policy.audit_all_agent_actions) {
+        if (!planning && policy.audit_all_agent_actions) {
           appendAuditEvent({
             action,
             status: "approved",
@@ -313,7 +353,7 @@ export async function evaluatePolicy(
       riskLevel,
       approval.id,
     );
-    if (policy.audit_all_agent_actions) {
+    if (!planning && policy.audit_all_agent_actions) {
       appendAuditEvent({
         action,
         status: "requires_approval",
@@ -347,7 +387,7 @@ export async function evaluatePolicy(
     if (reservationDenied) return reservationDenied;
   }
 
-  if (policy.audit_all_agent_actions) {
+  if (!planning && policy.audit_all_agent_actions) {
     appendAuditEvent({
       action,
       status: result.status === "allow" ? "allowed" : "denied",

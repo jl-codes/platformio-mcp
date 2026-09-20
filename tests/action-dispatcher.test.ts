@@ -5,13 +5,14 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   authorizeAction,
+  planAction,
   dispatchAuthorizedAction,
 } from "../src/core/action-dispatcher.js";
 import {
   MCP_ACTIONS,
   policyActionForCliCommand,
 } from "../src/core/action-catalog.js";
-import { approveRequest } from "../src/core/policy/approvals.js";
+import { approveRequest, getApproval } from "../src/core/policy/approvals.js";
 let root: string;
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-dispatch-"));
@@ -154,5 +155,64 @@ it("keeps category approval requirements when only a narrow operation is allowed
   });
   expect((await authorizeAction("size_report", {}, {})).status).toBe(
     "requires_approval",
+  );
+});
+
+it("plans approval readiness without consuming a grant or bypassing later policy", async () => {
+  const args = { projectDir: root, port: "COM7" };
+  const context = { workspaceDir: root };
+  const pending = await planAction("upload_firmware", args, context);
+  expect(pending.status).toBe("requires_approval");
+  approveRequest(pending.approvalId!);
+  const approved = { ...args, approvalId: pending.approvalId };
+  expect((await planAction("upload_firmware", approved, context)).status).toBe(
+    "ready",
+  );
+  expect((await planAction("upload_firmware", approved, context)).status).toBe(
+    "ready",
+  );
+  expect(getApproval(pending.approvalId!)?.status).toBe("approved");
+  expect(
+    (
+      await planAction(
+        "upload_firmware",
+        { ...approved, port: "COM8" },
+        context,
+      )
+    ).status,
+  ).toBe("requires_approval");
+  const execute = vi.fn(async () => "done");
+  expect(
+    await dispatchAuthorizedAction(
+      "upload_firmware",
+      approved,
+      context,
+      execute,
+    ),
+  ).toBe("done");
+  expect(getApproval(pending.approvalId!)?.status).toBe("consumed");
+  expect((await planAction("upload_firmware", approved, context)).status).toBe(
+    "requires_approval",
+  );
+  expect(execute).toHaveBeenCalledOnce();
+});
+it("planning does not override a deny and caller arguments cannot enable planning for execution", async () => {
+  const args = { projectDir: root, port: "COM7", planning: true };
+  const context = { workspaceDir: root };
+  const pending = await planAction("upload_firmware", args, context);
+  approveRequest(pending.approvalId!);
+  await dispatchAuthorizedAction(
+    "upload_firmware",
+    { ...args, approvalId: pending.approvalId },
+    context,
+    async () => {},
+  );
+  expect(getApproval(pending.approvalId!)?.status).toBe("consumed");
+  fs.writeFileSync(
+    path.join(root, ".pio-mcp-policy.json"),
+    '{"profile":"read_only"}',
+  );
+  expect((await planAction("upload_firmware", args, context)).status).toBe(
+    "deny",
   );
 });
