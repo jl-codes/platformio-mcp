@@ -1988,3 +1988,13 @@ observed actively building wheels. GitHub rejected manual config-acceptance disp
 with HTTP 404 because the new workflow is absent from the default branch. Added a
 read-only, path-filtered pull_request trigger so relevant changes produce the POL-05
 packet before merge. No merge, tag, environment or publishing permission was changed.
+
+### 2026-09-20: 3.1.0 installed on every planned native host
+
+Run 35529831694 built the complete wheel set and passed all five native installation
+jobs on 6a2e9566: Windows x64, macOS arm64/x64, Linux arm64/x64. Downloaded each
+python-host artifact, verified report outcome/source/version and all seven project
+names, and retained reports plus original file hashes in native-python-310-evidence.json.
+All six aliases were included on every host. Both native container jobs remained in
+progress at collection. This is actual 3.1.0 installation evidence, not public-registry,
+minimum-OS, physical hardware, or complete final-revision acceptance.
