@@ -1609,3 +1609,8 @@ Release validation run 35515111803 built all five native wheels and all six Pyth
 ### Debugger session metadata parity
 
 Start/list/stop responses now expose the host-resolved debug tool and monotonic session age, including age through successful shutdown. Metadata is copied at launch admission and preserved for retained failed-start/cleanup owners. Four focused debugger suites passed (31 cases), including ownership, failure recovery and immutable metadata timing; TypeScript passed. Physical debugger acceptance remains outstanding.
+
+
+### Five-host installed Python evidence
+
+Run 35515440936 passed installation, every functional alias, MCP stdio/EOF and alias-removal preservation on Windows x64, macOS arm64/x64 and Linux arm64/x64. Exact source 0dd30afd8358a7d0b7ff8d8b1f0e018f7708c421 and per-wheel hashes are retained in native-python-installation-evidence.json. This validates the packaging fixes, not the later debugger metadata commit or a published/final release. The container jobs continue in the same run.
