@@ -23,7 +23,7 @@ it("uses the exact endpoint and USB keys already used by serial sessions", async
   await selected.custody.revalidate();
   expect(enumerate).toHaveBeenCalledOnce();
 });
-it("rejects endpoint-only or ambiguous USB identity", () => {
+it("rejects endpoint-only USB identity", () => {
   expect(() =>
     bindPowerSerialDevice(
       "COM42",
@@ -34,14 +34,6 @@ it("rejects endpoint-only or ambiguous USB identity", () => {
   ).toThrow(
     expect.objectContaining({ code: "POWER_DEVICE_IDENTITY_REQUIRED" }),
   );
-  expect(() =>
-    bindPowerSerialDevice(
-      "COM42",
-      [record, { ...record, path: "COM43" }],
-      async () => [],
-      resolve,
-    ),
-  ).toThrow(expect.objectContaining({ code: "SERIAL_DEVICE_AMBIGUOUS" }));
 });
 it("refuses device replacement or port drift at pre-spawn refresh", async () => {
   for (const changed of [
@@ -55,5 +47,36 @@ it("refuses device replacement or port drift at pre-spawn refresh", async () => 
       resolve,
     );
     await expect(selected.custody.revalidate()).rejects.toThrow();
+  }
+});
+
+it("pins an explicitly selected interface while retaining the same whole-device key", async () => {
+  const sibling = { ...record, path: "COM43" };
+  let snapshot = [record, sibling];
+  const selected = bindPowerSerialDevice(
+    "COM42",
+    snapshot,
+    async () => snapshot,
+    resolve,
+  );
+  const other = bindPowerSerialDevice(
+    "COM43",
+    snapshot,
+    async () => snapshot,
+    resolve,
+  );
+  expect(selected.custody.resources[1]).toEqual(other.custody.resources[1]);
+  expect(selected.custody.resources[0]).not.toEqual(other.custody.resources[0]);
+  snapshot = [sibling, record];
+  await selected.custody.revalidate();
+  for (const changed of [
+    [record],
+    [record, sibling, { ...record, path: "COM44" }],
+    [record, { ...sibling, serialNumber: "replacement" }],
+  ]) {
+    snapshot = changed;
+    await expect(selected.custody.revalidate()).rejects.toThrow(
+      expect.objectContaining({ code: "SERIAL_DEVICE_CHANGED" }),
+    );
   }
 });

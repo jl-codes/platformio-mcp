@@ -68,14 +68,17 @@ function descriptor(record: SerialDiscoveryRecord): string | undefined {
 /**
  * Bind one explicitly selected endpoint to a bounded trusted enumeration snapshot.
  * Enumeration and resolution are supplied by the adapter, never by public tool arguments.
- * Duplicate USB descriptors on distinct endpoints are ambiguous, including multi-interface devices.
+ * Shared USB descriptors require explicit host opt-in and retain the whole-device exclusion key.
+ * The selected endpoint and complete observed interface set are pinned across revalidation.
  * USB descriptors are not cryptographic board authentication and never authorize automatic reconnect.
  */
 export function bindSerialDiscovery(
   endpoint: ResolvedSerialEndpoint,
   records: readonly SerialDiscoveryRecord[],
   resolve: (port: string) => ResolvedSerialEndpoint,
+  options: { allowSharedUsbInterfaces?: boolean } = {},
 ): SerialDiscoveryBinding {
+  const allowShared = options.allowSharedUsbInterfaces === true;
   const inspect = (snapshot: readonly SerialDiscoveryRecord[]) => {
     if (!Array.isArray(snapshot) || snapshot.length > 1024)
       throw new PlatformIOError(
@@ -108,6 +111,7 @@ export function bindSerialDiscovery(
     const usb = matches[0].usb;
     if (
       usb &&
+      !allowShared &&
       normalized.some(
         (record) =>
           record.usb === usb && record.endpoint !== endpoint.resource.identity,
@@ -117,20 +121,33 @@ export function bindSerialDiscovery(
         "USB identity is shared by multiple endpoints.",
         "SERIAL_DEVICE_AMBIGUOUS",
       );
-    return usb;
+    const interfaces = usb
+      ? [
+          ...new Set(
+            normalized
+              .filter((record) => record.usb === usb)
+              .map((record) => record.endpoint),
+          ),
+        ].sort()
+      : [];
+    return { usb, topology: JSON.stringify(interfaces) };
   };
   endpoint.revalidate();
   const expected = inspect(records);
   return Object.freeze({
     endpointIdentity: endpoint.resource.identity,
-    usbIdentity: expected === undefined ? undefined : `usb:${expected}`,
+    usbIdentity: expected.usb === undefined ? undefined : `usb:${expected.usb}`,
     identityBasis:
-      expected === undefined
+      expected.usb === undefined
         ? ("endpoint-only" as const)
         : ("usb-descriptor" as const),
     revalidate(snapshot: readonly SerialDiscoveryRecord[]) {
       endpoint.revalidate();
-      if (inspect(snapshot) !== expected)
+      const observed = inspect(snapshot);
+      if (
+        observed.usb !== expected.usb ||
+        observed.topology !== expected.topology
+      )
         throw new PlatformIOError(
           "Serial discovery identity changed; select and authorize again.",
           "SERIAL_DEVICE_CHANGED",

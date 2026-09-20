@@ -20,7 +20,9 @@ export function bindPowerSerialDevice(
   resolve = resolveSerialEndpoint,
 ) {
   const endpoint = resolve(port);
-  const binding = bindSerialDiscovery(endpoint, records, resolve);
+  const binding = bindSerialDiscovery(endpoint, records, resolve, {
+    allowSharedUsbInterfaces: true,
+  });
   if (!binding.usbIdentity)
     throw new PlatformIOError(
       "Power devices require a stable host-observed USB descriptor; endpoint-only binding is insufficient.",

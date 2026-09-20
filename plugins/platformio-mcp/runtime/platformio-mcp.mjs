@@ -95054,7 +95054,8 @@ function descriptor(record2) {
     ])
   ).digest("hex");
 }
-function bindSerialDiscovery(endpoint, records, resolve) {
+function bindSerialDiscovery(endpoint, records, resolve, options = {}) {
+  const allowShared = options.allowSharedUsbInterfaces === true;
   const inspect = (snapshot) => {
     if (!Array.isArray(snapshot) || snapshot.length > 1024)
       throw new PlatformIOError(
@@ -95085,24 +95086,30 @@ function bindSerialDiscovery(endpoint, records, resolve) {
         "SERIAL_DEVICE_AMBIGUOUS"
       );
     const usb = matches[0].usb;
-    if (usb && normalized.some(
+    if (usb && !allowShared && normalized.some(
       (record2) => record2.usb === usb && record2.endpoint !== endpoint.resource.identity
     ))
       throw new PlatformIOError(
         "USB identity is shared by multiple endpoints.",
         "SERIAL_DEVICE_AMBIGUOUS"
       );
-    return usb;
+    const interfaces = usb ? [
+      ...new Set(
+        normalized.filter((record2) => record2.usb === usb).map((record2) => record2.endpoint)
+      )
+    ].sort() : [];
+    return { usb, topology: JSON.stringify(interfaces) };
   };
   endpoint.revalidate();
   const expected = inspect(records);
   return Object.freeze({
     endpointIdentity: endpoint.resource.identity,
-    usbIdentity: expected === void 0 ? void 0 : `usb:${expected}`,
-    identityBasis: expected === void 0 ? "endpoint-only" : "usb-descriptor",
+    usbIdentity: expected.usb === void 0 ? void 0 : `usb:${expected.usb}`,
+    identityBasis: expected.usb === void 0 ? "endpoint-only" : "usb-descriptor",
     revalidate(snapshot) {
       endpoint.revalidate();
-      if (inspect(snapshot) !== expected)
+      const observed = inspect(snapshot);
+      if (observed.usb !== expected.usb || observed.topology !== expected.topology)
         throw new PlatformIOError(
           "Serial discovery identity changed; select and authorize again.",
           "SERIAL_DEVICE_CHANGED"
@@ -95115,7 +95122,9 @@ function bindSerialDiscovery(endpoint, records, resolve) {
 init_serial_endpoint();
 function bindPowerSerialDevice(port, records, enumerate, resolve = resolveSerialEndpoint) {
   const endpoint = resolve(port);
-  const binding = bindSerialDiscovery(endpoint, records, resolve);
+  const binding = bindSerialDiscovery(endpoint, records, resolve, {
+    allowSharedUsbInterfaces: true
+  });
   if (!binding.usbIdentity)
     throw new PlatformIOError(
       "Power devices require a stable host-observed USB descriptor; endpoint-only binding is insufficient.",

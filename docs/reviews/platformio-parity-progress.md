@@ -1653,3 +1653,10 @@ Configured -select USB commands now retain -select USB=<discovered serial> inste
 ### PPK2 trigger and owned-monitor coexistence
 
 Added a single-borrower internal monitor hold with exact resource snapshots, persistent handoff state and cancellation on stop/disconnect. Monitor closure retains endpoint/USB leases until the power owner confirms cleanup. PPK2 now accepts paired trigger/session fields, waits for fresh authorized output, verifies same-project/exact-DUT resources, and adopts the hold into supervised meter custody. Partial failures before ownership return unused holds; failed device cleanup retains the power recovery owner. Outer profile policy revision is carried through the trigger and execution path. Sixty-four focused serial/power ownership and policy cases plus twelve trigger/public-policy/real-stdio cases passed. Physical acceptance, ambiguous multi-interface support and full reference result/default parity remain incomplete.
+
+
+### Explicit multi-interface power-device binding
+
+Power discovery now accepts an explicitly selected endpoint when multiple host-observed serial interfaces share its USB descriptor. It retains the existing whole-device USB exclusion key alongside the selected endpoint key; selecting another interface cannot evade physical-device custody. Revalidation pins the complete normalized interface set and rejects interface removal, addition, identity replacement or endpoint drift. Enumeration order and equivalent endpoint aliases do not change that set. Other serial callers retain the conservative default rejection of shared descriptors. This does not authenticate USB descriptors, infer the correct PPK2 protocol interface, auto-select a meter, or establish physical wiring.
+
+Validation: 18 focused discovery and power-custody cases passed, including shared-interface identity, stable enumeration reorder and changed topology. TypeScript and scoped lint passed; the shipped plugin was rebuilt. Physical multi-interface hardware acceptance and reference auto-discovery behavior remain outstanding.
