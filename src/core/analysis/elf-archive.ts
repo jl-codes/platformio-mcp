@@ -82,7 +82,8 @@ export async function resolveRetainedElf(
       "Invalid retained ELF directory.",
       "ANALYSIS_ARCHIVE_INVALID",
     );
-  const file = path.join(root, sha256.toLowerCase() + ".elf");
+  const canonicalRoot = await fs.realpath(root);
+  const file = path.join(canonicalRoot, sha256.toLowerCase() + ".elf");
   const entry = await fs.lstat(file);
   if (!entry.isFile() || entry.isSymbolicLink())
     throw new PlatformIOError(

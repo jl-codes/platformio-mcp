@@ -141,3 +141,36 @@ it("does not resolve a hash retained only for another source path", async () => 
     resolveRetainedElf(second, identity.sha256, archive),
   ).rejects.toThrow();
 });
+
+it("returns the same canonical archive path through an aliased ancestor", async () => {
+  const file = path.join(root, "firmware.elf");
+  const actual = path.join(root, "actual");
+  const alias = path.join(root, "alias");
+  fs.writeFileSync(file, header(94));
+  fs.mkdirSync(actual);
+  fs.symlinkSync(
+    actual,
+    alias,
+    process.platform === "win32" ? "junction" : "dir",
+  );
+  const identity = await readElfIdentity(file);
+  const retained = await retainElfSnapshot(
+    file,
+    identity.sha256,
+    path.join(alias, "archive"),
+  );
+  expect(
+    await resolveRetainedElf(
+      file,
+      identity.sha256,
+      path.join(alias, "archive"),
+    ),
+  ).toBe(retained);
+  expect(
+    await resolveRetainedElf(
+      file,
+      identity.sha256,
+      path.join(actual, "archive"),
+    ),
+  ).toBe(retained);
+});

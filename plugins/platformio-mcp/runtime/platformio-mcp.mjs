@@ -92958,6 +92958,14 @@ var MCP_ACTIONS = {
   }
 };
 var INTERNAL_ACTIONS = {
+  debugger_inspect: { ...READ, policyAction: "query_logs" },
+  debugger_mutate: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
+  debugger_host_code: {
+    ...MCP_ACTIONS.upload_firmware,
+    policyAction: "run_shell_command",
+    riskLevel: "critical",
+    openWorld: true
+  },
   target_build: { ...MCP_ACTIONS.build_project, policyAction: "build_project" },
   target_cleanup: { ...MCP_ACTIONS.clean_project, policyAction: "clean_project" },
   target_upload: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
@@ -93809,7 +93817,8 @@ async function resolveRetainedElf(sourcePath, sha256, archiveRoot = path6.join(S
       "Invalid retained ELF directory.",
       "ANALYSIS_ARCHIVE_INVALID"
     );
-  const file = path6.join(root, sha256.toLowerCase() + ".elf");
+  const canonicalRoot = await fs5.realpath(root);
+  const file = path6.join(canonicalRoot, sha256.toLowerCase() + ".elf");
   const entry = await fs5.lstat(file);
   if (!entry.isFile() || entry.isSymbolicLink())
     throw new PlatformIOError(
