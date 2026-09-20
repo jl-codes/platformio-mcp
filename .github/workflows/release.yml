@@ -109,9 +109,53 @@ jobs:
           path: python-host-evidence
           if-no-files-found: error
 
+  build_container:
+    name: Build native container (${{ matrix.arch }})
+    needs: [build_python, accept_python]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - name: Download exact validated wheels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --name platformio-python-release --dir python-release-artifacts
+      - name: Build native image from minimal validated context
+        run: |
+          python scripts/prepare-container-context.py python-release-artifacts "$RUNNER_TEMP/container-context"
+          version="$(python -c 'import json; print(json.load(open("package.json"))["version"])')"
+          docker build --build-arg VERSION="$version" --build-arg SOURCE_COMMIT="$GITHUB_SHA" --tag "pio-agent:$GITHUB_SHA" "$RUNNER_TEMP/container-context"
+          actual="$(docker run --rm --network none "pio-agent:$GITHUB_SHA" --version)"
+          test "$actual" = "$version"
+          mkdir -p container-artifacts
+          docker image inspect "pio-agent:$GITHUB_SHA" > "container-artifacts/image-${{ matrix.arch }}.json"
+          docker save "pio-agent:$GITHUB_SHA" --output "container-artifacts/pio-agent-${{ matrix.arch }}.tar"
+          sha256sum "container-artifacts/pio-agent-${{ matrix.arch }}.tar" > "container-artifacts/pio-agent-${{ matrix.arch }}.sha256"
+          cp "$RUNNER_TEMP/container-context/identity.json" "container-artifacts/source-${{ matrix.arch }}.json"
+      - name: Retain native image and source identities
+        uses: actions/upload-artifact@v7
+        with:
+          name: platformio-container-${{ matrix.arch }}
+          path: container-artifacts
+          if-no-files-found: error
+          compression-level: 0
+
   build_release:
     name: Build release artifacts
-    needs: [build_python, accept_python]
+    needs: [build_python, accept_python, build_container]
     runs-on: ubuntu-latest
 
     steps:

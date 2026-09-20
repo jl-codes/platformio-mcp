@@ -3,9 +3,10 @@
 FROM python:3.11-slim-bookworm@sha256:a36c24f9cbdf4fd0f52d67f0823eeac19c2028c637cecc392d97f980d4fec56b AS install
 ARG VERSION
 COPY wheels/ /wheels/
+COPY requirements.txt /requirements.txt
 RUN python -m venv /opt/pio \
     && /opt/pio/bin/python -m pip install --no-cache-dir --no-index --find-links=/wheels "pio-agent-platformio==${VERSION}" \
-    && /opt/pio/bin/python -m pip install --no-cache-dir "platformio==6.1.16"
+    && /opt/pio/bin/python -m pip install --no-cache-dir --require-hashes --only-binary=:all: -r /requirements.txt
 
 FROM python:3.11-slim-bookworm@sha256:a36c24f9cbdf4fd0f52d67f0823eeac19c2028c637cecc392d97f980d4fec56b
 ARG VERSION

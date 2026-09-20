@@ -2,3 +2,4 @@
 !Dockerfile
 !wheels/
 !wheels/*.whl
+!requirements.txt
