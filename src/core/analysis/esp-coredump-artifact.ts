@@ -1,5 +1,6 @@
 /** Workspace-contained core-dump input loading; callers must authorize workspace reads first. */
 import fs from "node:fs/promises";
+import { readEspCoredumpFirmwareIdentity } from "./esp-coredump-firmware.js";
 import { readPartitionArtifact } from "../esp-partition-artifacts.js";
 import { PlatformIOError } from "../../utils/errors.js";
 import {
@@ -59,10 +60,24 @@ export async function readEspCoredumpArtifact(input: EspCoredumpArtifactInput) {
     bytes = decodeEspCoredumpBase64(text);
   }
   const inspected = inspectRawEspCoredump(bytes, input.encrypted);
+  const formatVersion = inspected.identity.version & 65535;
+  const headerSize =
+    formatVersion === 0x102 || formatVersion === 0x103 ? 24 : 20;
+  const checksumSize = inspected.identity.checksum === "sha256" ? 32 : 4;
+  const firmwareIdentity =
+    inspected.identity.payload_format === "elf"
+      ? readEspCoredumpFirmwareIdentity(
+          inspected.bytes.subarray(
+            headerSize,
+            inspected.bytes.length - checksumSize,
+          ),
+          inspected.identity.version,
+        )
+      : null;
   return {
     bytes: inspected.bytes,
     identity: inspected.identity,
+    firmwareIdentity,
     source: { ...artifact.identity, format: input.format },
   };
 }
-

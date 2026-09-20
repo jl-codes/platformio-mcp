@@ -1097,3 +1097,8 @@ CI 35497560904 and 35497559003 exposed lexical versus canonical path mismatches 
 
 Added bounded workspace-contained raw/base64 input loading, strict UTF-8 decoding, optional exact source-file SHA-256 enforcement and separate source/envelope identities. Four focused cases passed; targeted lint passed and TypeScript passed after correcting a Buffer generic inference mismatch. No analyzer execution, private retention, ELF correspondence or public-tool acceptance is claimed by this internal loader.
 
+
+### Embedded core-dump firmware identity
+
+Offline ELF-envelope loading now validates ELF32 core headers, chip/machine agreement, bounded program headers and note segments, then extracts the unique ESP_CORE_DUMP_INFO firmware SHA-256 prefix. Matching distinguishes full hash, partial prefix and absent evidence; mismatches fail. Format checked against Espressif esp-coredump v1.10.0 corefile/elf.py and corefile/loader.py. Fifteen focused artifact/identity cases, lint and TypeScript passed. Analyzer execution, complete immutable ELF binding, sensitive-data retention and public integration remain outstanding.
+
