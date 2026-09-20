@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { startCoredumpRetentionCleanup } from "./core/analysis/esp-coredump-retention.js";
 import { executeCoredump } from "./tools/coredump.js";
+import { executeCoredumpCompatibility } from "./adapters/coredump-compat.js";
 import { executePartitionCompatibility } from "./adapters/partition-compat.js";
 import { executePartitionTable } from "./tools/partition-table.js";
 import { executeSystemCompatibility } from "./adapters/system-compat.js";
@@ -1674,6 +1675,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     name === "pio_run_target" ||
     name === "pio_upload" ||
     name === "pio_partition_table" ||
+    name === "pio_coredump" ||
     name === "pio_system_info" ||
     dependencyCompatibility ||
     boardCompatibility ||
@@ -1740,6 +1742,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 ? executePartitionTable(parameters, caller, onAuthorized)
                 : tool === "run_target"
                 ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized)
+                : tool === "pio_coredump"
+                  ? executeCoredumpCompatibility(parameters, {projectDir:compatibilityProjectDir,cwd:process.cwd()},caller,onAuthorized)
                 : tool === "pio_partition_table"
                   ? executePartitionCompatibility(parameters, {projectDir:compatibilityProjectDir,cwd:process.cwd()},caller,onAuthorized)
                 : tool === "pio_system_info"

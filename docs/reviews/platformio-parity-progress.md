@@ -1211,3 +1211,7 @@ Authorized device captures are now exported before optional analyzer resolution.
 ### Reference core-dump adapter implementation
 
 Added the internal reference workflow with launch/project defaults, authorized environment/port selection (honoring explicit ports), separately authorized ELF metadata, default managed retention, explicit output paths, missing-build-output handling and reference result projection. Metadata denials propagate before acquisition. Three focused adapter cases, TypeScript and lint passed. Public compatibility registration and end-to-end adapter acceptance remain pending; the compatibility count remains 32.
+
+### Public core-dump compatibility registration
+
+Registered pio_coredump in opt-in mode with the reference arguments and explicit grant extensions, routing MCP dispatch to the implemented adapter. Inventory is 57 canonical plus 33 aliases. Seven adapter/real-stdio exposure cases passed; an additional targeted real-stdio invocation verified malformed core-dump arguments reach compatibility validation. TypeScript and lint passed. Physical capture and full result-contract acceptance remain unproven.

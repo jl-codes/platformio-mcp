@@ -52,7 +52,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 89 : 57);
+      expect(tools).toHaveLength(enabled ? 90 : 57);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -80,10 +80,17 @@ it.each([
         "pio_upload",
         "pio_system_info",
         "pio_partition_table",
+        "pio_coredump",
       ]) {
         expect(tools.some((tool) => tool.name === name)).toBe(enabled);
       }
       if (enabled) {
+        const invalidCoredump = await client.callTool({
+          name: "pio_coredump",
+          arguments: { analyze: "yes" },
+        });
+        expect(invalidCoredump.isError).toBe(true);
+        expect(JSON.stringify(invalidCoredump)).toContain("COMPAT_ARGUMENT_INVALID");
         const result = await client.callTool({
           name: "pio_pkg_install",
           arguments: { spec: "owner/package" },

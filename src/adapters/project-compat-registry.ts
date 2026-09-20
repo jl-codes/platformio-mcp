@@ -43,6 +43,49 @@ export function withProjectCompatibility<TResult>(
       handler: (args, context) => context.dispatch(name, args),
     });
   }
+  const coredump = base.get("coredump");
+  if (!coredump || result.has("pio_coredump"))
+    throw new Error("Invalid core-dump compatibility registry");
+  result.set("pio_coredump", {
+    ...coredump,
+    name: "pio_coredump",
+    description:
+      "Capture and save the selected ESP core-dump partition, optionally analyzing it against the matching project ELF. Configuration, metadata, device, export and analysis permissions remain separate.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], default: null },
+        env: { type: ["string", "null"], default: null },
+        port: { type: ["string", "null"], default: null },
+        out_path: { type: ["string", "null"], default: null },
+        analyze: { type: "boolean", default: true },
+        elf_path: { type: "string" },
+        table_path: { type: "string" },
+        table_offset: { type: "integer", minimum: 0, maximum: 4294963200 },
+        sdkconfig_path: { type: "string" },
+        build_metadata: { type: "boolean", default: true },
+        ...Object.fromEntries(
+          [
+            "approval_id",
+            "config_approval_id",
+            "selection_approval_id",
+            "elf_metadata_approval_id",
+            "table_approval_id",
+            "table_config_approval_id",
+            "metadata_approval_id",
+            "system_approval_id",
+            "board_approval_id",
+            "read_approval_id",
+            "read_command_approval_id",
+            "command_approval_id",
+            "export_approval_id",
+          ].map((name) => [name, { type: "string", maxLength: 256 }]),
+        ),
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_coredump", args),
+  });
   const partition = base.get("partition_table");
   if (!partition || result.has("pio_partition_table"))
     throw new Error("Invalid partition compatibility registry");

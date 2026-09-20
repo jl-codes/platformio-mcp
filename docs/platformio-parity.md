@@ -87,3 +87,9 @@ Device acquisition accepts outPath (CLI --out-path) with a separate exportApprov
 
 For private managed storage, device requests can select retainDump: true (CLI --retain-dump true) instead of outPath. This uses the same export permission and returns the saved path, hash and expiresAt timestamp. At most 32 dumps of up to 16 MiB are retained. Expiry cleanup runs on subsequent retention access and a live-process timer; a stopped server cannot delete expired files until cleanup resumes. Explicit paths remain user-managed. Canonical requests do not retain dumps unless one of these save options is selected.
 
+
+## Current core-dump compatibility exposure
+
+The opt-in pio_coredump tool now resolves project/environment/serial selection, saves captures by default in private managed storage, and supports out_path plus optional analysis. Missing ELF output preserves the capture with analysis=null; unconfigured analysis tools are reported without claiming analysis ran. Explicit output remains workspace-contained and never replaces an existing file. Metadata execution, partition inspection, device reads, exports and analyzer execution retain separate scoped permissions; table_config_approval_id and elf_metadata_approval_id avoid reusing a consumed selection grant.
+
+The inventory is now 57 canonical tools plus 33 compatibility tools (90 with compatibility enabled). Registration and offline checks do not prove full PAR-05 parity: physical capture, remaining reference result details and the wider acceptance gates remain outstanding.
