@@ -25804,7 +25804,7 @@ var require_has_flag = __commonJS({
 var require_supports_color = __commonJS({
   "node_modules/supports-color/index.js"(exports, module) {
     "use strict";
-    var os12 = __require("os");
+    var os11 = __require("os");
     var tty = __require("tty");
     var hasFlag = require_has_flag();
     var { env } = process;
@@ -25852,7 +25852,7 @@ var require_supports_color = __commonJS({
         return min;
       }
       if (process.platform === "win32") {
-        const osRelease = os12.release().split(".");
+        const osRelease = os11.release().split(".");
         if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
           return Number(osRelease[2]) >= 14931 ? 3 : 2;
         }
@@ -92926,7 +92926,7 @@ var MCP_ACTIONS = {
   }
 };
 var INTERNAL_ACTIONS = {
-  coredump_inspect: { ...READ, policyAction: "get_project_config" },
+  coredump_inspect: { ...READ, policyAction: "coredump" },
   coredump_analyze: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
   esp_flash_read: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
   esp_flash_read_command: { ...MCP_ACTIONS.upload_firmware, policyAction: "run_shell_command", riskLevel: "critical", openWorld: true },
@@ -95972,7 +95972,7 @@ if (-not $actual.AreAccessRulesProtected) { throw 'Unprotected analysis director
 $rules = $actual.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])
 if ($rules.Count -ne 1 -or $rules[0].IdentityReference.Value -ne $sid.Value -or $rules[0].AccessControlType -ne 'Allow' -or $rules[0].FileSystemRights -ne 'FullControl') { throw 'Unexpected analysis ACL' }
 `;
-async function withPrivateAnalysisDirectory(use) {
+async function createPrivateAnalysisDirectory() {
   const directory = await fs18.mkdtemp(
     path23.join(os4.tmpdir(), "pio-private-analysis-")
   );
@@ -96016,6 +96016,15 @@ async function withPrivateAnalysisDirectory(use) {
         "ANALYSIS_PRIVATE_STORAGE_UNAVAILABLE"
       );
     }
+    return directory;
+  } catch (error2) {
+    await fs18.rm(directory, { recursive: true, force: true });
+    throw error2;
+  }
+}
+async function withPrivateAnalysisDirectory(use) {
+  const directory = await createPrivateAnalysisDirectory();
+  try {
     return await use(directory);
   } finally {
     await fs18.rm(directory, { recursive: true, force: true });
@@ -96566,9 +96575,8 @@ async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, pr
 }
 
 // src/core/esp-flash-read.ts
-init_zod();
 import fs36 from "node:fs/promises";
-import os8 from "node:os";
+init_zod();
 import path39 from "node:path";
 init_serial_endpoint();
 
@@ -96725,10 +96733,7 @@ async function readEspFlash(input, caller = {}) {
         return hardwareLockManager.withImplicitLock(async () => {
           guard();
           endpoint.revalidate();
-          const temporary = await fs36.mkdtemp(
-            path39.join(os8.tmpdir(), "pio-flash-read-")
-          );
-          await fs36.chmod(temporary, 448);
+          const temporary = await createPrivateAnalysisDirectory();
           const output = path39.join(temporary, "flash.bin");
           let retain = false;
           try {
@@ -98680,12 +98685,12 @@ async function firmwareSizeReport(input, caller = {}, onAuthorized) {
 // src/adapters/compatibility-project.ts
 init_errors2();
 import fs43 from "node:fs/promises";
-import os9 from "node:os";
+import os8 from "node:os";
 import path46 from "node:path";
 async function resolveCompatibilityProject(requested, defaults) {
   let selected = requested || defaults.projectDir || defaults.cwd || process.cwd();
   if (selected === "~" || selected.startsWith("~/") || selected.startsWith("~\\"))
-    selected = path46.join(defaults.home ?? os9.homedir(), selected.slice(2));
+    selected = path46.join(defaults.home ?? os8.homedir(), selected.slice(2));
   else if (selected.startsWith("~"))
     throw new PlatformIOError(
       "Named-user home expansion is unsupported; pass an absolute project path.",
@@ -105547,7 +105552,7 @@ init_zod();
 init_projects();
 import fs54 from "node:fs/promises";
 import path58 from "node:path";
-import os10 from "node:os";
+import os9 from "node:os";
 init_redact();
 init_errors2();
 async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
@@ -105561,7 +105566,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
   }).strict().parse(input);
   let requested = params.project_dir;
   if (requested === "~" || requested.startsWith("~/") || requested.startsWith("~\\"))
-    requested = path58.join(defaults.home ?? os10.homedir(), requested.slice(2));
+    requested = path58.join(defaults.home ?? os9.homedir(), requested.slice(2));
   else if (requested.startsWith("~"))
     throw new PlatformIOError(
       "Named-user home expansion is unsupported.",
@@ -114960,7 +114965,7 @@ import fs61, { constants as fsConstants } from "node:fs/promises";
 
 // node_modules/is-wsl/index.js
 import process3 from "node:process";
-import os11 from "node:os";
+import os10 from "node:os";
 import fs60 from "node:fs";
 
 // node_modules/is-inside-container/index.js
@@ -115013,7 +115018,7 @@ var isWsl = () => {
   if (process3.platform !== "linux") {
     return false;
   }
-  if (os11.release().toLowerCase().includes("microsoft")) {
+  if (os10.release().toLowerCase().includes("microsoft")) {
     if (isInsideContainer()) {
       return false;
     }

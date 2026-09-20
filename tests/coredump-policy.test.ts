@@ -48,19 +48,22 @@ it("requires execution permission before looking up absent analysis artifacts", 
     }),
   ).rejects.toMatchObject({ code: "POLICY_DENIED" });
 });
-it("honors concrete inspection denial before file access", async () => {
-  fs.writeFileSync(
-    path.join(root, ".pio-mcp-policy.json"),
-    JSON.stringify({
-      profile: "read_only",
-      overrides: { deny: ["coredump_inspect"], audit_all_agent_actions: false },
-    }),
-  );
-  await expect(
-    executeCoredump({
-      projectDir: root,
-      dumpPath: "absent.raw",
-      analyze: false,
-    }),
-  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
-});
+it.each(["coredump", "coredump_inspect", "get_project_config"])(
+  "honors %s denial before file access",
+  async (deniedAction) => {
+    fs.writeFileSync(
+      path.join(root, ".pio-mcp-policy.json"),
+      JSON.stringify({
+        profile: "read_only",
+        overrides: { deny: [deniedAction], audit_all_agent_actions: false },
+      }),
+    );
+    await expect(
+      executeCoredump({
+        projectDir: root,
+        dumpPath: "absent.raw",
+        analyze: false,
+      }),
+    ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  },
+);

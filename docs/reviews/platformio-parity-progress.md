@@ -1152,3 +1152,9 @@ Added a core-dump partition reader reusing existing flash-read approvals, endpoi
 
 Connected core reads to the authorized partition workflow, retaining exact table source hash, offset and environment evidence. Invalid/mismatching layouts, missing crash storage, ambiguous selections and unknown flags fail before the core read; explicit partition names disambiguate multiple entries. Three real offline parser/policy cases with mocked device acquisition passed after adding the required application partition to valid fixture layouts; lint and TypeScript passed. No live-device layout identity or physical acquisition acceptance is claimed; public acquisition/reference adapter integration remains outstanding.
 
+
+### Core-dump public permission inheritance
+
+Corrected coredump_inspect to inherit the public coredump policy identity before get_project_config, preserving explicit denials on all three names. Eighteen focused policy/dispatcher cases passed and TypeScript passed. Refreshed the bundled plugin runtime for current permission and private flash-read behavior. CI on 18cb94a1 remains separately tracked; no publication or hardware acceptance is claimed.
+
+
