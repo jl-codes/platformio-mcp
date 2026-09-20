@@ -32,8 +32,9 @@ def accept(directory, host, evidence):
         raise ValueError(f"Expected native host {host}; received {actual}")
     identity = load_script("validate_release", "validate-python-release.py").validate(directory)
     selected = [item for item in identity["artifacts"] if item["host"] in (host, "any")]
-    if len(selected) != 3:
-        raise ValueError("Expected one native canonical wheel and two functional alias wheels")
+    aliases = load_script("python_release_packages", "python-release-packages.py").aliases()
+    if len(selected) != 1 + len(aliases):
+        raise ValueError("Expected one native canonical wheel and every functional alias wheel")
     canonical = next(item for item in selected if item["name"] == "pio-agent-platformio")
     version = canonical["version"]
     with tempfile.TemporaryDirectory(prefix="ph-") as temporary:
@@ -47,26 +48,26 @@ def accept(directory, host, evidence):
         environment = os.environ.copy()
         environment.update(PATH=str(binary), PIO_MCP_NO_BROWSER="true", PIO_MCP_DISABLE_DASHBOARD="true", PIO_MCP_DATA_DIR=str(root / "state"))
         commands = []
-        for name in ("pio-agent", "platformio-mcp", "pio-mcp"):
+        for name in ["pio-agent", "platformio-mcp", "pio-mcp", *[item["name"] for item in aliases if item["ownsCommand"]]]:
             executable = binary / (name + (".exe" if os.name == "nt" else ""))
             result = subprocess.run([str(executable), "--version"], capture_output=True, text=True, env=environment, cwd=root, timeout=30, check=True)
             if result.stdout.strip() != version:
                 raise ValueError(f"Wrong installed version from {name}")
             commands.append(name)
-        for module in ("pio_agent_alias", "pio_mcp_alias"):
+        for module in [item["module"] for item in aliases]:
             result = subprocess.run([str(python), "-m", module, "--version"], capture_output=True, text=True, env=environment, cwd=root, timeout=30, check=True)
             if result.stdout.strip() != version:
                 raise ValueError(f"Wrong installed version from {module}")
         executable = binary / ("pio-agent.exe" if os.name == "nt" else "pio-agent")
         protocol = load_script("installed_mcp", "test-installed-python-mcp.py").check(executable, version)
-        subprocess.run([str(python), "-m", "pip", "uninstall", "-y", "pio-agent", "pio-mcp"], check=True, timeout=30)
+        subprocess.run([str(python), "-m", "pip", "uninstall", "-y", *[item["name"] for item in aliases]], check=True, timeout=30)
         result = subprocess.run([str(executable), "--version"], capture_output=True, text=True, env=environment, cwd=root, timeout=30, check=True)
         if result.stdout.strip() != version:
             raise ValueError("Uninstalling aliases damaged the canonical launcher")
     report = {"schemaVersion": 1, "outcome": "pass", "sourceCommit": identity["sourceCommit"], "host": host,
               "environment": {"os": platform.platform(), "python": platform.python_version(), "machine": platform.machine()},
               "timestamp": datetime.now(timezone.utc).isoformat(), "artifacts": selected, "commands": commands,
-              "functionalAliases": ["pio-agent", "pio-mcp"], "aliasUninstallPreservesCanonical": True,
+              "functionalAliases": [item["name"] for item in aliases], "aliasUninstallPreservesCanonical": True,
               "mcp": protocol, "scope": "native installation, CLI aliases, MCP stdio and EOF shutdown; hardware, signals, minimum-OS and public-registry acceptance remain separate"}
     evidence.parent.mkdir(parents=True, exist_ok=True)
     evidence.write_text(json.dumps(report, indent=2) + "\n")

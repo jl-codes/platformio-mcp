@@ -110,13 +110,17 @@
       "registry": "pypi",
       "name": "pio-agent",
       "role": "candidate_alias",
-      "publishIntent": true
+      "publishIntent": true,
+      "packagePath": "packages/python-aliases/pio-agent",
+      "source": "https://github.com/jl-codes/platformio-mcp"
     },
     {
       "registry": "pypi",
       "name": "pio-mcp",
       "role": "candidate_alias",
-      "publishIntent": true
+      "publishIntent": true,
+      "packagePath": "packages/python-aliases/pio-mcp",
+      "source": "https://github.com/jl-codes/platformio-mcp"
     },
     {
       "registry": "pypi",
@@ -220,7 +224,8 @@
       "role": "candidate_alias",
       "publishIntent": false,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Explicit requested alias; metadata returned 404. Functional wheel packaging, publisher authority and eligibility remain pending."
+      "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified.",
+      "packagePath": "packages/python-aliases/platformiomcp"
     },
     {
       "registry": "ghcr",
@@ -236,7 +241,8 @@
       "role": "candidate_alias",
       "publishIntent": false,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Explicit requested alias; metadata returned 404. Functional wheel packaging, publisher authority and eligibility remain pending."
+      "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified.",
+      "packagePath": "packages/python-aliases/pioagent"
     },
     {
       "registry": "ghcr",
@@ -252,7 +258,8 @@
       "role": "candidate_alias",
       "publishIntent": false,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Explicit requested alias; metadata returned 404. Functional wheel packaging, publisher authority and eligibility remain pending."
+      "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified.",
+      "packagePath": "packages/python-aliases/flashagent"
     },
     {
       "registry": "ghcr",

@@ -10,7 +10,12 @@ from urllib.error import HTTPError
 from urllib.request import build_opener, HTTPRedirectHandler, Request
 
 ROOT = Path(__file__).resolve().parents[1]
-PROJECTS = ("pio-agent-platformio", "pio-agent", "pio-mcp")
+
+_packages_spec = importlib.util.spec_from_file_location("python_release_packages", ROOT / "scripts/python-release-packages.py")
+_packages_module = importlib.util.module_from_spec(_packages_spec)
+_packages_spec.loader.exec_module(_packages_module)
+
+PROJECTS = _packages_module.publishers()
 
 
 class NoRedirect(HTTPRedirectHandler):

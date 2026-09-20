@@ -58,7 +58,7 @@ jobs:
           npm ci
           npm run plugin:build
           npm run plugin:validate
-      - name: Assemble five platform wheels and two functional aliases
+      - name: Assemble five platform wheels and inventory-defined functional aliases
         shell: bash
         run: |
           mkdir -p python-release-artifacts
@@ -305,7 +305,7 @@ jobs:
         env:
           PUBLISHERS_VERIFIED: ${{ vars.PYPI_PUBLISHERS_VERIFIED }}
         run: |
-          test "$PUBLISHERS_VERIFIED" = 'pio-agent-platformio,pio-agent,pio-mcp' || { echo 'Configure and verify all three PyPI trusted publishers and the protected pypi environment first.' >&2; exit 1; }
+          test "$PUBLISHERS_VERIFIED" = "$(python scripts/python-release-packages.py)" || { echo 'Configure and verify all selected PyPI trusted publishers and the protected pypi environment first.' >&2; exit 1; }
       - name: Download immutable validated wheel set
         env:
           GH_TOKEN: ${{ github.token }}

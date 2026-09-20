@@ -1,5 +1,7 @@
 """Validate the complete wheel set and write its release identity without executing wheel code."""
 import argparse
+import configparser
+import importlib.util
 from email.parser import BytesParser
 import hashlib
 import json
@@ -9,6 +11,10 @@ from zipfile import ZipFile
 
 ROOT = Path(__file__).resolve().parents[1]
 
+_packages_spec = importlib.util.spec_from_file_location("python_release_packages", ROOT / "scripts/python-release-packages.py")
+_packages_module = importlib.util.module_from_spec(_packages_spec)
+_packages_spec.loader.exec_module(_packages_module)
+
 
 def validate(directory):
     """Reject missing hosts, wrong package identities, alias drift and altered payload files."""
@@ -17,7 +23,8 @@ def validate(directory):
     support = json.loads((ROOT / "distribution/python-runtime.json").read_text())
     commit = subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip()
     expected = {f"pio_agent_platformio-{version}-py3-none-{target['wheelTag']}.whl":host for host,target in support["targets"].items()}
-    expected.update({f"{name.replace('-', '_')}-{version}-py3-none-any.whl":name for name in ["pio-agent","pio-mcp"]})
+    alias_specs = {item["name"]:item for item in _packages_module.aliases()}
+    expected.update({f"{name.replace('-', '_')}-{version}-py3-none-any.whl":name for name in alias_specs})
     actual = {item.name:item for item in directory.glob("*.whl")}
     if set(actual) != set(expected):
         raise ValueError(f"Wheel set differs: missing={set(expected)-set(actual)}, unexpected={set(actual)-set(expected)}")
@@ -59,7 +66,15 @@ def validate(directory):
             else:
                 if f"pio-agent-platformio=={version}" not in metadata.get_all("Requires-Dist",[]):
                     raise ValueError("Alias does not pin exact canonical release")
-                if any(name.endswith('/entry_points.txt') for name in names):
+                entry_files = [name for name in names if name.endswith('/entry_points.txt')]
+                if alias_specs[identity]["ownsCommand"]:
+                    if len(entry_files) != 1:
+                        raise ValueError("Alias command entrypoint missing")
+                    config = configparser.ConfigParser()
+                    config.read_string(archive.read(entry_files[0]).decode())
+                    if config.sections() != ["console_scripts"] or dict(config["console_scripts"]) != {identity: alias_specs[identity]["module"] + ".__main__:main"}:
+                        raise ValueError("Alias may only install its own command")
+                elif entry_files:
                     raise ValueError("Alias must not overwrite canonical command files")
                 module=identity.replace('-','_')+'_alias/__main__.py'
                 source=json.loads(archive.read(identity.replace("-", "_")+"_alias/source.json"))
