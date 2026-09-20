@@ -94787,8 +94787,15 @@ async function resolvePpk2Environment(projectDir, environment = process.env) {
     if (!configStat.isFile() || configStat.size > 16384 || !contains(root, await fs11.realpath(config2)))
       throw new Error("Invalid virtual environment configuration.");
     const settings = await fs11.readFile(config2, "utf8");
-    if (!/^include-system-site-packages\s*=\s*false\s*$/im.test(settings))
-      throw new Error("System site packages must be disabled.");
+    const inheritedPackages = settings.split(/\r?\n/).map((line) => {
+      const separator = line.indexOf("=");
+      return separator < 0 ? null : [
+        line.slice(0, separator).trim().toLowerCase(),
+        line.slice(separator + 1).trim().toLowerCase()
+      ];
+    }).filter((entry) => entry?.[0] === "include-system-site-packages");
+    if (inheritedPackages.length !== 1 || inheritedPackages[0]?.[1] !== "false")
+      throw new Error("System site packages must be unambiguously disabled.");
     const directory = path16.join(
       root,
       process.platform === "win32" ? "Scripts" : "bin"

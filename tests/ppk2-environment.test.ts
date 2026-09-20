@@ -71,3 +71,17 @@ it("rejects inherited system packages and missing venv configuration", async () 
     resolvePpk2Environment(project, { PIO_MCP_PPK2_ENV: environment }),
   ).rejects.toMatchObject({ code: "PPK2_ENV_INVALID" });
 });
+
+it.each([
+  "include-system-site-packages = false\ninclude-system-site-packages = true\n",
+  "include-system-site-packages = true\ninclude-system-site-packages = false\n",
+  "include-system-site-packages = false\n include-system-site-packages = false\n",
+])(
+  "rejects ambiguous virtual environment configuration: %s",
+  async (settings) => {
+    await fs.writeFile(path.join(environment, "pyvenv.cfg"), settings);
+    await expect(
+      resolvePpk2Environment(project, { PIO_MCP_PPK2_ENV: environment }),
+    ).rejects.toMatchObject({ code: "PPK2_ENV_INVALID" });
+  },
+);

@@ -1624,3 +1624,12 @@ Both native container jobs in run 35515440936 failed because PlatformIO 6.1.16 h
 ### Canonical power profiling in normal mode
 
 Added power_profile to the default MCP surface using the same serial/PPK2 implementation as pio_power_profile. Compatibility mode retains the reference alias. The alias inherits canonical deny and approval rules through power_profile -> start_monitor, while lower meter host/source permissions remain independent. Owned cleanup remains available without a new measurement grant. Real stdio checks cover listing/calling the canonical tool with compatibility disabled and enabled. The registry now advertises 58 tools normally and 98 with all 40 reference names enabled. This closes the MCP exposure gap for power profiling; CLI/dashboard and remaining PPK2 behavior/physical acceptance are still outstanding.
+
+
+### Completed non-publishing distribution validation
+
+Run 35515777379 succeeded on ef52feb65e89cc1dab063ebfa79f57b1e9acdc28: complete wheel set, five native installation jobs, native amd64/arm64 containers and aggregate release artifact assembly passed. Job results and artifact identities are retained in distribution-build-evidence.json. All publisher inputs were false; tag/final-publication gates were not exercised. This evidence does not cover subsequent canonical power or isolation-parser changes.
+
+### Unambiguous PPK2 environment isolation
+
+Virtual-environment validation now rejects duplicate include-system-site-packages entries instead of accepting any false line even when Python could read another true entry. Seven focused environment cases and TypeScript passed. This does not replace actual PPK2 physical acceptance.
