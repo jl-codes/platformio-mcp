@@ -90,6 +90,7 @@ export async function prepareDebuggerProject(
         projectDir,
         environment: args.environment,
         approvalId: args.configApprovalId,
+        deadline,
       },
       context,
     ),

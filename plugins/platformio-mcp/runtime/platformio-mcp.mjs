@@ -108180,6 +108180,21 @@ async function collectDebugConfiguration(input, caller = {}) {
       "Select one valid debugger environment.",
       "DEBUG_ENVIRONMENT_INVALID"
     );
+  if (input.deadline !== void 0 && !Number.isFinite(input.deadline))
+    throw new PlatformIOError(
+      "Invalid debugger configuration deadline.",
+      "DEBUG_CONFIG_LIMIT_INVALID"
+    );
+  const remaining = () => {
+    const timeout3 = input.deadline === void 0 ? 3e4 : Math.min(3e4, Math.floor(input.deadline - performance.now()));
+    if (timeout3 < 1)
+      throw new PlatformIOError(
+        "Debugger configuration deadline expired.",
+        "DEBUG_PREPARATION_TIMEOUT"
+      );
+    return timeout3;
+  };
+  remaining();
   const guard = createPolicyRevisionGuard(projectDir);
   return dispatchAuthorizedAction(
     "get_project_config",
@@ -108195,9 +108210,10 @@ async function collectDebugConfiguration(input, caller = {}) {
       const result = await platformioExecutor.execute(
         "project",
         ["config", "--json-output"],
-        { cwd: projectDir, timeout: 3e4 }
+        { cwd: projectDir, timeout: remaining() }
       );
       guard();
+      remaining();
       if (result.exitCode !== 0)
         throw new PlatformIOError(
           "Debugger configuration collection failed.",
@@ -108475,7 +108491,8 @@ async function prepareDebuggerProject(input, caller = {}, signal, checkpoint) {
       {
         projectDir,
         environment: args.environment,
-        approvalId: args.configApprovalId
+        approvalId: args.configApprovalId,
+        deadline
       },
       context
     )

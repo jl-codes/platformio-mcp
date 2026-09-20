@@ -106,3 +106,31 @@ it("denies configuration before invoking Core when its concrete action is denied
   ).rejects.toMatchObject({ code: "POLICY_DENIED" });
   expect(platformioExecutor.execute).not.toHaveBeenCalled();
 });
+
+it("caps configuration execution to the remaining workflow deadline", async () => {
+  vi.mocked(platformioExecutor.execute).mockResolvedValue({
+    stdout: configuration,
+    stderr: "",
+    exitCode: 0,
+  });
+  await collectDebugConfiguration({
+    projectDir: project,
+    deadline: performance.now() + 1000,
+  });
+  const timeout = vi.mocked(platformioExecutor.execute).mock.calls[0][2]
+    ?.timeout;
+  expect(timeout).toBeGreaterThan(0);
+  expect(timeout).toBeLessThanOrEqual(1000);
+});
+it("rejects expired or invalid deadlines before launching Core", async () => {
+  for (const deadline of [performance.now() - 1, NaN, Infinity]) {
+    await expect(
+      collectDebugConfiguration({ projectDir: project, deadline }),
+    ).rejects.toMatchObject({
+      code: Number.isFinite(deadline)
+        ? "DEBUG_PREPARATION_TIMEOUT"
+        : "DEBUG_CONFIG_LIMIT_INVALID",
+    });
+  }
+  expect(platformioExecutor.execute).not.toHaveBeenCalled();
+});

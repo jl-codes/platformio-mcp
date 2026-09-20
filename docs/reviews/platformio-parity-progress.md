@@ -2083,3 +2083,10 @@ Removed the early host_unreachable return on negative ICMP. The pinned reference
 ### Dependency CLI test timing (2026-09-20)
 
 CI run 35533859317 timed out the dependency CLI case at five seconds while it sequentially launched three subprocesses, each individually allowed fifteen seconds. Split the two invalid-option invocations and concrete-denial invocation into independent twenty-second cases, retaining their exact argument/denial assertions and no-project-side-effect checks. All three affected cases passed locally; the remaining 23 cases were intentionally not rerun by the focused filter. Product timeout and policy behavior are unchanged.
+
+### 2026-09-20: Bound initial debugger configuration to the workflow deadline
+
+- Forward the host-owned monotonic preparation deadline into computed environment discovery. Cap its Core subprocess at the remaining time (and the existing 30-second maximum), reject invalid/expired deadlines before launch, and reject results returned after expiration. The deadline remains outside the stable authorization identity.
+- Validation: nine focused debugger configuration tests passed; TypeScript checking passed; plugin runtime and inventory regenerated. No hardware operation or smoke-test suite ran.
+- PR head 04001777 contains the previously queued contract evidence and CLI timing correction. CI runs 35534460284 and 35534458295 are still in progress; this follow-up stays local until those runs finish.
+- Current PPK2 tool documentation already supports explicit multi-interface selection; do not retain that as an assumed missing implementation. Physical PPK2 acceptance remains unverified.

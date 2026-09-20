@@ -71,7 +71,12 @@ export function selectDebugConfiguration(
 
 /** Read computed configuration without launching a build, GDB, backend, or probe operation. */
 export async function collectDebugConfiguration(
-  input: { projectDir: string; environment?: string; approvalId?: string },
+  input: {
+    projectDir: string;
+    environment?: string;
+    approvalId?: string;
+    deadline?: number; // Host-owned monotonic deadline; excluded from approval identity.
+  },
   caller: PolicyEvaluationContext = {},
 ): Promise<SelectedDebugConfiguration> {
   const projectDir = validateProjectPath(input.projectDir);
@@ -84,6 +89,24 @@ export async function collectDebugConfiguration(
       "Select one valid debugger environment.",
       "DEBUG_ENVIRONMENT_INVALID",
     );
+  if (input.deadline !== undefined && !Number.isFinite(input.deadline))
+    throw new PlatformIOError(
+      "Invalid debugger configuration deadline.",
+      "DEBUG_CONFIG_LIMIT_INVALID",
+    );
+  const remaining = () => {
+    const timeout =
+      input.deadline === undefined
+        ? 30000
+        : Math.min(30000, Math.floor(input.deadline - performance.now()));
+    if (timeout < 1)
+      throw new PlatformIOError(
+        "Debugger configuration deadline expired.",
+        "DEBUG_PREPARATION_TIMEOUT",
+      );
+    return timeout;
+  };
+  remaining();
   const guard = createPolicyRevisionGuard(projectDir);
   return dispatchAuthorizedAction(
     "get_project_config",
@@ -99,9 +122,10 @@ export async function collectDebugConfiguration(
       const result = await platformioExecutor.execute(
         "project",
         ["config", "--json-output"],
-        { cwd: projectDir, timeout: 30000 },
+        { cwd: projectDir, timeout: remaining() },
       );
       guard();
+      remaining();
       if (result.exitCode !== 0)
         throw new PlatformIOError(
           "Debugger configuration collection failed.",
