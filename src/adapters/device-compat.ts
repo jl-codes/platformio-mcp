@@ -2,6 +2,17 @@
  * Reference serial-device presentation without opening ports or asserting hardware identity.
  * Provides projectCompatibilityDevices for authorized discovery adapters.
  */
+import fs from "node:fs/promises";
+import path from "node:path";
+import { z } from "zod";
+import { SerialClientContext } from "./serial-client.js";
+import type { CompatibilityProjectDefaults } from "./compatibility-project.js";
+import type { PolicyEvaluationContext } from "../core/policy/types.js";
+import type { RegisteredTool } from "../mcp/tool-registry.js";
+import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
+import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
+import { listDevicesCore } from "../core/devices.js";
+import { PlatformIOError } from "../utils/errors.js";
 import type { SerialDevice } from "../types.js";
 
 // Hint patterns adapted from the pinned reference devices.py; these are not identity checks.
@@ -39,4 +50,95 @@ export function projectCompatibilityDevices(devices: readonly SerialDevice[]) {
     devices: rows,
     likely_ports: likely,
   };
+}
+
+/** Discover devices and caller-owned sessions through both canonical permission checks. */
+export async function executeDeviceCompatibility(
+  client: SerialClientContext,
+  name: string,
+  input: unknown,
+  defaults: CompatibilityProjectDefaults = {},
+  caller: PolicyEvaluationContext = {},
+  onAuthorized?: () => Promise<void>,
+) {
+  if (name !== "pio_list_devices")
+    throw new PlatformIOError(
+      "Unknown device compatibility tool.",
+      "COMPAT_TOOL_UNKNOWN",
+    );
+  const params = z
+    .object({
+      approval_id: z.string().max(256).optional(),
+      monitor_approval_id: z.string().max(256).optional(),
+    })
+    .strict()
+    .parse(input);
+  const projectDir = await fs.realpath(
+    path.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd()),
+  );
+  const guard = createPolicyRevisionGuard(projectDir);
+  return client.run(
+    { approvalId: params.monitor_approval_id, caller },
+    (service, owner) =>
+      dispatchAuthorizedAction(
+        "list_devices",
+        { projectDir, approvalId: params.approval_id },
+        { ...caller, workspaceDir: projectDir },
+        async () => {
+          await onAuthorized?.();
+          const sessions = await service.listSessions(owner, projectDir);
+          guard();
+          const devices = await listDevicesCore();
+          guard();
+          return {
+            ...projectCompatibilityDevices(devices),
+            open_monitor_sessions: sessions.map((session) => ({
+              session_id: session.sessionId,
+              port: session.path,
+              baud: session.baudRate,
+              lines_buffered: session.linesBuffered,
+              next_cursor: session.nextCursor,
+              bytes_received: session.bytesReceived,
+              uptime_s:
+                Math.round(
+                  Math.max(0, Date.now() - Date.parse(session.startedAt)) / 100,
+                ) / 10,
+              closed: ["stopped", "disconnected", "error"].includes(
+                session.state,
+              ),
+              error:
+                session.cleanupError ??
+                (session.state === "error" ? "SERIAL_TRANSPORT_ERROR" : null),
+              cleanup_pending: session.cleanupPending,
+            })),
+          };
+        },
+      ),
+  );
+}
+
+/** Add the explicitly enabled alias without changing canonical discovery metadata. */
+export function withDeviceCompatibility<TResult>(
+  base: ReadonlyMap<string, RegisteredTool<TResult>>,
+) {
+  const source = base.get("list_devices");
+  if (!source || base.has("pio_list_devices"))
+    throw new Error("Invalid device compatibility registry");
+  const result = new Map(base);
+  result.set("pio_list_devices", {
+    ...source,
+    name: "pio_list_devices",
+    description:
+      "List serial device hints and caller-owned monitor sessions under canonical permissions.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approval_id: { type: "string" },
+        monitor_approval_id: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+    handler: (args, context) => context.dispatch("pio_list_devices", args),
+  });
+  return result;
 }

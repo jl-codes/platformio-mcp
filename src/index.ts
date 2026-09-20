@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+import {
+  executeDeviceCompatibility,
+  withDeviceCompatibility,
+} from "./adapters/device-compat.js";
 import { SerialClientContext } from "./adapters/serial-client.js";
 import { readRuntimeVersion } from "./utils/runtime-version.js";
 
@@ -1573,6 +1577,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_list_targets",
   ].includes(name);
   const dependencyCompatibility = name === "pio_deps_check";
+  const deviceCompatibility = name === "pio_list_devices";
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name,
   );
@@ -1580,7 +1585,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     packageCompatibility ||
     projectCompatibility ||
     dependencyCompatibility ||
-    boardCompatibility;
+    boardCompatibility ||
+    deviceCompatibility;
   const projectInspection = [
     "project_envs",
     "project_metadata",
@@ -1637,13 +1643,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               tool === "deps_check"
                 ? inspectDependencies(parameters, caller, onAuthorized)
                 : compatibilityTool
-                  ? (boardCompatibility
-                      ? executeBoardCompatibility
-                      : dependencyCompatibility
-                        ? executeDependencyCompatibility
-                        : projectCompatibility
-                          ? executeProjectCompatibility
-                          : executePackageCompatibility)(
+                  ? (deviceCompatibility
+                      ? executeDeviceCompatibility.bind(null, serialClient)
+                      : boardCompatibility
+                        ? executeBoardCompatibility
+                        : dependencyCompatibility
+                          ? executeDependencyCompatibility
+                          : projectCompatibility
+                            ? executeProjectCompatibility
+                            : executePackageCompatibility)(
                       tool,
                       parameters,
                       {
@@ -2600,8 +2608,10 @@ async function main() {
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
     toolRegistry = withDependencyCompatibility(
-      withBoardCompatibility(
-        withProjectCompatibility(withPackageCompatibility(toolRegistry)),
+      withDeviceCompatibility(
+        withBoardCompatibility(
+          withProjectCompatibility(withPackageCompatibility(toolRegistry)),
+        ),
       ),
     );
   }

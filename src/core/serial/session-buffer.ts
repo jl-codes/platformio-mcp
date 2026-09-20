@@ -176,6 +176,16 @@ export class SerialSessionBuffer {
     this.changed();
   }
 
+  /** Return bounded accounting only; no retained serial content is disclosed. */
+  metadata() {
+    return {
+      linesBuffered: this.count,
+      nextCursor: this.nextCursor,
+      bytesReceived: this.received,
+      state: this.state,
+    };
+  }
+
   /** Snapshot without waiting; no cursor is advanced beyond the data actually returned. */
   snapshot(
     options: Pick<SerialReadOptions, "cursor" | "maxLines" | "maxBytes"> = {},

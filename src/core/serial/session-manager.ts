@@ -70,6 +70,9 @@ export interface SerialSessionDependencies {
 }
 /** Bounded inspection state, available to its owner even when policy prevents new work. */
 export interface SerialSessionInfo {
+  linesBuffered: number;
+  nextCursor: number;
+  bytesReceived: number;
   sessionId: string;
   projectDir: string;
   path: string;
@@ -656,7 +659,11 @@ export class SerialSessionManager {
     }
   }
   private info(session: Session): SerialSessionInfo {
+    const metadata = session.buffer.metadata();
     return {
+      linesBuffered: metadata.linesBuffered,
+      nextCursor: metadata.nextCursor,
+      bytesReceived: metadata.bytesReceived,
       sessionId: session.id,
       projectDir: session.request.projectDir,
       path: session.request.path,
@@ -664,9 +671,7 @@ export class SerialSessionManager {
       startedAt: session.startedAt,
       state:
         session.transport?.state ??
-        (session.startPending
-          ? "authorizing"
-          : session.buffer.snapshot().state),
+        (session.startPending ? "authorizing" : metadata.state),
       cleanupPending: this.cleanupPending(session),
       cleanupError: session.cleanupError,
     };
