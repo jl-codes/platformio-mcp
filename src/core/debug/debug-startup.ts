@@ -1,4 +1,5 @@
 /** Join trusted debugger selection, authorization, retained ELF lifetime and recoverable startup cleanup. */
+import { createHash } from "node:crypto";
 import { dispatchAuthorizedAction } from "../action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../policy/revision-guard.js";
 import type { PolicyEvaluationContext } from "../policy/types.js";
@@ -35,6 +36,22 @@ export function startPreparedDebugger(
   selection: PreparedDebuggerStartup,
   caller: PolicyEvaluationContext = {},
 ): Promise<string> {
+  const requestIdentity = createHash("sha256")
+    .update(
+      JSON.stringify({
+        projectDir: selection.projectDir,
+        environment: selection.environment,
+        executable: selection.executable,
+        roots: selection.trustedDebuggerRoots,
+        elfPath: selection.elfPath,
+        expectedElfSha256: selection.expectedElfSha256,
+        host: selection.target.host,
+        port: selection.target.port,
+        load: selection.target.load,
+        timeoutMs: selection.target.timeoutMs ?? 90000,
+      }),
+    )
+    .digest("hex");
   return sessions.start(
     selection.projectDir,
     selection.environment,
@@ -105,5 +122,6 @@ export function startPreparedDebugger(
         },
       );
     },
+    requestIdentity,
   );
 }

@@ -23,6 +23,11 @@ export class DebugClientSessions {
   >();
   private readonly starting = new Set<Promise<unknown>>();
   private readonly stopping = new Map<string, Promise<void>>();
+  private readonly approvalReservations = new Map<
+    string,
+    { id: string; expires: number }
+  >();
+  private readonly activeRequests = new Set<string>();
   private closed = false;
 
   /** Reserve capacity before asynchronous startup and clean up if the connection closes meanwhile. */
@@ -30,6 +35,7 @@ export class DebugClientSessions {
     projectDir: string,
     environment: string,
     launch: (sessionId: string) => Promise<OwnedDebugProcess>,
+    requestIdentity?: string,
   ): Promise<string> {
     if (this.closed)
       throw new PlatformIOError(
@@ -41,12 +47,43 @@ export class DebugClientSessions {
         "This connection already owns eight debugger sessions.",
         "DEBUG_SESSION_LIMIT",
       );
+    if (
+      requestIdentity !== undefined &&
+      !/^[a-f0-9]{64}$/.test(requestIdentity)
+    )
+      throw new PlatformIOError(
+        "Invalid debugger request identity.",
+        "DEBUG_REQUEST_INVALID",
+      );
+    for (const [key, reservation] of this.approvalReservations) {
+      if (reservation.expires <= Date.now())
+        this.approvalReservations.delete(key);
+    }
+    if (requestIdentity && this.activeRequests.has(requestIdentity))
+      throw new PlatformIOError(
+        "An identical debugger startup is already running.",
+        "DEBUG_START_BUSY",
+      );
+    if (
+      requestIdentity &&
+      !this.approvalReservations.has(requestIdentity) &&
+      this.approvalReservations.size >= 8
+    )
+      throw new PlatformIOError(
+        "Pending debugger approvals have reached capacity.",
+        "DEBUG_SESSION_LIMIT",
+      );
+    const id =
+      (requestIdentity
+        ? this.approvalReservations.get(requestIdentity)?.id
+        : undefined) ?? randomUUID();
+    if (requestIdentity) this.activeRequests.add(requestIdentity);
     // Defer launch until its promise is tracked, including synchronous launch failures.
-    const id = randomUUID();
     const pending = Promise.resolve().then(() => launch(id));
     this.starting.add(pending);
     try {
       const process = await pending;
+      if (requestIdentity) this.approvalReservations.delete(requestIdentity);
       this.sessions.set(id, { process, projectDir, environment });
       if (this.closed) {
         await this.stop(id);
@@ -57,6 +94,18 @@ export class DebugClientSessions {
       }
       return id;
     } catch (error) {
+      if (requestIdentity) {
+        if (
+          !this.closed &&
+          error instanceof PlatformIOError &&
+          error.code === "APPROVAL_REQUIRED"
+        )
+          this.approvalReservations.set(requestIdentity, {
+            id,
+            expires: Date.now() + 15 * 60_000,
+          });
+        else this.approvalReservations.delete(requestIdentity);
+      }
       if (error instanceof DebugStartupFailure) {
         this.sessions.set(id, {
           process: error.cleanupOwner(),
@@ -72,6 +121,7 @@ export class DebugClientSessions {
       throw error;
     } finally {
       this.starting.delete(pending);
+      if (requestIdentity) this.activeRequests.delete(requestIdentity);
     }
   }
 
@@ -128,6 +178,7 @@ export class DebugClientSessions {
   /** Refuse new work, await in-flight starts and retain failures for later cleanup retries. */
   async close() {
     this.closed = true;
+    this.approvalReservations.clear();
     await Promise.allSettled([...this.starting]);
     const results = await Promise.allSettled(
       [...this.sessions.keys()].map((id) => this.stop(id)),

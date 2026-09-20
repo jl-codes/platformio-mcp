@@ -1241,3 +1241,7 @@ Initialization failures with unconfirmed probe cleanup now carry an internal, no
 ### Prepared debugger startup orchestration
 
 Joined target-effect preflight, host-command authorization, private ELF retention, host-supplied probe custody, controlled GDB launch and target attachment. Confirmed cleanup releases the ELF; unconfirmed startup/attachment cleanup transfers process and artifact ownership to the connection registry. Eight focused orchestration/MI cases passed with mocked launch/artifact acquisition and real policy; TypeScript and lint passed. This internal prepared-start path does not yet provide public probe discovery, stable approval-retry reservations or physical acceptance.
+
+### Stable debugger startup retry identity
+
+Prepared startup hashes its concrete project/environment, executable roots, ELF selection, destination, load mode and timeout independently of approval IDs. Connection-owned reservations preserve the generated session ID only across approval-required retries, expire after 15 minutes, and are removed after success/other failure/disconnect. Pending reservations are bounded to eight; simultaneous duplicate requests are rejected before a second launch. Eleven focused registry/orchestration cases, TypeScript and lint passed. Complete public approval-ledger replay and probe discovery remain to be integrated.
