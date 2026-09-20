@@ -876,3 +876,8 @@ The existing test runner now accepts trusted inclusion/exclusion globs, separate
 
 Added a bounded parser for PlatformIO JSON test reports, retaining suite/environment/status/duration and case name/status/message-or-exception/source location. It rejects malformed/incomplete reports, unfinished case statuses and aggregate counters inconsistent with case evidence rather than declaring a false pass. Explicit zero-case reports retain zero cases. TypeScript and three focused parser checks passed. The stricter completeness rules require confirmation against native real reports before acceptance; report lifecycle and public adapter wiring remain pending. Parser is not yet reachable from the shipped runtime, so no unnecessary plugin rebuild was performed. No publication occurred.
 
+
+### Owned test reports and canonical foreground access
+
+Added private unique foreground test-report files, bounded redacted parsing and nonrecursive cleanup of the owned file/empty directory after completion. Unconfirmed process termination retains the destination and propagates cleanupPending with retainedReportPath. Missing/invalid report data cannot override command success into a passing result. Canonical run_tests accepts structuredReport for foreground calls under its existing authorization/lock; existing defaults are preserved, and background+structuredReport is explicitly rejected pending lifecycle support. TypeScript and six focused mocked report/parser checks passed; plugin rebuilt. Public pio_test, target/lease integration and real native/hardware report acceptance remain pending. No publication performed.
+

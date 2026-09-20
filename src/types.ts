@@ -186,6 +186,8 @@ export interface BuildResult {
   taskId?: string; // UUID mapping to the background invocation
   logPaths?: string[]; // Array of associated trailing paths
   rawLogPath?: string; // Full path to the captured raw log when available
+  testReport?: ReturnType<typeof import("./core/analysis/test-report.js").summarizeTestOutput>; // Validated foreground test case report.
+  testReportError?: string; // Explicit missing/invalid report instead of a false passing result.
   analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Structured diagnostic summary for agent-safe recovery flows
 }
@@ -235,6 +237,8 @@ export interface UploadResult {
   taskId?: string; // UUID mapping to the background invocation
   logPaths?: string[]; // Array of associated trailing paths
   rawLogPath?: string; // Full path to the captured raw log when available
+  testReport?: ReturnType<typeof import("./core/analysis/test-report.js").summarizeTestOutput>; // Validated foreground test case report.
+  testReportError?: string; // Explicit missing/invalid report instead of a false passing result.
   analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Structured diagnostic summary for agent-safe recovery flows
 }
@@ -516,6 +520,7 @@ export const CheckProjectParamsSchema = z.object({
 
 // Run tests parameters
 export const RunTestsParamsSchema = z.object({
+  structuredReport: z.boolean().optional().describe("Collect per-case results for a foreground test run"),
   projectDir: z
     .string()
     .min(1)
@@ -1007,6 +1012,8 @@ export interface AgentFlashMonitorVerifyResult {
   unmatchedExpectations: string[]; // Expected runtime markers not observed
   rejectedPatterns: string[]; // Rejected runtime patterns that appeared
   detectedRuntimeErrors: string[]; // Built-in runtime failures detected
+  testReport?: ReturnType<typeof import("./core/analysis/test-report.js").summarizeTestOutput>; // Validated foreground test case report.
+  testReportError?: string; // Explicit missing/invalid report instead of a false passing result.
   analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Upload-stage diagnostic payload when relevant
   recommendedNextAction: string; // Single recommended next step

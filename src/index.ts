@@ -100,6 +100,7 @@ import {
   getSystemInfo,
   getProjectContext,
 } from "./tools/projects.js";
+import { runTestsWithReport } from "./core/test-report-execution.js";
 import { cleanProject, checkProject, runTests } from "./tools/build.js";
 import { uploadFilesystem } from "./tools/upload.js";
 import {
@@ -1476,6 +1477,7 @@ const toolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        structuredReport: { type: "boolean", description: "Include per-case results for foreground runs; cannot be combined with background" },
         projectDir: {
           type: "string",
           description:
@@ -2456,7 +2458,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
               case "run_tests": {
                 const params = RunTestsParamsSchema.parse(args);
-                const executeTask = () =>
+                if (params.structuredReport && params.background)
+                  throw new PlatformIOError("Structured test reports require foreground execution", "INVALID_ARGUMENT");
+                const executeTask = () => params.structuredReport
+                  ? runTestsWithReport(params.projectDir, params.environment, params.compileOnly)
+                  :
                   runTests(
                     params.projectDir,
                     params.environment,

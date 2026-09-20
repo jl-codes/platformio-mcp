@@ -460,8 +460,8 @@ var init_parseUtil = __esm({
     init_errors();
     init_en();
     makeIssue = (params) => {
-      const { data, path: path54, errorMaps, issueData } = params;
-      const fullPath = [...path54, ...issueData.path || []];
+      const { data, path: path55, errorMaps, issueData } = params;
+      const fullPath = [...path55, ...issueData.path || []];
       const fullIssue = {
         ...issueData,
         path: fullPath
@@ -769,11 +769,11 @@ var init_types = __esm({
     init_parseUtil();
     init_util();
     ParseInputLazyPath = class {
-      constructor(parent, value2, path54, key) {
+      constructor(parent, value2, path55, key) {
         this._cachedPath = [];
         this.parent = parent;
         this.data = value2;
-        this._path = path54;
+        this._path = path55;
         this._key = key;
       }
       get path() {
@@ -4231,17 +4231,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path54) {
-      const ctrl = callVisitor(key, node, visitor, path54);
+    function visit_(key, node, visitor, path55) {
+      const ctrl = callVisitor(key, node, visitor, path55);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path54, ctrl);
-        return visit_(key, ctrl, visitor, path54);
+        replaceNode(key, path55, ctrl);
+        return visit_(key, ctrl, visitor, path55);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path54 = Object.freeze(path54.concat(node));
+          path55 = Object.freeze(path55.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path54);
+            const ci = visit_(i, node.items[i], visitor, path55);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -4252,13 +4252,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path54 = Object.freeze(path54.concat(node));
-          const ck = visit_("key", node.key, visitor, path54);
+          path55 = Object.freeze(path55.concat(node));
+          const ck = visit_("key", node.key, visitor, path55);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path54);
+          const cv = visit_("value", node.value, visitor, path55);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -4279,17 +4279,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path54) {
-      const ctrl = await callVisitor(key, node, visitor, path54);
+    async function visitAsync_(key, node, visitor, path55) {
+      const ctrl = await callVisitor(key, node, visitor, path55);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path54, ctrl);
-        return visitAsync_(key, ctrl, visitor, path54);
+        replaceNode(key, path55, ctrl);
+        return visitAsync_(key, ctrl, visitor, path55);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path54 = Object.freeze(path54.concat(node));
+          path55 = Object.freeze(path55.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path54);
+            const ci = await visitAsync_(i, node.items[i], visitor, path55);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -4300,13 +4300,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path54 = Object.freeze(path54.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path54);
+          path55 = Object.freeze(path55.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path55);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path54);
+          const cv = await visitAsync_("value", node.value, visitor, path55);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -4333,23 +4333,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path54) {
+    function callVisitor(key, node, visitor, path55) {
       if (typeof visitor === "function")
-        return visitor(key, node, path54);
+        return visitor(key, node, path55);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path54);
+        return visitor.Map?.(key, node, path55);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path54);
+        return visitor.Seq?.(key, node, path55);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path54);
+        return visitor.Pair?.(key, node, path55);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path54);
+        return visitor.Scalar?.(key, node, path55);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path54);
+        return visitor.Alias?.(key, node, path55);
       return void 0;
     }
-    function replaceNode(key, path54, node) {
-      const parent = path54[path54.length - 1];
+    function replaceNode(key, path55, node) {
+      const parent = path55[path55.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -4722,8 +4722,8 @@ var require_Node = __commonJS({
         };
         const res = toJS.toJS(this, "", ctx);
         if (typeof onAnchor === "function")
-          for (const { count, res: res2 } of ctx.anchors.values())
-            onAnchor(res2, count);
+          for (const { count: count2, res: res2 } of ctx.anchors.values())
+            onAnchor(res2, count2);
         return typeof reviver === "function" ? applyReviver.applyReviver(reviver, { "": res }, "", res) : res;
       }
     };
@@ -4831,13 +4831,13 @@ var require_Alias = __commonJS({
         const anchor = anchors2 && source && anchors2.get(source);
         return anchor ? anchor.count * anchor.aliasCount : 0;
       } else if (identity.isCollection(node)) {
-        let count = 0;
+        let count2 = 0;
         for (const item of node.items) {
           const c = getAliasCount(doc, item, anchors2);
-          if (c > count)
-            count = c;
+          if (c > count2)
+            count2 = c;
         }
-        return count;
+        return count2;
       } else if (identity.isPair(node)) {
         const kc = getAliasCount(doc, node.key, anchors2);
         const vc = getAliasCount(doc, node.value, anchors2);
@@ -4961,10 +4961,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema3, path54, value2) {
+    function collectionFromPath(schema3, path55, value2) {
       let v = value2;
-      for (let i = path54.length - 1; i >= 0; --i) {
-        const k = path54[i];
+      for (let i = path55.length - 1; i >= 0; --i) {
+        const k = path55[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -4983,7 +4983,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path54) => path54 == null || typeof path54 === "object" && !!path54[Symbol.iterator]().next().done;
+    var isEmptyPath = (path55) => path55 == null || typeof path55 === "object" && !!path55[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema3) {
         super(type);
@@ -5013,11 +5013,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path54, value2) {
-        if (isEmptyPath(path54))
+      addIn(path55, value2) {
+        if (isEmptyPath(path55))
           this.add(value2);
         else {
-          const [key, ...rest] = path54;
+          const [key, ...rest] = path55;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value2);
@@ -5031,8 +5031,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path54) {
-        const [key, ...rest] = path54;
+      deleteIn(path55) {
+        const [key, ...rest] = path55;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -5046,8 +5046,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path54, keepScalar) {
-        const [key, ...rest] = path54;
+      getIn(path55, keepScalar) {
+        const [key, ...rest] = path55;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -5065,8 +5065,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path54) {
-        const [key, ...rest] = path54;
+      hasIn(path55) {
+        const [key, ...rest] = path55;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -5076,8 +5076,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path54, value2) {
-        const [key, ...rest] = path54;
+      setIn(path55, value2) {
+        const [key, ...rest] = path55;
         if (rest.length === 0) {
           this.set(key, value2);
         } else {
@@ -5121,14 +5121,14 @@ var require_foldFlowLines = __commonJS({
     var FOLD_FLOW = "flow";
     var FOLD_BLOCK = "block";
     var FOLD_QUOTED = "quoted";
-    function foldFlowLines(text6, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
+    function foldFlowLines(text7, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
       if (!lineWidth || lineWidth < 0)
-        return text6;
+        return text7;
       if (lineWidth < minContentWidth)
         minContentWidth = 0;
       const endStep = Math.max(1 + minContentWidth, 1 + lineWidth - indent.length);
-      if (text6.length <= endStep)
-        return text6;
+      if (text7.length <= endStep)
+        return text7;
       const folds = [];
       const escapedFolds = {};
       let end = lineWidth - indent.length;
@@ -5145,14 +5145,14 @@ var require_foldFlowLines = __commonJS({
       let escStart = -1;
       let escEnd = -1;
       if (mode === FOLD_BLOCK) {
-        i = consumeMoreIndentedLines(text6, i, indent.length);
+        i = consumeMoreIndentedLines(text7, i, indent.length);
         if (i !== -1)
           end = i + endStep;
       }
-      for (let ch; ch = text6[i += 1]; ) {
+      for (let ch; ch = text7[i += 1]; ) {
         if (mode === FOLD_QUOTED && ch === "\\") {
           escStart = i;
-          switch (text6[i + 1]) {
+          switch (text7[i + 1]) {
             case "x":
               i += 3;
               break;
@@ -5169,12 +5169,12 @@ var require_foldFlowLines = __commonJS({
         }
         if (ch === "\n") {
           if (mode === FOLD_BLOCK)
-            i = consumeMoreIndentedLines(text6, i, indent.length);
+            i = consumeMoreIndentedLines(text7, i, indent.length);
           end = i + indent.length + endStep;
           split = void 0;
         } else {
           if (ch === " " && prev && prev !== " " && prev !== "\n" && prev !== "	") {
-            const next = text6[i + 1];
+            const next = text7[i + 1];
             if (next && next !== " " && next !== "\n" && next !== "	")
               split = i;
           }
@@ -5186,12 +5186,12 @@ var require_foldFlowLines = __commonJS({
             } else if (mode === FOLD_QUOTED) {
               while (prev === " " || prev === "	") {
                 prev = ch;
-                ch = text6[i += 1];
+                ch = text7[i += 1];
                 overflow = true;
               }
               const j = i > escEnd + 1 ? i - 2 : escStart - 1;
               if (escapedFolds[j])
-                return text6;
+                return text7;
               folds.push(j);
               escapedFolds[j] = true;
               end = j + endStep;
@@ -5206,39 +5206,39 @@ var require_foldFlowLines = __commonJS({
       if (overflow && onOverflow)
         onOverflow();
       if (folds.length === 0)
-        return text6;
+        return text7;
       if (onFold)
         onFold();
-      let res = text6.slice(0, folds[0]);
+      let res = text7.slice(0, folds[0]);
       for (let i2 = 0; i2 < folds.length; ++i2) {
         const fold = folds[i2];
-        const end2 = folds[i2 + 1] || text6.length;
+        const end2 = folds[i2 + 1] || text7.length;
         if (fold === 0)
           res = `
-${indent}${text6.slice(0, end2)}`;
+${indent}${text7.slice(0, end2)}`;
         else {
           if (mode === FOLD_QUOTED && escapedFolds[fold])
-            res += `${text6[fold]}\\`;
+            res += `${text7[fold]}\\`;
           res += `
-${indent}${text6.slice(fold + 1, end2)}`;
+${indent}${text7.slice(fold + 1, end2)}`;
         }
       }
       return res;
     }
-    function consumeMoreIndentedLines(text6, i, indent) {
+    function consumeMoreIndentedLines(text7, i, indent) {
       let end = i;
       let start = i + 1;
-      let ch = text6[start];
+      let ch = text7[start];
       while (ch === " " || ch === "	") {
         if (i < start + indent) {
-          ch = text6[++i];
+          ch = text7[++i];
         } else {
           do {
-            ch = text6[++i];
+            ch = text7[++i];
           } while (ch && ch !== "\n");
           end = i;
           start = i + 1;
-          ch = text6[start];
+          ch = text7[start];
         }
       }
       return end;
@@ -7592,9 +7592,9 @@ var require_Document = __commonJS({
           this.contents.add(value2);
       }
       /** Adds a value to the document. */
-      addIn(path54, value2) {
+      addIn(path55, value2) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path54, value2);
+          this.contents.addIn(path55, value2);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -7669,14 +7669,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path54) {
-        if (Collection.isEmptyPath(path54)) {
+      deleteIn(path55) {
+        if (Collection.isEmptyPath(path55)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path54) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path55) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -7691,10 +7691,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path54, keepScalar) {
-        if (Collection.isEmptyPath(path54))
+      getIn(path55, keepScalar) {
+        if (Collection.isEmptyPath(path55))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path54, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path55, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -7705,10 +7705,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path54) {
-        if (Collection.isEmptyPath(path54))
+      hasIn(path55) {
+        if (Collection.isEmptyPath(path55))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path54) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path55) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -7725,13 +7725,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path54, value2) {
-        if (Collection.isEmptyPath(path54)) {
+      setIn(path55, value2) {
+        if (Collection.isEmptyPath(path55)) {
           this.contents = value2;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path54), value2);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path55), value2);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path54, value2);
+          this.contents.setIn(path55, value2);
         }
       }
       /**
@@ -7790,8 +7790,8 @@ var require_Document = __commonJS({
         };
         const res = toJS.toJS(this.contents, jsonArg ?? "", ctx);
         if (typeof onAnchor === "function")
-          for (const { count, res: res2 } of ctx.anchors.values())
-            onAnchor(res2, count);
+          for (const { count: count2, res: res2 } of ctx.anchors.values())
+            onAnchor(res2, count2);
         return typeof reviver === "function" ? applyReviver.applyReviver(reviver, { "": res }, "", res) : res;
       }
       /**
@@ -7868,12 +7868,12 @@ var require_errors = __commonJS({
         lineStr = prev + lineStr;
       }
       if (/[^ ]/.test(lineStr)) {
-        let count = 1;
+        let count2 = 1;
         const end = error2.linePos[1];
         if (end?.line === line && end.col > col) {
-          count = Math.max(1, Math.min(end.col - col, 80 - ci));
+          count2 = Math.max(1, Math.min(end.col - col, 80 - ci));
         }
-        const pointer = " ".repeat(ci) + "^".repeat(count);
+        const pointer = " ".repeat(ci) + "^".repeat(count2);
         error2.message += `:
 
 ${lineStr}
@@ -9692,9 +9692,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path54) => {
+    visit.itemAtPath = (cst, path55) => {
       let item = cst;
-      for (const [field2, index] of path54) {
+      for (const [field2, index] of path55) {
         const tok = item?.[field2];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -9703,23 +9703,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path54) => {
-      const parent = visit.itemAtPath(cst, path54.slice(0, -1));
-      const field2 = path54[path54.length - 1][0];
+    visit.parentCollection = (cst, path55) => {
+      const parent = visit.itemAtPath(cst, path55.slice(0, -1));
+      const field2 = path55[path55.length - 1][0];
       const coll = parent?.[field2];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path54, item, visitor) {
-      let ctrl = visitor(item, path54);
+    function _visit(path55, item, visitor) {
+      let ctrl = visitor(item, path55);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field2 of ["key", "value"]) {
         const token = item[field2];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path54.concat([[field2, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path55.concat([[field2, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -9730,10 +9730,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field2 === "key")
-            ctrl = ctrl(item, path54);
+            ctrl = ctrl(item, path55);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path54) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path55) : ctrl;
     }
     exports.visit = visit;
   }
@@ -11035,14 +11035,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs52 = this.flowScalar(this.type);
+              const fs53 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs52, sep: [] });
+                map.items.push({ start, key: fs53, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs52);
+                this.stack.push(fs53);
               } else {
-                Object.assign(it, { key: fs52, sep: [] });
+                Object.assign(it, { key: fs53, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -11170,13 +11170,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs52 = this.flowScalar(this.type);
+              const fs53 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs52, sep: [] });
+                fc.items.push({ start: [], key: fs53, sep: [] });
               else if (it.sep)
-                this.stack.push(fs52);
+                this.stack.push(fs53);
               else
-                Object.assign(it, { key: fs52, sep: [] });
+                Object.assign(it, { key: fs53, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -11537,7 +11537,7 @@ Troubleshooting:
 2. Verify internet connection
 3. Try updating library registry: pio lib update`;
   }
-  if (error2 instanceof PlatformIOError) {
+  if (error2 instanceof PlatformIOError2) {
     let message = error2.message;
     if (error2.context) {
       message += "\n\nContext: " + JSON.stringify(error2.context, null, 2);
@@ -11729,11 +11729,11 @@ function isPlatformIONotFoundError(error2) {
   }
   return false;
 }
-var PlatformIOError, PlatformIONotInstalledError, BoardNotFoundError, ProjectInitError, BuildError, UploadError, LibraryError, CommandTimeoutError;
+var PlatformIOError2, PlatformIONotInstalledError, BoardNotFoundError, ProjectInitError, BuildError, UploadError, LibraryError, CommandTimeoutError;
 var init_errors2 = __esm({
   "src/utils/errors.ts"() {
     "use strict";
-    PlatformIOError = class extends Error {
+    PlatformIOError2 = class extends Error {
       constructor(message, code, context) {
         super(message);
         this.code = code;
@@ -11744,13 +11744,13 @@ var init_errors2 = __esm({
       code;
       context;
     };
-    PlatformIONotInstalledError = class extends PlatformIOError {
+    PlatformIONotInstalledError = class extends PlatformIOError2 {
       constructor(message = "PlatformIO CLI is not installed or not found in PATH") {
         super(message, "PLATFORMIO_NOT_INSTALLED");
         this.name = "PlatformIONotInstalledError";
       }
     };
-    BoardNotFoundError = class extends PlatformIOError {
+    BoardNotFoundError = class extends PlatformIOError2 {
       constructor(boardId) {
         super(
           `Board '${boardId}' not found in PlatformIO registry`,
@@ -11760,31 +11760,31 @@ var init_errors2 = __esm({
         this.name = "BoardNotFoundError";
       }
     };
-    ProjectInitError = class extends PlatformIOError {
+    ProjectInitError = class extends PlatformIOError2 {
       constructor(message, context) {
         super(message, "PROJECT_INIT_FAILED", context);
         this.name = "ProjectInitError";
       }
     };
-    BuildError = class extends PlatformIOError {
+    BuildError = class extends PlatformIOError2 {
       constructor(message, context) {
         super(message, "BUILD_FAILED", context);
         this.name = "BuildError";
       }
     };
-    UploadError = class extends PlatformIOError {
+    UploadError = class extends PlatformIOError2 {
       constructor(message, context) {
         super(message, "UPLOAD_FAILED", context);
         this.name = "UploadError";
       }
     };
-    LibraryError = class extends PlatformIOError {
+    LibraryError = class extends PlatformIOError2 {
       constructor(message, context) {
         super(message, "LIBRARY_ERROR", context);
         this.name = "LibraryError";
       }
     };
-    CommandTimeoutError = class extends PlatformIOError {
+    CommandTimeoutError = class extends PlatformIOError2 {
       constructor(command, timeout) {
         super(
           `Command '${command}' timed out after ${timeout}ms`,
@@ -11826,54 +11826,54 @@ var require_polyfills = __commonJS({
     }
     var chdir;
     module.exports = patch;
-    function patch(fs52) {
+    function patch(fs53) {
       if (constants2.hasOwnProperty("O_SYMLINK") && process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
-        patchLchmod(fs52);
+        patchLchmod(fs53);
       }
-      if (!fs52.lutimes) {
-        patchLutimes(fs52);
+      if (!fs53.lutimes) {
+        patchLutimes(fs53);
       }
-      fs52.chown = chownFix(fs52.chown);
-      fs52.fchown = chownFix(fs52.fchown);
-      fs52.lchown = chownFix(fs52.lchown);
-      fs52.chmod = chmodFix(fs52.chmod);
-      fs52.fchmod = chmodFix(fs52.fchmod);
-      fs52.lchmod = chmodFix(fs52.lchmod);
-      fs52.chownSync = chownFixSync(fs52.chownSync);
-      fs52.fchownSync = chownFixSync(fs52.fchownSync);
-      fs52.lchownSync = chownFixSync(fs52.lchownSync);
-      fs52.chmodSync = chmodFixSync(fs52.chmodSync);
-      fs52.fchmodSync = chmodFixSync(fs52.fchmodSync);
-      fs52.lchmodSync = chmodFixSync(fs52.lchmodSync);
-      fs52.stat = statFix(fs52.stat);
-      fs52.fstat = statFix(fs52.fstat);
-      fs52.lstat = statFix(fs52.lstat);
-      fs52.statSync = statFixSync(fs52.statSync);
-      fs52.fstatSync = statFixSync(fs52.fstatSync);
-      fs52.lstatSync = statFixSync(fs52.lstatSync);
-      if (fs52.chmod && !fs52.lchmod) {
-        fs52.lchmod = function(path54, mode, cb) {
+      fs53.chown = chownFix(fs53.chown);
+      fs53.fchown = chownFix(fs53.fchown);
+      fs53.lchown = chownFix(fs53.lchown);
+      fs53.chmod = chmodFix(fs53.chmod);
+      fs53.fchmod = chmodFix(fs53.fchmod);
+      fs53.lchmod = chmodFix(fs53.lchmod);
+      fs53.chownSync = chownFixSync(fs53.chownSync);
+      fs53.fchownSync = chownFixSync(fs53.fchownSync);
+      fs53.lchownSync = chownFixSync(fs53.lchownSync);
+      fs53.chmodSync = chmodFixSync(fs53.chmodSync);
+      fs53.fchmodSync = chmodFixSync(fs53.fchmodSync);
+      fs53.lchmodSync = chmodFixSync(fs53.lchmodSync);
+      fs53.stat = statFix(fs53.stat);
+      fs53.fstat = statFix(fs53.fstat);
+      fs53.lstat = statFix(fs53.lstat);
+      fs53.statSync = statFixSync(fs53.statSync);
+      fs53.fstatSync = statFixSync(fs53.fstatSync);
+      fs53.lstatSync = statFixSync(fs53.lstatSync);
+      if (fs53.chmod && !fs53.lchmod) {
+        fs53.lchmod = function(path55, mode, cb) {
           if (cb) process.nextTick(cb);
         };
-        fs52.lchmodSync = function() {
+        fs53.lchmodSync = function() {
         };
       }
-      if (fs52.chown && !fs52.lchown) {
-        fs52.lchown = function(path54, uid, gid, cb) {
+      if (fs53.chown && !fs53.lchown) {
+        fs53.lchown = function(path55, uid, gid, cb) {
           if (cb) process.nextTick(cb);
         };
-        fs52.lchownSync = function() {
+        fs53.lchownSync = function() {
         };
       }
       if (platform2 === "win32") {
-        fs52.rename = typeof fs52.rename !== "function" ? fs52.rename : (function(fs$rename) {
+        fs53.rename = typeof fs53.rename !== "function" ? fs53.rename : (function(fs$rename) {
           function rename(from, to, cb) {
             var start = Date.now();
             var backoff = 0;
             fs$rename(from, to, function CB(er) {
               if (er && (er.code === "EACCES" || er.code === "EPERM" || er.code === "EBUSY") && Date.now() - start < 6e4) {
                 setTimeout(function() {
-                  fs52.stat(to, function(stater, st) {
+                  fs53.stat(to, function(stater, st) {
                     if (stater && stater.code === "ENOENT")
                       fs$rename(from, to, CB);
                     else
@@ -11889,9 +11889,9 @@ var require_polyfills = __commonJS({
           }
           if (Object.setPrototypeOf) Object.setPrototypeOf(rename, fs$rename);
           return rename;
-        })(fs52.rename);
+        })(fs53.rename);
       }
-      fs52.read = typeof fs52.read !== "function" ? fs52.read : (function(fs$read) {
+      fs53.read = typeof fs53.read !== "function" ? fs53.read : (function(fs$read) {
         function read(fd, buffer, offset, length, position, callback_) {
           var callback;
           if (callback_ && typeof callback_ === "function") {
@@ -11899,22 +11899,22 @@ var require_polyfills = __commonJS({
             callback = function(er, _, __) {
               if (er && er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
-                return fs$read.call(fs52, fd, buffer, offset, length, position, callback);
+                return fs$read.call(fs53, fd, buffer, offset, length, position, callback);
               }
               callback_.apply(this, arguments);
             };
           }
-          return fs$read.call(fs52, fd, buffer, offset, length, position, callback);
+          return fs$read.call(fs53, fd, buffer, offset, length, position, callback);
         }
         if (Object.setPrototypeOf) Object.setPrototypeOf(read, fs$read);
         return read;
-      })(fs52.read);
-      fs52.readSync = typeof fs52.readSync !== "function" ? fs52.readSync : /* @__PURE__ */ (function(fs$readSync) {
+      })(fs53.read);
+      fs53.readSync = typeof fs53.readSync !== "function" ? fs53.readSync : /* @__PURE__ */ (function(fs$readSync) {
         return function(fd, buffer, offset, length, position) {
           var eagCounter = 0;
           while (true) {
             try {
-              return fs$readSync.call(fs52, fd, buffer, offset, length, position);
+              return fs$readSync.call(fs53, fd, buffer, offset, length, position);
             } catch (er) {
               if (er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
@@ -11924,11 +11924,11 @@ var require_polyfills = __commonJS({
             }
           }
         };
-      })(fs52.readSync);
-      function patchLchmod(fs53) {
-        fs53.lchmod = function(path54, mode, callback) {
-          fs53.open(
-            path54,
+      })(fs53.readSync);
+      function patchLchmod(fs54) {
+        fs54.lchmod = function(path55, mode, callback) {
+          fs54.open(
+            path55,
             constants2.O_WRONLY | constants2.O_SYMLINK,
             mode,
             function(err, fd) {
@@ -11936,80 +11936,80 @@ var require_polyfills = __commonJS({
                 if (callback) callback(err);
                 return;
               }
-              fs53.fchmod(fd, mode, function(err2) {
-                fs53.close(fd, function(err22) {
+              fs54.fchmod(fd, mode, function(err2) {
+                fs54.close(fd, function(err22) {
                   if (callback) callback(err2 || err22);
                 });
               });
             }
           );
         };
-        fs53.lchmodSync = function(path54, mode) {
-          var fd = fs53.openSync(path54, constants2.O_WRONLY | constants2.O_SYMLINK, mode);
+        fs54.lchmodSync = function(path55, mode) {
+          var fd = fs54.openSync(path55, constants2.O_WRONLY | constants2.O_SYMLINK, mode);
           var threw = true;
           var ret;
           try {
-            ret = fs53.fchmodSync(fd, mode);
+            ret = fs54.fchmodSync(fd, mode);
             threw = false;
           } finally {
             if (threw) {
               try {
-                fs53.closeSync(fd);
+                fs54.closeSync(fd);
               } catch (er) {
               }
             } else {
-              fs53.closeSync(fd);
+              fs54.closeSync(fd);
             }
           }
           return ret;
         };
       }
-      function patchLutimes(fs53) {
-        if (constants2.hasOwnProperty("O_SYMLINK") && fs53.futimes) {
-          fs53.lutimes = function(path54, at, mt, cb) {
-            fs53.open(path54, constants2.O_SYMLINK, function(er, fd) {
+      function patchLutimes(fs54) {
+        if (constants2.hasOwnProperty("O_SYMLINK") && fs54.futimes) {
+          fs54.lutimes = function(path55, at, mt, cb) {
+            fs54.open(path55, constants2.O_SYMLINK, function(er, fd) {
               if (er) {
                 if (cb) cb(er);
                 return;
               }
-              fs53.futimes(fd, at, mt, function(er2) {
-                fs53.close(fd, function(er22) {
+              fs54.futimes(fd, at, mt, function(er2) {
+                fs54.close(fd, function(er22) {
                   if (cb) cb(er2 || er22);
                 });
               });
             });
           };
-          fs53.lutimesSync = function(path54, at, mt) {
-            var fd = fs53.openSync(path54, constants2.O_SYMLINK);
+          fs54.lutimesSync = function(path55, at, mt) {
+            var fd = fs54.openSync(path55, constants2.O_SYMLINK);
             var ret;
             var threw = true;
             try {
-              ret = fs53.futimesSync(fd, at, mt);
+              ret = fs54.futimesSync(fd, at, mt);
               threw = false;
             } finally {
               if (threw) {
                 try {
-                  fs53.closeSync(fd);
+                  fs54.closeSync(fd);
                 } catch (er) {
                 }
               } else {
-                fs53.closeSync(fd);
+                fs54.closeSync(fd);
               }
             }
             return ret;
           };
-        } else if (fs53.futimes) {
-          fs53.lutimes = function(_a, _b, _c, cb) {
+        } else if (fs54.futimes) {
+          fs54.lutimes = function(_a, _b, _c, cb) {
             if (cb) process.nextTick(cb);
           };
-          fs53.lutimesSync = function() {
+          fs54.lutimesSync = function() {
           };
         }
       }
       function chmodFix(orig) {
         if (!orig) return orig;
         return function(target, mode, cb) {
-          return orig.call(fs52, target, mode, function(er) {
+          return orig.call(fs53, target, mode, function(er) {
             if (chownErOk(er)) er = null;
             if (cb) cb.apply(this, arguments);
           });
@@ -12019,7 +12019,7 @@ var require_polyfills = __commonJS({
         if (!orig) return orig;
         return function(target, mode) {
           try {
-            return orig.call(fs52, target, mode);
+            return orig.call(fs53, target, mode);
           } catch (er) {
             if (!chownErOk(er)) throw er;
           }
@@ -12028,7 +12028,7 @@ var require_polyfills = __commonJS({
       function chownFix(orig) {
         if (!orig) return orig;
         return function(target, uid, gid, cb) {
-          return orig.call(fs52, target, uid, gid, function(er) {
+          return orig.call(fs53, target, uid, gid, function(er) {
             if (chownErOk(er)) er = null;
             if (cb) cb.apply(this, arguments);
           });
@@ -12038,7 +12038,7 @@ var require_polyfills = __commonJS({
         if (!orig) return orig;
         return function(target, uid, gid) {
           try {
-            return orig.call(fs52, target, uid, gid);
+            return orig.call(fs53, target, uid, gid);
           } catch (er) {
             if (!chownErOk(er)) throw er;
           }
@@ -12058,13 +12058,13 @@ var require_polyfills = __commonJS({
             }
             if (cb) cb.apply(this, arguments);
           }
-          return options ? orig.call(fs52, target, options, callback) : orig.call(fs52, target, callback);
+          return options ? orig.call(fs53, target, options, callback) : orig.call(fs53, target, callback);
         };
       }
       function statFixSync(orig) {
         if (!orig) return orig;
         return function(target, options) {
-          var stats = options ? orig.call(fs52, target, options) : orig.call(fs52, target);
+          var stats = options ? orig.call(fs53, target, options) : orig.call(fs53, target);
           if (stats) {
             if (stats.uid < 0) stats.uid += 4294967296;
             if (stats.gid < 0) stats.gid += 4294967296;
@@ -12093,16 +12093,16 @@ var require_legacy_streams = __commonJS({
   "node_modules/graceful-fs/legacy-streams.js"(exports, module) {
     var Stream = __require("stream").Stream;
     module.exports = legacy;
-    function legacy(fs52) {
+    function legacy(fs53) {
       return {
         ReadStream,
         WriteStream
       };
-      function ReadStream(path54, options) {
-        if (!(this instanceof ReadStream)) return new ReadStream(path54, options);
+      function ReadStream(path55, options) {
+        if (!(this instanceof ReadStream)) return new ReadStream(path55, options);
         Stream.call(this);
         var self = this;
-        this.path = path54;
+        this.path = path55;
         this.fd = null;
         this.readable = true;
         this.paused = false;
@@ -12136,7 +12136,7 @@ var require_legacy_streams = __commonJS({
           });
           return;
         }
-        fs52.open(this.path, this.flags, this.mode, function(err, fd) {
+        fs53.open(this.path, this.flags, this.mode, function(err, fd) {
           if (err) {
             self.emit("error", err);
             self.readable = false;
@@ -12147,10 +12147,10 @@ var require_legacy_streams = __commonJS({
           self._read();
         });
       }
-      function WriteStream(path54, options) {
-        if (!(this instanceof WriteStream)) return new WriteStream(path54, options);
+      function WriteStream(path55, options) {
+        if (!(this instanceof WriteStream)) return new WriteStream(path55, options);
         Stream.call(this);
-        this.path = path54;
+        this.path = path55;
         this.fd = null;
         this.writable = true;
         this.flags = "w";
@@ -12175,7 +12175,7 @@ var require_legacy_streams = __commonJS({
         this.busy = false;
         this._queue = [];
         if (this.fd === null) {
-          this._open = fs52.open;
+          this._open = fs53.open;
           this._queue.push([this._open, this.path, this.flags, this.mode, void 0]);
           this.flush();
         }
@@ -12210,7 +12210,7 @@ var require_clone = __commonJS({
 // node_modules/graceful-fs/graceful-fs.js
 var require_graceful_fs = __commonJS({
   "node_modules/graceful-fs/graceful-fs.js"(exports, module) {
-    var fs52 = __require("fs");
+    var fs53 = __require("fs");
     var polyfills = require_polyfills();
     var legacy = require_legacy_streams();
     var clone2 = require_clone();
@@ -12242,12 +12242,12 @@ var require_graceful_fs = __commonJS({
         m = "GFS4: " + m.split(/\n/).join("\nGFS4: ");
         console.error(m);
       };
-    if (!fs52[gracefulQueue]) {
+    if (!fs53[gracefulQueue]) {
       queue = global[gracefulQueue] || [];
-      publishQueue(fs52, queue);
-      fs52.close = (function(fs$close) {
+      publishQueue(fs53, queue);
+      fs53.close = (function(fs$close) {
         function close(fd, cb) {
-          return fs$close.call(fs52, fd, function(err) {
+          return fs$close.call(fs53, fd, function(err) {
             if (!err) {
               resetQueue();
             }
@@ -12259,48 +12259,48 @@ var require_graceful_fs = __commonJS({
           value: fs$close
         });
         return close;
-      })(fs52.close);
-      fs52.closeSync = (function(fs$closeSync) {
+      })(fs53.close);
+      fs53.closeSync = (function(fs$closeSync) {
         function closeSync(fd) {
-          fs$closeSync.apply(fs52, arguments);
+          fs$closeSync.apply(fs53, arguments);
           resetQueue();
         }
         Object.defineProperty(closeSync, previousSymbol, {
           value: fs$closeSync
         });
         return closeSync;
-      })(fs52.closeSync);
+      })(fs53.closeSync);
       if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || "")) {
         process.on("exit", function() {
-          debug(fs52[gracefulQueue]);
-          __require("assert").equal(fs52[gracefulQueue].length, 0);
+          debug(fs53[gracefulQueue]);
+          __require("assert").equal(fs53[gracefulQueue].length, 0);
         });
       }
     }
     var queue;
     if (!global[gracefulQueue]) {
-      publishQueue(global, fs52[gracefulQueue]);
+      publishQueue(global, fs53[gracefulQueue]);
     }
-    module.exports = patch(clone2(fs52));
-    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs52.__patched) {
-      module.exports = patch(fs52);
-      fs52.__patched = true;
+    module.exports = patch(clone2(fs53));
+    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs53.__patched) {
+      module.exports = patch(fs53);
+      fs53.__patched = true;
     }
-    function patch(fs53) {
-      polyfills(fs53);
-      fs53.gracefulify = patch;
-      fs53.createReadStream = createReadStream;
-      fs53.createWriteStream = createWriteStream;
-      var fs$readFile = fs53.readFile;
-      fs53.readFile = readFile;
-      function readFile(path54, options, cb) {
+    function patch(fs54) {
+      polyfills(fs54);
+      fs54.gracefulify = patch;
+      fs54.createReadStream = createReadStream;
+      fs54.createWriteStream = createWriteStream;
+      var fs$readFile = fs54.readFile;
+      fs54.readFile = readFile;
+      function readFile(path55, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$readFile(path54, options, cb);
-        function go$readFile(path55, options2, cb2, startTime) {
-          return fs$readFile(path55, options2, function(err) {
+        return go$readFile(path55, options, cb);
+        function go$readFile(path56, options2, cb2, startTime) {
+          return fs$readFile(path56, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$readFile, [path55, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$readFile, [path56, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -12308,16 +12308,16 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$writeFile = fs53.writeFile;
-      fs53.writeFile = writeFile;
-      function writeFile(path54, data, options, cb) {
+      var fs$writeFile = fs54.writeFile;
+      fs54.writeFile = writeFile;
+      function writeFile(path55, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$writeFile(path54, data, options, cb);
-        function go$writeFile(path55, data2, options2, cb2, startTime) {
-          return fs$writeFile(path55, data2, options2, function(err) {
+        return go$writeFile(path55, data, options, cb);
+        function go$writeFile(path56, data2, options2, cb2, startTime) {
+          return fs$writeFile(path56, data2, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$writeFile, [path55, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$writeFile, [path56, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -12325,17 +12325,17 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$appendFile = fs53.appendFile;
+      var fs$appendFile = fs54.appendFile;
       if (fs$appendFile)
-        fs53.appendFile = appendFile;
-      function appendFile(path54, data, options, cb) {
+        fs54.appendFile = appendFile;
+      function appendFile(path55, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$appendFile(path54, data, options, cb);
-        function go$appendFile(path55, data2, options2, cb2, startTime) {
-          return fs$appendFile(path55, data2, options2, function(err) {
+        return go$appendFile(path55, data, options, cb);
+        function go$appendFile(path56, data2, options2, cb2, startTime) {
+          return fs$appendFile(path56, data2, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$appendFile, [path55, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$appendFile, [path56, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -12343,9 +12343,9 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$copyFile = fs53.copyFile;
+      var fs$copyFile = fs54.copyFile;
       if (fs$copyFile)
-        fs53.copyFile = copyFile;
+        fs54.copyFile = copyFile;
       function copyFile(src, dest, flags, cb) {
         if (typeof flags === "function") {
           cb = flags;
@@ -12363,34 +12363,34 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$readdir = fs53.readdir;
-      fs53.readdir = readdir;
+      var fs$readdir = fs54.readdir;
+      fs54.readdir = readdir;
       var noReaddirOptionVersions = /^v[0-5]\./;
-      function readdir(path54, options, cb) {
+      function readdir(path55, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path55, options2, cb2, startTime) {
-          return fs$readdir(path55, fs$readdirCallback(
-            path55,
+        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path56, options2, cb2, startTime) {
+          return fs$readdir(path56, fs$readdirCallback(
+            path56,
             options2,
             cb2,
             startTime
           ));
-        } : function go$readdir2(path55, options2, cb2, startTime) {
-          return fs$readdir(path55, options2, fs$readdirCallback(
-            path55,
+        } : function go$readdir2(path56, options2, cb2, startTime) {
+          return fs$readdir(path56, options2, fs$readdirCallback(
+            path56,
             options2,
             cb2,
             startTime
           ));
         };
-        return go$readdir(path54, options, cb);
-        function fs$readdirCallback(path55, options2, cb2, startTime) {
+        return go$readdir(path55, options, cb);
+        function fs$readdirCallback(path56, options2, cb2, startTime) {
           return function(err, files) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
               enqueue([
                 go$readdir,
-                [path55, options2, cb2],
+                [path56, options2, cb2],
                 err,
                 startTime || Date.now(),
                 Date.now()
@@ -12405,21 +12405,21 @@ var require_graceful_fs = __commonJS({
         }
       }
       if (process.version.substr(0, 4) === "v0.8") {
-        var legStreams = legacy(fs53);
+        var legStreams = legacy(fs54);
         ReadStream = legStreams.ReadStream;
         WriteStream = legStreams.WriteStream;
       }
-      var fs$ReadStream = fs53.ReadStream;
+      var fs$ReadStream = fs54.ReadStream;
       if (fs$ReadStream) {
         ReadStream.prototype = Object.create(fs$ReadStream.prototype);
         ReadStream.prototype.open = ReadStream$open;
       }
-      var fs$WriteStream = fs53.WriteStream;
+      var fs$WriteStream = fs54.WriteStream;
       if (fs$WriteStream) {
         WriteStream.prototype = Object.create(fs$WriteStream.prototype);
         WriteStream.prototype.open = WriteStream$open;
       }
-      Object.defineProperty(fs53, "ReadStream", {
+      Object.defineProperty(fs54, "ReadStream", {
         get: function() {
           return ReadStream;
         },
@@ -12429,7 +12429,7 @@ var require_graceful_fs = __commonJS({
         enumerable: true,
         configurable: true
       });
-      Object.defineProperty(fs53, "WriteStream", {
+      Object.defineProperty(fs54, "WriteStream", {
         get: function() {
           return WriteStream;
         },
@@ -12440,7 +12440,7 @@ var require_graceful_fs = __commonJS({
         configurable: true
       });
       var FileReadStream = ReadStream;
-      Object.defineProperty(fs53, "FileReadStream", {
+      Object.defineProperty(fs54, "FileReadStream", {
         get: function() {
           return FileReadStream;
         },
@@ -12451,7 +12451,7 @@ var require_graceful_fs = __commonJS({
         configurable: true
       });
       var FileWriteStream = WriteStream;
-      Object.defineProperty(fs53, "FileWriteStream", {
+      Object.defineProperty(fs54, "FileWriteStream", {
         get: function() {
           return FileWriteStream;
         },
@@ -12461,7 +12461,7 @@ var require_graceful_fs = __commonJS({
         enumerable: true,
         configurable: true
       });
-      function ReadStream(path54, options) {
+      function ReadStream(path55, options) {
         if (this instanceof ReadStream)
           return fs$ReadStream.apply(this, arguments), this;
         else
@@ -12481,7 +12481,7 @@ var require_graceful_fs = __commonJS({
           }
         });
       }
-      function WriteStream(path54, options) {
+      function WriteStream(path55, options) {
         if (this instanceof WriteStream)
           return fs$WriteStream.apply(this, arguments), this;
         else
@@ -12499,22 +12499,22 @@ var require_graceful_fs = __commonJS({
           }
         });
       }
-      function createReadStream(path54, options) {
-        return new fs53.ReadStream(path54, options);
+      function createReadStream(path55, options) {
+        return new fs54.ReadStream(path55, options);
       }
-      function createWriteStream(path54, options) {
-        return new fs53.WriteStream(path54, options);
+      function createWriteStream(path55, options) {
+        return new fs54.WriteStream(path55, options);
       }
-      var fs$open = fs53.open;
-      fs53.open = open2;
-      function open2(path54, flags, mode, cb) {
+      var fs$open = fs54.open;
+      fs54.open = open2;
+      function open2(path55, flags, mode, cb) {
         if (typeof mode === "function")
           cb = mode, mode = null;
-        return go$open(path54, flags, mode, cb);
-        function go$open(path55, flags2, mode2, cb2, startTime) {
-          return fs$open(path55, flags2, mode2, function(err, fd) {
+        return go$open(path55, flags, mode, cb);
+        function go$open(path56, flags2, mode2, cb2, startTime) {
+          return fs$open(path56, flags2, mode2, function(err, fd) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$open, [path55, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$open, [path56, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -12522,20 +12522,20 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      return fs53;
+      return fs54;
     }
     function enqueue(elem) {
       debug("ENQUEUE", elem[0].name, elem[1]);
-      fs52[gracefulQueue].push(elem);
+      fs53[gracefulQueue].push(elem);
       retry();
     }
     var retryTimer;
     function resetQueue() {
       var now = Date.now();
-      for (var i = 0; i < fs52[gracefulQueue].length; ++i) {
-        if (fs52[gracefulQueue][i].length > 2) {
-          fs52[gracefulQueue][i][3] = now;
-          fs52[gracefulQueue][i][4] = now;
+      for (var i = 0; i < fs53[gracefulQueue].length; ++i) {
+        if (fs53[gracefulQueue][i].length > 2) {
+          fs53[gracefulQueue][i][3] = now;
+          fs53[gracefulQueue][i][4] = now;
         }
       }
       retry();
@@ -12543,9 +12543,9 @@ var require_graceful_fs = __commonJS({
     function retry() {
       clearTimeout(retryTimer);
       retryTimer = void 0;
-      if (fs52[gracefulQueue].length === 0)
+      if (fs53[gracefulQueue].length === 0)
         return;
-      var elem = fs52[gracefulQueue].shift();
+      var elem = fs53[gracefulQueue].shift();
       var fn = elem[0];
       var args = elem[1];
       var err = elem[2];
@@ -12567,7 +12567,7 @@ var require_graceful_fs = __commonJS({
           debug("RETRY", fn.name, args);
           fn.apply(null, args.concat([startTime]));
         } else {
-          fs52[gracefulQueue].push(elem);
+          fs53[gracefulQueue].push(elem);
         }
       }
       if (retryTimer === void 0) {
@@ -12696,11 +12696,11 @@ var require_retry_operation = __commonJS({
       for (var i = 0; i < this._errors.length; i++) {
         var error2 = this._errors[i];
         var message = error2.message;
-        var count = (counts[message] || 0) + 1;
-        counts[message] = count;
-        if (count >= mainErrorCount) {
+        var count2 = (counts[message] || 0) + 1;
+        counts[message] = count2;
+        if (count2 >= mainErrorCount) {
           mainError = error2;
-          mainErrorCount = count;
+          mainErrorCount = count2;
         }
       }
       return mainError;
@@ -13002,10 +13002,10 @@ var require_mtime_precision = __commonJS({
   "node_modules/proper-lockfile/lib/mtime-precision.js"(exports, module) {
     "use strict";
     var cacheSymbol = /* @__PURE__ */ Symbol();
-    function probe(file, fs52, callback) {
-      const cachedPrecision = fs52[cacheSymbol];
+    function probe(file, fs53, callback) {
+      const cachedPrecision = fs53[cacheSymbol];
       if (cachedPrecision) {
-        return fs52.stat(file, (err, stat) => {
+        return fs53.stat(file, (err, stat) => {
           if (err) {
             return callback(err);
           }
@@ -13013,16 +13013,16 @@ var require_mtime_precision = __commonJS({
         });
       }
       const mtime = new Date(Math.ceil(Date.now() / 1e3) * 1e3 + 5);
-      fs52.utimes(file, mtime, mtime, (err) => {
+      fs53.utimes(file, mtime, mtime, (err) => {
         if (err) {
           return callback(err);
         }
-        fs52.stat(file, (err2, stat) => {
+        fs53.stat(file, (err2, stat) => {
           if (err2) {
             return callback(err2);
           }
           const precision = stat.mtime.getTime() % 1e3 === 0 ? "s" : "ms";
-          Object.defineProperty(fs52, cacheSymbol, { value: precision });
+          Object.defineProperty(fs53, cacheSymbol, { value: precision });
           callback(null, stat.mtime, precision);
         });
       });
@@ -13043,8 +13043,8 @@ var require_mtime_precision = __commonJS({
 var require_lockfile = __commonJS({
   "node_modules/proper-lockfile/lib/lockfile.js"(exports, module) {
     "use strict";
-    var path54 = __require("path");
-    var fs52 = require_graceful_fs();
+    var path55 = __require("path");
+    var fs53 = require_graceful_fs();
     var retry = require_retry2();
     var onExit = require_signal_exit();
     var mtimePrecision = require_mtime_precision();
@@ -13054,7 +13054,7 @@ var require_lockfile = __commonJS({
     }
     function resolveCanonicalPath(file, options, callback) {
       if (!options.realpath) {
-        return callback(null, path54.resolve(file));
+        return callback(null, path55.resolve(file));
       }
       options.fs.realpath(file, callback);
     }
@@ -13175,7 +13175,7 @@ var require_lockfile = __commonJS({
         update: null,
         realpath: true,
         retries: 0,
-        fs: fs52,
+        fs: fs53,
         onCompromised: (err) => {
           throw err;
         },
@@ -13219,7 +13219,7 @@ var require_lockfile = __commonJS({
     }
     function unlock(file, options, callback) {
       options = {
-        fs: fs52,
+        fs: fs53,
         realpath: true,
         ...options
       };
@@ -13241,7 +13241,7 @@ var require_lockfile = __commonJS({
       options = {
         stale: 1e4,
         realpath: true,
-        fs: fs52,
+        fs: fs53,
         ...options
       };
       options.stale = Math.max(options.stale || 0, 2e3);
@@ -13280,16 +13280,16 @@ var require_lockfile = __commonJS({
 var require_adapter = __commonJS({
   "node_modules/proper-lockfile/lib/adapter.js"(exports, module) {
     "use strict";
-    var fs52 = require_graceful_fs();
-    function createSyncFs(fs53) {
+    var fs53 = require_graceful_fs();
+    function createSyncFs(fs54) {
       const methods = ["mkdir", "realpath", "stat", "rmdir", "utimes"];
-      const newFs = { ...fs53 };
+      const newFs = { ...fs54 };
       methods.forEach((method) => {
         newFs[method] = (...args) => {
           const callback = args.pop();
           let ret;
           try {
-            ret = fs53[`${method}Sync`](...args);
+            ret = fs54[`${method}Sync`](...args);
           } catch (err) {
             return callback(err);
           }
@@ -13327,7 +13327,7 @@ var require_adapter = __commonJS({
     }
     function toSyncOptions(options) {
       options = { ...options };
-      options.fs = createSyncFs(options.fs || fs52);
+      options.fs = createSyncFs(options.fs || fs53);
       if (typeof options.retries === "number" && options.retries > 0 || options.retries && typeof options.retries.retries === "number" && options.retries.retries > 0) {
         throw Object.assign(new Error("Cannot use retries with the sync api"), { code: "ESYNC" });
       }
@@ -13528,8 +13528,8 @@ var init_workspace_registry = __esm({
 });
 
 // src/core/policy/redact.ts
-function redactSecretsInText(text6) {
-  let redacted = text6;
+function redactSecretsInText(text7) {
+  let redacted = text7;
   for (const pattern of secretPatterns) {
     redacted = redacted.replace(pattern, replacement);
   }
@@ -14004,21 +14004,21 @@ async function execPioCommand(args, options = {}) {
 }
 function parsePioJsonOutput(output, schema3) {
   if (!output || output.trim().length === 0) {
-    throw new PlatformIOError("Empty output from PlatformIO command");
+    throw new PlatformIOError2("Empty output from PlatformIO command");
   }
   try {
     const parsed = JSON.parse(output);
     return schema3.parse(parsed);
   } catch (error2) {
     if (error2 instanceof external_exports.ZodError) {
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         `Failed to parse PlatformIO output: ${error2.message}`,
         "PARSE_ERROR",
         { zodError: error2.issues, output: output.substring(0, 500) }
       );
     }
     if (error2 instanceof SyntaxError) {
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         `Invalid JSON output from PlatformIO: ${error2.message}`,
         "INVALID_JSON",
         { output: output.substring(0, 500) }
@@ -14045,12 +14045,12 @@ async function getPlatformIOVersion() {
       const match = result.stdout.match(/version\s+([\d\.]+)/i);
       return match ? match[1] : result.stdout.trim();
     }
-    throw new PlatformIOError("Failed to get PlatformIO version");
+    throw new PlatformIOError2("Failed to get PlatformIO version");
   } catch (error2) {
     if (error2 instanceof PlatformIONotInstalledError) {
       throw error2;
     }
-    throw new PlatformIOError("Failed to get PlatformIO version");
+    throw new PlatformIOError2("Failed to get PlatformIO version");
   }
 }
 function resolvePioPath() {
@@ -14182,7 +14182,7 @@ var init_platformio = __esm({
         }
         const result = await this.execute(command, fullArgs, options);
         if (result.exitCode !== 0) {
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             `PlatformIO command failed: ${command} ${args.join(" ")}`,
             "COMMAND_FAILED",
             { stderr: result.stderr, exitCode: result.exitCode }
@@ -14610,6 +14610,7 @@ var init_types2 = __esm({
       )
     });
     RunTestsParamsSchema = external_exports.object({
+      structuredReport: external_exports.boolean().optional().describe("Collect per-case results for a foreground test run"),
       projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
       sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
       environment: external_exports.string().optional().describe("Specific environment to test (from platformio.ini)"),
@@ -15022,13 +15023,13 @@ async function listDevices() {
       return enrichedDevice;
     });
   } catch (error2) {
-    if (error2 instanceof PlatformIOError) {
+    if (error2 instanceof PlatformIOError2) {
       const errorMessage = error2.message.toLowerCase();
       if (errorMessage.includes("no devices") || errorMessage.includes("empty")) {
         return [];
       }
     }
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Failed to list devices: ${error2}`,
       "LIST_DEVICES_FAILED"
     );
@@ -15389,8 +15390,8 @@ async function getProjectContext(projectDir, includeBuildHistory) {
   let libDeps;
   if (hasPlatformioIni) {
     try {
-      const text6 = fs10.readFileSync(iniPath, "utf8");
-      const parsed = parsePlatformioIni(text6);
+      const text7 = fs10.readFileSync(iniPath, "utf8");
+      const parsed = parsePlatformioIni(text7);
       environments = parsed.environments;
       libDeps = parsed.libDeps;
     } catch {
@@ -15451,7 +15452,7 @@ function regexSource(pattern, translate) {
     if (pattern[i] === "\\") {
       i++;
       if (/[AZzGRNUae]/.test(pattern[i] ?? ""))
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Unsupported Python regex escape; use the documented ECMAScript subset.",
           "PATTERN_UNSUPPORTED"
         );
@@ -15461,13 +15462,13 @@ function regexSource(pattern, translate) {
 }
 async function runBoundedPattern(lines2, pattern, options = {}, extract = false) {
   if (typeof pattern !== "string" || pattern.length > 4096 || lines2.length > 1e4 || lines2.some((line) => typeof line !== "string") || lines2.reduce((sum, line) => sum + Buffer.byteLength(line), 0) > 1024 * 1024) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Pattern matching is limited to 4096 pattern characters, 10000 lines and 1 MiB of input.",
       "PATTERN_INPUT_LIMIT"
     );
   }
   if (options.mode !== void 0 && options.mode !== "literal" && options.mode !== "regex")
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Unknown pattern matching mode.",
       "PATTERN_INVALID"
     );
@@ -15482,13 +15483,13 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
   }
   const timeoutMs = options.timeoutMs ?? 1e3;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2e3)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Regex timeout must be between 1 and 2000 ms.",
       "PATTERN_INVALID"
     );
   const source = regexSource(pattern, options.pythonNamedGroups ?? false);
   if (activeRegexWorkers >= 4)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Regex worker capacity is busy; retry after current searches finish.",
       "PATTERN_BUSY"
     );
@@ -15524,7 +15525,7 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
     };
     timer = setTimeout(
       () => finish(
-        new PlatformIOError(
+        new PlatformIOError2(
           "Regex worker exceeded its startup deadline.",
           "PATTERN_WORKER_STARTUP_TIMEOUT"
         )
@@ -15541,7 +15542,7 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
           clearTimeout(timer);
           timer = setTimeout(
             () => finish(
-              new PlatformIOError(
+              new PlatformIOError2(
                 "Regex exceeded its execution deadline.",
                 "PATTERN_TIMEOUT"
               )
@@ -15553,16 +15554,16 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
         }
         if (!executing)
           return finish(
-            new PlatformIOError(
+            new PlatformIOError2(
               "Unexpected regex worker response.",
               "PATTERN_WORKER_FAILED"
             )
           );
         finish(
-          message.limit ? new PlatformIOError(
+          message.limit ? new PlatformIOError2(
             "Named capture output exceeds limits.",
             "PATTERN_OUTPUT_LIMIT"
-          ) : message.invalid ? new PlatformIOError(
+          ) : message.invalid ? new PlatformIOError2(
             "Invalid or unsupported regular expression.",
             "PATTERN_INVALID"
           ) : void 0,
@@ -15573,13 +15574,13 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
     worker.once(
       "error",
       () => finish(
-        new PlatformIOError("Regex worker failed.", "PATTERN_WORKER_FAILED")
+        new PlatformIOError2("Regex worker failed.", "PATTERN_WORKER_FAILED")
       )
     );
     worker.once("exit", () => {
       if (!settled)
         finish(
-          new PlatformIOError(
+          new PlatformIOError2(
             "Regex worker exited before returning a result.",
             "PATTERN_WORKER_FAILED"
           )
@@ -15639,7 +15640,7 @@ function linuxStartToken(stat, bootId, pid) {
   const fields = stat.slice(end + 1).trim().split(/\s+/);
   const start = fields[19];
   if (stat.length > 8192 || end < 0 || !stat.startsWith(`${pid} (`) || !/^[0-9]+$/.test(start ?? "") || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(bootId.trim()))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid Linux process identity.",
       "PROCESS_IDENTITY_INVALID"
     );
@@ -15647,7 +15648,7 @@ function linuxStartToken(stat, bootId, pid) {
 }
 function inspectProcessIdentity(pid) {
   if (!Number.isSafeInteger(pid) || pid < 1 || pid > 2147483647)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid process ID.",
       "PROCESS_IDENTITY_INVALID"
     );
@@ -15764,7 +15765,7 @@ function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
       cleanup();
       if (timedOut)
         reject(
-          new PlatformIOError(
+          new PlatformIOError2(
             `Command timed out after ${timeoutMs}ms`,
             "COMMAND_TIMEOUT",
             { cleanupPending: false }
@@ -15776,7 +15777,7 @@ function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
       if (settled) return;
       cleanup();
       reject(
-        new PlatformIOError(error2.message, "PROCESS_FAILED", {
+        new PlatformIOError2(error2.message, "PROCESS_FAILED", {
           cleanupPending: !!proc.pid && proc.exitCode === null && proc.signalCode === null
         })
       );
@@ -15799,7 +15800,7 @@ function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
           if (settled) return;
           cleanup();
           reject(
-            new PlatformIOError(
+            new PlatformIOError2(
               "Child termination could not be confirmed.",
               "PROCESS_CLEANUP_PENDING",
               { cleanupPending: true }
@@ -15982,10 +15983,10 @@ function readMonitorIdentities(pidsFile) {
   const file = pidsFile + ".identities.json";
   if (!fs35.existsSync(file)) return {};
   if (fs35.statSync(file).size > 1024 * 1024)
-    throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
+    throw new PlatformIOError2("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
   const value2 = JSON.parse(fs35.readFileSync(file, "utf8"));
   if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
-    throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
+    throw new PlatformIOError2("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
   return value2;
 }
 async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFile, taskId, commandDesc) {
@@ -16087,7 +16088,7 @@ async function killPioMonitorByPort(port, projectDir) {
     if (observation.status === "absent") {
     } else {
       if (!identity || identity.pid !== pid || compareProcessIdentity(identity, observation) !== "alive")
-        throw new PlatformIOError("Monitor process identity is unavailable or changed; refusing PID-only termination.", "PROCESS_IDENTITY_UNVERIFIED");
+        throw new PlatformIOError2("Monitor process identity is unavailable or changed; refusing PID-only termination.", "PROCESS_IDENTITY_UNVERIFIED");
       await new Promise((resolve, reject) => (0, import_tree_kill.default)(pid, "SIGKILL", (error2) => error2 ? reject(error2) : resolve()));
       let confirmed = false;
       for (let attempt = 0; attempt < 20; attempt++) {
@@ -16097,7 +16098,7 @@ async function killPioMonitorByPort(port, projectDir) {
         }
         await delay2(50);
       }
-      if (!confirmed) throw new PlatformIOError("Monitor exit could not be confirmed.", "PROCESS_CLEANUP_PENDING");
+      if (!confirmed) throw new PlatformIOError2("Monitor exit could not be confirmed.", "PROCESS_CLEANUP_PENDING");
     }
     delete pids[port];
     const identities = readMonitorIdentities(pidsFile);
@@ -16470,11 +16471,11 @@ async function executeWithSpooling(command, args, options) {
           if (stat.size > fileOffset) {
             const stream = fs37.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on("data", (chunk) => {
-              const text6 = chunk.toString();
-              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text6);
+              const text7 = chunk.toString();
+              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text7);
               if (latestPointer.mirrorLatest) {
                 try {
-                  fs37.appendFileSync(latestLog, text6);
+                  fs37.appendFileSync(latestLog, text7);
                 } catch {
                 }
               }
@@ -16555,7 +16556,7 @@ async function executeWithSpooling(command, args, options) {
   try {
     exitCode = await waitForOwnedProcess(proc, timeoutMs);
   } catch (error2) {
-    const cleanupPending = !(error2 instanceof PlatformIOError) || error2.context?.cleanupPending !== false;
+    const cleanupPending = !(error2 instanceof PlatformIOError2) || error2.context?.cleanupPending !== false;
     await updateTaskStatus(commandId, taskId, { status: "error", error: error2 instanceof Error ? error2.message : "Process failed." }, projectArea).catch(() => {
     });
     try {
@@ -16573,8 +16574,8 @@ async function executeWithSpooling(command, args, options) {
       } catch {
       }
     }
-    if (error2 instanceof PlatformIOError)
-      throw new PlatformIOError(error2.message, error2.code, { ...error2.context, cleanupPending, fullLogPath: logFile });
+    if (error2 instanceof PlatformIOError2)
+      throw new PlatformIOError2(error2.message, error2.code, { ...error2.context, cleanupPending, fullLogPath: logFile });
     throw error2;
   }
   let errorMessage = void 0;
@@ -18860,20 +18861,20 @@ var require_resolve = __commonJS({
       return false;
     }
     function countKeys(schema3) {
-      let count = 0;
+      let count2 = 0;
       for (const key in schema3) {
         if (key === "$ref")
           return Infinity;
-        count++;
+        count2++;
         if (SIMPLE_INLINED.has(key))
           continue;
         if (typeof schema3[key] == "object") {
-          (0, util_1.eachItem)(schema3[key], (sch) => count += countKeys(sch));
+          (0, util_1.eachItem)(schema3[key], (sch) => count2 += countKeys(sch));
         }
-        if (count === Infinity)
+        if (count2 === Infinity)
           return Infinity;
       }
-      return count;
+      return count2;
     }
     function getFullPath(resolver, id = "", normalize) {
       if (normalize !== false)
@@ -19902,8 +19903,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path54) {
-      let input = path54;
+    function removeDotSegments(path55) {
+      let input = path55;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -20312,8 +20313,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path54 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path54 && path54 !== "/" ? path54 : void 0;
+        const path55 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path55 && path55 !== "/" ? path55 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -21264,7 +21265,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text6, msg) => text6 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text7, msg) => text7 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -22354,8 +22355,8 @@ var require_contains = __commonJS({
         cxt.result(valid, () => cxt.reset());
         function validateItemsWithCount() {
           const schValid = gen.name("_valid");
-          const count = gen.let("count", 0);
-          validateItems(schValid, () => gen.if(schValid, () => checkLimits(count)));
+          const count2 = gen.let("count", 0);
+          validateItems(schValid, () => gen.if(schValid, () => checkLimits(count2)));
         }
         function validateItems(_valid, block) {
           gen.forRange("i", 0, len, (i) => {
@@ -22368,16 +22369,16 @@ var require_contains = __commonJS({
             block();
           });
         }
-        function checkLimits(count) {
-          gen.code((0, codegen_1._)`${count}++`);
+        function checkLimits(count2) {
+          gen.code((0, codegen_1._)`${count2}++`);
           if (max === void 0) {
-            gen.if((0, codegen_1._)`${count} >= ${min}`, () => gen.assign(valid, true).break());
+            gen.if((0, codegen_1._)`${count2} >= ${min}`, () => gen.assign(valid, true).break());
           } else {
-            gen.if((0, codegen_1._)`${count} > ${max}`, () => gen.assign(valid, false).break());
+            gen.if((0, codegen_1._)`${count2} > ${max}`, () => gen.assign(valid, false).break());
             if (min === 1)
               gen.assign(valid, true);
             else
-              gen.if((0, codegen_1._)`${count} >= ${min}`, () => gen.assign(valid, true));
+              gen.if((0, codegen_1._)`${count2} >= ${min}`, () => gen.assign(valid, true));
           }
         }
       }
@@ -23825,12 +23826,12 @@ var require_dist2 = __commonJS({
         throw new Error(`Unknown format "${name2}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs52, exportName) {
+    function addFormats(ajv, list2, fs53, exportName) {
       var _a;
       var _b;
       (_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 ? _a : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs52[f]);
+        ajv.addFormat(f, fs53[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -23840,8 +23841,8 @@ var require_dist2 = __commonJS({
 
 // src/core/target-resolution.ts
 import crypto16 from "node:crypto";
-import fs41 from "node:fs";
-import path47 from "node:path";
+import fs42 from "node:fs";
+import path48 from "node:path";
 function parseTargetEnvironments(iniText) {
   const environments = [];
   const defaults = [];
@@ -23895,8 +23896,8 @@ function createBindingDigest(fields) {
 }
 async function resolveTarget(input, discoveredDevices) {
   const projectDir = validateProjectPath(input.projectDir);
-  const iniPath = path47.join(projectDir, "platformio.ini");
-  if (!fs41.existsSync(iniPath)) {
+  const iniPath = path48.join(projectDir, "platformio.ini");
+  if (!fs42.existsSync(iniPath)) {
     return {
       success: false,
       status: "invalid_config",
@@ -23907,7 +23908,7 @@ async function resolveTarget(input, discoveredDevices) {
       nextSteps: ["Initialize or select a PlatformIO project, then resolve the target again."]
     };
   }
-  const parsed = parseTargetEnvironments(fs41.readFileSync(iniPath, "utf8"));
+  const parsed = parseTargetEnvironments(fs42.readFileSync(iniPath, "utf8"));
   let selectedEnvironment;
   if (input.environment) {
     selectedEnvironment = parsed.environments.find(
@@ -24057,13 +24058,13 @@ async function verifyTargetBinding(binding, input) {
     expiresAt: binding.expiresAt
   });
   if (expectedDigest !== binding.digest) {
-    throw new PlatformIOError("Target binding digest is invalid.", "STALE_TARGET_BINDING");
+    throw new PlatformIOError2("Target binding digest is invalid.", "STALE_TARGET_BINDING");
   }
   if (new Date(binding.expiresAt).getTime() <= Date.now()) {
-    throw new PlatformIOError("Target binding has expired.", "STALE_TARGET_BINDING");
+    throw new PlatformIOError2("Target binding has expired.", "STALE_TARGET_BINDING");
   }
   if (binding.projectDir !== projectDir || binding.environment !== input.environment) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Target binding does not match the current project and environment.",
       "STALE_TARGET_BINDING"
     );
@@ -24073,7 +24074,7 @@ async function verifyTargetBinding(binding, input) {
     (device) => fingerprintDevice(device) === binding.deviceFingerprint
   );
   if (matching.length !== 1) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       matching.length === 0 ? "The bound device is no longer attached." : "The bound device identity is ambiguous.",
       matching.length === 0 ? "STALE_TARGET_BINDING" : "AMBIGUOUS_TARGET"
     );
@@ -24105,7 +24106,7 @@ async function resolveWriteTarget(input) {
   });
   if (!resolved.success || !resolved.environment || !resolved.port || !resolved.binding) {
     const errorCode = resolved.status === "ambiguous" ? "AMBIGUOUS_TARGET" : resolved.status === "unavailable" ? "TARGET_UNAVAILABLE" : "INVALID_TARGET_CONFIG";
-    throw new PlatformIOError(resolved.summary, errorCode, {
+    throw new PlatformIOError2(resolved.summary, errorCode, {
       candidates: resolved.candidates,
       nextSteps: resolved.nextSteps
     });
@@ -24140,8 +24141,8 @@ __export(monitor_exports, {
   startMonitor: () => startMonitor,
   stopMonitor: () => stopMonitor
 });
-import fs42 from "node:fs";
-import path48 from "node:path";
+import fs43 from "node:fs";
+import path49 from "node:path";
 import crypto17 from "node:crypto";
 function getSpoolerStates() {
   const clean = {};
@@ -24156,15 +24157,15 @@ function getSpoolerStates() {
 function emitNewLogBytes(port, daemon) {
   let fd;
   try {
-    const stat = fs42.statSync(daemon.logFile);
+    const stat = fs43.statSync(daemon.logFile);
     if (stat.size <= (daemon.fileOffset || 0)) return;
     const start = daemon.fileOffset || 0;
     const buffer = Buffer.alloc(stat.size - start);
-    fd = fs42.openSync(daemon.logFile, "r");
-    fs42.readSync(fd, buffer, 0, buffer.length, start);
-    const text6 = buffer.toString();
-    if (text6.length > 0) {
-      portalEvents.emitSerialLog(port, text6, daemon.taskId);
+    fd = fs43.openSync(daemon.logFile, "r");
+    fs43.readSync(fd, buffer, 0, buffer.length, start);
+    const text7 = buffer.toString();
+    if (text7.length > 0) {
+      portalEvents.emitSerialLog(port, text7, daemon.taskId);
       daemon.lastActivityAt = (/* @__PURE__ */ new Date()).toISOString();
     }
     daemon.fileOffset = stat.size;
@@ -24172,7 +24173,7 @@ function emitNewLogBytes(port, daemon) {
   } finally {
     if (fd !== void 0) {
       try {
-        fs42.closeSync(fd);
+        fs43.closeSync(fd);
       } catch {
       }
     }
@@ -24198,12 +24199,12 @@ async function stopMonitor(port, projectDir) {
     }
     if (daemon.watcher) {
       try {
-        const stat = fs42.statSync(daemon.logFile);
+        const stat = fs43.statSync(daemon.logFile);
         if (stat.size > (daemon.fileOffset || 0)) {
           const buffer = Buffer.alloc(stat.size - (daemon.fileOffset || 0));
-          const fd = fs42.openSync(daemon.logFile, "r");
-          fs42.readSync(fd, buffer, 0, buffer.length, daemon.fileOffset || 0);
-          fs42.closeSync(fd);
+          const fd = fs43.openSync(daemon.logFile, "r");
+          fs43.readSync(fd, buffer, 0, buffer.length, daemon.fileOffset || 0);
+          fs43.closeSync(fd);
           portalEvents.emitSerialLog(port, buffer.toString(), daemon.taskId);
         }
       } catch {
@@ -24237,7 +24238,7 @@ async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
     `[Spooler] Spawning pio monitor (Env: ${daemon.environment || "None"}) via executor for ${targetPort}`,
     projectDir
   );
-  const outFd = fs42.openSync(daemon.logFile, "a");
+  const outFd = fs43.openSync(daemon.logFile, "a");
   const proc = await platformioExecutor.spawn(
     "device",
     ["monitor", ...monitorArgs],
@@ -24260,13 +24261,13 @@ async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
     );
   }
   const targetDir = getLogDir("monitor", projectDir);
-  const latestLog = path48.join(targetDir, "latest-monitor.log");
+  const latestLog = path49.join(targetDir, "latest-monitor.log");
   try {
-    if (fs42.existsSync(latestLog)) fs42.unlinkSync(latestLog);
-    fs42.symlinkSync(daemon.logFile, latestLog);
+    if (fs43.existsSync(latestLog)) fs43.unlinkSync(latestLog);
+    fs43.symlinkSync(daemon.logFile, latestLog);
   } catch (e) {
     try {
-      fs42.linkSync(daemon.logFile, latestLog);
+      fs43.linkSync(daemon.logFile, latestLog);
     } catch {
       logDiagnostic(`[Spooler] Failed to link latest-monitor.log: ${e}`, projectDir);
     }
@@ -24282,7 +24283,7 @@ async function rehydrateMonitors() {
   let rehydrationCount = 0;
   const activeWorkspaces = [];
   for (const projectDir of workspaces) {
-    if (fs42.existsSync(projectDir)) {
+    if (fs43.existsSync(projectDir)) {
       activeWorkspaces.push(projectDir);
       if (isBuildActive(projectDir)) {
       }
@@ -24291,14 +24292,14 @@ async function rehydrateMonitors() {
         const pid = pids[port];
         if (isPidAlive(pid)) {
           if (!activeDaemons[port]) {
-            const logFile = path48.join(
+            const logFile = path49.join(
               getLogDir("monitor", projectDir),
               "latest-monitor.log"
             );
             let currentSize = 0;
             try {
-              if (fs42.existsSync(logFile)) {
-                currentSize = fs42.statSync(logFile).size;
+              if (fs43.existsSync(logFile)) {
+                currentSize = fs43.statSync(logFile).size;
               }
             } catch {
             }
@@ -24330,12 +24331,12 @@ async function rehydrateMonitors() {
             };
             activeDaemons[port] = daemon;
             try {
-              daemon.watcher = fs42.watch(logFile, (eventType) => {
+              daemon.watcher = fs43.watch(logFile, (eventType) => {
                 if (eventType === "change") {
                   try {
-                    const stat = fs42.statSync(logFile);
+                    const stat = fs43.statSync(logFile);
                     if (stat.size > (daemon.fileOffset || 0)) {
-                      const stream = fs42.createReadStream(logFile, {
+                      const stream = fs43.createReadStream(logFile, {
                         start: daemon.fileOffset || 0,
                         end: stat.size - 1
                       });
@@ -24383,7 +24384,7 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
   if (!activePort) {
     const defaultDevice = await getFirstDevice();
     if (!defaultDevice)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "No serial devices detected to monitor.",
         "PORT_NOT_FOUND"
       );
@@ -24395,21 +24396,21 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
     activeHwid = matchedDevice?.hwid || null;
   }
   if (!validateSerialPort(activePort))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Invalid serial port format: ${activePort}`,
       "INVALID_PORT"
     );
   if (baud && !validateBaudRate(baud))
-    throw new PlatformIOError(`Invalid baud rate: ${baud}`, "INVALID_BAUD");
+    throw new PlatformIOError2(`Invalid baud rate: ${baud}`, "INVALID_BAUD");
   await stopMonitor(activePort, projectDir);
   if (portSemaphoreManager.isPortClaimed(activePort))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Port is currently locked: ${activePort}`,
       "PORT_BUSY"
     );
   const targetDir = getLogDir("monitor", projectDir);
-  if (!fs42.existsSync(targetDir)) {
-    fs42.mkdirSync(targetDir, { recursive: true });
+  if (!fs43.existsSync(targetDir)) {
+    fs43.mkdirSync(targetDir, { recursive: true });
   }
   const { logFile } = rotateSpoolerStreams("monitor", projectDir);
   portSemaphoreManager.claimPort(activePort, "Monitor Daemon");
@@ -24427,12 +24428,12 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
   activeDaemons[activePort] = daemon;
   await spawnPioMonitor(activePort, projectDir, effectiveCommandId);
   try {
-    daemon.watcher = fs42.watch(logFile, (eventType) => {
+    daemon.watcher = fs43.watch(logFile, (eventType) => {
       if (eventType === "change") {
         try {
-          const stat = fs42.statSync(logFile);
+          const stat = fs43.statSync(logFile);
           if (stat.size > (daemon.fileOffset || 0)) {
-            const stream = fs42.createReadStream(logFile, {
+            const stream = fs43.createReadStream(logFile, {
               start: daemon.fileOffset || 0,
               end: stat.size - 1
             });
@@ -24476,18 +24477,18 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
       }
     }
     if (cmd) {
-      targetPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f) => Boolean(f && fs42.existsSync(f)));
+      targetPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f) => Boolean(f && fs43.existsSync(f)));
     }
   } else if (logPath) {
-    if (fs42.existsSync(logPath)) {
+    if (fs43.existsSync(logPath)) {
       targetPaths = [logPath];
     }
   } else if (port && activeDaemons[port]) {
     targetPaths = [activeDaemons[port].logFile];
   } else {
     const targetDir = getLogDir("monitor", projectDir);
-    const targetFile = path48.join(targetDir, "latest-monitor.log");
-    if (fs42.existsSync(targetFile)) {
+    const targetFile = path49.join(targetDir, "latest-monitor.log");
+    if (fs43.existsSync(targetFile)) {
       targetPaths = [targetFile];
     }
   }
@@ -24508,7 +24509,7 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
     } catch (error2) {
       return {
         success: false,
-        code: error2 instanceof PlatformIOError ? error2.code : "PATTERN_WORKER_FAILED",
+        code: error2 instanceof PlatformIOError2 ? error2.code : "PATTERN_WORKER_FAILED",
         content: error2 instanceof Error ? error2.message : "Pattern matching failed."
       };
     }
@@ -24524,7 +24525,7 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
 function encodeMonitorCursor(logPath, offset) {
   const payload = {
     version: 1,
-    logHash: crypto17.createHash("sha256").update(path48.resolve(logPath)).digest("hex"),
+    logHash: crypto17.createHash("sha256").update(path49.resolve(logPath)).digest("hex"),
     offset
   };
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
@@ -24534,13 +24535,13 @@ function decodeMonitorCursor(cursor, logPath) {
     const payload = JSON.parse(
       Buffer.from(cursor, "base64url").toString("utf8")
     );
-    const expectedHash = crypto17.createHash("sha256").update(path48.resolve(logPath)).digest("hex");
+    const expectedHash = crypto17.createHash("sha256").update(path49.resolve(logPath)).digest("hex");
     if (payload.version !== 1 || payload.logHash !== expectedHash || !Number.isSafeInteger(payload.offset) || (payload.offset ?? -1) < 0) {
       throw new Error("invalid cursor");
     }
     return payload.offset;
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "The serial cursor is invalid or belongs to an expired monitor log.",
       "CURSOR_EXPIRED"
     );
@@ -24549,18 +24550,18 @@ function decodeMonitorCursor(cursor, logPath) {
 function getMonitorStatus(port, projectDir) {
   const trackedPids = getActiveMonitorPids(projectDir);
   const statuses = Object.entries(activeDaemons).filter(
-    ([activePort, daemon]) => (!port || activePort === port) && (!projectDir || path48.resolve(daemon.projectDir ?? "") === path48.resolve(projectDir))
+    ([activePort, daemon]) => (!port || activePort === port) && (!projectDir || path49.resolve(daemon.projectDir ?? "") === path49.resolve(projectDir))
   ).map(([activePort, daemon]) => {
     let size = 0;
     let lastActivityAt = daemon.lastActivityAt;
     try {
-      const stats = fs42.statSync(daemon.logFile);
+      const stats = fs43.statSync(daemon.logFile);
       size = stats.size;
       lastActivityAt = lastActivityAt ?? stats.mtime.toISOString();
     } catch {
     }
     const trackedPid = trackedPids[activePort];
-    const stale = !fs42.existsSync(daemon.logFile) || trackedPid !== void 0 && !isPidAlive(trackedPid);
+    const stale = !fs43.existsSync(daemon.logFile) || trackedPid !== void 0 && !isPidAlive(trackedPid);
     return {
       state: stale ? "stale" : "active",
       port: activePort,
@@ -24581,10 +24582,10 @@ function getMonitorStatus(port, projectDir) {
   return { monitors: statuses };
 }
 function readSerialWindowFromFile(logPath, options = {}) {
-  const finalSize = fs42.statSync(logPath).size;
+  const finalSize = fs43.statSync(logPath).size;
   const requestedStart = options.cursor ? decodeMonitorCursor(options.cursor, logPath) : Math.max(0, options.startOffset ?? 0);
   if (requestedStart > finalSize) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "The serial cursor predates the current rotated monitor log.",
       "CURSOR_EXPIRED"
     );
@@ -24594,13 +24595,13 @@ function readSerialWindowFromFile(logPath, options = {}) {
   const bytesToRead = Math.max(0, finalSize - readStart);
   let content = "";
   if (bytesToRead > 0) {
-    const descriptor2 = fs42.openSync(logPath, "r");
+    const descriptor2 = fs43.openSync(logPath, "r");
     try {
       const buffer = Buffer.alloc(bytesToRead);
-      fs42.readSync(descriptor2, buffer, 0, bytesToRead, readStart);
+      fs43.readSync(descriptor2, buffer, 0, bytesToRead, readStart);
       content = redactSecretsInText(buffer.toString("utf8"));
     } finally {
-      fs42.closeSync(descriptor2);
+      fs43.closeSync(descriptor2);
     }
   }
   return {
@@ -24612,7 +24613,7 @@ function readSerialWindowFromFile(logPath, options = {}) {
   };
 }
 async function captureSerialWindow(input) {
-  const projectDir = path48.resolve(input.projectDir);
+  const projectDir = path49.resolve(input.projectDir);
   const verifiedTarget = input.targetBinding ? await resolveWriteTarget({
     projectDir,
     environment: input.environment,
@@ -24623,10 +24624,10 @@ async function captureSerialWindow(input) {
   let startedMonitor = false;
   if (!selectedPort) {
     const matchingPorts = Object.entries(activeDaemons).filter(
-      ([, daemon2]) => path48.resolve(daemon2.projectDir ?? "") === projectDir
+      ([, daemon2]) => path49.resolve(daemon2.projectDir ?? "") === projectDir
     ).map(([activePort]) => activePort);
     if (matchingPorts.length > 1) {
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Multiple active monitors match this project; specify one exact port.",
         "AMBIGUOUS_TARGET"
       );
@@ -24645,13 +24646,13 @@ async function captureSerialWindow(input) {
   }
   const daemon = activeDaemons[selectedPort];
   if (!daemon) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Serial monitor did not become available for capture.",
       "MONITOR_UNAVAILABLE"
     );
   }
   if (captureLeases.has(selectedPort)) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `A bounded capture is already running on ${selectedPort}.`,
       "OVERLAPPING_RUN"
     );
@@ -24667,7 +24668,7 @@ async function captureSerialWindow(input) {
   try {
     let initialSize = 0;
     try {
-      initialSize = fs42.statSync(daemon.logFile).size;
+      initialSize = fs43.statSync(daemon.logFile).size;
     } catch {
     }
     const startOffset = input.cursor ? decodeMonitorCursor(input.cursor, daemon.logFile) : initialSize;
@@ -24675,9 +24676,9 @@ async function captureSerialWindow(input) {
       await new Promise((resolve) => setTimeout(resolve, durationMs));
     }
     try {
-      fs42.statSync(daemon.logFile);
+      fs43.statSync(daemon.logFile);
     } catch {
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "The serial monitor log is unavailable.",
         "MONITOR_UNAVAILABLE"
       );
@@ -25567,8 +25568,8 @@ var require_depd = __commonJS({
       return deprecate;
     }
     function eehaslisteners(emitter, type) {
-      var count = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
-      return count > 0;
+      var count2 = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
+      return count2 > 0;
     }
     function isignored(namespace) {
       if (process.noDeprecation) {
@@ -40041,11 +40042,11 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path54) {
-      if (!path54 || typeof path54 !== "string") {
+    function lookup(path55) {
+      if (!path55 || typeof path55 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path54).toLowerCase().slice(1);
+      var extension2 = extname("x." + path55).toLowerCase().slice(1);
       if (!extension2) {
         return false;
       }
@@ -40722,8 +40723,8 @@ var require_text = __commonJS({
     var debug = require_src()("body-parser:text");
     var read = require_read();
     var { normalizeOptions, passthrough } = require_utils2();
-    module.exports = text6;
-    function text6(options) {
+    module.exports = text7;
+    function text7(options) {
       const normalizedOptions = normalizeOptions(options, "text/plain");
       return function textParser(req, res, next) {
         read(req, res, next, passthrough, debug, normalizedOptions);
@@ -43404,14 +43405,14 @@ var require_urlencoded = __commonJS({
       };
     }
     function parameterCount(body, limit) {
-      let count = 0;
+      let count2 = 0;
       let index = -1;
       do {
-        count++;
-        if (count > limit) return void 0;
+        count2++;
+        if (count2 > limit) return void 0;
         index = body.indexOf("&", index + 1);
       } while (index !== -1);
-      return count;
+      return count2;
     }
   }
 });
@@ -43732,13 +43733,13 @@ var require_view = __commonJS({
   "node_modules/express/lib/view.js"(exports, module) {
     "use strict";
     var debug = require_src()("express:view");
-    var path54 = __require("node:path");
-    var fs52 = __require("node:fs");
-    var dirname = path54.dirname;
-    var basename = path54.basename;
-    var extname = path54.extname;
-    var join = path54.join;
-    var resolve = path54.resolve;
+    var path55 = __require("node:path");
+    var fs53 = __require("node:fs");
+    var dirname = path55.dirname;
+    var basename = path55.basename;
+    var extname = path55.extname;
+    var join = path55.join;
+    var resolve = path55.resolve;
     module.exports = View;
     function View(name2, options) {
       var opts = options || {};
@@ -43767,17 +43768,17 @@ var require_view = __commonJS({
       this.path = this.lookup(fileName);
     }
     View.prototype.lookup = function lookup(name2) {
-      var path55;
+      var path56;
       var roots = [].concat(this.root);
       debug('lookup "%s"', name2);
-      for (var i = 0; i < roots.length && !path55; i++) {
+      for (var i = 0; i < roots.length && !path56; i++) {
         var root = roots[i];
         var loc = resolve(root, name2);
         var dir = dirname(loc);
         var file = basename(loc);
-        path55 = this.resolve(dir, file);
+        path56 = this.resolve(dir, file);
       }
-      return path55;
+      return path56;
     };
     View.prototype.render = function render(options, callback) {
       var sync = true;
@@ -43799,21 +43800,21 @@ var require_view = __commonJS({
     };
     View.prototype.resolve = function resolve2(dir, file) {
       var ext = this.ext;
-      var path55 = join(dir, file);
-      var stat = tryStat(path55);
+      var path56 = join(dir, file);
+      var stat = tryStat(path56);
       if (stat && stat.isFile()) {
-        return path55;
+        return path56;
       }
-      path55 = join(dir, basename(file, ext), "index" + ext);
-      stat = tryStat(path55);
+      path56 = join(dir, basename(file, ext), "index" + ext);
+      stat = tryStat(path56);
       if (stat && stat.isFile()) {
-        return path55;
+        return path56;
       }
     };
-    function tryStat(path55) {
-      debug('stat "%s"', path55);
+    function tryStat(path56) {
+      debug('stat "%s"', path56);
       try {
-        return fs52.statSync(path55);
+        return fs53.statSync(path56);
       } catch (e) {
         return void 0;
       }
@@ -53423,11 +53424,11 @@ var require_mime_types2 = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path54) {
-      if (!path54 || typeof path54 !== "string") {
+    function lookup(path55) {
+      if (!path55 || typeof path55 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path54).toLowerCase().slice(1);
+      var extension2 = extname("x." + path55).toLowerCase().slice(1);
       if (!extension2) {
         return false;
       }
@@ -54543,11 +54544,11 @@ var require_dist5 = __commonJS({
     exports.TokenData = TokenData;
     var PathError = class extends TypeError {
       constructor(message, originalPath) {
-        let text6 = message;
+        let text7 = message;
         if (originalPath)
-          text6 += `: ${originalPath}`;
-        text6 += `; visit https://git.new/pathToRegexpError for info`;
-        super(text6);
+          text7 += `: ${originalPath}`;
+        text7 += `; visit https://git.new/pathToRegexpError for info`;
+        super(text7);
         this.originalPath = originalPath;
       }
     };
@@ -54558,15 +54559,15 @@ var require_dist5 = __commonJS({
       let index = 0;
       function consumeUntil(end) {
         const output = [];
-        let path54 = "";
+        let path55 = "";
         function writePath() {
-          if (!path54)
+          if (!path55)
             return;
           output.push({
             type: "text",
-            value: encodePath(path54)
+            value: encodePath(path55)
           });
-          path54 = "";
+          path55 = "";
         }
         while (index < chars.length) {
           const value2 = chars[index++];
@@ -54578,7 +54579,7 @@ var require_dist5 = __commonJS({
             if (index === chars.length) {
               throw new PathError(`Unexpected end after \\ at index ${index}`, str);
             }
-            path54 += chars[index++];
+            path55 += chars[index++];
             continue;
           }
           if (value2 === ":" || value2 === "*") {
@@ -54622,7 +54623,7 @@ var require_dist5 = __commonJS({
           if (value2 === "}" || value2 === "(" || value2 === ")" || value2 === "[" || value2 === "]" || value2 === "+" || value2 === "?" || value2 === "!") {
             throw new PathError(`Unexpected ${value2} at index ${index - 1}`, str);
           }
-          path54 += value2;
+          path55 += value2;
         }
         if (end) {
           throw new PathError(`Unexpected end at index ${index}, expected ${end}`, str);
@@ -54632,17 +54633,17 @@ var require_dist5 = __commonJS({
       }
       return new TokenData(consumeUntil(""), str);
     }
-    function compile(path54, options = {}) {
+    function compile(path55, options = {}) {
       const { encode = encodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
-      const data = typeof path54 === "object" ? path54 : parse4(path54, options);
+      const data = typeof path55 === "object" ? path55 : parse4(path55, options);
       const fn = tokensToFunction(data.tokens, delimiter, encode);
-      return function path55(params = {}) {
+      return function path56(params = {}) {
         const missing = [];
-        const path56 = fn(params, missing);
+        const path57 = fn(params, missing);
         if (missing.length) {
           throw new TypeError(`Missing parameters: ${missing.join(", ")}`);
         }
-        return path56;
+        return path57;
       };
     }
     function tokensToFunction(tokens, delimiter, encode) {
@@ -54704,9 +54705,9 @@ var require_dist5 = __commonJS({
         return encodeValue(value2);
       };
     }
-    function match(path54, options = {}) {
+    function match(path55, options = {}) {
       const { decode = decodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
-      const { regexp, keys } = pathToRegexp(path54, options);
+      const { regexp, keys } = pathToRegexp(path55, options);
       const decoders = keys.map((key) => {
         if (decode === false)
           return NOOP_VALUE;
@@ -54718,7 +54719,7 @@ var require_dist5 = __commonJS({
         const m = regexp.exec(input);
         if (!m)
           return false;
-        const path55 = m[0];
+        const path56 = m[0];
         const params = /* @__PURE__ */ Object.create(null);
         for (let i = 1; i < m.length; i++) {
           if (m[i] === void 0)
@@ -54727,21 +54728,21 @@ var require_dist5 = __commonJS({
           const decoder = decoders[i - 1];
           params[key.name] = decoder(m[i]);
         }
-        return { path: path55, params };
+        return { path: path56, params };
       };
     }
-    function pathToRegexp(path54, options = {}) {
+    function pathToRegexp(path55, options = {}) {
       const { delimiter = DEFAULT_DELIMITER, end = true, sensitive = false, trailing = true } = options;
       const keys = [];
       let source = "";
       let combinations = 0;
-      function process9(path55) {
-        if (Array.isArray(path55)) {
-          for (const p of path55)
+      function process9(path56) {
+        if (Array.isArray(path56)) {
+          for (const p of path56)
             process9(p);
           return;
         }
-        const data = typeof path55 === "object" ? path55 : parse4(path55, options);
+        const data = typeof path56 === "object" ? path56 : parse4(path56, options);
         flatten(data.tokens, 0, [], (tokens) => {
           if (combinations >= 256) {
             throw new PathError("Too many path combinations", data.originalPath);
@@ -54752,7 +54753,7 @@ var require_dist5 = __commonJS({
           combinations++;
         });
       }
-      process9(path54);
+      process9(path55);
       let pattern = `^(?:${source})`;
       if (trailing)
         pattern += "(?:" + escape2(delimiter) + "$)?";
@@ -54892,18 +54893,18 @@ var require_layer = __commonJS({
     var TRAILING_SLASH_REGEXP = /\/+$/;
     var MATCHING_GROUP_REGEXP = /\((?:\?<(.*?)>)?(?!\?)/g;
     module.exports = Layer;
-    function Layer(path54, options, fn) {
+    function Layer(path55, options, fn) {
       if (!(this instanceof Layer)) {
-        return new Layer(path54, options, fn);
+        return new Layer(path55, options, fn);
       }
-      debug("new %o", path54);
+      debug("new %o", path55);
       const opts = options || {};
       this.handle = fn;
       this.keys = [];
       this.name = fn.name || "<anonymous>";
       this.params = void 0;
       this.path = void 0;
-      this.slash = path54 === "/" && opts.end === false;
+      this.slash = path55 === "/" && opts.end === false;
       function matcher(_path) {
         if (_path instanceof RegExp) {
           const keys = [];
@@ -54942,7 +54943,7 @@ var require_layer = __commonJS({
           decode: decodeParam
         });
       }
-      this.matchers = Array.isArray(path54) ? path54.map(matcher) : [matcher(path54)];
+      this.matchers = Array.isArray(path55) ? path55.map(matcher) : [matcher(path55)];
     }
     Layer.prototype.handleError = function handleError(error2, req, res, next) {
       const fn = this.handle;
@@ -54982,9 +54983,9 @@ var require_layer = __commonJS({
         next(err);
       }
     };
-    Layer.prototype.match = function match(path54) {
+    Layer.prototype.match = function match(path55) {
       let match2;
-      if (path54 != null) {
+      if (path55 != null) {
         if (this.slash) {
           this.params = {};
           this.path = "";
@@ -54992,7 +54993,7 @@ var require_layer = __commonJS({
         }
         let i = 0;
         while (!match2 && i < this.matchers.length) {
-          match2 = this.matchers[i](path54);
+          match2 = this.matchers[i](path55);
           i++;
         }
       }
@@ -55020,13 +55021,13 @@ var require_layer = __commonJS({
         throw err;
       }
     }
-    function loosen(path54) {
-      if (path54 instanceof RegExp || path54 === "/") {
-        return path54;
+    function loosen(path55) {
+      if (path55 instanceof RegExp || path55 === "/") {
+        return path55;
       }
-      return Array.isArray(path54) ? path54.map(function(p) {
+      return Array.isArray(path55) ? path55.map(function(p) {
         return loosen(p);
-      }) : String(path54).replace(TRAILING_SLASH_REGEXP, "");
+      }) : String(path55).replace(TRAILING_SLASH_REGEXP, "");
     }
   }
 });
@@ -55042,9 +55043,9 @@ var require_route = __commonJS({
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
     module.exports = Route;
-    function Route(path54) {
-      debug("new %o", path54);
-      this.path = path54;
+    function Route(path55) {
+      debug("new %o", path55);
+      this.path = path55;
       this.stack = [];
       this.methods = /* @__PURE__ */ Object.create(null);
     }
@@ -55252,8 +55253,8 @@ var require_router = __commonJS({
         if (++sync > 100) {
           return setImmediate(next, err);
         }
-        const path54 = getPathname(req);
-        if (path54 == null) {
+        const path55 = getPathname(req);
+        if (path55 == null) {
           return done(layerError);
         }
         let layer;
@@ -55261,7 +55262,7 @@ var require_router = __commonJS({
         let route;
         while (match !== true && idx < stack.length) {
           layer = stack[idx++];
-          match = matchLayer(layer, path54);
+          match = matchLayer(layer, path55);
           route = layer.route;
           if (typeof match !== "boolean") {
             layerError = layerError || match;
@@ -55299,18 +55300,18 @@ var require_router = __commonJS({
           } else if (route) {
             layer.handleRequest(req, res, next);
           } else {
-            trimPrefix(layer, layerError, layerPath, path54);
+            trimPrefix(layer, layerError, layerPath, path55);
           }
           sync = 0;
         });
       }
-      function trimPrefix(layer, layerError, layerPath, path54) {
+      function trimPrefix(layer, layerError, layerPath, path55) {
         if (layerPath.length !== 0) {
-          if (layerPath !== path54.substring(0, layerPath.length)) {
+          if (layerPath !== path55.substring(0, layerPath.length)) {
             next(layerError);
             return;
           }
-          const c = path54[layerPath.length];
+          const c = path55[layerPath.length];
           if (c && c !== "/") {
             next(layerError);
             return;
@@ -55334,7 +55335,7 @@ var require_router = __commonJS({
     };
     Router.prototype.use = function use(handler) {
       let offset = 0;
-      let path54 = "/";
+      let path55 = "/";
       if (typeof handler !== "function") {
         let arg = handler;
         while (Array.isArray(arg) && arg.length !== 0) {
@@ -55342,7 +55343,7 @@ var require_router = __commonJS({
         }
         if (typeof arg !== "function") {
           offset = 1;
-          path54 = handler;
+          path55 = handler;
         }
       }
       const callbacks = flatten.call(slice.call(arguments, offset), Infinity);
@@ -55354,8 +55355,8 @@ var require_router = __commonJS({
         if (typeof fn !== "function") {
           throw new TypeError("argument handler must be a function");
         }
-        debug("use %o %s", path54, fn.name || "<anonymous>");
-        const layer = new Layer(path54, {
+        debug("use %o %s", path55, fn.name || "<anonymous>");
+        const layer = new Layer(path55, {
           sensitive: this.caseSensitive,
           strict: false,
           end: false
@@ -55365,9 +55366,9 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router.prototype.route = function route(path54) {
-      const route2 = new Route(path54);
-      const layer = new Layer(path54, {
+    Router.prototype.route = function route(path55) {
+      const route2 = new Route(path55);
+      const layer = new Layer(path55, {
         sensitive: this.caseSensitive,
         strict: this.strict,
         end: true
@@ -55380,8 +55381,8 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router.prototype[method] = function(path54) {
-        const route = this.route(path54);
+      Router.prototype[method] = function(path55) {
+        const route = this.route(path55);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
       };
@@ -55410,9 +55411,9 @@ var require_router = __commonJS({
       const fqdnIndex = url.substring(0, pathLength).indexOf("://");
       return fqdnIndex !== -1 ? url.substring(0, url.indexOf("/", 3 + fqdnIndex)) : void 0;
     }
-    function matchLayer(layer, path54) {
+    function matchLayer(layer, path55) {
       try {
-        return layer.match(path54);
+        return layer.match(path55);
       } catch (err) {
         return err;
       }
@@ -55640,7 +55641,7 @@ var require_application = __commonJS({
     };
     app.use = function use(fn) {
       var offset = 0;
-      var path54 = "/";
+      var path55 = "/";
       if (typeof fn !== "function") {
         var arg = fn;
         while (Array.isArray(arg) && arg.length !== 0) {
@@ -55648,7 +55649,7 @@ var require_application = __commonJS({
         }
         if (typeof arg !== "function") {
           offset = 1;
-          path54 = fn;
+          path55 = fn;
         }
       }
       var fns = flatten.call(slice.call(arguments, offset), Infinity);
@@ -55658,12 +55659,12 @@ var require_application = __commonJS({
       var router = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router.use(path54, fn2);
+          return router.use(path55, fn2);
         }
-        debug(".use app under %s", path54);
-        fn2.mountpath = path54;
+        debug(".use app under %s", path55);
+        fn2.mountpath = path55;
         fn2.parent = this;
-        router.use(path54, function mounted_app(req, res, next) {
+        router.use(path55, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -55675,8 +55676,8 @@ var require_application = __commonJS({
       }, this);
       return this;
     };
-    app.route = function route(path54) {
-      return this.router.route(path54);
+    app.route = function route(path55) {
+      return this.router.route(path55);
     };
     app.engine = function engine(ext, fn) {
       if (typeof fn !== "function") {
@@ -55719,7 +55720,7 @@ var require_application = __commonJS({
       }
       return this;
     };
-    app.path = function path54() {
+    app.path = function path55() {
       return this.parent ? this.parent.path() + this.mountpath : "";
     };
     app.enabled = function enabled(setting) {
@@ -55735,17 +55736,17 @@ var require_application = __commonJS({
       return this.set(setting, false);
     };
     methods.forEach(function(method) {
-      app[method] = function(path54) {
+      app[method] = function(path55) {
         if (method === "get" && arguments.length === 1) {
-          return this.set(path54);
+          return this.set(path55);
         }
-        var route = this.route(path54);
+        var route = this.route(path55);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
       };
     });
-    app.all = function all(path54) {
-      var route = this.route(path54);
+    app.all = function all(path55) {
+      var route = this.route(path55);
       var args = slice.call(arguments, 1);
       for (var i = 0; i < methods.length; i++) {
         route[methods[i]].apply(route, args);
@@ -56718,7 +56719,7 @@ var require_request = __commonJS({
       var subdomains2 = !isIP2(hostname2) ? hostname2.split(".").reverse() : [hostname2];
       return subdomains2.slice(offset);
     });
-    defineGetter(req, "path", function path54() {
+    defineGetter(req, "path", function path55() {
       return parse4(this).pathname;
     });
     defineGetter(req, "host", function host() {
@@ -56929,8 +56930,8 @@ var require_content_disposition = __commonJS({
       this.type = type;
       this.parameters = parameters;
     }
-    function basename(path54) {
-      const normalized = path54.replaceAll("\\", "/");
+    function basename(path55) {
+      const normalized = path55.replaceAll("\\", "/");
       let end = normalized.length;
       while (end > 0 && normalized[end - 1] === "/") {
         end--;
@@ -66617,11 +66618,11 @@ var require_mime_types3 = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path54) {
-      if (!path54 || typeof path54 !== "string") {
+    function lookup(path55) {
+      if (!path55 || typeof path55 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path54).toLowerCase().slice(1);
+      var extension2 = extname("x." + path55).toLowerCase().slice(1);
       if (!extension2) {
         return false;
       }
@@ -66676,32 +66677,32 @@ var require_send = __commonJS({
     var escapeHtml = require_escape_html();
     var etag = require_etag();
     var fresh = require_fresh();
-    var fs52 = __require("fs");
+    var fs53 = __require("fs");
     var mime = require_mime_types3();
     var ms = require_ms();
     var onFinished = require_on_finished();
     var parseRange = require_range_parser();
-    var path54 = __require("path");
+    var path55 = __require("path");
     var statuses = require_statuses();
     var Stream = __require("stream");
     var util2 = __require("util");
-    var extname = path54.extname;
-    var join = path54.join;
-    var normalize = path54.normalize;
-    var resolve = path54.resolve;
-    var sep = path54.sep;
+    var extname = path55.extname;
+    var join = path55.join;
+    var normalize = path55.normalize;
+    var resolve = path55.resolve;
+    var sep = path55.sep;
     var BYTES_RANGE_REGEXP = /^ *bytes=/;
     var MAX_MAXAGE = 60 * 60 * 24 * 365 * 1e3;
     var UP_PATH_REGEXP = /(?:^|[\\/])\.\.(?:[\\/]|$)/;
     module.exports = send;
-    function send(req, path55, options) {
-      return new SendStream(req, path55, options);
+    function send(req, path56, options) {
+      return new SendStream(req, path56, options);
     }
-    function SendStream(req, path55, options) {
+    function SendStream(req, path56, options) {
       Stream.call(this);
       var opts = options || {};
       this.options = opts;
-      this.path = path55;
+      this.path = path56;
       this.req = req;
       this._acceptRanges = opts.acceptRanges !== void 0 ? Boolean(opts.acceptRanges) : true;
       this._cacheControl = opts.cacheControl !== void 0 ? Boolean(opts.cacheControl) : true;
@@ -66815,10 +66816,10 @@ var require_send = __commonJS({
       var lastModified = this.res.getHeader("Last-Modified");
       return parseHttpDate(lastModified) <= parseHttpDate(ifRange);
     };
-    SendStream.prototype.redirect = function redirect(path55) {
+    SendStream.prototype.redirect = function redirect(path56) {
       var res = this.res;
       if (hasListeners(this, "directory")) {
-        this.emit("directory", res, path55);
+        this.emit("directory", res, path56);
         return;
       }
       if (this.hasTrailingSlash()) {
@@ -66838,38 +66839,38 @@ var require_send = __commonJS({
     SendStream.prototype.pipe = function pipe2(res) {
       var root = this._root;
       this.res = res;
-      var path55 = decode(this.path);
-      if (path55 === -1) {
+      var path56 = decode(this.path);
+      if (path56 === -1) {
         this.error(400);
         return res;
       }
-      if (~path55.indexOf("\0")) {
+      if (~path56.indexOf("\0")) {
         this.error(400);
         return res;
       }
       var parts;
       if (root !== null) {
-        if (path55) {
-          path55 = normalize("." + sep + path55);
+        if (path56) {
+          path56 = normalize("." + sep + path56);
         }
-        if (UP_PATH_REGEXP.test(path55)) {
-          debug('malicious path "%s"', path55);
+        if (UP_PATH_REGEXP.test(path56)) {
+          debug('malicious path "%s"', path56);
           this.error(403);
           return res;
         }
-        parts = path55.split(sep);
-        path55 = normalize(join(root, path55));
+        parts = path56.split(sep);
+        path56 = normalize(join(root, path56));
       } else {
-        if (UP_PATH_REGEXP.test(path55)) {
-          debug('malicious path "%s"', path55);
+        if (UP_PATH_REGEXP.test(path56)) {
+          debug('malicious path "%s"', path56);
           this.error(403);
           return res;
         }
-        parts = normalize(path55).split(sep);
-        path55 = resolve(path55);
+        parts = normalize(path56).split(sep);
+        path56 = resolve(path56);
       }
       if (containsDotFile(parts)) {
-        debug('%s dotfile "%s"', this._dotfiles, path55);
+        debug('%s dotfile "%s"', this._dotfiles, path56);
         switch (this._dotfiles) {
           case "allow":
             break;
@@ -66883,13 +66884,13 @@ var require_send = __commonJS({
         }
       }
       if (this._index.length && this.hasTrailingSlash()) {
-        this.sendIndex(path55);
+        this.sendIndex(path56);
         return res;
       }
-      this.sendFile(path55);
+      this.sendFile(path56);
       return res;
     };
-    SendStream.prototype.send = function send2(path55, stat) {
+    SendStream.prototype.send = function send2(path56, stat) {
       var len = stat.size;
       var options = this.options;
       var opts = {};
@@ -66901,9 +66902,9 @@ var require_send = __commonJS({
         this.headersAlreadySent();
         return;
       }
-      debug('pipe "%s"', path55);
-      this.setHeader(path55, stat);
-      this.type(path55);
+      debug('pipe "%s"', path56);
+      this.setHeader(path56, stat);
+      this.type(path56);
       if (this.isConditionalGET()) {
         if (this.isPreconditionFailure()) {
           this.error(412);
@@ -66952,30 +66953,30 @@ var require_send = __commonJS({
         res.end();
         return;
       }
-      this.stream(path55, opts);
+      this.stream(path56, opts);
     };
-    SendStream.prototype.sendFile = function sendFile(path55) {
+    SendStream.prototype.sendFile = function sendFile(path56) {
       var i = 0;
       var self = this;
-      debug('stat "%s"', path55);
-      fs52.stat(path55, function onstat(err, stat) {
-        var pathEndsWithSep = path55[path55.length - 1] === sep;
-        if (err && err.code === "ENOENT" && !extname(path55) && !pathEndsWithSep) {
+      debug('stat "%s"', path56);
+      fs53.stat(path56, function onstat(err, stat) {
+        var pathEndsWithSep = path56[path56.length - 1] === sep;
+        if (err && err.code === "ENOENT" && !extname(path56) && !pathEndsWithSep) {
           return next(err);
         }
         if (err) return self.onStatError(err);
-        if (stat.isDirectory()) return self.redirect(path55);
+        if (stat.isDirectory()) return self.redirect(path56);
         if (pathEndsWithSep) return self.error(404);
-        self.emit("file", path55, stat);
-        self.send(path55, stat);
+        self.emit("file", path56, stat);
+        self.send(path56, stat);
       });
       function next(err) {
         if (self._extensions.length <= i) {
           return err ? self.onStatError(err) : self.error(404);
         }
-        var p = path55 + "." + self._extensions[i++];
+        var p = path56 + "." + self._extensions[i++];
         debug('stat "%s"', p);
-        fs52.stat(p, function(err2, stat) {
+        fs53.stat(p, function(err2, stat) {
           if (err2) return next(err2);
           if (stat.isDirectory()) return next();
           self.emit("file", p, stat);
@@ -66983,7 +66984,7 @@ var require_send = __commonJS({
         });
       }
     };
-    SendStream.prototype.sendIndex = function sendIndex(path55) {
+    SendStream.prototype.sendIndex = function sendIndex(path56) {
       var i = -1;
       var self = this;
       function next(err) {
@@ -66991,9 +66992,9 @@ var require_send = __commonJS({
           if (err) return self.onStatError(err);
           return self.error(404);
         }
-        var p = join(path55, self._index[i]);
+        var p = join(path56, self._index[i]);
         debug('stat "%s"', p);
-        fs52.stat(p, function(err2, stat) {
+        fs53.stat(p, function(err2, stat) {
           if (err2) return next(err2);
           if (stat.isDirectory()) return next();
           self.emit("file", p, stat);
@@ -67002,10 +67003,10 @@ var require_send = __commonJS({
       }
       next();
     };
-    SendStream.prototype.stream = function stream(path55, options) {
+    SendStream.prototype.stream = function stream(path56, options) {
       var self = this;
       var res = this.res;
-      var stream2 = fs52.createReadStream(path55, options);
+      var stream2 = fs53.createReadStream(path56, options);
       this.emit("stream", stream2);
       stream2.pipe(res);
       function cleanup() {
@@ -67020,17 +67021,17 @@ var require_send = __commonJS({
         self.emit("end");
       });
     };
-    SendStream.prototype.type = function type(path55) {
+    SendStream.prototype.type = function type(path56) {
       var res = this.res;
       if (res.getHeader("Content-Type")) return;
-      var ext = extname(path55);
+      var ext = extname(path56);
       var type2 = mime.contentType(ext) || "application/octet-stream";
       debug("content-type %s", type2);
       res.setHeader("Content-Type", type2);
     };
-    SendStream.prototype.setHeader = function setHeader(path55, stat) {
+    SendStream.prototype.setHeader = function setHeader(path56, stat) {
       var res = this.res;
-      this.emit("headers", res, path55, stat);
+      this.emit("headers", res, path56, stat);
       if (this._acceptRanges && !res.getHeader("Accept-Ranges")) {
         debug("accept ranges");
         res.setHeader("Accept-Ranges", "bytes");
@@ -67088,16 +67089,16 @@ var require_send = __commonJS({
       }
       return err instanceof Error ? createError(status, err, { expose: false }) : createError(status, err);
     }
-    function decode(path55) {
+    function decode(path56) {
       try {
-        return decodeURIComponent(path55);
+        return decodeURIComponent(path56);
       } catch (err) {
         return -1;
       }
     }
     function hasListeners(emitter, type) {
-      var count = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
-      return count > 0;
+      var count2 = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
+      return count2 > 0;
     }
     function normalizeList(val, name2) {
       var list2 = [].concat(val || []);
@@ -67234,7 +67235,7 @@ var require_response = __commonJS({
     var http = __require("node:http");
     var onFinished = require_on_finished();
     var mime = require_mime_types2();
-    var path54 = __require("node:path");
+    var path55 = __require("node:path");
     var pathIsAbsolute = __require("node:path").isAbsolute;
     var statuses = require_statuses();
     var sign = require_cookie_signature().sign;
@@ -67243,8 +67244,8 @@ var require_response = __commonJS({
     var setCharset = require_utils4().setCharset;
     var cookie = require_cookie();
     var send = require_send();
-    var extname = path54.extname;
-    var resolve = path54.resolve;
+    var extname = path55.extname;
+    var resolve = path55.resolve;
     var vary = require_vary();
     var { Buffer: Buffer4 } = __require("node:buffer");
     var res = Object.create(http.ServerResponse.prototype);
@@ -67390,26 +67391,26 @@ var require_response = __commonJS({
       this.type("txt");
       return this.send(body);
     };
-    res.sendFile = function sendFile(path55, options, callback) {
+    res.sendFile = function sendFile(path56, options, callback) {
       var done = callback;
       var req = this.req;
       var res2 = this;
       var next = req.next;
       var opts = options || {};
-      if (!path55) {
+      if (!path56) {
         throw new TypeError("path argument is required to res.sendFile");
       }
-      if (typeof path55 !== "string") {
+      if (typeof path56 !== "string") {
         throw new TypeError("path must be a string to res.sendFile");
       }
       if (typeof options === "function") {
         done = options;
         opts = {};
       }
-      if (!opts.root && !pathIsAbsolute(path55)) {
+      if (!opts.root && !pathIsAbsolute(path56)) {
         throw new TypeError("path must be absolute or specify root to res.sendFile");
       }
-      var pathname = encodeURI(path55);
+      var pathname = encodeURI(path56);
       opts.etag = this.app.enabled("etag");
       var file = send(req, pathname, opts);
       sendfile(res2, file, opts, function(err) {
@@ -67420,7 +67421,7 @@ var require_response = __commonJS({
         }
       });
     };
-    res.download = function download(path55, filename, options, callback) {
+    res.download = function download(path56, filename, options, callback) {
       var done = callback;
       var name2 = filename;
       var opts = options || null;
@@ -67437,7 +67438,7 @@ var require_response = __commonJS({
         opts = filename;
       }
       var headers = {
-        "Content-Disposition": contentDisposition(name2 || path55)
+        "Content-Disposition": contentDisposition(name2 || path56)
       };
       if (opts && opts.headers) {
         var keys = Object.keys(opts.headers);
@@ -67450,7 +67451,7 @@ var require_response = __commonJS({
       }
       opts = Object.create(opts);
       opts.headers = headers;
-      var fullPath = !opts.root ? resolve(path55) : path55;
+      var fullPath = !opts.root ? resolve(path56) : path56;
       return this.sendFile(fullPath, opts, done);
     };
     res.contentType = res.type = function contentType(type) {
@@ -67733,11 +67734,11 @@ var require_serve_static = __commonJS({
         }
         var forwardError = !fallthrough;
         var originalUrl = parseUrl.original(req);
-        var path54 = parseUrl(req).pathname;
-        if (path54 === "/" && originalUrl.pathname.substr(-1) !== "/") {
-          path54 = "";
+        var path55 = parseUrl(req).pathname;
+        if (path55 === "/" && originalUrl.pathname.substr(-1) !== "/") {
+          path55 = "";
         }
-        var stream = send(req, path54, opts);
+        var stream = send(req, path55, opts);
         stream.on("directory", onDirectory);
         if (setHeaders) {
           stream.on("headers", setHeaders);
@@ -68236,13 +68237,13 @@ var require_mediaType2 = __commonJS({
       return spec.q > 0;
     }
     function quoteCount(string3) {
-      var count = 0;
+      var count2 = 0;
       var index = 0;
       while ((index = string3.indexOf('"', index)) !== -1) {
-        count++;
+        count2++;
         index++;
       }
-      return count;
+      return count2;
     }
     function splitKeyValuePair(str) {
       var index = str.indexOf("=");
@@ -76928,11 +76929,11 @@ var require_mime_types4 = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path54) {
-      if (!path54 || typeof path54 !== "string") {
+    function lookup(path55) {
+      if (!path55 || typeof path55 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path54).toLowerCase().substr(1);
+      var extension2 = extname("x." + path55).toLowerCase().substr(1);
       if (!extension2) {
         return false;
       }
@@ -77249,11 +77250,11 @@ var require_cjs = __commonJS({
     var encodePayload = (packets, callback) => {
       const length = packets.length;
       const encodedPackets = new Array(length);
-      let count = 0;
+      let count2 = 0;
       packets.forEach((packet, i) => {
         (0, encodePacket_js_1.encodePacket)(packet, false, (encodedPacket) => {
           encodedPackets[i] = encodedPacket;
-          if (++count === length) {
+          if (++count2 === length) {
             callback(encodedPackets.join(SEPARATOR));
           }
         });
@@ -77714,11 +77715,11 @@ var require_parser_v3 = __commonJS({
     }
     function map(ary, each, done) {
       const results = new Array(ary.length);
-      let count = 0;
+      let count2 = 0;
       for (let i = 0; i < ary.length; i++) {
         each(ary[i], (error2, msg) => {
           results[i] = msg;
-          if (++count === ary.length) {
+          if (++count2 === ary.length) {
             done(null, results);
           }
         });
@@ -83103,11 +83104,11 @@ var require_server = __commonJS({
        * @protected
        */
       _computePath(options) {
-        let path54 = (options.path || "/engine.io").replace(/\/$/, "");
+        let path55 = (options.path || "/engine.io").replace(/\/$/, "");
         if (options.addTrailingSlash !== false) {
-          path54 += "/";
+          path55 += "/";
         }
-        return path54;
+        return path55;
       }
       /**
        * Returns a list of available transports for upgrade given a certain transport.
@@ -83633,10 +83634,10 @@ var require_server = __commonJS({
        * @param {Object} options
        */
       attach(server2, options = {}) {
-        const path54 = this._computePath(options);
+        const path55 = this._computePath(options);
         const destroyUpgradeTimeout = options.destroyUpgradeTimeout || 1e3;
         function check2(req) {
-          return path54 === req.url.slice(0, path54.length);
+          return path55 === req.url.slice(0, path55.length);
         }
         const listeners = server2.listeners("request").slice(0);
         server2.removeAllListeners("request");
@@ -83644,7 +83645,7 @@ var require_server = __commonJS({
         server2.on("listening", this.init.bind(this));
         server2.on("request", (req, res) => {
           if (check2(req)) {
-            debug('intercepting request for path "%s"', path54);
+            debug('intercepting request for path "%s"', path55);
             this.handleRequest(req, res);
           } else {
             let i = 0;
@@ -84493,8 +84494,8 @@ var require_userver = __commonJS({
        * @param options
        */
       attach(app, options = {}) {
-        const path54 = this._computePath(options);
-        app.any(path54, this.handleRequest.bind(this)).ws(path54, {
+        const path55 = this._computePath(options);
+        app.any(path55, this.handleRequest.bind(this)).ws(path55, {
           compression: options.compression,
           idleTimeout: options.idleTimeout,
           maxBackpressure: options.maxBackpressure,
@@ -89024,7 +89025,7 @@ var require_dist8 = __commonJS({
     var zlib_1 = __require("zlib");
     var accepts = require_accepts2();
     var stream_1 = __require("stream");
-    var path54 = __require("path");
+    var path55 = __require("path");
     var engine_io_1 = require_engine_io();
     var client_1 = require_client();
     var events_1 = __require("events");
@@ -89219,7 +89220,7 @@ var require_dist8 = __commonJS({
             res.writeHeader("cache-control", "public, max-age=0");
             res.writeHeader("content-type", "application/" + (isMap ? "json" : "javascript") + "; charset=utf-8");
             res.writeHeader("etag", expectedEtag);
-            const filepath = path54.join(__dirname, "../client-dist/", filename);
+            const filepath = path55.join(__dirname, "../client-dist/", filename);
             (0, uws_1.serveFile)(res, filepath);
           });
         }
@@ -89301,7 +89302,7 @@ var require_dist8 = __commonJS({
        * @private
        */
       static sendFile(filename, req, res) {
-        const readStream = (0, fs_1.createReadStream)(path54.join(__dirname, "../client-dist/", filename));
+        const readStream = (0, fs_1.createReadStream)(path55.join(__dirname, "../client-dist/", filename));
         const encoding = accepts(req).encodings(["br", "gzip", "deflate"]);
         const onError = (err) => {
           if (err) {
@@ -92530,7 +92531,7 @@ var PolicyDocumentSchema = external_exports.union([
   PolicyOverridesSchema
 ]);
 var MAX_POLICY_BYTES = 64 * 1024;
-var PolicyConfigError = class extends PlatformIOError {
+var PolicyConfigError = class extends PlatformIOError2 {
   /** Creates an actionable configuration error without exposing source contents. */
   constructor(source, detail) {
     super(`Invalid policy at ${source}: ${detail}`, "POLICY_CONFIG_INVALID", {
@@ -92541,8 +92542,8 @@ var PolicyConfigError = class extends PlatformIOError {
   }
   source;
 };
-function parsePolicyDocument(text6, source) {
-  if (Buffer.byteLength(text6, "utf8") > MAX_POLICY_BYTES) {
+function parsePolicyDocument(text7, source) {
+  if (Buffer.byteLength(text7, "utf8") > MAX_POLICY_BYTES) {
     throw new PolicyConfigError(source, "Policy exceeds the 64 KiB limit.");
   }
   const extension = path.extname(source).toLowerCase();
@@ -92553,8 +92554,8 @@ function parsePolicyDocument(text6, source) {
     );
   }
   try {
-    if (extension === ".json") JSON.parse(text6);
-    const document2 = (0, import_yaml.parseDocument)(text6, {
+    if (extension === ".json") JSON.parse(text7);
+    const document2 = (0, import_yaml.parseDocument)(text7, {
       version: "1.2",
       strict: true,
       uniqueKeys: true,
@@ -92910,12 +92911,12 @@ function readLayer(source, required2) {
     );
   }
 }
-function recordSource(sources, kind3, source, text6) {
+function recordSource(sources, kind3, source, text7) {
   sources.push({
     kind: kind3,
     source,
-    present: text6 !== void 0,
-    ...text6 === void 0 ? {} : { sha256: crypto2.createHash("sha256").update(text6).digest("hex") }
+    present: text7 !== void 0,
+    ...text7 === void 0 ? {} : { sha256: crypto2.createHash("sha256").update(text7).digest("hex") }
   });
 }
 function applyOperatorCeiling(policy, operator) {
@@ -92959,11 +92960,11 @@ function loadEffectivePolicyState(workspaceDir) {
       path4.resolve(workspaceDir),
       ".pio-mcp-policy.json"
     );
-    const text6 = readLayer(source2, false);
-    recordSource(sources, "project-profile", source2, text6);
-    if (text6 !== void 0) {
+    const text7 = readLayer(source2, false);
+    recordSource(sources, "project-profile", source2, text7);
+    if (text7 !== void 0) {
       const document2 = PolicyProfileConfigSchema.safeParse(
-        parsePolicyDocument(text6, source2)
+        parsePolicyDocument(text7, source2)
       );
       if (!document2.success)
         throw new PolicyConfigError(
@@ -92994,10 +92995,10 @@ function loadEffectivePolicyState(workspaceDir) {
       ".pio-mcp-workspace",
       "policy.yaml"
     );
-    const text6 = readLayer(source2, false);
-    recordSource(sources, "project-override", source2, text6);
-    if (text6 !== void 0) {
-      const document2 = parsePolicyDocument(text6, source2);
+    const text7 = readLayer(source2, false);
+    recordSource(sources, "project-override", source2, text7);
+    if (text7 !== void 0) {
+      const document2 = parsePolicyDocument(text7, source2);
       if ("profile" in document2)
         throw new PolicyConfigError(
           source2,
@@ -93029,7 +93030,7 @@ function createPolicyRevisionGuard(workspaceDir) {
   const expected = loadEffectivePolicyState(workspaceDir).digest;
   return () => {
     if (loadEffectivePolicyState(workspaceDir).digest !== expected)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Policy or project enrollment changed during execution; start a new authorized operation.",
         "POLICY_CHANGED"
       );
@@ -93069,21 +93070,21 @@ function approvalsFile() {
   return path14.join(resolvePolicyDirectory(), "approvals.json");
 }
 function readApprovals(file = approvalsFile()) {
-  let text6;
+  let text7;
   try {
     if (fs11.statSync(file).size > 8 * 1024 * 1024) throw new Error("size limit");
-    text6 = fs11.readFileSync(file, "utf8");
+    text7 = fs11.readFileSync(file, "utf8");
   } catch (error2) {
     if (error2.code === "ENOENT") return [];
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Approval storage is unreadable or exceeds its size limit.",
       "APPROVAL_STORE_INVALID"
     );
   }
   try {
-    return external_exports.array(ApprovalRecordSchema).parse(JSON.parse(text6));
+    return external_exports.array(ApprovalRecordSchema).parse(JSON.parse(text7));
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Approval storage is malformed; operator repair is required.",
       "APPROVAL_STORE_INVALID"
     );
@@ -93115,7 +93116,7 @@ function mutate(operation) {
       retries: 0
     });
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Approval storage is busy or unavailable; retry the operation.",
       "APPROVAL_STORE_BUSY"
     );
@@ -93153,7 +93154,7 @@ function listApprovalRequests(opts) {
 function createApprovalRequest(input) {
   const minutes = input.expiresInMinutes ?? 30;
   if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Approval lifetime must be between zero and 1440 minutes.",
       "APPROVAL_LIFETIME_INVALID"
     );
@@ -93181,7 +93182,7 @@ function transition(id, status) {
     const record2 = currentState(records[index], file);
     if (record2.status !== "pending" && !(status === "denied" && record2.status === "approved")) {
       if (record2.status === status) return record2;
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         `Approval is ${record2.status} and cannot become ${status}.`,
         "APPROVAL_TRANSITION_INVALID"
       );
@@ -93330,7 +93331,7 @@ import path16 from "node:path";
 var MAX_STATE_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
 function validateAutomationKey(automationKey) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u.test(automationKey)) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "automationKey must be 1-80 letters, numbers, underscores, or hyphens.",
       "AUTOMATION_POLICY_DENIED"
     );
@@ -93365,20 +93366,20 @@ function readAutomationStateRecord(projectDir, automationKey, allowStale) {
   try {
     state = JSON.parse(fs13.readFileSync(statePath, "utf8"));
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Automation '${automationKey}' state is malformed and requires operator review.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   const updatedAt = new Date(state.updatedAt).getTime();
   if (state.schemaVersion !== 1 || state.automationKey !== automationKey || !Number.isFinite(updatedAt) || !Number.isInteger(state.consecutiveFailures) || state.consecutiveFailures < 0 || !Number.isInteger(state.consecutiveHardwareWrites) || state.consecutiveHardwareWrites < 0) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Automation '${automationKey}' state cannot be verified and requires operator review.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (!allowStale && Date.now() - updatedAt > MAX_STATE_AGE_MS) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Automation '${automationKey}' write budget is stale and requires operator review.`,
       "AUTOMATION_POLICY_DENIED"
     );
@@ -93493,7 +93494,7 @@ async function withAutomationStateLock(projectDir, automationKey, operation) {
       realpath: false
     });
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Automation '${automationKey}' is already running.`,
       "OVERLAPPING_RUN"
     );
@@ -93556,7 +93557,7 @@ function loadLabRunnerPolicy(projectDir) {
       fs14.readFileSync(policyPath, "utf8")
     );
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "The lab-runner automation policy is malformed.",
       "AUTOMATION_POLICY_DENIED"
     );
@@ -93566,57 +93567,57 @@ function validateAutomationScope(input) {
   validateAutomationKey(input.automationKey);
   const projectDir = validateProjectPath(input.projectDir);
   if (projectDir === path17.parse(projectDir).root) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Automation cannot target a filesystem root.",
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (input.environment?.includes("*")) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Automation target selectors must be exact and cannot contain wildcards.",
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (!Number.isFinite(input.maxRunDurationSeconds) || input.maxRunDurationSeconds < 1 || input.maxRunDurationSeconds > 900) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Automation runs must have a maximum duration between 1 and 900 seconds.",
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (ALWAYS_DENIED_ACTIONS.has(input.action)) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Action '${input.action}' is never allowed in unattended automation.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   const writeOperation = WRITE_ACTIONS.has(input.action);
   if (!writeOperation && !SAFE_SCHEDULED_ACTIONS.has(input.action)) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Action '${input.action}' is not available to unattended automation.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (ENVIRONMENT_SCOPED_ACTIONS.has(input.action) && !input.environment) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Action '${input.action}' requires an exact PlatformIO environment.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if ((writeOperation || DEVICE_BOUND_ACTIONS.has(input.action)) && !input.targetBinding) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Action '${input.action}' requires a current physical target binding.`,
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (input.targetBinding) {
     if (input.targetBinding.port.includes("*") || input.targetBinding.deviceFingerprint.includes("*")) {
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Automation target selectors must be exact and cannot contain wildcards.",
         "AUTOMATION_POLICY_DENIED"
       );
     }
     if (path17.resolve(input.targetBinding.projectDir) !== projectDir || input.targetBinding.environment !== input.environment || new Date(input.targetBinding.expiresAt).getTime() <= Date.now()) {
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Automation target binding is expired or outside the requested scope.",
         "AUTOMATION_POLICY_DENIED"
       );
@@ -93631,19 +93632,19 @@ function validateAutomationScope(input) {
   }
   const policy = loadLabRunnerPolicy(projectDir);
   if (!policy?.enabled || policy.profile !== "lab_runner" || !policy.allowedOperations.includes(input.action) || policy.environment !== input.environment || policy.deviceFingerprint !== input.targetBinding.deviceFingerprint || new Date(policy.expiresAt).getTime() <= Date.now()) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Unattended hardware writes require a current, exact lab-runner policy.",
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if (input.maxRunDurationSeconds > policy.maxRunDurationSeconds) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Requested run duration exceeds the lab-runner policy.",
       "AUTOMATION_POLICY_DENIED"
     );
   }
   if ((input.consecutiveFlashes ?? 0) >= policy.maxConsecutiveFlashes) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "The lab-runner consecutive flash limit has been reached.",
       "AUTOMATION_POLICY_DENIED"
     );
@@ -93651,7 +93652,7 @@ function validateAutomationScope(input) {
   if (input.lastFlashAt) {
     const elapsedSeconds = (Date.now() - new Date(input.lastFlashAt).getTime()) / 1e3;
     if (elapsedSeconds < policy.cooldownSeconds) {
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "The lab-runner flash cooldown has not elapsed.",
         "AUTOMATION_POLICY_DENIED"
       );
@@ -93674,7 +93675,7 @@ async function reserveAutomationWriteBudget(input) {
         lastFlashAt: state.lastHardwareWriteAt
       });
       if (!scope5.writeOperation) {
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Only hardware-changing automation actions consume a write budget.",
           "AUTOMATION_POLICY_DENIED"
         );
@@ -93702,7 +93703,7 @@ import crypto8 from "node:crypto";
 import path18 from "node:path";
 function canonical2(value2, depth = 0) {
   if (depth > 32)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Approval arguments exceed the nesting limit.",
       "APPROVAL_SCOPE_INVALID"
     );
@@ -93717,7 +93718,7 @@ function canonical2(value2, depth = 0) {
       (key) => `${JSON.stringify(key)}:${canonical2(value2[key], depth + 1)}`
     ).join(",")}}`;
   }
-  throw new PlatformIOError(
+  throw new PlatformIOError2(
     "Approval arguments must contain finite JSON values.",
     "APPROVAL_SCOPE_INVALID"
   );
@@ -93740,7 +93741,7 @@ function approvalScopeDigest(action, args, policyDigest, context) {
     actorClass: context.actorClass ?? (context.actor === "system" ? "system" : "interactive")
   });
   if (Buffer.byteLength(encoded) > 256 * 1024)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Approval arguments exceed the 256 KiB limit.",
       "APPROVAL_SCOPE_INVALID"
     );
@@ -94028,7 +94029,7 @@ init_errors2();
 async function dispatchAuthorizedAction(name2, args, context, execute2) {
   const decision2 = await authorizeAction(name2, args, context);
   if (decision2.status !== "allow")
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       decision2.reason,
       decision2.status === "requires_approval" ? "APPROVAL_REQUIRED" : "POLICY_DENIED",
       { policyDecision: decision2 }
@@ -94038,7 +94039,7 @@ async function dispatchAuthorizedAction(name2, args, context, execute2) {
 async function authorizeAction(name2, args, context) {
   const action = name2 === "start_pio_home" ? "run_shell_command" : policyNamesForOperation(name2).at(-1);
   if (!Object.hasOwn(actionRiskLevels, action))
-    throw new PlatformIOError(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
+    throw new PlatformIOError2(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
   return evaluatePolicy(action, args, {
     ...context,
     operationName: name2
@@ -94047,7 +94048,7 @@ async function authorizeAction(name2, args, context) {
 async function planAction(name2, args, context) {
   const action = name2 === "start_pio_home" ? "run_shell_command" : policyNamesForOperation(name2).at(-1);
   if (!Object.hasOwn(actionRiskLevels, action))
-    throw new PlatformIOError(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
+    throw new PlatformIOError2(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
   return planPolicy(action, args, { ...context, operationName: name2 });
 }
 
@@ -94060,7 +94061,7 @@ import path20 from "node:path";
 import crypto9 from "node:crypto";
 async function retainCommandLog(purpose, stdout, stderr) {
   if (Buffer.byteLength(stdout) + Buffer.byteLength(stderr) > 16 * 1024 * 1024)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Command log exceeds its bound.",
       "COMMAND_LOG_LIMIT"
     );
@@ -94079,7 +94080,7 @@ async function readCommandOutput(filename) {
   try {
     const stat = await handle.stat();
     if (!stat.isFile() || stat.size > 16 * 1024 * 1024)
-      throw new PlatformIOError("Command output exceeds the report limit", "COMMAND_LOG_LIMIT");
+      throw new PlatformIOError2("Command output exceeds the report limit", "COMMAND_LOG_LIMIT");
     const buffer = Buffer.alloc(stat.size + 1);
     let offset = 0;
     while (offset < buffer.length) {
@@ -94088,7 +94089,7 @@ async function readCommandOutput(filename) {
       offset += read.bytesRead;
     }
     if (offset !== stat.size)
-      throw new PlatformIOError("Command output changed during collection", "COMMAND_LOG_CHANGED");
+      throw new PlatformIOError2("Command output changed during collection", "COMMAND_LOG_CHANGED");
     return redactSecretsInText(buffer.subarray(0, offset).toString("utf8")).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
   } finally {
     await handle.close();
@@ -94114,7 +94115,7 @@ function contained(root, candidate) {
 }
 async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
   if (!path21.isAbsolute(compilerPath) || !trustedRoots.length || trustedRoots.some((root2) => !path21.isAbsolute(root2)))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Analysis needs explicit absolute compiler and trusted-root paths.",
       "ANALYSIS_TOOLCHAIN_INVALID"
     );
@@ -94126,7 +94127,7 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
   ];
   const matches = roots.filter((root2) => contained(root2, compiler));
   if (!matches.length)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Compiler is outside the trusted toolchain roots.",
       "ANALYSIS_TOOLCHAIN_UNTRUSTED"
     );
@@ -94136,7 +94137,7 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
     /^((?:[a-z0-9_]+-)*)(?:gcc|g\+\+|cc|c\+\+)(\.exe)?$/i
   );
   if (!match || !(await fs16.stat(compiler)).isFile())
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Expected a native GNU-compatible compiler path.",
       "ANALYSIS_TOOLCHAIN_INVALID"
     );
@@ -94150,13 +94151,13 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
         )
       );
     } catch {
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         `The selected toolchain is missing ${tool}.`,
         "ANALYSIS_TOOL_UNAVAILABLE"
       );
     }
     if (!contained(root, candidate) || !(await fs16.stat(candidate)).isFile())
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         `The ${tool} utility escapes the selected toolchain root.`,
         "ANALYSIS_TOOLCHAIN_UNTRUSTED"
       );
@@ -94173,7 +94174,7 @@ async function resolveAnalysisToolchain(compilerPath, trustedRoots) {
 // src/core/analysis/build-metadata.ts
 function selectBuildMetadata(output, environment) {
   const invalid3 = (message) => {
-    throw new PlatformIOError(message, "ANALYSIS_METADATA_INVALID");
+    throw new PlatformIOError2(message, "ANALYSIS_METADATA_INVALID");
   };
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
     invalid3("Project metadata exceeds 10 MiB.");
@@ -94192,7 +94193,7 @@ function selectBuildMetadata(output, environment) {
   if (environment !== void 0 && (!environment || environment.length > 256 || /[\x00-\x1f]/.test(environment)))
     invalid3("Invalid selected environment.");
   if (environment === void 0 && names.length !== 1)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Select an explicit environment for analysis; project metadata contains multiple environments.",
       "ANALYSIS_ENVIRONMENT_REQUIRED"
     );
@@ -94222,7 +94223,7 @@ import fs17 from "node:fs/promises";
 import crypto10 from "node:crypto";
 async function readElfIdentity(elfPath, expectedSha256) {
   if (expectedSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(expectedSha256))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Expected ELF hash must be SHA-256.",
       "ANALYSIS_ELF_INVALID"
     );
@@ -94231,23 +94232,23 @@ async function readElfIdentity(elfPath, expectedSha256) {
   try {
     const before = await file.stat();
     if (!before.isFile() || before.size < 52)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Expected a regular ELF file with a complete header.",
         "ANALYSIS_ELF_INVALID"
       );
     if (before.size > 256 * 1024 * 1024)
-      throw new PlatformIOError("ELF exceeds 256 MiB.", "ANALYSIS_INPUT_LIMIT");
+      throw new PlatformIOError2("ELF exceeds 256 MiB.", "ANALYSIS_INPUT_LIMIT");
     const header = Buffer.alloc(Math.min(64, before.size));
     const { bytesRead } = await file.read(header, 0, header.length, 0);
     if (bytesRead !== header.length || header.subarray(0, 4).toString("hex") !== "7f454c46" || ![1, 2].includes(header[4]) || ![1, 2].includes(header[5]) || header[6] !== 1)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid or unsupported ELF header.",
         "ANALYSIS_ELF_INVALID"
       );
     const bits = header[4] === 1 ? 32 : 64;
     const byteOrder = header[5] === 1 ? "little" : "big";
     if (bits === 64 && bytesRead < 64)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Truncated ELF64 header.",
         "ANALYSIS_ELF_INVALID"
       );
@@ -94255,7 +94256,7 @@ async function readElfIdentity(elfPath, expectedSha256) {
     const version2 = byteOrder === "little" ? header.readUInt32LE(20) : header.readUInt32BE(20);
     const type = u16(16);
     if (version2 !== 1 || u16(bits === 32 ? 40 : 52) !== (bits === 32 ? 52 : 64) || ![2, 3].includes(type))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "ELF must be a supported executable or shared image.",
         "ANALYSIS_ELF_INVALID"
       );
@@ -94279,7 +94280,7 @@ async function readElfIdentity(elfPath, expectedSha256) {
         position
       );
       if (!read.bytesRead)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "ELF changed while reading.",
           "ANALYSIS_ELF_CHANGED"
         );
@@ -94288,13 +94289,13 @@ async function readElfIdentity(elfPath, expectedSha256) {
     }
     const after = await file.stat();
     if (after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "ELF changed while reading.",
         "ANALYSIS_ELF_CHANGED"
       );
     const sha256 = hash.digest("hex");
     if (expectedSha256 && sha256 !== expectedSha256.toLowerCase())
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "ELF does not match the selected firmware artifact.",
         "ANALYSIS_ELF_MISMATCH"
       );
@@ -94316,7 +94317,7 @@ async function readElfIdentity(elfPath, expectedSha256) {
 // src/core/analysis/collect-build-context.ts
 function scope(input) {
   if (!validateEnvironmentName(input.environment) || input.environment.startsWith("-"))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Select a valid explicit build environment.",
       "ANALYSIS_ENVIRONMENT_REQUIRED"
     );
@@ -94366,7 +94367,7 @@ async function collectionStage(input, args, caller, authorization, execute2) {
   const state = collectionAuthorities.get(authorization);
   const purpose = String(args.analysisPurpose);
   if (!state || authorization.projectDir !== input.projectDir || authorization.environment !== input.environment || !state.stages.has(purpose))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Analysis collection authority is invalid, expired or already used.",
       "ANALYSIS_AUTHORITY_INVALID"
     );
@@ -94392,7 +94393,7 @@ async function collectBuildMetadata(input, caller = {}, authorization) {
         { cwd: selected.projectDir, timeout: 6e5 }
       );
       if (result.exitCode !== 0)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "PlatformIO metadata collection failed.",
           "ANALYSIS_METADATA_FAILED"
         );
@@ -94451,7 +94452,7 @@ async function packageDocument(file) {
 }
 async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectDir, environment = process.env) {
   const fail = (message) => {
-    throw new PlatformIOError(message, "ANALYSIS_TOOLCHAIN_UNTRUSTED");
+    throw new PlatformIOError2(message, "ANALYSIS_TOOLCHAIN_UNTRUSTED");
   };
   const project = await fs18.realpath(projectDir);
   const validateRoot = async (root2) => {
@@ -94517,7 +94518,7 @@ async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectD
 init_errors2();
 function parsePlatformioMemory(output) {
   if (Buffer.byteLength(output) > 1024 * 1024)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Memory accounting output exceeds 1 MiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
@@ -94535,13 +94536,13 @@ function parsePlatformioMemory(output) {
       percent: Number(percentage)
     };
     if (!Number.isSafeInteger(region.usedBytes) || !Number.isSafeInteger(region.totalBytes) || region.totalBytes <= 0 || !Number.isFinite(region.percent) || Math.abs(region.percent - 100 * region.usedBytes / region.totalBytes) > 0.11)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid or inconsistent PlatformIO memory accounting.",
         "ANALYSIS_MEMORY_INVALID"
       );
     const key = name2.toLowerCase();
     if (regions[key])
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Multiple size-check results require explicit environment isolation.",
         "ANALYSIS_MEMORY_AMBIGUOUS"
       );
@@ -94558,15 +94559,15 @@ init_errors2();
 init_errors2();
 var HEX = "0x[0-9a-fA-F]{6,16}";
 var MAX_ADDRESSES = 4096;
-function linesOf(text6) {
-  if (Buffer.byteLength(text6) > 1024 * 1024)
-    throw new PlatformIOError(
+function linesOf(text7) {
+  if (Buffer.byteLength(text7) > 1024 * 1024)
+    throw new PlatformIOError2(
       "Analysis text exceeds 1 MiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
-  const lines2 = text6.split(/\r?\n/);
+  const lines2 = text7.split(/\r?\n/);
   if (lines2.some((line) => line.length > 16384))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Analysis line exceeds 16 KiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
@@ -94574,14 +94575,14 @@ function linesOf(text6) {
 }
 function normalizeAddress(address) {
   if (!/^0x[0-9a-f]{1,16}$/i.test(address))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid hexadecimal address.",
       "ANALYSIS_ADDRESS_INVALID"
     );
   return `0x${BigInt(address).toString(16).padStart(8, "0")}`;
 }
-function extractCrash(text6, includeAllHex = false) {
-  const lines2 = linesOf(text6);
+function extractCrash(text7, includeAllHex = false) {
+  const lines2 = linesOf(text7);
   const evidence = {
     addresses: [],
     causes: [],
@@ -94589,7 +94590,7 @@ function extractCrash(text6, includeAllHex = false) {
     backtraceCorrupted: false
   };
   const seen = /* @__PURE__ */ new Set();
-  const riscvDump = /\b(?:MEPC|MTVAL|MCAUSE)\s*[:=]/i.test(text6);
+  const riscvDump = /\b(?:MEPC|MTVAL|MCAUSE)\s*[:=]/i.test(text7);
   let inBacktrace = false;
   let backtraceFrame = 0;
   const add = (raw, role, register = null, frame = null) => {
@@ -94604,7 +94605,7 @@ function extractCrash(text6, includeAllHex = false) {
     const key = `${address}:${role}`;
     if (seen.has(key)) return;
     if (seen.size >= MAX_ADDRESSES)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Crash exceeds the address limit.",
         "ANALYSIS_INPUT_LIMIT"
       );
@@ -94658,8 +94659,8 @@ function extractCrash(text6, includeAllHex = false) {
 function parseAddr2line(output) {
   const frames = /* @__PURE__ */ new Map();
   let current;
-  const location = (text6) => {
-    const match = text6.match(
+  const location = (text7) => {
+    const match = text7.match(
       /^(.*?)\s+at\s+(.+):(\d+|\?)(?:\s+\(discriminator \d+\))?\s*$/
     );
     if (!match) return void 0;
@@ -94683,7 +94684,7 @@ function parseAddr2line(output) {
         inlined: []
       };
       if (frames.size >= MAX_ADDRESSES && !frames.has(address))
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Symbol output exceeds the address limit.",
           "ANALYSIS_INPUT_LIMIT"
         );
@@ -94702,13 +94703,13 @@ init_errors2();
 import path24 from "node:path";
 function lines(output) {
   if (Buffer.byteLength(output) > 16 * 1024 * 1024)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Size output exceeds 16 MiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
   const result = output.split(/\r?\n/);
   if (result.length > 1e5 || result.some((line) => line.length > 16384))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Size output exceeds line limits.",
       "ANALYSIS_INPUT_LIMIT"
     );
@@ -94716,7 +94717,7 @@ function lines(output) {
 }
 function exact(value2) {
   if (value2 < 0n || value2 > BigInt(Number.MAX_SAFE_INTEGER))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Size exceeds exact numeric range.",
       "ANALYSIS_SIZE_INVALID"
     );
@@ -94760,22 +94761,22 @@ function parseSizeTotals(output) {
   for (const line of lines(output)) {
     const match = line.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+/);
     if (!match) continue;
-    const [text6, data, bss, total] = match.slice(1).map(BigInt);
-    if (text6 + data + bss !== total)
-      throw new PlatformIOError(
+    const [text7, data, bss, total] = match.slice(1).map(BigInt);
+    if (text7 + data + bss !== total)
+      throw new PlatformIOError2(
         "Inconsistent GNU size totals.",
         "ANALYSIS_SIZE_INVALID"
       );
     rows.push({
-      text: exact(text6),
+      text: exact(text7),
       data: exact(data),
       bss: exact(bss),
-      flashEstimate: exact(text6 + data),
+      flashEstimate: exact(text7 + data),
       ramEstimate: exact(data + bss)
     });
   }
   if (rows.length > 1)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Expected size totals for exactly one ELF image.",
       "ANALYSIS_SIZE_INVALID"
     );
@@ -94848,22 +94849,22 @@ async function runAnalysisProcess(executable, args, options = {}) {
   const timeout = options.timeoutMs ?? 3e4;
   const maxBuffer = options.maxOutputBytes ?? 16 * 1024 * 1024;
   if (!path25.isAbsolute(executable) || /\.(?:cmd|bat|ps1|sh)$/i.test(executable))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Analysis requires an absolute native executable path.",
       "ANALYSIS_EXECUTABLE_INVALID"
     );
   if (!Number.isInteger(timeout) || timeout < 1 || timeout > 12e4 || !Number.isInteger(maxBuffer) || maxBuffer < 1 || maxBuffer > 32 * 1024 * 1024)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Analysis process limits are invalid.",
       "ANALYSIS_LIMIT_INVALID"
     );
   if (args.length > 8192 || args.some((arg) => typeof arg !== "string" || arg.includes("\0")) || args.reduce((total, arg) => total + Buffer.byteLength(arg), 0) > 256 * 1024)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Analysis argument list is invalid or too large.",
       "ANALYSIS_ARGUMENT_INVALID"
     );
   if (options.signal?.aborted)
-    throw new PlatformIOError("Analysis was cancelled.", "ANALYSIS_CANCELLED");
+    throw new PlatformIOError2("Analysis was cancelled.", "ANALYSIS_CANCELLED");
   return new Promise((resolve, reject) => {
     execFile2(
       executable,
@@ -94887,7 +94888,7 @@ async function runAnalysisProcess(executable, args, options = {}) {
         const code = error2.code;
         const failure = options.signal?.aborted || error2.name === "AbortError" ? "ANALYSIS_CANCELLED" : code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" ? "ANALYSIS_OUTPUT_LIMIT" : error2.killed ? "ANALYSIS_TIMEOUT" : code === "ENOENT" || code === "EACCES" ? "ANALYSIS_TOOL_UNAVAILABLE" : "ANALYSIS_TOOL_FAILED";
         reject(
-          new PlatformIOError(
+          new PlatformIOError2(
             `Analysis utility failed (${failure}).`,
             failure,
             {
@@ -94926,15 +94927,15 @@ function executionOptions(context, deadline) {
   context.validatePolicy?.();
   const timeoutMs = deadline - Date.now();
   if (timeoutMs <= 0)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Analysis report exceeded its execution deadline.",
       "ANALYSIS_TIMEOUT"
     );
   return { cwd: context.projectDir, signal: context.signal, timeoutMs };
 }
-async function decodeFirmwareCrash(context, text6, includeAllHex = false) {
+async function decodeFirmwareCrash(context, text7, includeAllHex = false) {
   context.validatePolicy?.();
-  const crash = extractCrash(text6, includeAllHex);
+  const crash = extractCrash(text7, includeAllHex);
   if (!crash.addresses.length)
     return { ok: false, error: "no_addresses", ...crash, frames: [] };
   const deadline = Date.now() + 3e4;
@@ -94992,7 +94993,7 @@ async function filterSizeSymbols(symbols, pattern, deadline) {
   const flush = async () => {
     const remaining = deadline - Date.now();
     if (remaining <= 0)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Analysis report exceeded its execution deadline.",
         "ANALYSIS_TIMEOUT"
       );
@@ -95008,11 +95009,11 @@ async function filterSizeSymbols(symbols, pattern, deadline) {
     bytes = 0;
   };
   for (let index = 0; index < symbols.length; index++) {
-    for (const text6 of [symbols[index].name, symbols[index].file]) {
-      if (!text6) continue;
-      const length = Buffer.byteLength(text6);
+    for (const text7 of [symbols[index].name, symbols[index].file]) {
+      if (!text7) continue;
+      const length = Buffer.byteLength(text7);
       if (texts.length >= 4096 || bytes + length > 1024 * 1024) await flush();
-      texts.push(text6);
+      texts.push(text7);
       owners.push(index);
       bytes += length;
     }
@@ -95023,7 +95024,7 @@ async function filterSizeSymbols(symbols, pattern, deadline) {
 async function reportFirmwareSize(context, top = 25, filter) {
   context.validatePolicy?.();
   if (!Number.isInteger(top) || top < 1 || top > 1e3)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Top-symbol count must be between 1 and 1000.",
       "ANALYSIS_ARGUMENT_INVALID"
     );
@@ -95038,7 +95039,7 @@ async function reportFirmwareSize(context, top = 25, filter) {
     async (snapshot, identity) => {
       const evidence = context.memoryEvidence;
       if (evidence && (evidence.environment !== context.environment || evidence.elfSha256 !== identity.sha256)) {
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Memory accounting does not match the selected environment and ELF.",
           "ANALYSIS_MEMORY_MISMATCH"
         );
@@ -95063,7 +95064,7 @@ async function reportFirmwareSize(context, top = 25, filter) {
       const sections = parseSizeSections(sectionsOutput.stdout);
       const totals = parseSizeTotals(totalsOutput.stdout);
       if (!totals)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "GNU size did not produce totals for the selected image.",
           "ANALYSIS_SIZE_INVALID"
         );
@@ -95255,7 +95256,7 @@ var metadataSchema = external_exports.record(
 );
 function readJson(output) {
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Project output exceeds 10 MiB.",
       "PROJECT_OUTPUT_LIMIT"
     );
@@ -95263,7 +95264,7 @@ function readJson(output) {
   try {
     raw = JSON.parse(output);
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Project output is not valid JSON.",
       "PROJECT_OUTPUT_INVALID"
     );
@@ -95271,7 +95272,7 @@ function readJson(output) {
   let nodes = 0;
   const clean = (item, depth) => {
     if (++nodes > 1e5 || depth > 24)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Project output exceeds structural limits.",
         "PROJECT_OUTPUT_LIMIT"
       );
@@ -95294,14 +95295,14 @@ function readJson(output) {
 function parseProjectEnvironments(output) {
   const parsed = configSchema.safeParse(readJson(output));
   if (!parsed.success)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Unexpected computed configuration shape.",
       "PROJECT_CONFIG_INVALID"
     );
   const sections = /* @__PURE__ */ new Map();
   for (const [name2, options] of parsed.data) {
     if (sections.has(name2) || new Set(options.map(([key]) => key)).size !== options.length)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Duplicate computed configuration section or option.",
         "PROJECT_CONFIG_INVALID"
       );
@@ -95334,7 +95335,7 @@ function parseProjectEnvironments(output) {
     extends: options.extends ?? []
   }));
   if (envs.length > 256 || envs.some((env) => !env.name))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid environment inventory.",
       "PROJECT_CONFIG_INVALID"
     );
@@ -95342,7 +95343,7 @@ function parseProjectEnvironments(output) {
   const rawDefaults = platformioSection.default_envs;
   const defaults = typeof rawDefaults === "string" ? rawDefaults.split(/[,\r\n]/).map((item) => item.trim()).filter(Boolean) : Array.isArray(rawDefaults) ? rawDefaults : rawDefaults == null ? [] : void 0;
   if (!defaults || defaults.some((name2) => !envs.some((env) => env.name === name2)))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Default environments do not match the resolved inventory.",
       "PROJECT_CONFIG_INVALID"
     );
@@ -95355,20 +95356,20 @@ function parseProjectEnvironments(output) {
 function parseProjectMetadata(output, environment) {
   const parsed = metadataSchema.safeParse(readJson(output));
   if (!parsed.success)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Unexpected build metadata shape.",
       "PROJECT_METADATA_INVALID"
     );
   const entries = Object.entries(parsed.data);
   if (entries.length < 1 || entries.length > 256 || environment && (entries.length !== 1 || entries[0][0] !== environment))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Metadata does not match the selected environments.",
       "PROJECT_METADATA_INVALID"
     );
   const envs = Object.fromEntries(
     entries.map(([name2, item]) => {
       if (!name2 || item.env_name && item.env_name !== name2)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Metadata environment identity disagrees with its key.",
           "PROJECT_METADATA_INVALID"
         );
@@ -95421,7 +95422,7 @@ var metadataSchema2 = external_exports.object({
 }).strict();
 async function executeProjectInspection(action, input, caller = {}, onAuthorized) {
   if (!["project_envs", "project_metadata", "list_targets"].includes(action))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Unknown project inspection operation.",
       "UNKNOWN_ACTION"
     );
@@ -95537,7 +95538,7 @@ async function listBoards(filter) {
     }
     return allBoards;
   } catch (error2) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Failed to list boards${filter ? ` with filter '${filter}'` : ""}: ${error2}`,
       "LIST_BOARDS_FAILED",
       { filter }
@@ -95564,7 +95565,7 @@ async function getBoardInfo(boardId) {
     if (error2 instanceof BoardNotFoundError) {
       throw error2;
     }
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Failed to get board info for '${boardId}': ${error2}`,
       "GET_BOARD_INFO_FAILED",
       { boardId }
@@ -95582,7 +95583,7 @@ async function resolveCompatibilityProject(requested, defaults) {
   if (selected === "~" || selected.startsWith("~/") || selected.startsWith("~\\"))
     selected = path27.join(defaults.home ?? os5.homedir(), selected.slice(2));
   else if (selected.startsWith("~"))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Named-user home expansion is unsupported; pass an absolute project path.",
       "COMPAT_PROJECT_INVALID"
     );
@@ -95590,7 +95591,7 @@ async function resolveCompatibilityProject(requested, defaults) {
     path27.resolve(defaults.cwd ?? process.cwd(), selected)
   );
   if (!(await fs22.stat(canonical3)).isDirectory() || !(await fs22.stat(path27.join(canonical3, "platformio.ini"))).isFile())
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Expected a PlatformIO project directory.",
       "COMPAT_PROJECT_INVALID"
     );
@@ -95622,14 +95623,14 @@ async function executeSizeCompatibility(input, defaults, caller, onAuthorized) {
   );
   guard();
   if (!configuration.ok || !("defaultEnvironments" in configuration))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Could not resolve size-report environment.",
       "PROJECT_CONFIG_INVALID"
     );
   const environment = params.env || configuration.defaultEnvironments[0] || (configuration.envs.length === 1 ? configuration.envs[0].name : void 0);
   const selected = configuration.envs.find((item) => item.name === environment);
   if (!environment || !selected)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Select a valid size-report environment.",
       "PROJECT_ENVIRONMENT_INVALID"
     );
@@ -95713,13 +95714,13 @@ async function executeDecodeCompatibility(client, input, defaults, caller, onAut
     read_approval_id: external_exports.string().max(256).optional(),
     expected_elf_sha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional()
   }).strict().parse(input);
-  const decode = async (text6, collection) => {
-    if (!text6.trim())
-      throw new PlatformIOError(
+  const decode = async (text7, collection) => {
+    if (!text7.trim())
+      throw new PlatformIOError2(
         "Pass crash text or an owned monitor session containing output.",
         "ANALYSIS_ARGUMENT_INVALID"
       );
-    const crash = extractCrash(text6, params.include_all_hex);
+    const crash = extractCrash(text7, params.include_all_hex);
     if (!crash.addresses.length)
       return {
         ok: false,
@@ -95740,13 +95741,13 @@ async function executeDecodeCompatibility(client, input, defaults, caller, onAut
     );
     guard();
     if (!configuration.ok || !("defaultEnvironments" in configuration))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Could not resolve analysis environment.",
         "PROJECT_CONFIG_INVALID"
       );
     const environment = params.env || configuration.defaultEnvironments[0] || (configuration.envs.length === 1 ? configuration.envs[0].name : void 0);
     if (!environment || !configuration.envs.some((item) => item.name === environment))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Select a valid analysis environment explicitly.",
         "PROJECT_ENVIRONMENT_INVALID"
       );
@@ -95754,7 +95755,7 @@ async function executeDecodeCompatibility(client, input, defaults, caller, onAut
       {
         projectDir,
         environment,
-        text: text6,
+        text: text7,
         includeAllHex: params.include_all_hex,
         approvalId: params.approval_id,
         expectedElfSha256: params.expected_elf_sha256
@@ -95831,7 +95832,7 @@ function parsePortHolders(output) {
       current = { pid, command: null };
       holders2.push(current);
       if (holders2.length > 64)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Port holder report exceeds its limit.",
           "PORT_DIAGNOSTICS_LIMIT"
         );
@@ -95889,10 +95890,10 @@ async function holders(port) {
 }
 async function inspectPortDiagnostics(port, listed) {
   if (!port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
-    throw new PlatformIOError("Invalid port name.", "SERIAL_ENDPOINT_INVALID");
+    throw new PlatformIOError2("Invalid port name.", "SERIAL_ENDPOINT_INVALID");
   if (process.platform === "win32") {
     if (!/^(?:\\\\\.\\)?COM[1-9][0-9]{0,8}$/i.test(port))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Expected a COM port.",
         "SERIAL_ENDPOINT_INVALID"
       );
@@ -95907,7 +95908,7 @@ async function inspectPortDiagnostics(port, listed) {
     };
   }
   if (!path28.posix.isAbsolute(port) || !path28.posix.normalize(port).startsWith("/dev/"))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Unix serial ports must be within /dev.",
       "SERIAL_ENDPOINT_INVALID"
     );
@@ -95927,13 +95928,13 @@ async function inspectPortDiagnostics(port, listed) {
     };
   }
   if (!canonical3.startsWith("/dev/"))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Serial alias escapes /dev.",
       "SERIAL_ENDPOINT_INVALID"
     );
   const stat = await fs23.stat(canonical3);
   if (!stat.isCharacterDevice())
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Port is not a character device.",
       "SERIAL_ENDPOINT_INVALID"
     );
@@ -95983,12 +95984,12 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
     stackWordBytes: external_exports.number().int().min(1).max(16).optional()
   }).strict().parse(options);
   if (settings.stackUnit === "words" && settings.stackWordBytes === void 0)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Word-valued stack telemetry requires stackWordBytes.",
       "MEMORY_UNIT_REQUIRED"
     );
   if (lines2.length > 1e4 || lines2.some((line) => typeof line !== "string" || line.length > 16384) || lines2.reduce((size, line) => size + Buffer.byteLength(line), 0) > 1024 * 1024)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Telemetry exceeds line or byte limits.",
       "MEMORY_TELEMETRY_LIMIT"
     );
@@ -95997,12 +95998,12 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
   const add = (line, metric, raw, unit, task, scale = 1) => {
     const value2 = Number(raw) * scale;
     if (!Number.isSafeInteger(value2) || value2 < 0)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Telemetry value is outside integer bounds.",
         "MEMORY_VALUE_INVALID"
       );
     if (samples.length >= 1e4)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Telemetry exceeds observation limits.",
         "MEMORY_TELEMETRY_LIMIT"
       );
@@ -96010,8 +96011,8 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
   };
   let heapSummaryUntil = -1, totalsPending = false, taskTable = false;
   lines2.forEach((raw, line) => {
-    const text6 = raw.replace(/\x1b\[[0-9;]*m/g, "");
-    const trimmed = text6.trim();
+    const text7 = raw.replace(/\x1b\[[0-9;]*m/g, "");
+    const trimmed = text7.trim();
     if (/heap summary for capabilities/i.test(trimmed)) {
       heapSummaryUntil = line + 128;
       totalsPending = false;
@@ -96102,7 +96103,7 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
     for (const [metric, label, trailer] of heapPatterns) {
       if (trailer && heapMatches.length === 0) continue;
       const regex = new RegExp(label + heapNumber, "gi");
-      for (const match of text6.matchAll(regex)) {
+      for (const match of text7.matchAll(regex)) {
         const end = match.index + match[0].length;
         if (claimed.some(([a, b]) => match.index < b && end > a)) continue;
         claimed.push([match.index, end]);
@@ -96130,7 +96131,7 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
       String.raw`^\s*(?<task>[\w.-]{1,128})\s*[:=]\s*` + stackNumber + String.raw`\s*(?:free|left|remaining)\b`
     ];
     for (const pattern of stackPatterns) {
-      for (const match of text6.matchAll(new RegExp(pattern, "gi"))) {
+      for (const match of text7.matchAll(new RegExp(pattern, "gi"))) {
         const end = match.index + match[0].length;
         if (claimed.some(([a, b]) => match.index < b && end > a)) continue;
         const groups = match.groups;
@@ -96155,7 +96156,7 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
         String.raw`(?<name>(?:[A-Za-z_][\w .-]{0,40}?)?(?:heap|stack|psram)[\w .-]{0,30}?)\s*[:=]\s*` + stackNumber,
         "gi"
       );
-      for (const match of text6.matchAll(generic)) {
+      for (const match of text7.matchAll(generic)) {
         const end = match.index + match[0].length;
         if (claimed.some(([a, b]) => match.index < b && end > a)) continue;
         const groups = match.groups;
@@ -96273,7 +96274,7 @@ function analyzeParsedTelemetry(lines2, options, custom3) {
     elapsedSeconds: external_exports.array(external_exports.number().finite().nonnegative()).max(1e4).optional()
   }).strict().parse(options);
   if (settings.elapsedSeconds && settings.elapsedSeconds.length !== lines2.length)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Telemetry timestamps must correspond to every input line.",
       "MEMORY_TIMESTAMPS_INVALID"
     );
@@ -96305,7 +96306,7 @@ function analyzeParsedTelemetry(lines2, options, custom3) {
       values2.push(sample);
       tasks.set(sample.task, values2);
       if (tasks.size > 256)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Telemetry exceeds 256 tasks.",
           "MEMORY_TELEMETRY_LIMIT"
         );
@@ -96319,7 +96320,7 @@ function analyzeParsedTelemetry(lines2, options, custom3) {
     });
     series.set(sample.metric, values);
     if (series.size > 256)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Telemetry exceeds 256 metrics.",
         "MEMORY_TELEMETRY_LIMIT"
       );
@@ -96378,7 +96379,7 @@ async function analyzeMemoryTelemetryPattern(lines2, pattern, options = {}) {
   });
   const samples = captures.map((capture) => {
     if (!/^\d+$/.test(capture.value))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Custom telemetry requires nonnegative integer byte values.",
         "MEMORY_VALUE_INVALID"
       );
@@ -96393,13 +96394,13 @@ async function analyzeMemoryTelemetryPattern(lines2, pattern, options = {}) {
     };
     const factor = unit === "word" || unit === "words" ? options.stackWordBytes : Object.hasOwn(factors, unit) ? factors[unit] : void 0;
     if (factor === void 0)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Custom telemetry unit is unknown or needs an explicit word size.",
         "MEMORY_UNIT_REQUIRED"
       );
     const value2 = Number(capture.value) * factor;
     if (!Number.isSafeInteger(value2))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Custom telemetry exceeds integer bounds.",
         "MEMORY_VALUE_INVALID"
       );
@@ -96449,13 +96450,13 @@ async function captureSessionMemory(manager, owner, sessionId, input = {}, signa
     droppedLines += last.droppedLines;
     let accepted = 0;
     for (let index = 0; index < last.lines.length; index++) {
-      const text6 = last.lines[index];
-      const size = Buffer.byteLength(text6);
+      const text7 = last.lines[index];
+      const size = Buffer.byteLength(text7);
       if (bytes + size > 1024 * 1024) {
         limitReached = true;
         break;
       }
-      lines2.push(text6);
+      lines2.push(text7);
       accepted++;
       bytes += size;
       truncatedBytes += last.lineTruncatedBytes[index] ?? 0;
@@ -96506,7 +96507,7 @@ init_errors2();
 async function captureTransientMemory(service, owner, request, input = {}, signal) {
   const args = MemoryCaptureSchema.parse(input);
   if (signal?.aborted)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Memory capture was cancelled before startup.",
       "SERIAL_CANCELLED"
     );
@@ -96521,11 +96522,11 @@ async function captureTransientMemory(service, owner, request, input = {}, signa
     );
   } catch (error2) {
     const stopped2 = await service.sessions.stop(owner, started.sessionId);
-    throw new PlatformIOError(
-      error2 instanceof PlatformIOError ? error2.message : "Memory capture failed.",
-      error2 instanceof PlatformIOError ? error2.code : "MEMORY_CAPTURE_FAILED",
+    throw new PlatformIOError2(
+      error2 instanceof PlatformIOError2 ? error2.message : "Memory capture failed.",
+      error2 instanceof PlatformIOError2 ? error2.code : "MEMORY_CAPTURE_FAILED",
       {
-        ...error2 instanceof PlatformIOError ? error2.context : {},
+        ...error2 instanceof PlatformIOError2 ? error2.context : {},
         sessionId: started.sessionId,
         cleanupPending: stopped2.cleanupPending
       }
@@ -96553,7 +96554,7 @@ import fs24 from "node:fs";
 import path29 from "node:path";
 function validatePort(port) {
   if (typeof port !== "string" || !port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid serial endpoint name.",
       "SERIAL_ENDPOINT_INVALID"
     );
@@ -96575,7 +96576,7 @@ function resolveSerialEndpoint(port, options = {}) {
       const name2 = port.startsWith(localPrefix) ? port.slice(localPrefix.length) : port;
       const match = /^COM([1-9][0-9]{0,8})$/i.exec(name2);
       if (!match)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Expected a COM port or its local device-path spelling.",
           "SERIAL_ENDPOINT_INVALID"
         );
@@ -96588,12 +96589,12 @@ function resolveSerialEndpoint(port, options = {}) {
       };
     }
     if (platform2 !== "linux" && platform2 !== "darwin")
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial endpoint identity is unavailable on this platform.",
         "SERIAL_ENDPOINT_UNSUPPORTED"
       );
     if (!path29.posix.isAbsolute(port) || !path29.posix.normalize(port).startsWith("/dev/"))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Unix serial endpoints must resolve within /dev.",
         "SERIAL_ENDPOINT_INVALID"
       );
@@ -96603,20 +96604,20 @@ function resolveSerialEndpoint(port, options = {}) {
       canonicalPort = realpath(port);
       validatePort(canonicalPort);
       if (!path29.posix.isAbsolute(canonicalPort) || !path29.posix.normalize(canonicalPort).startsWith("/dev/"))
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Serial alias resolves outside /dev.",
           "SERIAL_ENDPOINT_INVALID"
         );
       metadata = stat(canonicalPort);
     } catch (error2) {
-      if (error2 instanceof PlatformIOError) throw error2;
-      throw new PlatformIOError(
+      if (error2 instanceof PlatformIOError2) throw error2;
+      throw new PlatformIOError2(
         "Serial endpoint metadata is unavailable.",
         "SERIAL_ENDPOINT_UNAVAILABLE"
       );
     }
     if (!metadata.characterDevice || typeof metadata.deviceNumber !== "bigint" || metadata.deviceNumber < 0n || metadata.deviceNumber > 0xffffffffffffffffn)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial endpoint is not a valid character device.",
         "SERIAL_ENDPOINT_INVALID"
       );
@@ -96626,7 +96627,7 @@ function resolveSerialEndpoint(port, options = {}) {
         canonicalPort
       );
       if (!match)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Expected a Darwin callout/dial-in serial endpoint.",
           "SERIAL_ENDPOINT_INVALID"
         );
@@ -96660,7 +96661,7 @@ function resolveSerialEndpoint(port, options = {}) {
     revalidate() {
       const current = snapshot();
       if (current.canonicalPort !== expected.canonicalPort || current.identity !== expected.identity || current.deviceNumber !== expected.deviceNumber)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Serial endpoint changed after selection; resolve and authorize again.",
           "SERIAL_ENDPOINT_CHANGED"
         );
@@ -96673,7 +96674,7 @@ init_errors2();
 import fs25 from "node:fs";
 async function loadSerialBackend() {
   if (Number(process.versions.node.split(".")[0]) < 20)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Direct serial support requires Node 20 or newer.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -96695,7 +96696,7 @@ async function loadSerialBackend() {
     }
     return await import("serialport");
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "The pinned native serial backend is unavailable on this installation.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -96707,7 +96708,7 @@ init_errors2();
 function validateDirectSerialOptions(options) {
   const timeout = options.operationTimeoutMs ?? 5e3;
   if (typeof options.path !== "string" || !options.path || options.path.length > 512 || /[\x00-\x1f\x7f]/.test(options.path) || !Number.isSafeInteger(options.baudRate) || options.baudRate < 1 || options.baudRate > 4e6 || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 3e4)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid direct serial options.",
       "SERIAL_TRANSPORT_ARGUMENT_INVALID"
     );
@@ -96720,7 +96721,7 @@ var DirectSerialTransport = class {
     this.onData = onData;
     this.timeout = validateDirectSerialOptions(options);
     if (port.isOpen || port.opening || port.closing)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial transport requires an unopened binding.",
         "SERIAL_TRANSPORT_ARGUMENT_INVALID"
       );
@@ -96734,7 +96735,7 @@ var DirectSerialTransport = class {
       if (this.terminal) return;
       if (!Buffer.isBuffer(bytes)) {
         this.fail(
-          new PlatformIOError(
+          new PlatformIOError2(
             "Serial binding returned non-binary data.",
             "SERIAL_TRANSPORT_FAILED"
           )
@@ -96746,7 +96747,7 @@ var DirectSerialTransport = class {
           this.onData(bytes.subarray(offset, offset + 65536));
       } catch {
         this.fail(
-          new PlatformIOError(
+          new PlatformIOError2(
             "Serial data consumer failed.",
             "SERIAL_TRANSPORT_FAILED"
           )
@@ -96756,7 +96757,7 @@ var DirectSerialTransport = class {
     port.on(
       "error",
       () => this.fail(
-        new PlatformIOError(
+        new PlatformIOError2(
           "Serial transport failed.",
           "SERIAL_TRANSPORT_FAILED"
         )
@@ -96789,7 +96790,7 @@ var DirectSerialTransport = class {
   /** Open once; a late success after timeout/stop is immediately closed and never becomes usable. */
   async open() {
     if (this.current !== "idle" || this.terminal)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial transport cannot be reopened.",
         "SERIAL_TRANSPORT_STATE_INVALID"
       );
@@ -96800,7 +96801,7 @@ var DirectSerialTransport = class {
         this.port.open((error2) => {
           this.opening = false;
           if (error2) {
-            const failure = new PlatformIOError(
+            const failure = new PlatformIOError2(
               "Could not open serial port.",
               "SERIAL_OPEN_FAILED"
             );
@@ -96810,7 +96811,7 @@ var DirectSerialTransport = class {
           } else if (this.terminal) {
             this.requestClose();
             done(
-              new PlatformIOError(
+              new PlatformIOError2(
                 "Serial open was cancelled.",
                 "SERIAL_CLOSED"
               )
@@ -96822,7 +96823,7 @@ var DirectSerialTransport = class {
         });
       } catch {
         this.opening = false;
-        const failure = new PlatformIOError(
+        const failure = new PlatformIOError2(
           "Could not open serial port.",
           "SERIAL_OPEN_FAILED"
         );
@@ -96835,14 +96836,14 @@ var DirectSerialTransport = class {
   /** Write at most 64 KiB once, then wait for OS drain. This does not assert device-level acknowledgement. */
   async write(bytes) {
     if (!Buffer.isBuffer(bytes) || bytes.length > 65536)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial writes are limited to 64 KiB.",
         "SERIAL_WRITE_LIMIT"
       );
     if (this.state !== "open" || !this.port.isOpen)
-      throw new PlatformIOError("Serial port is not open.", "SERIAL_CLOSED");
+      throw new PlatformIOError2("Serial port is not open.", "SERIAL_CLOSED");
     if (this.writing)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "A serial write is already in progress.",
         "SERIAL_WRITE_BUSY"
       );
@@ -96854,14 +96855,14 @@ var DirectSerialTransport = class {
         this.port.write(copy, (error2) => {
           if (error2)
             return done(
-              new PlatformIOError(
+              new PlatformIOError2(
                 "Serial write failed; some bytes may have been sent.",
                 "SERIAL_WRITE_FAILED"
               )
             );
           if (this.terminal)
             return done(
-              new PlatformIOError(
+              new PlatformIOError2(
                 "Serial connection closed during write.",
                 "SERIAL_CLOSED"
               )
@@ -96869,7 +96870,7 @@ var DirectSerialTransport = class {
           try {
             this.port.drain(
               (drainError) => done(
-                drainError ? new PlatformIOError(
+                drainError ? new PlatformIOError2(
                   "Serial drain failed; some bytes may have been sent.",
                   "SERIAL_WRITE_FAILED"
                 ) : void 0
@@ -96877,7 +96878,7 @@ var DirectSerialTransport = class {
             );
           } catch {
             done(
-              new PlatformIOError(
+              new PlatformIOError2(
                 "Serial drain failed.",
                 "SERIAL_WRITE_FAILED"
               )
@@ -96894,7 +96895,7 @@ var DirectSerialTransport = class {
   async close() {
     this.markTerminal("stopped");
     this.abortPending(
-      new PlatformIOError("Serial operation stopped.", "SERIAL_CLOSED")
+      new PlatformIOError2("Serial operation stopped.", "SERIAL_CLOSED")
     );
     if (this.closeAttempt) return this.closeAttempt.promise;
     this.requestClose();
@@ -96908,7 +96909,7 @@ var DirectSerialTransport = class {
     const timer = setTimeout(() => {
       this.closeAttempt = void 0;
       reject(
-        new PlatformIOError(
+        new PlatformIOError2(
           "Serial closure is not confirmed; retain the device lease.",
           "SERIAL_CLOSE_TIMEOUT"
         )
@@ -96932,7 +96933,7 @@ var DirectSerialTransport = class {
       };
       const timer = setTimeout(
         () => finish(
-          new PlatformIOError(
+          new PlatformIOError2(
             "Serial operation timed out; effects may be partial.",
             timeoutCode
           )
@@ -96944,7 +96945,7 @@ var DirectSerialTransport = class {
         start(finish);
       } catch {
         finish(
-          new PlatformIOError(
+          new PlatformIOError2(
             "Serial operation failed.",
             "SERIAL_TRANSPORT_FAILED"
           )
@@ -96990,7 +96991,7 @@ var DirectSerialTransport = class {
     this.closing = false;
     this.markTerminal("stopped");
     this.abortPending(
-      new PlatformIOError("Serial connection closed.", "SERIAL_CLOSED")
+      new PlatformIOError2("Serial connection closed.", "SERIAL_CLOSED")
     );
     this.resolveClosed();
     if (this.closeAttempt) {
@@ -97003,7 +97004,7 @@ var DirectSerialTransport = class {
 async function createDirectSerialTransport(options, onData) {
   validateDirectSerialOptions(options);
   if (Number(process.versions.node.split(".")[0]) < 20)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Direct serial transport requires Node 20 or newer; the PlatformIO monitor remains available.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -97018,7 +97019,7 @@ async function createDirectSerialTransport(options, onData) {
     });
     return new DirectSerialTransport(port, options, onData);
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "The pinned serialport native backend is unavailable on this installation.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -97043,7 +97044,7 @@ var recordsSchema = external_exports.array(
 ).max(1024);
 async function loadBackend() {
   if (Number(process.versions.node.split(".")[0]) < 20)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Native serial discovery requires Node 20 or newer.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -97051,7 +97052,7 @@ async function loadBackend() {
     const { SerialPort } = await loadSerialBackend();
     return { list: () => SerialPort.list() };
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "The native serial backend is unavailable.",
       "SERIAL_BACKEND_UNAVAILABLE"
     );
@@ -97066,7 +97067,7 @@ var NativeSerialDiscovery = class {
   constructor(options) {
     this.timeoutMs = options.timeoutMs ?? 5e3;
     if (!Number.isSafeInteger(this.timeoutMs) || this.timeoutMs < 1 || this.timeoutMs > 3e4 || typeof options.authorize !== "function")
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid serial discovery configuration.",
         "SERIAL_DISCOVERY_INVALID"
       );
@@ -97076,7 +97077,7 @@ var NativeSerialDiscovery = class {
   /** Return only validated identity fields; permissions errors and enumeration failures never become an empty list. */
   async list() {
     if (this.active)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial discovery is already pending.",
         "SERIAL_DISCOVERY_BUSY"
       );
@@ -97087,7 +97088,7 @@ var NativeSerialDiscovery = class {
       try {
         const guard = await this.authorize();
         if (typeof guard !== "function")
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Discovery authorization returned no guard.",
             "SERIAL_AUTHORIZATION_REQUIRED"
           );
@@ -97101,7 +97102,7 @@ var NativeSerialDiscovery = class {
         guard();
         const parsed = recordsSchema.safeParse(raw);
         if (!parsed.success)
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Native discovery returned invalid metadata.",
             "SERIAL_DISCOVERY_INVALID"
           );
@@ -97109,8 +97110,8 @@ var NativeSerialDiscovery = class {
           parsed.data.map((record2) => Object.freeze(record2))
         );
       } catch (error2) {
-        if (error2 instanceof PlatformIOError) throw error2;
-        throw new PlatformIOError(
+        if (error2 instanceof PlatformIOError2) throw error2;
+        throw new PlatformIOError2(
           "Native serial enumeration failed.",
           "SERIAL_DISCOVERY_FAILED"
         );
@@ -97125,7 +97126,7 @@ var NativeSerialDiscovery = class {
           timer = setTimeout(() => {
             expired = true;
             reject(
-              new PlatformIOError(
+              new PlatformIOError2(
                 "Native serial enumeration timed out.",
                 "SERIAL_DISCOVERY_TIMEOUT"
               )
@@ -97161,19 +97162,19 @@ function descriptor(record2) {
     record2.serialNumber
   ]) {
     if (field2 !== void 0 && (typeof field2 !== "string" || field2.length > 512 || /[\x00-\x1f\x7f]/.test(field2)))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid serial discovery metadata.",
         "SERIAL_DISCOVERY_INVALID"
       );
   }
   if (!record2.path)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Missing serial discovery path.",
       "SERIAL_DISCOVERY_INVALID"
     );
   for (const id of [record2.vendorId, record2.productId]) {
     if (id !== void 0 && !/^[0-9a-f]{4}$/i.test(id))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid USB identifier.",
         "SERIAL_DISCOVERY_INVALID"
       );
@@ -97191,13 +97192,13 @@ function descriptor(record2) {
 function bindSerialDiscovery(endpoint, records, resolve) {
   const inspect = (snapshot) => {
     if (!Array.isArray(snapshot) || snapshot.length > 1024)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid serial discovery snapshot.",
         "SERIAL_DISCOVERY_INVALID"
       );
     const normalized = snapshot.map((record2) => {
       if (!record2 || typeof record2 !== "object")
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Invalid serial discovery entry.",
           "SERIAL_DISCOVERY_INVALID"
         );
@@ -97208,13 +97209,13 @@ function bindSerialDiscovery(endpoint, records, resolve) {
       (record2) => record2.endpoint === endpoint.resource.identity
     );
     if (!matches.length)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Selected serial endpoint is absent from discovery.",
         "SERIAL_DEVICE_UNAVAILABLE"
       );
     const identities = new Set(matches.map((record2) => record2.usb));
     if (identities.size !== 1)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Conflicting discovery metadata for the selected endpoint.",
         "SERIAL_DEVICE_AMBIGUOUS"
       );
@@ -97222,7 +97223,7 @@ function bindSerialDiscovery(endpoint, records, resolve) {
     if (usb && normalized.some(
       (record2) => record2.usb === usb && record2.endpoint !== endpoint.resource.identity
     ))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "USB identity is shared by multiple endpoints.",
         "SERIAL_DEVICE_AMBIGUOUS"
       );
@@ -97237,7 +97238,7 @@ function bindSerialDiscovery(endpoint, records, resolve) {
     revalidate(snapshot) {
       endpoint.revalidate();
       if (inspect(snapshot) !== expected)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Serial discovery identity changed; select and authorize again.",
           "SERIAL_DEVICE_CHANGED"
         );
@@ -97264,7 +97265,7 @@ function stableDeviceLeaseRoot() {
 }
 function resourceKey(resource) {
   if (!resource || !["serial", "probe"].includes(resource.kind) || typeof resource.identity !== "string" || !resource.identity.trim() || resource.identity.length > 1024 || /[\x00-\x1f\x7f]/.test(resource.identity))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid physical resource identity.",
       "DEVICE_IDENTITY_INVALID"
     );
@@ -97320,7 +97321,7 @@ var DeviceLeaseStore = class {
       const previous = this.readRecord(key);
       if (previous) {
         if (previous.handoffPending)
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Device custody handoff is unresolved; automatic stale recovery is disabled.",
             "DEVICE_HANDOFF_PENDING"
           );
@@ -97329,7 +97330,7 @@ var DeviceLeaseStore = class {
           this.inspect(previous.owner.pid)
         );
         if (status !== "stale")
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             status === "alive" ? "Physical resource is already owned." : "Physical resource ownership cannot be verified.",
             status === "alive" ? "DEVICE_BUSY" : "DEVICE_OWNER_UNKNOWN"
           );
@@ -97352,7 +97353,7 @@ var DeviceLeaseStore = class {
     this.withGate(key, () => {
       const current = this.requirePersistedOwner(key, held);
       if (current.handoffPending)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Device handoff is already pending.",
           "DEVICE_HANDOFF_PENDING"
         );
@@ -97379,14 +97380,14 @@ var DeviceLeaseStore = class {
     const held = this.requireHandle(lease);
     const key = resourceKey(held.resource);
     if (!validProcessIdentity(target) || target.platform !== held.owner.platform || target.pid === held.owner.pid)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid lease transfer target.",
         "DEVICE_TRANSFER_INVALID"
       );
     return this.withGate(key, () => {
       const current = this.requirePersistedOwner(key, held);
       if (compareProcessIdentity(target, this.inspect(target.pid)) !== "alive")
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Lease transfer target is unavailable or its process identity changed.",
           "DEVICE_TRANSFER_INVALID"
         );
@@ -97410,7 +97411,7 @@ var DeviceLeaseStore = class {
   finishTransfer(ticket) {
     const transferred = this.transfers.get(ticket);
     if (!transferred)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Unknown or completed transfer receipt.",
         "DEVICE_TRANSFER_INVALID"
       );
@@ -97421,7 +97422,7 @@ var DeviceLeaseStore = class {
         current.owner,
         this.inspect(current.owner.pid)
       ) !== "stale")
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Transferred child exit is not confirmed.",
           "DEVICE_OWNER_UNKNOWN"
         );
@@ -97436,7 +97437,7 @@ var DeviceLeaseStore = class {
   adopt(ticket) {
     const key = resourceKey(ticket?.resource);
     if (typeof ticket.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(ticket.nonce))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid lease transfer ticket.",
         "DEVICE_TRANSFER_INVALID"
       );
@@ -97444,7 +97445,7 @@ var DeviceLeaseStore = class {
     return this.withGate(key, () => {
       const current = this.readRecord(key);
       if (!current || current.nonce !== ticket.nonce || !sameProcessIdentity(current.owner, owner))
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Lease transfer ticket is stale or belongs to another process.",
           "DEVICE_TRANSFER_INVALID"
         );
@@ -97460,7 +97461,7 @@ var DeviceLeaseStore = class {
     this.withGate(key, () => {
       const current = this.requirePersistedOwner(key, held);
       if (current.handoffPending)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Cannot release unresolved child custody.",
           "DEVICE_HANDOFF_PENDING"
         );
@@ -97479,7 +97480,7 @@ var DeviceLeaseStore = class {
   requireHandle(lease) {
     const held = this.held.get(lease);
     if (!held)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Unknown or already released device lease.",
         "DEVICE_LEASE_NOT_OWNED"
       );
@@ -97488,7 +97489,7 @@ var DeviceLeaseStore = class {
   requirePersistedOwner(key, held) {
     const current = this.readRecord(key);
     if (!current || current.nonce !== held.nonce || !sameProcessIdentity(current.owner, held.owner))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Device lease ownership changed; refusing mutation.",
         "DEVICE_LEASE_NOT_OWNED"
       );
@@ -97498,7 +97499,7 @@ var DeviceLeaseStore = class {
     if (this.owner) return this.owner;
     const observation = this.inspect(process.pid);
     if (observation.status !== "running" || observation.identity.pid !== process.pid || !validProcessIdentity(observation.identity))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Cannot establish this process's start identity.",
         "DEVICE_OWNER_UNKNOWN"
       );
@@ -97518,14 +97519,14 @@ var DeviceLeaseStore = class {
       }
       const stat = fs27.lstatSync(current);
       if (!stat.isDirectory() || stat.isSymbolicLink())
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Device lease directory must not contain symlinks.",
           "DEVICE_LEASE_PATH_INVALID"
         );
     }
     const rootStat = fs27.statSync(this.root);
     if (process.platform !== "win32" && (rootStat.uid !== process.getuid?.() || (rootStat.mode & 18) !== 0))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Device lease directory must be owned by this user and not writable by others.",
         "DEVICE_LEASE_PATH_INVALID"
       );
@@ -97537,7 +97538,7 @@ var DeviceLeaseStore = class {
       fs27.mkdirSync(gate, { mode: 448 });
     } catch (error2) {
       if (error2.code === "EEXIST")
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Device lease update is busy or interrupted; retry, then inspect the gate if it persists.",
           "DEVICE_LEASE_GATE_BUSY"
         );
@@ -97559,7 +97560,7 @@ var DeviceLeaseStore = class {
       throw error2;
     }
     if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 8192)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid device lease record.",
         "DEVICE_LEASE_CORRUPT"
       );
@@ -97569,7 +97570,7 @@ var DeviceLeaseStore = class {
         throw new Error("Invalid lease schema");
       return record2;
     } catch {
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid device lease record; ownership is not assumed stale.",
         "DEVICE_LEASE_CORRUPT"
       );
@@ -97639,7 +97640,7 @@ import { StringDecoder } from "node:string_decoder";
 import { performance as performance3 } from "node:perf_hooks";
 function boundedInteger(value2, min, max, field2) {
   if (!Number.isSafeInteger(value2) || value2 < min || value2 > max)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Invalid serial ${field2}; expected ${min} through ${max}.`,
       "SERIAL_BUFFER_ARGUMENT_INVALID"
     );
@@ -97696,13 +97697,13 @@ var SerialSessionBuffer = class {
   append(chunk) {
     if (this.state !== "open") return false;
     if (!Buffer.isBuffer(chunk) || chunk.length > 1024 * 1024)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial chunks must be buffers no larger than 1 MiB.",
         "SERIAL_BUFFER_INPUT_LIMIT"
       );
     if (!chunk.length) return true;
     if (this.received > Number.MAX_SAFE_INTEGER - chunk.length)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial byte counter exhausted.",
         "SERIAL_BUFFER_COUNTER_LIMIT"
       );
@@ -97715,7 +97716,7 @@ var SerialSessionBuffer = class {
   close(state = "stopped", error2) {
     if (this.state !== "open") return;
     if (!["stopped", "disconnected", "error"].includes(state) || error2 !== void 0 && (typeof error2 !== "string" || error2.length > 4096))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid serial close state or error text.",
         "SERIAL_BUFFER_ARGUMENT_INVALID"
       );
@@ -97897,12 +97898,12 @@ var SerialSessionBuffer = class {
       const matched = matchedLine !== null;
       const expired = performance3.now() >= deadline;
       if (cancelled || matched || view.state !== "open" || expired || !options.waitFor && rows.length > 0) {
-        const count = matched ? Math.min(view.lines.length, matchedLine - first + 1) : view.lines.length;
-        const cursor = first + count;
+        const count2 = matched ? Math.min(view.lines.length, matchedLine - first + 1) : view.lines.length;
+        const cursor = first + count2;
         return {
           ...view,
-          lines: view.lines.slice(0, count),
-          lineTruncatedBytes: view.lineTruncatedBytes.slice(0, count),
+          lines: view.lines.slice(0, count2),
+          lineTruncatedBytes: view.lineTruncatedBytes.slice(0, count2),
           cursor,
           moreAvailable: view.moreAvailable || cursor < view.latestCursor,
           matched,
@@ -97919,8 +97920,8 @@ var SerialSessionBuffer = class {
     }
   }
   /** Frame CRLF or bare CR/LF once, retaining only a whole-code-point prefix of long lines. */
-  acceptText(text6) {
-    for (const character of text6) {
+  acceptText(text7) {
+    for (const character of text7) {
       if (character === "\n" && this.previousCr) {
         this.previousCr = false;
         continue;
@@ -97946,16 +97947,16 @@ var SerialSessionBuffer = class {
   }
   finishLine() {
     if (this.nextCursor === Number.MAX_SAFE_INTEGER)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial line cursor exhausted.",
         "SERIAL_BUFFER_COUNTER_LIMIT"
       );
-    const text6 = this.filterText(this.partial);
-    const bytes = Buffer.byteLength(text6);
+    const text7 = this.filterText(this.partial);
+    const bytes = Buffer.byteLength(text7);
     while (this.count && (this.count === this.capacity || this.storedBytes + bytes > this.byteCapacity))
       this.evict();
     this.ring[(this.head + this.count) % this.capacity] = {
-      text: text6,
+      text: text7,
       bytes,
       truncatedBytes: this.partialLost,
       cursor: this.nextCursor++
@@ -97968,9 +97969,9 @@ var SerialSessionBuffer = class {
     this.partialLost = 0;
   }
   /** Apply filtering before response/storage budgeting; never split a UTF-8 code point. */
-  filterText(text6) {
-    if (!this.redactor) return text6;
-    const filtered = this.redactor.preview(text6);
+  filterText(text7) {
+    if (!this.redactor) return text7;
+    const filtered = this.redactor.preview(text7);
     if (Buffer.byteLength(filtered) <= this.lineCapacity) return filtered;
     this.redactionClipped = true;
     let prefix = "", bytes = 0;
@@ -97998,7 +97999,7 @@ var SerialSessionBuffer = class {
   /** Install the waiter before rechecking revision to avoid a lost arrival during async matching. */
   waitForChange(revision, timeout, signal) {
     if (this.waiters.size >= 32)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Too many pending serial readers.",
         "SERIAL_READ_BUSY"
       );
@@ -98024,7 +98025,7 @@ var SerialSessionManager = class {
   constructor(dependencies) {
     this.dependencies = dependencies;
     if (typeof dependencies.authorize !== "function")
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial session authorization is required.",
         "SERIAL_AUTHORIZATION_REQUIRED"
       );
@@ -98052,7 +98053,7 @@ var SerialSessionManager = class {
     return () => {
       this.requireActiveOwner(owner);
       if ((this.ownerStops.get(owner) ?? 0) !== generation)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Serial startup was stopped.",
           "SERIAL_CLOSED"
         );
@@ -98092,7 +98093,7 @@ var SerialSessionManager = class {
         resolve
       );
       if ((this.ownerStops.get(owner) ?? 0) !== stopGeneration)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Serial discovery was stopped.",
           "SERIAL_CLOSED"
         );
@@ -98118,7 +98119,7 @@ var SerialSessionManager = class {
         );
       this.requireActiveOwner(owner);
       if ((this.ownerStops.get(owner) ?? 0) !== stopGeneration)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Serial startup was stopped during preflight.",
           "SERIAL_CLOSED"
         );
@@ -98137,18 +98138,18 @@ var SerialSessionManager = class {
     this.requireActiveOwner(owner);
     validateDirectSerialOptions(input);
     if (!path32.isAbsolute(input.projectDir))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
     const projectDir = fs28.realpathSync.native(input.projectDir);
     if (!fs28.statSync(projectDir).isDirectory())
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial project directory is not a directory.",
         "SERIAL_PROJECT_INVALID"
       );
     if (input.additionalResources !== void 0 && (!Array.isArray(input.additionalResources) || input.additionalResources.length > 2))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Too many serial identity scopes.",
         "SERIAL_RESOURCE_INVALID"
       );
@@ -98159,7 +98160,7 @@ var SerialSessionManager = class {
     );
     const resources = [input.resource, ...additionalResources];
     if (resources.some((resource) => resource.kind !== "serial") || new Set(resources.map((resource) => resource.identity)).size !== resources.length)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial identity scopes must be distinct serial resources.",
         "SERIAL_RESOURCE_INVALID"
       );
@@ -98243,11 +98244,11 @@ var SerialSessionManager = class {
         session.confirmedClosed = true;
         this.releaseLease(session);
       }
-      throw new PlatformIOError(
-        error2 instanceof PlatformIOError ? error2.message : "Serial session could not start.",
-        error2 instanceof PlatformIOError ? error2.code : "SERIAL_SESSION_FAILED",
+      throw new PlatformIOError2(
+        error2 instanceof PlatformIOError2 ? error2.message : "Serial session could not start.",
+        error2 instanceof PlatformIOError2 ? error2.code : "SERIAL_SESSION_FAILED",
         {
-          ...error2 instanceof PlatformIOError ? error2.context : {},
+          ...error2 instanceof PlatformIOError2 ? error2.context : {},
           sessionId: session.id,
           cleanupPending: session.leases.length > 0
         }
@@ -98270,7 +98271,7 @@ var SerialSessionManager = class {
   async write(owner, id, bytes) {
     const session = this.requireSession(owner, id);
     if (!Buffer.isBuffer(bytes) || bytes.length > 65536)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial writes are limited to 64 KiB.",
         "SERIAL_WRITE_LIMIT"
       );
@@ -98281,7 +98282,7 @@ var SerialSessionManager = class {
     this.requireActiveOwner(owner);
     guard();
     if (!session.transport)
-      throw new PlatformIOError("Serial session is not open.", "SERIAL_CLOSED");
+      throw new PlatformIOError2("Serial session is not open.", "SERIAL_CLOSED");
     return session.transport.write(copy);
   }
   /** Owned process-only cleanup remains available when policy is invalid or permission was revoked. */
@@ -98310,7 +98311,7 @@ var SerialSessionManager = class {
   forget(owner, id) {
     const session = this.requireSession(owner, id);
     if (this.cleanupPending(session))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial cleanup is still pending.",
         "SERIAL_CLEANUP_PENDING"
       );
@@ -98324,11 +98325,11 @@ var SerialSessionManager = class {
       read = await this.read(owner, started.sessionId, options);
     } catch (error2) {
       const stopped = await this.stop(owner, started.sessionId);
-      throw new PlatformIOError(
-        error2 instanceof PlatformIOError ? error2.message : "Serial capture failed.",
-        error2 instanceof PlatformIOError ? error2.code : "SERIAL_CAPTURE_FAILED",
+      throw new PlatformIOError2(
+        error2 instanceof PlatformIOError2 ? error2.message : "Serial capture failed.",
+        error2 instanceof PlatformIOError2 ? error2.code : "SERIAL_CAPTURE_FAILED",
         {
-          ...error2 instanceof PlatformIOError ? error2.context : {},
+          ...error2 instanceof PlatformIOError2 ? error2.context : {},
           sessionId: started.sessionId,
           cleanupPending: stopped.cleanupPending
         }
@@ -98371,7 +98372,7 @@ var SerialSessionManager = class {
       })
     );
     if (typeof guard !== "function")
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial authorization did not return a revision guard.",
         "SERIAL_AUTHORIZATION_REQUIRED"
       );
@@ -98386,7 +98387,7 @@ var SerialSessionManager = class {
         new Promise((_, reject) => {
           timer = setTimeout(
             () => reject(
-              new PlatformIOError(
+              new PlatformIOError2(
                 "Serial endpoint verification timed out.",
                 "SERIAL_DISCOVERY_TIMEOUT"
               )
@@ -98414,7 +98415,7 @@ var SerialSessionManager = class {
     if (this.pendingDiscovery + [...this.sessions.values()].filter(
       (session) => this.cleanupPending(session)
     ).length >= 8)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial session capacity is full; close an owned session first.",
         "SERIAL_SESSION_LIMIT"
       );
@@ -98422,14 +98423,14 @@ var SerialSessionManager = class {
   requireActiveOwner(owner) {
     this.requireOwner(owner);
     if (this.disconnectedOwners.has(owner))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial client disconnected.",
         "SERIAL_OWNER_DISCONNECTED"
       );
   }
   requireOwner(owner) {
     if (!this.owners.has(owner))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Unknown serial session owner.",
         "SERIAL_SESSION_NOT_OWNED"
       );
@@ -98439,7 +98440,7 @@ var SerialSessionManager = class {
     this.prune();
     const session = this.sessions.get(id);
     if (!session || session.owner !== owner)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial session is unavailable to this owner.",
         "SERIAL_SESSION_NOT_OWNED"
       );
@@ -98447,7 +98448,7 @@ var SerialSessionManager = class {
   }
   ensureNotStopped(session) {
     if (session.stopRequested)
-      throw new PlatformIOError("Serial session was stopped.", "SERIAL_CLOSED");
+      throw new PlatformIOError2("Serial session was stopped.", "SERIAL_CLOSED");
   }
   releaseLease(session) {
     if (!session.confirmedClosed) return;
@@ -98558,11 +98559,11 @@ var PolicySerialSessionService = class {
           });
         } catch (error2) {
           const stopped2 = await this.sessions.stop(owner, started.sessionId);
-          throw new PlatformIOError(
-            error2 instanceof PlatformIOError ? error2.message : "Monitor capture failed.",
-            error2 instanceof PlatformIOError ? error2.code : "SERIAL_CAPTURE_FAILED",
+          throw new PlatformIOError2(
+            error2 instanceof PlatformIOError2 ? error2.message : "Monitor capture failed.",
+            error2 instanceof PlatformIOError2 ? error2.code : "SERIAL_CAPTURE_FAILED",
             {
-              ...error2 instanceof PlatformIOError ? error2.context : {},
+              ...error2 instanceof PlatformIOError2 ? error2.context : {},
               sessionId: started.sessionId,
               cleanupPending: stopped2.cleanupPending
             }
@@ -98621,7 +98622,7 @@ var PolicySerialSessionService = class {
     const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
     if (!path33.isAbsolute(input.projectDir))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial project must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
@@ -98632,7 +98633,7 @@ var PolicySerialSessionService = class {
     });
     const context = this.context.getStore();
     if (!context)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Trusted request context required.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED"
       );
@@ -98668,13 +98669,13 @@ var PolicySerialSessionService = class {
   /** Enumerate through one shared native provider under this request's canonical workspace policy. */
   async listSerialDevices(projectDir) {
     if (!path33.isAbsolute(projectDir))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
     const canonical3 = fs29.realpathSync.native(projectDir);
     if (!fs29.statSync(canonical3).isDirectory())
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial project directory is not a directory.",
         "SERIAL_PROJECT_INVALID"
       );
@@ -98685,18 +98686,18 @@ var PolicySerialSessionService = class {
     this.sessions.list(owner);
     const context = this.context.getStore();
     if (!context)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Session listing requires a trusted request context.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED"
       );
     if (!path33.isAbsolute(projectDir))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial project must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
     const canonical3 = fs29.realpathSync.native(projectDir);
     if (!fs29.statSync(canonical3).isDirectory())
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial project must be a directory.",
         "SERIAL_PROJECT_INVALID"
       );
@@ -98712,7 +98713,7 @@ var PolicySerialSessionService = class {
       { ...context.caller, workspaceDir: canonical3 },
       async () => {
         if (!check2)
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Policy changed during session listing.",
             "POLICY_CHANGED"
           );
@@ -98728,7 +98729,7 @@ var PolicySerialSessionService = class {
     const context = this.context.getStore();
     const projectDir = this.discoveryProject.getStore();
     if (!context || !projectDir)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial discovery requires a trusted request context.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED"
       );
@@ -98736,7 +98737,7 @@ var PolicySerialSessionService = class {
     if (batch) {
       const guard = () => {
         if (!batch.active || batch.projectDir !== projectDir || performance5.now() > batch.expiresAt)
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Startup discovery scope expired.",
             "SERIAL_DISCOVERY_SCOPE_INVALID"
           );
@@ -98744,7 +98745,7 @@ var PolicySerialSessionService = class {
       };
       guard();
       if (batch.remaining-- <= 0)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Startup discovery limit exceeded.",
           "SERIAL_DISCOVERY_SCOPE_INVALID"
         );
@@ -98762,7 +98763,7 @@ var PolicySerialSessionService = class {
       { ...context.caller, workspaceDir: projectDir },
       async () => {
         if (!check2)
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Policy changed during discovery authorization.",
             "POLICY_CHANGED"
           );
@@ -98779,7 +98780,7 @@ var PolicySerialSessionService = class {
       context.discoveryApprovalId
     ]) {
       if (id !== void 0 && (typeof id !== "string" || !id || id.length > 256))
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Invalid serial approval identifier.",
           "APPROVAL_SCOPE_INVALID"
         );
@@ -98797,7 +98798,7 @@ var PolicySerialSessionService = class {
   async authorize(request) {
     const context = this.context.getStore();
     if (!context)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial operations require a trusted request context.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED"
       );
@@ -98805,7 +98806,7 @@ var PolicySerialSessionService = class {
     const scopedRead = scope5 && request.operation === "read" && request.sessionId === scope5.sessionId;
     const checkScope = () => {
       if (scopedRead && (!scope5.active || performance5.now() > scope5.expiresAt))
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Memory capture authorization scope expired.",
           "SERIAL_CAPTURE_SCOPE_INVALID"
         );
@@ -98823,7 +98824,7 @@ var PolicySerialSessionService = class {
     }
     const transient = this.transientMemoryScope.getStore();
     if (transient && !transient.active)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Transient memory scope expired.",
         "SERIAL_CAPTURE_SCOPE_INVALID"
       );
@@ -98835,7 +98836,7 @@ var PolicySerialSessionService = class {
     );
     const binding = JSON.stringify(deviceRequest);
     if (transient && request.operation === "read" && transient.binding !== binding)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Transient memory device identity changed.",
         "SERIAL_CAPTURE_SCOPE_INVALID"
       );
@@ -98881,7 +98882,7 @@ var PolicySerialSessionService = class {
       );
       const decisions = { opening, reading };
       if (opening.status !== "ready" || reading.status !== "ready")
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "One-shot capture needs opening and reading permissions before startup.",
           opening.status === "deny" || reading.status === "deny" ? "POLICY_DENIED" : "APPROVAL_REQUIRED",
           { decisions }
@@ -98894,7 +98895,7 @@ var PolicySerialSessionService = class {
       caller,
       async () => {
         if (!check2)
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Policy changed while authorizing serial operation.",
             "POLICY_CHANGED"
           );
@@ -98942,14 +98943,14 @@ async function resolveMonitorRequest(input, defaults, caller, projectDevices) {
       caller
     );
     if (!report.ok || !("defaultEnvironments" in report))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Could not resolve monitor project configuration.",
         "PROJECT_CONFIG_INVALID"
       );
     const environment = params.env || report.defaultEnvironments[0];
     const selected = report.envs.find((item) => item.name === environment);
     if (environment && !selected)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Monitor environment does not exist.",
         "PROJECT_ENVIRONMENT_INVALID"
       );
@@ -98961,7 +98962,7 @@ async function resolveMonitorRequest(input, defaults, caller, projectDevices) {
     if (!baud && selected?.monitorSpeed != null && selected.monitorSpeed !== "") {
       const speed = selected.monitorSpeed;
       if (typeof speed !== "number" && (typeof speed !== "string" || !/^\d+$/.test(speed)))
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Invalid configured monitor speed.",
           "SERIAL_TRANSPORT_ARGUMENT_INVALID"
         );
@@ -98978,7 +98979,7 @@ async function resolveMonitorRequest(input, defaults, caller, projectDevices) {
         const rows = projectDevices(await listDevicesCore());
         guard();
         if (rows.likely_ports.length !== 1)
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             rows.likely_ports.length ? "Several candidate ports; pass port explicitly." : "No likely development-board port; pass port explicitly.",
             "SERIAL_PORT_SELECTION_REQUIRED"
           );
@@ -99115,7 +99116,7 @@ async function executeMemoryCompatibility(client, input, defaults, caller, proje
     read_approval_id: external_exports.string().max(256).optional()
   }).parse(input);
   if (params.stack_unit === "words" && params.stack_word_bytes === void 0)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Word-valued stack telemetry requires stack_word_bytes.",
       "MEMORY_UNIT_REQUIRED"
     );
@@ -99148,7 +99149,7 @@ async function executeMemoryCompatibility(client, input, defaults, caller, proje
         const report = await service.captureMemory(owner, session_id, options);
         const session = service.sessions.list(owner).find((item) => item.sessionId === session_id);
         if (!session)
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Owned memory session is no longer available.",
             "SERIAL_SESSION_NOT_FOUND"
           );
@@ -99395,7 +99396,7 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
       "utf8"
     );
     if (bytes.length > 65536)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial writes are limited to 64 KiB including the newline.",
         "SERIAL_WRITE_LIMIT"
       );
@@ -99450,7 +99451,7 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
     );
   }
   if (name2 !== "pio_list_devices")
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Unknown device compatibility tool.",
       "COMPAT_TOOL_UNKNOWN"
     );
@@ -99756,13 +99757,13 @@ var SerialClientContext = class {
   /** Execute a trusted adapter under isolated request approvals and this connection's owner capability. */
   async run(context, execute2) {
     if (this.closed)
-      throw new PlatformIOError("Serial client disconnected.", "SERIAL_CLOSED");
+      throw new PlatformIOError2("Serial client disconnected.", "SERIAL_CLOSED");
     const result = await this.service.run(
       context,
       () => execute2(this.service, this.owner)
     );
     if (this.closed)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Serial client disconnected before result delivery.",
         "SERIAL_CLOSED"
       );
@@ -99803,13 +99804,13 @@ init_errors2();
 init_redact();
 function parseDependencyGraph(output) {
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Dependency build output exceeds 10 MiB.",
       "DEPENDENCY_GRAPH_LIMIT"
     );
   const lines2 = redactSecretsInText(output).replace(/\x1b\[[0-9;]*m/g, "").split(/\r?\n/);
   if (lines2.length > 1e5 || lines2.some((line) => line.length > 16384))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Dependency build output exceeds line limits.",
       "DEPENDENCY_GRAPH_LIMIT"
     );
@@ -99858,7 +99859,7 @@ function parseDependencyGraph(output) {
       continue;
     }
     if (++nodes > 4096)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Dependency graph exceeds 4096 nodes.",
         "DEPENDENCY_GRAPH_LIMIT"
       );
@@ -99894,7 +99895,7 @@ init_redact();
 var nameSchema = external_exports.string().trim().min(1).max(512).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 function parseDependencyDeclaration(input) {
   if (input.length > 4096 || /[\x00-\x1f\x7f]/.test(input))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid dependency declaration.",
       "DEPENDENCY_SPEC_INVALID"
     );
@@ -99916,9 +99917,9 @@ function parseDependencyDeclaration(input) {
     constrained: !!match[3]?.trim()
   };
 }
-function parseDependencyManifest(text6, format) {
-  if (Buffer.byteLength(text6) > 1024 * 1024)
-    throw new PlatformIOError(
+function parseDependencyManifest(text7, format) {
+  if (Buffer.byteLength(text7) > 1024 * 1024)
+    throw new PlatformIOError2(
       "Library manifest exceeds 1 MiB.",
       "DEPENDENCY_MANIFEST_LIMIT"
     );
@@ -99934,7 +99935,7 @@ function parseDependencyManifest(text6, format) {
         name: nameSchema.nullish(),
         version: external_exports.union([external_exports.string().max(512), external_exports.number().finite()]).nullish(),
         dependencies: external_exports.unknown().optional()
-      }).parse(JSON.parse(text6));
+      }).parse(JSON.parse(text7));
       rawName = data.name;
       rawVersion = data.version;
       if (Array.isArray(data.dependencies)) {
@@ -99952,7 +99953,7 @@ function parseDependencyManifest(text6, format) {
         throw new Error("Invalid dependencies");
     } else {
       const fields = /* @__PURE__ */ new Map();
-      for (const line of text6.split(/\r?\n/)) {
+      for (const line of text7.split(/\r?\n/)) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith("#")) continue;
         const at = line.indexOf("=");
@@ -99977,7 +99978,7 @@ function parseDependencyManifest(text6, format) {
       dependencies: [...new Set(dependencies)]
     };
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid library manifest; dependency evidence is incomplete.",
       "DEPENDENCY_MANIFEST_INVALID"
     );
@@ -99992,7 +99993,7 @@ function list(value2) {
   if (!Array.isArray(values) || values.length > 2048 || values.some(
     (item) => typeof item !== "string" || item.length > 4096 || /[\x00-\x1f\x7f]/.test(item)
   ))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid resolved dependency configuration.",
       "DEPENDENCY_CONFIG_INVALID"
     );
@@ -100002,7 +100003,7 @@ function dependencyProjectInputs(projectDir, report, environment) {
   const selected = environment ?? report.defaultEnvironments[0];
   const env = report.envs.find((item) => item.name === selected);
   if (!env || !/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,49}$/.test(env.name))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "No valid selected environment for dependency inspection.",
       "DEPENDENCY_ENVIRONMENT_INVALID"
     );
@@ -100010,7 +100011,7 @@ function dependencyProjectInputs(projectDir, report, environment) {
   const settingPath = (value2, fallback) => {
     if (value2 == null) return path36.join(project, fallback);
     if (typeof value2 !== "string" || !value2.trim() || value2.length > 32768 || /[\x00-\x1f\x7f]/.test(value2))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Invalid resolved library directory.",
         "DEPENDENCY_CONFIG_INVALID"
       );
@@ -100018,7 +100019,7 @@ function dependencyProjectInputs(projectDir, report, environment) {
   };
   const extras = list(env.libraryExtraDirectories);
   if (extras.length > 62)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Too many library search directories.",
       "DEPENDENCY_LIMIT"
     );
@@ -100055,7 +100056,7 @@ import path37 from "node:path";
 init_errors2();
 async function collectDependencyInventory(roots, assertAuthorized) {
   if (roots.length > 64)
-    throw new PlatformIOError("Too many library roots.", "DEPENDENCY_LIMIT");
+    throw new PlatformIOError2("Too many library roots.", "DEPENDENCY_LIMIT");
   let authorizationFailed = false;
   const check2 = (directory) => {
     try {
@@ -100092,7 +100093,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
     }
     for await (const entry of handle) {
       if (++entries > 4096)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Library inventory exceeds 4096 entries.",
           "DEPENDENCY_LIMIT"
         );
@@ -100108,7 +100109,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
       }
       if (!entry.isDirectory()) continue;
       if (libraries.length >= 2048)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Library inventory exceeds 2048 libraries.",
           "DEPENDENCY_LIMIT"
         );
@@ -100136,7 +100137,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
           break;
         }
         if (info.size > 1024 * 1024 || bytes + info.size > 16 * 1024 * 1024)
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Library manifest byte budget exceeded.",
             "DEPENDENCY_LIMIT"
           );
@@ -100163,7 +100164,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
             }
             bytes += used;
             if (used > 1024 * 1024 || bytes > 16 * 1024 * 1024)
-              throw new PlatformIOError(
+              throw new PlatformIOError2(
                 "Library manifest byte budget exceeded.",
                 "DEPENDENCY_LIMIT"
               );
@@ -100177,11 +100178,11 @@ async function collectDependencyInventory(roots, assertAuthorized) {
           }
         } catch (error2) {
           if (authorizationFailed) throw error2;
-          if (error2 instanceof PlatformIOError && error2.code === "DEPENDENCY_LIMIT")
+          if (error2 instanceof PlatformIOError2 && error2.code === "DEPENDENCY_LIMIT")
             throw error2;
           diagnostics.push({
             path: manifestPath,
-            code: error2 instanceof PlatformIOError ? error2.code ?? "MANIFEST_UNREADABLE" : "MANIFEST_UNREADABLE"
+            code: error2 instanceof PlatformIOError2 ? error2.code ?? "MANIFEST_UNREADABLE" : "MANIFEST_UNREADABLE"
           });
         }
         break;
@@ -100232,7 +100233,7 @@ function auditDependencies(declaredInput, installedInput) {
   const declared = external_exports.array(declarationSchema).max(2048).parse(declaredInput);
   const installed2 = external_exports.array(librarySchema).max(2048).parse(installedInput);
   if (installed2.reduce((sum, lib) => sum + lib.dependencies.length, 0) > 16384)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Dependency graph exceeds 16384 edges.",
       "DEPENDENCY_LIMIT"
     );
@@ -100376,7 +100377,7 @@ async function inspectDependencies(input, caller = {}, onAuthorized) {
       );
       check2();
       if (!configuration.ok || !("defaultEnvironments" in configuration))
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Cannot audit dependencies without resolved configuration.",
           "DEPENDENCY_CONFIG_UNAVAILABLE"
         );
@@ -100417,7 +100418,7 @@ async function inspectDependencies(input, caller = {}, onAuthorized) {
               const relative = path38.relative(root, target);
               return relative === "" || !relative.startsWith(`..${path38.sep}`) && relative !== ".." && !path38.isAbsolute(relative);
             }))
-              throw new PlatformIOError(
+              throw new PlatformIOError2(
                 "Library path moved outside the authorized roots.",
                 "DEPENDENCY_SCOPE_CHANGED"
               );
@@ -100515,13 +100516,13 @@ var schema2 = external_exports.object({
 }).strict();
 async function executeDependencyCompatibility(name2, input, defaults = {}, caller = {}, onAuthorized) {
   if (name2 !== "pio_deps_check")
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Unknown dependency compatibility tool.",
       "COMPAT_TOOL_UNKNOWN"
     );
   const parsed = schema2.safeParse(input);
   if (!parsed.success)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid dependency compatibility arguments.",
       "COMPAT_ARGUMENT_INVALID"
     );
@@ -100687,7 +100688,7 @@ async function executeBoardCompatibility(name2, input, _defaults = {}, caller = 
     const params2 = listSchema.parse(input);
     const query = params2.query.trim().toLowerCase();
     if (!query && !params2.platform && !params2.framework)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Give a query or platform/framework filter.",
         "COMPAT_ARGUMENT_INVALID"
       );
@@ -100729,7 +100730,7 @@ async function executeBoardCompatibility(name2, input, _defaults = {}, caller = 
     );
   }
   if (name2 !== "pio_board_info")
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Unknown board compatibility tool.",
       "COMPAT_TOOL_UNKNOWN"
     );
@@ -100957,13 +100958,13 @@ var reportSchema = external_exports.array(
 ).max(1024);
 function summarizeCheckOutput(output, projectDir) {
   if (Buffer.byteLength(output) > 16 * 1024 * 1024)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Static analysis report exceeds 16 MiB",
       "CHECK_REPORT_LIMIT"
     );
   const start = output.indexOf("[");
   if (start < 0)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Static analysis returned no JSON report",
       "CHECK_REPORT_INVALID"
     );
@@ -100971,14 +100972,14 @@ function summarizeCheckOutput(output, projectDir) {
   try {
     raw = JSON.parse(output.slice(start).trim());
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Static analysis returned malformed JSON",
       "CHECK_REPORT_INVALID"
     );
   }
   const parsed = reportSchema.safeParse(raw);
   if (!parsed.success)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Static analysis report has an invalid shape",
       "CHECK_REPORT_INVALID"
     );
@@ -101402,7 +101403,7 @@ async function buildProject(projectDir, environment, verbose, background, execut
       diagnostic
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError) {
+    if (error2 instanceof PlatformIOError2) {
       throw error2;
     }
     throw new BuildError(`Failed to build project: ${error2}`, {
@@ -101463,7 +101464,7 @@ async function checkProject(projectDir, environment, background, options = {}) {
       ...analysisReport ? { analysisReport, rawLogPath: result.fullLogPath } : {}
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError) {
+    if (error2 instanceof PlatformIOError2) {
       throw error2;
     }
     throw new BuildError(`Failed to check project: ${error2}`, { projectDir, environment });
@@ -101524,7 +101525,7 @@ async function runTests(projectDir, environment, background, compileOnly, option
       errors
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError) {
+    if (error2 instanceof PlatformIOError2) {
       throw error2;
     }
     throw new BuildError(`Failed to run tests: ${error2}`, { projectDir, environment });
@@ -101576,7 +101577,7 @@ async function cleanProject(projectDir, background, options = {}) {
       message: "Successfully cleaned build artifacts"
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError) {
+    if (error2 instanceof PlatformIOError2) {
       throw error2;
     }
     throw new BuildError(`Failed to clean project: ${error2}`, { projectDir });
@@ -101699,7 +101700,7 @@ init_errors2();
 init_errors2();
 init_events();
 import { randomUUID as randomUUID3 } from "node:crypto";
-var QueueEnforcementError = class extends PlatformIOError {
+var QueueEnforcementError = class extends PlatformIOError2 {
   constructor(message, context) {
     super(message, "QUEUE_ENFORCEMENT_FAILED", context);
     this.name = "QueueEnforcementError";
@@ -101794,7 +101795,7 @@ var HardwareLockManager = class _HardwareLockManager {
       const result = await action();
       return result;
     } catch (error2) {
-      cleanupPending = error2 instanceof PlatformIOError && error2.context?.cleanupPending === true;
+      cleanupPending = error2 instanceof PlatformIOError2 && error2.context?.cleanupPending === true;
       throw error2;
     } finally {
       if (!cleanupPending) this.releaseLock(implicitSessionId);
@@ -101918,7 +101919,7 @@ async function executeRunCompatibility(mode, input, defaults, caller, onAuthoriz
             });
           }
         } catch (error2) {
-          if (error2 instanceof PlatformIOError && error2.code === "COMMAND_TIMEOUT" && error2.context?.cleanupPending === false && typeof error2.context.fullLogPath === "string") {
+          if (error2 instanceof PlatformIOError2 && error2.code === "COMMAND_TIMEOUT" && error2.context?.cleanupPending === false && typeof error2.context.fullLogPath === "string") {
             timedOut = true;
             completed = await collect(-1, error2.context.fullLogPath, true);
           } else if (!(error2 instanceof BuildError) || !completed || error2.context?.exitCode !== completed.exitCode)
@@ -101926,7 +101927,7 @@ async function executeRunCompatibility(mode, input, defaults, caller, onAuthoriz
         }
         guard();
         if (!completed)
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Command result was not collected",
             "COMPAT_RESULT_INVALID"
           );
@@ -101948,7 +101949,7 @@ async function executeRunCompatibility(mode, input, defaults, caller, onAuthoriz
     }
   );
 }
-function cleanCompatibilityResult(result, environment, duration3, timedOut = false, tool = "clean") {
+function cleanCompatibilityResult(result, environment, duration4, timedOut = false, tool = "clean") {
   const output = normalizeCleanOutput(result.output);
   const lines2 = output.split("\n");
   const diagnostics = [];
@@ -102025,7 +102026,7 @@ function cleanCompatibilityResult(result, environment, duration3, timedOut = fal
   const warnings = diagnostics.filter((item) => item.kind === "warning");
   const ok = !timedOut && result.exitCode === 0 && !failed;
   const status = timedOut ? "timeout" : ok ? "success" : "failed";
-  const durationSeconds = Math.round(duration3 * 100) / 100;
+  const durationSeconds = Math.round(duration4 * 100) / 100;
   const summary = [
     `${tool} ${status} for env ${environment || environments.join(",") || "default"} in ${durationSeconds}s.`
   ];
@@ -102111,7 +102112,7 @@ function checkCompatibilityResult(result, projectDir, severity, timedOut = false
   try {
     report = summarizeCheckOutput(output, projectDir);
   } catch (error2) {
-    if (error2 instanceof PlatformIOError && error2.code?.startsWith("CHECK_REPORT_"))
+    if (error2 instanceof PlatformIOError2 && error2.code?.startsWith("CHECK_REPORT_"))
       return failure();
     throw error2;
   }
@@ -102148,7 +102149,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
   if (requested === "~" || requested.startsWith("~/") || requested.startsWith("~\\"))
     requested = path44.join(defaults.home ?? os8.homedir(), requested.slice(2));
   else if (requested.startsWith("~"))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Named-user home expansion is unsupported.",
       "COMPAT_PROJECT_INVALID"
     );
@@ -102209,7 +102210,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
             path44.join(root, "platformio.ini")
           );
           if (path44.dirname(filename) !== root)
-            throw new PlatformIOError(
+            throw new PlatformIOError2(
               "Generated configuration escapes the project.",
               "COMPAT_PROJECT_INVALID"
             );
@@ -102217,7 +102218,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
           try {
             const stat = await file.stat();
             if (!stat.isFile() || stat.size > 1048576)
-              throw new PlatformIOError(
+              throw new PlatformIOError2(
                 "Generated configuration exceeds report limits.",
                 "COMPAT_RESULT_LIMIT"
               );
@@ -102229,7 +102230,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
               0
             );
             if (bytesRead > 1048576)
-              throw new PlatformIOError(
+              throw new PlatformIOError2(
                 "Generated configuration exceeds report limits.",
                 "COMPAT_RESULT_LIMIT"
               );
@@ -102244,7 +102245,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
         }
         const items = (await fs39.readdir(root, { withFileTypes: true })).filter((item) => !item.name.startsWith("."));
         if (items.length > 4096)
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Project layout exceeds report limits.",
             "COMPAT_RESULT_LIMIT"
           );
@@ -102278,13 +102279,13 @@ var schemas = {
 };
 async function mapProjectCompatibilityRequest(name2, input, defaults = {}) {
   if (!Object.hasOwn(schemas, name2))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Unknown project compatibility tool.",
       "COMPAT_TOOL_UNKNOWN"
     );
   const parsed = schemas[name2].safeParse(input);
   if (!parsed.success)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid project compatibility arguments.",
       "COMPAT_ARGUMENT_INVALID"
     );
@@ -102356,7 +102357,7 @@ function projectCompatibilityResult(result) {
         ])
       )
     };
-  throw new PlatformIOError(
+  throw new PlatformIOError2(
     "Unexpected project compatibility result.",
     "COMPAT_RESULT_INVALID"
   );
@@ -102416,7 +102417,7 @@ function parseCompatibilityLaunch(args, environment = process.env.PIO_MCP_COMPAT
   };
 }
 function invalid(message) {
-  return new PlatformIOError(message, "COMPAT_CONFIG_INVALID");
+  return new PlatformIOError2(message, "COMPAT_CONFIG_INVALID");
 }
 
 // src/adapters/package-compat-registry.ts
@@ -102507,14 +102508,14 @@ function uncomment(value2) {
   return value2.replace(/(^|\s)[#;].*$/, "").trim();
 }
 function invalid2() {
-  throw new PlatformIOError(
+  throw new PlatformIOError2(
     "Package configuration has ambiguous syntax or unexpected non-dependency changes; inspect platformio.ini before retrying.",
     "PACKAGE_CONFIG_CONFLICT"
   );
 }
-function parse(text6) {
-  if (Buffer.byteLength(text6) > 1024 * 1024) invalid2();
-  const lines2 = text6.split(/\r?\n/);
+function parse(text7) {
+  if (Buffer.byteLength(text7) > 1024 * 1024) invalid2();
+  const lines2 = text7.split(/\r?\n/);
   const sections = /* @__PURE__ */ new Map();
   let section;
   let entry;
@@ -102549,7 +102550,7 @@ function parse(text6) {
   for (const section2 of sections.values())
     for (const entry2 of section2.entries.values())
       entry2.value = entry2.value.trim();
-  return { lines: lines2, sections, newline: text6.includes("\r\n") ? "\r\n" : "\n" };
+  return { lines: lines2, sections, newline: text7.includes("\r\n") ? "\r\n" : "\n" };
 }
 function mergePackageConfiguration(before, after, options) {
   const original = parse(before), updated = parse(after);
@@ -102597,13 +102598,13 @@ function mergePackageConfiguration(before, after, options) {
 init_errors2();
 function linesFromOutput(output) {
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Package output exceeds 10 MiB.",
       "PACKAGE_OUTPUT_LIMIT"
     );
   const lines2 = output.replace(/\x1b\[[0-9;]*m/g, "").split(/\r?\n/);
   if (lines2.length > 1e5 || lines2.some((line) => line.length > 16384))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Package output exceeds line limits.",
       "PACKAGE_OUTPUT_LIMIT"
     );
@@ -102721,9 +102722,9 @@ var mutationSchema = external_exports.object({
     "Package specification cannot be an option"
   )
 }).strict();
-function safeOutput(text6) {
+function safeOutput(text7) {
   return redactSecretsInText(
-    text6.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1[REDACTED]@")
+    text7.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1[REDACTED]@")
   );
 }
 async function readConfiguration(projectDir) {
@@ -102735,7 +102736,7 @@ async function readConfiguration(projectDir) {
   try {
     const stat = await file.stat();
     if (!stat.isFile() || stat.size > 1024 * 1024)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Project configuration exceeds 1 MiB or is not a regular file.",
         "PACKAGE_CONFIG_INVALID"
       );
@@ -102752,7 +102753,7 @@ async function readConfiguration(projectDir) {
       length += read.bytesRead;
     }
     if (length > 1024 * 1024)
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Project configuration grew beyond 1 MiB.",
         "PACKAGE_CONFIG_INVALID"
       );
@@ -102772,7 +102773,7 @@ async function retainOutput(projectDir, output) {
     const actual = await fs40.realpath(current);
     const relative = path46.relative(projectDir, actual);
     if (relative === ".." || relative.startsWith(`..${path46.sep}`) || path46.isAbsolute(relative))
-      throw new PlatformIOError(
+      throw new PlatformIOError2(
         "Package log directory escapes the project.",
         "PACKAGE_LOG_PATH_INVALID"
       );
@@ -102795,7 +102796,7 @@ async function retainOutput(projectDir, output) {
 async function executePackageAction(action, input, caller = {}, onAuthorized, outputOptions = {}) {
   const tailLines = outputOptions.tailLines ?? 40;
   if (tailLines !== 40 && tailLines !== 60)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid package output limit.",
       "PACKAGE_OUTPUT_LIMIT"
     );
@@ -102807,14 +102808,14 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
     "pkg_outdated",
     "pkg_update"
   ].includes(action))
-    throw new PlatformIOError("Unknown package operation.", "UNKNOWN_ACTION");
+    throw new PlatformIOError2("Unknown package operation.", "UNKNOWN_ACTION");
   const search = action === "pkg_search";
   const mutation = action === "pkg_install" || action === "pkg_uninstall";
   const parsed = search ? searchSchema.parse(input) : mutation ? mutationSchema.parse(input) : projectSchema.parse(input);
   const projectDir = "projectDir" in parsed ? await fs40.realpath(parsed.projectDir) : void 0;
   const params = { ...parsed, ...projectDir ? { projectDir } : {} };
   if (params.spec !== void 0 && (/[a-z][a-z0-9+.-]*:\/\/[^\s/@]+@/i.test(params.spec) || /[?&](?:token|password|key|secret|signature)=/i.test(params.spec)))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Use an external credential helper instead of credentials in package URLs.",
       "PACKAGE_SPEC_SECRET"
     );
@@ -102838,7 +102839,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
       if (projectDir && configPath) {
         const relative = path46.relative(projectDir, configPath);
         if (relative === ".." || relative.startsWith(`..${path46.sep}`) || path46.isAbsolute(relative))
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Project configuration resolves outside the project.",
             "PACKAGE_CONFIG_CONFLICT"
           );
@@ -102867,7 +102868,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
         timeout: search ? 9e4 : action === "pkg_install" || action === "pkg_update" ? 9e5 : 3e5
       });
       if (!Number.isInteger(result.exitCode))
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Package command did not return a numeric exit status.",
           "PACKAGE_PROCESS_ERROR"
         );
@@ -102875,7 +102876,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
         [result.stdout, result.stderr].filter(Boolean).join("\n")
       );
       if (Buffer.byteLength(output) > 20 * 1024 * 1024)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "Package output exceeds 20 MiB.",
           "PACKAGE_OUTPUT_LIMIT"
         );
@@ -102888,7 +102889,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
         });
         validatePolicy();
         if (configPath !== await fs40.realpath(path46.join(projectDir, "platformio.ini")) || after !== await readConfiguration(projectDir))
-          throw new PlatformIOError(
+          throw new PlatformIOError2(
             "Configuration changed concurrently; inspect it before retrying.",
             "PACKAGE_CONFIG_CONFLICT"
           );
@@ -102900,7 +102901,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
               mode: (await fs40.stat(configPath)).mode
             });
             if (after !== await readConfiguration(projectDir))
-              throw new PlatformIOError(
+              throw new PlatformIOError2(
                 "Configuration changed concurrently.",
                 "PACKAGE_CONFIG_CONFLICT"
               );
@@ -102912,7 +102913,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
           after = merged;
         }
       }
-      const digest = (text6) => text6 === null ? null : crypto15.createHash("sha256").update(text6).digest("hex");
+      const digest = (text7) => text7 === null ? null : crypto15.createHash("sha256").update(text7).digest("hex");
       validatePolicy();
       const detail = action === "pkg_search" ? parsePackageSearch(safeOutput(result.stdout)) : action === "pkg_list" ? parsePackageList(safeOutput(result.stdout)) : void 0;
       const parsedOk = !detail || detail.parseStatus === "complete";
@@ -102975,13 +102976,13 @@ var schemas2 = {
 };
 async function mapPackageCompatibilityRequest(name2, input, defaults = {}) {
   if (!Object.hasOwn(schemas2, name2))
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Unknown package compatibility tool.",
       "COMPAT_TOOL_UNKNOWN"
     );
   const parsed = schemas2[name2].safeParse(input);
   if (!parsed.success)
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "Invalid package compatibility arguments.",
       "COMPAT_ARGUMENT_INVALID"
     );
@@ -103256,10 +103257,10 @@ function assignProp(target, prop, value2) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path54) {
-  if (!path54)
+function getElementAtPath(obj, path55) {
+  if (!path55)
     return obj;
-  return path54.reduce((acc, key) => acc?.[key], obj);
+  return path55.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -103579,11 +103580,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path54, issues) {
+function prefixIssues(path55, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path54);
+    iss.path.unshift(path55);
     return iss;
   });
 }
@@ -110150,6 +110151,163 @@ init_mcp_context();
 init_workspace_registry();
 init_projects();
 
+// src/core/test-report-execution.ts
+import fs41 from "node:fs/promises";
+import path47 from "node:path";
+init_paths();
+init_errors2();
+
+// src/core/analysis/test-report.ts
+init_zod();
+init_errors2();
+var text6 = external_exports.string().max(65536).nullable().optional();
+var count = external_exports.number().int().nonnegative().max(1e6);
+var duration3 = external_exports.number().finite().nonnegative();
+var testCase = external_exports.object({
+  name: text6,
+  status: external_exports.enum(["PASSED", "FAILED", "ERRORED", "SKIPPED"]),
+  message: text6,
+  exception: text6,
+  source: external_exports.object({
+    file: text6,
+    line: external_exports.number().int().nonnegative().nullable().optional()
+  }).nullable().optional()
+});
+var reportSchema2 = external_exports.object({
+  testcase_nums: count,
+  failure_nums: count,
+  error_nums: count,
+  skipped_nums: count,
+  duration: duration3,
+  test_suites: external_exports.array(
+    external_exports.object({
+      env_name: text6,
+      test_name: text6,
+      status: external_exports.string().min(1).max(64),
+      duration: duration3.default(0),
+      test_cases: external_exports.array(testCase).max(1e5)
+    })
+  ).max(1024)
+});
+function summarizeTestOutput(output) {
+  if (Buffer.byteLength(output) > 16 * 1024 * 1024)
+    throw new PlatformIOError2(
+      "Test report exceeds 16 MiB",
+      "TEST_REPORT_LIMIT"
+    );
+  let raw;
+  try {
+    raw = JSON.parse(output);
+  } catch {
+    throw new PlatformIOError2(
+      "Test runner returned no valid JSON report",
+      "TEST_REPORT_INVALID"
+    );
+  }
+  const parsed = reportSchema2.safeParse(raw);
+  if (!parsed.success)
+    throw new PlatformIOError2(
+      "Test report has an invalid or incomplete shape",
+      "TEST_REPORT_INVALID"
+    );
+  const report = parsed.data;
+  if (report.failure_nums + report.error_nums + report.skipped_nums > report.testcase_nums)
+    throw new PlatformIOError2(
+      "Test report counters contradict the total",
+      "TEST_REPORT_INVALID"
+    );
+  const observed = { PASSED: 0, FAILED: 0, ERRORED: 0, SKIPPED: 0 };
+  const suites = report.test_suites.map((suite) => ({
+    env: suite.env_name ?? null,
+    test: suite.test_name ?? null,
+    status: suite.status,
+    duration_s: Math.round(suite.duration * 100) / 100,
+    cases: suite.test_cases.map((item) => {
+      observed[item.status]++;
+      return {
+        name: item.name ?? null,
+        status: item.status,
+        message: item.message || item.exception || null,
+        file: item.source?.file ?? null,
+        line: item.source?.line ?? null
+      };
+    })
+  }));
+  const observedTotal = Object.values(observed).reduce(
+    (sum, value2) => sum + value2,
+    0
+  );
+  if (observedTotal !== report.testcase_nums || observed.FAILED !== report.failure_nums || observed.ERRORED !== report.error_nums || observed.SKIPPED !== report.skipped_nums)
+    throw new PlatformIOError2(
+      "Test case statuses contradict the report counters",
+      "TEST_REPORT_INVALID"
+    );
+  return {
+    total: report.testcase_nums,
+    failed: report.failure_nums,
+    errored: report.error_nums,
+    skipped: report.skipped_nums,
+    duration_s: Math.round(report.duration * 100) / 100,
+    suites
+  };
+}
+
+// src/core/test-report-execution.ts
+async function runTestsWithReport(projectDir, environment, compileOnly, options = {}) {
+  const parent = path47.join(SERVER_DATA_DIR, "test-reports");
+  await fs41.mkdir(parent, { recursive: true, mode: 448 });
+  const directory = await fs41.mkdtemp(path47.join(parent, "run-"));
+  const reportPath = path47.join(directory, "report.json");
+  let retain = false;
+  try {
+    await fs41.writeFile(reportPath, "", { flag: "wx", mode: 384 });
+    const result = await runTests(projectDir, environment, false, compileOnly, {
+      ...options,
+      reportPath
+    });
+    try {
+      const stat = await fs41.lstat(reportPath);
+      if (!stat.isFile() || stat.isSymbolicLink())
+        throw new PlatformIOError2(
+          "Test report is not a regular file",
+          "TEST_REPORT_INVALID"
+        );
+      const testReport = summarizeTestOutput(
+        await readCommandOutput(reportPath)
+      );
+      return {
+        ...result,
+        success: result.success === true && testReport.failed === 0 && testReport.errored === 0,
+        testReport
+      };
+    } catch (error2) {
+      if (error2 instanceof PlatformIOError2 || error2.code === "ENOENT")
+        return {
+          ...result,
+          success: false,
+          testReportError: error2 instanceof PlatformIOError2 ? error2.code ?? "TEST_REPORT_INVALID" : "TEST_REPORT_MISSING"
+        };
+      throw error2;
+    }
+  } catch (error2) {
+    if (error2 instanceof PlatformIOError2 && error2.context?.cleanupPending === true) {
+      retain = true;
+      throw new PlatformIOError2(error2.message, error2.code, {
+        ...error2.context,
+        retainedReportPath: reportPath
+      });
+    }
+    throw error2;
+  } finally {
+    if (!retain) {
+      await fs41.unlink(reportPath).catch((error2) => {
+        if (error2.code !== "ENOENT") throw error2;
+      });
+      await fs41.rmdir(directory);
+    }
+  }
+}
+
 // src/tools/upload.ts
 init_mcp_context();
 init_spooler();
@@ -110179,7 +110337,7 @@ async function uploadFilesystem(projectDir, port, environment, verbose, backgrou
     if (!activePort) {
       const device = await getFirstDevice2();
       if (!device)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "No serial devices detected for upload.",
           "PORT_NOT_FOUND"
         );
@@ -110258,7 +110416,7 @@ async function uploadFilesystem(projectDir, port, environment, verbose, backgrou
       diagnostic
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError) {
+    if (error2 instanceof PlatformIOError2) {
       throw new UploadError(`Filesystem upload failed: ${error2.message}`, {
         projectDir,
         port,
@@ -110290,7 +110448,7 @@ async function uploadFirmware(projectDir, port, environment, verbose, background
     if (!activePort) {
       const device = await getFirstDevice2();
       if (!device)
-        throw new PlatformIOError(
+        throw new PlatformIOError2(
           "No serial devices detected for upload.",
           "PORT_NOT_FOUND"
         );
@@ -110369,7 +110527,7 @@ async function uploadFirmware(projectDir, port, environment, verbose, background
       diagnostic
     };
   } catch (error2) {
-    if (error2 instanceof PlatformIOError) {
+    if (error2 instanceof PlatformIOError2) {
       throw new UploadError(`Upload failed: ${error2.message}`, {
         projectDir,
         port,
@@ -110495,7 +110653,7 @@ async function resolveTask(taskId, projectDir) {
   }
   const running = command.tasks.filter((task) => task.status === "running");
   if (running.length !== 1) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Command ${command.id} does not identify exactly one running task.`,
       "AMBIGUOUS_TASK"
     );
@@ -110555,7 +110713,7 @@ var { Server: Server2, Namespace, Socket } = import_dist.default;
 
 // src/api/server.ts
 var import_cors = __toESM(require_lib3(), 1);
-import path50 from "path";
+import path51 from "path";
 
 // node_modules/express-rate-limit/dist/index.mjs
 var import_ip_address = __toESM(require_ip_address(), 1);
@@ -111300,18 +111458,18 @@ var parseOptions = (passedOptions) => {
     statusCode: 429,
     legacyHeaders: passedOptions.headers ?? true,
     identifier(request, _response) {
-      let duration3 = "";
+      let duration4 = "";
       const property = config2.requestPropertyName;
       const { limit } = request[property];
       const seconds = config2.windowMs / 1e3;
       const minutes = config2.windowMs / (1e3 * 60);
       const hours = config2.windowMs / (1e3 * 60 * 60);
       const days = config2.windowMs / (1e3 * 60 * 60 * 24);
-      if (seconds < 60) duration3 = `${seconds}sec`;
-      else if (minutes < 60) duration3 = `${minutes}min`;
-      else if (hours < 24) duration3 = `${hours}hr${hours > 1 ? "s" : ""}`;
-      else duration3 = `${days}day${days > 1 ? "s" : ""}`;
-      return `${limit}-in-${duration3}`;
+      if (seconds < 60) duration4 = `${seconds}sec`;
+      else if (minutes < 60) duration4 = `${minutes}min`;
+      else if (hours < 24) duration4 = `${hours}hr${hours > 1 ? "s" : ""}`;
+      else duration4 = `${days}day${days > 1 ? "s" : ""}`;
+      return `${limit}-in-${duration4}`;
     },
     requestPropertyName: "rateLimit",
     skipFailedRequests: false,
@@ -111573,30 +111731,30 @@ import { exec } from "child_process";
 // node_modules/open/index.js
 import process8 from "node:process";
 import { Buffer as Buffer3 } from "node:buffer";
-import path49 from "node:path";
+import path50 from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 import { promisify as promisify6 } from "node:util";
 import childProcess from "node:child_process";
-import fs47, { constants as fsConstants2 } from "node:fs/promises";
+import fs48, { constants as fsConstants2 } from "node:fs/promises";
 
 // node_modules/wsl-utils/index.js
 import process4 from "node:process";
-import fs46, { constants as fsConstants } from "node:fs/promises";
+import fs47, { constants as fsConstants } from "node:fs/promises";
 
 // node_modules/is-wsl/index.js
 import process3 from "node:process";
 import os9 from "node:os";
-import fs45 from "node:fs";
+import fs46 from "node:fs";
 
 // node_modules/is-inside-container/index.js
-import fs44 from "node:fs";
+import fs45 from "node:fs";
 
 // node_modules/is-docker/index.js
-import fs43 from "node:fs";
+import fs44 from "node:fs";
 var isDockerCached;
 function hasDockerEnv() {
   try {
-    fs43.statSync("/.dockerenv");
+    fs44.statSync("/.dockerenv");
     return true;
   } catch {
     return false;
@@ -111604,7 +111762,7 @@ function hasDockerEnv() {
 }
 function hasDockerCGroup() {
   try {
-    return fs43.readFileSync("/proc/self/cgroup", "utf8").includes("docker");
+    return fs44.readFileSync("/proc/self/cgroup", "utf8").includes("docker");
   } catch {
     return false;
   }
@@ -111620,7 +111778,7 @@ function isDocker() {
 var cachedResult;
 var hasContainerEnv = () => {
   try {
-    fs44.statSync("/run/.containerenv");
+    fs45.statSync("/run/.containerenv");
     return true;
   } catch {
     return false;
@@ -111645,12 +111803,12 @@ var isWsl = () => {
     return true;
   }
   try {
-    if (fs45.readFileSync("/proc/version", "utf8").toLowerCase().includes("microsoft")) {
+    if (fs46.readFileSync("/proc/version", "utf8").toLowerCase().includes("microsoft")) {
       return !isInsideContainer();
     }
   } catch {
   }
-  if (fs45.existsSync("/proc/sys/fs/binfmt_misc/WSLInterop") || fs45.existsSync("/run/WSL")) {
+  if (fs46.existsSync("/proc/sys/fs/binfmt_misc/WSLInterop") || fs46.existsSync("/run/WSL")) {
     return !isInsideContainer();
   }
   return false;
@@ -111668,14 +111826,14 @@ var wslDrivesMountPoint = /* @__PURE__ */ (() => {
     const configFilePath = "/etc/wsl.conf";
     let isConfigFileExists = false;
     try {
-      await fs46.access(configFilePath, fsConstants.F_OK);
+      await fs47.access(configFilePath, fsConstants.F_OK);
       isConfigFileExists = true;
     } catch {
     }
     if (!isConfigFileExists) {
       return defaultMountPoint;
     }
-    const configContent = await fs46.readFile(configFilePath, { encoding: "utf8" });
+    const configContent = await fs47.readFile(configFilePath, { encoding: "utf8" });
     const configMountPoint = /(?<!#.*)root\s*=\s*(?<mountPoint>.*)/g.exec(configContent);
     if (!configMountPoint) {
       return defaultMountPoint;
@@ -111829,8 +111987,8 @@ async function defaultBrowser2() {
 
 // node_modules/open/index.js
 var execFile8 = promisify6(childProcess.execFile);
-var __dirname4 = path49.dirname(fileURLToPath3(import.meta.url));
-var localXdgOpenPath = path49.join(__dirname4, "xdg-open");
+var __dirname4 = path50.dirname(fileURLToPath3(import.meta.url));
+var localXdgOpenPath = path50.join(__dirname4, "xdg-open");
 var { platform, arch } = process8;
 async function getWindowsDefaultBrowserFromWsl() {
   const powershellPath = await powerShellPath();
@@ -111980,7 +112138,7 @@ var baseOpen = async (options) => {
       const isBundled = !__dirname4 || __dirname4 === "/";
       let exeLocalXdgOpen = false;
       try {
-        await fs47.access(localXdgOpenPath, fsConstants2.X_OK);
+        await fs48.access(localXdgOpenPath, fsConstants2.X_OK);
         exeLocalXdgOpen = true;
       } catch {
       }
@@ -112085,7 +112243,7 @@ defineLazyProperty(apps, "browserPrivate", () => "browserPrivate");
 var open_default = open;
 
 // src/api/server.ts
-import fs48 from "node:fs";
+import fs49 from "node:fs";
 init_process_manager();
 init_tail();
 init_command_registry();
@@ -112200,7 +112358,7 @@ async function listInstalledLibraries(projectDir) {
     }
     return Array.from(uniqueLibs.values());
   } catch (error2) {
-    if (error2 instanceof PlatformIOError) {
+    if (error2 instanceof PlatformIOError2) {
       const errorMessage = error2.message.toLowerCase();
       if (errorMessage.includes("no libraries") || errorMessage.includes("empty")) {
         return [];
@@ -112376,10 +112534,10 @@ function pickWorkspaceDirectory() {
 
 // src/api/server.ts
 var __filename3 = fileURLToPath4(import.meta.url);
-var __dirname5 = path50.dirname(__filename3);
+var __dirname5 = path51.dirname(__filename3);
 function resolveDashboardWebRoot(environment = process.env, moduleDirectory = __dirname5) {
   const configuredPath = environment.PIO_MCP_WEB_DIST?.trim();
-  return configuredPath ? path50.resolve(configuredPath) : path50.join(moduleDirectory, "..", "..", "web", "dist");
+  return configuredPath ? path51.resolve(configuredPath) : path51.join(moduleDirectory, "..", "..", "web", "dist");
 }
 var PORTAL_AUTH_TOKEN = crypto19.randomUUID();
 var DASHBOARD_SESSION_COOKIE = "pio_mcp_session";
@@ -112447,14 +112605,14 @@ function issueLaunchTicket(projectDir) {
 }
 function parseDeviceLocks() {
   const locks = [];
-  if (!fs48.existsSync(GLOBAL_LOCKS_DIR)) {
+  if (!fs49.existsSync(GLOBAL_LOCKS_DIR)) {
     return locks;
   }
-  for (const file of fs48.readdirSync(GLOBAL_LOCKS_DIR)) {
+  for (const file of fs49.readdirSync(GLOBAL_LOCKS_DIR)) {
     if (!file.endsWith(".json")) continue;
-    const lockFile = path50.join(GLOBAL_LOCKS_DIR, file);
+    const lockFile = path51.join(GLOBAL_LOCKS_DIR, file);
     try {
-      const payload = JSON.parse(fs48.readFileSync(lockFile, "utf8"));
+      const payload = JSON.parse(fs49.readFileSync(lockFile, "utf8"));
       const claim = payload?.current_claim ?? payload;
       locks.push({
         lockFile,
@@ -112717,10 +112875,10 @@ function startPortalServer(defaultPort = 8080) {
               taskId: task.taskId,
               type: task.type,
               logPath: firstLogPath,
-              exists: fs48.existsSync(firstLogPath)
+              exists: fs49.existsSync(firstLogPath)
             });
           }
-          if (!firstLogPath || !fs48.existsSync(firstLogPath)) {
+          if (!firstLogPath || !fs49.existsSync(firstLogPath)) {
             continue;
           }
           try {
@@ -112964,7 +113122,7 @@ function startPortalServer(defaultPort = 8080) {
       );
       res.json(result);
     } catch (e) {
-      if (e instanceof PlatformIOError && (e.code === "APPROVAL_REQUIRED" || e.code === "POLICY_DENIED")) {
+      if (e instanceof PlatformIOError2 && (e.code === "APPROVAL_REQUIRED" || e.code === "POLICY_DENIED")) {
         res.status(e.code === "APPROVAL_REQUIRED" ? 409 : 403).json({ success: false, error: e.message, ...e.context });
         return;
       }
@@ -113005,10 +113163,10 @@ function startPortalServer(defaultPort = 8080) {
           hardwareLockManager.releaseLock(status.sessionId);
         }
         try {
-          if (fs48.existsSync(GLOBAL_LOCKS_DIR)) {
-            for (const file of fs48.readdirSync(GLOBAL_LOCKS_DIR)) {
+          if (fs49.existsSync(GLOBAL_LOCKS_DIR)) {
+            for (const file of fs49.readdirSync(GLOBAL_LOCKS_DIR)) {
               if (file.endsWith(".json") || file.endsWith(".lock")) {
-                fs48.unlinkSync(path50.join(GLOBAL_LOCKS_DIR, file));
+                fs49.unlinkSync(path51.join(GLOBAL_LOCKS_DIR, file));
               }
             }
           }
@@ -113029,7 +113187,7 @@ function startPortalServer(defaultPort = 8080) {
         res.status(400).json({ error: "Missing dir parameter" });
         return;
       }
-      const resolved = path50.resolve(dir);
+      const resolved = path51.resolve(dir);
       if (!await isValidProject(resolved)) {
         res.status(400).json({
           error: "This folder is not a PlatformIO project. Please initialize it using the AI Agent or terminal first, then try opening it again."
@@ -113048,7 +113206,7 @@ function startPortalServer(defaultPort = 8080) {
     try {
       let result = pickWorkspaceDirectory();
       if (result) {
-        result = path50.resolve(result);
+        result = path51.resolve(result);
         if (!await isValidProject(result)) {
           res.status(400).json({
             error: "This folder is not a PlatformIO project. Please initialize it using the AI Agent or terminal first, then try opening it again."
@@ -113163,11 +113321,11 @@ function startPortalServer(defaultPort = 8080) {
         res.status(404).json({ error: "No log paths mapped for this task" });
         return;
       }
-      if (!fs48.existsSync(task.logPaths[0])) {
+      if (!fs49.existsSync(task.logPaths[0])) {
         res.status(404).json({ error: "Log file missing from disk" });
         return;
       }
-      const fileStream = fs48.createReadStream(task.logPaths[0]);
+      const fileStream = fs49.createReadStream(task.logPaths[0]);
       res.setHeader("Content-Type", "text/plain");
       fileStream.pipe(res);
     } catch (e) {
@@ -113364,7 +113522,7 @@ function startPortalServer(defaultPort = 8080) {
     const spoolers = getSpoolerStates();
     socket.emit("spooler_states", spoolers);
     for (const [port2, daemon] of Object.entries(spoolers)) {
-      if (daemon.logFile && fs48.existsSync(daemon.logFile)) {
+      if (daemon.logFile && fs49.existsSync(daemon.logFile)) {
         try {
           socket.emit("serial_clear", { port: port2, taskId: daemon.taskId });
           const lines2 = await tailFileBounded(daemon.logFile);
@@ -113389,12 +113547,12 @@ function startPortalServer(defaultPort = 8080) {
         timestamp: Date.now(),
         projectDir: activeWorkspace
       });
-      const activityLogPath = path50.join(
+      const activityLogPath = path51.join(
         activeWorkspace,
         ".pio-mcp-workspace",
         "agent_activities.jsonl"
       );
-      if (fs48.existsSync(activityLogPath)) {
+      if (fs49.existsSync(activityLogPath)) {
         try {
           const lines2 = await tailFileBounded(activityLogPath);
           const tailLines = lines2.slice(-100);
@@ -113406,14 +113564,14 @@ function startPortalServer(defaultPort = 8080) {
         } catch {
         }
       }
-      const latestBuildLog = path50.join(
+      const latestBuildLog = path51.join(
         activeWorkspace,
         ".pio-mcp-workspace",
         "logs",
         "build",
         "latest-build.log"
       );
-      if (fs48.existsSync(latestBuildLog)) {
+      if (fs49.existsSync(latestBuildLog)) {
         socket.emit("build_state", {
           timestamp: Date.now(),
           logFile: latestBuildLog
@@ -113537,8 +113695,8 @@ async function getDashboardStatusCore(input) {
 }
 
 // src/tools/agent.ts
-import fs50 from "node:fs";
-import path52 from "node:path";
+import fs51 from "node:fs";
+import path53 from "node:path";
 
 // src/core/runtime-assertions.ts
 var RUNTIME_FAILURE_MATCHERS = [
@@ -113601,7 +113759,7 @@ var MAX_PATTERN_LENGTH = 128;
 var MAX_EVIDENCE_BYTES = 8192;
 function compileBoundedPattern(pattern) {
   if (!pattern || pattern.length > MAX_PATTERN_LENGTH) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       `Monitor patterns must be 1-${MAX_PATTERN_LENGTH} characters.`,
       "UNSAFE_PATTERN"
     );
@@ -113611,7 +113769,7 @@ function compileBoundedPattern(pattern) {
   }
   const source = pattern.slice(3);
   if (!source || /\(\?[=!<]/u.test(source) || /\\[1-9]/u.test(source) || /(?:\*|\+|\{\d+(?:,\d*)?\})(?:\s*)(?:\*|\+|\{)/u.test(source)) {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "The requested regular expression uses an unsafe construct.",
       "UNSAFE_PATTERN"
     );
@@ -113619,7 +113777,7 @@ function compileBoundedPattern(pattern) {
   try {
     return new RegExp(source, "iu");
   } catch {
-    throw new PlatformIOError(
+    throw new PlatformIOError2(
       "The requested monitor regular expression is invalid.",
       "UNSAFE_PATTERN"
     );
@@ -113747,37 +113905,37 @@ function getBoardProfile(input) {
 init_build_cache();
 
 // src/utils/artifacts.ts
-import fs49 from "node:fs";
-import path51 from "node:path";
+import fs50 from "node:fs";
+import path52 from "node:path";
 var WORKSPACE_DIR4 = ".pio-mcp-workspace";
 var LAST_AGENT_REPORT_FILE = "lastAgentReport.json";
 var BOARD_REPORT_FILE = "boardReport.json";
 function getWorkspaceArtifactsDir(projectDir) {
-  return path51.join(projectDir, WORKSPACE_DIR4);
+  return path52.join(projectDir, WORKSPACE_DIR4);
 }
 function getLastAgentReportPath(projectDir) {
-  return path51.join(getWorkspaceArtifactsDir(projectDir), LAST_AGENT_REPORT_FILE);
+  return path52.join(getWorkspaceArtifactsDir(projectDir), LAST_AGENT_REPORT_FILE);
 }
 function getBoardReportPath(projectDir) {
-  return path51.join(getWorkspaceArtifactsDir(projectDir), BOARD_REPORT_FILE);
+  return path52.join(getWorkspaceArtifactsDir(projectDir), BOARD_REPORT_FILE);
 }
 function ensureArtifactsDir(projectDir) {
   const dir = getWorkspaceArtifactsDir(projectDir);
-  if (!fs49.existsSync(dir)) {
-    fs49.mkdirSync(dir, { recursive: true });
+  if (!fs50.existsSync(dir)) {
+    fs50.mkdirSync(dir, { recursive: true });
   }
 }
 function readJsonFile(filePath) {
-  if (!fs49.existsSync(filePath)) return null;
+  if (!fs50.existsSync(filePath)) return null;
   try {
-    const raw = fs49.readFileSync(filePath, "utf8");
+    const raw = fs50.readFileSync(filePath, "utf8");
     return JSON.parse(raw);
   } catch {
     return null;
   }
 }
 function writeJsonFile(filePath, payload) {
-  fs49.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
+  fs50.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
 }
 function writeLastAgentReport(projectDir, report) {
   ensureArtifactsDir(projectDir);
@@ -113841,37 +113999,37 @@ function parseEnvironmentsFromIni(iniText) {
   return environments;
 }
 function readProjectIniText(projectDir) {
-  const iniPath = path52.join(projectDir, "platformio.ini");
-  if (!fs50.existsSync(iniPath)) return "";
+  const iniPath = path53.join(projectDir, "platformio.ini");
+  if (!fs51.existsSync(iniPath)) return "";
   try {
-    return fs50.readFileSync(iniPath, "utf8");
+    return fs51.readFileSync(iniPath, "utf8");
   } catch {
     return "";
   }
 }
 function listSourceFiles2(projectDir) {
-  const srcRoot = path52.join(projectDir, "src");
-  if (!fs50.existsSync(srcRoot)) return [];
+  const srcRoot = path53.join(projectDir, "src");
+  if (!fs51.existsSync(srcRoot)) return [];
   const out = [];
   const stack = [srcRoot];
   while (stack.length > 0) {
     const current = stack.pop();
     let entries;
     try {
-      entries = fs50.readdirSync(current, { withFileTypes: true });
+      entries = fs51.readdirSync(current, { withFileTypes: true });
     } catch {
       continue;
     }
     for (const entry of entries) {
-      const absPath = path52.join(current, entry.name);
+      const absPath = path53.join(current, entry.name);
       if (entry.isDirectory()) {
         stack.push(absPath);
         continue;
       }
       if (!entry.isFile()) continue;
-      const ext = path52.extname(entry.name).toLowerCase();
+      const ext = path53.extname(entry.name).toLowerCase();
       if (!SOURCE_EXTENSIONS.has(ext)) continue;
-      out.push(path52.relative(projectDir, absPath).replace(/\\/g, "/"));
+      out.push(path53.relative(projectDir, absPath).replace(/\\/g, "/"));
     }
   }
   return out.sort((a, b) => a.localeCompare(b));
@@ -113920,12 +114078,12 @@ function persistAgentReport(projectDir, tool, success, summary, payload) {
 }
 async function agentValidateProject(projectDir) {
   const validatedPath = validateProjectPath(projectDir);
-  const iniPath = path52.join(validatedPath, "platformio.ini");
-  const hasPlatformioIni = fs50.existsSync(iniPath);
+  const iniPath = path53.join(validatedPath, "platformio.ini");
+  const hasPlatformioIni = fs51.existsSync(iniPath);
   let iniText = "";
   if (hasPlatformioIni) {
     try {
-      iniText = fs50.readFileSync(iniPath, "utf8");
+      iniText = fs51.readFileSync(iniPath, "utf8");
     } catch {
       iniText = "";
     }
@@ -114066,31 +114224,31 @@ async function agentBuildDiagnose(projectDir, environment, verbose, background) 
   return result;
 }
 function collectPinUsages(projectDir) {
-  const srcFiles = listSourceFiles2(projectDir).map((relPath) => path52.join(projectDir, relPath)).filter((absPath) => fs50.existsSync(absPath));
+  const srcFiles = listSourceFiles2(projectDir).map((relPath) => path53.join(projectDir, relPath)).filter((absPath) => fs51.existsSync(absPath));
   const usages = [];
   const macroMap = /* @__PURE__ */ new Map();
   const defineRegex = /^\s*#define\s+([A-Za-z_][A-Za-z0-9_]*)\s+(\d{1,2})\b/gm;
   const callRegex = /\b(pinMode|digitalWrite|analogWrite|analogRead)\s*\(\s*([A-Za-z_][A-Za-z0-9_]*|\d{1,2})/g;
   for (const absPath of srcFiles) {
-    let text6 = "";
+    let text7 = "";
     try {
-      text6 = fs50.readFileSync(absPath, "utf8");
+      text7 = fs51.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
     defineRegex.lastIndex = 0;
-    for (const match of text6.matchAll(defineRegex)) {
+    for (const match of text7.matchAll(defineRegex)) {
       macroMap.set(match[1], Number.parseInt(match[2], 10));
     }
   }
   for (const absPath of srcFiles) {
-    let text6 = "";
+    let text7 = "";
     try {
-      text6 = fs50.readFileSync(absPath, "utf8");
+      text7 = fs51.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
-    const lines2 = text6.split(/\r?\n/);
+    const lines2 = text7.split(/\r?\n/);
     for (const line of lines2) {
       callRegex.lastIndex = 0;
       for (const match of line.matchAll(callRegex)) {
@@ -114221,10 +114379,10 @@ async function collectMonitorTail(logPath, timeoutSeconds) {
   let captured = "";
   let monitorSuccess = false;
   while (Date.now() < deadline) {
-    if (fs50.existsSync(logPath)) {
+    if (fs51.existsSync(logPath)) {
       monitorSuccess = true;
       try {
-        const content = fs50.readFileSync(logPath, "utf8");
+        const content = fs51.readFileSync(logPath, "utf8");
         if (content.length < lastKnownLength) {
           lastKnownLength = 0;
         }
@@ -114479,7 +114637,7 @@ async function agentFlashMonitorVerify(input) {
     );
     return failedResult;
   }
-  const monitorLogPath = path52.join(
+  const monitorLogPath = path53.join(
     validatedPath,
     ".pio-mcp-workspace",
     "logs",
@@ -114675,10 +114833,10 @@ init_platformio();
 init_errors2();
 init_process_manager();
 init_paths();
-import fs51 from "node:fs";
+import fs52 from "node:fs";
 init_logger();
 init_events();
-import path53 from "node:path";
+import path54 from "node:path";
 import { execSync as execSync4 } from "node:child_process";
 import crypto21 from "node:crypto";
 init_target_resolution();
@@ -114710,12 +114868,12 @@ function ensureStructuredToolResult(toolName, response) {
   if (response.structuredContent) {
     return response;
   }
-  const text6 = response.content?.find(
+  const text7 = response.content?.find(
     (item) => item.type === "text" && typeof item.text === "string"
   )?.text;
-  let data = text6;
+  let data = text7;
   try {
-    data = text6 ? JSON.parse(text6) : void 0;
+    data = text7 ? JSON.parse(text7) : void 0;
   } catch {
   }
   const record2 = typeof data === "object" && data !== null ? data : void 0;
@@ -116006,6 +116164,7 @@ var toolDefinitions = [
     inputSchema: {
       type: "object",
       properties: {
+        structuredReport: { type: "boolean", description: "Include per-case results for foreground runs; cannot be combined with background" },
         projectDir: {
           type: "string",
           description: "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
@@ -116543,10 +116702,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 hardwareLockManager.releaseLock(status.sessionId);
               }
               try {
-                if (fs51.existsSync(GLOBAL_LOCKS_DIR)) {
-                  for (const file of fs51.readdirSync(GLOBAL_LOCKS_DIR)) {
+                if (fs52.existsSync(GLOBAL_LOCKS_DIR)) {
+                  for (const file of fs52.readdirSync(GLOBAL_LOCKS_DIR)) {
                     if (file.endsWith(".json") || file.endsWith(".lock")) {
-                      fs51.unlinkSync(path53.join(GLOBAL_LOCKS_DIR, file));
+                      fs52.unlinkSync(path54.join(GLOBAL_LOCKS_DIR, file));
                     }
                   }
                 }
@@ -116830,7 +116989,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "run_tests": {
               const params = RunTestsParamsSchema.parse(args2);
-              const executeTask = () => runTests(
+              if (params.structuredReport && params.background)
+                throw new PlatformIOError("Structured test reports require foreground execution", "INVALID_ARGUMENT");
+              const executeTask = () => params.structuredReport ? runTestsWithReport(params.projectDir, params.environment, params.compileOnly) : runTests(
                 params.projectDir,
                 params.environment,
                 params.background,
@@ -117003,8 +117164,8 @@ async function main() {
       process.exit(1);
     }
     try {
-      const currentDir = path53.dirname(new URL(import.meta.url).pathname);
-      const installerEntry = path53.join(
+      const currentDir = path54.dirname(new URL(import.meta.url).pathname);
+      const installerEntry = path54.join(
         currentDir,
         "..",
         "scripts",
@@ -117060,7 +117221,7 @@ async function main() {
   }
   let gitHash = "unknown";
   try {
-    const currentDir = path53.dirname(new URL(import.meta.url).pathname);
+    const currentDir = path54.dirname(new URL(import.meta.url).pathname);
     gitHash = execSync4("git rev-parse --short HEAD", {
       cwd: currentDir,
       stdio: "pipe"
