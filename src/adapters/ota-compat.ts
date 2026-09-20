@@ -27,6 +27,7 @@ export const OtaCompatibilitySchema = z
     timeout_s: z.number().finite().min(0.001).max(600).default(180),
     verify_reachable: z.boolean().default(true),
     image_path: z.string().min(1).max(32768).optional(),
+    elf_path: z.string().min(1).max(32768).optional(),
     expected_image_sha256: z
       .string()
       .regex(/^[a-fA-F0-9]{64}$/)
@@ -66,6 +67,7 @@ export async function executeOtaCompatibility(
       timeoutSeconds: args.timeout_s,
       verifyReachable: args.verify_reachable,
       imagePath: args.image_path,
+      elfPath: args.elf_path,
       expectedImageSha256: args.expected_image_sha256,
       approvalId: args.approval_id,
       commandApprovalId: args.command_approval_id,

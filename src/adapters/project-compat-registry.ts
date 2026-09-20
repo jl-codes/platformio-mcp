@@ -370,6 +370,7 @@ export function withProjectCompatibility<TResult>(
         },
         verify_reachable: { type: "boolean", default: true },
         image_path: { type: "string" },
+        elf_path: { type: "string", minLength: 1, maxLength: 32768 },
         expected_image_sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
         ...Object.fromEntries(
           [

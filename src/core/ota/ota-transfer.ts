@@ -19,6 +19,7 @@ export interface PreparedOtaTransfer {
   target: Awaited<ReturnType<typeof resolveOtaTarget>>;
   tools: Awaited<ReturnType<typeof resolveOtaTools>>;
   image: Awaited<ReturnType<typeof retainOtaImage>>;
+  elfIdentity?: { path: string; sha256: string; archivePath?: string } | null;
   filesystem: boolean;
   uploaderOptions?: OtaUploaderOptions;
   auth?: string;
@@ -52,6 +53,9 @@ export async function executePreparedOtaTransfer(
       size: input.image.identity.size,
       sha256: input.image.identity.sha256,
     },
+    elf: input.elfIdentity
+      ? { path: input.elfIdentity.path, sha256: input.elfIdentity.sha256 }
+      : null,
     uploader: {
       executable: input.tools.pythonExecutable,
       script: input.tools.uploaderScript,

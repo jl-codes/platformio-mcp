@@ -139,3 +139,38 @@ it("builds and selects the configured filesystem image", async () => {
   expect(mocks.build).toHaveBeenCalledWith(project, "buildfs", "esp", false);
   expect(mocks.transfer.mock.calls[0][0].filesystem).toBe(true);
 });
+
+it("rejects explicit ELF matching when image identity is absent before transferring", async () => {
+  await expect(
+    executeOtaUpload({
+      projectDir: project,
+      host: "192.0.2.8",
+      build: false,
+      elfPath: "firmware.elf",
+    }),
+  ).rejects.toMatchObject({ code: "OTA_ELF_IDENTITY_UNAVAILABLE" });
+  expect(mocks.transfer).not.toHaveBeenCalled();
+});
+it("rejects a mismatched explicit ELF before transferring recognized firmware", async () => {
+  const firmware = Buffer.alloc(304);
+  firmware[0] = 0xe9;
+  firmware[1] = 1;
+  firmware.writeUInt32LE(256, 28);
+  firmware.writeUInt32LE(0xabcd5432, 32);
+  firmware.fill(0x12, 176, 208);
+  let checksum = 0xef;
+  for (const byte of firmware.subarray(32, 288)) checksum ^= byte;
+  firmware[303] = checksum;
+  await fs.writeFile(image, firmware);
+  const elf = path.join(project, "firmware.elf");
+  await fs.writeFile(elf, "wrong build");
+  await expect(
+    executeOtaUpload({
+      projectDir: project,
+      host: "192.0.2.8",
+      build: false,
+      elfPath: elf,
+    }),
+  ).rejects.toMatchObject({ code: "OTA_ELF_MISMATCH" });
+  expect(mocks.transfer).not.toHaveBeenCalled();
+});

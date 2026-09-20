@@ -1,5 +1,6 @@
 /** Authorized ESP OTA build, immutable image capture, fixed network selection and protocol reporting. */
 import fs from "node:fs/promises";
+import { matchAndRetainOtaElf } from "../core/ota/ota-elf-match.js";
 import path from "node:path";
 import { z } from "zod";
 import { platformioExecutor } from "../platformio.js";
@@ -39,6 +40,7 @@ export const OtaUploadSchema = z
     timeoutSeconds: z.number().finite().min(0.001).max(600).default(180),
     verifyReachable: z.boolean().default(true),
     imagePath: z.string().min(1).max(32768).optional(),
+    elfPath: z.string().min(1).max(32768).optional(),
     expectedImageSha256: z
       .string()
       .regex(/^[a-fA-F0-9]{64}$/)
@@ -170,6 +172,7 @@ export async function executeOtaUpload(
         environment: configuration.environment,
         purpose: "ota_image",
         imagePath: args.imagePath ?? null,
+        elfPath: args.elfPath ?? null,
         filesystem: args.filesystem,
         expectedImageSha256: args.expectedImageSha256,
         approvalId: args.imageApprovalId,
@@ -204,7 +207,25 @@ export async function executeOtaUpload(
           selected = candidates[0];
         }
         guard();
-        return retainOtaImage(projectDir, selected, args.expectedImageSha256);
+        const retained = await retainOtaImage(
+          projectDir,
+          selected,
+          args.expectedImageSha256,
+        );
+        try {
+          const elfIdentity = args.elfPath
+            ? await matchAndRetainOtaElf(
+                projectDir,
+                args.elfPath,
+                retained.identity.embeddedElfSha256,
+              )
+            : null;
+          guard();
+          return { ...retained, elfIdentity };
+        } catch (error) {
+          await retained.release();
+          throw error;
+        }
       },
     );
     let cleanupPending = false;
@@ -216,6 +237,7 @@ export async function executeOtaUpload(
           target,
           tools,
           image,
+          elfIdentity: image.elfIdentity,
           filesystem: args.filesystem,
           uploaderOptions,
           auth,
@@ -251,7 +273,10 @@ export async function executeOtaUpload(
         firmware_bytes: image.identity.size,
         firmware_sha256: image.identity.sha256,
         firmware_archive_path: result.imageArchivePath,
-        elf_correspondence: "identity_unverified" as const,
+        elf_correspondence: image.elfIdentity
+          ? "embedded_hash_match"
+          : "identity_unverified",
+        elf: image.elfIdentity,
         embedded_elf_sha256: args.filesystem
           ? null
           : image.identity.embeddedElfSha256,
