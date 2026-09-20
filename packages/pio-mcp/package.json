@@ -11,7 +11,7 @@
     "README.md"
   ],
   "dependencies": {
-    "platformio-mcp": "^3.0.0"
+    "platformio-mcp": "3.0.0"
   },
   "engines": {
     "node": ">=20.0.0"

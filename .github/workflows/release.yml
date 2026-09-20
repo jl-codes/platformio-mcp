@@ -52,6 +52,7 @@ jobs:
           npm audit --audit-level=low
           npm --prefix web audit --audit-level=low
           npm run test:ci:unit
+          npm run test:namespaces
           npm --prefix web run test -- --run
           npm run test:e2e:ci
           npm --prefix web run test:e2e:codex
@@ -75,6 +76,10 @@ jobs:
           mv "pio-agent-${version}.tgz" release-artifacts/
           cp plugins/platformio-mcp/runtime/inventory.json release-artifacts/plugin-runtime-inventory.json
 
+      - name: Verify npm release identities before publication
+        if: inputs.publish_npm
+        run: node scripts/npm-release-identity.mjs
+
       - name: Upload immutable artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -84,15 +89,7 @@ jobs:
 
       - name: Publish npm package when explicitly requested
         if: github.event_name == 'workflow_dispatch' && inputs.publish_npm
-        run: |
-          version="$(node -p "require('./package.json').version")"
-          for package_name in platformio-mcp pio-mcp pio-agent; do
-            if npm view "${package_name}@${version}" version >/dev/null 2>&1; then
-              echo "${package_name}@${version} is already published; skipping"
-            else
-              npm publish "./release-artifacts/${package_name}-${version}.tgz" --access public
-            fi
-          done
+        run: node scripts/npm-release-identity.mjs --publish
 
       - name: Attach artifacts to GitHub tag
         if: startsWith(github.ref, 'refs/tags/v')

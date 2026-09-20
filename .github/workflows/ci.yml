@@ -47,6 +47,9 @@ jobs:
       - name: Run unit and component tests
         run: npm run test:ci:unit
 
+      - name: Validate distribution identity controls
+        run: npm run test:namespaces
+
       - name: Run dashboard component tests
         run: npm --prefix web run test -- --run
 

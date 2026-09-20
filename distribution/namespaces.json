@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "canonicalSource": "https://github.com/jl-codes/platformio-mcp",
+  "operatorRole": "repository maintainer; release operator identity must be verified at publication",
+  "maxLookups": 100,
+  "entries": [
+    {
+      "registry": "npm",
+      "name": "platformio-mcp",
+      "role": "canonical",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": true
+    },
+    {
+      "registry": "npm",
+      "name": "pio-agent",
+      "role": "functional_alias",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": true
+    },
+    {
+      "registry": "npm",
+      "name": "pio-mcp",
+      "role": "functional_alias",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": true
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/platformio-mcp",
+      "role": "candidate_alias",
+      "publishIntent": false
+    },
+    {
+      "registry": "npm",
+      "name": "platformio.mcp",
+      "role": "watch_only",
+      "publishIntent": false
+    },
+    {
+      "registry": "npm",
+      "name": "platformio_mcp",
+      "role": "watch_only",
+      "publishIntent": false
+    },
+    {
+      "registry": "npm",
+      "name": "platformiomcp",
+      "role": "watch_only",
+      "publishIntent": false
+    },
+    {
+      "registry": "npm",
+      "name": "pio.agent",
+      "role": "watch_only",
+      "publishIntent": false
+    },
+    {
+      "registry": "npm",
+      "name": "pio_agent",
+      "role": "watch_only",
+      "publishIntent": false
+    },
+    {
+      "registry": "npm",
+      "name": "pioagent",
+      "role": "watch_only",
+      "publishIntent": false
+    },
+    {
+      "registry": "npm",
+      "name": "pio.mcp",
+      "role": "watch_only",
+      "publishIntent": false
+    },
+    {
+      "registry": "npm",
+      "name": "pio_mcp",
+      "role": "watch_only",
+      "publishIntent": false
+    },
+    {
+      "registry": "npm",
+      "name": "piomcp",
+      "role": "watch_only",
+      "publishIntent": false
+    },
+    {
+      "registry": "pypi",
+      "name": "pio-agent-platformio",
+      "role": "candidate_canonical",
+      "publishIntent": true
+    },
+    {
+      "registry": "pypi",
+      "name": "pio-agent",
+      "role": "candidate_alias",
+      "publishIntent": true
+    },
+    {
+      "registry": "pypi",
+      "name": "pio-mcp",
+      "role": "candidate_alias",
+      "publishIntent": true
+    },
+    {
+      "registry": "pypi",
+      "name": "platformio.mcp",
+      "role": "excluded_third_party",
+      "publishIntent": false,
+      "equivalentNames": [
+        "platformio-mcp",
+        "platformio_mcp"
+      ]
+    },
+    {
+      "registry": "mcp",
+      "name": "io.github.jl-codes/platformio-mcp",
+      "role": "planned",
+      "publishIntent": true
+    },
+    {
+      "registry": "plugin",
+      "name": "platformio-mcp",
+      "role": "existing",
+      "publishIntent": true
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/platformio-mcp",
+      "role": "canonical",
+      "publishIntent": true
+    }
+  ],
+  "unsupportedChannels": [
+    "Docker Hub",
+    "GHCR",
+    "VS Code Marketplace",
+    "Open VSX",
+    "Homebrew",
+    "winget",
+    "Chocolatey",
+    "domains"
+  ]
+}

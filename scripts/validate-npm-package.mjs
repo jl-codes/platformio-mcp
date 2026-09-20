@@ -223,7 +223,7 @@ const compatibilityResults = COMPATIBILITY_PACKAGES.map((packageName) => {
   }
   if (
     compatibilityPackageJson.dependencies?.["platformio-mcp"] !==
-    `^${packageJson.version}`
+    packageJson.version
   ) {
     throw new Error(
       `${packageName} does not depend on the matching 3.x package line.`,
