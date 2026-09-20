@@ -75,6 +75,8 @@ it("does not invent zero-current energy from absent samples", () => {
   expect(projectPpk2PowerReport(fixture([]), request)).toMatchObject({
     ok: false,
     sample_count: 0,
+    unparsed_lines: 0,
+    error: "no_samples",
     charge_uah: null,
     energy_mwh: null,
   });

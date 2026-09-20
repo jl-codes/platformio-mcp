@@ -37,7 +37,7 @@ export const Ppk2CompatibilitySchema = z
       .optional(),
     trigger: z.string().min(1).max(4096).nullable().optional(),
     trigger_session_id: z.string().min(1).max(256).nullable().optional(),
-    trigger_seconds: z.number().finite().positive().max(600).default(10),
+    trigger_seconds: z.number().finite().positive().max(600).optional(),
     trigger_approval_id: z.string().max(256).optional(),
     discovery_approval_id: z.string().max(256).optional(),
     host_approval_id: z.string().max(256).optional(),

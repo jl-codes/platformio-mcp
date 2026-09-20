@@ -35,7 +35,7 @@ export const SerialPowerCompatibilitySchema =
       .default("unspecified_serial"),
     trigger: z.string().min(1).max(4096).nullable().optional(),
     trigger_session_id: z.string().min(1).max(256).nullable().optional(),
-    trigger_seconds: z.number().finite().positive().max(600).default(10),
+    trigger_seconds: z.number().finite().positive().max(600).optional(),
     trigger_approval_id: z.string().max(256).optional(),
     read_approval_id: z.string().max(256).optional(),
   }).superRefine((input, context) => {
@@ -83,7 +83,7 @@ export function projectSerialPowerCompatibility(
     redaction_applied: report.redactionApplied,
     redaction_output_may_be_truncated: report.redactionOutputMayBeTruncated,
     port_error: report.portError,
-    ...(!report.analysis ? { error: "No current readings captured." } : {}),
+    ...(!report.analysis ? { error: "no_samples" } : {}),
   };
 }
 
@@ -95,7 +95,9 @@ export async function executeSerialPowerCompatibility(
   caller: PolicyEvaluationContext,
   projectDevices: Parameters<typeof resolveMonitorRequest>[3],
   signal?: AbortSignal,
+  guard: () => void = () => {},
 ) {
+  guard();
   const params = SerialPowerCompatibilitySchema.parse(input);
   const capture = await validatePowerCapture({
     seconds: params.seconds,
@@ -106,6 +108,7 @@ export async function executeSerialPowerCompatibility(
     sleepThresholdMa: params.sleep_threshold_ma ?? undefined,
     provenance: params.provenance,
   });
+  guard();
   if (signal?.aborted)
     throw new PlatformIOError(
       "Power collection cancelled before startup.",
@@ -119,11 +122,15 @@ export async function executeSerialPowerCompatibility(
             service.waitPowerTrigger(
               owner,
               params.trigger_session_id!,
-              { trigger: params.trigger!, seconds: params.trigger_seconds },
+              {
+                trigger: params.trigger!,
+                seconds: params.trigger_seconds ?? params.seconds,
+              },
               signal,
             ),
         )
       : {};
+  guard();
   const { request } = await resolveMonitorRequest(
     {
       port: params.port,
@@ -140,6 +147,7 @@ export async function executeSerialPowerCompatibility(
     caller,
     projectDevices,
   );
+  guard();
   return client.run(
     {
       caller,
@@ -148,12 +156,14 @@ export async function executeSerialPowerCompatibility(
       discoveryApprovalId: params.discovery_approval_id,
     },
     async (service, owner) => {
+      guard();
       const report = await service.capturePowerOnce(
         owner,
         request,
         capture,
         signal,
       );
+      guard();
       return {
         ...projectSerialPowerCompatibility(report, {
           port: report.port,

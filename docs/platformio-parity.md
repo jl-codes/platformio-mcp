@@ -164,3 +164,6 @@ J-Link commands that already use `-select` retain serial-bound `-select USB=<ser
 
 
 PPK2 trigger capture begins only after fresh owned monitor output matches. The meter owner then retains the monitor's device leases while acquiring its separate meter leases. A stopped/disconnected monitor aborts collection, but the DUT leases remain held until supervised meter/device cleanup succeeds. Successful cleanup returns custody to a still-open monitor; failed cleanup retains the existing power operation recovery ID. The outer profile policy revision remains enforced through the trigger wait and PPK2 collection. This path has mock-transport, real-lease and real-policy coverage; physical trigger/source behavior remains unverified.
+
+
+Power-profile trigger waits use the requested `seconds` unless `trigger_seconds` is supplied. No-sample responses use `error: no_samples`; incomplete PPK2 windows and current-limit trips retain separate diagnostics. Collection timing and provenance qualifiers remain explicit.

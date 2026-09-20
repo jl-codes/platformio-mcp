@@ -83,6 +83,8 @@ export async function executePowerCompatibility(
             defaults,
             caller,
             projectCompatibilityDevices,
+            undefined,
+            guard,
           ),
   );
 }

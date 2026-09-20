@@ -26,7 +26,10 @@ export async function executeTriggeredMeter(
       const trigger = await service.waitPowerTrigger(
         owner,
         params.trigger_session_id!,
-        { trigger: params.trigger!, seconds: params.trigger_seconds },
+        {
+          trigger: params.trigger!,
+          seconds: params.trigger_seconds ?? params.seconds,
+        },
       );
       guard();
       const hold = service.sessions.holdForPower(

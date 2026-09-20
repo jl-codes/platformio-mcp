@@ -90,7 +90,7 @@ it("reports absent samples without invented zero-current measurements", async ()
     ok: false,
     sample_count: 0,
     unparsed_lines: 1,
-    error: "No current readings captured.",
+    error: "no_samples",
   });
 });
 it("uses separate trigger and capture grants and opens only after trigger success", async () => {
@@ -174,4 +174,53 @@ it("returns a recoverable session identifier if one-shot cleanup is pending", as
     ok: false,
     collection_complete: false,
   });
+});
+
+it.each([undefined, 3])(
+  "uses capture duration as trigger default while honoring explicit %s",
+  async (triggerSeconds) => {
+    const f = fixture(await report());
+    await executeSerialPowerCompatibility(
+      f.client,
+      {
+        port: "FAKE",
+        seconds: 42,
+        trigger: "READY",
+        trigger_session_id: "firmware",
+        trigger_seconds: triggerSeconds,
+      },
+      {},
+      {},
+      () => ({ likely_ports: [] }),
+    );
+    expect(f.service.waitPowerTrigger).toHaveBeenCalledWith(
+      owner,
+      "firmware",
+      { trigger: "READY", seconds: triggerSeconds ?? 42 },
+      undefined,
+    );
+  },
+);
+it("does not open a meter when the outer policy changes during trigger waiting", async () => {
+  const f = fixture(await report());
+  let revoked = false;
+  f.service.waitPowerTrigger.mockImplementationOnce(async () => {
+    revoked = true;
+    return { trigger_line: "READY", trigger_offset_s: 0.1 };
+  });
+  await expect(
+    executeSerialPowerCompatibility(
+      f.client,
+      { port: "FAKE", trigger: "READY", trigger_session_id: "firmware" },
+      {},
+      {},
+      () => ({ likely_ports: [] }),
+      undefined,
+      () => {
+        if (revoked) throw new Error("policy changed");
+      },
+    ),
+  ).rejects.toThrow("policy changed");
+  expect(resolveMonitorRequest).not.toHaveBeenCalled();
+  expect(f.service.capturePowerOnce).not.toHaveBeenCalled();
 });

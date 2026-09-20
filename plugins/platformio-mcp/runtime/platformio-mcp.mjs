@@ -92648,7 +92648,7 @@ function withPowerCompatibility(base2, name2 = "pio_power_profile") {
   if (result.has(name2)) throw new Error(`Duplicate power tool: ${name2}`);
   result.set(name2, {
     name: name2,
-    description: "Collect bounded serial current samples or PPK2 meter windows. PPK2 requires explicit mode, voltage/current limits, meter port and DUT port plus configured PIO_MCP_PPK2_ENV. Source mode requires independent power permission. operation=list/cleanup inspects or retries this connection's retained meter cleanup. An owned serial trigger retains DUT custody through meter cleanup. Ambiguous multi-interface devices are not yet supported; physical acceptance is pending.",
+    description: "Collect bounded serial current samples or PPK2 meter windows. PPK2 requires explicit mode, voltage/current limits, meter port and DUT port plus configured PIO_MCP_PPK2_ENV. Source mode requires independent power permission. operation=list/cleanup inspects or retries this connection's retained meter cleanup. An owned serial trigger retains DUT custody through meter cleanup. Explicit multi-interface selection pins the observed interface set and retains whole-device exclusion; physical acceptance is pending.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -92701,7 +92701,12 @@ function withPowerCompatibility(base2, name2 = "pio_power_profile") {
         },
         trigger: { type: ["string", "null"], maxLength: 4096 },
         trigger_session_id: { type: ["string", "null"], maxLength: 256 },
-        trigger_seconds: { type: "number", exclusiveMinimum: 0, maximum: 600 },
+        trigger_seconds: {
+          type: "number",
+          exclusiveMinimum: 0,
+          maximum: 600,
+          description: "Trigger wait limit; defaults to seconds when omitted."
+        },
         ...Object.fromEntries(
           [
             "profile_approval_id",
@@ -93748,7 +93753,10 @@ async function executeTriggeredMeter(serial, meter, params, defaults, caller, gu
       const trigger = await service.waitPowerTrigger(
         owner,
         params.trigger_session_id,
-        { trigger: params.trigger, seconds: params.trigger_seconds }
+        {
+          trigger: params.trigger,
+          seconds: params.trigger_seconds ?? params.seconds
+        }
       );
       guard();
       const hold = service.sessions.holdForPower(
@@ -96830,6 +96838,7 @@ function projectPpk2PowerReport(report, input, analysisOptions = {}) {
     seconds: request.seconds,
     sample_count: samples.length,
     raw_sample_count: finish.sampleCount,
+    unparsed_lines: 0,
     duration_s: Number(duration4.toFixed(3)),
     collection_duration_s: finish.durationSeconds,
     duration_basis: "complete_windows_at_meter_sample_rate",
@@ -96853,7 +96862,7 @@ function projectPpk2PowerReport(report, input, analysisOptions = {}) {
     outcome: finish.outcome,
     summary: complete ? `${samples.length} complete PPK2 current windows collected.` : "PPK2 collection is incomplete; statistics cover only returned complete windows.",
     ...complete ? {} : {
-      error: finish.outcome === "complete" ? "PPK2_INCOMPLETE_SAMPLES" : finish.outcome
+      error: finish.outcome === "complete" ? samples.length ? "PPK2_INCOMPLETE_SAMPLES" : "no_samples" : finish.outcome
     }
   };
 }
@@ -96872,7 +96881,7 @@ var Ppk2CompatibilitySchema = external_exports.object({
   sleep_threshold_ma: external_exports.number().finite().min(-1e9).max(1e9).nullable().optional(),
   trigger: external_exports.string().min(1).max(4096).nullable().optional(),
   trigger_session_id: external_exports.string().min(1).max(256).nullable().optional(),
-  trigger_seconds: external_exports.number().finite().positive().max(600).default(10),
+  trigger_seconds: external_exports.number().finite().positive().max(600).optional(),
   trigger_approval_id: external_exports.string().max(256).optional(),
   discovery_approval_id: external_exports.string().max(256).optional(),
   host_approval_id: external_exports.string().max(256).optional(),
@@ -101151,7 +101160,7 @@ var SerialPowerCompatibilitySchema = MonitorStartCompatibilitySchema.extend({
   provenance: external_exports.enum(["firmware_estimate", "external_meter", "unspecified_serial"]).default("unspecified_serial"),
   trigger: external_exports.string().min(1).max(4096).nullable().optional(),
   trigger_session_id: external_exports.string().min(1).max(256).nullable().optional(),
-  trigger_seconds: external_exports.number().finite().positive().max(600).default(10),
+  trigger_seconds: external_exports.number().finite().positive().max(600).optional(),
   trigger_approval_id: external_exports.string().max(256).optional(),
   read_approval_id: external_exports.string().max(256).optional()
 }).superRefine((input, context) => {
@@ -101188,10 +101197,12 @@ function projectSerialPowerCompatibility(report, source) {
     redaction_applied: report.redactionApplied,
     redaction_output_may_be_truncated: report.redactionOutputMayBeTruncated,
     port_error: report.portError,
-    ...!report.analysis ? { error: "No current readings captured." } : {}
+    ...!report.analysis ? { error: "no_samples" } : {}
   };
 }
-async function executeSerialPowerCompatibility(client, input, defaults, caller, projectDevices, signal) {
+async function executeSerialPowerCompatibility(client, input, defaults, caller, projectDevices, signal, guard = () => {
+}) {
+  guard();
   const params = SerialPowerCompatibilitySchema.parse(input);
   const capture = await validatePowerCapture({
     seconds: params.seconds,
@@ -101202,6 +101213,7 @@ async function executeSerialPowerCompatibility(client, input, defaults, caller, 
     sleepThresholdMa: params.sleep_threshold_ma ?? void 0,
     provenance: params.provenance
   });
+  guard();
   if (signal?.aborted)
     throw new PlatformIOError(
       "Power collection cancelled before startup.",
@@ -101212,10 +101224,14 @@ async function executeSerialPowerCompatibility(client, input, defaults, caller, 
     (service, owner) => service.waitPowerTrigger(
       owner,
       params.trigger_session_id,
-      { trigger: params.trigger, seconds: params.trigger_seconds },
+      {
+        trigger: params.trigger,
+        seconds: params.trigger_seconds ?? params.seconds
+      },
       signal
     )
   ) : {};
+  guard();
   const { request } = await resolveMonitorRequest(
     {
       port: params.port,
@@ -101232,6 +101248,7 @@ async function executeSerialPowerCompatibility(client, input, defaults, caller, 
     caller,
     projectDevices
   );
+  guard();
   return client.run(
     {
       caller,
@@ -101240,12 +101257,14 @@ async function executeSerialPowerCompatibility(client, input, defaults, caller, 
       discoveryApprovalId: params.discovery_approval_id
     },
     async (service, owner) => {
+      guard();
       const report = await service.capturePowerOnce(
         owner,
         request,
         capture,
         signal
       );
+      guard();
       return {
         ...projectSerialPowerCompatibility(report, {
           port: report.port,
@@ -103897,7 +103916,9 @@ async function executePowerCompatibility(serial, meter, input, defaults, caller,
       params,
       defaults,
       caller,
-      projectCompatibilityDevices
+      projectCompatibilityDevices,
+      void 0,
+      guard
     )
   );
 }

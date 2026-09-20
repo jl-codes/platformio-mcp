@@ -18,56 +18,64 @@ const params = () =>
     trigger_session_id: "owned",
     trigger_approval_id: "read-grant",
   });
-it("waits for a fresh owned trigger before transferring the hold", async () => {
-  const order: string[] = [];
-  const owner = { id: "connection" },
-    hold = { releaseAfterExit: vi.fn() };
-  const service = {
-    waitPowerTrigger: vi.fn(async () => {
-      order.push("trigger");
-      return { trigger_line: "READY" };
-    }),
-    sessions: {
-      holdForPower: vi.fn(() => {
-        order.push("hold");
-        return hold;
+it.each([undefined, 3])(
+  "waits using capture duration or explicit trigger limit %s before transferring the hold",
+  async (triggerSeconds) => {
+    const order: string[] = [];
+    const owner = { id: "connection" },
+      hold = { releaseAfterExit: vi.fn() };
+    const service = {
+      waitPowerTrigger: vi.fn(async () => {
+        order.push("trigger");
+        return { trigger_line: "READY" };
       }),
-    },
-  };
-  const serial = {
-    run: vi.fn(async (_context, execute) => execute(service, owner)),
-  };
-  const meter = {
-    run: vi.fn(async () => {
-      order.push("meter");
-      return { ok: true };
-    }),
-  };
-  const result = await executeTriggeredMeter(
-    serial as unknown as SerialClientContext,
-    meter as unknown as PowerMeterClient,
-    params(),
-    {},
-    {},
-  );
-  expect(order).toEqual(["trigger", "hold", "meter"]);
-  expect(serial.run.mock.calls[0][0]).toMatchObject({
-    readApprovalId: "read-grant",
-  });
-  expect(service.waitPowerTrigger).toHaveBeenCalledWith(owner, "owned", {
-    trigger: "READY",
-    seconds: 10,
-  });
-  expect(meter.run.mock.calls[0]).toEqual([
-    params(),
-    {},
-    {},
-    hold,
-    expect.any(Function),
-  ]);
-  expect(result).toMatchObject({ ok: true, trigger_line: "READY" });
-  expect(hold.releaseAfterExit).not.toHaveBeenCalled();
-});
+      sessions: {
+        holdForPower: vi.fn(() => {
+          order.push("hold");
+          return hold;
+        }),
+      },
+    };
+    const serial = {
+      run: vi.fn(async (_context, execute) => execute(service, owner)),
+    };
+    const meter = {
+      run: vi.fn(async () => {
+        order.push("meter");
+        return { ok: true };
+      }),
+    };
+    const request = {
+      ...params(),
+      seconds: 42,
+      trigger_seconds: triggerSeconds,
+    };
+    const result = await executeTriggeredMeter(
+      serial as unknown as SerialClientContext,
+      meter as unknown as PowerMeterClient,
+      request,
+      {},
+      {},
+    );
+    expect(order).toEqual(["trigger", "hold", "meter"]);
+    expect(serial.run.mock.calls[0][0]).toMatchObject({
+      readApprovalId: "read-grant",
+    });
+    expect(service.waitPowerTrigger).toHaveBeenCalledWith(owner, "owned", {
+      trigger: "READY",
+      seconds: triggerSeconds ?? 42,
+    });
+    expect(meter.run.mock.calls[0]).toEqual([
+      request,
+      {},
+      {},
+      hold,
+      expect.any(Function),
+    ]);
+    expect(result).toMatchObject({ ok: true, trigger_line: "READY" });
+    expect(hold.releaseAfterExit).not.toHaveBeenCalled();
+  },
+);
 it("does not open a meter or take custody after trigger failure", async () => {
   const holdForPower = vi.fn(),
     run = vi.fn();

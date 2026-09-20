@@ -61,6 +61,7 @@ export function projectPpk2PowerReport(
     seconds: request.seconds,
     sample_count: samples.length,
     raw_sample_count: finish.sampleCount,
+    unparsed_lines: 0,
     duration_s: Number(duration.toFixed(3)),
     collection_duration_s: finish.durationSeconds,
     duration_basis: "complete_windows_at_meter_sample_rate" as const,
@@ -95,7 +96,9 @@ export function projectPpk2PowerReport(
       : {
           error:
             finish.outcome === "complete"
-              ? "PPK2_INCOMPLETE_SAMPLES"
+              ? samples.length
+                ? "PPK2_INCOMPLETE_SAMPLES"
+                : "no_samples"
               : finish.outcome,
         }),
   };

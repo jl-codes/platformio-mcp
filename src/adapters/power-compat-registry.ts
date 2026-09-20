@@ -10,7 +10,7 @@ export function withPowerCompatibility<TResult>(
   result.set(name, {
     name,
     description:
-      "Collect bounded serial current samples or PPK2 meter windows. PPK2 requires explicit mode, voltage/current limits, meter port and DUT port plus configured PIO_MCP_PPK2_ENV. Source mode requires independent power permission. operation=list/cleanup inspects or retries this connection's retained meter cleanup. An owned serial trigger retains DUT custody through meter cleanup. Ambiguous multi-interface devices are not yet supported; physical acceptance is pending.",
+      "Collect bounded serial current samples or PPK2 meter windows. PPK2 requires explicit mode, voltage/current limits, meter port and DUT port plus configured PIO_MCP_PPK2_ENV. Source mode requires independent power permission. operation=list/cleanup inspects or retries this connection's retained meter cleanup. An owned serial trigger retains DUT custody through meter cleanup. Explicit multi-interface selection pins the observed interface set and retains whole-device exclusion; physical acceptance is pending.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -63,7 +63,12 @@ export function withPowerCompatibility<TResult>(
         },
         trigger: { type: ["string", "null"], maxLength: 4096 },
         trigger_session_id: { type: ["string", "null"], maxLength: 256 },
-        trigger_seconds: { type: "number", exclusiveMinimum: 0, maximum: 600 },
+        trigger_seconds: {
+          type: "number",
+          exclusiveMinimum: 0,
+          maximum: 600,
+          description: "Trigger wait limit; defaults to seconds when omitted.",
+        },
         ...Object.fromEntries(
           [
             "profile_approval_id",

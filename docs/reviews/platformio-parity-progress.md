@@ -1709,3 +1709,10 @@ Validation: seventeen focused archive, OTA ELF and converter tests passed; TypeS
 ### Real ESP OTA image/ELF correspondence evidence
 
 Using the existing official ESP core-dump ELF fixtures and installed esptool 5.4.0, generated ESP32, ESP32-C3 and ESP32-P4 application images offline with an embedded ELF SHA-256 at offset 176. The actual image parser and ELF-retention path matched all three full hashes and preserved their archived bytes. Each case rejected a different real ELF and an image with corrupted descriptor bytes. Exact source revision, implementation hashes, image hashes and ELF hashes are recorded in `ota-elf-windows-evidence.json`. This validates offline Xtensa/RISC-V format handling on Windows; it does not claim a physical upload or board boot.
+
+
+### Power trigger defaults, response fields and policy continuity
+
+Both serial and PPK2 trigger waits now default to the requested collection `seconds`, matching the pinned reference, while preserving an explicit `trigger_seconds` override. Empty serial/otherwise-complete empty PPK2 collections return reference `no_samples`; PPK2 reports include `unparsed_lines: 0`. Other partial/current-trip diagnostics remain distinct. Serial orchestration carries the outer profile revision guard across trigger completion, discovery, capture admission and result return. The public description now reflects implemented explicit multi-interface selection.
+
+Validation: sixteen focused serial/projection/trigger checks passed, followed by nine updated PPK2-trigger/public-policy cases; TypeScript and scoped lint passed. Plugin rebuilt. Both preceding CI runs (35519193064 and 35519190348) passed on 3cdb3174, including the corrected Python setup order. No physical power measurement was performed.
