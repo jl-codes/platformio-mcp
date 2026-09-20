@@ -80,3 +80,48 @@ it("encodes monitor writes once, defaults the newline and rejects oversized UTF-
   ).rejects.toMatchObject({ code: "SERIAL_WRITE_LIMIT" });
   expect(run).toHaveBeenCalledTimes(1);
 });
+
+it("starts explicit monitor sessions through identity-checked startup with separate opening and discovery grants", async () => {
+  const owner = Object.freeze({ id: "private-owner" });
+  const startWithDiscovery = vi.fn(async () => ({
+    sessionId: "new",
+    path: "COM42",
+    baudRate: 115200,
+    startedAt: new Date().toISOString(),
+    state: "open",
+    linesBuffered: 0,
+    nextCursor: 0,
+    bytesReceived: 0,
+    cleanupPending: false,
+  }));
+  const run = vi.fn(async (_context, execute) =>
+    execute({ startWithDiscovery }, owner),
+  );
+  const client = {
+    run,
+  } as unknown as import("../src/adapters/serial-client.js").SerialClientContext;
+  const result = await executeDeviceCompatibility(client, "pio_monitor_start", {
+    port: "COM42",
+    approval_id: "open-grant",
+    discovery_approval_id: "identity-grant",
+    max_lines: 100,
+  });
+  expect(startWithDiscovery).toHaveBeenCalledWith(
+    owner,
+    expect.objectContaining({
+      path: "COM42",
+      baudRate: 115200,
+      buffer: { maxLines: 100 },
+    }),
+  );
+  expect(run.mock.calls[0][0]).toMatchObject({
+    approvalId: "open-grant",
+    discoveryApprovalId: "identity-grant",
+  });
+  expect(result).toMatchObject({
+    ok: true,
+    session_id: "new",
+    port: "COM42",
+    baud: 115200,
+  });
+});

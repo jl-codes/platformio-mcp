@@ -2,6 +2,7 @@
  * Reference serial-device presentation without opening ports or asserting hardware identity.
  * Provides projectCompatibilityDevices for authorized discovery adapters.
  */
+import { startCompatibilityMonitor } from "./monitor-start-compat.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -62,6 +63,24 @@ export async function executeDeviceCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_monitor_start") {
+    const session = await startCompatibilityMonitor(
+      client,
+      input,
+      defaults,
+      caller,
+      projectCompatibilityDevices,
+    );
+    const info = projectCompatibilitySession(session);
+    return {
+      ok: session.state === "open",
+      summary:
+        session.state !== "open"
+          ? `Monitor session ${info.session_id} is ${session.state}; inspect its state before continuing.`
+          : `Monitoring ${info.port} at ${info.baud} baud in session ${info.session_id}. Read with pio_monitor_read(session_id='${info.session_id}', cursor=0). Stop before flashing.`,
+      ...info,
+    };
+  }
   if (name === "pio_monitor_read") {
     const params = z
       .object({
@@ -254,6 +273,42 @@ export function withDeviceCompatibility<TResult>(
       additionalProperties: false,
     },
     handler: (args, context) => context.dispatch("pio_list_devices", args),
+  });
+  const startSource = base.get("start_monitor");
+  if (!startSource || result.has("pio_monitor_start"))
+    throw new Error("Invalid serial startup compatibility registry");
+  result.set("pio_monitor_start", {
+    ...startSource,
+    name: "pio_monitor_start",
+    policyAction: "serial_session_start",
+    annotations: {
+      ...startSource.annotations,
+      title: "Start Monitor",
+      idempotentHint: false,
+    },
+    description:
+      "Start an owned serial monitor using explicit arguments, resolved project settings, or an unambiguous device candidate. Opening requires hardware authorization and exclusive device ownership.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        port: { type: ["string", "null"], maxLength: 512 },
+        baud: { type: ["integer", "null"], minimum: 1, maximum: 4000000 },
+        project_dir: { type: ["string", "null"] },
+        env: { type: ["string", "null"] },
+        max_lines: {
+          type: "integer",
+          minimum: 1,
+          maximum: 10000,
+          default: 5000,
+        },
+        approval_id: { type: "string" },
+        config_approval_id: { type: "string" },
+        selection_approval_id: { type: "string" },
+        discovery_approval_id: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+    handler: (args, context) => context.dispatch("pio_monitor_start", args),
   });
   const readSource = base.get("query_logs");
   if (!readSource || result.has("pio_monitor_read"))
