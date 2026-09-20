@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { parseFlashVerificationCli } from "./adapters/flash-verification-cli.js";
+import { executeFlashVerificationCompatibility } from "./adapters/flash-verification-compat.js";
 import { executeCoredump } from "./tools/coredump.js";
 import { executePartitionTable } from "./tools/partition-table.js";
 
@@ -131,6 +133,7 @@ COMMANDS:
   project-metadata|list-targets --project-dir <dir> [--environment <env>]
   coredump --project-dir <dir> (--dump-path <file> | --port <port> --table-path <csv> --table-offset <bytes>) [--format <raw|base64>] [--analyze false | --elf-path <file>]
   partition-table --project-dir <dir> [--environment <env>] [--table-path <file>] [--format <csv|binary>] [--table-offset <bytes> | --sdkconfig-path <file>] [--flash-size <bytes>] [--firmware-path <file>] [--observed-table-path <file>]
+  flash-verify --project-dir <dir> [--environment <env>] [--upload-port <port>] [--monitor-port <port>] [--baud <rate>] [--expect <regex>] [--fail-on <regex>] [--timeout <seconds>] [--settle <seconds>] [--stability-window <seconds>] [--max-lines <count>] [--stop-open-sessions]
   run-target --project-dir <dir> --target <name> [--environment <env>] [--upload-port <port>]
   pkg-search --query <query> [--kind library|platform|tool] [--page <n>]
   pkg-install --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
@@ -441,6 +444,20 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       }, {workspaceDir: projectDirForPolicy, actor: "user"});
       printOutput(result, jsonMode);
       if (!result.ok) process.exitCode = 1;
+      return;
+    }
+    if (command === "flash-verify") {
+      const input = parseFlashVerificationCli(options, positionals, projectDirForPolicy);
+      const client = new SerialClientContext();
+      try {
+        const result = await executeFlashVerificationCompatibility(input, client, {}, {
+          workspaceDir: projectDirForPolicy, actor: "user",
+        });
+        printOutput(result, jsonMode);
+        if (!result.ok) process.exitCode = 1;
+      } finally {
+        await client.close();
+      }
       return;
     }
     if (command === "run-target") {
@@ -1170,6 +1187,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       "project-metadata": "inspection",
       "list-targets": "inspection",
       "run-target": "build",
+      "flash-verify": "upload",
 
       "pkg-search": "packages",
       "pkg-install": "packages",
@@ -1233,6 +1251,7 @@ async function main() {
     "coredump",
     "partition-table",
     "run-target",
+    "flash-verify",
     "deps-check",
     "project-envs",
     "project-metadata",

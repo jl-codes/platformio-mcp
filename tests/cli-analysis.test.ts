@@ -128,14 +128,54 @@ it("rejects invalid dependency flags and honors concrete tool denial", () => {
   expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
 });
 
-
-it.each(["clean", "check", "test"])("routes %s CLI through canonical permission before execution", command => {
-  expect(run(command).errorType).toBe("PolicyDenied");
-  expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
-});
+it.each(["clean", "check", "test"])(
+  "routes %s CLI through canonical permission before execution",
+  (command) => {
+    expect(run(command).errorType).toBe("PolicyDenied");
+    expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
+  },
+);
 
 it("routes named-target CLI through effect permission before execution", () => {
-  fs.writeFileSync(path.join(project, "platformio.ini"), "[env:fixture]\nplatform=native\n");
-  expect(run("run-target", "--target", "buildfs").errorType).toBe("PolicyDenied");
+  fs.writeFileSync(
+    path.join(project, "platformio.ini"),
+    "[env:fixture]\nplatform=native\n",
+  );
+  expect(run("run-target", "--target", "buildfs").errorType).toBe(
+    "PolicyDenied",
+  );
   expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
 });
+
+it("routes flash-verify through shared permissions before hardware access", () => {
+  fs.writeFileSync(
+    path.join(project, "platformio.ini"),
+    "[env:fixture]\nplatform=native\n",
+  );
+  expect(
+    run(
+      "flash-verify",
+      "--upload-port",
+      "COM42",
+      "--monitor-port",
+      "COM42",
+      "--baud",
+      "115200",
+    ),
+  ).toMatchObject({ errorType: "PolicyDenied" });
+  expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
+}, 20000);
+it.each([
+  ["--timeout", "invalid"],
+  ["--baud"],
+  ["--stop-open-sessions", "maybe"],
+  ["--unknown"],
+])(
+  "rejects malformed flash-verify flags %j",
+  (...args) => {
+    expect(run("flash-verify", ...args).errorType).toBe(
+      "FLASH_VERIFY_INPUT_INVALID",
+    );
+  },
+  20000,
+);
