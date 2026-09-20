@@ -1207,3 +1207,7 @@ MCP startup now sweeps expired managed dumps and runs non-overlapping minute swe
 ### Capture preservation without optional analysis tools
 
 Authorized device captures are now exported before optional analyzer resolution. A saved, validated capture returns analyzed=false and COREDUMP_TOOLS_UNCONFIGURED when host analysis tools are unconfigured; invalid tool trust and other errors still propagate. Unsaved captures do not silently downgrade analysis requests. Seven focused export-policy cases, TypeScript and lint passed; no hardware acceptance or completed reference adapter is claimed.
+
+### Reference core-dump adapter implementation
+
+Added the internal reference workflow with launch/project defaults, authorized environment/port selection (honoring explicit ports), separately authorized ELF metadata, default managed retention, explicit output paths, missing-build-output handling and reference result projection. Metadata denials propagate before acquisition. Three focused adapter cases, TypeScript and lint passed. Public compatibility registration and end-to-end adapter acceptance remain pending; the compatibility count remains 32.

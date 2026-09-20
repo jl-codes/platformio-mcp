@@ -230,6 +230,7 @@ export async function resolveTargetSerialSelection(
   environment: string | undefined,
   grants: { config_approval_id?: string; selection_approval_id?: string },
   caller: PolicyEvaluationContext,
+  explicitPort?: string,
 ): Promise<{ environment: string; port: string }> {
   const guard = createPolicyRevisionGuard(projectDir);
   const report = await executeProjectInspection(
@@ -256,13 +257,13 @@ export async function resolveTargetSerialSelection(
       "Select one target environment explicitly.",
       "TARGET_ENVIRONMENT_REQUIRED",
     );
-  if (config.uploadPort) {
+  if (explicitPort || config.uploadPort) {
     const port = z
       .string()
       .min(1)
       .max(512)
       .regex(/^[^\x00-\x1f\x7f]+$/)
-      .parse(config.uploadPort);
+      .parse(explicitPort ?? config.uploadPort);
     // Network/glob destinations need their own ownership adapter, not a fake serial lease.
     resolveSerialEndpoint(port);
     return { environment: config.name, port };

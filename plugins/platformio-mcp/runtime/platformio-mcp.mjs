@@ -104059,7 +104059,7 @@ async function executeNamedTarget(input, client, defaults = {}, caller = {}, onA
     }
   );
 }
-async function resolveTargetSerialSelection(projectDir, environment, grants, caller) {
+async function resolveTargetSerialSelection(projectDir, environment, grants, caller, explicitPort) {
   const guard = createPolicyRevisionGuard(projectDir);
   const report = await executeProjectInspection(
     "project_envs",
@@ -104082,8 +104082,8 @@ async function resolveTargetSerialSelection(projectDir, environment, grants, cal
       "Select one target environment explicitly.",
       "TARGET_ENVIRONMENT_REQUIRED"
     );
-  if (config2.uploadPort) {
-    const port2 = external_exports.string().min(1).max(512).regex(/^[^\x00-\x1f\x7f]+$/).parse(config2.uploadPort);
+  if (explicitPort || config2.uploadPort) {
+    const port2 = external_exports.string().min(1).max(512).regex(/^[^\x00-\x1f\x7f]+$/).parse(explicitPort ?? config2.uploadPort);
     resolveSerialEndpoint(port2);
     return { environment: config2.name, port: port2 };
   }
