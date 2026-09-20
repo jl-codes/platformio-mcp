@@ -6,6 +6,16 @@
 
 PIO Agent is the open-source, agent-first hardware execution layer for embedded development, built on the PlatformIO MCP runtime.
 
+## 3.1.0 development status
+
+The parity branch prepares an unreleased 3.1.0 version with optional reference tool
+aliases, owned serial workflows, retained flash, OTA and expanded distribution
+candidates. Existing published installations remain 3.0.0. See the
+[unreleased changelog](CHANGELOG.md#310---unreleased),
+[compatibility guide](docs/package-compatibility.md), and
+[distribution readiness](docs/DISTRIBUTION_READINESS.md) for implemented behavior,
+remaining acceptance, and which package names are prepared versus published.
+
 ## Brand and Compatibility
 
 **PIO Agent** is the product and Codex Plugin name. **PlatformIO MCP** is the underlying MCP runtime and the compatibility identity used by existing installations. The Codex plugin ID, marketplace ID, configuration keys, and skill namespace remain `platformio-mcp`. On npm, `platformio-mcp` is the canonical package while `pio-mcp` and `pio-agent` are thin compatibility packages that delegate to it. The canonical package also installs both `platformio-mcp` and `pio-agent` executable names. This lets existing consumers upgrade without migration while new users see PIO Agent throughout the interface.

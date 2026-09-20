@@ -2,6 +2,33 @@
 
 This document serves as the definitive reference for all tools exposed by the PlatformIO MCP Server.
 
+## 3.1.0 additions (unreleased)
+
+Existing tool names and argument contracts remain available. Normal mode now exposes
+72 tools; `--compat platformio-mcp-python` adds the 40 reference names for 112 total.
+The [compatibility guide](package-compatibility.md) covers snake-case arguments,
+project resolution, approvals, backend limits and result fields. Use the server's
+`tools/list` schemas for exact arguments supported by the installed revision.
+
+| Normal-mode tools | Purpose and permission boundary |
+|---|---|
+| `serial_session_start`, `serial_session_read`, `serial_session_write`, `serial_session_list`, `serial_session_stop` | Connection-owned serial lifecycle; opening, reading and writing retain separate permissions. Ownership persists until closure is confirmed. |
+| `monitor_capture` | Bounded opening/read/close workflow with opening and reading authorized before startup. |
+| `memory_watch` | Heap/stack sample analysis with explicit units and incomplete-collection reporting. |
+| `port_diagnose` | Observe port presence and holders without opening the port; absence of an observed holder does not prove availability. |
+| `flash_verification` | Retained firmware upload and fresh serial verification, with scoped resume/approval controls. |
+| `upload_ota` | ESP firmware/filesystem OTA using an immutable image and pinned destination. Transfer success does not prove runtime health. |
+| `debug_start`, `debug_cmd`, `debug_list`, `debug_stop` | Owned debugger workflows with separately classified inspection, target mutation and host-code permissions. |
+| `power_profile` | Serial or PPK2 profiling with bounded collection, explicit source mode and electrical limits. |
+
+The shared CLI provides `flash-verify`, `upload-ota`, and `power-profile`. For OTA
+credentials, `--auth-env <variable>` reads a host environment variable; no plaintext
+password flag is accepted. Explicit `--approve` does not override policy denial.
+
+Prepared 3.1.0 artifacts are not a published release. See
+[distribution readiness](DISTRIBUTION_READINESS.md) for outstanding acceptance and
+publisher requirements; supported tool names alone do not prove full parity.
+
 ## Command Index
 
 | Command | Description |
