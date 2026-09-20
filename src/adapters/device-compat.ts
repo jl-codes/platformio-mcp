@@ -2,6 +2,7 @@
  * Reference serial-device presentation without opening ports or asserting hardware identity.
  * Provides projectCompatibilityDevices for authorized discovery adapters.
  */
+import { executeMemoryCompatibility } from "./memory-compat.js";
 import {
   startCompatibilityMonitor,
   captureCompatibilityMonitor,
@@ -66,6 +67,14 @@ export async function executeDeviceCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_memory_watch")
+    return executeMemoryCompatibility(
+      client,
+      input,
+      defaults,
+      caller,
+      projectCompatibilityDevices,
+    );
   if (name === "pio_monitor_capture") {
     const { result, session } = await captureCompatibilityMonitor(
       client,
@@ -362,6 +371,28 @@ export function withDeviceCompatibility<TResult>(
       additionalProperties: false,
     },
     handler: (args, context) => context.dispatch("pio_monitor_capture", args),
+  });
+  result.set("pio_memory_watch", {
+    ...captureSource,
+    name: "pio_memory_watch",
+    annotations: { ...captureSource.annotations, title: "Watch Memory" },
+    description:
+      "Collect bounded heap/stack telemetry from an owned session or an authorized temporary monitor. Reports sample-window trends, explicit unknown units and incomplete collection; does not prove a memory leak.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...startProperties,
+        session_id: { type: ["string", "null"] },
+        seconds: { type: "number", default: 15 },
+        pattern: { type: ["string", "null"], maxLength: 4096 },
+        stack_warn_bytes: { type: "integer", minimum: 0, default: 512 },
+        stack_unit: { type: "string", enum: ["bytes", "words"] },
+        stack_word_bytes: { type: "integer", minimum: 1, maximum: 16 },
+        read_approval_id: { type: "string", maxLength: 256 },
+      },
+      additionalProperties: false,
+    },
+    handler: (args, context) => context.dispatch("pio_memory_watch", args),
   });
   const readSource = base.get("query_logs");
   if (!readSource || result.has("pio_monitor_read"))

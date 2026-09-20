@@ -92027,6 +92027,9 @@ var require_ip_address = __commonJS({
   }
 });
 
+// src/adapters/memory-compat.ts
+init_zod();
+
 // src/adapters/monitor-start-compat.ts
 init_zod();
 import fs21 from "node:fs/promises";
@@ -97365,6 +97368,154 @@ async function captureCompatibilityMonitor(client, input, defaults, caller, proj
   );
 }
 
+// src/adapters/memory-compat.ts
+init_errors2();
+function projectMemoryCompatibility(report, source) {
+  const fragmentation = report.fragmentation;
+  return {
+    ok: report.ok && !source.cleanupPending,
+    summary: report.summary,
+    port: source.port,
+    baud: source.baud,
+    session_id: source.sessionId,
+    duration_s: report.durationSeconds,
+    line_count: report.lineCount,
+    port_error: report.portError,
+    recognized: report.recognized,
+    formats: report.formats,
+    sample_count: report.sampleCount,
+    metrics: Object.fromEntries(
+      Object.entries(report.metrics).map(([name2, value2]) => [
+        name2,
+        {
+          metric: name2,
+          samples: value2.samples,
+          first: value2.first,
+          last: value2.last,
+          min: value2.min,
+          max: value2.max,
+          change: value2.fittedChange,
+          bytes_per_sample: value2.bytesPerSample,
+          bytes_per_second: value2.bytesPerSecond,
+          verdict: value2.verdict,
+          leak_suspected: value2.leakSuspected,
+          evidence: value2.evidence
+        }
+      ])
+    ),
+    stacks: report.stacks.map((row) => ({
+      task: row.task,
+      stack_free_bytes: row.stackFreeBytes,
+      samples: row.samples,
+      last: row.lastBytes,
+      warning: row.warning,
+      unknown_unit_samples: row.unknownUnitSamples
+    })),
+    fragmentation: fragmentation?.available ? {
+      ratio: fragmentation.ratio,
+      fragmented: fragmentation.fragmented,
+      free_heap: fragmentation.freeHeap,
+      largest_free_block: fragmentation.largestFreeBlock,
+      evidence: fragmentation.evidence
+    } : null,
+    samples: report.samples,
+    samples_truncated: report.samplesTruncated,
+    collection_complete: report.collectionComplete && !source.cleanupPending,
+    cleanup_pending: source.cleanupPending ?? false,
+    dropped_lines: report.droppedLines,
+    truncated_bytes: report.truncatedBytes,
+    unknown_unit_samples: report.unknownUnitSamples,
+    ...!report.recognized ? {
+      instrumentation_hint: {
+        arduino_esp32: 'Serial.printf("mem=%u\\n", (unsigned)ESP.getFreeHeap());',
+        esp_idf: 'ESP_LOGI("memory", "mem=%u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT));',
+        freertos: "Print task stack high-water marks with their explicit byte/word unit; supply stack_word_bytes when reporting words.",
+        custom: "For mem=1234 byte values, pass pattern: mem=(?P<value>\\d+)."
+      }
+    } : {}
+  };
+}
+async function executeMemoryCompatibility(client, input, defaults, caller, projectDevices) {
+  const params = MonitorStartCompatibilitySchema.extend({
+    session_id: external_exports.string().min(1).max(256).nullable().optional(),
+    seconds: external_exports.number().finite().default(15),
+    pattern: external_exports.string().max(4096).nullable().optional(),
+    stack_warn_bytes: external_exports.number().int().min(0).max(1024 * 1024 * 1024).default(512),
+    stack_unit: external_exports.enum(["bytes", "words"]).optional(),
+    stack_word_bytes: external_exports.number().int().min(1).max(16).optional(),
+    read_approval_id: external_exports.string().max(256).optional()
+  }).parse(input);
+  if (params.stack_unit === "words" && params.stack_word_bytes === void 0)
+    throw new PlatformIOError(
+      "Word-valued stack telemetry requires stack_word_bytes.",
+      "MEMORY_UNIT_REQUIRED"
+    );
+  const {
+    session_id,
+    seconds,
+    pattern,
+    stack_warn_bytes,
+    stack_unit,
+    stack_word_bytes,
+    read_approval_id,
+    ...start
+  } = params;
+  const options = {
+    seconds: Math.max(0, Math.min(seconds, 300)),
+    pattern: pattern ?? void 0,
+    stackWarnBytes: stack_warn_bytes,
+    stackUnit: stack_unit,
+    stackWordBytes: stack_word_bytes,
+    maxLines: params.max_lines
+  };
+  if (session_id) {
+    return client.run(
+      {
+        caller,
+        approvalId: params.approval_id,
+        readApprovalId: read_approval_id
+      },
+      async (service, owner) => {
+        const report = await service.captureMemory(owner, session_id, options);
+        const session = service.sessions.list(owner).find((item) => item.sessionId === session_id);
+        if (!session)
+          throw new PlatformIOError(
+            "Owned memory session is no longer available.",
+            "SERIAL_SESSION_NOT_FOUND"
+          );
+        return projectMemoryCompatibility(report, {
+          port: session.path,
+          baud: session.baudRate,
+          sessionId: session_id
+        });
+      }
+    );
+  }
+  const { request } = await resolveMonitorRequest(
+    start,
+    defaults,
+    caller,
+    projectDevices
+  );
+  return client.run(
+    {
+      caller,
+      approvalId: params.approval_id,
+      readApprovalId: read_approval_id,
+      discoveryApprovalId: params.discovery_approval_id
+    },
+    async (service, owner) => {
+      const report = await service.captureMemoryOnce(owner, request, options);
+      return projectMemoryCompatibility(report, {
+        port: report.port,
+        baud: report.baud,
+        sessionId: report.cleanupPending ? report.sessionId : null,
+        cleanupPending: report.cleanupPending
+      });
+    }
+  );
+}
+
 // src/adapters/device-compat.ts
 init_zod();
 import fs22 from "node:fs/promises";
@@ -97395,6 +97546,14 @@ function projectCompatibilityDevices(devices) {
   };
 }
 async function executeDeviceCompatibility(client, name2, input, defaults = {}, caller = {}, onAuthorized) {
+  if (name2 === "pio_memory_watch")
+    return executeMemoryCompatibility(
+      client,
+      input,
+      defaults,
+      caller,
+      projectCompatibilityDevices
+    );
   if (name2 === "pio_monitor_capture") {
     const { result, session } = await captureCompatibilityMonitor(
       client,
@@ -97655,6 +97814,27 @@ function withDeviceCompatibility(base2) {
       additionalProperties: false
     },
     handler: (args, context) => context.dispatch("pio_monitor_capture", args)
+  });
+  result.set("pio_memory_watch", {
+    ...captureSource,
+    name: "pio_memory_watch",
+    annotations: { ...captureSource.annotations, title: "Watch Memory" },
+    description: "Collect bounded heap/stack telemetry from an owned session or an authorized temporary monitor. Reports sample-window trends, explicit unknown units and incomplete collection; does not prove a memory leak.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...startProperties,
+        session_id: { type: ["string", "null"] },
+        seconds: { type: "number", default: 15 },
+        pattern: { type: ["string", "null"], maxLength: 4096 },
+        stack_warn_bytes: { type: "integer", minimum: 0, default: 512 },
+        stack_unit: { type: "string", enum: ["bytes", "words"] },
+        stack_word_bytes: { type: "integer", minimum: 1, maximum: 16 },
+        read_approval_id: { type: "string", maxLength: 256 }
+      },
+      additionalProperties: false
+    },
+    handler: (args, context) => context.dispatch("pio_memory_watch", args)
   });
   const readSource = base2.get("query_logs");
   if (!readSource || result.has("pio_monitor_read"))
@@ -114570,7 +114750,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_list_targets"
   ].includes(name2);
   const dependencyCompatibility = name2 === "pio_deps_check";
-  const deviceCompatibility = ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop", "pio_monitor_write", "pio_monitor_read", "pio_monitor_start", "pio_monitor_capture"].includes(name2);
+  const deviceCompatibility = ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop", "pio_monitor_write", "pio_monitor_read", "pio_monitor_start", "pio_monitor_capture", "pio_memory_watch"].includes(name2);
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name2
   );

@@ -37,7 +37,7 @@ export const MonitorStartCompatibilitySchema = z
   .strict();
 
 /** Never guess among multiple candidate devices or bypass the startup service's identity/lease checks. */
-async function resolveMonitorRequest(
+export async function resolveMonitorRequest(
   input: unknown,
   defaults: CompatibilityProjectDefaults,
   caller: PolicyEvaluationContext,
