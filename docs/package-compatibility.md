@@ -74,3 +74,23 @@ process arguments. Without this flag, project configuration supplies authenticat
 The CLI supports the same seven scoped approval IDs using hyphenated flags and
 in-process interactive approvals (`--approve`, or prompts outside JSON mode).
 Approval never overrides policy denial. A failed result exits nonzero.
+
+
+### Bounded debugger CLI sequence
+
+`pio-agent debug-run --project-dir <dir> --commands '["bt","info registers"]'`
+starts one owned debugger session, executes the JSON array in order, and performs
+the normal authorized reset/run stop. The array is validated before startup and
+limited to 32 commands; execution stops after a failed or timed-out command.
+`--environment`, `--probe-serial`, `--load false`, `--timeout` (startup seconds),
+and `--command-timeout` (seconds per command/stop) select the workflow. Shell
+quoting of JSON depends on the caller's shell.
+
+`--process-only` requests cleanup without the normal target reset/run hook.
+Otherwise that hook requires its own host and target permissions. All paths
+attempt process cleanup on failure and report uncertain cleanup rather than
+claiming the probe is free. `--approve` permits interactive approval-required
+stages in this invocation but cannot override policy denial. The sequence uses
+the same local backend limitations as MCP; it does not create a session that a
+later CLI process can borrow. Use the persistent MCP connection for interactive
+step-by-step debugging.

@@ -375,6 +375,8 @@ export const actionRiskLevels: Record<string, PolicyRiskLevel> = {
 /** Resolves the existing CLI spelling to its concrete operation. */
 export function operationForCliCommand(command: string): string {
   switch (command) {
+    case "debug-run":
+      return "debug_start";
     case "upload-ota":
       return "upload_ota";
     case "power-profile":

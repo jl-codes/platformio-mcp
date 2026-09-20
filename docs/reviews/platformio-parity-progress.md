@@ -2041,3 +2041,9 @@ Updated the existing platformio-debug and serial-diagnostics plugin skills to co
 Added distribution/capabilities.json covering PlatformIO Core/OTA, ELF tools, esp-coredump 1.10.0, owned local debugging, serial telemetry, and PPK2 with pinned dependencies. Plugin assembly copies this declaration into runtime/capabilities.json before creating the checksum inventory; existing npm/Python/container packaging carries that shared runtime. Partial backend support and pending physical acceptance are explicit, and no availability probe or automatic installation is claimed. Rebuilt the runtime and verified all six entries and the inventory entry.
 
 The rebuild also revealed that plugin skill edits must originate in .skills. Moved the earlier analysis/serial/policy guidance to those source skills and regenerated the plugin, preserving the shipped changes across future builds.
+
+### Debugger CLI sequence (2026-09-20)
+
+Added debug-run to the canonical CLI using DebugCompatibilityClient for startup, commands, normal stop and final process cleanup. It validates up to 32 commands before startup, preserves startup versus per-command timeout controls, stops on a failed command, and exposes explicit process-only cleanup. Interactive approvals use the same scoped in-process path as OTA/power; policy denial remains enforced. It does not pretend a session can survive between separate CLI processes. MCP remains the persistent interactive interface.
+
+Validation: five focused argument/ownership/failure/cleanup tests passed; TypeScript passed and CLI help exposes the command. The first focused run found an assertion missing the forwarded caller argument; corrected that assertion and reran the affected suite. No physical debugger or additional smoke suite was run. Existing local backend limitations and required physical acceptance remain open.
