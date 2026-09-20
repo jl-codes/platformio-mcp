@@ -137,7 +137,7 @@ try {
   } finally {
     await owner.cleanupProcess();
   }
-  if (process.platform === "win32") {
+  {
     let output = "";
     const interactive = new DebugBackendProcess({
       pythonExecutable: python,

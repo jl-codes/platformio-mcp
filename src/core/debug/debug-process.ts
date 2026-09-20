@@ -8,7 +8,11 @@ import {
 } from "./debug-init-execution.js";
 import type { DebugInitArtifact } from "./debug-init-artifact.js";
 import { DebugStartupFailure } from "./debug-start-failure.js";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn } from "node:child_process";
+import {
+  SupervisedDebugChild,
+  type GdbProcessChild,
+} from "./supervised-debug-child.js";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import { PlatformIOError } from "../../utils/errors.js";
@@ -40,6 +44,7 @@ export interface DebugProcessOptions {
   /** Prove debug servers/descendants no longer own the probe, beyond the direct GDB child. */
   confirmProbeReleased: () => Promise<boolean>;
   startupTimeoutMs?: number;
+  supervisorPython?: string; // Host-resolved interpreter for whole-process-tree ownership.
   /** Trusted test/host integration dependency, not a caller-selectable executable launcher. */
   launch?: typeof spawn;
 }
@@ -57,7 +62,7 @@ export class DebugProcess {
   private markClosed!: () => void;
 
   private constructor(
-    private readonly child: ChildProcessWithoutNullStreams,
+    private readonly child: GdbProcessChild,
     private readonly options: DebugProcessOptions,
   ) {
     this.closedPromise = new Promise((resolve) => {
@@ -101,7 +106,7 @@ export class DebugProcess {
 
   /** Launch only after authorization; initialization failure always attempts bounded cleanup. */
   static async start(options: DebugProcessOptions): Promise<DebugProcess> {
-    let child: ChildProcessWithoutNullStreams;
+    let child: GdbProcessChild;
     try {
       if (
         !path.isAbsolute(options.executable) ||
@@ -124,18 +129,26 @@ export class DebugProcess {
         options.projectDir,
       );
       await options.custody.prepareSpawn();
-      child = (options.launch ?? spawn)(executable, [...GDB_STARTUP_ARGS], {
-        cwd: options.projectDir,
-        shell: false,
-        windowsHide: true,
-        stdio: "pipe",
-      }) as ChildProcessWithoutNullStreams;
+      child = options.supervisorPython
+        ? new SupervisedDebugChild(options.supervisorPython, {
+            executable,
+            cwd: options.projectDir,
+            arguments: [...GDB_STARTUP_ARGS],
+          })
+        : ((options.launch ?? spawn)(executable, [...GDB_STARTUP_ARGS], {
+            cwd: options.projectDir,
+            shell: false,
+            windowsHide: true,
+            stdio: "pipe",
+          }) as GdbProcessChild);
     } catch (error) {
       options.custody.releaseAfterExit();
       throw error;
     }
     const owner = new DebugProcess(child, options);
     try {
+      if (child instanceof SupervisedDebugChild)
+        await child.supervisor.waitStarted(options.startupTimeoutMs);
       await initializeGdbInspection(
         owner.transport,
         options.elfPath,
@@ -227,6 +240,12 @@ export class DebugProcess {
   }
 
   private async cleanup(): Promise<void> {
+    if (this.child instanceof SupervisedDebugChild) {
+      this.transport.invalidate(
+        new Error("Debugger process cleanup requested."),
+      );
+      await this.child.supervisor.cleanupProcess();
+    }
     if (!this.closed) {
       this.transport.invalidate(
         new Error("Debugger process cleanup requested."),
@@ -263,6 +282,11 @@ export class DebugProcess {
   private releaseIfConfirmed(): Promise<boolean> {
     if (this.released) return Promise.resolve(true);
     if (!this.closed) return Promise.resolve(false);
+    if (
+      this.child instanceof SupervisedDebugChild &&
+      this.child.supervisor.state().cleanupPending
+    )
+      return Promise.resolve(false);
     if (this.releaseAttempt) return this.releaseAttempt;
     const attempt = (async () => {
       let timer: ReturnType<typeof setTimeout> | undefined;

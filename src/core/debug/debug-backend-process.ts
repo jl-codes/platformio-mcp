@@ -11,7 +11,9 @@ import { POSIX_BACKEND_SUPERVISOR } from "./posix-backend-supervisor.js";
 export interface DebugBackendProcessOptions {
   pythonExecutable: string;
   command: DebugServerCommand;
-  onStdout?: (data: Buffer) => void; // Trusted interactive MI consumer; Windows supervision currently supports this channel.
+  onClose?: () => void; // Trusted transport observer; never proof of descendant cleanup by itself.
+  onStderr?: (data: Buffer) => void;
+  onStdout?: (data: Buffer) => void; // Trusted interactive MI consumer; Supervisor control records remain separate from this channel.
   launch?: typeof spawn; // Trusted host/test dependency only.
 }
 
@@ -39,11 +41,6 @@ export class DebugBackendProcess {
 
   /** Spawn only after host-code/target authorization, executable trust and probe custody are established. */
   constructor(options: DebugBackendProcessOptions) {
-    if (options.onStdout && process.platform !== "win32")
-      throw new PlatformIOError(
-        "Interactive debug supervision is not implemented on this host yet.",
-        "DEBUG_INTERACTIVE_UNSUPPORTED",
-      );
     this.onStdout = options.onStdout;
     if (
       !path.isAbsolute(options.pythonExecutable) ||
@@ -98,6 +95,11 @@ export class DebugBackendProcess {
     this.child.stdout.on("data", (data: Buffer) => this.readControl(data));
     this.child.stderr.on("data", (data: Buffer) => {
       this.outputBytes += data.length;
+      try {
+        options.onStderr?.(data);
+      } catch {
+        this.fail();
+      }
       this.output = Buffer.concat([this.output, data]).subarray(-16384);
       if (this.outputBytes > 1024 * 1024) this.fail();
     });
@@ -118,6 +120,7 @@ export class DebugBackendProcess {
         this.protocolFailed = true;
       }
       this.resolveClosed();
+      options.onClose?.();
     });
     this.child.stdin.write(
       JSON.stringify({ ...command, interactive: Boolean(this.onStdout) }) +

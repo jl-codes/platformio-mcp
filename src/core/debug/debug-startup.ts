@@ -169,6 +169,7 @@ export function startPreparedDebugger(
               projectDir: selection.projectDir,
               elfPath: elf.path,
               startupTimeoutMs: target.timeoutMs,
+              supervisorPython: selection.backend?.options.pythonExecutable,
             };
             const process = selection.backend
               ? await startDebuggerWithBackend(
