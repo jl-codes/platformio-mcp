@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.jl-codes/platformio-mcp",
+  "title": "PIO Agent",
+  "description": "Build, inspect, flash, and monitor PlatformIO firmware projects with policy-controlled tools.",
+  "version": "3.0.0",
+  "repository": {
+    "url": "https://github.com/jl-codes/platformio-mcp",
+    "source": "github",
+    "id": "1131896566"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "platformio-mcp",
+      "version": "3.0.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

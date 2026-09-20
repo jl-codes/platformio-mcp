@@ -35,3 +35,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## MCP Registry validation schema (development tooling)
+
+`distribution/mcp-server.schema.json` is copied from the official Model Context Protocol Registry at the commit and path recorded in `distribution/mcp-schema-source.json`. Its SHA-256 is checked by the validator. The upstream license is preserved in `distribution/MCP-REGISTRY-LICENSE`; the schema is used for release validation and is not bundled in the npm runtime.

@@ -204,7 +204,8 @@ export class DeviceLeaseStore {
     const key = resourceKey(held.resource);
     this.withGate(key, () => {
       const current = this.requirePersistedOwner(key, held);
-      const { handoffPending: _pending, ...rest } = current;
+      const rest = { ...current };
+      delete rest.handoffPending;
       this.writeRecord(key, rest);
     });
   }

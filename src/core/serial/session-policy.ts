@@ -340,11 +340,11 @@ export class PolicySerialSessionService {
         "SERIAL_CAPTURE_SCOPE_INVALID",
       );
     transient?.guard?.();
-    const {
-      sessionId: _sessionId,
-      operation: _operation,
-      ...deviceRequest
-    } = request;
+    const deviceRequest = Object.fromEntries(
+      Object.entries(request).filter(
+        ([key]) => key !== "sessionId" && key !== "operation",
+      ),
+    );
     const binding = JSON.stringify(deviceRequest);
     if (
       transient &&

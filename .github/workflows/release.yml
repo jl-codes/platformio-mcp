@@ -53,6 +53,7 @@ jobs:
           npm --prefix web audit --audit-level=low
           npm run test:ci:unit
           npm run test:namespaces
+          npm run registry:validate
           npm --prefix web run test -- --run
           npm run test:e2e:ci
           npm --prefix web run test:e2e:codex
@@ -75,6 +76,7 @@ jobs:
           mv "pio-mcp-${version}.tgz" release-artifacts/
           mv "pio-agent-${version}.tgz" release-artifacts/
           cp plugins/platformio-mcp/runtime/inventory.json release-artifacts/plugin-runtime-inventory.json
+          cp server.json release-artifacts/server.json
 
       - name: Verify npm release identities before publication
         if: inputs.publish_npm

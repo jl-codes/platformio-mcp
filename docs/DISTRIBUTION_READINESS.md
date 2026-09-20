@@ -9,7 +9,7 @@ The parity branch is not a releasable version yet. Implementation, acceptance, a
 | npm scoped alias | `@forkbomb/platformio-mcp` | Public lookup missing | Authenticate scope control, implement/test functional wrapper; do not assume availability |
 | PyPI canonical | `pio-agent-platformio` | Public lookup missing | Functional wheels for all five planned host targets, trusted publisher, actual name acceptance and installed-artifact verification |
 | PyPI aliases | `pio-agent`, `pio-mcp` | Public lookups missing | Exact canonical dependency, executable collision tests, authority and publication |
-| Official MCP Registry | `io.github.jl-codes/platformio-mcp` | Planned owner-qualified identity | Server manifest, package ownership metadata, publisher authentication, publish and verify registry result |
+| Official MCP Registry | `io.github.jl-codes/platformio-mcp` | Pinned official schema, server manifest and npm ownership metadata validate locally | Publisher authentication, new published npm version with matching mcpName, publish and verify registry result |
 | Codex plugin | `platformio-mcp` from this repository | Local bundled plugin validation passes | Release version/source consistency, install/upgrade smoke against published source |
 | GitHub release | `jl-codes/platformio-mcp` | Authenticated repository admin access verified | Reviewed release commit/tag, immutable artifact identity and release gates |
 | Other registries | See inventory's unsupported channels | No supported artifacts or authority evidence | Build and validate an authentic installer before adding a channel |
@@ -24,7 +24,7 @@ The finite source inventory is `distribution/namespaces.json`. `npm run namespac
 
 - Local `npm whoami --registry=https://registry.npmjs.org` returned HTTP 401. Repository admin access does not establish npm/PyPI ownership. Verify package-specific OIDC configuration in the protected release workflow; do not paste tokens into task messages.
 - Local manifests still use 3.0.0, already published. Select and consistently apply a new release version after compatibility review. Do not treat the existing 3.0.0 packages as the new implementation.
-- Python wheel packaging and MCP Registry publication metadata are not implemented yet.
+- Python wheel packaging and MCP Registry publication automation are not implemented yet. The MCP Registry manifest and npm mcpName are implemented and validated locally.
 - Full parity, cross-host/hardware acceptance, and the release gate remain incomplete. No new release has been published by this goal.
 
 ## Release identity enforcement
@@ -32,3 +32,7 @@ The finite source inventory is `distribution/namespaces.json`. `npm run namespac
 The release workflow builds all three npm tarballs and checks names, versions, exact alias dependencies, and SHA-512 integrity before publishing any artifact. Existing versions are accepted only when their exact artifact integrity matches; registry errors fail closed. Publishing requests npm provenance and rechecks registry artifact integrity. This does not replace installed-artifact smoke tests or cryptographic attestation verification, which remain required.
 
 `npm run test:namespaces` tests normalization, lookup failure handling, wrong-package rejection, and changed artifact identity. These controls are now part of CI and release gates. Namespace audit backoff/cache/change notification, wheel identity, and end-to-end publication checks remain outstanding.
+
+## MCP Registry identity
+
+`server.json` advertises the exact canonical npm version over stdio. `npm run registry:validate` verifies the official schema, repository identity, namespace inventory, npm `mcpName`, and package/version routing. The schema is pinned by upstream commit and SHA-256 in `distribution/mcp-schema-source.json`, with its upstream license preserved in `distribution/MCP-REGISTRY-LICENSE`. This is preparation only: a manifest cannot establish publisher authority or make the new runtime available before npm publication.

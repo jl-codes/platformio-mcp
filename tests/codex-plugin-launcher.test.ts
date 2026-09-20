@@ -99,7 +99,7 @@ describe("Codex plugin launcher", () => {
       expect(aliasPackage.version).toBe(PACKAGE_VERSION);
       expect(aliasPackage.bin[packageName]).toBe("bin.js");
       expect(aliasPackage.dependencies["platformio-mcp"]).toBe(
-        `^${PACKAGE_VERSION}`,
+        PACKAGE_VERSION,
       );
       expect(aliasLauncher).toContain('import("platformio-mcp/build/cli.js")');
     },
