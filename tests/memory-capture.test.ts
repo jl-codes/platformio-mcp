@@ -42,3 +42,17 @@ it("rejects a final authorization failure instead of returning analyzed data", a
     captureSessionMemory({ read }, owner, "session", { seconds: 0 }),
   ).rejects.toThrow("revoked");
 });
+
+it("does not claim a disconnected collection is complete", async () => {
+  const buffer = new SerialSessionBuffer();
+  buffer.append(Buffer.from("Free heap: 1000\n"));
+  buffer.close("disconnected");
+  const read = vi.fn(async (_owner, _id, options) => buffer.read(options));
+  expect(
+    await captureSessionMemory({ read }, owner, "session", { seconds: 0 }),
+  ).toMatchObject({
+    ok: false,
+    collectionComplete: false,
+    state: "disconnected",
+  });
+});

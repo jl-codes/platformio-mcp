@@ -1,4 +1,5 @@
 /** Session ownership, policy boundaries and lease cleanup with maintained mock streams, never hardware. */
+import { captureSessionMemory } from "../src/core/serial/memory-capture.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -650,4 +651,45 @@ describe("owned serial sessions", () => {
       code: "SERIAL_SESSION_NOT_OWNED",
     });
   });
+});
+
+it("collects memory from a real owned manager and rejects a different owner", async () => {
+  const f = fixture();
+  const started = await f.manager.start(f.owner, f.request());
+  const ready = f.manager.read(f.owner, started.sessionId, {
+    waitFor: "largest: 2000",
+    timeoutMs: 1000,
+  });
+  await f.manager.write(
+    f.owner,
+    started.sessionId,
+    Buffer.from("Free heap: 10000 min: 9000 largest: 2000\n"),
+  );
+  expect((await ready).matched).toBe(true);
+  const result = await captureSessionMemory(
+    f.manager,
+    f.owner,
+    started.sessionId,
+    { seconds: 0.05 },
+  );
+  expect(result).toMatchObject({
+    ok: true,
+    redactionApplied: true,
+    metrics: { free_heap: { last: 10000 } },
+    fragmentation: { ratio: 0.2 },
+  });
+  await expect(
+    captureSessionMemory(
+      f.manager,
+      f.manager.createOwner(),
+      started.sessionId,
+      { seconds: 0 },
+    ),
+  ).rejects.toThrow();
+  await f.manager.stop(f.owner, started.sessionId);
+  expect(
+    await captureSessionMemory(f.manager, f.owner, started.sessionId, {
+      seconds: 0,
+    }),
+  ).toMatchObject({ ok: true, state: "stopped" });
 });

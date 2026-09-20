@@ -575,3 +575,7 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added internal memory collection through owner-scoped serial reads, bounded to 300 seconds, 10000 lines and 1 MiB. Completed lines are analyzed; partial-line omission, data loss/truncation, cancellation, errors and limits are explicit. Backlog read timing is not treated as telemetry sampling time.
 - Final authorized read occurs after analysis to prevent disclosure following policy revocation. Buffer tests exposed minimum page-size requirements; fixed collector pages and retained cursor accounting for byte-budget exclusions.
 - TypeScript compilation and 25 capture/buffer tests passed. Real manager/physical acceptance, one-shot port handling, public session lifecycle and MCP/CLI/reference wiring remain open.
+
+### Owned memory capture integration correction
+
+Validated capture through the real session manager and byte-at-a-time mock transport, including rejection of another owner and retained reads after stopping. This exposed partial-line read starvation; collection now yields briefly when no completed lines arrive. Disconnected/error sessions, cancellation, and redaction truncation no longer claim complete collection; redaction flags accumulate across pages. No physical hardware was exercised. TypeScript checking and the 29 memory-capture/session-manager tests pass. Public memory tools and legacy ownership migration remain outstanding.

@@ -1,5 +1,6 @@
 /** Bounded memory telemetry collection from an already-owned, authorized serial session. */
 import { performance } from "node:perf_hooks";
+import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import type {
   SerialSessionManager,
@@ -52,6 +53,8 @@ export async function captureSessionMemory(
     cursor = args.cursor,
     droppedLines = 0,
     truncatedBytes = 0;
+  let redactionApplied = false,
+    redactionOutputMayBeTruncated = false;
   let last: SerialBufferRead;
   let limitReached = false;
   do {
@@ -63,6 +66,8 @@ export async function captureSessionMemory(
       timeoutMs: Math.min(1000, Math.ceil(remaining)),
       signal,
     });
+    redactionApplied ||= last.redactionApplied;
+    redactionOutputMayBeTruncated ||= last.redactionOutputMayBeTruncated;
     droppedLines += last.droppedLines;
     let accepted = 0;
     for (let index = 0; index < last.lines.length; index++) {
@@ -87,6 +92,8 @@ export async function captureSessionMemory(
       (performance.now() >= deadline && !last.moreAvailable)
     )
       break;
+    // Partial text makes read return immediately; yield so incoming bytes and cancellation can progress.
+    if (last.lines.length === 0) await delay(1);
   } while (true);
   const options: MemoryReportOptions = {
     stackUnit: args.stackUnit,
@@ -105,29 +112,31 @@ export async function captureSessionMemory(
     timeoutMs: 0,
   });
   const portError = final.error ?? last.error ?? null;
+  const cancelled = last.readStatus === "cancelled" || signal?.aborted === true;
+  const terminalError =
+    final.state === "error" || final.state === "disconnected";
   return {
     ...report,
-    ok:
-      !portError &&
-      last.readStatus !== "cancelled" &&
-      final.state !== "disconnected",
+    ok: !portError && !cancelled && !terminalError,
     sessionId,
     cursor,
     durationSeconds: (performance.now() - started) / 1000,
     portError,
     state: final.state,
-    cancelled: last.readStatus === "cancelled",
+    cancelled,
     limitReached,
     droppedLines,
     truncatedBytes,
     partialLineOmitted: !!last.partial,
-    redactionApplied: last.redactionApplied,
-    redactionOutputMayBeTruncated: last.redactionOutputMayBeTruncated,
+    redactionApplied,
+    redactionOutputMayBeTruncated,
     collectionComplete:
       !limitReached &&
       droppedLines === 0 &&
       truncatedBytes === 0 &&
       !portError &&
-      last.readStatus !== "cancelled",
+      !cancelled &&
+      !terminalError &&
+      !redactionOutputMayBeTruncated,
   };
 }
