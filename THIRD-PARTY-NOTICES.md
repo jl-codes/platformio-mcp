@@ -16,6 +16,8 @@ Board compatibility filtering, compact fields and summaries in `src/adapters/boa
 
 Device hint patterns and summary fields in `src/adapters/device-compat.ts` are adapted from the pinned reference `devices.py`; they do not establish physical identity.
 
+OTA protocol outcome signatures in `src/core/ota/ota-report.ts` and reference configuration defaults in `src/core/ota/ota-configuration.ts` are adapted from the pinned reference `ota.py`. The implementation uses private credentials, immutable images and separate policy stages; transfer success does not establish runtime health.
+
 The pinned reference license follows:
 
 MIT License

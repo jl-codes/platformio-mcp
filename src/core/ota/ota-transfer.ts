@@ -30,6 +30,7 @@ export interface PreparedOtaTransfer {
 export async function executePreparedOtaTransfer(
   input: PreparedOtaTransfer,
   caller: PolicyEvaluationContext = {},
+  onAuthorized?: () => Promise<void>,
 ) {
   const guard = createPolicyRevisionGuard(input.projectDir);
   const operation = input.filesystem
@@ -79,6 +80,7 @@ export async function executePreparedOtaTransfer(
         { ...args, approvalId: input.commandApprovalId },
         context,
         async () => {
+          await onAuthorized?.();
           guard();
           await input.image.verify();
           guard();
