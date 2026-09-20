@@ -1376,3 +1376,8 @@ Added a fixed Python/Win32 backend supervisor using PROC_THREAD_ATTRIBUTE_JOB_LI
 
 
 CI follow-up: Windows checks on 3855b90a exposed fixture comparisons between legacy realpathSync 8.3 names and the canonical long paths used by fs.promises.realpath. Updated debugger test fixture roots to realpathSync.native so exact path assertions match the production path identity. The failure was in test expectations; command and ELF selection assertions remain intact.
+
+
+### POSIX backend supervision and Node owner (2026-09-20)
+
+Added Linux/macOS process-group supervision with a live guardian retaining the group identity until shutdown. Linux adopts/reaps orphaned descendants; a separate owner pipe requests group termination if the supervisor exits. Added a Node backend owner that bounds diagnostics/control output, retains cleanup authority after uncertain exit, rejects contradictory control records, and requires both explicit cleanup proof and supervisor closure. Five focused lifecycle tests and TypeScript passed. The native parent/grandchild fixture is now portable and wired into the existing three-host CI matrix; POSIX native acceptance is pending that run. Backend readiness/trust/probe selection and public startup integration remain incomplete.

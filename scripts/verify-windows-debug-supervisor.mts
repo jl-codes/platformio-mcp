@@ -1,16 +1,22 @@
-/** Verify Windows backend descendant shutdown using local Python fixtures; no hardware is contacted. */
+/** Verify backend descendant shutdown using local Python fixtures; no hardware is contacted. */
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { DebugBackendProcess } from "../src/core/debug/debug-backend-process.ts";
+import { POSIX_BACKEND_SUPERVISOR } from "../src/core/debug/posix-backend-supervisor.ts";
 import { WINDOWS_BACKEND_SUPERVISOR } from "../src/core/debug/windows-backend-supervisor.ts";
 const python = process.argv[2];
 assert(
-  process.platform === "win32" && python && path.isAbsolute(python),
-  "Pass an absolute Windows Python executable.",
+  python && path.isAbsolute(python),
+  "Pass an absolute Python executable.",
 );
+const supervisor =
+  process.platform === "win32"
+    ? WINDOWS_BACKEND_SUPERVISOR
+    : POSIX_BACKEND_SUPERVISOR;
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "pio-debug-supervisor-"));
 const fixture = path.join(root, "fixture.py");
 await fs.writeFile(
@@ -24,7 +30,7 @@ if sys.argv[1] != "natural": time.sleep(60)
 const results: unknown[] = [];
 try {
   for (const mode of ["stop", "owner_eof", "natural"]) {
-    const child = spawn(python, ["-I", "-c", WINDOWS_BACKEND_SUPERVISOR], {
+    const child = spawn(python, ["-I", "-c", supervisor], {
       windowsHide: true,
       stdio: "pipe",
     });
@@ -95,13 +101,44 @@ try {
       descendantExited: true,
     });
   }
+  const owner = new DebugBackendProcess({
+    pythonExecutable: python,
+    command: {
+      executable: python,
+      cwd: root,
+      arguments: ["-I", fixture, "stop"],
+    },
+  });
+  try {
+    await owner.waitStarted();
+    const deadline = Date.now() + 5000;
+    while (
+      !owner.state().outputTail.includes("descendantPid") &&
+      Date.now() < deadline
+    )
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    const descendant = JSON.parse(
+      owner.state().outputTail.trim(),
+    ).descendantPid;
+    const backendPid = owner.state().pid!;
+    await owner.cleanupProcess();
+    assert.equal(owner.state().cleanupPending, false);
+    for (const pid of [backendPid, descendant])
+      assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+    results.push({
+      mode: "node_owner",
+      cleanupConfirmed: true,
+      rootExited: true,
+      descendantExited: true,
+    });
+  } finally {
+    await owner.cleanupProcess();
+  }
   const evidence = {
     observedAt: new Date().toISOString(),
     platform: process.platform,
     physicalDeviceContacted: false,
-    supervisorSha256: createHash("sha256")
-      .update(WINDOWS_BACKEND_SUPERVISOR)
-      .digest("hex"),
+    supervisorSha256: createHash("sha256").update(supervisor).digest("hex"),
     results,
   };
   if (process.argv[3])

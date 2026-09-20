@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-20T10:57:29.388Z",
+  "observedAt": "2026-09-20T11:04:37.884Z",
   "platform": "win32",
   "physicalDeviceContacted": false,
   "supervisorSha256": "83c25830ac12dd6a42aaa29c6011f0de78ff983ec2439ab7204070227b4ce8b6",
@@ -18,6 +18,12 @@
     },
     {
       "mode": "natural",
+      "cleanupConfirmed": true,
+      "rootExited": true,
+      "descendantExited": true
+    },
+    {
+      "mode": "node_owner",
       "cleanupConfirmed": true,
       "rootExited": true,
       "descendantExited": true

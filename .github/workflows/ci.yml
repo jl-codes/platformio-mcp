@@ -47,6 +47,15 @@ jobs:
       - name: Run unit and component tests
         run: npm run test:ci:unit
 
+      - name: Setup Python for native backend lifecycle verification
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Verify native debug backend descendant cleanup
+        shell: bash
+        run: npx tsx scripts/verify-windows-debug-supervisor.mts "$(python -c 'import sys; print(sys.executable)')"
+
       - name: Validate distribution identity controls
         run: npm run test:namespaces
 
