@@ -1704,3 +1704,8 @@ Archived ELF lookup no longer requires the original file or build directory to s
 CI run 35518807967 exposed a Python subprocess startup timeout at the retained 10-second process bound (rather than the previously fixed harness deadline). Inspection found setup-python after the unit tests that invoke Python. CI now installs the existing selected Python 3.12 runtime before those tests, using the release workflow's pinned setup-python action. Converter assertions now report subprocess errors directly; neither the process bound nor behavior checks were relaxed. Hosted verification remains pending.
 
 Validation: seventeen focused archive, OTA ELF and converter tests passed; TypeScript and scoped lint passed, plugin rebuilt.
+
+
+### Real ESP OTA image/ELF correspondence evidence
+
+Using the existing official ESP core-dump ELF fixtures and installed esptool 5.4.0, generated ESP32, ESP32-C3 and ESP32-P4 application images offline with an embedded ELF SHA-256 at offset 176. The actual image parser and ELF-retention path matched all three full hashes and preserved their archived bytes. Each case rejected a different real ELF and an image with corrupted descriptor bytes. Exact source revision, implementation hashes, image hashes and ELF hashes are recorded in `ota-elf-windows-evidence.json`. This validates offline Xtensa/RISC-V format handling on Windows; it does not claim a physical upload or board boot.

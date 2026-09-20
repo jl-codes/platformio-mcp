@@ -1,0 +1,50 @@
+{
+  "sourceCommit": "3cdb317450a78224293ed0e19455bec0bb5bd5c4",
+  "capturedAt": "2026-09-20T15:20:44.448Z",
+  "platform": "win32",
+  "architecture": "x64",
+  "node": "v24.15.0",
+  "esptool": "5.4.0",
+  "procedure": "esptool --chip <chip> elf2image --elf-sha256-offset 176 --output <image> <elf>; readEspAppElfHash; matchAndRetainOtaElf; compare archived SHA-256; reject a different ELF and corrupted image",
+  "physicalHardware": false,
+  "assertions": [
+    {
+      "chip": "esp32",
+      "elfSha256": "1b43c5e74f2da1385fb132b85a6e12c9c2371755843792612b7e95da9a7f33dd",
+      "imageSha256": "f4bd0a025da2a9355425cd51be74149ccec165a8fb3f99f40216bd981f22f13c",
+      "imageBytes": 161904,
+      "embeddedElfSha256": "1b43c5e74f2da1385fb132b85a6e12c9c2371755843792612b7e95da9a7f33dd",
+      "archiveSha256": "1b43c5e74f2da1385fb132b85a6e12c9c2371755843792612b7e95da9a7f33dd",
+      "architecture": "xtensa",
+      "mismatchedElfRejected": true,
+      "corruptImageRejected": true
+    },
+    {
+      "chip": "esp32c3",
+      "elfSha256": "7d946a8e8cd5e4196dca452f6aaea74a9569861d45e7861eb1a11c063d042472",
+      "imageSha256": "36955e702cb570a007ec0a04ee5970aafef48977240eca2cb5917173f344a742",
+      "imageBytes": 172720,
+      "embeddedElfSha256": "7d946a8e8cd5e4196dca452f6aaea74a9569861d45e7861eb1a11c063d042472",
+      "archiveSha256": "7d946a8e8cd5e4196dca452f6aaea74a9569861d45e7861eb1a11c063d042472",
+      "architecture": "riscv",
+      "mismatchedElfRejected": true,
+      "corruptImageRejected": true
+    },
+    {
+      "chip": "esp32p4",
+      "elfSha256": "f2df9a0058126efdc8a78363bf332efe5ad95dfba773c8599104e8d4522b5b66",
+      "imageSha256": "c8f57c66c92a052210747a9383d7117f5f75a1451b94bb4d7c6a23bbe8611cd4",
+      "imageBytes": 158704,
+      "embeddedElfSha256": "f2df9a0058126efdc8a78363bf332efe5ad95dfba773c8599104e8d4522b5b66",
+      "archiveSha256": "f2df9a0058126efdc8a78363bf332efe5ad95dfba773c8599104e8d4522b5b66",
+      "architecture": "riscv",
+      "mismatchedElfRejected": true,
+      "corruptImageRejected": true
+    }
+  ],
+  "implementationSha256": {
+    "src/core/ota/esp-app-identity.ts": "4585fd5ab08715ca474bcf72637d5a31198f638b0b82fb807227f45fc955c7ab",
+    "src/core/ota/ota-elf-match.ts": "81c07872525d4dc4e80e364876add5f52e40dcb4cd1a55c88576e67a98bf3415",
+    "src/core/analysis/elf-archive.ts": "c33bc97126a629e67dcaf760b6614b2c220ab0ad563633f030a160aeb4b37746"
+  }
+}
