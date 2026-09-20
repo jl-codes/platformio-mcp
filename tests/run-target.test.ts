@@ -5,13 +5,19 @@ import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   executeNamedTarget,
+  diagnoseTargetPortFailure,
   resolveTargetSerialSelection,
 } from "../src/tools/run-target.js";
+import { inspectPortDiagnostics } from "../src/core/devices/port-diagnostics.js";
 import { executeProjectInspection } from "../src/tools/project-inspection.js";
 import { listDevicesCore } from "../src/core/devices.js";
+import { readCommandOutput } from "../src/utils/command-log.js";
 import { approveRequest } from "../src/core/policy/approvals.js";
 import { buildTarget } from "../src/tools/build.js";
 import { SerialClientContext } from "../src/adapters/serial-client.js";
+vi.mock("../src/core/devices/port-diagnostics.js", () => ({
+  inspectPortDiagnostics: vi.fn(),
+}));
 vi.mock("../src/tools/project-inspection.js", () => ({
   executeProjectInspection: vi.fn(),
 }));
@@ -228,11 +234,118 @@ it.each([
 );
 
 it("honors a public run_target denial before executing an allowed build category", async () => {
-  fs.writeFileSync(path.join(project, ".pio-mcp-policy.json"), JSON.stringify({
-    profile: "build_only", deny: ["run_target"],
-    overrides: { audit_all_agent_actions: false },
-  }));
-  await expect(executeNamedTarget({ target: "buildfs", project_dir: project },
-    {} as SerialClientContext)).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  fs.writeFileSync(
+    path.join(project, ".pio-mcp-policy.json"),
+    JSON.stringify({
+      profile: "build_only",
+      deny: ["run_target"],
+      overrides: { audit_all_agent_actions: false },
+    }),
+  );
+  await expect(
+    executeNamedTarget(
+      { target: "buildfs", project_dir: project },
+      {} as SerialClientContext,
+    ),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
   expect(buildTarget).not.toHaveBeenCalled();
+});
+
+it("adds observed port facts without claiming unknown presence or exclusive access", async () => {
+  vi.mocked(inspectPortDiagnostics).mockResolvedValue({
+    exists: null,
+    in_device_list: null,
+    permission: null,
+    held_by_processes: [],
+    process_check: "unavailable",
+    process_check_complete: false,
+    platform: "win32",
+  } as never);
+  const report = await diagnoseTargetPortFailure(
+    "COM9",
+    "port_busy",
+    project,
+    {},
+  );
+  expect(report).toMatchObject({
+    port: "COM9",
+    diagnosis_status: "observed",
+    exists: null,
+    process_check_complete: false,
+  });
+  expect(report.hint).toContain("serial connection");
+});
+it("does not inspect the host when diagnostic permission is denied", async () => {
+  vi.mocked(inspectPortDiagnostics).mockClear();
+  fs.writeFileSync(
+    path.join(project, ".pio-mcp-policy.json"),
+    JSON.stringify({
+      profile: "read_only",
+      deny: ["list_devices"],
+      overrides: { audit_all_agent_actions: false },
+    }),
+  );
+  await expect(
+    diagnoseTargetPortFailure("COM9", "port_missing", project, {}),
+  ).resolves.toMatchObject({
+    diagnosis_status: "not_authorized",
+    port: "COM9",
+  });
+  expect(inspectPortDiagnostics).not.toHaveBeenCalled();
+});
+
+it("retains a failed upload result when optional port diagnosis fails", async () => {
+  fs.writeFileSync(
+    path.join(project, ".pio-mcp-policy.json"),
+    JSON.stringify({
+      profile: "lab_runner",
+      overrides: { audit_all_agent_actions: false },
+    }),
+  );
+  const client = {
+    run: async (
+      _context: unknown,
+      execute: (service: unknown, owner: unknown) => Promise<unknown>,
+    ) => execute({ sessions: { list: () => [] } }, {}),
+  } as unknown as SerialClientContext;
+  const request = {
+    target: "uploadfs",
+    project_dir: project,
+    upload_port: "COM9",
+  };
+  const decision = await executeNamedTarget(request, client).catch(
+    (error) => error,
+  );
+  approveRequest(decision.context.policyDecision.approvalId);
+  vi.mocked(readCommandOutput).mockResolvedValueOnce(
+    "Permission denied opening COM9",
+  );
+  vi.mocked(inspectPortDiagnostics).mockRejectedValueOnce(
+    new Error("host lookup unavailable"),
+  );
+  vi.mocked(buildTarget).mockImplementationOnce(
+    async (_p, _t, _e, _v, execution) => {
+      await execution?.onResult?.({
+        exitCode: 1,
+        finalOutput: "failed",
+        fullLogPath: "spool.log",
+      });
+      return { success: false, environment: "native" };
+    },
+  );
+  await expect(
+    executeNamedTarget(
+      {
+        ...request,
+        approval_id: decision.context.policyDecision.approvalId,
+      },
+      client,
+    ),
+  ).resolves.toMatchObject({
+    ok: false,
+    error: "port_permission",
+    exit_code: 1,
+    log_path: "retained.log",
+    port_diagnosis: { port: "COM9", diagnosis_status: "unavailable" },
+  });
 });

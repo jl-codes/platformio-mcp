@@ -3,6 +3,7 @@
  * Physical target adapters supply an already resolved serial port; discovery remains separately authorized.
  */
 import { z } from "zod";
+import { inspectPortDiagnostics } from "../core/devices/port-diagnostics.js";
 import {
   planAction,
   dispatchAuthorizedAction,
@@ -185,7 +186,7 @@ export async function executeNamedTarget(
             "Named target returned no completed result.",
             "TARGET_RESULT_MISSING",
           );
-        return {
+        const report = {
           ...cleanCompatibilityResult(
             completed,
             environment,
@@ -197,6 +198,27 @@ export async function executeNamedTarget(
             ? { stopped_sessions: stopped }
             : {}),
         };
+        if (
+          !report.ok &&
+          report.port_error &&
+          effects.deviceAccess !== "none"
+        ) {
+          const diagnosis = await diagnoseTargetPortFailure(
+            uploadPort,
+            report.port_error,
+            projectDir,
+            caller,
+          );
+          guard();
+          return {
+            ...report,
+            error: report.port_error,
+            port_diagnosis: diagnosis,
+            summary:
+              "Target failed (" + report.port_error + "): " + diagnosis.hint,
+          };
+        }
+        return report;
       });
     },
   );
@@ -304,4 +326,43 @@ export function executeRunTargetAction(
     caller,
     onAuthorized,
   );
+}
+
+/** Preserve the original failure even when optional, separately authorized diagnosis is unavailable. */
+export async function diagnoseTargetPortFailure(
+  port: string | undefined,
+  code: string,
+  projectDir: string,
+  caller: PolicyEvaluationContext,
+) {
+  const hints: Record<string, string> = {
+    port_busy:
+      "Close the serial connection holding the selected port, then retry.",
+    port_permission: "Check OS access to the selected serial port, then retry.",
+    port_missing: "Check the device connection and selected upload port.",
+    no_response:
+      "Check the board, boot mode and upload protocol before retrying.",
+  };
+  const base = {
+    port: port ?? null,
+    hint:
+      hints[code] ?? "Inspect the retained command log and selected device.",
+  };
+  if (!port) return { ...base, diagnosis_status: "no_selected_port" };
+  const args = { projectDir, port };
+  const context = { ...caller, workspaceDir: projectDir };
+  const permission = await planAction("list_devices", args, context);
+  if (permission.status !== "ready")
+    return { ...base, diagnosis_status: "not_authorized" };
+  try {
+    const observation = await dispatchAuthorizedAction(
+      "list_devices",
+      args,
+      context,
+      () => inspectPortDiagnostics(port, null),
+    );
+    return { ...base, ...observation, diagnosis_status: "observed" };
+  } catch {
+    return { ...base, diagnosis_status: "unavailable" };
+  }
 }

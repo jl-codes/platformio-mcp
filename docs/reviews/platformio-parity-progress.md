@@ -1011,3 +1011,7 @@ Registered run_target and optional pio_run_target using the same executor. Canon
 ### Named-target CLI and compatibility launch verification
 
 Added CLI run-target with strict flags and canonical executor mapping, without a second execution path or broad preauthorization. The focused real CLI denial check passed and TypeScript passed. All four compatibility launch cases passed, establishing 55 canonical tools / 84 enabled tools and opt-in pio_run_target registration. Complete CI 35494348961 passed for the preceding pushed revision, before public route/CLI additions. Full target/hardware parity remains incomplete.
+
+### Target port-failure reporting
+
+Failed device targets now expose the classified port error and an actionable diagnosis while preserving exit code, log path and output. Host port observations require separate list_devices permission; denied/unavailable diagnosis leaves the original execution failure intact and unknown presence remains null. Fifteen focused workflow checks plus the new full-executor failed-upload/diagnostic-failure regression passed; TypeScript passed. No hardware ran. Full network/probe/artifact and physical parity remains unfinished.
