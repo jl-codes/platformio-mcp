@@ -147,10 +147,15 @@ export class DebugProcess {
   }
 
   /** Reauthorize every classified command using this process's actual project identity. */
-  command(command: string, caller: PolicyEvaluationContext, timeoutMs = 30000) {
+  command(
+    command: string,
+    caller: PolicyEvaluationContext,
+    timeoutMs = 30000,
+    grants: { approvalId?: string; sessionId?: string } = {},
+  ) {
     return dispatchDebuggerCommand(
       command,
-      { projectDir: this.options.projectDir },
+      { ...grants, projectDir: this.options.projectDir },
       caller,
       (prepared) =>
         this.transport.execute(
