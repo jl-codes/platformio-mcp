@@ -92018,6 +92018,21 @@ var require_ip_address = __commonJS({
   }
 });
 
+// src/utils/runtime-version.ts
+import { readFileSync } from "node:fs";
+function readRuntimeVersion(entryUrl) {
+  for (const relative of ["../package.json", "../.codex-plugin/plugin.json"]) {
+    try {
+      const manifest = JSON.parse(readFileSync(new URL(relative, entryUrl), "utf8"));
+      if (manifest.name === "platformio-mcp" && typeof manifest.version === "string" && /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(manifest.version)) {
+        return manifest.version;
+      }
+    } catch {
+    }
+  }
+  return "unknown";
+}
+
 // src/adapters/dependency-compat.ts
 init_zod();
 
@@ -109597,7 +109612,7 @@ function listRegisteredTools(registry2) {
 var server = new Server(
   {
     name: "platformio-mcp-server",
-    version: "1.0.0"
+    version: readRuntimeVersion(import.meta.url)
   },
   {
     capabilities: {
@@ -111736,15 +111751,7 @@ async function main() {
     process.exit(0);
   }
   if (cliArgs.includes("--version") || subcommand === "version") {
-    let version3 = "unknown";
-    try {
-      const currentDir = path43.dirname(new URL(import.meta.url).pathname);
-      const pkg = JSON.parse(
-        fs41.readFileSync(path43.join(currentDir, "..", "package.json"), "utf8")
-      );
-      version3 = pkg.version;
-    } catch {
-    }
+    const version3 = readRuntimeVersion(import.meta.url);
     console.log(version3);
     process.exit(0);
   }
@@ -111827,15 +111834,7 @@ async function main() {
     }).toString().trim();
   } catch {
   }
-  let version2 = "1.0.0";
-  try {
-    const currentDir = path43.dirname(new URL(import.meta.url).pathname);
-    const pkg = JSON.parse(
-      fs41.readFileSync(path43.join(currentDir, "../package.json"), "utf8")
-    );
-    version2 = pkg.version;
-  } catch {
-  }
+  const version2 = readRuntimeVersion(import.meta.url);
   logDiagnostic("\n\n=======================================================");
   logDiagnostic(`\u{1F680} PIO Agent v${version2} (Build: ${gitHash}) running on stdio`);
   logDiagnostic("\u{1F680} Server supports 1000+ boards across 30+ platforms");

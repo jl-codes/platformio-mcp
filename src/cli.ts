@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { readRuntimeVersion } from "./utils/runtime-version.js";
 import { inspectDependencies } from "./tools/dependency-inspection.js";
 import { parseCompatibilityLaunch } from "./adapters/compatibility-mode.js";
 import {
@@ -255,15 +256,7 @@ async function promptApproval(reason: string): Promise<boolean> {
 }
 
 function readVersion(): string {
-  try {
-    const currentDir = path.dirname(fileURLToPath(import.meta.url));
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(currentDir, "..", "package.json"), "utf8"),
-    ) as { version?: string };
-    return pkg.version ?? "unknown";
-  } catch {
-    return "unknown";
-  }
+  return readRuntimeVersion(import.meta.url);
 }
 
 async function runInstallSubcommand(rawArgs: string[]) {

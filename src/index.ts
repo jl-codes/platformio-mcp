@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readRuntimeVersion } from "./utils/runtime-version.js";
 
 /**
  * PlatformIO MCP Server Entry Point
@@ -164,7 +165,7 @@ import {
 const server = new Server(
   {
     name: "platformio-mcp-server",
-    version: "1.0.0",
+    version: readRuntimeVersion(import.meta.url),
   },
   {
     capabilities: {
@@ -2579,14 +2580,7 @@ async function main() {
   }
 
   if (cliArgs.includes("--version") || subcommand === "version") {
-    let version = "unknown";
-    try {
-      const currentDir = path.dirname(new URL(import.meta.url).pathname);
-      const pkg = JSON.parse(
-        fs.readFileSync(path.join(currentDir, "..", "package.json"), "utf8"),
-      );
-      version = pkg.version;
-    } catch {}
+    const version = readRuntimeVersion(import.meta.url);
     console.log(version);
     process.exit(0);
   }
@@ -2696,14 +2690,7 @@ async function main() {
       .trim();
   } catch {}
 
-  let version = "1.0.0";
-  try {
-    const currentDir = path.dirname(new URL(import.meta.url).pathname);
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(currentDir, "../package.json"), "utf8"),
-    );
-    version = pkg.version;
-  } catch {}
+  const version = readRuntimeVersion(import.meta.url);
 
   logDiag("\n\n=======================================================");
   logDiag(`🚀 PIO Agent v${version} (Build: ${gitHash}) running on stdio`);
