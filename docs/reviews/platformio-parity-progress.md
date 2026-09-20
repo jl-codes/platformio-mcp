@@ -1249,3 +1249,9 @@ Prepared startup hashes its concrete project/environment, executable roots, ELF 
 ### Real debugger approval replay and image binding
 
 Verified connect/load/host startup approvals against the real approval store and MI transport: preflights leave earlier grants approved, launch occurs only after all required grants are supplied, and execution consumes each once. Prepared startup now requires a selected ELF hash; target-download authorization includes that identity, and retained-ELF creation enforces it. Ten focused startup/target cases, TypeScript and lint passed. Launch and artifact acquisition were mocked in the approval replay case; no physical debugger acceptance is claimed.
+
+### Resolved debugger backend configuration
+
+Reviewed PlatformIO Core v6.1.18 debug/config/base.py, factory.py and generic.py. DebugConfigBase resolves server cwd/executable/arguments and can install a missing backend package during configuration, so discovery cannot be treated as a read-only operation. Source: https://github.com/platformio/platformio-core/blob/v6.1.18/platformio/debug/config/base.py .
+
+Added a bounded parser for the resolved server object, preserving argument boundaries and package-relative executable resolution; null explicitly represents an external backend. Ambiguous PATH-only commands, shell shims, control characters and oversized arguments fail. Parsing grants no executable/probe trust. Eight focused cases, TypeScript and lint passed. Authorized config collection, process-tree containment and public probe startup remain unfinished.
