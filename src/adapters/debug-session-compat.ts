@@ -75,6 +75,8 @@ export function formatDebuggerCommandResult(result: GdbMiCommandResult) {
       !result.timedOut &&
       !(result.closed && resultClass !== "exit"),
     result_class: resultClass,
+    // Preserve bounded ordered MI fields: inspection results may have no console stream.
+    result_fields: result.result?.fields ?? [],
     console: result.console,
     error,
     stopped: normalizeDebuggerStop(result.stopped),

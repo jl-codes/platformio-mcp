@@ -11,7 +11,10 @@ import {
   resolveCompatibilityProject,
   type CompatibilityProjectDefaults,
 } from "./compatibility-project.js";
-import { executeDebugSessionCompatibility } from "./debug-session-compat.js";
+import {
+  executeDebugSessionCompatibility,
+  normalizeDebuggerStop,
+} from "./debug-session-compat.js";
 
 const approval = z.string().min(1).max(256).optional();
 /** Request data narrows discovery; executable roots and cleanup authority remain host-owned. */
@@ -153,14 +156,20 @@ export class DebugCompatibilityClient {
       );
       // Forgetting is bookkeeping: a failure must not hide an already-owned session ID.
       await this.preparation.forget(preparation, caller).catch(() => {});
+      const state = this.sessions
+        .list()
+        .find((session) => session.session_id === id);
       return {
         ok: true,
         session_id: id,
         project_dir: prepared.projectDir,
         env: prepared.environment,
         load: prepared.load,
+        stopped: normalizeDebuggerStop(state?.lastStop),
+        running: state?.running ?? null,
+        closed: state?.closed ?? null,
         summary:
-          "Debugger initialized using the retained PlatformIO script; target state is available through pio_debug_list.",
+          "Debugger initialized using the retained PlatformIO script; reported target state reflects the latest observed event.",
       };
     })();
     this.pending.add(operation);

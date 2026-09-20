@@ -1593,3 +1593,9 @@ Added controlled GitHub-command injection for the release-asset helper and exerc
 ### 2026-09-20 — Alias-complete release instructions
 
 Confirmed that Python release building and native acceptance derive every alias from `distribution/namespaces.json`: the native installer requires one host wheel plus all configured alias wheels, checks each alias module/owned command, and verifies canonical survival after all aliases are uninstalled. Corrected stale two-alias/seven-wheel wording and hard-coded seven-container workflow labels; npm publication input now accurately describes all authorized packages. These are instruction/label fixes, not new publication or native acceptance evidence. No additional smoke tests were run.
+
+### 2026-09-20 — Preserve debugger inspection results and initial stop state
+
+Fixed a concrete response gap: mapped GDB/MI inspection commands could succeed with empty console output while the adapter discarded their structured result fields. Replies now retain bounded ordered `result_fields`, preserving repeated names and keeping debugger-controlled names as data. Startup also returns the latest owned stop frame and running/closed observations instead of requiring an extra list call. Unknown state remains null; initialization success is not interpreted as target halt.
+
+Validation: 13 focused debugger response/connection cases passed, covering variable values, backtrace frames, register values, repeated/prototype-like field names and initial stop reporting. TypeScript passed and the plugin was rebuilt. Full reference response parity and physical debugger acceptance remain incomplete; no deployment occurred.

@@ -126,3 +126,29 @@ it("rejects owner selection and invalid timeout before dispatch", async () => {
     ),
   ).rejects.toMatchObject({ code: "COMPAT_ARGUMENT_INVALID" });
 });
+it.each([
+  '^done,value="42"',
+  '^done,stack=[frame={level="0",func="main",file="main.cpp",line="12"}]',
+  '^done,register-values=[{number="0",value="0x1234"}]',
+  '^done,name="first",name="second",__proto__="untrusted"',
+])(
+  "preserves structured inspection output without console text: %s",
+  (line) => {
+    const record = parseGdbMiRecord(line) as NonNullable<
+      GdbMiCommandResult["result"]
+    >;
+    const formatted = formatDebuggerCommandResult({
+      ...result,
+      result: record,
+      timedOut: false,
+      running: false,
+    });
+    expect(formatted.ok).toBe(true);
+    expect(formatted.console).toEqual([]);
+    expect(formatted.result_fields).toEqual(record.fields);
+    expect(JSON.parse(JSON.stringify(formatted)).result_fields).toEqual(
+      record.fields,
+    );
+    expect(Object.getPrototypeOf(formatted)).toBe(Object.prototype);
+  },
+);

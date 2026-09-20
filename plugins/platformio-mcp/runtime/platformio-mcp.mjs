@@ -107157,6 +107157,8 @@ function formatDebuggerCommandResult(result) {
   return {
     ok: error2 === null && !result.timedOut && !(result.closed && resultClass !== "exit"),
     result_class: resultClass,
+    // Preserve bounded ordered MI fields: inspection results may have no console stream.
+    result_fields: result.result?.fields ?? [],
     console: result.console,
     error: error2,
     stopped: normalizeDebuggerStop(result.stopped),
@@ -107333,13 +107335,17 @@ var DebugCompatibilityClient = class {
       );
       await this.preparation.forget(preparation, caller).catch(() => {
       });
+      const state = this.sessions.list().find((session2) => session2.session_id === id);
       return {
         ok: true,
         session_id: id,
         project_dir: prepared.projectDir,
         env: prepared.environment,
         load: prepared.load,
-        summary: "Debugger initialized using the retained PlatformIO script; target state is available through pio_debug_list."
+        stopped: normalizeDebuggerStop(state?.lastStop),
+        running: state?.running ?? null,
+        closed: state?.closed ?? null,
+        summary: "Debugger initialized using the retained PlatformIO script; reported target state reflects the latest observed event."
       };
     })();
     this.pending.add(operation);

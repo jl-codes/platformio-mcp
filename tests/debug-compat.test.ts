@@ -101,3 +101,46 @@ it("excludes unidentified peripherals and closes admission on disconnect", async
     code: "DEBUG_CLIENT_CLOSED",
   });
 });
+it("returns the initial observed stop frame instead of requiring a later list call", async () => {
+  mocks.start.mockImplementation(async (sessions) =>
+    sessions.start("/project", "debug", async () => ({
+      command: vi.fn(),
+      cleanupProcess: vi.fn(async () => {}),
+      state: () => ({
+        running: false,
+        closed: false,
+        exitCode: null,
+        failed: false,
+        cleanupPending: false,
+        stderr: "",
+        lastStop: {
+          kind: "exec",
+          class: "stopped",
+          fields: [
+            { name: "reason", value: "breakpoint-hit" },
+            {
+              name: "frame",
+              value: {
+                kind: "tuple",
+                fields: [
+                  { name: "func", value: "main" },
+                  { name: "line", value: "12" },
+                ],
+              },
+            },
+          ],
+        },
+      }),
+    })),
+  );
+  const client = new DebugCompatibilityClient();
+  expect(await client.start({ load: false })).toMatchObject({
+    running: false,
+    closed: false,
+    stopped: {
+      reason: "breakpoint-hit",
+      frame: { function: "main", line: "12" },
+    },
+  });
+  await client.close();
+});
