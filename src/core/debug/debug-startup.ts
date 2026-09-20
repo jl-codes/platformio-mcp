@@ -9,7 +9,10 @@ import type {
 } from "./debug-client-sessions.js";
 import { DebugProcess, type DebugProcessOptions } from "./debug-process.js";
 import { retainDebugElf, ownDebugElf } from "./debug-elf.js";
-import { startDebuggerWithBackend } from "./debug-backend-session.js";
+import {
+  startDebuggerWithBackend,
+  preflightDebuggerBackend,
+} from "./debug-backend-session.js";
 import type { DebugBackendProcessOptions } from "./debug-backend-process.js";
 import {
   describeDebugInitializationTemplate,
@@ -122,6 +125,25 @@ export function startPreparedDebugger(
       if (initDescriptor)
         await preflightDebugInitialization(initDescriptor, initInput, caller);
       else await preflightDebuggerTarget(target, caller);
+      if (selection.backend)
+        await preflightDebuggerBackend(
+          {
+            debugger: {
+              projectDir: selection.projectDir,
+              executable: selection.executable,
+              elfPath: selection.elfPath,
+              trustedDebuggerRoots: selection.trustedDebuggerRoots,
+            },
+            backend: selection.backend.options,
+            readyPattern: selection.backend.readyPattern,
+            elfSha256: selection.expectedElfSha256,
+            sessionId,
+            timeoutMs: target.timeoutMs ?? 90000,
+            hostApprovalId: selection.backend.hostApprovalId,
+            targetApprovalId: selection.backend.targetApprovalId,
+          },
+          caller,
+        );
       const args = {
         projectDir: selection.projectDir,
         environment: selection.environment,
@@ -175,6 +197,7 @@ export function startPreparedDebugger(
               ? await startDebuggerWithBackend(
                   {
                     debugger: debuggerOptions,
+                    elfSha256: selection.expectedElfSha256,
                     backend: selection.backend.options,
                     readyPattern: selection.backend.readyPattern,
                     sessionId,

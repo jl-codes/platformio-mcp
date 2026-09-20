@@ -20,10 +20,73 @@ export interface DebugBackendSessionInput {
   debugger: DebugProcessOptions;
   backend: DebugBackendProcessOptions;
   readyPattern: string;
+  elfSha256?: string; // Stable retained-image identity; avoids binding grants to random snapshot paths.
   sessionId: string;
   timeoutMs: number;
   hostApprovalId?: string;
   targetApprovalId?: string;
+}
+
+/** Plan backend effects before artifact/custody allocation, using the same scope as execution. */
+export async function preflightDebuggerBackend(
+  input: Omit<DebugBackendSessionInput, "debugger"> & {
+    debugger: Pick<
+      DebugProcessOptions,
+      "projectDir" | "executable" | "elfPath" | "trustedDebuggerRoots"
+    >;
+  },
+  caller: PolicyEvaluationContext = {},
+) {
+  const selected = input.debugger;
+  if (
+    !input.sessionId ||
+    (input.elfSha256 !== undefined &&
+      !/^[a-f0-9]{64}$/i.test(input.elfSha256)) ||
+    !Number.isSafeInteger(input.timeoutMs) ||
+    input.timeoutMs < 1 ||
+    input.timeoutMs > 600000
+  )
+    throw new PlatformIOError(
+      "Invalid backend startup scope.",
+      "DEBUG_BACKEND_INPUT_INVALID",
+    );
+  await validateBackendReadyPattern(input.readyPattern);
+  const base = {
+    projectDir: selected.projectDir,
+    sessionId: input.sessionId,
+    command: input.backend.command,
+    debuggerExecutable: selected.executable,
+    elfPath: input.elfSha256 ? undefined : selected.elfPath,
+    elfSha256: input.elfSha256?.toLowerCase(),
+    trustedDebuggerRoots: selected.trustedDebuggerRoots,
+    pythonExecutable: input.backend.pythonExecutable,
+    readyPattern: input.readyPattern,
+    timeoutMs: input.timeoutMs,
+    purpose: "debugger_backend_start",
+  };
+  const context = { ...caller, workspaceDir: selected.projectDir };
+  const stages = [
+    {
+      action: "debugger_host_code",
+      args: { ...base, approvalId: input.hostApprovalId },
+    },
+    {
+      action: "debugger_mutate",
+      args: { ...base, approvalId: input.targetApprovalId },
+    },
+  ];
+  for (const stage of stages) {
+    const plan = await planAction(stage.action, stage.args, context);
+    if (plan.status !== "ready")
+      throw new PlatformIOError(
+        plan.reason,
+        plan.status === "requires_approval"
+          ? "APPROVAL_REQUIRED"
+          : "POLICY_DENIED",
+        { policyDecision: plan },
+      );
+  }
+  return { stages, context };
 }
 
 /** Authorize backend target/host effects, wait for readiness, then start GDB with joint cleanup. */
@@ -83,51 +146,7 @@ export async function startDebuggerWithBackend(
     cleanupProcess: cleanupBackend,
   };
   try {
-    if (
-      !input.sessionId ||
-      !Number.isSafeInteger(input.timeoutMs) ||
-      input.timeoutMs < 1 ||
-      input.timeoutMs > 600000
-    )
-      throw new PlatformIOError(
-        "Invalid backend startup scope.",
-        "DEBUG_BACKEND_INPUT_INVALID",
-      );
-    await validateBackendReadyPattern(input.readyPattern);
-    const base = {
-      projectDir: selected.projectDir,
-      sessionId: input.sessionId,
-      command: input.backend.command,
-      debuggerExecutable: selected.executable,
-      elfPath: selected.elfPath,
-      trustedDebuggerRoots: selected.trustedDebuggerRoots,
-      pythonExecutable: input.backend.pythonExecutable,
-      readyPattern: input.readyPattern,
-      timeoutMs: input.timeoutMs,
-      purpose: "debugger_backend_start",
-    };
-    const context = { ...caller, workspaceDir: selected.projectDir };
-    const stages = [
-      {
-        action: "debugger_host_code",
-        args: { ...base, approvalId: input.hostApprovalId },
-      },
-      {
-        action: "debugger_mutate",
-        args: { ...base, approvalId: input.targetApprovalId },
-      },
-    ];
-    for (const stage of stages) {
-      const plan = await planAction(stage.action, stage.args, context);
-      if (plan.status !== "ready")
-        throw new PlatformIOError(
-          plan.reason,
-          plan.status === "requires_approval"
-            ? "APPROVAL_REQUIRED"
-            : "POLICY_DENIED",
-          { policyDecision: plan },
-        );
-    }
+    const { stages, context } = await preflightDebuggerBackend(input, caller);
     return await dispatchAuthorizedAction(
       stages[0].action,
       stages[0].args,

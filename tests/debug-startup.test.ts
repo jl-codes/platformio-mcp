@@ -311,3 +311,37 @@ it("preflights and consumes all initialization grants through the retained start
     expect(getApproval(grant!)?.status).toBe("consumed");
   await sessions.stop(id);
 });
+
+it("requests backend approval before allocating retained files or probe custody", async () => {
+  const { selection } = fixture();
+  fs.writeFileSync(
+    path.join(root, "operator.json"),
+    JSON.stringify({
+      profile: "lab_admin",
+      overrides: {
+        allow: ["upload_firmware", "run_shell_command"],
+        deny: [],
+        approval_required: ["run_shell_command"],
+        audit_all_agent_actions: false,
+      },
+    }),
+  );
+  const error = await startPreparedDebugger(new DebugClientSessions(), {
+    ...selection,
+    backend: {
+      options: {
+        pythonExecutable: path.join(root, "python.exe"),
+        command: {
+          executable: path.join(root, "openocd.exe"),
+          cwd: root,
+          arguments: [],
+        },
+      },
+      readyPattern: "Listening on port",
+    },
+  }).catch((failure: unknown) => failure);
+  expect(error).toMatchObject({ code: "APPROVAL_REQUIRED" });
+  expect(retainDebugElf).not.toHaveBeenCalled();
+  expect(selection.acquireCustody).not.toHaveBeenCalled();
+  expect(DebugProcess.start).not.toHaveBeenCalled();
+});

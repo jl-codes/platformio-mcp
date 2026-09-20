@@ -24,7 +24,10 @@ import {
   type DebugProcessOptions,
 } from "../src/core/debug/debug-process.js";
 import { DebugStartupFailure } from "../src/core/debug/debug-start-failure.js";
-import { startDebuggerWithBackend } from "../src/core/debug/debug-backend-session.js";
+import {
+  startDebuggerWithBackend,
+  preflightDebuggerBackend,
+} from "../src/core/debug/debug-backend-session.js";
 let root: string;
 let closed: boolean;
 beforeEach(() => {
@@ -154,4 +157,21 @@ it("cleans backend when GDB fails before returning a process owner", async () =>
   await expect(startDebuggerWithBackend(args)).rejects.toThrow("spawn failed");
   expect(backend.cleanupProcess).toHaveBeenCalledOnce();
   expect(args.debugger.custody.releaseAfterExit).toHaveBeenCalledOnce();
+});
+
+it("keeps backend approval scope identical before and after private ELF retention", async () => {
+  const args = { ...input(), elfSha256: "a".repeat(64) };
+  const original = await preflightDebuggerBackend(args);
+  const retained = await preflightDebuggerBackend({
+    ...args,
+    debugger: {
+      ...args.debugger,
+      elfPath: path.join(root, "private-snapshot", "firmware.elf"),
+    },
+  });
+  expect(retained).toEqual(original);
+  expect(original.stages[0].args.elfSha256).toBe(args.elfSha256);
+  expect(original.stages[0].args.elfPath).toBeUndefined();
+  expect(DebugBackendProcess).not.toHaveBeenCalled();
+  expect(args.debugger.custody.prepareSpawn).not.toHaveBeenCalled();
 });
