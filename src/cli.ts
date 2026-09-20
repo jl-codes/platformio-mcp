@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { executeRunTargetAction } from "./tools/run-target.js";
+import { SerialClientContext } from "./adapters/serial-client.js";
 import { readRuntimeVersion } from "./utils/runtime-version.js";
 import { inspectDependencies } from "./tools/dependency-inspection.js";
 import { parseCompatibilityLaunch } from "./adapters/compatibility-mode.js";
@@ -125,6 +127,7 @@ COMMANDS:
   deps-check --project-dir <dir> [--environment <env>] [--build]
   project-envs --project-dir <dir>
   project-metadata|list-targets --project-dir <dir> [--environment <env>]
+  run-target --project-dir <dir> --target <name> [--environment <env>] [--upload-port <port>]
   pkg-search --query <query> [--kind library|platform|tool] [--page <n>]
   pkg-install --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
   pkg-uninstall --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
@@ -364,6 +367,33 @@ async function runCliCommand(command: string, rawArgs: string[]) {
   };
 
   try {
+    if (command === "run-target") {
+      const allowed = new Set([
+        "json", "project-dir", "target", "environment", "upload-port",
+        "stop-open-sessions", "approval-id", "config-approval-id", "selection-approval-id",
+      ]);
+      if (positionals.length || Object.keys(options).some((key) => !allowed.has(key)))
+        throw new PlatformIOError("Unknown named-target option or positional argument.", "TARGET_INPUT_INVALID");
+      if (options["stop-open-sessions"] !== undefined &&
+          ![true, false, "true", "false"].includes(options["stop-open-sessions"]))
+        throw new PlatformIOError("--stop-open-sessions must be true or false.", "TARGET_INPUT_INVALID");
+      const client = new SerialClientContext();
+      try {
+        const result = await executeRunTargetAction({
+          projectDir: projectDirForPolicy, target: asString(options.target),
+          environment: asString(options.environment), uploadPort: asString(options["upload-port"]),
+          stopOpenSessions: asBoolean(options["stop-open-sessions"]) ?? false,
+          approvalId: asString(options["approval-id"]),
+          configApprovalId: asString(options["config-approval-id"]),
+          selectionApprovalId: asString(options["selection-approval-id"]),
+        }, client, { workspaceDir: projectDirForPolicy, actor: "user" });
+        printOutput(result, jsonMode);
+        if (!result.ok) process.exitCode = 1;
+      } finally {
+        await client.close();
+      }
+      return;
+    }
     // Operator administration stays local to the CLI, including recovery from invalid policy.
     // This is not proof of human identity against a process with the same OS-user authority.
     if (command === "policy-enroll" || command === "policy-revoke") {
@@ -1063,6 +1093,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       "project-envs": "inspection",
       "project-metadata": "inspection",
       "list-targets": "inspection",
+      "run-target": "build",
 
       "pkg-search": "packages",
       "pkg-install": "packages",
@@ -1123,6 +1154,7 @@ async function main() {
   );
   const command = args[0];
   const knownCommands = new Set([
+    "run-target",
     "deps-check",
     "project-envs",
     "project-metadata",

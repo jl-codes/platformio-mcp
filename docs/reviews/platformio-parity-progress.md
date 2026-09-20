@@ -1007,3 +1007,7 @@ Extended workflow regression coverage through the real policy/approval service w
 ### Public named-target routes
 
 Registered run_target and optional pio_run_target using the same executor. Canonical inputs map to the reference spelling without a second implementation. Target effect policy chains now honor public-name denials as well as effect/category denials. Thirty-six workflow/effect checks and one focused real-stdio named-target denial check passed; no PlatformIO operation executed. Canonical inventory is 55 tools, with 29 optional aliases (84 total). The attempted alias test-name filter matched no cases, so it supplies no additional validation evidence. Public exposure does not close PAR-35: network/probe targets, artifact binding, diagnostic presentation and native/hardware acceptance remain required.
+
+### Named-target CLI and compatibility launch verification
+
+Added CLI run-target with strict flags and canonical executor mapping, without a second execution path or broad preauthorization. The focused real CLI denial check passed and TypeScript passed. All four compatibility launch cases passed, establishing 55 canonical tools / 84 enabled tools and opt-in pio_run_target registration. Complete CI 35494348961 passed for the preceding pushed revision, before public route/CLI additions. Full target/hardware parity remains incomplete.

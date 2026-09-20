@@ -133,3 +133,9 @@ it.each(["clean", "check", "test"])("routes %s CLI through canonical permission 
   expect(run(command).errorType).toBe("PolicyDenied");
   expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
 });
+
+it("routes named-target CLI through effect permission before execution", () => {
+  fs.writeFileSync(path.join(project, "platformio.ini"), "[env:fixture]\nplatform=native\n");
+  expect(run("run-target", "--target", "buildfs").errorType).toBe("PolicyDenied");
+  expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
+});

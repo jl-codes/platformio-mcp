@@ -347,6 +347,8 @@ export const actionRiskLevels: Record<string, PolicyRiskLevel> = {
 /** Resolves the existing CLI spelling to its concrete operation. */
 export function operationForCliCommand(command: string): string {
   switch (command) {
+    case "run-target":
+      return "run_target";
     case "project-envs":
       return "project_envs";
     case "project-metadata":
