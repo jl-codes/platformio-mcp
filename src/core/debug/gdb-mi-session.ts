@@ -123,6 +123,11 @@ export class GdbMiSession {
     });
   }
 
+  /** Disable further commands after owner-detected unsafe startup; process custody is retained. */
+  invalidate(error: unknown): void {
+    this.fail(error);
+  }
+
   /** Consume stdout and return parsed records for the owner's event/log dispatcher. */
   accept(chunk: Uint8Array): GdbMiRecord[] {
     if (this.failure) throw this.failure;
