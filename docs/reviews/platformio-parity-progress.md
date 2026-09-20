@@ -1183,3 +1183,8 @@ Added bounded exact-byte export into an existing authorized workspace directory,
 
 Integrated explicit outPath/exportApprovalId into device MCP/CLI requests. Export permission is preflighted before device access, captures preserve erased bytes internally, and empty results retain their failure status while returning only export metadata. Seventeen focused cases passed across export policy, core policy, effective-table selection and read selection (the export fixture required an explicit read-category allow). Lint and TypeScript passed; plugin runtime refreshed. Default managed retention and reference adapter remain incomplete.
 
+
+### Export identity ordering
+
+Moved captured-partition expected hash verification ahead of any export, including erased partitions. A mismatch now leaves the destination absent instead of exporting before later analysis detects it. Three focused public export cases, lint and TypeScript passed. Both CI runs 35499752243 and 35499749555 passed at 738779d9. Runtime rebuilt for the corrected export path; the newer acquisition/export commits require CI at their own head.
+

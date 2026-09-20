@@ -81857,7 +81857,7 @@ var require_websocket2 = __commonJS({
     var http = __require("http");
     var net = __require("net");
     var tls = __require("tls");
-    var { randomBytes, createHash: createHash12 } = __require("crypto");
+    var { randomBytes, createHash: createHash13 } = __require("crypto");
     var { Duplex, Readable } = __require("stream");
     var { URL: URL2 } = __require("url");
     var PerMessageDeflate = require_permessage_deflate();
@@ -82525,7 +82525,7 @@ var require_websocket2 = __commonJS({
           abortHandshake(websocket, socket, "Invalid Upgrade header");
           return;
         }
-        const digest = createHash12("sha1").update(key + GUID).digest("base64");
+        const digest = createHash13("sha1").update(key + GUID).digest("base64");
         if (res.headers["sec-websocket-accept"] !== digest) {
           abortHandshake(websocket, socket, "Invalid Sec-WebSocket-Accept header");
           return;
@@ -82894,7 +82894,7 @@ var require_websocket_server = __commonJS({
     var EventEmitter2 = __require("events");
     var http = __require("http");
     var { Duplex } = __require("stream");
-    var { createHash: createHash12 } = __require("crypto");
+    var { createHash: createHash13 } = __require("crypto");
     var extension = require_extension();
     var PerMessageDeflate = require_permessage_deflate();
     var subprotocol = require_subprotocol();
@@ -83201,7 +83201,7 @@ var require_websocket_server = __commonJS({
           );
         }
         if (this._state > RUNNING) return abortHandshake(socket, 503);
-        const digest = createHash12("sha1").update(key + GUID).digest("base64");
+        const digest = createHash13("sha1").update(key + GUID).digest("base64");
         const headers = [
           "HTTP/1.1 101 Switching Protocols",
           "Upgrade: websocket",
@@ -92643,6 +92643,7 @@ var require_ip_address = __commonJS({
 
 // src/tools/coredump.ts
 import fs39 from "node:fs/promises";
+import { createHash as createHash8 } from "node:crypto";
 
 // src/core/analysis/esp-coredump-export.ts
 init_errors();
@@ -97887,6 +97888,11 @@ async function executeCoredump(input, caller = {}, onAuthorized) {
           caller
         ) : null;
         validatePolicy();
+        if (capture && request.expectedInputSha256 && createHash8("sha256").update(capture.bytes).digest("hex") !== request.expectedInputSha256.toLowerCase())
+          throw new PlatformIOError(
+            "Captured partition does not match the selected input identity.",
+            "COREDUMP_IDENTITY_MISMATCH"
+          );
         const exported = request.outPath && capture ? await dispatchAuthorizedAction(
           "coredump_export",
           exportArgs,
@@ -100277,18 +100283,18 @@ var NativeSerialDiscovery = class {
 
 // src/core/serial/session-policy.ts
 import { AsyncLocalStorage as AsyncLocalStorage2 } from "node:async_hooks";
-import { createHash as createHash10 } from "node:crypto";
+import { createHash as createHash11 } from "node:crypto";
 init_errors();
 
 // src/core/serial/session-manager.ts
 import fs46 from "node:fs";
 import path48 from "node:path";
-import { createHash as createHash9, randomUUID as randomUUID4 } from "node:crypto";
+import { createHash as createHash10, randomUUID as randomUUID4 } from "node:crypto";
 import { performance as performance4 } from "node:perf_hooks";
 
 // src/core/devices/serial-discovery-binding.ts
 init_errors();
-import { createHash as createHash8 } from "node:crypto";
+import { createHash as createHash9 } from "node:crypto";
 function descriptor(record2) {
   for (const field2 of [
     record2.path,
@@ -100316,7 +100322,7 @@ function descriptor(record2) {
   }
   if (!record2.vendorId || !record2.productId || !record2.serialNumber)
     return void 0;
-  return createHash8("sha256").update(
+  return createHash9("sha256").update(
     JSON.stringify([
       record2.vendorId.toLowerCase(),
       record2.productId.toLowerCase(),
@@ -101155,7 +101161,7 @@ var SerialSessionManager = class {
         path: request.path,
         baudRate: request.baudRate,
         ...bytes ? {
-          bytesHash: createHash9("sha256").update(bytes).digest("hex"),
+          bytesHash: createHash10("sha256").update(bytes).digest("hex"),
           byteLength: bytes.length
         } : {}
       })
@@ -101644,7 +101650,7 @@ var PolicySerialSessionService = class {
       ...context.caller,
       workspaceDir: request.projectDir,
       devicePort: request.path,
-      targetBindingDigest: createHash10("sha256").update(
+      targetBindingDigest: createHash11("sha256").update(
         JSON.stringify([
           [request.resource.kind, request.resource.identity],
           ...(request.additionalResources ?? []).map((resource) => [
@@ -114232,7 +114238,7 @@ var import_debug = __toESM(require_src(), 1);
 import { isIPv6 } from "node:net";
 import { isIPv6 as isIPv62 } from "node:net";
 import { Buffer as Buffer2 } from "node:buffer";
-import { createHash as createHash11 } from "node:crypto";
+import { createHash as createHash12 } from "node:crypto";
 import { isIP } from "node:net";
 var ipv4CompatibleSubnet = new import_ip_address.Address6("::/96");
 function ipKeyGenerator(ip, ipv6Subnet = 56) {
@@ -114414,7 +114420,7 @@ var getResetSeconds = (windowMs, resetTime) => {
   return resetSeconds;
 };
 var getPartitionKey = (key) => {
-  const hash = createHash11("sha256");
+  const hash = createHash12("sha256");
   hash.update(key);
   const partitionKey = hash.digest("hex").slice(0, 12);
   return Buffer2.from(partitionKey).toString("base64");

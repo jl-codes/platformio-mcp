@@ -1,5 +1,6 @@
 /** Permission-gated offline core-dump handler shared by MCP and CLI adapters. */
 import fs from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { exportEspCoredump } from "../core/analysis/esp-coredump-export.js";
 import { z } from "zod";
 import { PlatformIOError } from "../utils/errors.js";
@@ -153,6 +154,16 @@ export async function executeCoredump(
             )
           : null;
         validatePolicy();
+        if (
+          capture &&
+          request.expectedInputSha256 &&
+          createHash("sha256").update(capture.bytes).digest("hex") !==
+            request.expectedInputSha256.toLowerCase()
+        )
+          throw new PlatformIOError(
+            "Captured partition does not match the selected input identity.",
+            "COREDUMP_IDENTITY_MISMATCH",
+          );
         const exported =
           request.outPath && capture
             ? await dispatchAuthorizedAction(
