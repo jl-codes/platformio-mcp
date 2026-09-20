@@ -18,7 +18,7 @@ import { tailFileBounded } from "./tail.js";
 import { registerCommand, updateTaskStatus } from "./command-registry.js";
 import crypto from "node:crypto";
 import { mcpContext } from "./mcp-context.js";
-import { parseStderrErrors } from "./errors.js";
+import { PlatformIOError, parseStderrErrors } from "./errors.js";
 
 import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
 
@@ -281,7 +281,23 @@ export async function executeWithSpooling(
     return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
   }
   
-  const exitCode = await waitForOwnedProcess(proc, timeoutMs);
+  let exitCode: number;
+  try {
+    exitCode = await waitForOwnedProcess(proc, timeoutMs);
+  } catch (error) {
+    const cleanupPending = !(error instanceof PlatformIOError) || error.context?.cleanupPending !== false;
+    await updateTaskStatus(commandId, taskId, {status: "error", error: error instanceof Error ? error.message : "Process failed."}, projectArea).catch(() => {});
+    try {
+      if (!cleanupPending) {
+        await unregisterBuildPid(projectArea);
+        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      }
+    } finally {
+      try { fs.closeSync(outFd); } catch {}
+      try { watcher?.close(); } catch {}
+    }
+    throw error;
+  }
 
   let errorMessage = undefined;
   if (exitCode !== 0) {

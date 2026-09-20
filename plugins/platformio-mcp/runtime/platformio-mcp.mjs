@@ -22764,6 +22764,84 @@ parentPort.postMessage({ready:true});
   }
 });
 
+// src/utils/owned-process-wait.ts
+function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
+  return new Promise((resolve, reject) => {
+    let settled = false, timedOut = false;
+    let escalation;
+    let deadline;
+    const cleanup = () => {
+      settled = true;
+      clearTimeout(timer);
+      clearTimeout(escalation);
+      clearTimeout(deadline);
+      proc.off("exit", exited);
+      proc.off("close", exited);
+      proc.off("error", failed);
+    };
+    const exited = (code) => {
+      if (settled) return;
+      cleanup();
+      if (timedOut)
+        reject(
+          new PlatformIOError(
+            `Command timed out after ${timeoutMs}ms`,
+            "COMMAND_TIMEOUT",
+            { cleanupPending: false }
+          )
+        );
+      else resolve(code ?? 1);
+    };
+    const failed = (error2) => {
+      if (settled) return;
+      cleanup();
+      reject(
+        new PlatformIOError(error2.message, "PROCESS_FAILED", {
+          cleanupPending: !!proc.pid && proc.exitCode === null && proc.signalCode === null
+        })
+      );
+    };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        proc.kill("SIGTERM");
+      } catch {
+      }
+      if (settled) return;
+      escalation = setTimeout(() => {
+        if (settled) return;
+        try {
+          proc.kill("SIGKILL");
+        } catch {
+        }
+        if (settled) return;
+        deadline = setTimeout(() => {
+          if (settled) return;
+          cleanup();
+          reject(
+            new PlatformIOError(
+              "Child termination could not be confirmed.",
+              "PROCESS_CLEANUP_PENDING",
+              { cleanupPending: true }
+            )
+          );
+        }, graceMs);
+      }, graceMs);
+    }, timeoutMs);
+    proc.once("exit", exited);
+    proc.once("close", exited);
+    proc.once("error", failed);
+    if (proc.exitCode !== null || proc.signalCode !== null)
+      exited(proc.exitCode);
+  });
+}
+var init_owned_process_wait = __esm({
+  "src/utils/owned-process-wait.ts"() {
+    "use strict";
+    init_errors2();
+  }
+});
+
 // node_modules/tree-kill/index.js
 var require_tree_kill = __commonJS({
   "node_modules/tree-kill/index.js"(exports, module) {
@@ -23321,46 +23399,6 @@ function rotateSpoolerStreams(verb, projectDir) {
   const latestLog = path34.join(targetDir, `latest-${verb}.log`);
   return { logFile, latestLog };
 }
-function tryTerminateProcess(pid) {
-  if (!pid) return;
-  try {
-    process.kill(pid, "SIGTERM");
-    setTimeout(() => {
-      try {
-        process.kill(pid, 0);
-        process.kill(pid, "SIGKILL");
-      } catch {
-      }
-    }, 1e3);
-  } catch {
-  }
-}
-function waitForProcessEnd(proc, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const onDone = (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(code ?? 1);
-    };
-    const onError = (err) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(err);
-    };
-    const timer = setTimeout(() => {
-      if (settled) return;
-      tryTerminateProcess(proc?.pid);
-      settled = true;
-      reject(new Error(`Command timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-    proc.on("error", onError);
-    proc.on("exit", onDone);
-    proc.on("close", onDone);
-  });
-}
 function ensureLatestLogPointer(logFile, latestLog) {
   try {
     if (fs28.existsSync(latestLog)) fs28.unlinkSync(latestLog);
@@ -23452,8 +23490,10 @@ async function executeWithSpooling(command, args, options) {
   }
   const timeoutMs = options.timeout ?? (options.background ? 36e5 : 6e5);
   if (options.background) {
-    const p = waitForProcessEnd(proc, timeoutMs);
+    const p = waitForOwnedProcess(proc, timeoutMs);
+    let cleanupPending = false;
     p.catch((e) => {
+      cleanupPending = e?.context?.cleanupPending !== false;
       console.error(`[Background Task Error]: ${e.message}`);
       updateTaskStatus(commandId, taskId, { status: "error", error: e.message }, targetProjectArea).catch(() => {
       });
@@ -23474,8 +23514,10 @@ async function executeWithSpooling(command, args, options) {
         ...errorMessage2 ? { error: errorMessage2 } : {}
       }, targetProjectArea).catch(() => {
       });
-      await unregisterBuildPid(targetProjectArea);
-      if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      if (!cleanupPending) {
+        await unregisterBuildPid(targetProjectArea);
+        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      }
       try {
         fs28.closeSync(outFd);
       } catch {
@@ -23508,7 +23550,30 @@ async function executeWithSpooling(command, args, options) {
     });
     return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
   }
-  const exitCode = await waitForProcessEnd(proc, timeoutMs);
+  let exitCode;
+  try {
+    exitCode = await waitForOwnedProcess(proc, timeoutMs);
+  } catch (error2) {
+    const cleanupPending = !(error2 instanceof PlatformIOError) || error2.context?.cleanupPending !== false;
+    await updateTaskStatus(commandId, taskId, { status: "error", error: error2 instanceof Error ? error2.message : "Process failed." }, projectArea).catch(() => {
+    });
+    try {
+      if (!cleanupPending) {
+        await unregisterBuildPid(projectArea);
+        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      }
+    } finally {
+      try {
+        fs28.closeSync(outFd);
+      } catch {
+      }
+      try {
+        watcher?.close();
+      } catch {
+      }
+    }
+    throw error2;
+  }
   let errorMessage = void 0;
   if (exitCode !== 0) {
     try {
@@ -23590,6 +23655,7 @@ var WORKSPACE_DIR3;
 var init_spooler = __esm({
   "src/utils/spooler.ts"() {
     "use strict";
+    init_owned_process_wait();
     init_platformio();
     init_process_manager();
     init_semaphore();

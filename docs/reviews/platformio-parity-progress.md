@@ -623,3 +623,7 @@ Added an advisory DeviceLeaseStore.status query serialized with lease mutations.
 ### Spooler timeout custody correction
 
 Replaced PID-only delayed termination with completion tracking on the original ChildProcess handle. Timeout requests termination, escalates within a bounded grace period, and reports whether process exit was actually observed. Background spooling retains its port claim and PID tracking when termination remains uncertain instead of freeing hardware immediately after requesting termination. TypeScript checking and eight spooler/process/wait tests pass; a subsequent real Node-child timeout test also passes (four waiter tests total). No hardware was used. Shared legacy lease migration, child handoff, monitor-stop identity checks, and late-exit recovery remain incomplete.
+
+### Spooler failure cleanup verification
+
+Foreground process failures now record task failure and close local log descriptors/watchers in finally. Port claims and PID tracking are released only when exit is confirmed; uncertain children retain custody. New isolated tests cover foreground/background and confirmed/uncertain termination without invoking PlatformIO. Eight custody/wait tests and TypeScript compilation pass. Rebuilt plugin and npm validation pass (564 canonical package files). Legacy shared leases and surviving-child custody are still outstanding; these cleanup fixes do not establish full hardware lifecycle parity.
