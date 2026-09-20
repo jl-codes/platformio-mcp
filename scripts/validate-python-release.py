@@ -52,8 +52,8 @@ def validate(directory):
                     data=archive.read(prefix+item["path"])
                     if len(data)!=item["bytes"] or hashlib.sha256(data).hexdigest()!=item["sha256"]:
                         raise ValueError("Wheel payload checksum mismatch")
-                if "node/LICENSE" not in paths or "runtime/cli.mjs" not in paths:
-                    raise ValueError("Required Node license or CLI missing")
+                if not {"node/LICENSE", "runtime/cli.mjs", "licenses/javascript-inventory.json"}.issubset(paths):
+                    raise ValueError("Required license inventory, Node license or CLI missing")
             else:
                 if f"pio-agent-platformio=={version}" not in metadata.get_all("Requires-Dist",[]):
                     raise ValueError("Alias does not pin exact canonical release")

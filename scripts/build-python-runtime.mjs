@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /** Build the shared CLI engine and ancillary assets for a Python wheel staging directory. */
 import {build} from "esbuild";
+import {collectBundleLicenses} from "./bundle-license-inventory.mjs";
 import {cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import path from "node:path";
 
-/** Create a fresh staging tree. Node binaries and the final signed inventory are added by the wheel builder. */
+/** Create a fresh staging tree. Node binaries and the final checksum inventory are added by the wheel builder. */
 export async function buildPythonRuntime(destination) {
   const root = fileURLToPath(new URL("..", import.meta.url));
   const output = path.resolve(destination);
@@ -15,13 +16,13 @@ export async function buildPythonRuntime(destination) {
   mkdirSync(output, {recursive:true});
   cpSync(path.join(plugin, "runtime"), path.join(output, "runtime"), {recursive:true});
   const common = {
-    bundle:true, platform:"node", format:"esm", target:"node20", sourcemap:false,
+    absWorkingDir:root, metafile:true, bundle:true, platform:"node", format:"esm", target:"node20", sourcemap:false,
     legalComments:"inline", logLevel:"warning",
     banner:{js:'import { createRequire as __createRequire } from "node:module"; const require = __createRequire(import.meta.url);'},
   };
-  await build({...common, entryPoints:[path.join(root,"src/cli.ts")], outfile:path.join(output,"runtime/cli.mjs"), external:["serialport"]});
+  const cliBuild = await build({...common, entryPoints:[path.join(root,"src/cli.ts")], outfile:path.join(output,"runtime/cli.mjs"), external:["serialport"]});
   // Preserve dynamic installer/validator paths used by the original CLI.
-  await build({...common, entryPoints:[path.join(root,"scripts/installers/index.js")], outfile:path.join(output,"scripts/installers/index.js"), external:["../validate-codex-plugin.mjs"]});
+  const installerBuild = await build({...common, entryPoints:[path.join(root,"scripts/installers/index.js")], outfile:path.join(output,"scripts/installers/index.js"), external:["../validate-codex-plugin.mjs"]});
   for (const name of ["validate-codex-plugin.mjs", "serial-runtime-contract.mjs"])
     cpSync(path.join(root,"scripts",name),path.join(output,"scripts",name));
   cpSync(plugin,path.join(output,"plugins/platformio-mcp"),{recursive:true});
@@ -31,6 +32,7 @@ export async function buildPythonRuntime(destination) {
     cpSync(path.join(root,name),path.join(output,name));
   const pkg=JSON.parse(readFileSync(path.join(root,"package.json"),"utf8"));
   writeFileSync(path.join(output,"package.json"),JSON.stringify({name:pkg.name,version:pkg.version,type:"module",license:pkg.license},null,2)+"\n");
+  collectBundleLicenses(root, output, [cliBuild.metafile, installerBuild.metafile]);
   return output;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

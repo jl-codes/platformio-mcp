@@ -5,12 +5,17 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from pio_agent_launcher.__main__ import launch_spec, MINIMUMS
 
 
 class LauncherTests(unittest.TestCase):
     def setUp(self):
+        # Payload tests model Windows independently of the machine running the tests.
+        windows = patch("pio_agent_launcher.__main__.sys.getwindowsversion", create=True)
+        windows.start().return_value.major = 10
+        self.addCleanup(windows.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)

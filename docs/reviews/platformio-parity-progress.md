@@ -687,3 +687,7 @@ Added a release build job that assembles all five pinned platform wheels and bot
 ### Enforce Python wheel operating-system floors
 
 The launcher now requires the pinned platform contract and rejects older Windows/macOS/Linux kernels, older glibc and musl before executing bundled Node. The wheel builder embeds those requirements, and release validation checks them against the support manifest. Syntax compilation passed; no repeated smoke tests were run. Linux libstdc++ symbol-version acceptance remains an explicit target-host requirement, not proven by these checks. No publication occurred.
+
+### Include bundled JavaScript dependency licenses
+
+Python runtime assembly now uses esbuild input metadata to identify and copy license/notice files from each bundled dependency instance, with package names/versions/input paths and notice hashes in a shipped inventory. A real staging build collected 116 dependency records; missing license files stop assembly. Separate nested versions/copies are preserved, and short collision-checked paths avoid excessive Windows wheel paths. Release validation now requires the inventory. Native dependency and Node licenses remain separately included. This does not establish complete dashboard asset attribution or legal review; those still need accounting. Corrected the existing payload-test Windows version mock for non-Windows runners without running more smoke tests.
