@@ -206,23 +206,25 @@ export async function executePartitionTable(
         build &&
         path.basename(build.tablePath).toLowerCase() === "partitions.bin"
       ) {
-        const candidate = path.resolve(
-          projectDir,
-          path.dirname(build.tablePath),
-          "firmware.bin",
-        );
-        const relative = path.relative(projectDir, candidate);
-        if (
-          relative &&
-          relative !== ".." &&
-          !relative.startsWith(".." + path.sep) &&
-          !path.isAbsolute(relative)
-        ) {
-          try {
-            if ((await fs.stat(candidate)).isFile()) firmwarePath = candidate;
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-          }
+        try {
+          const candidate = await fs.realpath(
+            path.resolve(
+              projectDir,
+              path.dirname(build.tablePath),
+              "firmware.bin",
+            ),
+          );
+          const relative = path.relative(projectDir, candidate);
+          if (
+            relative &&
+            relative !== ".." &&
+            !relative.startsWith(".." + path.sep) &&
+            !path.isAbsolute(relative) &&
+            (await fs.stat(candidate)).isFile()
+          )
+            firmwarePath = candidate;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
         }
       }
       const boardInfo =

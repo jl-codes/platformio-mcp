@@ -96197,18 +96197,19 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
       guard();
       let firmwarePath = params.firmwarePath;
       if (!firmwarePath && build && path30.basename(build.tablePath).toLowerCase() === "partitions.bin") {
-        const candidate = path30.resolve(
-          projectDir,
-          path30.dirname(build.tablePath),
-          "firmware.bin"
-        );
-        const relative = path30.relative(projectDir, candidate);
-        if (relative && relative !== ".." && !relative.startsWith(".." + path30.sep) && !path30.isAbsolute(relative)) {
-          try {
-            if ((await fs26.stat(candidate)).isFile()) firmwarePath = candidate;
-          } catch (error2) {
-            if (error2.code !== "ENOENT") throw error2;
-          }
+        try {
+          const candidate = await fs26.realpath(
+            path30.resolve(
+              projectDir,
+              path30.dirname(build.tablePath),
+              "firmware.bin"
+            )
+          );
+          const relative = path30.relative(projectDir, candidate);
+          if (relative && relative !== ".." && !relative.startsWith(".." + path30.sep) && !path30.isAbsolute(relative) && (await fs26.stat(candidate)).isFile())
+            firmwarePath = candidate;
+        } catch (error2) {
+          if (error2.code !== "ENOENT") throw error2;
         }
       }
       const boardInfo = project && ((params.flashSize ?? project.flashSize) === void 0 || project.mcu === null) ? await resolvePartitionBoardInfo(

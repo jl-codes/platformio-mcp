@@ -1087,3 +1087,8 @@ Added separately authorized optional catalogue fallback for absent flash size/MC
 ### Core-dump input and report foundations
 
 Added bounded raw framing for supported v0.2/v0.3 and v1.0-v1.3 envelopes, CRC32/SHA-256 validation, exact declared-length trimming, input/content identities and strict base64 decoding. Encrypted, erased, unsupported and corrupted inputs produce distinct errors. Definitions checked against https://github.com/espressif/esp-coredump/blob/v1.10.0/esp_coredump/corefile/loader.py. Added bounded current-thread analyzer report projection with common-secret redaction and explicit truncation. Ten focused cases use Python zlib/hashlib-generated checksum fixtures and synthetic reports; lint and TypeScript passed. No analyzer or hardware executed. Legacy v0.1/direct ELF input, analyzer packaging/execution, immutable matching ELF, private retention, public integration and physical acceptance remain unfinished; this is not PAR completion.
+
+### Cross-platform firmware discovery correction
+
+CI 35497560904 and 35497559003 exposed lexical versus canonical path mismatches on Windows and macOS. Firmware discovery now resolves the existing candidate before enforcing workspace containment, handling Windows short paths and symlinked temporary directories while rejecting outside targets. The failing focused regression, targeted lint and TypeScript passed locally. Full CI remains required on the corrected commit; no physical acceptance or publication is claimed.
+
