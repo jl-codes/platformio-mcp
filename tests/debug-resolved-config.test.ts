@@ -27,6 +27,7 @@ function config() {
     readyPattern: "Listening on port",
     initScript: "monitor init\n$LOAD_CMDS\n",
     generatedInitScript: "monitor init\nload\n",
+    generatedInitTemplate: "monitor init\nload\n",
     initCommands: [],
     extraCommands: [],
     loadCommands: ["load"],

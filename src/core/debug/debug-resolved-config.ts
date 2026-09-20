@@ -32,6 +32,18 @@ with contextlib.redirect_stdout(sys.stderr):
         debug.load_cmds = []
     elif sys.argv[2] != "load":
         raise ValueError("invalid load mode")
+    # Preserve Core placeholders for later binding to retained artifacts and an owned endpoint.
+    markers = {"$PROG_PATH": "__PIO_MCP_INIT_ELF_PATH__", "$PROG_DIR": "__PIO_MCP_INIT_ELF_DIRECTORY__", "$DEBUG_PORT": "__PIO_MCP_INIT_ENDPOINT__"}
+    original_reveal = debug.reveal_patterns
+    def reveal_template(value, recursive=True):
+        def protect(item):
+            if isinstance(item, str):
+                for key, marker in markers.items(): item = item.replace(key, marker)
+                return item
+            if isinstance(item, list): return [protect(child) for child in item]
+            if isinstance(item, dict): return {key: protect(child) for key, child in item.items()}
+            return item
+        return original_reveal(protect(value), recursive)
     # Reuse only the pure file-generation method, never construct/run a debug client.
     with tempfile.TemporaryDirectory(prefix="pio-debug-init-") as directory:
         script_path = os.path.join(directory, ".pioinit")
@@ -39,8 +51,16 @@ with contextlib.redirect_stdout(sys.stderr):
         GDBClientProcess.generate_init_script(owner, script_path)
         with open(script_path, "r", encoding="utf-8") as script_file:
             generated_script = script_file.read(65537)
-        if len(generated_script) > 65536:
-            raise ValueError("initialization script limit")
+        if len(generated_script) > 65536 or any(marker in generated_script for marker in markers.values()):
+            raise ValueError("initialization script limit or reserved marker")
+        debug.reveal_patterns = reveal_template
+        try:
+            GDBClientProcess.generate_init_script(owner, script_path)
+            with open(script_path, "r", encoding="utf-8") as script_file:
+                generated_template = script_file.read(65537)
+            if len(generated_template) > 65536: raise ValueError("initialization template limit")
+        finally:
+            debug.reveal_patterns = original_reveal
     result = dict(
         environment=env,
         debuggerPath=debug.client_executable_path,
@@ -51,6 +71,7 @@ with contextlib.redirect_stdout(sys.stderr):
         readyPattern=debug.server_ready_pattern,
         initScript=debug.reveal_patterns(debug.get_init_script("gdb")),
         generatedInitScript=generated_script,
+        generatedInitTemplate=generated_template,
         initCommands=debug.reveal_patterns(list(debug.init_cmds or [])),
         extraCommands=debug.reveal_patterns(list(debug.extra_cmds or [])),
         loadCommands=debug.reveal_patterns(list(debug.load_cmds or [])),
@@ -75,6 +96,7 @@ const resolvedSchema = z
     readyPattern: z.string().max(4096).nullable(),
     initScript: boundedText,
     generatedInitScript: boundedText,
+    generatedInitTemplate: boundedText,
     initCommands: commandList,
     extraCommands: commandList,
     loadCommands: commandList,

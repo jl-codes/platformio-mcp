@@ -70,6 +70,7 @@ beforeEach(() => {
     readyPattern: null,
     initScript: "",
     generatedInitScript: "",
+    generatedInitTemplate: "",
     initCommands: [],
     extraCommands: [],
     loadCommands: ["load"],
