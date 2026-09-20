@@ -1188,3 +1188,8 @@ Integrated explicit outPath/exportApprovalId into device MCP/CLI requests. Expor
 
 Moved captured-partition expected hash verification ahead of any export, including erased partitions. A mismatch now leaves the destination absent instead of exporting before later analysis detects it. Three focused public export cases, lint and TypeScript passed. Both CI runs 35499752243 and 35499749555 passed at 738779d9. Runtime rebuilt for the corrected export path; the newer acquisition/export commits require CI at their own head.
 
+
+### Managed dump retention foundation
+
+Added private managed storage with a maximum of 32 objects at 16 MiB each, serialized across processes using the existing lock library. Entries carry a 24-hour expiry, checked during access and by a live-process expiry timer; stopped servers cannot physically delete files until cleanup runs again. Corrupt records fail closed; unrelated store files are not pruned. Three real filesystem cases passed for exact bytes/expiry, quota and unrelated-file preservation; lint and TypeScript passed. Startup/access integration and default reference-adapter retention remain incomplete.
+
