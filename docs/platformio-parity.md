@@ -92,7 +92,7 @@ For private managed storage, device requests can select retainDump: true (CLI --
 
 The opt-in pio_coredump tool now resolves project/environment/serial selection, saves captures by default in private managed storage, and supports out_path plus optional analysis. Missing ELF output preserves the capture with analysis=null; unconfigured analysis tools are reported without claiming analysis ran. Explicit output remains workspace-contained and never replaces an existing file. Metadata execution, partition inspection, device reads, exports and analyzer execution retain separate scoped permissions; table_config_approval_id and elf_metadata_approval_id avoid reusing a consumed selection grant.
 
-The inventory is now 57 canonical tools plus 35 compatibility tools (92 with compatibility enabled). Registration and offline checks do not prove full PAR-05 parity: physical capture, remaining reference result details and the wider acceptance gates remain outstanding.
+The inventory is now 57 canonical tools plus 39 compatibility tools (96 with compatibility enabled). Registration and offline checks do not prove full PAR-05 parity: physical capture, remaining reference result details and the wider acceptance gates remain outstanding.
 
 
 ## Flash and boot verification
@@ -117,3 +117,14 @@ Configured `-I`/`--host_ip`, `-P`/`--host_port`, and `-t`/`--timeout` select num
 ICMP failure never blocks an upload: `reachable` is null with an explicit not-probed/not-requested diagnostic. `upload_path` is `pio_build_espota_direct` for build mode and `espota_direct` otherwise. Successful transfer reports the captured image SHA-256 and `runtime_verified: false`; it does not establish healthy firmware execution. This remains incomplete physical/platform acceptance, not a full parity claim.
 
 The native bridge can be checked without a board using `node --import tsx scripts/verify-ota-bridge.mts <absolute-python-path> [evidence-path]`. It uses only loopback UDP/TCP fixtures and dummy credentials. Windows evidence is recorded in `docs/reviews/ota-bridge-windows-evidence.json`.
+
+
+### Live debugger compatibility
+
+Compatibility mode now exposes `pio_debug_start`, `pio_debug_cmd`, `pio_debug_list` and `pio_debug_stop`. Sessions belong to the current MCP connection. Startup uses the installed PlatformIO configuration and generated initialization, a retained ELF, and a uniquely identified USB probe. Supply `probe: {vendor_id, product_id, serial_number}` when discovery is ambiguous. Currently implemented owned local bindings are OpenOCD and modern J-Link; standalone ST-Link and remote/pipe transports remain incomplete.
+
+Startup approvals are separate for preparation, discovery, host code and target effects. Completed preparation stages survive approval retries on the same connection. Discovery authorization is consumed per attempt; if a later startup approval is requested, obtain a fresh discovery approval on the next attempt. Never reuse a consumed grant as permission. Normal stop authorizes the configured reset/run hook; `process_only: true` performs recovery cleanup without sending target commands. A reset/run acknowledgment does not independently prove that the physical target is running.
+
+Native supervisors require empty owned process groups/Windows jobs for both GDB and its backend before releasing probe custody. Optional host verification can impose an additional check. This proves closure of owned process handles, not that another application cannot open the probe afterward; privileged project/debugger code is not an OS sandbox. Failed or uncertain cleanup retains a recoverable session.
+
+Registration is not full debugger acceptance: physical ESP/Cortex probe evidence, remaining backend bindings, response parity details, endpoint-conflict handling and complete CLI/dashboard integration remain outstanding. Power profiling is the remaining unregistered reference tool. No release has been published.

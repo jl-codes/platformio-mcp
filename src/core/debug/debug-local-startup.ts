@@ -18,7 +18,7 @@ import { startPreparedDebugger } from "./debug-startup.js";
 export interface LocalDebuggerStartup {
   prepared: Awaited<ReturnType<typeof prepareDebuggerProject>>;
   readInventory: () => Promise<readonly UsbProbeRecord[]>;
-  confirmProbeReleased: () => Promise<boolean>;
+  confirmProbeReleased?: () => Promise<boolean>; // Optional additional host check; owned supervisors always prove closure.
   selector?: DebugProbeSelector;
   timeoutMs: number;
   approvalId?: string;

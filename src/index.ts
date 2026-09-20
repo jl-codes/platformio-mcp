@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { DebugCompatibilityClient } from "./adapters/debug-compat.js";
+import { withDebugCompatibility } from "./adapters/debug-compat-registry.js";
 import { executeOtaCompatibility } from "./adapters/ota-compat.js";
 import { executeFlashVerificationCompatibility } from "./adapters/flash-verification-compat.js";
 import { startCoredumpRetentionCleanup } from "./core/analysis/esp-coredump-retention.js";
@@ -1618,6 +1620,13 @@ const toolDefinitions: ToolDefinition[] = [
 
 // stdio serves one trusted client connection; owner capabilities never come from tool arguments.
 const serialClient = new SerialClientContext();
+const debugClient = new DebugCompatibilityClient();
+registerShutdownTask(async () => {
+  if ((await debugClient.close()).cleanupPending) {
+    await logDiag("Debugger shutdown cleanup remains pending; probe ownership is retained.");
+    throw new Error("Debugger shutdown closure unconfirmed");
+  }
+});
 registerShutdownTask(async () => {
   const sessions = await serialClient.close();
   if (sessions.some(session => session.cleanupPending)) {
@@ -1626,6 +1635,9 @@ registerShutdownTask(async () => {
   }
 });
 server.onclose = () => {
+  void debugClient.close().then((state) => {
+    if (state.cleanupPending) void logDiag("Debugger disconnect cleanup remains pending; probe ownership is retained.");
+  }).catch(() => logDiag("Debugger disconnect cleanup failed; probe ownership is retained."));
   void serialClient
     .close()
     .then((sessions) => {
@@ -1671,7 +1683,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name,
   );
+  const debugCompatibility = ["pio_debug_start", "pio_debug_cmd", "pio_debug_list", "pio_debug_stop"].includes(name);
   const compatibilityTool =
+    debugCompatibility ||
     packageCompatibility ||
     projectCompatibility ||
     name === "pio_run_target" ||
@@ -1740,7 +1754,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         () =>
           registeredTool.handler(args, {
             dispatch: async (tool, parameters) =>
-              tool === "coredump"
+              tool === "pio_debug_start"
+                ? debugClient.start(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller)
+                : tool === "pio_debug_cmd" || tool === "pio_debug_list" || tool === "pio_debug_stop"
+                ? debugClient.execute(tool, parameters, caller)
+                : tool === "coredump"
                 ? executeCoredump(parameters, caller, onAuthorized)
                 : tool === "partition_table"
                 ? executePartitionTable(parameters, caller, onAuthorized)
@@ -2740,13 +2758,13 @@ async function main() {
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
-    toolRegistry = withDependencyCompatibility(
+    toolRegistry = withDebugCompatibility(withDependencyCompatibility(
       withDeviceCompatibility(
         withBoardCompatibility(
           withProjectCompatibility(withPackageCompatibility(toolRegistry)),
         ),
       ),
-    );
+    ));
   }
   const subcommand = cliArgs.find((a) => !a.startsWith("--"));
 

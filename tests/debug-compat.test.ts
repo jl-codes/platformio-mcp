@@ -75,21 +75,27 @@ it("keeps preparation checkpoints and stable timeout scope when startup requires
     "approval pending",
   );
   expect(mocks.forget).not.toHaveBeenCalled();
-  await client.start({ timeout_s: 10, approval_id: "approved" });
+  await client.start(
+    { timeout_s: 10, approval_id: "approved" },
+    {},
+    { taskId: "next-mcp-activity" },
+  );
+  expect(mocks.prepare.mock.calls[0][1].taskId).toBe(
+    mocks.prepare.mock.calls[1][1].taskId,
+  );
   expect(mocks.start.mock.calls.map((call) => call[1].timeoutMs)).toEqual([
     10000, 10000,
   ]);
 });
-it("refuses unidentified inventory and closes admission on disconnect", async () => {
+it("excludes unidentified peripherals and closes admission on disconnect", async () => {
   mocks.inventory.mockResolvedValue({ devices: [], unidentified: 1 });
   mocks.start.mockImplementation(async (_sessions, input) => {
     await input.readInventory();
     return "id";
   });
   const client = new DebugCompatibilityClient(async () => false);
-  await expect(client.start({})).rejects.toMatchObject({
-    code: "DEBUG_PROBE_IDENTITY_INVALID",
-  });
+  await expect(client.start({})).resolves.toMatchObject({ session_id: "id" });
+  expect(await mocks.start.mock.calls[0][1].readInventory()).toEqual([]);
   expect(await client.close()).toMatchObject({ cleanupPending: false });
   await expect(client.start({})).rejects.toMatchObject({
     code: "DEBUG_CLIENT_CLOSED",

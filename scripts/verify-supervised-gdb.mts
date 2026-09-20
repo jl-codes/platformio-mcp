@@ -34,8 +34,7 @@ try {
         released++;
       },
     },
-    // This fixture never opens a probe/backend; process-group proof is still enforced by DebugProcess.
-    confirmProbeReleased: async () => true,
+    // No external verifier: native supervisor group closure must prove process release.
   });
   const pid = owner.state().pid!;
   assert(Number.isSafeInteger(pid) && pid > 0);
@@ -55,6 +54,7 @@ try {
     processExited: true,
     cleanupConfirmed: true,
     fixtureProbeCallbacksOnly: true,
+    externalReleaseVerifier: false,
   };
   if (evidencePath)
     await fs.writeFile(evidencePath, JSON.stringify(evidence, null, 2) + "\n");

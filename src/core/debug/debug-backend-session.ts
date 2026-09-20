@@ -99,6 +99,15 @@ export async function startDebuggerWithBackend(
   let released = false;
   let debuggerProcess: DebugProcess | undefined;
   const guard = createPolicyRevisionGuard(selected.projectDir);
+  // The native supervisor proves an empty owned job/process group, not merely root PID exit.
+  // DebugProcess independently proves its GDB group before invoking this backend verifier.
+  const confirmBackendReleased = async () => {
+    if (backend && (backend.state().cleanupPending || !backend.state().closed))
+      return false;
+    if (selected.confirmProbeReleased) return selected.confirmProbeReleased();
+    // A legacy direct GDB launch cannot prove descendant closure through backend evidence.
+    return !!selected.supervisorPython;
+  };
   const cleanupBackend = async () => {
     if (released) return;
     if (backend) await backend.cleanupProcess();
@@ -106,7 +115,7 @@ export async function startDebuggerWithBackend(
     let confirmed = false;
     try {
       confirmed = await Promise.race([
-        selected.confirmProbeReleased(),
+        confirmBackendReleased(),
         new Promise<false>((resolve) => {
           timer = setTimeout(() => resolve(false), 1000);
         }),
@@ -199,7 +208,7 @@ export async function startDebuggerWithBackend(
               },
               confirmProbeReleased: async () => {
                 await backend!.cleanupProcess();
-                return selected.confirmProbeReleased();
+                return confirmBackendReleased();
               },
             });
             guard();

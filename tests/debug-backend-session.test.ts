@@ -104,7 +104,7 @@ it("prepares custody once and releases only after backend cleanup following GDB 
   expect(args.debugger.custody.prepareSpawn).toHaveBeenCalledOnce();
   expect(() => options.custody.releaseAfterExit()).toThrow();
   expect(args.debugger.custody.releaseAfterExit).not.toHaveBeenCalled();
-  expect(await options.confirmProbeReleased()).toBe(true);
+  expect(await options.confirmProbeReleased!()).toBe(true);
   options.custody.releaseAfterExit();
   options.custody.releaseAfterExit();
   expect(args.debugger.custody.releaseAfterExit).toHaveBeenCalledOnce();
@@ -174,4 +174,28 @@ it("keeps backend approval scope identical before and after private ELF retentio
   expect(original.stages[0].args.elfPath).toBeUndefined();
   expect(DebugBackendProcess).not.toHaveBeenCalled();
   expect(args.debugger.custody.prepareSpawn).not.toHaveBeenCalled();
+});
+it("uses proven backend group closure without an extra host callback for supervised GDB", async () => {
+  const args = input();
+  args.debugger.supervisorPython = args.backend.pythonExecutable;
+  delete args.debugger.confirmProbeReleased;
+  vi.spyOn(DebugProcess, "start").mockResolvedValue({} as DebugProcess);
+  await startDebuggerWithBackend(args);
+  const options = vi.mocked(DebugProcess.start).mock.calls[0][0];
+  expect(await options.confirmProbeReleased!()).toBe(true);
+  expect(closed).toBe(true);
+  options.custody.releaseAfterExit();
+  expect(args.debugger.custody.releaseAfterExit).toHaveBeenCalledOnce();
+});
+it("does not turn incomplete backend cleanup into a release proof", async () => {
+  const args = input();
+  args.debugger.supervisorPython = args.backend.pythonExecutable;
+  delete args.debugger.confirmProbeReleased;
+  backend.cleanupProcess.mockResolvedValue(undefined);
+  vi.spyOn(DebugProcess, "start").mockResolvedValue({} as DebugProcess);
+  await startDebuggerWithBackend(args);
+  const options = vi.mocked(DebugProcess.start).mock.calls[0][0];
+  expect(await options.confirmProbeReleased!()).toBe(false);
+  expect(() => options.custody.releaseAfterExit()).toThrow();
+  expect(args.debugger.custody.releaseAfterExit).not.toHaveBeenCalled();
 });

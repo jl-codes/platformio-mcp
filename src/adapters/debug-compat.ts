@@ -1,5 +1,6 @@
 /** Connection-owned reference debugger startup and session dispatch composition. */
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import { DebugClientSessions } from "../core/debug/debug-client-sessions.js";
 import { DebugPreparationCache } from "../core/debug/debug-preparation-cache.js";
 import { startLocalPreparedDebugger } from "../core/debug/debug-local-startup.js";
@@ -58,13 +59,14 @@ export const DebugStartCompatibilitySchema = z
 
 /** Instantiate once per authenticated connection; never share sessions or approval checkpoints globally. */
 export class DebugCompatibilityClient {
+  private readonly taskId = randomUUID();
   private readonly sessions = new DebugClientSessions();
   private readonly preparation = new DebugPreparationCache();
   private readonly abort = new AbortController();
   private readonly pending = new Set<Promise<unknown>>();
 
-  /** The embedding host must supply actual probe-release verification, never a request-controlled flag. */
-  constructor(private readonly confirmProbeReleased: () => Promise<boolean>) {}
+  /** Optional host verification supplements mandatory native supervisor proofs; never request-controlled. */
+  constructor(private readonly confirmProbeReleased?: () => Promise<boolean>) {}
 
   /** Prepare once across approvals, then select and revalidate the physical probe during owned startup. */
   async start(
@@ -84,6 +86,8 @@ export class DebugCompatibilityClient {
         "COMPAT_ARGUMENT_INVALID",
       );
     const args = parsed.data;
+    // MCP activity IDs change on approval retries; checkpoint ownership is this connection.
+    caller = { ...caller, taskId: this.taskId };
     const operation = (async () => {
       const deadline = performance.now() + args.timeout_s * 1000;
       const projectDir = await resolveCompatibilityProject(
@@ -123,11 +127,8 @@ export class DebugCompatibilityClient {
               prepared,
               readInventory: async () => {
                 const inventory = await readInventory();
-                if (inventory.unidentified)
-                  throw new PlatformIOError(
-                    "USB inventory contains unidentified devices; probe selection is unsafe.",
-                    "DEBUG_PROBE_IDENTITY_INVALID",
-                  );
+                // Unidentified peripherals are not probe candidates. The selected probe must
+                // still have a unique serial/location and be revalidated at handoff.
                 return inventory.devices;
               },
               confirmProbeReleased: this.confirmProbeReleased,

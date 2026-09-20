@@ -42,7 +42,7 @@ export interface DebugProcessOptions {
   elfPath: string;
   custody: ProcessDeviceCustody;
   /** Prove debug servers/descendants no longer own the probe, beyond the direct GDB child. */
-  confirmProbeReleased: () => Promise<boolean>;
+  confirmProbeReleased?: () => Promise<boolean>;
   startupTimeoutMs?: number;
   supervisorPython?: string; // Host-resolved interpreter for whole-process-tree ownership.
   /** Trusted test/host integration dependency, not a caller-selectable executable launcher. */
@@ -115,6 +115,11 @@ export class DebugProcess {
         throw new PlatformIOError(
           "Debugger paths must be host-resolved.",
           "GDB_PATH_INVALID",
+        );
+      if (!options.supervisorPython && !options.confirmProbeReleased)
+        throw new PlatformIOError(
+          "Unsupervised GDB requires independent descendant-release verification.",
+          "GDB_RELEASE_VERIFIER_REQUIRED",
         );
       const roots =
         options.trustedDebuggerRoots ??
@@ -296,9 +301,14 @@ export class DebugProcess {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         const confirmed = await Promise.race([
-          this.options.confirmProbeReleased(),
+          this.options.confirmProbeReleased
+            ? this.options.confirmProbeReleased()
+            : Promise.resolve(
+                this.child instanceof SupervisedDebugChild &&
+                  !this.child.supervisor.state().cleanupPending,
+              ),
           new Promise<false>((resolve) => {
-            timer = setTimeout(() => resolve(false), 1000);
+            timer = setTimeout(() => resolve(false), 8000);
           }),
         ]);
         if (!confirmed) return false;

@@ -194,3 +194,10 @@ it("keeps a failed initializer reachable for later probe cleanup", async () => {
   expect(client.list()).toEqual([]);
   expect(f.custody.releaseAfterExit).toHaveBeenCalledOnce();
 });
+it("rejects direct GDB without descendant release verification before spawning", async () => {
+  const f = fixture();
+  await expect(
+    DebugProcess.start({ ...f.options, confirmProbeReleased: undefined }),
+  ).rejects.toMatchObject({ code: "GDB_RELEASE_VERIFIER_REQUIRED" });
+  expect(f.launch).not.toHaveBeenCalled();
+});

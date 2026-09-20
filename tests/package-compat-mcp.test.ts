@@ -52,7 +52,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 92 : 57);
+      expect(tools).toHaveLength(enabled ? 96 : 57);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -83,10 +83,41 @@ it.each([
         "pio_coredump",
         "pio_flash_and_verify",
         "pio_upload_ota",
+        "pio_debug_start",
+        "pio_debug_cmd",
+        "pio_debug_list",
+        "pio_debug_stop",
       ]) {
         expect(tools.some((tool) => tool.name === name)).toBe(enabled);
       }
       if (enabled) {
+        const debugList = await client.callTool({
+          name: "pio_debug_list",
+          arguments: {},
+        });
+        expect(debugList.structuredContent).toMatchObject({
+          ok: true,
+          sessions: [],
+        });
+        const invalidDebug = await client.callTool({
+          name: "pio_debug_start",
+          arguments: { executable: "/untrusted/gdb" },
+        });
+        expect(invalidDebug.isError).toBe(true);
+        expect(JSON.stringify(invalidDebug)).toContain(
+          "COMPAT_ARGUMENT_INVALID",
+        );
+        const foreignDebug = await client.callTool({
+          name: "pio_debug_cmd",
+          arguments: {
+            session_id: "00000000-0000-4000-8000-000000000000",
+            command: "bt",
+          },
+        });
+        expect(foreignDebug.isError).toBe(true);
+        expect(JSON.stringify(foreignDebug)).toContain(
+          "DEBUG_SESSION_NOT_FOUND",
+        );
         const invalidOta = await client.callTool({
           name: "pio_upload_ota",
           arguments: { host: "board.local", auth: 123 },

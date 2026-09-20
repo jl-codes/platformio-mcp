@@ -1,10 +1,11 @@
 {
-  "observedAt": "2026-09-20T12:02:54.259Z",
+  "observedAt": "2026-09-20T12:31:44.443Z",
   "platform": "win32",
   "physicalDeviceContacted": false,
   "nativeGdbInitialized": true,
   "isolatedSupervisor": true,
   "processExited": true,
   "cleanupConfirmed": true,
-  "fixtureProbeCallbacksOnly": true
+  "fixtureProbeCallbacksOnly": true,
+  "externalReleaseVerifier": false
 }
