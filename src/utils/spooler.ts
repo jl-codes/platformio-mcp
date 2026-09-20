@@ -8,6 +8,7 @@
  * - executeWithSpooling: Spawns child processes mapped to disk limits.
  */
 import fs from "node:fs";
+import { waitForOwnedProcess } from "./owned-process-wait.js";
 
 import path from "node:path";
 import { platformioExecutor } from "../platformio.js";
@@ -101,50 +102,6 @@ export interface SpoolingForegroundResult {
 
 export type SpoolingResult = SpoolingBackgroundResult | SpoolingForegroundResult;
 
-function tryTerminateProcess(pid?: number) {
-  if (!pid) return;
-  try {
-    process.kill(pid, "SIGTERM");
-    setTimeout(() => {
-      try {
-        process.kill(pid, 0);
-        process.kill(pid, "SIGKILL");
-      } catch {}
-    }, 1000);
-  } catch {}
-}
-
-function waitForProcessEnd(proc: any, timeoutMs: number): Promise<number> {
-  return new Promise<number>((resolve, reject) => {
-    let settled = false;
-
-    const onDone = (code?: number | null) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(code ?? 1);
-    };
-
-    const onError = (err: Error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(err);
-    };
-
-    const timer = setTimeout(() => {
-      if (settled) return;
-      tryTerminateProcess(proc?.pid);
-      settled = true;
-      reject(new Error(`Command timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    proc.on("error", onError);
-    proc.on("exit", onDone);
-    proc.on("close", onDone);
-  });
-}
-
 function ensureLatestLogPointer(logFile: string, latestLog: string): { mirrorLatest: boolean } {
   try {
     if (fs.existsSync(latestLog)) fs.unlinkSync(latestLog);
@@ -167,6 +124,7 @@ function ensureLatestLogPointer(logFile: string, latestLog: string): { mirrorLat
 
   return { mirrorLatest: false };
 }
+
 
 /**
  * Wraps child process invocation forcing its runtime payload exclusively through 
@@ -263,9 +221,11 @@ export async function executeWithSpooling(
   const timeoutMs = options.timeout ?? (options.background ? 3600000 : 600000);
 
   if (options.background) {
-    const p = waitForProcessEnd(proc, timeoutMs);
+    const p = waitForOwnedProcess(proc, timeoutMs);
 
+    let cleanupPending = false;
     p.catch(e => {
+      cleanupPending = e?.context?.cleanupPending !== false;
       console.error(`[Background Task Error]: ${e.message}`);
       updateTaskStatus(commandId, taskId, { status: "error", error: e.message }, targetProjectArea).catch(() => {});
       return 1;
@@ -284,8 +244,10 @@ export async function executeWithSpooling(
         exitCode: code,
         ...(errorMessage ? { error: errorMessage } : {})
       }, targetProjectArea).catch(() => {});
-      await unregisterBuildPid(targetProjectArea);
-      if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      if (!cleanupPending) {
+        await unregisterBuildPid(targetProjectArea);
+        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      }
       try { fs.closeSync(outFd); } catch {}
       if (watcher) {
         // ARCHITECTURAL EXCEPTION: While synchronous fs calls are broadly banned to prevent 
@@ -319,7 +281,7 @@ export async function executeWithSpooling(
     return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
   }
   
-  const exitCode = await waitForProcessEnd(proc, timeoutMs);
+  const exitCode = await waitForOwnedProcess(proc, timeoutMs);
 
   let errorMessage = undefined;
   if (exitCode !== 0) {

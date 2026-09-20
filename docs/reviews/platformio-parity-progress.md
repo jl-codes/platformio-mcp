@@ -619,3 +619,7 @@ PolicySerialSessionService.captureMemoryOnce now plans opening and reading toget
 ### Shared lease status for legacy migration
 
 Added an advisory DeviceLeaseStore.status query serialized with lease mutations. It reports unclaimed/owned/stale/unknown with PID and acquisition time, never release nonces or process-start tokens. Inspection does not recover stale records or confer acquisition rights; malformed records still fail closed. TypeScript checking and all 16 device-lease tests pass, including real process contention/handoff tests and a new status/capability test. Legacy semaphore paths are still unmigrated: their raw files can overwrite claims, and upload/monitor child custody must be preserved while replacing them before public direct-serial tools are enabled.
+
+### Spooler timeout custody correction
+
+Replaced PID-only delayed termination with completion tracking on the original ChildProcess handle. Timeout requests termination, escalates within a bounded grace period, and reports whether process exit was actually observed. Background spooling retains its port claim and PID tracking when termination remains uncertain instead of freeing hardware immediately after requesting termination. TypeScript checking and eight spooler/process/wait tests pass; a subsequent real Node-child timeout test also passes (four waiter tests total). No hardware was used. Shared legacy lease migration, child handoff, monitor-stop identity checks, and late-exit recovery remain incomplete.
