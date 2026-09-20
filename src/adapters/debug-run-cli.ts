@@ -1,5 +1,6 @@
 /** Bounded CLI debugger sequences over the same connection-owned MCP implementation. */
 import { z } from "zod";
+import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
 import {
   DebugCompatibilityClient,
   DebugStartCompatibilitySchema,
@@ -105,18 +106,25 @@ export async function executeDebugRunCli(
 ) {
   const client = new DebugCompatibilityClient();
   try {
-    const start = await client.start(input.start, {}, caller);
+    const start = await dispatchAuthorizedAction(
+      "debug_start",
+      input.start,
+      caller,
+      () => client.start(input.start, {}, caller),
+    );
     const results = [];
     let ok = true;
     for (const command of input.commands) {
-      const result = await client.execute(
-        "pio_debug_cmd",
-        {
-          session_id: start.session_id,
-          command,
-          timeout_s: input.commandTimeout,
-        },
+      const args = {
+        session_id: start.session_id,
+        command,
+        timeout_s: input.commandTimeout,
+      };
+      const result = await dispatchAuthorizedAction(
+        "debug_cmd",
+        args,
         caller,
+        () => client.execute("pio_debug_cmd", args, caller),
       );
       results.push(result);
       if (!result.ok) {
@@ -124,15 +132,16 @@ export async function executeDebugRunCli(
         break;
       }
     }
-    const stop = await client.execute(
-      "pio_debug_stop",
-      {
-        session_id: start.session_id,
-        timeout_s: input.commandTimeout,
-        process_only: input.processOnly,
-      },
-      caller,
-    );
+    const stopArgs = {
+      session_id: start.session_id,
+      timeout_s: input.commandTimeout,
+      process_only: input.processOnly,
+    };
+    const stop = input.processOnly
+      ? await client.execute("pio_debug_stop", stopArgs, caller)
+      : await dispatchAuthorizedAction("debug_stop", stopArgs, caller, () =>
+          client.execute("pio_debug_stop", stopArgs, caller),
+        );
     return {
       ok: ok && stop.ok,
       start,

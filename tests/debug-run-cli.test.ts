@@ -1,5 +1,11 @@
 /** CLI debugger sequences preserve connection ownership and stop on failed commands. */
 import { beforeEach, expect, it, vi } from "vitest";
+vi.mock("../src/core/action-dispatcher.js", () => ({
+  dispatchAuthorizedAction: vi.fn(async (_name, _args, _caller, execute) =>
+    execute(),
+  ),
+}));
+import { dispatchAuthorizedAction } from "../src/core/action-dispatcher.js";
 const owner = vi.hoisted(() => ({
   start: vi.fn(),
   execute: vi.fn(),
@@ -18,7 +24,10 @@ import {
   executeDebugRunCli,
 } from "../src/adapters/debug-run-cli.js";
 beforeEach(() => {
-  vi.resetAllMocks();
+  vi.clearAllMocks();
+  owner.start.mockReset();
+  owner.execute.mockReset();
+  owner.close.mockReset();
   owner.start.mockResolvedValue({ ok: true, session_id: "owned" });
   owner.execute.mockResolvedValue({ ok: true });
   owner.close.mockResolvedValue({ cleanupPending: false, failed: 0 });
@@ -94,4 +103,18 @@ it("never reports success when process cleanup remains uncertain", async () => {
       {},
     ),
   ).rejects.toMatchObject({ code: "DEBUG_CLI_CLEANUP_PENDING" });
+});
+
+it("honors canonical startup denial before invoking the shared client", async () => {
+  vi.mocked(dispatchAuthorizedAction).mockRejectedValueOnce(
+    new Error("debug_start denied"),
+  );
+  await expect(
+    executeDebugRunCli(
+      parseDebugRunCli({ commands: '["bt"]' }, [], "/project"),
+      {},
+    ),
+  ).rejects.toThrow("debug_start denied");
+  expect(owner.start).not.toHaveBeenCalled();
+  expect(owner.close).toHaveBeenCalledOnce();
 });
