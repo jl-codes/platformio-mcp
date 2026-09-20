@@ -8,6 +8,7 @@ import {
 } from "../devices/ota-target.js";
 import type { retainOtaImage } from "./ota-artifacts.js";
 import type { resolveOtaTools } from "./ota-tools.js";
+import type { OtaUploaderOptions } from "./ota-options.js";
 import { runEspotaProcess } from "./espota-process.js";
 import { PlatformIOError } from "../../utils/errors.js";
 
@@ -19,6 +20,7 @@ export interface PreparedOtaTransfer {
   tools: Awaited<ReturnType<typeof resolveOtaTools>>;
   image: Awaited<ReturnType<typeof retainOtaImage>>;
   filesystem: boolean;
+  uploaderOptions?: OtaUploaderOptions;
   auth?: string;
   timeoutMs: number;
   approvalId?: string;
@@ -42,6 +44,7 @@ export async function executePreparedOtaTransfer(
     address: input.target.address,
     port: input.target.port,
     filesystem: input.filesystem,
+    uploaderOptions: input.uploaderOptions ?? {},
     timeoutMs: input.timeoutMs,
     authenticationProvided: input.auth !== undefined,
     image: {
@@ -97,6 +100,7 @@ export async function executePreparedOtaTransfer(
               port: input.target.port,
               auth: input.auth,
               filesystem: input.filesystem,
+              uploaderOptions: input.uploaderOptions,
               timeoutMs: input.timeoutMs,
               signal: input.signal,
               custody,

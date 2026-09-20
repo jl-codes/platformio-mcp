@@ -92,7 +92,7 @@ For private managed storage, device requests can select retainDump: true (CLI --
 
 The opt-in pio_coredump tool now resolves project/environment/serial selection, saves captures by default in private managed storage, and supports out_path plus optional analysis. Missing ELF output preserves the capture with analysis=null; unconfigured analysis tools are reported without claiming analysis ran. Explicit output remains workspace-contained and never replaces an existing file. Metadata execution, partition inspection, device reads, exports and analyzer execution retain separate scoped permissions; table_config_approval_id and elf_metadata_approval_id avoid reusing a consumed selection grant.
 
-The inventory is now 57 canonical tools plus 34 compatibility tools (91 with compatibility enabled). Registration and offline checks do not prove full PAR-05 parity: physical capture, remaining reference result details and the wider acceptance gates remain outstanding.
+The inventory is now 57 canonical tools plus 35 compatibility tools (92 with compatibility enabled). Registration and offline checks do not prove full PAR-05 parity: physical capture, remaining reference result details and the wider acceptance gates remain outstanding.
 
 
 ## Flash and boot verification
@@ -104,3 +104,16 @@ The existing quiet-window and built-in crash checks remain active. `stability_wi
 Separate grants are `workflow_approval_id` (the composite verifier), `approval_id` (upload), `config_approval_id`, `selection_approval_id`, `monitor_approval_id`, `read_approval_id`, `preflight_discovery_approval_id`, `discovery_approval_id`, `decode_approval_id` and `decode_config_approval_id`. Denials of `pio_flash_and_verify`, `agent_flash_monitor_verify` or `upload_firmware` block flashing. Opening uses the same request/device identity checked before upload; USB replacement causes a failure rather than selecting another board. USB metadata is not cryptographic identity.
 
 Results explicitly report `firmware_identity: identity_unverified` until the upload manifest is bound to immutable images and ELF. Automatic crash decoding currently uses the selected environment ELF and reports that matching the uploaded firmware has not been verified. Complete upload-to-monitor custody, matching-image evidence, dedicated CLI exposure and physical acceptance remain outstanding. Registration does not establish complete PAR-12 acceptance.
+
+
+## OTA upload
+
+Opt-in `pio_upload_ota` accepts the reference `host`, `project_dir`, `env`, `port`, `auth`, `filesystem`, `build`, `timeout_s` and `verify_reachable` fields. ESP32/ESP8266 port defaults come from computed upload flags or 3232/8266 respectively. Build mode builds the image without uploading, freezes its bytes, and calls the registered framework uploader directly. `build=false` transfers an existing image. Custom artifacts can use `image_path` and `expected_image_sha256`.
+
+Upload, host execution, configuration, build, image inspection, host tool discovery and DNS resolution have separate approval extensions: `approval_id`, `command_approval_id`, `config_approval_id`, `build_approval_id`, `image_approval_id`, `system_approval_id`, and `resolve_approval_id`. Filesystem writes retain their own canonical permission. A concrete `pio_upload_ota` denial blocks both transfer types. Credentials travel via private stdin and are excluded from approval records and process arguments.
+
+Configured `-I`/`--host_ip`, `-P`/`--host_port`, and `-t`/`--timeout` select numeric IPv4 callback bindings and bounded invitation deadlines; progress output is enabled. Debug option dumps are suppressed to avoid credentials. Configured filesystem mode must agree with the request. Flags overriding the selected destination or image, unknown flags, and ambiguous/quoted credential tokens fail explicitly. The current resolver pins IPv4 and rejects ambiguous DNS; supported host framework layout is the registered default Arduino framework package beneath the host packages directory. Alternate framework layouts and IPv6 remain unsupported here.
+
+ICMP failure never blocks an upload: `reachable` is null with an explicit not-probed/not-requested diagnostic. `upload_path` is `pio_build_espota_direct` for build mode and `espota_direct` otherwise. Successful transfer reports the captured image SHA-256 and `runtime_verified: false`; it does not establish healthy firmware execution. This remains incomplete physical/platform acceptance, not a full parity claim.
+
+The native bridge can be checked without a board using `node --import tsx scripts/verify-ota-bridge.mts <absolute-python-path> [evidence-path]`. It uses only loopback UDP/TCP fixtures and dummy credentials. Windows evidence is recorded in `docs/reviews/ota-bridge-windows-evidence.json`.

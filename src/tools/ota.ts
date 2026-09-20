@@ -6,6 +6,7 @@ import { platformioExecutor } from "../platformio.js";
 import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
 import type { PolicyEvaluationContext } from "../core/policy/types.js";
+import { parseOtaUploaderOptions } from "../core/ota/ota-options.js";
 import { selectOtaConfiguration } from "../core/ota/ota-configuration.js";
 import { resolveOtaTools } from "../core/ota/ota-tools.js";
 import { resolveOtaTarget } from "../core/devices/ota-target.js";
@@ -95,11 +96,10 @@ export async function executeOtaUpload(
       );
     },
   );
-  if (configuration.otherFlags.length)
-    throw new PlatformIOError(
-      "Additional configured OTA upload flags require supported explicit mapping.",
-      "OTA_FLAGS_UNSUPPORTED",
-    );
+  const uploaderOptions = parseOtaUploaderOptions(
+    configuration.otherFlags,
+    args.filesystem,
+  );
   const auth = args.auth ?? configuration.auth;
   const target = await dispatchAuthorizedAction(
     "list_devices",
@@ -217,6 +217,7 @@ export async function executeOtaUpload(
           tools,
           image,
           filesystem: args.filesystem,
+          uploaderOptions,
           auth,
           timeoutMs: Math.ceil(args.timeoutSeconds * 1000),
           approvalId: args.approvalId,

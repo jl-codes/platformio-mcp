@@ -1,4 +1,8 @@
 /** Execute the installed espota uploader with private stdin credentials and confirmed process custody. */
+import {
+  OtaUploaderOptionsSchema,
+  type OtaUploaderOptions,
+} from "./ota-options.js";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { isIP } from "node:net";
@@ -8,7 +12,7 @@ import type { ProcessDeviceCustody } from "../devices/process-device-custody.js"
 
 // Constant program; request data is JSON on stdin and never interpolated into executable code or argv.
 const ESPOTA_BRIDGE = String.raw`
-import hashlib, json, runpy, sys
+import hashlib, json, logging, runpy, socket, sys
 request = json.loads(sys.stdin.buffer.read(65537))
 for filename, expected in [(request["image"], request["imageSha256"]), (request["script"], request["scriptSha256"])]:
     digest = hashlib.sha256()
@@ -21,6 +25,29 @@ for filename, expected in [(request["image"], request["imageSha256"]), (request[
     if digest.hexdigest() != expected:
         raise RuntimeError("OTA artifact changed before execution")
 sys.argv = [request["script"], "--ip", request["address"], "--port", str(request["port"]), "--file", request["image"], "--progress"]
+for key, flag in [("hostAddress", "--host_ip"), ("hostPort", "--host_port"), ("invitationTimeoutSeconds", "--timeout")]:
+    if key in request["options"]:
+        sys.argv += [flag, str(request["options"][key])]
+# INFO records contain the protocol completion marker. Suppress DEBUG option dumps containing auth.
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s]: %(message)s")
+original_accept = socket.socket.accept
+original_recv = socket.socket.recv
+original_recvfrom = socket.socket.recvfrom
+def bound_accept(sock):
+    while True:
+        connection, peer = original_accept(sock)
+        if peer[0] == request["address"]:
+            return connection, peer
+        connection.close()
+def bound_recv(sock, size, flags=0):
+    if sock.type & socket.SOCK_DGRAM:
+        while True:
+            data, peer = original_recvfrom(sock, size, flags)
+            if peer[0] == request["address"] and peer[1] == request["port"]:
+                return data
+    return original_recv(sock, size, flags)
+socket.socket.accept = bound_accept
+socket.socket.recv = bound_recv
 if request["auth"] is not None:
     sys.argv += ["--auth", request["auth"]]
 if request["filesystem"]:
@@ -39,6 +66,7 @@ export interface EspotaProcessRequest {
   port: number;
   auth?: string;
   filesystem: boolean;
+  uploaderOptions?: OtaUploaderOptions;
   timeoutMs: number;
   custody: ProcessDeviceCustody;
   signal?: AbortSignal;
@@ -74,7 +102,16 @@ export async function runEspotaProcess(request: EspotaProcessRequest) {
       "Invalid resolved OTA execution request.",
       "OTA_EXECUTION_INVALID",
     );
+  const options = OtaUploaderOptionsSchema.safeParse(
+    request.uploaderOptions ?? {},
+  );
+  if (!options.success)
+    throw new PlatformIOError(
+      "Invalid OTA uploader options.",
+      "OTA_EXECUTION_INVALID",
+    );
   const payload = JSON.stringify({
+    options: options.data,
     script: request.uploaderScript,
     image: request.imagePath,
     imageSha256: request.imageSha256,

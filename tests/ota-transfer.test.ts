@@ -164,3 +164,17 @@ it("rejects changed snapshot bytes before acquiring a network lease", async () =
   expect(mocks.acquire).not.toHaveBeenCalled();
   expect(mocks.run).not.toHaveBeenCalled();
 });
+
+it.each([false, true])(
+  "honors concrete OTA alias denial for filesystem=%s",
+  async (filesystem) => {
+    const f = fixture();
+    f.input.filesystem = filesystem;
+    policy({ deny: ["pio_upload_ota"] });
+    await expect(executePreparedOtaTransfer(f.input)).rejects.toMatchObject({
+      code: "POLICY_DENIED",
+    });
+    expect(mocks.run).not.toHaveBeenCalled();
+    expect(mocks.acquire).not.toHaveBeenCalled();
+  },
+);

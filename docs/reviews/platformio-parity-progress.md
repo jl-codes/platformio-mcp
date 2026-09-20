@@ -1339,3 +1339,12 @@ Added `executeOtaUpload` to compose authorized computed project configuration, f
 Protocol reports distinguish authentication rejection, missing invitation/callback, interrupted transfer and device rejection; a zero exit status or 100% progress alone cannot pass. Results identify exact uploaded bytes and explicitly leave runtime health unverified. ICMP is not used to block uploads: reachable remains null with an explicit not-probed diagnostic. Additional configured upload flags currently fail explicitly pending supported option mapping; public OTA registration and physical acceptance remain unfinished.
 
 17 focused configuration/report, firmware/filesystem service and transfer-policy cases passed. Typecheck and changed-file lint passed. Both prior-head CI runs 35504748761 and 35504746223 passed at e548e063. These internal additions are not yet reachable from the public server, so no plugin regeneration was required this turn. Registration remains 34/40; no publishing or physical OTA run occurred.
+
+
+### 2026-09-20 — Public OTA tool, uploader options and native bridge proof
+
+Registered `pio_upload_ota` with reference parameters and scoped extensions. Added typed host interface/callback port/invitation timeout configuration; target/image override flags are rejected. Configured debug flags do not enable credential-bearing option dumps. INFO completion markers are now enabled explicitly, correcting the installed uploader's default WARNING log level. The bridge accepts TCP callbacks and UDP replies only from the pinned peer/UDP endpoint.
+
+27 focused options/adapter, public MCP, policy/transfer, process and service tests passed; typecheck and changed-file lint passed. A native Python 3.14 Windows loopback fixture proved UDP/TCP wrong-peer rejection, dummy-password redaction, INFO completion output and confirmed cleanup. No physical device was contacted. The checked-in fixture, reproduction script and source-hashed evidence are provided. This does not replace ESP32/ESP8266 hardware acceptance.
+
+Both prior-head CI runs 35505106601 and 35505104039 passed at 5bead67c. Public inventory is now 57 canonical plus 35 reference tools = 92 enabled. Five reference tools remain unregistered: four debugger tools and power profiling. Full physical/platform acceptance, alternate OTA framework layouts/options, shared serial/network board identity, remaining flash-verifier artifact proof and publication remain incomplete. No release has been published.

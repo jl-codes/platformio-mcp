@@ -336,6 +336,56 @@ export function withProjectCompatibility<TResult>(
     },
     handler: (args, context) => context.dispatch("pio_flash_and_verify", args),
   });
+  const ota = base.get("upload_firmware");
+  if (!ota || result.has("pio_upload_ota"))
+    throw new Error("Invalid OTA compatibility registry");
+  result.set("pio_upload_ota", {
+    ...ota,
+    name: "pio_upload_ota",
+    annotations: { ...ota.annotations, openWorldHint: true },
+    description:
+      "Upload ESP32/ESP8266 firmware or filesystem images over ArduinoOTA using a fixed network target, immutable image and private credentials. Build and uploader permissions are separate; transfer success does not verify runtime health.",
+    inputSchema: {
+      type: "object",
+      required: ["host"],
+      additionalProperties: false,
+      properties: {
+        host: { type: "string", minLength: 1, maxLength: 253 },
+        project_dir: { type: ["string", "null"], default: null },
+        env: { type: ["string", "null"], default: null },
+        port: {
+          type: ["integer", "null"],
+          minimum: 1,
+          maximum: 65535,
+          default: null,
+        },
+        auth: { type: ["string", "null"], maxLength: 1024, default: null },
+        filesystem: { type: "boolean", default: false },
+        build: { type: "boolean", default: true },
+        timeout_s: {
+          type: "number",
+          minimum: 0.001,
+          maximum: 600,
+          default: 180,
+        },
+        verify_reachable: { type: "boolean", default: true },
+        image_path: { type: "string" },
+        expected_image_sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
+        ...Object.fromEntries(
+          [
+            "approval_id",
+            "command_approval_id",
+            "config_approval_id",
+            "build_approval_id",
+            "image_approval_id",
+            "system_approval_id",
+            "resolve_approval_id",
+          ].map((name) => [name, { type: "string", maxLength: 256 }]),
+        ),
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_upload_ota", args),
+  });
   const upload = base.get("upload_firmware");
   if (!upload || result.has("pio_upload"))
     throw new Error("Invalid firmware upload compatibility registry");

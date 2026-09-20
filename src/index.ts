@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { executeOtaCompatibility } from "./adapters/ota-compat.js";
 import { executeFlashVerificationCompatibility } from "./adapters/flash-verification-compat.js";
 import { startCoredumpRetentionCleanup } from "./core/analysis/esp-coredump-retention.js";
 import { executeCoredump } from "./tools/coredump.js";
@@ -1676,6 +1677,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     name === "pio_run_target" ||
     name === "pio_upload" ||
     name === "pio_flash_and_verify" ||
+    name === "pio_upload_ota" ||
     name === "pio_partition_table" ||
     name === "pio_coredump" ||
     name === "pio_system_info" ||
@@ -1750,6 +1752,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   ? executePartitionCompatibility(parameters, {projectDir:compatibilityProjectDir,cwd:process.cwd()},caller,onAuthorized)
                 : tool === "pio_system_info"
                   ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
+                : tool === "pio_upload_ota"
+                  ? executeOtaCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
                 : tool === "pio_flash_and_verify"
                   ? executeFlashVerificationCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
                 : tool === "pio_upload"

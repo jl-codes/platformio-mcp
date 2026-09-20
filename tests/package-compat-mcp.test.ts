@@ -52,7 +52,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 91 : 57);
+      expect(tools).toHaveLength(enabled ? 92 : 57);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -82,10 +82,17 @@ it.each([
         "pio_partition_table",
         "pio_coredump",
         "pio_flash_and_verify",
+        "pio_upload_ota",
       ]) {
         expect(tools.some((tool) => tool.name === name)).toBe(enabled);
       }
       if (enabled) {
+        const invalidOta = await client.callTool({
+          name: "pio_upload_ota",
+          arguments: { host: "board.local", auth: 123 },
+        });
+        expect(invalidOta.isError).toBe(true);
+        expect(JSON.stringify(invalidOta)).toContain("COMPAT_ARGUMENT_INVALID");
         const invalidFlash = await client.callTool({
           name: "pio_flash_and_verify",
           arguments: { stop_open_sessions: "yes" },
