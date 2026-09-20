@@ -635,3 +635,7 @@ New monitor registrations retain OS process-start identity beside the compatible
 ### Runtime floor and CI fixture correction
 
 Canonical and both npm alias engine declarations now require Node >=20, matching the native serial runtime, with the root lockfile and README aligned. The remaining build child-process fixture now uses EventEmitter lifecycle events and exit metadata. Both failed CI runs at ee1490d9 contained only the API/build proc.once fixture failures; those cases now pass locally. TypeScript checking, 28 targeted build/API/custody tests, and all npm package validations pass. Full new-head CI remains to be observed; no release has been published.
+
+### Durable child-handoff uncertainty
+
+Device leases now support a persisted pending-handoff marker before a child launch. Marked leases report unknown custody, reject normal release, and cannot be automatically reclaimed even after the coordinator is proven stale. Verified transfer clears the marker while recording child identity; cancellation requires the original trusted release capability and proof by the launcher that no child remains. TypeScript checking and 19 lease tests pass, including a real separate coordinator that writes the marker and exits. Launcher integration and explicit unresolved-handoff recovery remain outstanding; no hardware was exercised.

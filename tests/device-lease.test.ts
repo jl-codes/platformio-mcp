@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
@@ -570,3 +570,82 @@ it("reports lease ownership without exposing capabilities or recovering stale re
   store.release(lease);
   expect(store.status(resource).status).toBe("unclaimed");
 });
+
+it("pins unresolved child handoff even when the coordinator is proven stale", () => {
+  const root = directory();
+  const original = new DeviceLeaseStore({ root, inspect: () => running() });
+  const lease = original.acquire(resource);
+  original.beginHandoff(lease);
+  expect(() => original.release(lease)).toThrow(
+    expect.objectContaining({ code: "DEVICE_HANDOFF_PENDING" }),
+  );
+  const replacement = new DeviceLeaseStore({
+    root,
+    inspect: () => running("replacement"),
+  });
+  expect(replacement.status(resource).status).toBe("unknown");
+  expect(() => replacement.acquire(resource)).toThrow(
+    expect.objectContaining({ code: "DEVICE_HANDOFF_PENDING" }),
+  );
+  expect(() => replacement.cancelHandoff({ ...lease })).toThrow(
+    expect.objectContaining({ code: "DEVICE_LEASE_NOT_OWNED" }),
+  );
+  original.cancelHandoff(lease);
+  original.release(lease);
+});
+it("clears the pending marker only when transfer records a verified child owner", () => {
+  const root = directory();
+  const child = {
+    pid: process.pid + 1,
+    platform: process.platform,
+    startToken: "child",
+  };
+  const store = new DeviceLeaseStore({
+    root,
+    inspect: (pid) =>
+      pid === child.pid ? { status: "running", identity: child } : running(),
+  });
+  const lease = store.acquire(resource);
+  store.beginHandoff(lease);
+  store.transfer(lease, child);
+  expect(store.status(resource)).toMatchObject({
+    status: "owned",
+    ownerPid: child.pid,
+  });
+  expect(() => store.cancelHandoff(lease)).toThrow(
+    expect.objectContaining({ code: "DEVICE_LEASE_NOT_OWNED" }),
+  );
+});
+
+it("retains unresolved custody after the real coordinator process exits", () => {
+  const root = directory();
+  const script = path.join(directory(), "handoff-crash.mjs");
+  const moduleUrl = pathToFileURL(
+    path.resolve("src/core/devices/device-lease.ts"),
+  ).href;
+  fs.writeFileSync(
+    script,
+    `import {DeviceLeaseStore} from ${JSON.stringify(moduleUrl)};
+    const store = new DeviceLeaseStore({root: process.argv[2]});
+    const lease = store.acquire(${JSON.stringify(resource)});
+    store.beginHandoff(lease);
+    process.exit(0);`,
+  );
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      pathToFileURL(path.resolve("node_modules/tsx/dist/loader.mjs")).href,
+      script,
+      root,
+    ],
+    { encoding: "utf8", timeout: 15000, windowsHide: true },
+  );
+  expect(child.error).toBeUndefined();
+  expect(child.status, child.stderr).toBe(0);
+  const store = new DeviceLeaseStore({ root });
+  expect(store.status(resource).status).toBe("unknown");
+  expect(() => store.acquire(resource)).toThrow(
+    expect.objectContaining({ code: "DEVICE_HANDOFF_PENDING" }),
+  );
+}, 20000);

@@ -42,6 +42,7 @@ interface LeaseRecord {
   owner: ProcessIdentity;
   nonce: string;
   acquiredAt: string;
+  handoffPending?: true; // A child may exist even if the coordinator dies before its identity is recorded.
 }
 /** Internal dependency injection for isolated tests, never populated from tool arguments. */
 export interface DeviceLeaseStoreOptions {
@@ -125,6 +126,13 @@ export class DeviceLeaseStore {
     return this.withGate(key, () => {
       const record = this.readRecord(key);
       if (!record) return { status: "unclaimed", resource: { ...resource } };
+      if (record.handoffPending)
+        return {
+          status: "unknown",
+          resource: { ...record.resource },
+          ownerPid: record.owner.pid,
+          acquiredAt: record.acquiredAt,
+        };
       const identity = compareProcessIdentity(
         record.owner,
         this.inspect(record.owner.pid),
@@ -145,6 +153,11 @@ export class DeviceLeaseStore {
     return this.withGate(key, () => {
       const previous = this.readRecord(key);
       if (previous) {
+        if (previous.handoffPending)
+          throw new PlatformIOError(
+            "Device custody handoff is unresolved; automatic stale recovery is disabled.",
+            "DEVICE_HANDOFF_PENDING",
+          );
         const status = compareProcessIdentity(
           previous.owner,
           this.inspect(previous.owner.pid),
@@ -166,6 +179,32 @@ export class DeviceLeaseStore {
       };
       this.writeRecord(key, record);
       return this.createHandle(record);
+    });
+  }
+
+  /** Persist uncertainty before launching a child, so a coordinator crash cannot expose its hardware. */
+  beginHandoff(lease: DeviceLease): void {
+    const held = this.requireHandle(lease);
+    const key = resourceKey(held.resource);
+    this.withGate(key, () => {
+      const current = this.requirePersistedOwner(key, held);
+      if (current.handoffPending)
+        throw new PlatformIOError(
+          "Device handoff is already pending.",
+          "DEVICE_HANDOFF_PENDING",
+        );
+      this.writeRecord(key, { ...current, handoffPending: true });
+    });
+  }
+
+  /** Cancel only after the trusted launcher proves no child started or all started children exited. */
+  cancelHandoff(lease: DeviceLease): void {
+    const held = this.requireHandle(lease);
+    const key = resourceKey(held.resource);
+    this.withGate(key, () => {
+      const current = this.requirePersistedOwner(key, held);
+      const { handoffPending: _pending, ...rest } = current;
+      this.writeRecord(key, rest);
     });
   }
 
@@ -196,6 +235,7 @@ export class DeviceLeaseStore {
       const transferred: LeaseRecord = {
         ...current,
         owner: { ...target },
+        handoffPending: undefined,
         nonce: randomUUID(),
       };
       this.writeRecord(key, transferred);
@@ -244,7 +284,12 @@ export class DeviceLeaseStore {
     const held = this.requireHandle(lease);
     const key = resourceKey(held.resource);
     this.withGate(key, () => {
-      this.requirePersistedOwner(key, held);
+      const current = this.requirePersistedOwner(key, held);
+      if (current.handoffPending)
+        throw new PlatformIOError(
+          "Cannot release unresolved child custody.",
+          "DEVICE_HANDOFF_PENDING",
+        );
       fs.unlinkSync(path.join(this.root, `${key}.json`));
       this.held.delete(lease);
     });
@@ -374,6 +419,8 @@ export class DeviceLeaseStore {
       const record = JSON.parse(fs.readFileSync(file, "utf8")) as LeaseRecord;
       if (
         record.version !== 1 ||
+        (record.handoffPending !== undefined &&
+          record.handoffPending !== true) ||
         resourceKey(record.resource) !== key ||
         !validProcessIdentity(record.owner) ||
         typeof record.nonce !== "string" ||
