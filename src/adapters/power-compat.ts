@@ -1,4 +1,6 @@
 /** Public power routing shares explicit policy, serial ownership and PPK2 cleanup capabilities. */
+import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
+import { executeTriggeredMeter } from "./power-triggered-meter.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -67,13 +69,14 @@ export async function executePowerCompatibility(
   const scope = Object.fromEntries(
     Object.entries(params).filter(([key]) => !key.endsWith("approval_id")),
   );
+  const guard = createPolicyRevisionGuard(projectDir);
   return dispatchAuthorizedAction(
     operationName,
     { ...scope, projectDir, approvalId },
     { ...caller, workspaceDir: projectDir },
     async () =>
       params.source === "ppk2"
-        ? meter.run(params, defaults, caller)
+        ? executeTriggeredMeter(serial, meter, params, defaults, caller, guard)
         : executeSerialPowerCompatibility(
             serial,
             params,

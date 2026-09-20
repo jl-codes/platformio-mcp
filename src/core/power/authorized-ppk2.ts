@@ -1,4 +1,5 @@
 /** Authorize exact PPK2 meter/DUT bindings and electrical settings before supervised execution. */
+import type { SerialPowerHold } from "../serial/session-manager.js";
 import { dispatchAuthorizedAction, planAction } from "../action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../policy/revision-guard.js";
 import type { PolicyEvaluationContext } from "../policy/types.js";
@@ -17,6 +18,8 @@ export interface AuthorizedPpk2Options {
   request: unknown;
   meter: PowerCustodyBinding;
   dut: PowerCustodyBinding;
+  guard?: () => void; // Retained outer request revision check; never supplied by public arguments.
+  dutHold?: SerialPowerHold; // Internal capability issued by this connection's serial owner.
   hostApprovalId?: string;
   powerApprovalId?: string;
 }
@@ -27,6 +30,7 @@ export class AuthorizedPpk2Operation {
   private readonly stages;
   private readonly context: PolicyEvaluationContext;
   private readonly guard: () => void;
+  private readonly dutSignal?: AbortSignal;
   private used = false;
   private closing = false;
 
@@ -47,8 +51,19 @@ export class AuthorizedPpk2Operation {
       workspaceDir: options.projectDir,
       devicePort: request.port,
     };
-    this.guard = createPolicyRevisionGuard(options.projectDir);
-    const custody = new PowerDeviceCustody(options.meter, options.dut);
+    const revision = createPolicyRevisionGuard(options.projectDir);
+    const outerGuard = options.guard;
+    this.guard = () => {
+      revision();
+      outerGuard?.();
+    };
+    this.dutSignal = options.dutHold?.signal;
+    const custody = new PowerDeviceCustody(
+      options.meter,
+      options.dut,
+      undefined,
+      options.dutHold,
+    );
     const resources = (binding: PowerCustodyBinding) =>
       binding.resources
         .map((resource) => ({ ...resource }))
@@ -91,6 +106,10 @@ export class AuthorizedPpk2Operation {
 
   /** Preflight both grants before consuming either; every policy revision ends collection and triggers owned cleanup. */
   async collect(signal?: AbortSignal) {
+    if (this.dutSignal)
+      signal = AbortSignal.any(
+        signal ? [signal, this.dutSignal] : [this.dutSignal],
+      );
     if (this.used || this.closing)
       throw new PlatformIOError(
         "Power operation owner is already used.",

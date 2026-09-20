@@ -111,3 +111,41 @@ it("retries only unreleased leases after a release failure", async () => {
   for (const resource of [meterResource, dutResource])
     expect(f.peer.status(resource).status).toBe("unclaimed");
 });
+
+it("borrows the exact held DUT resources without reacquiring or releasing the monitor lease", async () => {
+  const f = fixture();
+  const lease = f.store.acquire(dutResource);
+  const hold = {
+    projectDir: root,
+    resources: [dutResource],
+    signal: new AbortController().signal,
+    prepareSpawn: vi.fn(async () => {
+      f.store.beginHandoff(lease);
+    }),
+    releaseAfterExit: vi.fn(() => {
+      f.store.cancelHandoff(lease);
+    }),
+  };
+  const owner = new PowerDeviceCustody(f.meter, f.dut, f.store, hold);
+  await owner.prepareSpawn();
+  expect(hold.prepareSpawn).toHaveBeenCalledOnce();
+  expect(() => f.peer.acquire(dutResource)).toThrow(/handoff is unresolved/);
+  owner.releaseAfterExit();
+  expect(f.peer.status(meterResource).status).toBe("unclaimed");
+  expect(f.peer.status(dutResource).status).toBe("owned");
+  f.store.release(lease);
+});
+it("rejects a monitor hold for a different DUT before acquiring anything", () => {
+  const f = fixture();
+  const hold = {
+    projectDir: root,
+    resources: [{ kind: "serial" as const, identity: "other" }],
+    signal: new AbortController().signal,
+    prepareSpawn: vi.fn(),
+    releaseAfterExit: vi.fn(),
+  };
+  expect(() => new PowerDeviceCustody(f.meter, f.dut, f.store, hold)).toThrow(
+    expect.objectContaining({ code: "POWER_DUT_SCOPE_MISMATCH" }),
+  );
+  expect(f.peer.status(meterResource).status).toBe("unclaimed");
+});

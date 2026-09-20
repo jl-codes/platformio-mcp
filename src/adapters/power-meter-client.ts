@@ -1,4 +1,5 @@
 /** Compose connection-owned PPK2 discovery, permissions, process cleanup and power reports. */
+import type { SerialPowerHold } from "../core/serial/session-manager.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { PlatformIOError } from "../utils/errors.js";
@@ -34,12 +35,20 @@ export const Ppk2CompatibilitySchema = z
       .max(1e9)
       .nullable()
       .optional(),
+    trigger: z.string().min(1).max(4096).nullable().optional(),
+    trigger_session_id: z.string().min(1).max(256).nullable().optional(),
+    trigger_seconds: z.number().finite().positive().max(600).default(10),
+    trigger_approval_id: z.string().max(256).optional(),
     discovery_approval_id: z.string().max(256).optional(),
     host_approval_id: z.string().max(256).optional(),
     power_approval_id: z.string().max(256).optional(),
   })
   .strict()
-  .refine((input) => input.mode !== "source" || input.current_limit_ma <= 600);
+  .refine((input) => input.mode !== "source" || input.current_limit_ma <= 600)
+  .refine(
+    (input) => !!input.trigger === !!input.trigger_session_id,
+    "trigger and trigger_session_id must be supplied together.",
+  );
 
 /** One instance belongs to one authenticated connection; opaque cleanup IDs never cross connection ownership. */
 export class PowerMeterClient {
@@ -53,24 +62,43 @@ export class PowerMeterClient {
     input: unknown,
     defaults: CompatibilityProjectDefaults,
     caller: PolicyEvaluationContext,
+    dutHold?: SerialPowerHold,
+    guard: () => void = () => {},
   ) {
-    if (this.closed)
-      throw new PlatformIOError(
-        "Power client disconnected.",
-        "POWER_CLIENT_CLOSED",
-      );
-    if (this.pending.size + this.owners.size >= 8)
-      throw new PlatformIOError(
-        "Power operation capacity reached; resolve pending cleanup first.",
-        "POWER_CAPACITY",
-      );
-    const params = Ppk2CompatibilitySchema.parse(input);
-    const task = this.execute(params, defaults, caller);
-    this.pending.add(task);
+    let transferred = false;
     try {
-      return await task;
+      this.assertOpen();
+      guard();
+      if (this.pending.size + this.owners.size >= 8)
+        throw new PlatformIOError(
+          "Power operation capacity reached; resolve pending cleanup first.",
+          "POWER_CAPACITY",
+        );
+      const params = Ppk2CompatibilitySchema.parse(input);
+      if (!!params.trigger !== !!dutHold)
+        throw new PlatformIOError(
+          "PPK2 triggers require an owned monitor hold.",
+          "POWER_TRIGGER_REQUIRED",
+        );
+      const task = this.execute(
+        params,
+        defaults,
+        caller,
+        dutHold,
+        () => {
+          transferred = true;
+        },
+        guard,
+      );
+      this.pending.add(task);
+      try {
+        return await task;
+      } finally {
+        this.pending.delete(task);
+      }
     } finally {
-      this.pending.delete(task);
+      // Before an operation owner is retained, no meter process can exist; return the unused hold.
+      if (!transferred) dutHold?.releaseAfterExit();
     }
   }
 
@@ -86,14 +114,24 @@ export class PowerMeterClient {
     params: z.infer<typeof Ppk2CompatibilitySchema>,
     defaults: CompatibilityProjectDefaults,
     caller: PolicyEvaluationContext,
+    dutHold: SerialPowerHold | undefined,
+    onOwnership: () => void,
+    guard: () => void,
   ) {
     const projectDir = await resolveCompatibilityProject(
       params.project_dir,
       defaults,
     );
+    guard();
+    if (dutHold && dutHold.projectDir !== projectDir)
+      throw new PlatformIOError(
+        "Trigger monitor belongs to a different project.",
+        "POWER_DUT_SCOPE_MISMATCH",
+      );
     this.assertOpen();
     const runtime = await resolvePpk2Environment(projectDir);
     this.assertOpen();
+    guard();
     return withPowerSerialDiscovery(
       {
         projectDir,
@@ -105,6 +143,7 @@ export class PowerMeterClient {
       async (read) => {
         const records = await read();
         this.assertOpen();
+        guard();
         const meter = bindPowerSerialDevice(params.port, records, read);
         const dut = bindPowerSerialDevice(params.dut_port, records, read);
         const request = {
@@ -121,6 +160,8 @@ export class PowerMeterClient {
             request,
             meter: meter.custody,
             dut: dut.custody,
+            dutHold,
+            guard,
             hostApprovalId: params.host_approval_id,
             powerApprovalId: params.power_approval_id,
           },
@@ -128,8 +169,10 @@ export class PowerMeterClient {
         );
         const id = randomUUID();
         this.owners.set(id, operation);
+        onOwnership();
         try {
           const report = await operation.collect(this.abort.signal);
+          guard();
           this.assertOpen();
           return {
             ...projectPpk2PowerReport(report, request, {

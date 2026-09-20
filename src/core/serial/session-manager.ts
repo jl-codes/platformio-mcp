@@ -82,6 +82,14 @@ export interface SerialSessionInfo {
   cleanupPending: boolean;
   cleanupError?: string;
 }
+/** Host-only retention of an owned monitor's lease; this grants no serial or power execution permission. */
+export interface SerialPowerHold {
+  readonly projectDir: string;
+  readonly resources: readonly Readonly<DeviceResource>[];
+  readonly signal: AbortSignal;
+  prepareSpawn(): Promise<void>;
+  releaseAfterExit(): void;
+}
 interface Session {
   id: string;
   owner: SerialSessionOwner;
@@ -95,6 +103,7 @@ interface Session {
   transport?: DirectSerialTransport;
   leases: DeviceLease[];
   cleanupError?: string;
+  powerHold?: { abort: AbortController };
 }
 
 /**
@@ -329,6 +338,7 @@ export class SerialSessionManager {
         session.buffer.append(bytes),
       );
       void session.transport.terminated.then((state) => {
+        session.powerHold?.abort.abort();
         session.buffer.close(
           state,
           state === "error" ? "Serial transport failed." : undefined,
@@ -418,6 +428,95 @@ export class SerialSessionManager {
     return session.transport.write(copy);
   }
 
+  /** Retain this connection's live monitor custody for one separately authorized power operation. */
+  holdForPower(owner: SerialSessionOwner, id: string): SerialPowerHold {
+    const session = this.requireSession(owner, id);
+    this.requireActiveOwner(owner);
+    this.ensureNotStopped(session);
+    if (
+      session.startPending ||
+      session.transport?.state !== "open" ||
+      !session.leases.length
+    )
+      throw new PlatformIOError(
+        "Power trigger monitor is not open.",
+        "SERIAL_CLOSED",
+      );
+    if (session.powerHold)
+      throw new PlatformIOError(
+        "Monitor already belongs to an active power operation.",
+        "POWER_DUT_BUSY",
+      );
+    const hold = { abort: new AbortController() };
+    session.powerHold = hold;
+    const marked = new Set<DeviceLease>();
+    let used = false,
+      preparing = false,
+      released = false;
+    const guard = () => {
+      this.requireActiveOwner(owner);
+      this.ensureNotStopped(session);
+      if (
+        released ||
+        session.powerHold !== hold ||
+        hold.abort.signal.aborted ||
+        session.transport?.state !== "open"
+      )
+        throw new PlatformIOError(
+          "Power trigger monitor is no longer active.",
+          "SERIAL_CLOSED",
+        );
+    };
+    return Object.freeze({
+      projectDir: session.request.projectDir,
+      resources: Object.freeze(
+        session.leases.map((lease) => Object.freeze({ ...lease.resource })),
+      ),
+      signal: hold.abort.signal,
+      prepareSpawn: async () => {
+        if (used)
+          throw new PlatformIOError(
+            "Power monitor hold cannot be reused.",
+            "POWER_CUSTODY_CLOSED",
+          );
+        used = true;
+        preparing = true;
+        try {
+          guard();
+          await this.checkEndpoint(session, guard);
+          for (const lease of session.leases) {
+            this.leases.beginHandoff(lease);
+            marked.add(lease);
+          }
+        } finally {
+          preparing = false;
+        }
+      },
+      releaseAfterExit: () => {
+        if (released) return;
+        if (preparing)
+          throw new PlatformIOError(
+            "Power handoff is still being prepared.",
+            "DEVICE_CLEANUP_PENDING",
+            { cleanupPending: true },
+          );
+        for (const lease of marked) {
+          this.leases.cancelHandoff(lease);
+          marked.delete(lease);
+        }
+        if (session.powerHold === hold) session.powerHold = undefined;
+        this.releaseLease(session);
+        if (session.confirmedClosed && session.leases.length)
+          throw new PlatformIOError(
+            "Monitor lease cleanup remains pending.",
+            "DEVICE_CLEANUP_PENDING",
+            { cleanupPending: true },
+          );
+        released = true;
+      },
+    });
+  }
+
   /** Owned process-only cleanup remains available when policy is invalid or permission was revoked. */
   async stop(
     owner: SerialSessionOwner,
@@ -425,6 +524,7 @@ export class SerialSessionManager {
   ): Promise<SerialSessionInfo> {
     const session = this.requireSession(owner, id);
     session.stopRequested = true;
+    session.powerHold?.abort.abort();
     session.buffer.close("stopped");
     if (session.transport) {
       try {
@@ -634,7 +734,7 @@ export class SerialSessionManager {
   }
 
   private releaseLease(session: Session): void {
-    if (!session.confirmedClosed) return;
+    if (!session.confirmedClosed || session.powerHold) return;
     const pending: DeviceLease[] = [];
     for (const lease of session.leases) {
       try {

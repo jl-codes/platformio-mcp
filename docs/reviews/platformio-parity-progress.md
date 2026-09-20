@@ -1648,3 +1648,8 @@ Added an inert endpoint/probe custody owner retained before lease allocation. St
 ### Preserve configured legacy J-Link selection
 
 Configured -select USB commands now retain -select USB=<discovered serial> instead of introducing the V8.24-only -USB option. Explicit -USB configurations retain the modern selector. Both paths preserve -LocalhostOnly 1, reject remote/conflicting selectors and keep target settings. SEGGER UM08001 v6.30 sections 3.3.5.8/3.3.5.23 and current SEGGER GDB Server documentation were inspected; links are in the parity guide. Twenty binding/backend-selection cases and TypeScript passed. Physical and installed legacy-binary acceptance remain outstanding. CI runs 35516577339 and 35516579513 passed on 0b36b9bb before this and the pending endpoint-custody changes.
+
+
+### PPK2 trigger and owned-monitor coexistence
+
+Added a single-borrower internal monitor hold with exact resource snapshots, persistent handoff state and cancellation on stop/disconnect. Monitor closure retains endpoint/USB leases until the power owner confirms cleanup. PPK2 now accepts paired trigger/session fields, waits for fresh authorized output, verifies same-project/exact-DUT resources, and adopts the hold into supervised meter custody. Partial failures before ownership return unused holds; failed device cleanup retains the power recovery owner. Outer profile policy revision is carried through the trigger and execution path. Sixty-four focused serial/power ownership and policy cases plus twelve trigger/public-policy/real-stdio cases passed. Physical acceptance, ambiguous multi-interface support and full reference result/default parity remain incomplete.

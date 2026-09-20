@@ -1,10 +1,11 @@
 /** Connection composition keeps cleanup ownership after failures and cancels work on disconnect. */
+import type { AuthorizedPpk2Options } from "../src/core/power/authorized-ppk2.js";
 import { beforeEach, expect, it, vi } from "vitest";
 const fixture = vi.hoisted(() => ({
   collect: vi.fn(),
   cleanup: vi.fn(),
   pending: true,
-  options: undefined as any,
+  options: undefined as unknown as AuthorizedPpk2Options,
 }));
 vi.mock("../src/adapters/compatibility-project.js", () => ({
   resolveCompatibilityProject: async () => "/fixture/project",
@@ -16,7 +17,7 @@ vi.mock("../src/core/power/power-serial-discovery.js", () => ({
   withPowerSerialDiscovery: async (
     _input: unknown,
     _caller: unknown,
-    execute: any,
+    execute: (read: () => Promise<never[]>) => Promise<unknown>,
   ) => execute(async () => []),
   bindPowerSerialDevice: (port: string) => ({
     port,
@@ -28,7 +29,7 @@ vi.mock("../src/core/power/power-serial-discovery.js", () => ({
 }));
 vi.mock("../src/core/power/authorized-ppk2.js", () => ({
   AuthorizedPpk2Operation: class {
-    constructor(options: unknown) {
+    constructor(options: AuthorizedPpk2Options) {
       fixture.options = options;
     }
     collect = fixture.collect;
@@ -128,4 +129,50 @@ it("cancels active collection on disconnect and rejects new work", async () => {
   await expect(client.run(input, {}, {})).rejects.toMatchObject({
     code: "POWER_CLIENT_CLOSED",
   });
+});
+
+it("returns unused holds when admission fails or the monitor project differs", async () => {
+  const hold = {
+    projectDir: "/other",
+    resources: [{ kind: "serial" as const, identity: "dut" }],
+    signal: new AbortController().signal,
+    prepareSpawn: vi.fn(),
+    releaseAfterExit: vi.fn(),
+  };
+  const args = { ...input, trigger: "READY", trigger_session_id: "monitor" };
+  const client = new PowerMeterClient();
+  await expect(client.run(args, {}, {}, hold)).rejects.toMatchObject({
+    code: "POWER_DUT_SCOPE_MISMATCH",
+  });
+  expect(hold.releaseAfterExit).toHaveBeenCalledOnce();
+  await client.close();
+  await expect(client.run(args, {}, {}, hold)).rejects.toMatchObject({
+    code: "POWER_CLIENT_CLOSED",
+  });
+  expect(hold.releaseAfterExit).toHaveBeenCalledTimes(2);
+  expect(fixture.collect).not.toHaveBeenCalled();
+});
+it("transfers monitor custody to retained failed cleanup without releasing it at adapter return", async () => {
+  const hold = {
+    projectDir: "/fixture/project",
+    resources: [{ kind: "serial" as const, identity: "dut" }],
+    signal: new AbortController().signal,
+    prepareSpawn: vi.fn(),
+    releaseAfterExit: vi.fn(),
+  };
+  fixture.collect.mockRejectedValueOnce(new Error("interrupted"));
+  fixture.cleanup.mockRejectedValueOnce(new Error("still powered"));
+  const client = new PowerMeterClient();
+  const error = await client
+    .run(
+      { ...input, trigger: "READY", trigger_session_id: "monitor" },
+      {},
+      {},
+      hold,
+    )
+    .catch((error) => error);
+  expect(fixture.options.dutHold).toBe(hold);
+  expect(error.context.cleanupPending).toBe(true);
+  expect(hold.releaseAfterExit).not.toHaveBeenCalled();
+  await client.cleanup(error.context.powerOperationId);
 });

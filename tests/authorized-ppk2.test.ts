@@ -192,3 +192,46 @@ it("rejects collection after disconnect cleanup without consuming an approval", 
   expect(getApproval(input.hostApprovalId)?.status).toBe("approved");
   expect(transport.collect).not.toHaveBeenCalled();
 });
+
+it("cancels supervised collection when the owned trigger monitor closes", async () => {
+  const selected = options(),
+    monitor = new AbortController();
+  selected.dutHold = {
+    projectDir: root,
+    resources: selected.dut.resources,
+    signal: monitor.signal,
+    prepareSpawn: vi.fn(),
+    releaseAfterExit: vi.fn(),
+  };
+  let ready!: () => void;
+  const started = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  transport.collect.mockImplementation(
+    (signal: AbortSignal) =>
+      new Promise((_resolve, reject) => {
+        signal.addEventListener(
+          "abort",
+          () => reject(new Error("monitor closed")),
+          { once: true },
+        );
+        ready();
+      }),
+  );
+  const operation = new AuthorizedPpk2Operation(selected);
+  const running = operation.collect().catch((error) => error);
+  await started;
+  monitor.abort();
+  expect((await running).message).toBe("monitor closed");
+  expect(transport.cleanup).toHaveBeenCalledOnce();
+});
+it("checks the retained outer policy guard before any meter execution", async () => {
+  const selected = options();
+  selected.guard = () => {
+    throw new Error("outer request revoked");
+  };
+  await expect(new AuthorizedPpk2Operation(selected).collect()).rejects.toThrow(
+    "outer request revoked",
+  );
+  expect(transport.collect).not.toHaveBeenCalled();
+});

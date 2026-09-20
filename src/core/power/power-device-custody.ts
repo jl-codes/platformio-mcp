@@ -5,6 +5,7 @@ import {
   type DeviceResource,
 } from "../devices/device-lease.js";
 import type { ProcessDeviceCustody } from "../devices/process-device-custody.js";
+import type { SerialPowerHold } from "../serial/session-manager.js";
 import { PlatformIOError } from "../../utils/errors.js";
 
 /** Trusted discovery supplies existing lease-domain keys; public arguments must never supply these identities. */
@@ -26,6 +27,7 @@ export class PowerDeviceCustody implements ProcessDeviceCustody {
     private readonly meter: PowerCustodyBinding,
     private readonly dut: PowerCustodyBinding,
     private readonly store = new DeviceLeaseStore(),
+    private readonly dutHold?: SerialPowerHold,
   ) {
     const valid = (binding: PowerCustodyBinding) =>
       binding.resources.length > 0 &&
@@ -51,12 +53,22 @@ export class PowerDeviceCustody implements ProcessDeviceCustody {
         "Meter and DUT must be distinct physical resources.",
         "POWER_BINDING_INVALID",
       );
+    if (dutHold) {
+      const heldKeys = new Set(dutHold.resources.map(key));
+      if (
+        heldKeys.size !== dut.resources.length ||
+        dut.resources.some((resource) => !heldKeys.has(key(resource)))
+      )
+        throw new PlatformIOError(
+          "Trigger monitor does not own the selected DUT resources.",
+          "POWER_DUT_SCOPE_MISMATCH",
+        );
+    }
     this.resources = [
       ...new Map(
-        [...meter.resources, ...dut.resources].map((resource) => [
-          key(resource),
-          { ...resource },
-        ]),
+        [...meter.resources, ...(dutHold ? [] : dut.resources)].map(
+          (resource) => [key(resource), { ...resource }],
+        ),
       ).values(),
     ].sort((a, b) => key(a).localeCompare(key(b)));
   }
@@ -88,6 +100,7 @@ export class PowerDeviceCustody implements ProcessDeviceCustody {
       this.held.add(this.store.acquire(resource));
     await this.meter.revalidate();
     await this.dut.revalidate();
+    await this.dutHold?.prepareSpawn();
     if (this.closing)
       throw new PlatformIOError(
         "Power custody closed during discovery.",
@@ -114,6 +127,11 @@ export class PowerDeviceCustody implements ProcessDeviceCustody {
       } catch {
         failed = true;
       }
+    }
+    try {
+      this.dutHold?.releaseAfterExit();
+    } catch {
+      failed = true;
     }
     if (failed)
       throw new PlatformIOError(

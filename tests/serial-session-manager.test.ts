@@ -19,6 +19,7 @@ import {
   DirectSerialTransport,
   type SerialPortHandle,
 } from "../src/core/serial/serial-transport.js";
+import { PowerDeviceCustody } from "../src/core/power/power-device-custody.js";
 import { PlatformIOError } from "../src/utils/errors.js";
 
 const directories: string[] = [];
@@ -812,4 +813,110 @@ it("does not resume startup when its owner stops during preflight", async () => 
     ),
   ).rejects.toMatchObject({ code: "SERIAL_CLOSED" });
   expect(f.transport).not.toHaveBeenCalled();
+});
+
+describe("owned monitor retention for power collection", () => {
+  it("rejects foreign sessions and concurrent power borrowers", async () => {
+    const f = fixture();
+    const started = await f.manager.start(f.owner, f.request());
+    expect(() =>
+      f.manager.holdForPower(f.manager.createOwner(), started.sessionId),
+    ).toThrow(expect.objectContaining({ code: "SERIAL_SESSION_NOT_OWNED" }));
+    const hold = f.manager.holdForPower(f.owner, started.sessionId);
+    expect(() => f.manager.holdForPower(f.owner, started.sessionId)).toThrow(
+      expect.objectContaining({ code: "POWER_DUT_BUSY" }),
+    );
+    hold.releaseAfterExit();
+  });
+  it("aborts on monitor stop while retaining endpoint and physical leases until power cleanup", async () => {
+    const f = fixture(),
+      request = f.request();
+    request.additionalResources = [
+      { kind: "serial", identity: "usb:" + randomUUID() },
+    ];
+    const started = await f.manager.start(f.owner, request);
+    const hold = f.manager.holdForPower(f.owner, started.sessionId);
+    expect(hold.resources).toHaveLength(2);
+    await hold.prepareSpawn();
+    const stopped = await f.manager.stop(f.owner, started.sessionId);
+    expect(hold.signal.aborted).toBe(true);
+    expect(stopped.cleanupPending).toBe(true);
+    for (const resource of hold.resources)
+      expect(() => f.leases.acquire(resource)).toThrow(
+        expect.objectContaining({ code: "DEVICE_HANDOFF_PENDING" }),
+      );
+    hold.releaseAfterExit();
+    hold.releaseAfterExit();
+    for (const resource of hold.resources) {
+      const lease = f.leases.acquire(resource);
+      f.leases.release(lease);
+    }
+    expect(
+      (await f.manager.stop(f.owner, started.sessionId)).cleanupPending,
+    ).toBe(false);
+  });
+  it("returns custody to a still-open monitor without closing or releasing its device", async () => {
+    const f = fixture(),
+      request = f.request();
+    const started = await f.manager.start(f.owner, request);
+    const hold = f.manager.holdForPower(f.owner, started.sessionId);
+    await hold.prepareSpawn();
+    hold.releaseAfterExit();
+    expect(f.manager.list(f.owner)[0].state).toBe("open");
+    expect(() => f.leases.acquire(request.resource)).toThrow(
+      expect.objectContaining({ code: "DEVICE_BUSY" }),
+    );
+    const second = f.manager.holdForPower(f.owner, started.sessionId);
+    second.releaseAfterExit();
+  });
+  it("retains a failed handoff cancellation for retry", async () => {
+    const f = fixture(),
+      request = f.request();
+    const started = await f.manager.start(f.owner, request);
+    const hold = f.manager.holdForPower(f.owner, started.sessionId);
+    await hold.prepareSpawn();
+    await f.manager.stop(f.owner, started.sessionId);
+    const cancel = vi
+      .spyOn(f.leases, "cancelHandoff")
+      .mockImplementationOnce(() => {
+        throw new Error("lease update failed");
+      });
+    expect(() => hold.releaseAfterExit()).toThrow("lease update failed");
+    expect(() => f.leases.acquire(request.resource)).toThrow(
+      expect.objectContaining({ code: "DEVICE_HANDOFF_PENDING" }),
+    );
+    hold.releaseAfterExit();
+    expect(cancel).toHaveBeenCalledTimes(2);
+    expect(f.leases.status(request.resource).status).toBe("unclaimed");
+  });
+});
+
+it("joins actual monitor custody to meter custody and releases both after stopped-monitor cleanup", async () => {
+  const f = fixture(),
+    request = f.request();
+  request.additionalResources = [
+    { kind: "serial", identity: "usb:" + randomUUID() },
+  ];
+  const started = await f.manager.start(f.owner, request);
+  const hold = f.manager.holdForPower(f.owner, started.sessionId);
+  const meterResource = {
+    kind: "serial" as const,
+    identity: "meter:" + randomUUID(),
+  };
+  const custody = new PowerDeviceCustody(
+    { resources: [meterResource], revalidate: async () => {} },
+    { resources: hold.resources, revalidate: async () => {} },
+    f.leases,
+    hold,
+  );
+  await custody.prepareSpawn();
+  await f.manager.stop(f.owner, started.sessionId);
+  expect(hold.signal.aborted).toBe(true);
+  for (const resource of [meterResource, ...hold.resources])
+    expect(() => f.leases.acquire(resource)).toThrow(
+      expect.objectContaining({ code: "DEVICE_HANDOFF_PENDING" }),
+    );
+  custody.releaseAfterExit();
+  for (const resource of [meterResource, ...hold.resources])
+    expect(f.leases.status(resource).status).toBe("unclaimed");
 });
