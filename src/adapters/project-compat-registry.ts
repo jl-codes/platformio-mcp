@@ -43,6 +43,38 @@ export function withProjectCompatibility<TResult>(
       handler: (args, context) => context.dispatch(name, args),
     });
   }
+  const partition = base.get("partition_table");
+  if (!partition || result.has("pio_partition_table"))
+    throw new Error("Invalid partition compatibility registry");
+  result.set("pio_partition_table", {
+    ...partition,
+    name: "pio_partition_table",
+    description:
+      "Inspect the effective ESP partition layout and optionally compare a serial device. Build metadata and hardware access retain separate canonical permissions.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], default: null },
+        env: { type: ["string", "null"], default: null },
+        read_device: { type: "boolean", default: false },
+        port: { type: ["string", "null"], default: null },
+        build_metadata: { type: "boolean", default: true },
+        table_path: { type: "string" },
+        table_offset: { type: "integer", minimum: 0, maximum: 4294963200 },
+        sdkconfig_path: { type: "string" },
+        firmware_path: { type: "string" },
+        approval_id: { type: "string" },
+        config_approval_id: { type: "string" },
+        metadata_approval_id: { type: "string" },
+        system_approval_id: { type: "string" },
+        selection_approval_id: { type: "string" },
+        read_approval_id: { type: "string" },
+        command_approval_id: { type: "string" },
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_partition_table", args),
+  });
   const init = base.get("init_project");
   if (!init || result.has("pio_project_init"))
     throw new Error("Invalid init compatibility registry");

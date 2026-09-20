@@ -3,6 +3,7 @@
  * Explicit artifact paths and table offsets avoid hidden compilation or framework guesses.
  */
 import fs from "node:fs/promises";
+import path from "node:path";
 import { getSystemInfo } from "./projects.js";
 import { resolveFrameworkPartitionCsv } from "../core/esp-partition-framework.js";
 import { readEspFlash } from "../core/esp-flash-read.js";
@@ -196,6 +197,31 @@ export async function executePartitionTable(
         }
       }
       guard();
+      let firmwarePath = params.firmwarePath;
+      if (
+        !firmwarePath &&
+        build &&
+        path.basename(build.tablePath).toLowerCase() === "partitions.bin"
+      ) {
+        const candidate = path.resolve(
+          projectDir,
+          path.dirname(build.tablePath),
+          "firmware.bin",
+        );
+        const relative = path.relative(projectDir, candidate);
+        if (
+          relative &&
+          relative !== ".." &&
+          !relative.startsWith(".." + path.sep) &&
+          !path.isAbsolute(relative)
+        ) {
+          try {
+            if ((await fs.stat(candidate)).isFile()) firmwarePath = candidate;
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          }
+        }
+      }
       const result = await inspectEspPartitionArtifacts({
         workspaceDir: projectDir,
         tablePath,
@@ -205,7 +231,7 @@ export async function executePartitionTable(
           tableOffset: location.tableOffset,
           flashSize: params.flashSize ?? project?.flashSize,
         },
-        firmwarePath: params.firmwarePath,
+        firmwarePath,
         observedTablePath:
           params.observedTablePath ??
           (format === "csv" && build ? build.tablePath : undefined),
@@ -284,9 +310,7 @@ export async function executePartitionTable(
         ...publicResult,
         device,
         comparison_source:
-          !params.observedTablePath &&
-          format === "csv" &&
-          build
+          !params.observedTablePath && format === "csv" && build
             ? "build_binary"
             : publicResult.comparison_source,
         issues,
