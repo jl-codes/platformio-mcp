@@ -6,9 +6,10 @@ The parity branch is not a releasable version yet. Implementation, acceptance, a
 |---|---|---|---|
 | npm canonical | `platformio-mcp` | Public 3.0.0 metadata links this repository; local tarball validates | New unused version, full release gates, verified OIDC publisher or authenticated authority, registry-installed smoke and provenance |
 | npm aliases | `pio-agent`, `pio-mcp` | Both published at 3.0.0; local functional wrappers now pin the exact canonical version | Publish canonical first, then matching aliases; verify installed command routing |
-| npm scoped alias | `@forkbomb/platformio-mcp` | Public lookup missing | Authenticate scope control, implement/test functional wrapper; do not assume availability |
-| PyPI canonical | `pio-agent-platformio` | Public lookup missing | Functional wheels for all five planned host targets, trusted publisher, actual name acceptance and installed-artifact verification |
-| PyPI aliases | `pio-agent`, `pio-mcp` | Both functional alias wheels build with exact canonical pins and no shared command-file ownership | Installed uvx/uninstall acceptance, authority and publication |
+| Additional npm aliases | Inventory-defined scoped and unscoped candidates | Functional wrappers are implemented; local publisher identity reverified as `forkbomb` | Verify each name and CI trusted publisher; publish exact-version wrappers and verify installed routing |
+| PyPI canonical | `pio-agent-platformio` | Native wheel installation passed on all five planned hosts | Final-version artifact checks, trusted publisher, actual name acceptance and registry-installed verification |
+| PyPI aliases | `pio-agent`, `pio-mcp`, `platformiomcp`, `pioagent`, `flashagent`, `flash-agent` | All six installed and routed successfully on five hosts; alias removal preserved canonical commands | Final-version and public uvx acceptance, name-specific authority and publication |
+| GHCR | Ten inventory-defined names under `ghcr.io/jl-codes/` | Native amd64 and arm64 image builds passed in run 35515777379 | Full release artifact gate, protected publisher configuration, publication and registry pull verification |
 | Official MCP Registry | `io.github.jl-codes/platformio-mcp` | Pinned official schema, server manifest and npm ownership metadata validate locally | Publisher authentication, new published npm version with matching mcpName, publish and verify registry result |
 | Codex plugin | `platformio-mcp` from this repository | Local bundled plugin validation passes | Release version/source consistency, install/upgrade smoke against published source |
 | GitHub release | `jl-codes/platformio-mcp` | Authenticated repository admin access verified | Reviewed release commit/tag, immutable artifact identity and release gates |
@@ -22,14 +23,14 @@ The finite source inventory is `distribution/namespaces.json`. `npm run namespac
 
 ## Concrete blockers observed
 
-- Local `npm whoami --registry=https://registry.npmjs.org` returned HTTP 401. Repository admin access does not establish npm/PyPI ownership. Verify package-specific OIDC configuration in the protected release workflow; do not paste tokens into task messages.
+- On 2026-09-20, local npm authentication returned `forkbomb`. GitHub reported no release environments and no repository publication verification variables. Local login does not configure CI trusted publishing; verify package-specific npm OIDC and PyPI/GHCR/MCP publisher authority before publication.
 - Local manifests still use 3.0.0, already published. Select and consistently apply a new release version after compatibility review. Do not treat the existing 3.0.0 packages as the new implementation.
-- A first Windows wheel builds and passes isolated CLI smoke; the other wheel targets and MCP Registry publication automation remain incomplete. The MCP Registry manifest and npm mcpName are implemented and validated locally.
+- Native installation passed on Windows x64, macOS arm64/x64 and Linux arm64/x64, including all six Python aliases. Exact evidence is recorded in `reviews/native-python-installation-evidence.json`; it belongs to its recorded source commit, not a final release. MCP Registry publication automation is implemented but has not published this version.
 - Full parity, cross-host/hardware acceptance, and the release gate remain incomplete. No new release has been published by this goal.
 
 ## Release identity enforcement
 
-The release workflow builds all three npm tarballs and checks names, versions, exact alias dependencies, and SHA-512 integrity before publishing any artifact. Existing versions are accepted only when their exact artifact integrity matches; registry errors fail closed. Publishing requests npm provenance and rechecks registry artifact integrity. This does not replace installed-artifact smoke tests or cryptographic attestation verification, which remain required.
+The release workflow builds the canonical npm tarball and inventory-defined functional aliases and checks names, versions, exact alias dependencies, and SHA-512 integrity before publishing any artifact. Existing versions are accepted only when their exact artifact integrity matches; registry errors fail closed. Publishing requests npm provenance and rechecks registry artifact integrity. This does not replace installed-artifact smoke tests or cryptographic attestation verification, which remain required.
 
 `npm run test:namespaces` tests normalization, lookup failure handling, wrong-package rejection, and changed artifact identity. These controls are now part of CI and release gates. Namespace audit backoff/cache/change notification, wheel identity, and end-to-end publication checks remain outstanding.
 
@@ -109,4 +110,4 @@ The PR is conflict-free but remains incomplete against the full pinned plan. Com
 
 All seven explicit name targets are tracked: platformio-mcp, pio-mcp, platformio.mcp, pio-agent, platformiomcp, pioagent, flashagent. Functional npm and Python candidates and a seven-alias GHCR publisher are prepared. Ten Python wheels are now planned (five native canonical plus five aliases). Publisher jobs for npm, PyPI, MCP Registry and GHCR are gated; no new release has been published. Registry-specific collisions and third-party names remain excluded. The earlier table describes historical evidence; the namespace inventory and current progress record provide the updated scope.
 
-Publication blockers verified during this audit: local npm authentication returned 401; repository environments and publisher variables were absent; version remains the already-published 3.0.0. Full same-commit acceptance, native/hardware evidence and actual registry publication are not complete. Green CI alone cannot certify full plan completion.
+Current publication status: local npm authentication is verified as `forkbomb`; repository release environments and publisher variables remain absent; version remains the already-published 3.0.0. Full same-commit acceptance, native/hardware evidence and actual registry publication are not complete. Green CI alone cannot certify full plan completion.
