@@ -20582,8 +20582,8 @@ var require_utils = __commonJS({
     var HOST_DELIMS = { "@": "%40", "/": "%2F", "?": "%3F", "#": "%23", ":": "%3A" };
     var HOST_DELIM_RE = /[@/?#:]/g;
     var HOST_DELIM_NO_COLON_RE = /[@/?#]/g;
-    function reescapeHostDelimiters(host, isIP9) {
-      const re = isIP9 ? HOST_DELIM_NO_COLON_RE : HOST_DELIM_RE;
+    function reescapeHostDelimiters(host, isIP10) {
+      const re = isIP10 ? HOST_DELIM_NO_COLON_RE : HOST_DELIM_RE;
       re.lastIndex = 0;
       return host.replace(re, (ch) => HOST_DELIMS[ch]);
     }
@@ -21272,8 +21272,8 @@ var require_fast_uri = __commonJS({
       const host = matches[4];
       return hasMalformedPercentEncoding(matches[3]) || host !== void 0 && !isIPLiteral(host) && hasMalformedPercentEncoding(host) || hasMalformedPercentEncoding(matches[6]) || hasMalformedPercentEncoding(matches[7]) || hasMalformedPercentEncoding(matches[8]);
     }
-    function canonicalizeHost(parsed, options, schemeHandler, isIP9) {
-      if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport) && parsed.host && !isIPLiteral(parsed.host) && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP9 === false && nonSimpleDomain(parsed.host)) {
+    function canonicalizeHost(parsed, options, schemeHandler, isIP10) {
+      if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport) && parsed.host && !isIPLiteral(parsed.host) && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP10 === false && nonSimpleDomain(parsed.host)) {
         try {
           parsed.host = new URL("http://" + parsed.host).hostname;
         } catch (e) {
@@ -21300,7 +21300,7 @@ var require_fast_uri = __commonJS({
       let malformedHost = false;
       let malformedIPLiteral = false;
       let malformedScheme = false;
-      let isIP9 = false;
+      let isIP10 = false;
       if (options.reference === "suffix") {
         if (options.scheme) {
           uri = options.scheme + ":" + uri;
@@ -21363,15 +21363,15 @@ var require_fast_uri = __commonJS({
             const bracketedIPLiteral = isIPLiteral(parsed.host);
             const hasIPLiteralBracket = parsed.host.indexOf("[") !== -1 || parsed.host.indexOf("]") !== -1;
             const ipv6result = normalizeIPv6(parsed.host);
-            isIP9 = ipv6result.isIPV6 || ipv6result.isIPVFuture === true;
+            isIP10 = ipv6result.isIPV6 || ipv6result.isIPVFuture === true;
             malformedIPLiteral = hasIPLiteralBracket && (!bracketedIPLiteral || ipv6result.error === true);
-            parsed.host = isIP9 ? ipv6result.host : ipv6result.host.toLowerCase();
+            parsed.host = isIP10 ? ipv6result.host : ipv6result.host.toLowerCase();
             if (malformedIPLiteral) {
               parsed.error = parsed.error || "URI host is malformed.";
               malformedAuthorityOrPort = true;
             }
           } else {
-            isIP9 = true;
+            isIP10 = true;
           }
         }
         if (parsed.scheme === void 0 && parsed.userinfo === void 0 && parsed.host === void 0 && parsed.port === void 0 && parsed.query === void 0 && !parsed.path) {
@@ -21388,13 +21388,13 @@ var require_fast_uri = __commonJS({
         }
         const schemeHandler = getSchemeHandler(options.scheme || parsed.scheme);
         if (!malformedIPLiteral) {
-          malformedHost = canonicalizeHost(parsed, options, schemeHandler, isIP9);
+          malformedHost = canonicalizeHost(parsed, options, schemeHandler, isIP10);
         }
         if (!schemeHandler || schemeHandler && !schemeHandler.skipNormalize) {
           if (uri.indexOf("%") !== -1) {
             if (parsed.host !== void 0 && !malformedIPLiteral) {
-              const host = isIP9 ? parsed.host : normalizePercentEncoding(parsed.host, true);
-              parsed.host = reescapeHostDelimiters(host, isIP9);
+              const host = isIP10 ? parsed.host : normalizePercentEncoding(parsed.host, true);
+              parsed.host = reescapeHostDelimiters(host, isIP10);
             }
           }
           if (parsed.path) {
@@ -57227,7 +57227,7 @@ var require_request = __commonJS({
   "node_modules/express/lib/request.js"(exports, module) {
     "use strict";
     var accepts = require_accepts();
-    var isIP9 = __require("node:net").isIP;
+    var isIP10 = __require("node:net").isIP;
     var typeis = require_type_is();
     var http = __require("node:http");
     var fresh = require_fresh();
@@ -57317,7 +57317,7 @@ var require_request = __commonJS({
       var hostname2 = this.hostname;
       if (!hostname2) return [];
       var offset2 = this.app.get("subdomain offset");
-      var subdomains2 = !isIP9(hostname2) ? hostname2.split(".").reverse() : [hostname2];
+      var subdomains2 = !isIP10(hostname2) ? hostname2.split(".").reverse() : [hostname2];
       return subdomains2.slice(offset2);
     });
     defineGetter(req, "path", function path103() {
@@ -108744,6 +108744,47 @@ var DebugPreparationCache = class {
 init_device_lease();
 init_errors2();
 import net from "node:net";
+
+// src/core/debug/debug-remote-endpoint.ts
+init_errors2();
+import { isIP } from "node:net";
+function parseRemoteDebugEndpoint(value2) {
+  const invalid4 = () => {
+    throw new PlatformIOError(
+      "Select a numeric unicast debugger endpoint and port.",
+      "DEBUG_ENDPOINT_UNSUPPORTED"
+    );
+  };
+  if (typeof value2 !== "string" || value2.length > 128) return invalid4();
+  const match = /^(?:\[([0-9a-fA-F:]+)\]|([^:\s]*)):([0-9]{1,5})$/.exec(value2);
+  if (!match) return invalid4();
+  let host = match[1] ?? match[2];
+  const port = Number(match[3]);
+  if (!host || host === "localhost") host = "127.0.0.1";
+  if (port < 1 || port > 65535 || !isIP(host)) return invalid4();
+  if (isIP(host) === 6) {
+    host = new URL("http://[" + host + "]/").hostname.slice(1, -1);
+    const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(host);
+    if (mapped) {
+      const high = parseInt(mapped[1], 16), low = parseInt(mapped[2], 16);
+      host = [high >>> 8, high & 255, low >>> 8, low & 255].join(".");
+    }
+  }
+  if (isIP(host) === 4) {
+    const first = Number(host.split(".")[0]);
+    if (first === 0 || first >= 224) return invalid4();
+  } else if (host === "::" || host.startsWith("ff")) return invalid4();
+  return Object.freeze({
+    host,
+    port,
+    resource: Object.freeze({
+      kind: "network",
+      identity: `debug-tcp:${host}:${port}`
+    })
+  });
+}
+
+// src/core/debug/debug-endpoint-custody.ts
 async function assertDebugEndpointAvailable(port) {
   const server2 = net.createServer((socket) => socket.destroy());
   await new Promise((resolve, reject) => {
@@ -108764,7 +108805,7 @@ async function assertDebugEndpointAvailable(port) {
 }
 var DebugEndpointCustody = class {
   /** Host-only callbacks obtain physical ownership and supplement real endpoint availability checks in fixtures. */
-  constructor(port, acquireProbe, store = new DeviceLeaseStore(), check2 = assertDebugEndpointAvailable) {
+  constructor(port, acquireProbe, store = new DeviceLeaseStore(), check2 = assertDebugEndpointAvailable, endpointHost = "127.0.0.1") {
     this.port = port;
     this.acquireProbe = acquireProbe;
     this.store = store;
@@ -108774,6 +108815,9 @@ var DebugEndpointCustody = class {
         "Invalid local debugger port.",
         "DEBUG_ENDPOINT_UNSUPPORTED"
       );
+    this.endpoint = parseRemoteDebugEndpoint(
+      `${endpointHost.includes(":") ? `[${endpointHost}]` : endpointHost}:${port}`
+    );
   }
   port;
   acquireProbe;
@@ -108784,6 +108828,7 @@ var DebugEndpointCustody = class {
   started = false;
   closed = false;
   preparing = false;
+  endpoint;
   /** Claim the shared endpoint before the probe and recheck the listener immediately before process handoff. */
   async prepareSpawn() {
     if (this.started || this.closed)
@@ -108794,10 +108839,7 @@ var DebugEndpointCustody = class {
     this.started = true;
     this.preparing = true;
     try {
-      this.endpointLease = this.store.acquire({
-        kind: "network",
-        identity: `debug-tcp:127.0.0.1:${this.port}`
-      });
+      this.endpointLease = this.store.acquire(this.endpoint.resource);
       await this.check(this.port);
       this.probe = await this.acquireProbe();
       await this.probe.prepareSpawn();
@@ -109174,12 +109216,12 @@ init_errors2();
 import fs57 from "node:fs/promises";
 import path67 from "node:path";
 import { createHash as createHash13 } from "node:crypto";
-import { isIP as isIP2 } from "node:net";
+import { isIP as isIP3 } from "node:net";
 
 // src/core/debug/debug-init-template.ts
 init_errors2();
 import path66 from "node:path";
-import { isIP } from "node:net";
+import { isIP as isIP2 } from "node:net";
 var DEBUG_INIT_MARKERS = Object.freeze({
   elf: "__PIO_MCP_INIT_ELF_PATH__",
   directory: "__PIO_MCP_INIT_ELF_DIRECTORY__",
@@ -109192,7 +109234,7 @@ function bindDebugInitializationTemplate(template, selection) {
       "DEBUG_INIT_TEMPLATE_INVALID"
     );
   };
-  if (typeof template !== "string" || !template.trim() || Buffer.byteLength(template) > 65536 || template.includes("\0") || !path66.isAbsolute(selection.elfPath) || /[\x00-\x1f\x7f]/.test(selection.elfPath) || !isIP(selection.host) || !Number.isInteger(selection.port) || selection.port < 1 || selection.port > 65535)
+  if (typeof template !== "string" || !template.trim() || Buffer.byteLength(template) > 65536 || template.includes("\0") || !path66.isAbsolute(selection.elfPath) || /[\x00-\x1f\x7f]/.test(selection.elfPath) || !isIP2(selection.host) || !Number.isInteger(selection.port) || selection.port < 1 || selection.port > 65535)
     return invalid4();
   const nativePath = (value2) => process.platform === "win32" ? value2.replace(/\\/g, "/") : value2;
   const replacements = [
@@ -109200,7 +109242,7 @@ function bindDebugInitializationTemplate(template, selection) {
     [DEBUG_INIT_MARKERS.directory, nativePath(path66.dirname(selection.elfPath))],
     [
       DEBUG_INIT_MARKERS.endpoint,
-      (isIP(selection.host) === 6 ? "[" + selection.host + "]" : selection.host) + ":" + selection.port
+      (isIP2(selection.host) === 6 ? "[" + selection.host + "]" : selection.host) + ":" + selection.port
     ]
   ];
   if (replacements.some(([, value2]) => value2.includes("__PIO_MCP_INIT_")))
@@ -109247,7 +109289,7 @@ async function retainDebugInitializationTemplate(template, binding, retainedElfP
   return retainInitialization(script, binding, template);
 }
 async function retainInitialization(script, binding, template) {
-  if (typeof script !== "string" || !script.trim() || Buffer.byteLength(script) > 65536 || script.includes("\0") || !/^[a-f0-9]{64}$/i.test(binding.elfSha256) || !isIP2(binding.host) || !Number.isInteger(binding.port) || binding.port < 1 || binding.port > 65535 || typeof binding.load !== "boolean")
+  if (typeof script !== "string" || !script.trim() || Buffer.byteLength(script) > 65536 || script.includes("\0") || !/^[a-f0-9]{64}$/i.test(binding.elfSha256) || !isIP3(binding.host) || !Number.isInteger(binding.port) || binding.port < 1 || binding.port > 65535 || typeof binding.load !== "boolean")
     throw new PlatformIOError(
       "Invalid debugger initialization artifact.",
       "DEBUG_INIT_ARTIFACT_INVALID"
@@ -109644,15 +109686,15 @@ async function dispatchDebuggerCommand(command, args, caller, send) {
 
 // src/core/debug/debug-target.ts
 init_errors2();
-import { isIP as isIP3 } from "node:net";
+import { isIP as isIP4 } from "node:net";
 async function preflightDebuggerTarget(selection, caller) {
   const timeoutMs = selection.timeoutMs ?? 9e4;
-  if (!isIP3(selection.host) || !Number.isInteger(selection.port) || selection.port < 1 || selection.port > 65535 || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 6e5 || typeof selection.load !== "boolean" || selection.load && !selection.elfSha256 || selection.elfSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(selection.elfSha256) || !selection.sessionId)
+  if (!isIP4(selection.host) || !Number.isInteger(selection.port) || selection.port < 1 || selection.port > 65535 || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 6e5 || typeof selection.load !== "boolean" || selection.load && !selection.elfSha256 || selection.elfSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(selection.elfSha256) || !selection.sessionId)
     throw new PlatformIOError(
       "Invalid debugger target selection.",
       "DEBUG_TARGET_INVALID"
     );
-  const endpoint = isIP3(selection.host) === 6 ? "[" + selection.host + "]:" + selection.port : selection.host + ":" + selection.port;
+  const endpoint = isIP4(selection.host) === 6 ? "[" + selection.host + "]:" + selection.port : selection.host + ":" + selection.port;
   const base2 = {
     projectDir: selection.projectDir,
     sessionId: selection.sessionId,
@@ -111724,14 +111766,14 @@ init_zod();
 
 // src/core/ota/ota-reachability.ts
 import path73 from "node:path";
-import { isIP as isIP4 } from "node:net";
+import { isIP as isIP5 } from "node:net";
 init_errors2();
 async function probeOtaReachability(address, host = {
   platform: process.platform,
   systemRoot: process.env.SystemRoot,
   run: runAnalysisProcess
 }) {
-  if (isIP4(address) !== 4 || Number(address.split(".")[0]) === 0 || Number(address.split(".")[0]) >= 224)
+  if (isIP5(address) !== 4 || Number(address.split(".")[0]) === 0 || Number(address.split(".")[0]) >= 224)
     throw new PlatformIOError(
       "ICMP requires a pinned unicast IPv4 destination.",
       "OTA_TARGET_INVALID"
@@ -111821,9 +111863,9 @@ import path78 from "node:path";
 // src/core/ota/ota-options.ts
 init_zod();
 init_errors2();
-import { isIP as isIP5 } from "node:net";
+import { isIP as isIP6 } from "node:net";
 var OtaUploaderOptionsSchema = external_exports.object({
-  hostAddress: external_exports.string().refine((value2) => isIP5(value2) === 4).optional(),
+  hostAddress: external_exports.string().refine((value2) => isIP6(value2) === 4).optional(),
   hostPort: external_exports.number().int().min(1).max(65535).optional(),
   invitationTimeoutSeconds: external_exports.number().int().min(1).max(60).optional()
 }).strict();
@@ -112029,17 +112071,17 @@ async function resolveOtaTools(projectDir, family, systemInfo, environment = pro
 init_errors2();
 init_device_lease();
 import { lookup } from "node:dns/promises";
-import { isIP as isIP6 } from "node:net";
+import { isIP as isIP7 } from "node:net";
 async function resolveOtaTarget(host, port, resolve = (host2) => lookup(host2, { all: true, family: 4 })) {
   if (typeof host !== "string" || !host || host.length > 253 || host !== host.trim() || !Number.isInteger(port) || port < 1 || port > 65535)
     throw new PlatformIOError("Invalid OTA destination.", "OTA_TARGET_INVALID");
   const name2 = host.toLowerCase().replace(/\.$/, "");
-  if (!isIP6(name2) && !name2.split(".").every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)))
+  if (!isIP7(name2) && !name2.split(".").every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)))
     throw new PlatformIOError(
       "OTA host must be an IPv4 address or DNS name, without a URL, path or port.",
       "OTA_TARGET_INVALID"
     );
-  if (isIP6(name2) === 6)
+  if (isIP7(name2) === 6)
     throw new PlatformIOError(
       "This OTA target resolver requires IPv4.",
       "OTA_ADDRESS_UNSUPPORTED"
@@ -112047,7 +112089,7 @@ async function resolveOtaTarget(host, port, resolve = (host2) => lookup(host2, {
   let addresses;
   let timer;
   try {
-    addresses = isIP6(name2) === 4 ? [{ address: name2, family: 4 }] : await Promise.race([
+    addresses = isIP7(name2) === 4 ? [{ address: name2, family: 4 }] : await Promise.race([
       resolve(name2),
       new Promise((_, reject) => {
         timer = setTimeout(
@@ -112077,7 +112119,7 @@ async function resolveOtaTarget(host, port, resolve = (host2) => lookup(host2, {
     );
   const unique = [
     ...new Set(
-      addresses.filter((item) => item.family === 4 && isIP6(item.address) === 4).map((item) => item.address)
+      addresses.filter((item) => item.family === 4 && isIP7(item.address) === 4).map((item) => item.address)
     )
   ];
   if (unique.length !== 1)
@@ -112099,7 +112141,7 @@ async function resolveOtaTarget(host, port, resolve = (host2) => lookup(host2, {
   return Object.freeze({ host: name2, address, port, resource });
 }
 function acquireOtaCustody(target, store = new DeviceLeaseStore()) {
-  if (isIP6(target.address) !== 4 || target.resource.kind !== "network" || target.resource.identity !== JSON.stringify(["ota", target.address]))
+  if (isIP7(target.address) !== 4 || target.resource.kind !== "network" || target.resource.identity !== JSON.stringify(["ota", target.address]))
     throw new PlatformIOError(
       "Invalid OTA lease binding.",
       "OTA_TARGET_INVALID"
@@ -112137,7 +112179,7 @@ init_owned_process_wait();
 init_errors2();
 import { spawn as spawn4 } from "node:child_process";
 import path77 from "node:path";
-import { isIP as isIP7 } from "node:net";
+import { isIP as isIP8 } from "node:net";
 var ESPOTA_BRIDGE = String.raw`
 import hashlib, json, logging, runpy, socket, sys
 request = json.loads(sys.stdin.buffer.read(65537))
@@ -112184,7 +112226,7 @@ runpy.run_path(request["script"], run_name="__main__")
 async function runEspotaProcess(request) {
   if ([request.pythonExecutable, request.uploaderScript, request.imagePath].some(
     (value2) => typeof value2 !== "string" || !path77.isAbsolute(value2) || value2.length > 32768 || /[\x00-\x1f\x7f]/.test(value2)
-  ) || /\.(?:cmd|bat|ps1|sh)$/i.test(request.pythonExecutable) || isIP7(request.address) !== 4 || !Number.isInteger(request.port) || request.port < 1 || request.port > 65535 || !Number.isInteger(request.timeoutMs) || request.timeoutMs < 1 || request.timeoutMs > 6e5 || typeof request.filesystem !== "boolean" || !/^[a-f0-9]{64}$/.test(request.imageSha256) || !/^[a-f0-9]{64}$/.test(request.uploaderSha256) || request.auth !== void 0 && (typeof request.auth !== "string" || request.auth.length > 1024 || /[\x00-\x1f\x7f]/.test(request.auth)))
+  ) || /\.(?:cmd|bat|ps1|sh)$/i.test(request.pythonExecutable) || isIP8(request.address) !== 4 || !Number.isInteger(request.port) || request.port < 1 || request.port > 65535 || !Number.isInteger(request.timeoutMs) || request.timeoutMs < 1 || request.timeoutMs > 6e5 || typeof request.filesystem !== "boolean" || !/^[a-f0-9]{64}$/.test(request.imageSha256) || !/^[a-f0-9]{64}$/.test(request.uploaderSha256) || request.auth !== void 0 && (typeof request.auth !== "string" || request.auth.length > 1024 || /[\x00-\x1f\x7f]/.test(request.auth)))
     throw new PlatformIOError(
       "Invalid resolved OTA execution request.",
       "OTA_EXECUTION_INVALID"
@@ -125269,7 +125311,7 @@ import { isIPv6 } from "node:net";
 import { isIPv6 as isIPv62 } from "node:net";
 import { Buffer as Buffer2 } from "node:buffer";
 import { createHash as createHash20 } from "node:crypto";
-import { isIP as isIP8 } from "node:net";
+import { isIP as isIP9 } from "node:net";
 var ipv4CompatibleSubnet = new import_ip_address.Address6("::/96");
 function ipKeyGenerator(ip, ipv6Subnet = 56) {
   if (isIPv6(ip)) {
@@ -125557,7 +125599,7 @@ var validations = {
         `An undefined 'request.ip' was detected. This might indicate a misconfiguration or the connection being destroyed prematurely.`
       );
     }
-    if (!isIP8(ip)) {
+    if (!isIP9(ip)) {
       throw new ValidationError(
         "ERR_ERL_INVALID_IP_ADDRESS",
         `An invalid 'request.ip' (${ip}) was detected. Consider passing a custom 'keyGenerator' function to the rate limiter.`

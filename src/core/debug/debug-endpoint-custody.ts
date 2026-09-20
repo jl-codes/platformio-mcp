@@ -3,6 +3,7 @@ import net from "node:net";
 import { DeviceLeaseStore, type DeviceLease } from "../devices/device-lease.js";
 import type { ProcessDeviceCustody } from "../devices/process-device-custody.js";
 import { PlatformIOError } from "../../utils/errors.js";
+import { parseRemoteDebugEndpoint } from "./debug-remote-endpoint.js";
 
 /** A local bind detects existing listeners without connecting to or commanding another server. */
 export async function assertDebugEndpointAvailable(
@@ -32,18 +33,23 @@ export class DebugEndpointCustody implements ProcessDeviceCustody {
   private started = false;
   private closed = false;
   private preparing = false;
+  private readonly endpoint;
   /** Host-only callbacks obtain physical ownership and supplement real endpoint availability checks in fixtures. */
   constructor(
     private readonly port: number,
     private readonly acquireProbe: () => Promise<ProcessDeviceCustody>,
     private readonly store = new DeviceLeaseStore(),
     private readonly check = assertDebugEndpointAvailable,
+    endpointHost = "127.0.0.1", // Host-selected address; public requests never supply custody capabilities.
   ) {
     if (!Number.isInteger(port) || port < 1 || port > 65535)
       throw new PlatformIOError(
         "Invalid local debugger port.",
         "DEBUG_ENDPOINT_UNSUPPORTED",
       );
+    this.endpoint = parseRemoteDebugEndpoint(
+      `${endpointHost.includes(":") ? `[${endpointHost}]` : endpointHost}:${port}`,
+    );
   }
   /** Claim the shared endpoint before the probe and recheck the listener immediately before process handoff. */
   async prepareSpawn(): Promise<void> {
@@ -55,10 +61,7 @@ export class DebugEndpointCustody implements ProcessDeviceCustody {
     this.started = true;
     this.preparing = true;
     try {
-      this.endpointLease = this.store.acquire({
-        kind: "network",
-        identity: `debug-tcp:127.0.0.1:${this.port}`,
-      });
+      this.endpointLease = this.store.acquire(this.endpoint.resource);
       await this.check(this.port);
       this.probe = await this.acquireProbe();
       await this.probe.prepareSpawn();
@@ -87,4 +90,21 @@ export class DebugEndpointCustody implements ProcessDeviceCustody {
       this.endpointLease = undefined;
     }
   }
+}
+
+/** Reserve an externally managed endpoint plus host-bound target custody without probing or owning its server. */
+export function createRemoteDebugEndpointCustody(
+  endpoint: ReturnType<typeof parseRemoteDebugEndpoint>,
+  acquireTarget: () => Promise<ProcessDeviceCustody>,
+  store = new DeviceLeaseStore(),
+): ProcessDeviceCustody {
+  // A remote server is expected to be listening. Target identity/revalidation still
+  // comes from the host binding; knowing a network address is not physical custody.
+  return new DebugEndpointCustody(
+    endpoint.port,
+    acquireTarget,
+    store,
+    async () => {},
+    endpoint.host,
+  );
 }

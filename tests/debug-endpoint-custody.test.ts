@@ -4,9 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import net from "node:net";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { DebugEndpointCustody } from "../src/core/debug/debug-endpoint-custody.js";
+import {
+  DebugEndpointCustody,
+  createRemoteDebugEndpointCustody,
+} from "../src/core/debug/debug-endpoint-custody.js";
 import { DeviceLeaseStore } from "../src/core/devices/device-lease.js";
 let root: string, store: DeviceLeaseStore;
+import { parseRemoteDebugEndpoint } from "../src/core/debug/debug-remote-endpoint.js";
 const resource = {
   kind: "network" as const,
   identity: "debug-tcp:127.0.0.1:3333",
@@ -136,4 +140,38 @@ it("cannot release a lease while asynchronous preparation still owns it", async 
   await pending;
   owner.releaseAfterExit();
   expect(store.status(resource).status).toBe("unclaimed");
+});
+
+it("excludes equivalent remote endpoints and retains host-bound target cleanup", async () => {
+  const firstProbe = probe();
+  const first = createRemoteDebugEndpointCustody(
+    parseRemoteDebugEndpoint("[2001:db8::1]:3333"),
+    async () => firstProbe,
+    store,
+  );
+  await first.prepareSpawn();
+  const acquire = vi.fn(async () => probe());
+  const second = createRemoteDebugEndpointCustody(
+    parseRemoteDebugEndpoint("[2001:0db8:0:0:0:0:0:1]:3333"),
+    acquire,
+    store,
+  );
+  await expect(second.prepareSpawn()).rejects.toMatchObject({
+    code: "DEVICE_HANDOFF_PENDING",
+  });
+  second.releaseAfterExit();
+  expect(acquire).not.toHaveBeenCalled();
+  firstProbe.releaseAfterExit.mockImplementationOnce(() => {
+    throw new Error("target still held");
+  });
+  expect(() => first.releaseAfterExit()).toThrow("target still held");
+  expect(
+    store.status(parseRemoteDebugEndpoint("[2001:db8::1]:3333").resource)
+      .status,
+  ).toBe("unknown");
+  first.releaseAfterExit();
+  expect(
+    store.status(parseRemoteDebugEndpoint("[2001:db8::1]:3333").resource)
+      .status,
+  ).toBe("unclaimed");
 });
