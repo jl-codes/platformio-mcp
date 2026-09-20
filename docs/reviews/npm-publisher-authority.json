@@ -1,0 +1,30 @@
+{
+  "observedAt": "2026-09-20T15:27:44.480824+00:00",
+  "registry": "https://registry.npmjs.org/",
+  "authenticatedUser": "forkbomb",
+  "identityCommand": "npm whoami --registry=https://registry.npmjs.org/",
+  "accessCommand": "npm access list packages forkbomb --json --registry=https://registry.npmjs.org/",
+  "packageAccess": {
+    "platformio-mcp": "read-write",
+    "pio-mcp": "read-write",
+    "pio-agent": "read-write"
+  },
+  "personalScope": "@forkbomb",
+  "scopeAuthorityBasis": "npm grants each authenticated user a personal scope matching the username.",
+  "scopeAuthoritySource": "https://docs.npmjs.com/about-scopes/",
+  "scopeControlRecordedFor": [
+    "@forkbomb/platformio-mcp",
+    "@forkbomb/platformio.mcp",
+    "@forkbomb/pio-mcp",
+    "@forkbomb/pio-agent",
+    "@forkbomb/flashagent",
+    "@forkbomb/platformiomcp",
+    "@forkbomb/pioagent"
+  ],
+  "limits": [
+    "Does not establish CI OIDC configuration.",
+    "Does not establish naming eligibility for each new candidate.",
+    "Does not mean candidates are registered or published.",
+    "Revalidate publisher identity and permissions at publication."
+  ]
+}

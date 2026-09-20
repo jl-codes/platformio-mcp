@@ -1716,3 +1716,8 @@ Using the existing official ESP core-dump ELF fixtures and installed esptool 5.4
 Both serial and PPK2 trigger waits now default to the requested collection `seconds`, matching the pinned reference, while preserving an explicit `trigger_seconds` override. Empty serial/otherwise-complete empty PPK2 collections return reference `no_samples`; PPK2 reports include `unparsed_lines: 0`. Other partial/current-trip diagnostics remain distinct. Serial orchestration carries the outer profile revision guard across trigger completion, discovery, capture admission and result return. The public description now reflects implemented explicit multi-interface selection.
 
 Validation: sixteen focused serial/projection/trigger checks passed, followed by nine updated PPK2-trigger/public-policy cases; TypeScript and scoped lint passed. Plugin rebuilt. Both preceding CI runs (35519193064 and 35519190348) passed on 3cdb3174, including the corrected Python setup order. No physical power measurement was performed.
+
+
+### Authenticated npm package and personal-scope authority
+
+The current npm session returned `forkbomb`; npm access metadata confirmed read-write permissions for platformio-mcp, pio-mcp and pio-agent. npm's documented personal-scope assignment establishes control of @forkbomb, so the five prepared scoped candidates now record publicationControlVerified. Evidence and limitations are in npm-publisher-authority.json. Candidate publishIntent remains false pending name-specific eligibility and release configuration; no package was published, reserved or overwritten. This removes the stale scope-authority blocker without asserting CI identity or successful registration.

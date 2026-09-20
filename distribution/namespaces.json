@@ -34,8 +34,9 @@
       "role": "candidate_alias",
       "publishIntent": false,
       "packagePath": "packages/scoped-platformio-mcp",
-      "reason": "Functional alias prepared; scope authority and registry similarity eligibility must be verified before publication.",
-      "source": "https://github.com/jl-codes/platformio-mcp"
+      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publicationControlVerified": true
     },
     {
       "registry": "npm",
@@ -156,8 +157,9 @@
       "role": "candidate_alias",
       "publishIntent": false,
       "packagePath": "packages/scoped-platformio.mcp",
-      "reason": "Functional alias prepared; scope authority and registry similarity eligibility must be verified before publication.",
-      "source": "https://github.com/jl-codes/platformio-mcp"
+      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publicationControlVerified": true
     },
     {
       "registry": "npm",
@@ -165,8 +167,9 @@
       "role": "candidate_alias",
       "publishIntent": false,
       "packagePath": "packages/scoped-pio-mcp",
-      "reason": "Functional alias prepared; scope authority and registry similarity eligibility must be verified before publication.",
-      "source": "https://github.com/jl-codes/platformio-mcp"
+      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publicationControlVerified": true
     },
     {
       "registry": "npm",
@@ -174,8 +177,9 @@
       "role": "candidate_alias",
       "publishIntent": false,
       "packagePath": "packages/scoped-pio-agent",
-      "reason": "Functional alias prepared; scope authority and registry similarity eligibility must be verified before publication.",
-      "source": "https://github.com/jl-codes/platformio-mcp"
+      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publicationControlVerified": true
     },
     {
       "registry": "ghcr",
@@ -300,7 +304,8 @@
       "publishIntent": false,
       "packagePath": "packages/scoped-flashagent",
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Functional wrapper prepared; scope control and eligibility remain unverified."
+      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "publicationControlVerified": true
     },
     {
       "registry": "pypi",
@@ -320,14 +325,16 @@
       "name": "@forkbomb/platformiomcp",
       "role": "watch",
       "publishIntent": false,
-      "reason": "Punctuation-insensitive collision candidate with an existing scoped alias; not independently claimed."
+      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "publicationControlVerified": true
     },
     {
       "registry": "npm",
       "name": "@forkbomb/pioagent",
       "role": "watch",
       "publishIntent": false,
-      "reason": "Punctuation-insensitive collision candidate with an existing scoped alias; not independently claimed."
+      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "publicationControlVerified": true
     },
     {
       "registry": "ghcr",
