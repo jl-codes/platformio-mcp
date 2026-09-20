@@ -55,7 +55,9 @@
     "test:parity:acceptance": "node scripts/validate-parity-acceptance.mjs",
     "package:aliases": "node scripts/pack-npm-alias-candidates.mjs",
     "package:release": "node scripts/pack-npm-release.mjs",
-    "package:container": "python scripts/prepare-container-context.py"
+    "package:container": "python scripts/prepare-container-context.py",
+    "aliases:sync": "node scripts/sync-npm-aliases.mjs",
+    "aliases:check": "node scripts/sync-npm-aliases.mjs --check"
   },
   "keywords": [
     "mcp",

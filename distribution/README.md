@@ -23,3 +23,5 @@ Functional aliases must install the same release, preserve existing commands and
 This coverage reduces impersonation opportunities. No finite alias list can guarantee that all possible confusing names on all services are unavailable to other publishers.
 
 The additional `platformiomcp` and `pioagent` spellings already have npm punctuation-collision entries. Their PyPI spellings are distinct from hyphenated names and require separate evaluation. `flashagent` has a functional npm candidate package; all three additional Python aliases remain packaging candidates.
+
+When changing the canonical npm version, run `npm run aliases:sync` to update every functional alias, including candidates, then `npm run aliases:check`. This changes version pins only and does not enable publication. Python alias versions derive directly from the canonical manifest during wheel assembly.

@@ -211,6 +211,7 @@ jobs:
           npm --prefix web audit --audit-level=low
           npm run test:ci:unit
           npm run test:namespaces
+          npm run aliases:check
           python3 tests/test-container-release.py
           python3 tests/test-container-publication.py
           npm run registry:validate
