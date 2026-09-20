@@ -111,3 +111,95 @@ it("requires exact image identity for download authorization", async () => {
   ).rejects.toMatchObject({ code: "DEBUG_TARGET_INVALID" });
   expect(lines).toEqual([]);
 });
+
+it("orders initialization around download and retains the temporary entry breakpoint", async () => {
+  const { session, lines } = fixture();
+  await attachDebuggerTarget(
+    session,
+    {
+      ...selection(true),
+      beforeLoadCommands: [
+        { command: "monitor init" },
+        { command: "monitor reset halt" },
+      ],
+      afterLoadCommands: [{ command: "tbreak main" }],
+    },
+    {},
+  );
+  expect(lines.map((line) => line.replace(/^\d+/, "").trim())).toEqual([
+    "-target-select extended-remote 127.0.0.1:3333",
+    '-interpreter-exec console "monitor init"',
+    '-interpreter-exec console "monitor reset halt"',
+    "-target-download",
+    '-break-insert -t -- "main"',
+  ]);
+});
+it("denies privileged initialization before even attaching to the target", async () => {
+  fs.writeFileSync(
+    path.join(root, "operator.json"),
+    JSON.stringify({
+      profile: "lab_admin",
+      overrides: {
+        allow: ["upload_firmware"],
+        deny: ["run_shell_command"],
+        approval_required: [],
+        audit_all_agent_actions: false,
+      },
+    }),
+  );
+  const { session, lines } = fixture();
+  await expect(
+    attachDebuggerTarget(
+      session,
+      {
+        ...selection(false),
+        afterLoadCommands: [{ command: "source project.gdb" }],
+      },
+      {},
+    ),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(lines).toEqual([]);
+});
+it("validates every initialization command before any transport write", async () => {
+  const { session, lines } = fixture();
+  await expect(
+    attachDebuggerTarget(
+      session,
+      {
+        ...selection(true),
+        beforeLoadCommands: [{ command: "monitor init; shell bad" }],
+      },
+      {},
+    ),
+  ).rejects.toMatchObject({ code: "DEBUG_COMMAND_UNSUPPORTED" });
+  expect(lines).toEqual([]);
+});
+it("waits for the initial stop event after continuing to an entry breakpoint", async () => {
+  const lines: string[] = [];
+  const session = new GdbMiSession(async (line) => {
+    lines.push(line);
+    const token = /^(\d+)/.exec(line)![1];
+    queueMicrotask(() =>
+      session.accept(
+        Buffer.from(
+          token +
+            (line.includes("-exec-continue")
+              ? '^running\n*stopped,reason="breakpoint-hit"\n'
+              : lines.length === 1
+                ? "^connected\n"
+                : "^done\n"),
+        ),
+      ),
+    );
+  });
+  await attachDebuggerTarget(
+    session,
+    {
+      ...selection(false),
+      afterLoadCommands: [{ command: "tbreak main" }, { command: "continue" }],
+    },
+    {},
+  );
+  expect(session.state().running).toBe(false);
+  expect(session.state().lastStop?.class).toBe("stopped");
+});

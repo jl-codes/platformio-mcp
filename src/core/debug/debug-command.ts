@@ -96,9 +96,9 @@ export function prepareDebugCommand(
       return invalid();
     return consoleCommand(command, "inspect");
   }
-  const breakpoint = /^(?:break|b) (.+)$/.exec(command);
+  const breakpoint = /^(break|b|tbreak|tb) (.+)$/.exec(command);
   if (breakpoint) {
-    const location = breakpoint[1];
+    const location = breakpoint[2];
     const functionName =
       /^[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*$/;
     const fileLine = /^[^"'\x60;$(){}\r\n]+:[1-9][0-9]{0,8}$/;
@@ -107,7 +107,13 @@ export function prepareDebugCommand(
       (!functionName.test(location) && !fileLine.test(location))
     )
       return invalid();
-    return make("-break-insert -- " + JSON.stringify(location), "target");
+    return make(
+      "-break-insert " +
+        (["tbreak", "tb"].includes(breakpoint[1]) ? "-t " : "") +
+        "-- " +
+        JSON.stringify(location),
+      "target",
+    );
   }
   const watch = /^watch (.+)$/.exec(command);
   if (watch) {
@@ -135,6 +141,8 @@ export function prepareDebugCommand(
   }
   if (
     [
+      "monitor init",
+      "monitor reset",
       "monitor reset halt",
       "monitor reset run",
       "monitor halt",

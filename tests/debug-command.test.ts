@@ -36,6 +36,8 @@ it.each([
   ["continue", "-exec-continue", "target", true],
   ["-exec-interrupt", "-exec-interrupt", "target", true],
   ["break main", '-break-insert -- "main"', "target", false],
+  ["tbreak main", '-break-insert -t -- "main"', "target", false],
+  ["monitor init", '-interpreter-exec console "monitor init"', "target", false],
   ["watch counter", '-break-watch "counter"', "target", false],
   ["quit", "-gdb-exit", "target", false],
   ["detach", "-target-detach", "target", false],

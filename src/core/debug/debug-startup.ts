@@ -65,6 +65,12 @@ export function startPreparedDebugger(
         load: selection.target.load,
         timeoutMs: selection.target.timeoutMs ?? 90000,
         backend: backendScope,
+        beforeLoadCommands: selection.target.beforeLoadCommands?.map((entry) =>
+          entry.command.trim(),
+        ),
+        afterLoadCommands: selection.target.afterLoadCommands?.map((entry) =>
+          entry.command.trim(),
+        ),
       }),
     )
     .digest("hex");

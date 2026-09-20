@@ -1396,3 +1396,8 @@ Connected optional supervised backends to the existing prepared debugger startup
 
 
 CI confirmation: both 35507080260 and 35507077976 passed on 6444c9c7. The native backend parent/grandchild lifecycle fixture passed Windows, Linux and macOS, including the Node owner path. This confirms the macOS cleanup observation fix for that fixture, not physical debugger/probe acceptance.
+
+
+### Classified target initialization stages (2026-09-20)
+
+Extended the existing attachment/download pipeline with ordered before-load and after-load commands. Every stage is parsed and permission-planned before the first transport write; inspection, target mutation and privileged host-code commands retain distinct authorization. Commands share one startup deadline, and execution commands require their asynchronous stop event. Added temporary entry breakpoints and explicit monitor init/reset classification. Startup reservation identity includes the initialization command sequence while excluding grant IDs. Fifty focused command/target/startup cases passed, including host-code denial before attachment, command ordering and continue-to-stop behavior. Translating full PlatformIO target-specific init scripts and exposing the public debugger workflow remain incomplete.
