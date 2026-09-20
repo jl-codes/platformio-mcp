@@ -60,6 +60,11 @@ export interface ReservedUploadCustody {
   signal: AbortSignal;
 }
 
+/** Host workflow may surround one authorized upload with monitor startup and capture. */
+export type AroundAuthorizedUpload = (
+  upload: (custody?: ReservedUploadCustody) => Promise<boolean>,
+) => Promise<void>;
+
 /** Authorize before stopping monitors or spawning, and preserve cleanup uncertainty on failure. */
 export async function executeNamedTarget(
   input: unknown,
@@ -68,6 +73,7 @@ export async function executeNamedTarget(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
   reservedUpload?: ReservedUploadCustody,
+  aroundUpload?: AroundAuthorizedUpload,
 ) {
   const request = RunTargetSchema.parse(input);
   const projectDir = await resolveCompatibilityProject(
@@ -114,162 +120,202 @@ export async function executeNamedTarget(
       const guard = createPolicyRevisionGuard(projectDir);
       await onAuthorized?.();
       guard();
-      const endpoint = uploadPort
-        ? resolveSerialEndpoint(uploadPort)
-        : undefined;
-      if (
-        reservedUpload &&
-        (request.target !== "upload" ||
-          !endpoint ||
-          resolveSerialEndpoint(reservedUpload.path).resource.identity !==
-            endpoint.resource.identity)
-      )
+      const execute = async (reservedUpload?: ReservedUploadCustody) => {
+        guard();
+        const endpoint = uploadPort
+          ? resolveSerialEndpoint(uploadPort)
+          : undefined;
+        if (
+          reservedUpload &&
+          (request.target !== "upload" ||
+            !endpoint ||
+            resolveSerialEndpoint(reservedUpload.path).resource.identity !==
+              endpoint.resource.identity)
+        )
+          throw new PlatformIOError(
+            "Retained upload custody does not match the selected target.",
+            "UPLOAD_CUSTODY_MISMATCH",
+          );
+        const stopped: string[] = [];
+        return hardwareLockManager.withImplicitLock(async () => {
+          guard();
+          if (effects.deviceAccess !== "none") {
+            await client.run({ caller }, async (service, owner) => {
+              const sessions = service.sessions.list(owner);
+              if (reservedUpload) {
+                const reserved = sessions.find(
+                  (session) => session.sessionId === reservedUpload.sessionId,
+                );
+                if (
+                  !reserved ||
+                  reserved.projectDir !== projectDir ||
+                  reserved.state !== "authorizing" ||
+                  !reserved.cleanupPending ||
+                  resolveSerialEndpoint(reserved.path).resource.identity !==
+                    endpoint!.resource.identity
+                )
+                  throw new PlatformIOError(
+                    "Upload reservation is not an owned pending monitor.",
+                    "UPLOAD_CUSTODY_MISMATCH",
+                  );
+              }
+              const held = sessions.filter((session) => {
+                if (
+                  reservedUpload &&
+                  session.sessionId === reservedUpload.sessionId
+                )
+                  return false;
+                if (
+                  ["stopped", "disconnected", "error"].includes(
+                    session.state,
+                  ) &&
+                  !session.cleanupPending
+                )
+                  return false;
+                if (!endpoint) return session.projectDir === projectDir;
+                return (
+                  resolveSerialEndpoint(session.path).resource.identity ===
+                  endpoint.resource.identity
+                );
+              });
+              if (held.length && !request.stop_open_sessions)
+                throw new PlatformIOError(
+                  "An owned monitor holds the target port; stop it or set stop_open_sessions.",
+                  "TARGET_PORT_BUSY",
+                );
+              for (const session of held) {
+                guard();
+                const result = await service.sessions.stop(
+                  owner,
+                  session.sessionId,
+                );
+                if (result.cleanupPending)
+                  throw new PlatformIOError(
+                    "Monitor closure is not confirmed.",
+                    "DEVICE_CLEANUP_PENDING",
+                    { cleanupPending: true },
+                  );
+                stopped.push(session.sessionId);
+              }
+            });
+          }
+          endpoint?.revalidate();
+          guard();
+          const started = performance.now();
+          let completed:
+            | { exitCode: number; output: string; logPath: string }
+            | undefined;
+          const collect = async (exitCode: number, fullLogPath: string) => {
+            const output = await readCommandOutput(fullLogPath);
+            return {
+              exitCode,
+              output,
+              logPath: await retainCommandLog("target", output, ""),
+            };
+          };
+          let timedOut = false;
+          try {
+            await buildTarget(projectDir, request.target, environment, false, {
+              uploadPort,
+              serialPort: endpoint?.canonicalPort,
+              ...(reservedUpload
+                ? {
+                    deviceCustody: reservedUpload.custody,
+                    cancellation: reservedUpload.signal,
+                  }
+                : {}),
+              timeoutMs: effects.deviceAccess === "write" ? 180000 : 1200000,
+              onResult: async (result) => {
+                completed = await collect(result.exitCode, result.fullLogPath);
+              },
+            });
+          } catch (error) {
+            if (
+              error instanceof PlatformIOError &&
+              error.code === "COMMAND_TIMEOUT" &&
+              error.context?.cleanupPending === false &&
+              typeof error.context.fullLogPath === "string"
+            ) {
+              timedOut = true;
+              completed = await collect(-1, error.context.fullLogPath);
+            } else throw error;
+          }
+          guard();
+          if (!completed)
+            throw new PlatformIOError(
+              "Named target returned no completed result.",
+              "TARGET_RESULT_MISSING",
+            );
+          const report = {
+            ...cleanCompatibilityResult(
+              completed,
+              environment,
+              (performance.now() - started) / 1000,
+              timedOut,
+              "target-" + request.target,
+            ),
+            ...(effects.deviceAccess !== "none"
+              ? { stopped_sessions: stopped }
+              : {}),
+          };
+          if (
+            !report.ok &&
+            report.port_error &&
+            effects.deviceAccess !== "none"
+          ) {
+            const diagnosis = await diagnoseTargetPortFailure(
+              uploadPort,
+              report.port_error,
+              projectDir,
+              caller,
+            );
+            guard();
+            return {
+              ...report,
+              error: report.port_error,
+              port_diagnosis: diagnosis,
+              summary:
+                "Target failed (" + report.port_error + "): " + diagnosis.hint,
+            };
+          }
+          return report;
+        });
+      };
+      if (!aroundUpload) return execute(reservedUpload);
+      if (request.target !== "upload" || reservedUpload)
         throw new PlatformIOError(
-          "Retained upload custody does not match the selected target.",
+          "Invalid upload workflow composition.",
           "UPLOAD_CUSTODY_MISMATCH",
         );
-      const stopped: string[] = [];
-      return hardwareLockManager.withImplicitLock(async () => {
-        guard();
-        if (effects.deviceAccess !== "none") {
-          await client.run({ caller }, async (service, owner) => {
-            const sessions = service.sessions.list(owner);
-            if (reservedUpload) {
-              const reserved = sessions.find(
-                (session) => session.sessionId === reservedUpload.sessionId,
-              );
-              if (
-                !reserved ||
-                reserved.projectDir !== projectDir ||
-                reserved.state !== "authorizing" ||
-                !reserved.cleanupPending ||
-                resolveSerialEndpoint(reserved.path).resource.identity !==
-                  endpoint!.resource.identity
-              )
-                throw new PlatformIOError(
-                  "Upload reservation is not an owned pending monitor.",
-                  "UPLOAD_CUSTODY_MISMATCH",
-                );
-            }
-            const held = sessions.filter((session) => {
-              if (
-                reservedUpload &&
-                session.sessionId === reservedUpload.sessionId
-              )
-                return false;
-              if (
-                ["stopped", "disconnected", "error"].includes(session.state) &&
-                !session.cleanupPending
-              )
-                return false;
-              if (!endpoint) return session.projectDir === projectDir;
-              return (
-                resolveSerialEndpoint(session.path).resource.identity ===
-                endpoint.resource.identity
-              );
-            });
-            if (held.length && !request.stop_open_sessions)
-              throw new PlatformIOError(
-                "An owned monitor holds the target port; stop it or set stop_open_sessions.",
-                "TARGET_PORT_BUSY",
-              );
-            for (const session of held) {
-              guard();
-              const result = await service.sessions.stop(
-                owner,
-                session.sessionId,
-              );
-              if (result.cleanupPending)
-                throw new PlatformIOError(
-                  "Monitor closure is not confirmed.",
-                  "DEVICE_CLEANUP_PENDING",
-                  { cleanupPending: true },
-                );
-              stopped.push(session.sessionId);
-            }
+      let result: Awaited<ReturnType<typeof execute>> | undefined;
+      let pending: Promise<boolean> | undefined;
+      let active = true;
+      try {
+        await aroundUpload((custody) => {
+          if (!active || pending)
+            return Promise.reject(
+              new PlatformIOError(
+                "Authorized upload is single-use.",
+                "UPLOAD_ALREADY_CONSUMED",
+              ),
+            );
+          pending = execute(custody).then((report) => {
+            result = report;
+            return report.ok;
           });
-        }
-        endpoint?.revalidate();
-        guard();
-        const started = performance.now();
-        let completed:
-          | { exitCode: number; output: string; logPath: string }
-          | undefined;
-        const collect = async (exitCode: number, fullLogPath: string) => {
-          const output = await readCommandOutput(fullLogPath);
-          return {
-            exitCode,
-            output,
-            logPath: await retainCommandLog("target", output, ""),
-          };
-        };
-        let timedOut = false;
-        try {
-          await buildTarget(projectDir, request.target, environment, false, {
-            uploadPort,
-            serialPort: endpoint?.canonicalPort,
-            ...(reservedUpload
-              ? {
-                  deviceCustody: reservedUpload.custody,
-                  cancellation: reservedUpload.signal,
-                }
-              : {}),
-            timeoutMs: effects.deviceAccess === "write" ? 180000 : 1200000,
-            onResult: async (result) => {
-              completed = await collect(result.exitCode, result.fullLogPath);
-            },
-          });
-        } catch (error) {
-          if (
-            error instanceof PlatformIOError &&
-            error.code === "COMMAND_TIMEOUT" &&
-            error.context?.cleanupPending === false &&
-            typeof error.context.fullLogPath === "string"
-          ) {
-            timedOut = true;
-            completed = await collect(-1, error.context.fullLogPath);
-          } else throw error;
-        }
-        guard();
-        if (!completed)
-          throw new PlatformIOError(
-            "Named target returned no completed result.",
-            "TARGET_RESULT_MISSING",
-          );
-        const report = {
-          ...cleanCompatibilityResult(
-            completed,
-            environment,
-            (performance.now() - started) / 1000,
-            timedOut,
-            "target-" + request.target,
-          ),
-          ...(effects.deviceAccess !== "none"
-            ? { stopped_sessions: stopped }
-            : {}),
-        };
-        if (
-          !report.ok &&
-          report.port_error &&
-          effects.deviceAccess !== "none"
-        ) {
-          const diagnosis = await diagnoseTargetPortFailure(
-            uploadPort,
-            report.port_error,
-            projectDir,
-            caller,
-          );
-          guard();
-          return {
-            ...report,
-            error: report.port_error,
-            port_diagnosis: diagnosis,
-            summary:
-              "Target failed (" + report.port_error + "): " + diagnosis.hint,
-          };
-        }
-        return report;
-      });
+          return pending;
+        });
+      } finally {
+        active = false;
+        await pending;
+      }
+      if (!result)
+        throw new PlatformIOError(
+          "Upload workflow returned without executing its upload.",
+          "TARGET_RESULT_MISSING",
+        );
+      guard();
+      return result;
     },
   );
 }

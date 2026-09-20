@@ -3,6 +3,7 @@ import {
   RunTargetSchema,
   executeNamedTarget,
   type ReservedUploadCustody,
+  type AroundAuthorizedUpload,
 } from "../tools/run-target.js";
 import type { SerialClientContext } from "./serial-client.js";
 import type { CompatibilityProjectDefaults } from "./compatibility-project.js";
@@ -18,6 +19,7 @@ export function executeUploadCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
   reservedUpload?: ReservedUploadCustody,
+  aroundUpload?: AroundAuthorizedUpload,
 ) {
   const params = UploadCompatibilitySchema.parse(input);
   return executeNamedTarget(
@@ -27,5 +29,6 @@ export function executeUploadCompatibility(
     caller,
     onAuthorized,
     reservedUpload,
+    aroundUpload,
   );
 }

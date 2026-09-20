@@ -1,4 +1,5 @@
 /** Compose authorized upload and fresh owned boot capture for an already resolved project/environment. */
+import type { PolicySerialSessionService } from "../core/serial/session-policy.js";
 import { z } from "zod";
 import {
   dispatchAuthorizedAction,
@@ -85,6 +86,7 @@ export async function executeFlashVerification(
         request,
         args.verification,
         args.discoveryApprovalId,
+        true,
       ),
   );
   guard();
@@ -94,7 +96,12 @@ export async function executeFlashVerification(
     workflowContext,
     async () => {
       guard();
-      const started = performance.now();
+      let uploadSeconds = 0;
+      let report:
+        | Awaited<
+            ReturnType<PolicySerialSessionService["captureVerificationOnce"]>
+          >
+        | undefined;
       const upload = await executeUploadCompatibility(
         {
           project_dir: args.projectDir,
@@ -143,9 +150,55 @@ export async function executeFlashVerification(
           });
           guard();
         },
+        undefined,
+        async (runUpload) => {
+          try {
+            report = await client.run(
+              { ...context, discoveryApprovalId: args.discoveryApprovalId },
+              (service, owner) =>
+                service.captureVerificationOnce(
+                  owner,
+                  request,
+                  args.verification,
+                  undefined,
+                  selection.deviceBinding,
+                  async (held) => {
+                    guard();
+                    const started = performance.now();
+                    let ok: boolean;
+                    try {
+                      const sameEndpoint =
+                        resolveSerialEndpoint(args.uploadPort).resource
+                          .identity === monitorEndpoint.resource.identity;
+                      ok = await runUpload(
+                        sameEndpoint
+                          ? { ...held, path: args.monitorPort }
+                          : undefined,
+                      );
+                    } finally {
+                      uploadSeconds = (performance.now() - started) / 1000;
+                    }
+                    guard();
+                    if (!ok)
+                      throw new PlatformIOError(
+                        "Upload failed; do not open the verification monitor.",
+                        "VERIFICATION_UPLOAD_FAILED",
+                      );
+                  },
+                ),
+            );
+          } catch (error) {
+            // A failed upload has its own report; never hide an uncertain reservation cleanup.
+            if (
+              !(error instanceof PlatformIOError) ||
+              error.code !== "VERIFICATION_UPLOAD_FAILED" ||
+              error.context?.cleanupPending !== false
+            )
+              throw error;
+          }
+        },
       );
       guard();
-      const uploadSeconds = (performance.now() - started) / 1000;
       if (!upload.ok)
         return {
           ok: false,
@@ -156,17 +209,11 @@ export async function executeFlashVerification(
           baud: args.baudRate,
           summary: "Upload failed; boot verification did not start.",
         };
-      const report = await client.run(
-        { ...context, discoveryApprovalId: args.discoveryApprovalId },
-        (service, owner) =>
-          service.captureVerificationOnce(
-            owner,
-            request,
-            args.verification,
-            undefined,
-            selection.deviceBinding,
-          ),
-      );
+      if (!report)
+        throw new PlatformIOError(
+          "Boot verification returned no report.",
+          "VERIFICATION_RESULT_MISSING",
+        );
       guard();
       return {
         ...report,

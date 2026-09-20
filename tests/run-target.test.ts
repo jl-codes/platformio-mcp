@@ -384,7 +384,7 @@ it.each(["valid", "other-owner", "other-port", "already-open"])(
     const reserved = {
       sessionId: "pending-monitor",
       path: "COM9",
-      projectDir: project,
+      projectDir: fs.realpathSync.native(project),
       state: kind === "already-open" ? "open" : "authorizing",
       cleanupPending: true,
     };
@@ -457,3 +457,56 @@ it.each(["valid", "other-owner", "other-port", "already-open"])(
     expect(stop).not.toHaveBeenCalled();
   },
 );
+
+it("allows only one upload inside an authorization scope and rejects later reuse", async () => {
+  fs.writeFileSync(
+    path.join(project, ".pio-mcp-policy.json"),
+    JSON.stringify({
+      profile: "lab_runner",
+      overrides: { audit_all_agent_actions: false },
+    }),
+  );
+  const client = {
+    run: async (
+      _context: unknown,
+      execute: (service: unknown, owner: unknown) => Promise<unknown>,
+    ) => execute({ sessions: { list: () => [] } }, {}),
+  } as unknown as SerialClientContext;
+  const request = { project_dir: project, upload_port: "COM9" };
+  let late!: () => Promise<boolean>;
+  const around = vi.fn(async (run: () => Promise<boolean>) => {
+    late = run;
+    expect(await run()).toBe(true);
+    await expect(run()).rejects.toMatchObject({
+      code: "UPLOAD_ALREADY_CONSUMED",
+    });
+  });
+  const decision = await executeUploadCompatibility(
+    request,
+    client,
+    {},
+    {},
+    undefined,
+    undefined,
+    around,
+  ).catch((error) => error);
+  expect(decision.code).toBe("APPROVAL_REQUIRED");
+  expect(around).not.toHaveBeenCalled();
+  const approvalId = decision.context.policyDecision.approvalId;
+  approveRequest(approvalId);
+  await expect(
+    executeUploadCompatibility(
+      { ...request, approval_id: approvalId },
+      client,
+      {},
+      {},
+      undefined,
+      undefined,
+      around,
+    ),
+  ).resolves.toMatchObject({ ok: true });
+  await expect(late()).rejects.toMatchObject({
+    code: "UPLOAD_ALREADY_CONSUMED",
+  });
+  expect(buildTarget).toHaveBeenCalledOnce();
+});

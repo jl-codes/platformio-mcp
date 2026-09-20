@@ -99642,7 +99642,7 @@ var PolicySerialSessionService = class {
     });
   }
   /** Resolve and plan boot opening/reading before upload, without consuming either hardware grant or opening a port. */
-  async preflightVerificationCapture(owner, input, options = {}, startupDiscoveryApprovalId) {
+  async preflightVerificationCapture(owner, input, options = {}, startupDiscoveryApprovalId, beforeUpload = false) {
     const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
     new SerialSessionBuffer(input.buffer);
@@ -99660,7 +99660,7 @@ var PolicySerialSessionService = class {
         ...input,
         projectDir,
         buffer: input.buffer ? { ...input.buffer } : void 0,
-        snapshots: 4,
+        snapshots: beforeUpload ? 5 : 4,
         approvalId: startupDiscoveryApprovalId
       },
       { ...this.context.getStore()?.caller, workspaceDir: projectDir }
@@ -99720,18 +99720,22 @@ var PolicySerialSessionService = class {
     }
   }
   /** Open a fresh boot capture, bind all pages to one bounded read grant, and always close its owned port. */
-  async captureVerificationOnce(owner, request, input = {}, signal, expectedDeviceBinding) {
+  async captureVerificationOnce(owner, request, input = {}, signal, expectedDeviceBinding, beforeOpen) {
     const args = await validateVerificationCapture(input);
     const scope5 = {
       expectedDeviceBinding,
       input: args,
       purpose: "boot_verification",
       active: true,
-      expiresAt: performance8.now() + (args.timeoutSeconds + args.settleSeconds + 30) * 1e3
+      expiresAt: performance8.now() + (args.timeoutSeconds + args.settleSeconds + (beforeOpen ? 240 : 30)) * 1e3
     };
     return this.transientMemoryScope.run(scope5, async () => {
       try {
-        const started = await this.startWithDiscovery(owner, request);
+        const started = await this.startWithDiscovery(
+          owner,
+          request,
+          beforeOpen
+        );
         let report;
         try {
           report = await captureSessionVerification(
@@ -99858,7 +99862,8 @@ var PolicySerialSessionService = class {
     });
   }
   /** Authorize four identity snapshots for one startup; opening retains its separate permission check. */
-  async startWithDiscovery(owner, input) {
+  async startWithDiscovery(owner, input, beforeOpen) {
+    const snapshots = beforeOpen ? 5 : 4;
     const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
     if (!path24.isAbsolute(input.projectDir))
@@ -99880,16 +99885,16 @@ var PolicySerialSessionService = class {
     const guard = createPolicyRevisionGuard(request.projectDir);
     return dispatchAuthorizedAction(
       "serial_startup_discovery",
-      { ...request, snapshots: 4, approvalId: context.discoveryApprovalId },
+      { ...request, snapshots, approvalId: context.discoveryApprovalId },
       { ...context.caller, workspaceDir: request.projectDir },
       async () => {
         checkOwner();
         guard();
         const batch = {
           projectDir: request.projectDir,
-          remaining: 4,
+          remaining: snapshots,
           active: true,
-          expiresAt: performance8.now() + 3e4,
+          expiresAt: performance8.now() + (beforeOpen ? 24e4 : 3e4),
           guard
         };
         try {
@@ -99897,7 +99902,8 @@ var PolicySerialSessionService = class {
             batch,
             () => this.sessions.startDiscovered(owner, request, {
               list: () => this.listSerialDevices(request.projectDir),
-              resolve: this.resolveEndpoint
+              resolve: this.resolveEndpoint,
+              beforeOpen
             })
           );
         } finally {
@@ -110431,7 +110437,7 @@ var RunTargetSchema = external_exports.object({
   config_approval_id: external_exports.string().max(256).optional(),
   selection_approval_id: external_exports.string().max(256).optional()
 }).strict();
-async function executeNamedTarget(input, client, defaults = {}, caller = {}, onAuthorized, reservedUpload) {
+async function executeNamedTarget(input, client, defaults = {}, caller = {}, onAuthorized, reservedUpload, aroundUpload) {
   const request = RunTargetSchema.parse(input);
   const projectDir = await resolveCompatibilityProject(
     request.project_dir,
@@ -110477,122 +110483,162 @@ async function executeNamedTarget(input, client, defaults = {}, caller = {}, onA
       const guard = createPolicyRevisionGuard(projectDir);
       await onAuthorized?.();
       guard();
-      const endpoint = uploadPort ? resolveSerialEndpoint(uploadPort) : void 0;
-      if (reservedUpload && (request.target !== "upload" || !endpoint || resolveSerialEndpoint(reservedUpload.path).resource.identity !== endpoint.resource.identity))
+      const execute3 = async (reservedUpload2) => {
+        guard();
+        const endpoint = uploadPort ? resolveSerialEndpoint(uploadPort) : void 0;
+        if (reservedUpload2 && (request.target !== "upload" || !endpoint || resolveSerialEndpoint(reservedUpload2.path).resource.identity !== endpoint.resource.identity))
+          throw new PlatformIOError(
+            "Retained upload custody does not match the selected target.",
+            "UPLOAD_CUSTODY_MISMATCH"
+          );
+        const stopped = [];
+        return hardwareLockManager.withImplicitLock(async () => {
+          guard();
+          if (effects2.deviceAccess !== "none") {
+            await client.run({ caller }, async (service, owner) => {
+              const sessions = service.sessions.list(owner);
+              if (reservedUpload2) {
+                const reserved = sessions.find(
+                  (session2) => session2.sessionId === reservedUpload2.sessionId
+                );
+                if (!reserved || reserved.projectDir !== projectDir || reserved.state !== "authorizing" || !reserved.cleanupPending || resolveSerialEndpoint(reserved.path).resource.identity !== endpoint.resource.identity)
+                  throw new PlatformIOError(
+                    "Upload reservation is not an owned pending monitor.",
+                    "UPLOAD_CUSTODY_MISMATCH"
+                  );
+              }
+              const held = sessions.filter((session2) => {
+                if (reservedUpload2 && session2.sessionId === reservedUpload2.sessionId)
+                  return false;
+                if (["stopped", "disconnected", "error"].includes(
+                  session2.state
+                ) && !session2.cleanupPending)
+                  return false;
+                if (!endpoint) return session2.projectDir === projectDir;
+                return resolveSerialEndpoint(session2.path).resource.identity === endpoint.resource.identity;
+              });
+              if (held.length && !request.stop_open_sessions)
+                throw new PlatformIOError(
+                  "An owned monitor holds the target port; stop it or set stop_open_sessions.",
+                  "TARGET_PORT_BUSY"
+                );
+              for (const session2 of held) {
+                guard();
+                const result2 = await service.sessions.stop(
+                  owner,
+                  session2.sessionId
+                );
+                if (result2.cleanupPending)
+                  throw new PlatformIOError(
+                    "Monitor closure is not confirmed.",
+                    "DEVICE_CLEANUP_PENDING",
+                    { cleanupPending: true }
+                  );
+                stopped.push(session2.sessionId);
+              }
+            });
+          }
+          endpoint?.revalidate();
+          guard();
+          const started = performance.now();
+          let completed;
+          const collect = async (exitCode, fullLogPath) => {
+            const output = await readCommandOutput(fullLogPath);
+            return {
+              exitCode,
+              output,
+              logPath: await retainCommandLog("target", output, "")
+            };
+          };
+          let timedOut = false;
+          try {
+            await buildTarget(projectDir, request.target, environment, false, {
+              uploadPort,
+              serialPort: endpoint?.canonicalPort,
+              ...reservedUpload2 ? {
+                deviceCustody: reservedUpload2.custody,
+                cancellation: reservedUpload2.signal
+              } : {},
+              timeoutMs: effects2.deviceAccess === "write" ? 18e4 : 12e5,
+              onResult: async (result2) => {
+                completed = await collect(result2.exitCode, result2.fullLogPath);
+              }
+            });
+          } catch (error2) {
+            if (error2 instanceof PlatformIOError && error2.code === "COMMAND_TIMEOUT" && error2.context?.cleanupPending === false && typeof error2.context.fullLogPath === "string") {
+              timedOut = true;
+              completed = await collect(-1, error2.context.fullLogPath);
+            } else throw error2;
+          }
+          guard();
+          if (!completed)
+            throw new PlatformIOError(
+              "Named target returned no completed result.",
+              "TARGET_RESULT_MISSING"
+            );
+          const report = {
+            ...cleanCompatibilityResult(
+              completed,
+              environment,
+              (performance.now() - started) / 1e3,
+              timedOut,
+              "target-" + request.target
+            ),
+            ...effects2.deviceAccess !== "none" ? { stopped_sessions: stopped } : {}
+          };
+          if (!report.ok && report.port_error && effects2.deviceAccess !== "none") {
+            const diagnosis = await diagnoseTargetPortFailure(
+              uploadPort,
+              report.port_error,
+              projectDir,
+              caller
+            );
+            guard();
+            return {
+              ...report,
+              error: report.port_error,
+              port_diagnosis: diagnosis,
+              summary: "Target failed (" + report.port_error + "): " + diagnosis.hint
+            };
+          }
+          return report;
+        });
+      };
+      if (!aroundUpload) return execute3(reservedUpload);
+      if (request.target !== "upload" || reservedUpload)
         throw new PlatformIOError(
-          "Retained upload custody does not match the selected target.",
+          "Invalid upload workflow composition.",
           "UPLOAD_CUSTODY_MISMATCH"
         );
-      const stopped = [];
-      return hardwareLockManager.withImplicitLock(async () => {
-        guard();
-        if (effects2.deviceAccess !== "none") {
-          await client.run({ caller }, async (service, owner) => {
-            const sessions = service.sessions.list(owner);
-            if (reservedUpload) {
-              const reserved = sessions.find(
-                (session2) => session2.sessionId === reservedUpload.sessionId
-              );
-              if (!reserved || reserved.projectDir !== projectDir || reserved.state !== "authorizing" || !reserved.cleanupPending || resolveSerialEndpoint(reserved.path).resource.identity !== endpoint.resource.identity)
-                throw new PlatformIOError(
-                  "Upload reservation is not an owned pending monitor.",
-                  "UPLOAD_CUSTODY_MISMATCH"
-                );
-            }
-            const held = sessions.filter((session2) => {
-              if (reservedUpload && session2.sessionId === reservedUpload.sessionId)
-                return false;
-              if (["stopped", "disconnected", "error"].includes(session2.state) && !session2.cleanupPending)
-                return false;
-              if (!endpoint) return session2.projectDir === projectDir;
-              return resolveSerialEndpoint(session2.path).resource.identity === endpoint.resource.identity;
-            });
-            if (held.length && !request.stop_open_sessions)
-              throw new PlatformIOError(
-                "An owned monitor holds the target port; stop it or set stop_open_sessions.",
-                "TARGET_PORT_BUSY"
-              );
-            for (const session2 of held) {
-              guard();
-              const result = await service.sessions.stop(
-                owner,
-                session2.sessionId
-              );
-              if (result.cleanupPending)
-                throw new PlatformIOError(
-                  "Monitor closure is not confirmed.",
-                  "DEVICE_CLEANUP_PENDING",
-                  { cleanupPending: true }
-                );
-              stopped.push(session2.sessionId);
-            }
+      let result;
+      let pending;
+      let active = true;
+      try {
+        await aroundUpload((custody) => {
+          if (!active || pending)
+            return Promise.reject(
+              new PlatformIOError(
+                "Authorized upload is single-use.",
+                "UPLOAD_ALREADY_CONSUMED"
+              )
+            );
+          pending = execute3(custody).then((report) => {
+            result = report;
+            return report.ok;
           });
-        }
-        endpoint?.revalidate();
-        guard();
-        const started = performance.now();
-        let completed;
-        const collect = async (exitCode, fullLogPath) => {
-          const output = await readCommandOutput(fullLogPath);
-          return {
-            exitCode,
-            output,
-            logPath: await retainCommandLog("target", output, "")
-          };
-        };
-        let timedOut = false;
-        try {
-          await buildTarget(projectDir, request.target, environment, false, {
-            uploadPort,
-            serialPort: endpoint?.canonicalPort,
-            ...reservedUpload ? {
-              deviceCustody: reservedUpload.custody,
-              cancellation: reservedUpload.signal
-            } : {},
-            timeoutMs: effects2.deviceAccess === "write" ? 18e4 : 12e5,
-            onResult: async (result) => {
-              completed = await collect(result.exitCode, result.fullLogPath);
-            }
-          });
-        } catch (error2) {
-          if (error2 instanceof PlatformIOError && error2.code === "COMMAND_TIMEOUT" && error2.context?.cleanupPending === false && typeof error2.context.fullLogPath === "string") {
-            timedOut = true;
-            completed = await collect(-1, error2.context.fullLogPath);
-          } else throw error2;
-        }
-        guard();
-        if (!completed)
-          throw new PlatformIOError(
-            "Named target returned no completed result.",
-            "TARGET_RESULT_MISSING"
-          );
-        const report = {
-          ...cleanCompatibilityResult(
-            completed,
-            environment,
-            (performance.now() - started) / 1e3,
-            timedOut,
-            "target-" + request.target
-          ),
-          ...effects2.deviceAccess !== "none" ? { stopped_sessions: stopped } : {}
-        };
-        if (!report.ok && report.port_error && effects2.deviceAccess !== "none") {
-          const diagnosis = await diagnoseTargetPortFailure(
-            uploadPort,
-            report.port_error,
-            projectDir,
-            caller
-          );
-          guard();
-          return {
-            ...report,
-            error: report.port_error,
-            port_diagnosis: diagnosis,
-            summary: "Target failed (" + report.port_error + "): " + diagnosis.hint
-          };
-        }
-        return report;
-      });
+          return pending;
+        });
+      } finally {
+        active = false;
+        await pending;
+      }
+      if (!result)
+        throw new PlatformIOError(
+          "Upload workflow returned without executing its upload.",
+          "TARGET_RESULT_MISSING"
+        );
+      guard();
+      return result;
     }
   );
 }
@@ -110706,7 +110752,7 @@ async function diagnoseTargetPortFailure(port, code, projectDir, caller) {
 
 // src/adapters/upload-compat.ts
 var UploadCompatibilitySchema = RunTargetSchema.omit({ target: true });
-function executeUploadCompatibility(input, client, defaults = {}, caller = {}, onAuthorized, reservedUpload) {
+function executeUploadCompatibility(input, client, defaults = {}, caller = {}, onAuthorized, reservedUpload, aroundUpload) {
   const params = UploadCompatibilitySchema.parse(input);
   return executeNamedTarget(
     { ...params, target: "upload" },
@@ -110714,7 +110760,8 @@ function executeUploadCompatibility(input, client, defaults = {}, caller = {}, o
     defaults,
     caller,
     onAuthorized,
-    reservedUpload
+    reservedUpload,
+    aroundUpload
   );
 }
 
@@ -110779,7 +110826,8 @@ async function executeFlashVerification(input, client, caller = {}, onAuthorized
       owner,
       request,
       args.verification,
-      args.discoveryApprovalId
+      args.discoveryApprovalId,
+      true
     )
   );
   guard();
@@ -110789,7 +110837,8 @@ async function executeFlashVerification(input, client, caller = {}, onAuthorized
     workflowContext,
     async () => {
       guard();
-      const started = performance.now();
+      let uploadSeconds = 0;
+      let report;
       const upload = await executeUploadCompatibility(
         {
           project_dir: args.projectDir,
@@ -110830,10 +110879,46 @@ async function executeFlashVerification(input, client, caller = {}, onAuthorized
             }
           });
           guard();
+        },
+        void 0,
+        async (runUpload) => {
+          try {
+            report = await client.run(
+              { ...context, discoveryApprovalId: args.discoveryApprovalId },
+              (service, owner) => service.captureVerificationOnce(
+                owner,
+                request,
+                args.verification,
+                void 0,
+                selection.deviceBinding,
+                async (held) => {
+                  guard();
+                  const started = performance.now();
+                  let ok;
+                  try {
+                    const sameEndpoint = resolveSerialEndpoint(args.uploadPort).resource.identity === monitorEndpoint.resource.identity;
+                    ok = await runUpload(
+                      sameEndpoint ? { ...held, path: args.monitorPort } : void 0
+                    );
+                  } finally {
+                    uploadSeconds = (performance.now() - started) / 1e3;
+                  }
+                  guard();
+                  if (!ok)
+                    throw new PlatformIOError(
+                      "Upload failed; do not open the verification monitor.",
+                      "VERIFICATION_UPLOAD_FAILED"
+                    );
+                }
+              )
+            );
+          } catch (error2) {
+            if (!(error2 instanceof PlatformIOError) || error2.code !== "VERIFICATION_UPLOAD_FAILED" || error2.context?.cleanupPending !== false)
+              throw error2;
+          }
         }
       );
       guard();
-      const uploadSeconds = (performance.now() - started) / 1e3;
       if (!upload.ok)
         return {
           ok: false,
@@ -110844,16 +110929,11 @@ async function executeFlashVerification(input, client, caller = {}, onAuthorized
           baud: args.baudRate,
           summary: "Upload failed; boot verification did not start."
         };
-      const report = await client.run(
-        { ...context, discoveryApprovalId: args.discoveryApprovalId },
-        (service, owner) => service.captureVerificationOnce(
-          owner,
-          request,
-          args.verification,
-          void 0,
-          selection.deviceBinding
-        )
-      );
+      if (!report)
+        throw new PlatformIOError(
+          "Boot verification returned no report.",
+          "VERIFICATION_RESULT_MISSING"
+        );
       guard();
       return {
         ...report,

@@ -1726,3 +1726,10 @@ The current npm session returned `forkbomb`; npm access metadata confirmed read-
 ### Namespace coverage preserves verified authority
 
 The generated seven-name coverage matrix now includes personal-scope authority and naming eligibility for scoped alternatives. Existing npm packages with directly verified write access are recorded as authority-verified, while observed registry versions remain separate from final-release deployment. Candidate packages still do not count as published or secured. Six namespace audit/coverage cases passed, including metadata-only observations remaining authority-unproven and verified scoped candidates remaining unpublished. Regenerated platformio-namespace-coverage.json from the current inventory without new registry lookups.
+
+
+### Public upload-to-monitor custody integration (2026-09-20)
+
+The compatibility flash verifier now reserves the monitor endpoint and discovered USB scope before uploading. A same-port uploader borrows these exact leases, marks child uncertainty before spawn, and returns custody only after confirmed closure. The serial transport opens under the retained leases. A separate upload port retains its existing process custody while the monitor reservation remains held. Upload authorization surrounds a single-use execution continuation; monitor open/read authorization and five-snapshot startup discovery remain separate. Failed upload does not open a monitor. Disconnect cancels same-port uploads, and unconfirmed cleanup keeps the owning session pending.
+
+Validation: 71 focused workflow/policy/compatibility/target tests passed, including three public-workflow integration cases with real permission/session/lease code and simulated upload/serial hardware. TypeScript and scoped lint passed. The previous CI batch's new reservation fixture used an unresolved temporary project path on Windows/macOS; it now uses native canonical identity, matching real session construction without weakening runtime checks. Physical hardware acceptance, immutable serial upload manifests and full reference parity remain unproven.

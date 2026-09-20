@@ -19,6 +19,7 @@ vi.mock("../src/core/devices/serial-endpoint.js", async (importOriginal) => {
       original.resolveSerialEndpoint(port, { platform: "win32" }),
   };
 });
+import { PlatformIOError } from "../src/utils/errors.js";
 import { executeFlashVerification } from "../src/tools/flash-verification.js";
 let root: string;
 beforeEach(() => {
@@ -44,7 +45,19 @@ function fixture() {
       order.push("preflight");
       return { port: "COM42", deviceBinding: "bound-device" };
     }),
-    captureVerificationOnce: vi.fn(async () => {
+    captureVerificationOnce: vi.fn(async (...args) => {
+      order.push("reserved");
+      try {
+        await args[5]({
+          sessionId: "reserved-monitor",
+          signal: new AbortController().signal,
+          custody: { prepareSpawn: vi.fn(), releaseAfterExit: vi.fn() },
+        });
+      } catch (error) {
+        throw new PlatformIOError(error.message, error.code, {
+          cleanupPending: false,
+        });
+      }
       order.push("capture");
       return { ok: true, verdict: "pass", cleanupPending: false };
     }),
@@ -57,10 +70,21 @@ function fixture() {
     ) => execute(service, {}),
   } as unknown as SerialClientContext;
   upload.mockImplementation(
-    async (_args, _client, _defaults, _caller, authorized) => {
+    async (
+      _args,
+      _client,
+      _defaults,
+      _caller,
+      authorized,
+      _reserved,
+      around,
+    ) => {
       order.push("upload-authorized");
       await authorized();
-      order.push("uploaded");
+      await around(async () => {
+        order.push("uploaded");
+        return true;
+      });
       return { ok: true };
     },
   );
@@ -84,10 +108,11 @@ it("plans before upload and binds subsequent capture to the preflight device", a
   expect(f.order).toEqual([
     "preflight",
     "upload-authorized",
+    "reserved",
     "uploaded",
     "capture",
   ]);
-  expect(f.service.captureVerificationOnce.mock.calls[0].at(-1)).toBe(
+  expect(f.service.captureVerificationOnce.mock.calls[0][4]).toBe(
     "bound-device",
   );
 });

@@ -317,39 +317,55 @@ it("consumes a separate one-use inspection approval and never reuses the session
   expect(load).toHaveBeenCalledTimes(1);
 });
 
-it("authorizes bounded startup discovery once without replaying a list_devices grant", async () => {
-  const list = vi.fn(async () => [
-    {
+it.each([false, true])(
+  "authorizes bounded startup discovery once with upload=%s without replaying a list_devices grant",
+  async (withUpload) => {
+    const list = vi.fn(async () => [
+      {
+        path: "COM44",
+        vendorId: "10c4",
+        productId: "ea60",
+        serialNumber: "fixture",
+      },
+    ]);
+    const f = fixture({
+      discoveryLoad: async () => ({ list }),
+      resolveEndpoint: (port) =>
+        resolveSerialEndpoint(port, { platform: "win32" }),
+    });
+    f.policy({
+      profile: "flash_requires_approval",
+      overrides: { approval_required: ["list_devices"] },
+    });
+    const request = {
+      projectDir: f.projectDir,
       path: "COM44",
-      vendorId: "10c4",
-      productId: "ea60",
-      serialNumber: "fixture",
-    },
-  ]);
-  const f = fixture({
-    discoveryLoad: async () => ({ list }),
-    resolveEndpoint: (port) =>
-      resolveSerialEndpoint(port, { platform: "win32" }),
-  });
-  f.policy({
-    profile: "flash_requires_approval",
-    overrides: { approval_required: ["list_devices"] },
-  });
-  const request = { projectDir: f.projectDir, path: "COM44", baudRate: 115200 };
-  const start = (discoveryApprovalId?: string) =>
-    f.service.run({ discoveryApprovalId }, () =>
-      f.service.startWithDiscovery(f.owner, request),
-    );
-  const id = await approval(start());
-  expect(list).not.toHaveBeenCalled();
-  approveRequest(id);
-  const session = await start(id);
-  expect(session.state).toBe("open");
-  expect(list).toHaveBeenCalledTimes(4);
-  await f.service.sessions.stop(f.owner, session.sessionId);
-  await approval(start(id));
-  expect(list).toHaveBeenCalledTimes(4);
-});
+      baudRate: 115200,
+    };
+    const start = (discoveryApprovalId?: string) =>
+      f.service.run({ discoveryApprovalId }, () =>
+        f.service.startWithDiscovery(
+          f.owner,
+          request,
+          withUpload
+            ? async ({ custody }) => {
+                await custody.prepareSpawn();
+                custody.releaseAfterExit();
+              }
+            : undefined,
+        ),
+      );
+    const id = await approval(start());
+    expect(list).not.toHaveBeenCalled();
+    approveRequest(id);
+    const session = await start(id);
+    expect(session.state).toBe("open");
+    expect(list).toHaveBeenCalledTimes(withUpload ? 5 : 4);
+    await f.service.sessions.stop(f.owner, session.sessionId);
+    await approval(start(id));
+    expect(list).toHaveBeenCalledTimes(withUpload ? 5 : 4);
+  },
+);
 
 it("does not begin discovery after owner cleanup during composite authorization", async () => {
   const list = vi.fn(async () => [{ path: "COM44" }]);

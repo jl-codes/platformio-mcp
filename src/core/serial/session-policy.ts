@@ -40,6 +40,7 @@ import {
   type SerialSessionDependencies,
   type SerialSessionOwner,
   type SerialSessionRequest,
+  type SerialBeforeOpen,
 } from "./session-manager.js";
 
 /** Trusted adapter context; only a scoped approval ID may originate in validated public arguments. */
@@ -231,6 +232,7 @@ export class PolicySerialSessionService {
     input: Parameters<PolicySerialSessionService["startWithDiscovery"]>[1],
     options: z.input<typeof VerificationCaptureSchema> = {},
     startupDiscoveryApprovalId?: string,
+    beforeUpload = false,
   ) {
     const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
@@ -250,7 +252,7 @@ export class PolicySerialSessionService {
         ...input,
         projectDir,
         buffer: input.buffer ? { ...input.buffer } : undefined,
-        snapshots: 4,
+        snapshots: beforeUpload ? 5 : 4,
         approvalId: startupDiscoveryApprovalId,
       },
       { ...this.context.getStore()?.caller, workspaceDir: projectDir },
@@ -319,6 +321,7 @@ export class PolicySerialSessionService {
     input: z.input<typeof VerificationCaptureSchema> = {},
     signal?: AbortSignal,
     expectedDeviceBinding?: string,
+    beforeOpen?: SerialBeforeOpen,
   ) {
     const args = await validateVerificationCapture(input);
     const scope = {
@@ -328,11 +331,16 @@ export class PolicySerialSessionService {
       active: true,
       expiresAt:
         performance.now() +
-        (args.timeoutSeconds + args.settleSeconds + 30) * 1000,
+        (args.timeoutSeconds + args.settleSeconds + (beforeOpen ? 240 : 30)) *
+          1000,
     };
     return this.transientMemoryScope.run(scope, async () => {
       try {
-        const started = await this.startWithDiscovery(owner, request);
+        const started = await this.startWithDiscovery(
+          owner,
+          request,
+          beforeOpen,
+        );
         let report: Awaited<ReturnType<typeof captureSessionVerification>>;
         try {
           report = await captureSessionVerification(
@@ -516,7 +524,9 @@ export class PolicySerialSessionService {
       SerialSessionRequest,
       "resource" | "additionalResources" | "revalidateEndpoint"
     >,
+    beforeOpen?: SerialBeforeOpen,
   ) {
+    const snapshots = beforeOpen ? 5 : 4;
     const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
     if (!path.isAbsolute(input.projectDir))
@@ -538,16 +548,16 @@ export class PolicySerialSessionService {
     const guard = createPolicyRevisionGuard(request.projectDir);
     return dispatchAuthorizedAction(
       "serial_startup_discovery",
-      { ...request, snapshots: 4, approvalId: context.discoveryApprovalId },
+      { ...request, snapshots, approvalId: context.discoveryApprovalId },
       { ...context.caller, workspaceDir: request.projectDir },
       async () => {
         checkOwner();
         guard();
         const batch = {
           projectDir: request.projectDir,
-          remaining: 4,
+          remaining: snapshots,
           active: true,
-          expiresAt: performance.now() + 30000,
+          expiresAt: performance.now() + (beforeOpen ? 240000 : 30000),
           guard,
         };
         try {
@@ -555,6 +565,7 @@ export class PolicySerialSessionService {
             this.sessions.startDiscovered(owner, request, {
               list: () => this.listSerialDevices(request.projectDir),
               resolve: this.resolveEndpoint,
+              beforeOpen,
             }),
           );
         } finally {
