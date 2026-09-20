@@ -13,6 +13,7 @@ export interface MemoryTelemetrySample {
 export function parseMemoryTelemetry(
   lines: readonly string[],
   options: { stackUnit?: "bytes" | "words"; stackWordBytes?: number } = {},
+  excluded: readonly { line: number; start: number; end: number }[] = [],
 ) {
   const settings = z
     .object({
@@ -129,7 +130,10 @@ export function parseMemoryTelemetry(
     }
     // Match specific labels first so a minimum-heap label is not also counted as free heap.
     const heapMatches: Array<{ metric: string; match: RegExpExecArray }> = [];
-    const claimed: Array<[number, number]> = [];
+    const claimed: Array<[number, number]> = excluded
+      .filter((span) => span.line === line)
+      .map((span) => [span.start, span.end]);
+    const initialClaims = claimed.length;
     const heapNumber = String.raw`\s*(?:[:=]|\bis\b)?\s*(\d+)\b(?![.eE])(?:\s*(KiB|KB|MB|bytes?|B|words?)\b)?`;
     const heapPatterns: Array<[string, string, boolean]> = [
       [
@@ -237,13 +241,15 @@ export function parseMemoryTelemetry(
         formats.add("stack_high_water_mark");
       }
     }
-    if (claimed.length === 0) {
+    if (claimed.length === initialClaims) {
       const generic = new RegExp(
         String.raw`(?<name>(?:[A-Za-z_][\w .-]{0,40}?)?(?:heap|stack|psram)[\w .-]{0,30}?)\s*[:=]\s*` +
           stackNumber,
         "gi",
       );
       for (const match of text.matchAll(generic)) {
+        const end = match.index + match[0].length;
+        if (claimed.some(([a, b]) => match.index < b && end > a)) continue;
         const groups = match.groups!;
         const metric = groups.name
           .trim()

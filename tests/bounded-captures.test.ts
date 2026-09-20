@@ -9,8 +9,8 @@ it("extracts repeated named values and translates supported Python groups", asyn
       { pythonNamedGroups: true },
     ),
   ).toEqual([
-    { line: 0, name: "heap", value: "123" },
-    { line: 0, name: "heap", value: "456" },
+    { line: 0, start: 0, end: 8, name: "heap", value: "123" },
+    { line: 0, start: 9, end: 17, name: "heap", value: "456" },
   ]);
 });
 it("requires a value group even when no line matches", async () => {

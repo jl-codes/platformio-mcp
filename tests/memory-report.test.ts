@@ -96,3 +96,20 @@ it("converts explicit custom units and requires word-size evidence", async () =>
     analyzeMemoryTelemetryPattern(["mem=2 bananas"], pattern),
   ).rejects.toMatchObject({ code: "MEMORY_UNIT_REQUIRED" });
 });
+
+it("custom spans replace overlapping labels but preserve separate same-line measurements", async () => {
+  const report = await analyzeMemoryTelemetryPattern(
+    ["Free heap: 1000; Free heap: 2000"],
+    "Free heap: (?P<value>1000)",
+  );
+  expect(report.metrics.custom.last).toBe(1000);
+  expect(report.metrics.free_heap).toMatchObject({ samples: 1, last: 2000 });
+});
+
+it("uses the same coordinates for colored custom and built-in measurements", async () => {
+  const report = await analyzeMemoryTelemetryPattern(
+    ["\x1b[32mFree heap: 1000\x1b[0m; Free heap: 2000"],
+    "Free heap: (?P<value>1000)",
+  );
+  expect(report.metrics.free_heap).toMatchObject({ samples: 1, last: 2000 });
+});

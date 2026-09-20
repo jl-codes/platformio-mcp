@@ -587,3 +587,7 @@ Adapted the pinned reference heap-label and trailer patterns, retaining the MIT 
 ### Stack and generic telemetry coverage
 
 Adapted reference stack HWM/headroom/remaining, function-call, task free-space and generic memory-label patterns with bounded task names and numeric validation. Explicit units scale correctly; anonymous and unitless stack headroom remain unknown rather than assumed bytes. Task tables now tolerate separator rows. Total observations are capped at 10,000 even when each line contains multiple measurements. Attribution updated. TypeScript checking and 22 parser/report/capture tests pass. Public memory tool integration, exact custom-match overlap precedence, and full reference output compatibility remain outstanding.
+
+### Custom memory match precedence
+
+The bounded worker now retains match offsets. Memory parsing excludes only overlapping built-in matches, preserving disjoint measurements on the same line even when metric names coincide. ANSI color removal uses consistent coordinates for custom and built-in matches. TypeScript compilation and 32 worker/parser/report tests pass; rebuilt plugin validates and npm package validation passes (556 canonical package files). This remains internal functionality; public memory tools and complete reference output acceptance are not yet delivered.

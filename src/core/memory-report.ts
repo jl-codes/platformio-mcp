@@ -30,7 +30,7 @@ export function analyzeMemoryTelemetry(
 function analyzeParsedTelemetry(
   lines: readonly string[],
   options: MemoryReportOptions,
-  custom?: MemoryTelemetrySample[],
+  custom?: Array<MemoryTelemetrySample & { start: number; end: number }>,
 ) {
   const settings = z
     .object({
@@ -57,19 +57,18 @@ function analyzeParsedTelemetry(
       "Telemetry timestamps must correspond to every input line.",
       "MEMORY_TIMESTAMPS_INVALID",
     );
-  const parsed = parseMemoryTelemetry(lines, {
-    stackUnit: settings.stackUnit,
-    stackWordBytes: settings.stackWordBytes,
-  });
+  const parsed = parseMemoryTelemetry(
+    lines,
+    {
+      stackUnit: settings.stackUnit,
+      stackWordBytes: settings.stackWordBytes,
+    },
+    custom,
+  );
   if (custom?.length) {
-    const claimed = new Set(
-      custom.map((sample) => `${sample.line}:${sample.metric}`),
-    );
     parsed.samples = [
-      ...parsed.samples.filter(
-        (sample) => !claimed.has(`${sample.line}:${sample.metric}`),
-      ),
-      ...custom,
+      ...parsed.samples,
+      ...custom.map(({ start: _start, end: _end, ...sample }) => sample),
     ].sort((a, b) => a.line - b.line);
     parsed.unknownUnitSamples = parsed.samples.filter(
       (sample) => sample.unit === "unknown",
@@ -173,7 +172,10 @@ export async function analyzeMemoryTelemetryPattern(
 ) {
   // Validate all built-in bounds and options before creating a regex worker.
   analyzeMemoryTelemetry(lines, options);
-  const captures = await extractBoundedCaptures(lines, pattern, {
+  const normalizedLines = lines.map((line) =>
+    line.replace(/\x1b\[[0-9;]*m/g, ""),
+  );
+  const captures = await extractBoundedCaptures(normalizedLines, pattern, {
     pythonNamedGroups: true,
   });
   const samples = captures.map((capture) => {
@@ -213,7 +215,14 @@ export async function analyzeMemoryTelemetryPattern(
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "_")
         .replace(/^_+|_+$/g, "") || "custom";
-    return { line: capture.line, metric, value, unit: "bytes" as const };
+    return {
+      line: capture.line,
+      start: capture.start,
+      end: capture.end,
+      metric,
+      value,
+      unit: "bytes" as const,
+    };
   });
-  return analyzeParsedTelemetry(lines, options, samples);
+  return analyzeParsedTelemetry(normalizedLines, options, samples);
 }
