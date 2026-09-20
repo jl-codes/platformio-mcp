@@ -1063,3 +1063,7 @@ Implemented bounded readEspFlash using shared spooling/process custody, an expli
 ### Flash-read grant and installation review
 
 CI 35496366805 passed for 49da3211. Reviewed official Core v6.1.16 package/commands/exec.py: --package installs missing packages, so removed that selector to use installed-executable discovery only. Added two-stage readiness checks before grant consumption and kept transport grant IDs outside concrete operation payloads. A real scoped-approval regression proves the first approval survives waiting for the second; fourteen focused cases and TypeScript passed. Serial implementation plus these fixes are now ready to push; no physical execution or publication occurred.
+
+### Structured partition mismatch findings
+
+Device-erased and device-mismatch observations now add structured error issues/counts, and explicit CSV inspection with build metadata automatically compares the selected built binary. Added mocked device-report and full workflow regressions; three device cases and eleven workflow cases passed. CI 35496714588 exposed unused destructured values under ESLint; corrected variable use without changing lint policy. Targeted lint across all new partition/flash modules and TypeScript passed. Physical acceptance remains outstanding.

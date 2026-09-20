@@ -209,3 +209,56 @@ it("requires device permission even when offline layout inspection is permitted"
     }),
   ).rejects.toMatchObject({ code: "POLICY_DENIED" });
 });
+
+it("compares an explicit CSV with its metadata-selected built binary", async () => {
+  fs.writeFileSync(path.join(root, "table.csv"), "app,app,factory,0x20000,1M,");
+  const table = path.join(root, "partitions.bin");
+  const bytes = Buffer.alloc(96, 255);
+  bytes.writeUInt16LE(0x50aa, 0);
+  bytes[2] = 0;
+  bytes[3] = 0;
+  bytes.writeUInt32LE(0x20000, 4);
+  bytes.writeUInt32LE(0x200000, 8);
+  bytes.fill(0, 12, 32);
+  bytes.write("app", 12, "utf8");
+  fs.writeFileSync(table, bytes);
+  vi.mocked(executeProjectInspection)
+    .mockResolvedValueOnce({
+      ok: true,
+      defaultEnvironments: ["custom"],
+      envs: [
+        {
+          name: "custom",
+          partitionTable: null,
+          partitionTableUploadOffset: null,
+          flashSize: null,
+          board: null,
+          mcu: null,
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>)
+    .mockResolvedValueOnce({
+      ok: true,
+      envs: {
+        custom: {
+          extra: { flash_images: [{ path: table, offset: "0x10000" }] },
+        },
+      },
+    } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>);
+  const result = await executePartitionTable({
+    projectDir: root,
+    tablePath: "table.csv",
+    buildMetadata: true,
+  });
+  expect(result).toMatchObject({
+    ok: false,
+    comparison_source: "build_binary",
+    error_count: 1,
+  });
+  expect(result.comparison).toMatchObject([
+    { name: "app", kind: "changed", fields: ["size"] },
+  ]);
+  expect(result.issues).toContainEqual(
+    expect.objectContaining({ code: "offline_table_mismatch" }),
+  );
+});

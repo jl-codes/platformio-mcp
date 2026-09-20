@@ -69,10 +69,10 @@ export async function executePartitionTable(
   const params = PartitionTableSchema.parse(input);
   const projectDir = await fs.realpath(params.projectDir);
   const {
-    configApprovalId: _configGrant,
-    metadataApprovalId: _metadataGrant,
-    readApprovalId: _readGrant,
-    commandApprovalId: _commandGrant,
+    configApprovalId,
+    metadataApprovalId,
+    readApprovalId,
+    commandApprovalId,
     ...operation
   } = params;
   return dispatchAuthorizedAction(
@@ -91,7 +91,7 @@ export async function executePartitionTable(
               projectDir,
               params.environment,
               { ...caller, workspaceDir: projectDir },
-              params.configApprovalId,
+              configApprovalId,
             )
           : null;
       guard();
@@ -100,7 +100,7 @@ export async function executePartitionTable(
             projectDir,
             project!.environment,
             { ...caller, workspaceDir: projectDir },
-            params.metadataApprovalId,
+            metadataApprovalId,
             params.format === "binary" ? params.tablePath : undefined,
           )
         : null;
@@ -145,7 +145,11 @@ export async function executePartitionTable(
           flashSize: params.flashSize ?? project?.flashSize,
         },
         firmwarePath: params.firmwarePath,
-        observedTablePath: params.observedTablePath,
+        observedTablePath:
+          params.observedTablePath ??
+          (params.tablePath && params.format === "csv" && build
+            ? build.tablePath
+            : undefined),
       });
       guard();
       let device: {
@@ -164,8 +168,8 @@ export async function executePartitionTable(
             port: params.port!,
             offset: location.tableOffset,
             length: 4096,
-            approvalId: params.readApprovalId,
-            commandApprovalId: params.commandApprovalId,
+            approvalId: readApprovalId,
+            commandApprovalId: commandApprovalId,
           },
           { ...caller, workspaceDir: projectDir },
         );
@@ -188,11 +192,47 @@ export async function executePartitionTable(
       const mismatch = Boolean(
         result.comparison?.length || device?.erased || device?.diff.length,
       );
-      const { partitionRecords: _records, ...publicResult } = result;
+      const issues = [...result.issues];
+      if (result.comparison?.length)
+        issues.push({
+          severity: "error",
+          code: "offline_table_mismatch",
+          message:
+            "The supplied binary comparison differs from the expected partition layout.",
+          fix: "Confirm both artifacts belong to the same build before flashing.",
+        });
+      if (device?.erased)
+        issues.push({
+          severity: "error",
+          code: "device_table_erased",
+          message: "The selected device partition sector is erased.",
+          fix: "Verify the chip and table offset, then restore a complete approved firmware image.",
+        });
+      else if (device?.diff.length)
+        issues.push({
+          severity: "error",
+          code: "device_table_mismatch",
+          message:
+            "The observed device table differs from the inspected partition layout.",
+          fix: "Verify the selected device and rebuild or restore the intended complete flash layout.",
+        });
+      const errorCount = issues.filter(
+        (issue) => issue.severity === "error",
+      ).length;
+      const { partitionRecords, ...publicResult } = result;
 
       return {
         ...publicResult,
         device,
+        comparison_source:
+          !params.observedTablePath &&
+          params.tablePath &&
+          params.format === "csv" &&
+          build
+            ? "build_binary"
+            : publicResult.comparison_source,
+        issues,
+        error_count: errorCount,
         environment: project?.environment ?? null,
         table_source: params.tablePath
           ? "explicit:tablePath"
@@ -205,12 +245,12 @@ export async function executePartitionTable(
         sdkconfig_artifact: sdkconfig?.identity ?? null,
         ok: result.ok && !mismatch,
         summary:
-          result.partitions.length +
+          partitionRecords.length +
           " partition(s) inspected from offline artifacts. " +
           (mismatch
             ? "The compared partition layout differs or is erased. "
             : "") +
-          result.error_count +
+          errorCount +
           " layout error(s), " +
           result.warning_count +
           " warning(s).",
