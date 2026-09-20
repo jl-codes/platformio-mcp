@@ -25,7 +25,7 @@ const READ: ActionSafetyMetadata = {
 
 /** Existing callable MCP actions; additions require matching registered handlers. */
 export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
-  partition_table: { ...READ, policyAction: "get_project_config", riskLevel: "medium", readOnly: false, idempotent: false, openWorld: true },
+  partition_table: { ...READ, policyAction: "get_project_config", riskLevel: "high", readOnly: false, destructive: true, idempotent: false, openWorld: true },
   run_target: {
     policyAction: "run_shell_command", riskLevel: "critical",
     readOnly: false, destructive: true, idempotent: false, openWorld: true,
@@ -295,6 +295,8 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
 
 /** Implemented internal service actions; these are not advertised as MCP tools. */
 export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  esp_flash_read: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
+  esp_flash_read_command: { ...MCP_ACTIONS.upload_firmware, policyAction: "run_shell_command", riskLevel: "critical", openWorld: true },
   debugger_inspect: { ...READ, policyAction: "query_logs" },
   debugger_mutate: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
   debugger_host_code: {

@@ -370,9 +370,11 @@ async function runCliCommand(command: string, rawArgs: string[]) {
 
   try {
     if (command === "partition-table") {
-      const allowed = new Set(["json", "project-dir", "table-path", "format", "table-offset", "sdkconfig-path", "build-metadata", "metadata-approval-id", "environment", "config-approval-id", "flash-size", "firmware-path", "observed-table-path", "approval-id"]);
+      const allowed = new Set(["json", "project-dir", "table-path", "format", "table-offset", "sdkconfig-path", "read-device", "port", "read-approval-id", "command-approval-id", "build-metadata", "metadata-approval-id", "environment", "config-approval-id", "flash-size", "firmware-path", "observed-table-path", "approval-id"]);
       if (positionals.length || Object.keys(options).some((key) => !allowed.has(key)))
         throw new PlatformIOError("Unknown partition inspection argument.", "PARTITION_INPUT_INVALID");
+      if (options["read-device"] !== undefined && ![true, false, "true", "false"].includes(options["read-device"]))
+        throw new PlatformIOError("--read-device must be true or false.", "PARTITION_INPUT_INVALID");
       if (options["build-metadata"] !== undefined && ![true, false, "true", "false"].includes(options["build-metadata"]))
         throw new PlatformIOError("--build-metadata must be true or false.", "PARTITION_INPUT_INVALID");
       const numberOption = (key: string) => {
@@ -386,6 +388,8 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         projectDir: projectDirForPolicy, tablePath: asString(options["table-path"]),
         format: asString(options.format), tableOffset: numberOption("table-offset"),
         sdkconfigPath: asString(options["sdkconfig-path"]),
+        readDevice: asBoolean(options["read-device"]) ?? false, port: asString(options.port),
+        readApprovalId: asString(options["read-approval-id"]), commandApprovalId: asString(options["command-approval-id"]),
         buildMetadata: asBoolean(options["build-metadata"]) ?? false, metadataApprovalId: asString(options["metadata-approval-id"]),
         environment: asString(options.environment), configApprovalId: asString(options["config-approval-id"]),
         flashSize: numberOption("flash-size"), firmwarePath: asString(options["firmware-path"]),

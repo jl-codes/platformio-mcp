@@ -1055,3 +1055,7 @@ Added opt-in buildMetadata resolution through project_metadata, preserving its b
 ### Partition CI and provenance fixes
 
 CI run 35496158937 completed with a stale 55-tool assertion in mcp-authorization.test.ts (current inventory is 56); corrected it without weakening pinned legacy contract validation. Corrected metadata-selected binary provenance to metadata:extra.flash_images and added a complete executor regression. Eighteen focused MCP/partition cases and TypeScript passed. Both prior CI runs are terminal, so the saved metadata change and fixes can now be pushed together.
+
+### Serial partition reads
+
+Implemented bounded readEspFlash using shared spooling/process custody, an explicit serial port/range, separate device and host-package-command permissions, exact output-length validation and completed staging cleanup. Connected readDevice/port and scoped approvals to MCP and CLI; device partitions are decoded, hashed and compared with the inspected layout. Worst-case MCP annotations now reflect hardware effects. Thirteen targeted authorization/executor/workflow cases and TypeScript passed with hardware mocked. Physical reset/read behavior, installed esptool version compatibility and descendant containment remain acceptance gaps. CI runs 35496366805 and 35496364780 were still live; saved locally to preserve those runs.

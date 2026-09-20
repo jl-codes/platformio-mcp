@@ -299,7 +299,7 @@ const toolDefinitions: ToolDefinition[] = [
   },
   {
     name: "partition_table",
-    description: "Inspect ESP partition artifacts and firmware fit. Optional buildMetadata requires build permission and can execute project scripts. Does not read a device.",
+    description: "Inspect ESP partition artifacts and firmware fit. Optional buildMetadata requires build permission and can execute project scripts. Optional readDevice resets/reads an explicitly selected serial device with separate permissions.",
     inputSchema: {
       type: "object", required: ["projectDir"], additionalProperties: false,
       properties: {
@@ -310,6 +310,10 @@ const toolDefinitions: ToolDefinition[] = [
         format: { type: "string", enum: ["csv", "binary"], default: "csv" },
         tableOffset: { type: "integer", minimum: 0, maximum: 4294963200 },
         sdkconfigPath: { type: "string", minLength: 1, maxLength: 32768 },
+        readDevice: { type: "boolean", default: false, description: "Read the partition sector from an explicit serial port; may reset hardware and requires separate device and host-command permissions." },
+        port: { type: "string", minLength: 1, maxLength: 512 },
+        readApprovalId: { type: "string", maxLength: 256 },
+        commandApprovalId: { type: "string", maxLength: 256 },
         buildMetadata: { type: "boolean", default: false, description: "Generate build metadata under build permission; may execute project scripts." },
         metadataApprovalId: { type: "string", maxLength: 256 },
         flashSize: { type: "integer", minimum: 1, maximum: 4294967296 },

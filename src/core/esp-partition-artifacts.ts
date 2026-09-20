@@ -135,6 +135,7 @@ export async function inspectEspPartitionArtifacts(input: {
     : null;
   return {
     ...reportEspPartitions(parts, input.layout, firmware?.identity.size),
+    partitionRecords: parts,
     artifacts: {
       table: table.identity,
       firmware: firmware?.identity ?? null,

@@ -3,6 +3,12 @@
  * Explicit artifact paths and table offsets avoid hidden compilation or framework guesses.
  */
 import fs from "node:fs/promises";
+import { readEspFlash } from "../core/esp-flash-read.js";
+import { parseEspPartitionBinary } from "../core/esp-partitions.js";
+import {
+  compareEspPartitions,
+  projectEspPartition,
+} from "../core/esp-partition-report.js";
 import {
   resolveProjectPartitionInputs,
   resolveBuildPartitionInputs,
@@ -42,9 +48,17 @@ export const PartitionTableSchema = z
     flashSize: z.number().int().positive().max(0x100000000).optional(),
     firmwarePath: z.string().min(1).max(32768).optional(),
     observedTablePath: z.string().min(1).max(32768).optional(),
+    readDevice: z.boolean().default(false),
+    port: z.string().min(1).max(512).optional(),
+    readApprovalId: z.string().max(256).optional(),
+    commandApprovalId: z.string().max(256).optional(),
     approvalId: z.string().max(256).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (value) => !value.readDevice || Boolean(value.port),
+    "An explicit serial port is required for a device read.",
+  );
 
 /** Gate all artifact reads and recheck policy before delivering the resulting report. */
 export async function executePartitionTable(
@@ -127,9 +141,51 @@ export async function executePartitionTable(
         observedTablePath: params.observedTablePath,
       });
       guard();
-      const mismatch = Boolean(result.comparison?.length);
+      let device: {
+        port: string;
+        erased: boolean;
+        partitions: ReturnType<typeof projectEspPartition>[];
+        diff: ReturnType<typeof compareEspPartitions>;
+        log_path: string;
+        sha256: string;
+        offset: number;
+      } | null = null;
+      if (params.readDevice) {
+        const read = await readEspFlash(
+          {
+            projectDir,
+            port: params.port!,
+            offset: location.tableOffset,
+            length: 4096,
+            approvalId: params.readApprovalId,
+            commandApprovalId: params.commandApprovalId,
+          },
+          { ...caller, workspaceDir: projectDir },
+        );
+        guard();
+        const observed = parseEspPartitionBinary(read.bytes, {
+          tableOffset: location.tableOffset,
+        });
+        device = {
+          port: read.port,
+          erased: read.bytes.every((byte) => byte === 255),
+          partitions: observed.map(projectEspPartition),
+          diff: compareEspPartitions(result.partitionRecords, observed, {
+            tableOffset: location.tableOffset,
+          }),
+          log_path: read.logPath,
+          sha256: read.sha256,
+          offset: read.offset,
+        };
+      }
+      const mismatch = Boolean(
+        result.comparison?.length || device?.erased || device?.diff.length,
+      );
+      const { partitionRecords: _records, ...publicResult } = result;
+
       return {
-        ...result,
+        ...publicResult,
+        device,
         environment: project?.environment ?? null,
         table_source: params.tablePath
           ? "explicit:tablePath"
@@ -144,7 +200,9 @@ export async function executePartitionTable(
         summary:
           result.partitions.length +
           " partition(s) inspected from offline artifacts. " +
-          (mismatch ? "The supplied comparison table differs. " : "") +
+          (mismatch
+            ? "The compared partition layout differs or is erased. "
+            : "") +
           result.error_count +
           " layout error(s), " +
           result.warning_count +

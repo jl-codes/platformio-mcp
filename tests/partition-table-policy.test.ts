@@ -196,3 +196,16 @@ it("reports the actual metadata-selected binary source", async () => {
   });
   expect(result.artifacts.table.path).toBe(fs.realpathSync.native(table));
 });
+
+it("requires device permission even when offline layout inspection is permitted", async () => {
+  fs.writeFileSync(path.join(root, "table.csv"), "app,app,factory,,1M,");
+  await expect(
+    executePartitionTable({
+      projectDir: root,
+      tablePath: "table.csv",
+      tableOffset: 0x8000,
+      readDevice: true,
+      port: "COM9",
+    }),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+});
