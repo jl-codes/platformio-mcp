@@ -37,6 +37,7 @@ export async function initProject(config: {
   framework?: string;
   projectDir: string;
   platformOptions?: Record<string, string>;
+  projectOptions?: string[]; // Ordered PlatformIO options, preserving repeated keys.
 }): Promise<ProjectInitResult> {
   // Validate inputs
   if (!validateBoardId(config.board)) {
@@ -49,6 +50,14 @@ export async function initProject(config: {
     throw new ProjectInitError(`Invalid framework: ${config.framework}`, {
       framework: config.framework,
     });
+  }
+
+  const projectOptions = z.array(z.string().min(1).max(4096).refine(
+    value => !value.includes("\0") && /^[a-zA-Z0-9_.-]+\s*=/.test(value),
+    "Project options must be key=value strings without NUL bytes",
+  )).max(128).default([]).parse(config.projectOptions);
+  if (Buffer.byteLength(projectOptions.join(""), "utf8") > 65536) {
+    throw new ProjectInitError("Project options exceed 64 KiB");
   }
 
   let projectPath: string;
@@ -81,6 +90,9 @@ export async function initProject(config: {
         args.push("--project-option", `${key}=${value}`);
       }
     }
+
+    // Preserve caller ordering and repeated keys; each option is a separate argv value.
+    for (const option of projectOptions) args.push("--project-option", option);
 
     // Execute init command in the project directory
     const result = await platformioExecutor.execute("project", args.slice(1), {

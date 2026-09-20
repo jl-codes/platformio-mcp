@@ -113,8 +113,8 @@
     },
     {
       "path": "platformio-mcp.mjs",
-      "bytes": 4113056,
-      "sha256": "d9ce72be8fb5acc4876b62eee27544b8fcd8176da809f994ab6034eb51199899"
+      "bytes": 4113574,
+      "sha256": "cabaf52c7f5e4ba3f82b6ee6a8d86122c043791f01f97346c9e7d8884bd2bbb1"
     },
     {
       "path": "prebuilds/darwin-x64+arm64/@serialport+bindings-cpp.node",

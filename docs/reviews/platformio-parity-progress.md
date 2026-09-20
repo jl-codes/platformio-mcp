@@ -790,3 +790,7 @@ Added functional `@forkbomb/flashagent` npm and `flash-agent` Python candidates;
 ### Expanded registry observations
 
 Refreshed the cached public namespace report for the expanded inventory. npm `flash-agent` exists at 1.0.38 with maintainer `chenpingaodian` and no repository link in the returned metadata. Marked that name excluded from project publication; recorded the punctuation-family collision against unscoped `flashagent`, `flash.agent` and `flash_agent`. Missing exact-name lookups cannot establish registrability. The scoped flashagent candidate remains subject to independent scope-control verification. PyPI `flash-agent` returned 404, separately from npm; no claim of availability or ownership follows. No package was installed or published.
+
+### Ordered project-init options
+
+Extended the shared project initializer to accept a bounded ordered `projectOptions` list in addition to the existing `platformOptions` map. Repeated keys retain their original order and are passed as separate argv values. Option syntax/size checks happen before directory creation. Existing callers and their 120-second timeout are unchanged. TypeScript passed. The public reference project-init adapter, response/log projection and its acceptance checks remain unfinished.

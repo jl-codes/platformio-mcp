@@ -15132,6 +15132,13 @@ async function initProject(config2) {
       framework: config2.framework
     });
   }
+  const projectOptions = external_exports.array(external_exports.string().min(1).max(4096).refine(
+    (value2) => !value2.includes("\0") && /^[a-zA-Z0-9_.-]+\s*=/.test(value2),
+    "Project options must be key=value strings without NUL bytes"
+  )).max(128).default([]).parse(config2.projectOptions);
+  if (Buffer.byteLength(projectOptions.join(""), "utf8") > 65536) {
+    throw new ProjectInitError("Project options exceed 64 KiB");
+  }
   let projectPath;
   try {
     projectPath = validateProjectPath(config2.projectDir);
@@ -15154,6 +15161,7 @@ async function initProject(config2) {
         args.push("--project-option", `${key}=${value2}`);
       }
     }
+    for (const option of projectOptions) args.push("--project-option", option);
     const result = await platformioExecutor.execute("project", args.slice(1), {
       cwd: projectPath,
       timeout: 12e4
