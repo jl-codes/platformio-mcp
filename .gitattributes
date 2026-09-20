@@ -9,3 +9,6 @@ plugins/platformio-mcp/skills/** -text
 
 # Pinned upstream schema is verified using its exact byte hash.
 distribution/mcp-server.schema.json -text
+
+# Alias release validation compares exact launcher bytes across native hosts.
+packages/python-aliases/**/*.py text eol=lf

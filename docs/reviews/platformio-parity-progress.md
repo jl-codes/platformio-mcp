@@ -1599,3 +1599,8 @@ Confirmed that Python release building and native acceptance derive every alias 
 Fixed a concrete response gap: mapped GDB/MI inspection commands could succeed with empty console output while the adapter discarded their structured result fields. Replies now retain bounded ordered `result_fields`, preserving repeated names and keeping debugger-controlled names as data. Startup also returns the latest owned stop frame and running/closed observations instead of requiring an extra list call. Unknown state remains null; initialization success is not interpreted as target halt.
 
 Validation: 13 focused debugger response/connection cases passed, covering variable values, backtrace frames, register values, repeated/prototype-like field names and initial stop reporting. TypeScript passed and the plugin was rebuilt. Full reference response parity and physical debugger acceptance remain incomplete; no deployment occurred.
+
+
+### Native wheel packaging correction
+
+Release validation run 35515111803 built all five native wheels and all six Python aliases. Linux x64 and arm64 installed and exercised the complete alias set successfully. Windows failed exact alias-source comparison because checkout converted launcher newlines; alias Python sources now require LF through Git attributes, preserving exact byte validation. Both macOS hosts rejected the nonstandard 13_5 wheel tags. Wheels now conservatively target macOS 14.0; the bundled Node runtime minimum remains 13.5, but these wheels require macOS 14 or later. No publisher ran. Native acceptance must be repeated for the corrected artifacts; this is not physical or final-release acceptance.
