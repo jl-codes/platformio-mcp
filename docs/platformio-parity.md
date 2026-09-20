@@ -127,18 +127,24 @@ Startup approvals are separate for preparation, discovery, host code and target 
 
 Native supervisors require empty owned process groups/Windows jobs for both GDB and its backend before releasing probe custody. Optional host verification can impose an additional check. This proves closure of owned process handles, not that another application cannot open the probe afterward; privileged project/debugger code is not an OS sandbox. Failed or uncertain cleanup retains a recoverable session.
 
-Registration is not full debugger acceptance: physical ESP/Cortex probe evidence, remaining backend bindings, response parity details, endpoint-conflict handling and complete CLI/dashboard integration remain outstanding. Power profiling is the remaining unregistered reference tool. No release has been published.
+Registration is not full debugger acceptance: physical ESP/Cortex probe evidence, remaining backend bindings, response parity details, endpoint-conflict handling and complete CLI/dashboard integration remain outstanding. All 40 reference tool names are now registered in compatibility mode (97 total tools, with all 57 canonical tools retained). This is registration coverage, not full behavioral or physical acceptance. No release has been published.
 
 ### Power execution permissions (implementation in progress)
 
 The internal PPK2 operation preflights `power_meter_command` (under `run_shell_command`) and either `power_meter_measure` (under `start_monitor`) or the independent `power_source` permission. Source permission is not inherited from upload, monitor, or host-command permissions. An operator must explicitly configure `power_source` in `approval_required` or `allow`; it is otherwise denied. Request-bound approvals include the meter and DUT resource identities, interpreter, measurement/source mode, voltage, software current-trip threshold, and duration. The current limit is a software trip, not a hardware current regulator.
 
-The retained operation owner cancels collection on policy revision and remains available for cleanup retries. This internal service is not yet the public `pio_power_profile` tool: trusted meter/DUT discovery, optional dependency setup, connection ownership, public routing, and physical acceptance remain incomplete.
+The retained operation owner cancels collection on policy revision and remains available for cleanup retries. The public `pio_power_profile` route composes serial collection or the owned PPK2 service. PPK2 trigger/monitor coexistence, ambiguous multi-interface discovery, complete response/default parity, and physical acceptance remain incomplete.
 
 ### Explicit optional PPK2 dependency setup
 
 Run `python -I scripts/setup-ppk2.py <new-environment-directory>` using a trusted host Python. The parent directory must exist; the environment directory must not. The command installs only hash-pinned binary wheels for `ppk2-api==0.9.2` and `pyserial==3.5` from PyPI, then checks isolated imports, package versions and required API methods without opening hardware. It writes `ppk2-setup.json` only after validation succeeds. Failed installations are left for operator inspection and cannot be reused by rerunning this command. Measurement requests never install dependencies automatically.
 
-The setup script is included in npm, plugin and Python runtime packaging. Its environment is not automatically trusted or selected by the still-incomplete public PPK2 adapter. Import success is dependency evidence only, not device identity, voltage/current approval, or physical acceptance.
+The setup script is included in npm, plugin and Python runtime packaging. Its environment is selected only through explicit server configuration. Import success is dependency evidence only, not device identity, voltage/current approval, or physical acceptance.
 
-Set `PIO_MCP_PPK2_ENV` in the server's environment to explicitly select the dedicated virtual environment. Keep that directory outside the firmware project and keep `include-system-site-packages = false`. This selects a host runtime; it does not grant meter access or source-power permission, and public meter routing remains in development.
+Set `PIO_MCP_PPK2_ENV` in the server's environment to explicitly select the dedicated virtual environment. Keep that directory outside the firmware project and keep `include-system-site-packages = false`. This selects a host runtime; it does not grant meter access or source-power permission, and physical meter acceptance remains outstanding.
+
+### Public power requests
+
+`pio_power_profile` defaults to `source: "serial"` and supports the reference duration, port, baud, pattern, voltage, threshold, bucket and owned-trigger arguments. The serial path closes its one-shot meter session and retains the trigger monitor. PPK2 requests require `source: "ppk2"`, explicit `mode: "ampere" | "source"`, `port`, `dut_port`, `voltage_mv` and `current_limit_ma`, with the configured isolated host environment. PPK2 source current trips are limited to 600 mA and ampere trips to 1000 mA; these are software thresholds, not hardware regulation. Ambiguous USB interfaces are rejected, and PPK2 trigger arguments are not yet supported.
+
+The public operation honors `pio_power_profile` and its `start_monitor` policy parent, separately from meter host/power permissions. `profile_approval_id` covers this outer request; collector-specific approval arguments cover their own stages. Approval retries may require fresh discovery/outer grants. `operation: "list"` lists only the connection's retained meter operations; `operation: "cleanup", power_operation_id: "..."` retries owned cleanup without a new power grant. Unconfirmed physical shutdown remains reported and custody is retained.

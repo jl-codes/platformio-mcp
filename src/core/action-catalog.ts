@@ -296,6 +296,7 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
 
 /** Implemented internal service actions; these are not advertised as MCP tools. */
 export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  pio_power_profile: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", riskLevel: "critical", destructive: true, idempotent: false },
   power_meter_measure: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", idempotent: false },
   power_source: { riskLevel: "critical", readOnly: false, destructive: true, idempotent: false, openWorld: false },
   power_meter_command: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },

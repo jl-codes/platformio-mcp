@@ -15,6 +15,7 @@ it.each([
   async ({ entry, mode }) => {
     const enabled = mode !== "off";
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-compat-mcp-"));
+    const state = fs.mkdtempSync(path.join(os.tmpdir(), "pio-compat-state-"));
     const client = new Client({ name: "compat-test", version: "1" });
     const environment = Object.fromEntries(
       Object.entries(process.env).filter(
@@ -36,7 +37,7 @@ it.each([
         ...(mode === "environment"
           ? { PIO_MCP_COMPAT: "platformio-mcp-python" }
           : {}),
-        PIO_MCP_DATA_DIR: path.join(root, "state"),
+        PIO_MCP_DATA_DIR: state,
         PLATFORMIO_MCP_PROJECT_DIR: root,
       },
       stderr: "pipe",
@@ -52,7 +53,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 96 : 57);
+      expect(tools).toHaveLength(enabled ? 97 : 57);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -68,6 +69,7 @@ it.each([
         "pio_monitor_start",
         "pio_monitor_capture",
         "pio_memory_watch",
+        "pio_power_profile",
         "pio_port_diagnose",
         "pio_decode_backtrace",
         "pio_size_report",
@@ -91,6 +93,32 @@ it.each([
         expect(tools.some((tool) => tool.name === name)).toBe(enabled);
       }
       if (enabled) {
+        const powerList = await client.callTool({
+          name: "pio_power_profile",
+          arguments: { operation: "list" },
+        });
+        expect(
+          powerList.structuredContent,
+          JSON.stringify(powerList),
+        ).toMatchObject({
+          ok: true,
+          operations: [],
+        });
+        const invalidPower = await client.callTool({
+          name: "pio_power_profile",
+          arguments: { source: "ppk2", voltage_mv: 3300 },
+        });
+        expect(invalidPower.isError).toBe(true);
+        const foreignPower = await client.callTool({
+          name: "pio_power_profile",
+          arguments: {
+            operation: "cleanup",
+            power_operation_id: "00000000-0000-4000-8000-000000000000",
+          },
+        });
+        expect(JSON.stringify(foreignPower)).toContain(
+          "POWER_OPERATION_NOT_FOUND",
+        );
         const debugList = await client.callTool({
           name: "pio_debug_list",
           arguments: {},
@@ -179,6 +207,7 @@ it.each([
       await client.close();
       await transport.close();
       fs.rmSync(root, { recursive: true, force: true });
+      fs.rmSync(state, { recursive: true, force: true });
     }
   },
   20000,

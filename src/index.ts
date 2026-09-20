@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { withPowerCompatibility } from "./adapters/power-compat-registry.js";
+import { executePowerCompatibility } from "./adapters/power-compat.js";
+import { PowerMeterClient } from "./adapters/power-meter-client.js";
 import { DebugCompatibilityClient } from "./adapters/debug-compat.js";
 import { withDebugCompatibility } from "./adapters/debug-compat-registry.js";
 import { executeOtaCompatibility } from "./adapters/ota-compat.js";
@@ -1621,6 +1624,8 @@ const toolDefinitions: ToolDefinition[] = [
 // stdio serves one trusted client connection; owner capabilities never come from tool arguments.
 const serialClient = new SerialClientContext();
 const debugClient = new DebugCompatibilityClient();
+const powerClient = new PowerMeterClient();
+registerShutdownTask(() => powerClient.close());
 registerShutdownTask(async () => {
   if ((await debugClient.close()).cleanupPending) {
     await logDiag("Debugger shutdown cleanup remains pending; probe ownership is retained.");
@@ -1635,6 +1640,7 @@ registerShutdownTask(async () => {
   }
 });
 server.onclose = () => {
+  void powerClient.close().catch(() => logDiag("Power disconnect cleanup remains pending; device custody is retained."));
   void debugClient.close().then((state) => {
     if (state.cleanupPending) void logDiag("Debugger disconnect cleanup remains pending; probe ownership is retained.");
   }).catch(() => logDiag("Debugger disconnect cleanup failed; probe ownership is retained."));
@@ -1685,6 +1691,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   );
   const debugCompatibility = ["pio_debug_start", "pio_debug_cmd", "pio_debug_list", "pio_debug_stop"].includes(name);
   const compatibilityTool =
+    name === "pio_power_profile" ||
     debugCompatibility ||
     packageCompatibility ||
     projectCompatibility ||
@@ -1754,7 +1761,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         () =>
           registeredTool.handler(args, {
             dispatch: async (tool, parameters) =>
-              tool === "pio_debug_start"
+              tool === "pio_power_profile"
+                ? executePowerCompatibility(serialClient, powerClient, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller)
+                : tool === "pio_debug_start"
                 ? debugClient.start(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller)
                 : tool === "pio_debug_cmd" || tool === "pio_debug_list" || tool === "pio_debug_stop"
                 ? debugClient.execute(tool, parameters, caller)
@@ -2758,13 +2767,13 @@ async function main() {
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
-    toolRegistry = withDebugCompatibility(withDependencyCompatibility(
+    toolRegistry = withPowerCompatibility(withDebugCompatibility(withDependencyCompatibility(
       withDeviceCompatibility(
         withBoardCompatibility(
           withProjectCompatibility(withPackageCompatibility(toolRegistry)),
         ),
       ),
-    ));
+    )));
   }
   const subcommand = cliArgs.find((a) => !a.startsWith("--"));
 
