@@ -794,3 +794,7 @@ Refreshed the cached public namespace report for the expanded inventory. npm `fl
 ### Ordered project-init options
 
 Extended the shared project initializer to accept a bounded ordered `projectOptions` list in addition to the existing `platformOptions` map. Repeated keys retain their original order and are passed as separate argv values. Option syntax/size checks happen before directory creation. Existing callers and their 120-second timeout are unchanged. TypeScript passed. The public reference project-init adapter, response/log projection and its acceptance checks remain unfinished.
+
+### Public initialization compatibility
+
+Added `pio_project_init` (78 compatibility-visible tools, 54 canonical). The adapter binds ordered options to canonical initialization authorization and separately authorizes configuration disclosure before invoking the initializer. It supports explicit/home-relative paths, bounded INI output with existing secret redaction, and a bounded visible layout. TypeScript and two permission-denial checks passed; plugin rebuilt. No actual PlatformIO operation was executed locally. Remaining exact-contract gaps include retained initialization logs, reference timeout/failure output semantics, and native project-init acceptance.

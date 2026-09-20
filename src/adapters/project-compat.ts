@@ -1,4 +1,5 @@
 /** Adapt pinned project inspection vocabulary to the existing authorized canonical services. */
+import { executeInitCompatibility } from "./init-compat.js";
 import path from "node:path";
 import { z } from "zod";
 import {
@@ -139,6 +140,8 @@ export async function executeProjectCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_project_init")
+    return executeInitCompatibility(input, defaults, caller, onAuthorized);
   const request = await mapProjectCompatibilityRequest(name, input, defaults);
   return projectCompatibilityResult(
     await executeProjectInspection(

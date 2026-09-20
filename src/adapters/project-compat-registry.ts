@@ -43,5 +43,32 @@ export function withProjectCompatibility<TResult>(
       handler: (args, context) => context.dispatch(name, args),
     });
   }
+  const init = base.get("init_project");
+  if (!init || result.has("pio_project_init"))
+    throw new Error("Invalid init compatibility registry");
+  result.set("pio_project_init", {
+    ...init,
+    name: "pio_project_init",
+    description:
+      "Initialize a PlatformIO project with ordered options. Canonical initialization and configuration-read permissions apply before filesystem changes.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["project_dir", "board"],
+      properties: {
+        project_dir: { type: "string", minLength: 1, maxLength: 32768 },
+        board: { type: "string", minLength: 1, maxLength: 256 },
+        framework: { type: ["string", "null"] },
+        project_options: {
+          type: ["array", "null"],
+          maxItems: 128,
+          items: { type: "string", maxLength: 4096 },
+        },
+        approval_id: { type: "string", maxLength: 256 },
+        config_approval_id: { type: "string", maxLength: 256 },
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_project_init", args),
+  });
   return result;
 }
