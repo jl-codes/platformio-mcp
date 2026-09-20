@@ -296,6 +296,9 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
 
 /** Implemented internal service actions; these are not advertised as MCP tools. */
 export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  power_meter_measure: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", idempotent: false },
+  power_source: { riskLevel: "critical", readOnly: false, destructive: true, idempotent: false, openWorld: false },
+  power_meter_command: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
   pio_upload_ota: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
   ota_upload_firmware: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware", openWorld: true },
   ota_upload_filesystem: { ...MCP_ACTIONS.upload_filesystem, policyAction: "upload_filesystem", openWorld: true },

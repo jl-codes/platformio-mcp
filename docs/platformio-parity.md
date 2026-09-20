@@ -128,3 +128,9 @@ Startup approvals are separate for preparation, discovery, host code and target 
 Native supervisors require empty owned process groups/Windows jobs for both GDB and its backend before releasing probe custody. Optional host verification can impose an additional check. This proves closure of owned process handles, not that another application cannot open the probe afterward; privileged project/debugger code is not an OS sandbox. Failed or uncertain cleanup retains a recoverable session.
 
 Registration is not full debugger acceptance: physical ESP/Cortex probe evidence, remaining backend bindings, response parity details, endpoint-conflict handling and complete CLI/dashboard integration remain outstanding. Power profiling is the remaining unregistered reference tool. No release has been published.
+
+### Power execution permissions (implementation in progress)
+
+The internal PPK2 operation preflights `power_meter_command` (under `run_shell_command`) and either `power_meter_measure` (under `start_monitor`) or the independent `power_source` permission. Source permission is not inherited from upload, monitor, or host-command permissions. An operator must explicitly configure `power_source` in `approval_required` or `allow`; it is otherwise denied. Request-bound approvals include the meter and DUT resource identities, interpreter, measurement/source mode, voltage, software current-trip threshold, and duration. The current limit is a software trip, not a hardware current regulator.
+
+The retained operation owner cancels collection on policy revision and remains available for cleanup retries. This internal service is not yet the public `pio_power_profile` tool: trusted meter/DUT discovery, optional dependency setup, connection ownership, public routing, and physical acceptance remain incomplete.
