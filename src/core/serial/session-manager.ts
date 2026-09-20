@@ -163,6 +163,8 @@ export class SerialSessionManager {
     discovery: {
       list: () => Promise<readonly SerialDiscoveryRecord[]>;
       resolve?: typeof resolveSerialEndpoint;
+      /** Trusted composite authorization hook; completes before lease acquisition or transport construction. */
+      beforeStart?: (request: Readonly<SerialSessionRequest>) => Promise<void>;
     },
   ): Promise<SerialSessionInfo> {
     this.requireActiveOwner(owner);
@@ -191,18 +193,40 @@ export class SerialSessionManager {
           "Serial discovery was stopped.",
           "SERIAL_CLOSED",
         );
+      const prepared: SerialSessionRequest = Object.freeze({
+        ...request,
+        buffer: request.buffer
+          ? Object.freeze({ ...request.buffer })
+          : undefined,
+        path: endpoint.canonicalPort,
+        resource: Object.freeze({ ...endpoint.resource }),
+        additionalResources: Object.freeze(
+          binding.usbIdentity
+            ? [
+                Object.freeze({
+                  kind: "serial" as const,
+                  identity: binding.usbIdentity,
+                }),
+              ]
+            : [],
+        ),
+        revalidateEndpoint: async () => binding.revalidate(await list()),
+      });
+      if (discovery.beforeStart)
+        await this.withEndpointDeadline(
+          () => discovery.beforeStart!(prepared),
+          request.operationTimeoutMs ?? 5000,
+        );
+      this.requireActiveOwner(owner);
+      if ((this.ownerStops.get(owner) ?? 0) !== stopGeneration)
+        throw new PlatformIOError(
+          "Serial startup was stopped during preflight.",
+          "SERIAL_CLOSED",
+        );
       // Transfer the reservation synchronously to start before another request can interleave.
       this.pendingDiscovery--;
       try {
-        return this.start(owner, {
-          ...request,
-          path: endpoint.canonicalPort,
-          resource: endpoint.resource,
-          additionalResources: binding.usbIdentity
-            ? [{ kind: "serial", identity: binding.usbIdentity }]
-            : [],
-          revalidateEndpoint: async () => binding.revalidate(await list()),
-        });
+        return this.start(owner, prepared);
       } finally {
         this.pendingDiscovery++;
       }

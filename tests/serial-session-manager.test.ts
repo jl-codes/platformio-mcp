@@ -764,3 +764,52 @@ it("rejects invalid and already-cancelled memory captures before startup", async
   ).rejects.toMatchObject({ code: "SERIAL_CANCELLED" });
   expect(startWithDiscovery).not.toHaveBeenCalled();
 });
+
+it("runs immutable identity preflight before constructing a serial transport", async () => {
+  const f = fixture();
+  const beforeStart = vi.fn(async (request: Readonly<SerialSessionRequest>) => {
+    expect(request.path).toBe("COM44");
+    expect(request.additionalResources).toHaveLength(1);
+    expect(Object.isFrozen(request)).toBe(true);
+    expect(f.transport).not.toHaveBeenCalled();
+    throw new PlatformIOError("Approval needed", "APPROVAL_REQUIRED");
+  });
+  await expect(
+    f.manager.startDiscovered(
+      f.owner,
+      { projectDir: f.root, path: "com44", baudRate: 115200 },
+      {
+        list: async () => [
+          {
+            path: "COM44",
+            vendorId: "10c4",
+            productId: "ea60",
+            serialNumber: "one",
+          },
+        ],
+        resolve: (port) => resolveSerialEndpoint(port, { platform: "win32" }),
+        beforeStart,
+      },
+    ),
+  ).rejects.toMatchObject({ code: "APPROVAL_REQUIRED" });
+  expect(beforeStart).toHaveBeenCalledOnce();
+  expect(f.transport).not.toHaveBeenCalled();
+  expect(f.manager.list(f.owner)).toEqual([]);
+});
+it("does not resume startup when its owner stops during preflight", async () => {
+  const f = fixture();
+  await expect(
+    f.manager.startDiscovered(
+      f.owner,
+      { projectDir: f.root, path: "COM44", baudRate: 115200 },
+      {
+        list: async () => [{ path: "COM44" }],
+        resolve: (port) => resolveSerialEndpoint(port, { platform: "win32" }),
+        beforeStart: async () => {
+          await f.manager.stopAll(f.owner);
+        },
+      },
+    ),
+  ).rejects.toMatchObject({ code: "SERIAL_CLOSED" });
+  expect(f.transport).not.toHaveBeenCalled();
+});
