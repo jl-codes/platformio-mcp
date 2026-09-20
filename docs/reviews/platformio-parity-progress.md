@@ -711,3 +711,7 @@ Wheel-launched installers now receive the absolute Python interpreter from the l
 ### Board reference tools wired into compatibility mode
 
 Added opt-in pio_list_boards and pio_board_info through the canonical list_boards/get_board_info permission dispatcher and existing catalog services. Supports vendor/query/platform/framework filtering, exact-id/shorter-id ordering, reference limit slicing, compact CPU/memory values and board debug/connectivity hints. Board schema retains catalog debug/connectivity fields. Source attribution is recorded. TypeScript and targeted lint pass; four fixture-based adapter checks pass, including no execution after denial. Rebuilt plugin payload. Canonical tools remain 54; compatibility now adds 12 aliases (66 tools). Actual catalog acceptance, exact error-envelope parity and the remaining reference tools are still incomplete; no hardware or broad runtime smoke test was run.
+
+### Reference device presentation
+
+Implemented reference device rows, likely-board/noise hints, stable likely-first ordering and summary fields. Private claim records and inferred board IDs are excluded from the projection. TypeScript and two fixture-only checks pass; no devices were enumerated or opened. The full pio_list_devices alias is intentionally not advertised yet: its open_monitor_sessions field must come from caller-owned session listing, not a fabricated empty list or a global session dump. Public tool counts remain 54/66. This is a partial implementation step toward the complete alias, not completed device parity.
