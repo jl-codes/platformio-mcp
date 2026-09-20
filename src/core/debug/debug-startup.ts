@@ -1,4 +1,5 @@
 /** Join trusted debugger selection, authorization, retained ELF lifetime and recoverable startup cleanup. */
+import { PlatformIOError } from "../../utils/errors.js";
 import { createHash } from "node:crypto";
 import { dispatchAuthorizedAction } from "../action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../policy/revision-guard.js";
@@ -29,6 +30,7 @@ import {
 
 /** Host-resolved configuration, never a public tool schema or request-controlled executable launcher. */
 export interface PreparedDebuggerStartup {
+  deadline?: number; // Host execution limit; deliberately excluded from request/grant identity.
   projectDir: string;
   environment: string;
   debugTool?: string | null; // Resolved PlatformIO configuration, never supplied by a public session selector.
@@ -61,6 +63,19 @@ export function startPreparedDebugger(
   selection: PreparedDebuggerStartup,
   caller: PolicyEvaluationContext = {},
 ): Promise<string> {
+  const deadline = Math.min(
+    selection.deadline ?? Infinity,
+    performance.now() + (selection.target.timeoutMs ?? 90000),
+  );
+  const remaining = () => {
+    const duration = Math.floor(deadline - performance.now());
+    if (!Number.isFinite(duration) || duration < 1)
+      throw new PlatformIOError(
+        "Debugger startup deadline expired.",
+        "DEBUG_START_TIMEOUT",
+      );
+    return duration;
+  };
   const backendScope = selection.backend
     ? {
         command: selection.backend.options.command,
@@ -110,13 +125,16 @@ export function startPreparedDebugger(
     selection.projectDir,
     selection.environment,
     async (sessionId) => {
+      remaining();
       const target = {
+        deadline,
         ...selection.target,
         elfSha256: selection.expectedElfSha256,
         projectDir: selection.projectDir,
         sessionId,
       };
       const initInput = {
+        deadline,
         projectDir: selection.projectDir,
         sessionId,
         timeoutMs: target.timeoutMs ?? 90000,
@@ -166,6 +184,7 @@ export function startPreparedDebugger(
         async () => {
           const guard = createPolicyRevisionGuard(selection.projectDir);
           guard();
+          remaining();
           const elf = await retainDebugElf(
             selection.projectDir,
             selection.elfPath,
@@ -183,6 +202,7 @@ export function startPreparedDebugger(
               );
               guard();
             }
+            remaining();
             const custody = await selection.acquireCustody();
             // DebugProcess owns release from this point, including spawn/initialization failure.
             const debuggerOptions: DebugProcessOptions = {
@@ -192,11 +212,13 @@ export function startPreparedDebugger(
               projectDir: selection.projectDir,
               elfPath: elf.path,
               startupTimeoutMs: target.timeoutMs,
+              startupDeadline: deadline,
               supervisorPython: selection.backend?.options.pythonExecutable,
             };
             const process = selection.backend
               ? await startDebuggerWithBackend(
                   {
+                    deadline,
                     debugger: debuggerOptions,
                     elfSha256: selection.expectedElfSha256,
                     backend: selection.backend.options,

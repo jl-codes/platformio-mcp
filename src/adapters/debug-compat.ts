@@ -143,6 +143,7 @@ export class DebugCompatibilityClient {
                   }
                 : undefined,
               timeoutMs: preparation.timeoutMs,
+              deadline,
               approvalId: args.approval_id,
               initializationHostApprovalId:
                 args.initialization_host_approval_id,

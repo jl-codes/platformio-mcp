@@ -47,6 +47,7 @@ export interface DebugProcessOptions {
   /** Prove debug servers/descendants no longer own the probe, beyond the direct GDB child. */
   confirmProbeReleased?: () => Promise<boolean>;
   startupTimeoutMs?: number;
+  startupDeadline?: number; // Host monotonic deadline shared with preparation/backend startup.
   supervisorPython?: string; // Host-resolved interpreter for whole-process-tree ownership.
   /** Trusted test/host integration dependency, not a caller-selectable executable launcher. */
   launch?: typeof spawn;
@@ -121,6 +122,19 @@ export class DebugProcess {
 
   /** Launch only after authorization; initialization failure always attempts bounded cleanup. */
   static async start(options: DebugProcessOptions): Promise<DebugProcess> {
+    const deadline = Math.min(
+      options.startupDeadline ?? Infinity,
+      performance.now() + (options.startupTimeoutMs ?? 30000),
+    );
+    const remaining = () => {
+      const duration = Math.floor(deadline - performance.now());
+      if (!Number.isFinite(duration) || duration < 1)
+        throw new PlatformIOError(
+          "Debugger startup deadline expired.",
+          "GDB_START_TIMEOUT",
+        );
+      return duration;
+    };
     let child: GdbProcessChild;
     let executable: string;
     try {
@@ -149,7 +163,9 @@ export class DebugProcess {
         roots,
         options.projectDir,
       );
+      remaining();
       await options.custody.prepareSpawn();
+      remaining();
       child = options.supervisorPython
         ? new SupervisedDebugChild(options.supervisorPython, {
             executable,
@@ -175,11 +191,11 @@ export class DebugProcess {
     const owner = new DebugProcess(child, options, executable);
     try {
       if (child instanceof SupervisedDebugChild)
-        await child.supervisor.waitStarted(options.startupTimeoutMs);
+        await child.supervisor.waitStarted(remaining());
       const initialized = await initializeGdbInspection(
         owner.transport,
         options.elfPath,
-        options.startupTimeoutMs,
+        remaining(),
       );
       owner.gdbVersion = initialized.gdbVersion;
       return owner;

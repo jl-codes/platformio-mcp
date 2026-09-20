@@ -345,3 +345,31 @@ it("requests backend approval before allocating retained files or probe custody"
   expect(selection.acquireCustody).not.toHaveBeenCalled();
   expect(DebugProcess.start).not.toHaveBeenCalled();
 });
+
+it("rejects an expired overall deadline before allocating artifacts or custody", async () => {
+  const { selection } = fixture();
+  await expect(
+    startPreparedDebugger(new DebugClientSessions(), {
+      ...selection,
+      deadline: performance.now() - 1,
+    }),
+  ).rejects.toMatchObject({ code: "DEBUG_START_TIMEOUT" });
+  expect(selection.acquireCustody).not.toHaveBeenCalled();
+  expect(retainDebugElf).not.toHaveBeenCalled();
+  expect(DebugProcess.start).not.toHaveBeenCalled();
+});
+
+it("passes the same overall deadline through GDB startup and target attachment", async () => {
+  const { process, selection } = fixture();
+  const deadline = performance.now() + 5000;
+  const sessions = new DebugClientSessions();
+  const id = await startPreparedDebugger(sessions, { ...selection, deadline });
+  expect(DebugProcess.start).toHaveBeenCalledWith(
+    expect.objectContaining({ startupDeadline: deadline }),
+  );
+  expect(process.attach).toHaveBeenCalledWith(
+    expect.objectContaining({ deadline }),
+    {},
+  );
+  await sessions.stop(id);
+});

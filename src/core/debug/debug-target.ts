@@ -9,6 +9,7 @@ import type { GdbMiSession } from "./gdb-mi-session.js";
 
 /** Trusted startup selection; adapters must acquire matching probe/server custody before use. */
 export interface DebugTargetSelection {
+  deadline?: number; // Host execution limit, excluded from target authorization scope.
   projectDir: string;
   sessionId: string;
   host: string;
@@ -148,7 +149,10 @@ export async function attachDebuggerTarget(
     caller,
   );
   const guard = createPolicyRevisionGuard(selection.projectDir);
-  const deadline = performance.now() + timeoutMs;
+  const deadline = Math.min(
+    selection.deadline ?? Infinity,
+    performance.now() + timeoutMs,
+  );
   for (const stage of stages) {
     await dispatchAuthorizedAction(
       stage.operation,
@@ -157,7 +161,7 @@ export async function attachDebuggerTarget(
       async () => {
         guard();
         const remaining = Math.floor(deadline - performance.now());
-        if (remaining < 1)
+        if (!Number.isFinite(remaining) || remaining < 1)
           throw new PlatformIOError(
             "Debugger target startup timed out.",
             "DEBUG_TARGET_TIMEOUT",

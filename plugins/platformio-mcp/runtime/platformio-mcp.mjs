@@ -109141,6 +109141,7 @@ async function prepareLocalDebugBackend(prepared, probe) {
 }
 
 // src/core/debug/debug-startup.ts
+init_errors2();
 import { createHash as createHash14 } from "node:crypto";
 
 // src/core/debug/debug-init-execution.ts
@@ -109365,7 +109366,10 @@ async function executeDebugInitialization(transport, artifact, input, caller = {
         guard();
         await artifact.verify();
         guard();
-        const deadline = performance.now() + input.timeoutMs;
+        const deadline = Math.min(
+          input.deadline ?? Infinity,
+          performance.now() + input.timeoutMs
+        );
         const commands = [
           "-interpreter-exec console " + JSON.stringify(
             "source " + (process.platform === "win32" ? artifact.path.replace(/\\/g, "/") : artifact.path)
@@ -109376,7 +109380,7 @@ async function executeDebugInitialization(transport, artifact, input, caller = {
         try {
           for (const command of commands) {
             const remaining = Math.floor(deadline - performance.now());
-            if (remaining < 1)
+            if (!Number.isFinite(remaining) || remaining < 1)
               throw new PlatformIOError(
                 "Debugger initialization timed out.",
                 "DEBUG_INIT_TIMEOUT"
@@ -109693,7 +109697,10 @@ async function attachDebuggerTarget(transport, selection, caller) {
     caller
   );
   const guard = createPolicyRevisionGuard(selection.projectDir);
-  const deadline = performance.now() + timeoutMs;
+  const deadline = Math.min(
+    selection.deadline ?? Infinity,
+    performance.now() + timeoutMs
+  );
   for (const stage of stages) {
     await dispatchAuthorizedAction(
       stage.operation,
@@ -109702,7 +109709,7 @@ async function attachDebuggerTarget(transport, selection, caller) {
       async () => {
         guard();
         const remaining = Math.floor(deadline - performance.now());
-        if (remaining < 1)
+        if (!Number.isFinite(remaining) || remaining < 1)
           throw new PlatformIOError(
             "Debugger target startup timed out.",
             "DEBUG_TARGET_TIMEOUT"
@@ -110230,6 +110237,19 @@ var DebugProcess = class _DebugProcess {
   markClosed;
   /** Launch only after authorization; initialization failure always attempts bounded cleanup. */
   static async start(options) {
+    const deadline = Math.min(
+      options.startupDeadline ?? Infinity,
+      performance.now() + (options.startupTimeoutMs ?? 3e4)
+    );
+    const remaining = () => {
+      const duration4 = Math.floor(deadline - performance.now());
+      if (!Number.isFinite(duration4) || duration4 < 1)
+        throw new PlatformIOError(
+          "Debugger startup deadline expired.",
+          "GDB_START_TIMEOUT"
+        );
+      return duration4;
+    };
     let child;
     let executable;
     try {
@@ -110253,7 +110273,9 @@ var DebugProcess = class _DebugProcess {
         roots,
         options.projectDir
       );
+      remaining();
       await options.custody.prepareSpawn();
+      remaining();
       child = options.supervisorPython ? new SupervisedDebugChild(options.supervisorPython, {
         executable,
         cwd: options.projectDir,
@@ -110277,11 +110299,11 @@ var DebugProcess = class _DebugProcess {
     const owner = new _DebugProcess(child, options, executable);
     try {
       if (child instanceof SupervisedDebugChild)
-        await child.supervisor.waitStarted(options.startupTimeoutMs);
+        await child.supervisor.waitStarted(remaining());
       const initialized = await initializeGdbInspection(
         owner.transport,
         options.elfPath,
-        options.startupTimeoutMs
+        remaining()
       );
       owner.gdbVersion = initialized.gdbVersion;
       return owner;
@@ -110593,17 +110615,21 @@ async function startDebuggerWithBackend(input, caller = {}) {
         context,
         async () => {
           guard();
-          const deadline = performance.now() + input.timeoutMs;
+          const deadline = Math.min(
+            input.deadline ?? Infinity,
+            performance.now() + input.timeoutMs
+          );
           const remaining = () => {
             guard();
             const value2 = Math.floor(deadline - performance.now());
-            if (value2 < 1)
+            if (!Number.isFinite(value2) || value2 < 1)
               throw new PlatformIOError(
                 "Debugger backend startup timed out.",
                 "DEBUG_BACKEND_READY_TIMEOUT"
               );
             return value2;
           };
+          remaining();
           await selected.custody.prepareSpawn();
           remaining();
           backend = new DebugBackendProcess(input.backend);
@@ -110616,6 +110642,7 @@ async function startDebuggerWithBackend(input, caller = {}) {
           debuggerProcess = await DebugProcess.start({
             ...selected,
             startupTimeoutMs: remaining(),
+            startupDeadline: deadline,
             custody: {
               prepareSpawn: () => {
                 remaining();
@@ -110663,6 +110690,19 @@ async function startDebuggerWithBackend(input, caller = {}) {
 
 // src/core/debug/debug-startup.ts
 function startPreparedDebugger(sessions, selection, caller = {}) {
+  const deadline = Math.min(
+    selection.deadline ?? Infinity,
+    performance.now() + (selection.target.timeoutMs ?? 9e4)
+  );
+  const remaining = () => {
+    const duration4 = Math.floor(deadline - performance.now());
+    if (!Number.isFinite(duration4) || duration4 < 1)
+      throw new PlatformIOError(
+        "Debugger startup deadline expired.",
+        "DEBUG_START_TIMEOUT"
+      );
+    return duration4;
+  };
   const backendScope = selection.backend ? {
     command: selection.backend.options.command,
     pythonExecutable: selection.backend.options.pythonExecutable,
@@ -110706,13 +110746,16 @@ function startPreparedDebugger(sessions, selection, caller = {}) {
     selection.projectDir,
     selection.environment,
     async (sessionId2) => {
+      remaining();
       const target = {
+        deadline,
         ...selection.target,
         elfSha256: selection.expectedElfSha256,
         projectDir: selection.projectDir,
         sessionId: sessionId2
       };
       const initInput = {
+        deadline,
         projectDir: selection.projectDir,
         sessionId: sessionId2,
         timeoutMs: target.timeoutMs ?? 9e4,
@@ -110762,6 +110805,7 @@ function startPreparedDebugger(sessions, selection, caller = {}) {
         async () => {
           const guard = createPolicyRevisionGuard(selection.projectDir);
           guard();
+          remaining();
           const elf = await retainDebugElf(
             selection.projectDir,
             selection.elfPath,
@@ -110779,6 +110823,7 @@ function startPreparedDebugger(sessions, selection, caller = {}) {
               );
               guard();
             }
+            remaining();
             const custody = await selection.acquireCustody();
             const debuggerOptions = {
               ...custody,
@@ -110787,10 +110832,12 @@ function startPreparedDebugger(sessions, selection, caller = {}) {
               projectDir: selection.projectDir,
               elfPath: elf.path,
               startupTimeoutMs: target.timeoutMs,
+              startupDeadline: deadline,
               supervisorPython: selection.backend?.options.pythonExecutable
             };
             const process9 = selection.backend ? await startDebuggerWithBackend(
               {
+                deadline,
                 debugger: debuggerOptions,
                 elfSha256: selection.expectedElfSha256,
                 backend: selection.backend.options,
@@ -110854,6 +110901,7 @@ async function startLocalPreparedDebugger(sessions, input, caller = {}) {
   return startPreparedDebugger(
     sessions,
     {
+      deadline: input.deadline,
       projectDir: prepared.projectDir,
       environment: prepared.environment,
       debugTool: prepared.configuration.debugTool,
@@ -111422,6 +111470,7 @@ var DebugCompatibilityClient = class {
               serialNumber: args.probe.serial_number
             } : void 0,
             timeoutMs: preparation.timeoutMs,
+            deadline,
             approvalId: args.approval_id,
             initializationHostApprovalId: args.initialization_host_approval_id,
             initializationTargetApprovalId: args.initialization_target_approval_id,

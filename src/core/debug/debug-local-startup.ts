@@ -25,6 +25,7 @@ export interface LocalDebuggerStartup {
   confirmProbeReleased?: () => Promise<boolean>; // Optional additional host check; owned supervisors always prove closure.
   selector?: DebugProbeSelector;
   timeoutMs: number;
+  deadline?: number; // Host monotonic execution deadline, separate from stable approval scope.
   approvalId?: string;
   initializationHostApprovalId?: string;
   initializationTargetApprovalId?: string;
@@ -52,6 +53,7 @@ export async function startLocalPreparedDebugger(
   return startPreparedDebugger(
     sessions,
     {
+      deadline: input.deadline,
       projectDir: prepared.projectDir,
       environment: prepared.environment,
       debugTool: prepared.configuration.debugTool,

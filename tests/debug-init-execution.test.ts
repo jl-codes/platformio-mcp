@@ -259,3 +259,22 @@ it("honors a real template approval after retry allocates a different private fi
   expect(lines).toHaveLength(3);
   await retried.release();
 });
+
+it("does not source a retained script after the overall startup deadline expires", async () => {
+  const artifact = await retainDebugInitialization(
+    "monitor reset halt\n",
+    binding,
+  );
+  const { session, lines } = transport();
+  try {
+    await expect(
+      executeDebugInitialization(session, artifact, {
+        ...input(),
+        deadline: performance.now() - 1,
+      }),
+    ).rejects.toMatchObject({ code: "DEBUG_INIT_TIMEOUT" });
+    expect(lines).toEqual([]);
+  } finally {
+    await artifact.release();
+  }
+});

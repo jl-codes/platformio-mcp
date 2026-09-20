@@ -247,3 +247,19 @@ it.each(["prepare", "spawn"])(
     expect(f.lines).toEqual([]);
   },
 );
+
+it("releases custody and never spawns when the shared deadline expires during handoff", async () => {
+  const f = fixture();
+  const now = vi.spyOn(performance, "now").mockReturnValue(100);
+  f.custody.prepareSpawn.mockImplementation(() => now.mockReturnValue(201));
+  try {
+    await expect(
+      DebugProcess.start({ ...f.options, startupDeadline: 200 }),
+    ).rejects.toMatchObject({ code: "GDB_START_TIMEOUT" });
+    expect(f.launch).not.toHaveBeenCalled();
+    expect(f.custody.releaseAfterExit).toHaveBeenCalledOnce();
+    expect(f.lines).toEqual([]);
+  } finally {
+    now.mockRestore();
+  }
+});

@@ -2025,3 +2025,9 @@ The command ledger now retains a redacted, bounded projection of decoded frames 
 Validation: backend projection tests 3 passed; dashboard preview and existing command-feed tests 7 passed; TypeScript and the production dashboard build passed. Rebuilt the bundled plugin. No hardware execution or additional smoke suite was performed for this change.
 
 Both CI runs for 4a56bd1151b442a834460df9fa31f8a2820003b7 passed. Installer acceptance run 35530618249 passed all 17 cases; its downloaded manifest and evidence identify that exact PR revision, resolving the earlier synthetic merge revision mismatch. This is POL-05 evidence only, not full parity or deployment acceptance.
+
+### Shared debugger startup deadline (2026-09-20)
+
+Debugger startup previously restarted its timeout after preparation and again during backend/GDB/target initialization. A host-owned monotonic deadline now travels from the compatibility request through local startup, backend readiness, GDB launch and initialization, and target attachment. The configured timeout remains stable in request and approval identities, so elapsed execution time does not invalidate approval retries. GDB rechecks the deadline after custody handoff and releases unstarted custody on expiry. Cleanup retains its independent bounded recovery behavior.
+
+Validation: 47 focused debugger tests passed, including existing approval-retry and cleanup cases; after adding the handoff-expiry regression, all 12 process-owner tests passed. TypeScript and patch whitespace checks passed. The bundled plugin was rebuilt. These tests use synthetic transports and do not establish physical debugger acceptance or support for remote/pipe/ST-Link standalone backends.

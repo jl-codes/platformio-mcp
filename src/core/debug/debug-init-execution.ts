@@ -11,6 +11,7 @@ import {
 
 /** Stable startup scope shared by preflight and execution. */
 export interface DebugInitializationInput {
+  deadline?: number; // Host execution limit, excluded from approval identity.
   projectDir: string;
   sessionId: string;
   timeoutMs: number;
@@ -95,7 +96,10 @@ export async function executeDebugInitialization(
           guard();
           await artifact.verify();
           guard();
-          const deadline = performance.now() + input.timeoutMs;
+          const deadline = Math.min(
+            input.deadline ?? Infinity,
+            performance.now() + input.timeoutMs,
+          );
           // GDB source treats the remaining argument as a filename, including spaces; quote only the MI string.
           const commands = [
             "-interpreter-exec console " +
@@ -111,7 +115,7 @@ export async function executeDebugInitialization(
           try {
             for (const command of commands) {
               const remaining = Math.floor(deadline - performance.now());
-              if (remaining < 1)
+              if (!Number.isFinite(remaining) || remaining < 1)
                 throw new PlatformIOError(
                   "Debugger initialization timed out.",
                   "DEBUG_INIT_TIMEOUT",

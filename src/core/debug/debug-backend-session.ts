@@ -17,6 +17,7 @@ import type { OwnedDebugProcess } from "./debug-client-sessions.js";
 
 /** All paths/commands/probe custody must be host-resolved; the helper owns cleanup from entry onward. */
 export interface DebugBackendSessionInput {
+  deadline?: number; // Host monotonic deadline, never part of the authorization scope.
   debugger: DebugProcessOptions;
   backend: DebugBackendProcessOptions;
   readyPattern: string;
@@ -167,17 +168,21 @@ export async function startDebuggerWithBackend(
           context,
           async () => {
             guard();
-            const deadline = performance.now() + input.timeoutMs;
+            const deadline = Math.min(
+              input.deadline ?? Infinity,
+              performance.now() + input.timeoutMs,
+            );
             const remaining = () => {
               guard();
               const value = Math.floor(deadline - performance.now());
-              if (value < 1)
+              if (!Number.isFinite(value) || value < 1)
                 throw new PlatformIOError(
                   "Debugger backend startup timed out.",
                   "DEBUG_BACKEND_READY_TIMEOUT",
                 );
               return value;
             };
+            remaining();
             await selected.custody.prepareSpawn();
             remaining();
             backend = new DebugBackendProcess(input.backend);
@@ -190,6 +195,7 @@ export async function startDebuggerWithBackend(
             debuggerProcess = await DebugProcess.start({
               ...selected,
               startupTimeoutMs: remaining(),
+              startupDeadline: deadline,
               custody: {
                 prepareSpawn: () => {
                   remaining();
