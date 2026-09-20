@@ -15898,7 +15898,7 @@ function stableDeviceLeaseRoot() {
   );
 }
 function resourceKey(resource) {
-  if (!resource || !["serial", "probe"].includes(resource.kind) || typeof resource.identity !== "string" || !resource.identity.trim() || resource.identity.length > 1024 || /[\x00-\x1f\x7f]/.test(resource.identity))
+  if (!resource || !["serial", "probe", "network"].includes(resource.kind) || typeof resource.identity !== "string" || !resource.identity.trim() || resource.identity.length > 1024 || /[\x00-\x1f\x7f]/.test(resource.identity))
     throw new PlatformIOError(
       "Invalid physical resource identity.",
       "DEVICE_IDENTITY_INVALID"

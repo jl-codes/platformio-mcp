@@ -16,7 +16,7 @@ import {
 
 /** A physical resource identity, not a raw session ID or an authorization grant. */
 export interface DeviceResource {
-  kind: "serial" | "probe";
+  kind: "serial" | "probe" | "network";
   identity: string; // Stable, resolved physical identity shared by all aliases and adapters.
 }
 /** The returned object is a process-local release capability; copying its fields cannot release a lease. */
@@ -63,7 +63,7 @@ export function stableDeviceLeaseRoot(): string {
 function resourceKey(resource: DeviceResource): string {
   if (
     !resource ||
-    !["serial", "probe"].includes(resource.kind) ||
+    !["serial", "probe", "network"].includes(resource.kind) ||
     typeof resource.identity !== "string" ||
     !resource.identity.trim() ||
     resource.identity.length > 1024 ||
