@@ -52,7 +52,8 @@
     "smoke-test": "node -e \"require('fs').accessSync('build/index.js'); require('fs').accessSync('build/cli.js'); require('fs').accessSync('web/dist/index.html'); require('fs').accessSync('scripts/installers/index.js'); require('fs').accessSync('scripts/validate-codex-plugin.mjs')\"",
     "prepublishOnly": "npm run build && npm run plugin:build && npm run plugin:validate && npm run plugin:test && npm run smoke-test && npm run package:validate",
     "test:python-runtime": "node --test tests/python-runtime.test.mjs",
-    "test:parity:acceptance": "node scripts/validate-parity-acceptance.mjs"
+    "test:parity:acceptance": "node scripts/validate-parity-acceptance.mjs",
+    "package:aliases": "node scripts/pack-npm-alias-candidates.mjs"
   },
   "keywords": [
     "mcp",

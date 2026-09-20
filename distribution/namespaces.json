@@ -29,61 +29,73 @@
       "registry": "npm",
       "name": "@forkbomb/platformio-mcp",
       "role": "candidate_alias",
-      "publishIntent": false
+      "publishIntent": false,
+      "packagePath": "packages/scoped-platformio-mcp",
+      "reason": "Functional alias prepared; scope authority and registry similarity eligibility must be verified before publication.",
+      "source": "https://github.com/jl-codes/platformio-mcp"
     },
     {
       "registry": "npm",
       "name": "platformio.mcp",
-      "role": "watch_only",
-      "publishIntent": false
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
     },
     {
       "registry": "npm",
       "name": "platformio_mcp",
-      "role": "watch_only",
-      "publishIntent": false
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
     },
     {
       "registry": "npm",
       "name": "platformiomcp",
-      "role": "watch_only",
-      "publishIntent": false
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
     },
     {
       "registry": "npm",
       "name": "pio.agent",
-      "role": "watch_only",
-      "publishIntent": false
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
     },
     {
       "registry": "npm",
       "name": "pio_agent",
-      "role": "watch_only",
-      "publishIntent": false
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
     },
     {
       "registry": "npm",
       "name": "pioagent",
-      "role": "watch_only",
-      "publishIntent": false
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
     },
     {
       "registry": "npm",
       "name": "pio.mcp",
-      "role": "watch_only",
-      "publishIntent": false
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
     },
     {
       "registry": "npm",
       "name": "pio_mcp",
-      "role": "watch_only",
-      "publishIntent": false
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
     },
     {
       "registry": "npm",
       "name": "piomcp",
-      "role": "watch_only",
-      "publishIntent": false
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
     },
     {
       "registry": "pypi",
@@ -130,6 +142,33 @@
       "name": "jl-codes/platformio-mcp",
       "role": "canonical",
       "publishIntent": true
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/platformio.mcp",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "packagePath": "packages/scoped-platformio.mcp",
+      "reason": "Functional alias prepared; scope authority and registry similarity eligibility must be verified before publication.",
+      "source": "https://github.com/jl-codes/platformio-mcp"
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/pio-mcp",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "packagePath": "packages/scoped-pio-mcp",
+      "reason": "Functional alias prepared; scope authority and registry similarity eligibility must be verified before publication.",
+      "source": "https://github.com/jl-codes/platformio-mcp"
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/pio-agent",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "packagePath": "packages/scoped-pio-agent",
+      "reason": "Functional alias prepared; scope authority and registry similarity eligibility must be verified before publication.",
+      "source": "https://github.com/jl-codes/platformio-mcp"
     }
   ],
   "unsupportedChannels": [
