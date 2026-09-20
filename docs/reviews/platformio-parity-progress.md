@@ -1589,3 +1589,7 @@ Both CI runs for 864ad2b3 completed successfully (35514230904 and 35514228152), 
 ### 2026-09-20 — Release retry orchestration evidence
 
 Added controlled GitHub-command injection for the release-asset helper and exercised its full sequence against real temporary artifacts. The fixture verified legacy asset download/hash comparison, uploading only missing names without clobber, post-upload inspection, and whole-set rejection before any upload when a later artifact conflicts. All five release-asset checks passed; these are simulated remote responses, not live publication evidence. Physical hardware inventory and the operator-approved PPK2 source envelope were requested while implementation/release work continues.
+
+### 2026-09-20 — Alias-complete release instructions
+
+Confirmed that Python release building and native acceptance derive every alias from `distribution/namespaces.json`: the native installer requires one host wheel plus all configured alias wheels, checks each alias module/owned command, and verifies canonical survival after all aliases are uninstalled. Corrected stale two-alias/seven-wheel wording and hard-coded seven-container workflow labels; npm publication input now accurately describes all authorized packages. These are instruction/label fixes, not new publication or native acceptance evidence. No additional smoke tests were run.

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_npm:
-        description: Publish the validated tarball to npm
+        description: Publish all validated and authorized npm packages
         required: true
         default: false
         type: boolean
@@ -22,7 +22,7 @@ on:
         type: boolean
 
       publish_ghcr:
-        description: Publish validated native images under all seven verified GHCR aliases
+        description: Publish validated native images under every verified GHCR alias
         required: true
         default: false
         type: boolean
@@ -389,7 +389,7 @@ jobs:
           if-no-files-found: warn
 
   publish_container:
-    name: Publish all seven verified container aliases
+    name: Publish every verified container alias
     needs: build_release
     if: github.event_name == 'workflow_dispatch' && inputs.publish_ghcr
     runs-on: ubuntu-24.04
