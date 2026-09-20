@@ -13,6 +13,8 @@ import {
   resolveDebugBackendExecutable,
   resolveDebuggerExecutable,
 } from "../src/core/debug/debug-discovery.js";
+import { DebugPreparationCache } from "../src/core/debug/debug-preparation-cache.js";
+import { approveRequest, getApproval } from "../src/core/policy/approvals.js";
 import { prepareDebuggerProject } from "../src/core/debug/debug-project.js";
 vi.mock("../src/platformio.js", () => ({
   platformioExecutor: { execute: vi.fn() },
@@ -88,7 +90,10 @@ beforeEach(() => {
     path.join(root, "gdb"),
   );
 });
-afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+afterEach(() => {
+  vi.unstubAllEnvs();
+  fs.rmSync(root, { recursive: true, force: true });
+});
 it("builds the selected debug environment without starting a debugger interface", async () => {
   const result = await prepareDebuggerProject({ projectDir: project });
   expect(platformioExecutor.execute).toHaveBeenCalledExactlyOnceWith(
@@ -201,4 +206,82 @@ it("stops preparation when a configured backend has no trusted installation", as
     "untrusted backend",
   );
   expect(resolveDebugBackendExecutable).not.toHaveBeenCalled();
+});
+
+function preparationPolicy(approvalRequired: string[] = []) {
+  vi.stubEnv("PIO_MCP_DATA_DIR", path.join(root, "data"));
+  vi.stubEnv("PIO_MCP_POLICY_FILE", path.join(root, "policy.json"));
+  fs.writeFileSync(
+    path.join(root, "policy.json"),
+    JSON.stringify({
+      profile: "lab_admin",
+      overrides: {
+        allow: ["build_project", "system_info", "get_project_config"],
+        deny: [],
+        approval_required: approvalRequired,
+        audit_all_agent_actions: false,
+      },
+    }),
+  );
+}
+it("resumes completed preparation stages without replaying consumed build/system approvals", async () => {
+  preparationPolicy(["build_project", "system_info", "get_project_config"]);
+  const cache = new DebugPreparationCache();
+  const input: Record<string, unknown> = { projectDir: project };
+  const grants: string[] = [];
+  for (const field of [
+    "buildApprovalId",
+    "systemApprovalId",
+    "imageApprovalId",
+  ]) {
+    const error = await cache
+      .prepare(input)
+      .catch((failure: unknown) => failure);
+    expect(error).toMatchObject({ code: "APPROVAL_REQUIRED" });
+    const id = (
+      error as { context: { policyDecision: { approvalId: string } } }
+    ).context.policyDecision.approvalId;
+    approveRequest(id);
+    grants.push(id);
+    input[field] = id;
+  }
+  const result = await cache.prepare(input);
+  expect(result.expectedElfSha256).toMatch(/^[a-f0-9]{64}$/);
+  expect(platformioExecutor.execute).toHaveBeenCalledOnce();
+  expect(collectDebugConfiguration).toHaveBeenCalledOnce();
+  expect(getSystemInfo).toHaveBeenCalledOnce();
+  expect(resolveDebugConfiguration).toHaveBeenCalledOnce();
+  for (const id of grants) expect(getApproval(id)?.status).toBe("consumed");
+  await cache.prepare(input);
+  expect(platformioExecutor.execute).toHaveBeenCalledOnce();
+  cache.close();
+});
+it("invalidates preparation on policy changes and rejects a closed connection", async () => {
+  preparationPolicy();
+  const cache = new DebugPreparationCache();
+  await cache.prepare({ projectDir: project });
+  fs.writeFileSync(
+    path.join(root, "policy.json"),
+    JSON.stringify({ profile: "read_only" }),
+  );
+  await expect(cache.prepare({ projectDir: project })).rejects.toMatchObject({
+    code: "POLICY_CHANGED",
+  });
+  expect(platformioExecutor.execute).toHaveBeenCalledOnce();
+  cache.close();
+  await expect(cache.prepare({ projectDir: project })).rejects.toMatchObject({
+    code: "DEBUG_CLIENT_CLOSED",
+  });
+});
+it("separates caller identities and forgets preparation after completed startup", async () => {
+  preparationPolicy();
+  const cache = new DebugPreparationCache();
+  const input = { projectDir: project };
+  await cache.prepare(input, { taskId: "one" });
+  await cache.prepare(input, { taskId: "two" });
+  expect(platformioExecutor.execute).toHaveBeenCalledTimes(2);
+  await cache.forget(input, { taskId: "one" });
+  await cache.prepare(input, { taskId: "one" });
+  expect(platformioExecutor.execute).toHaveBeenCalledTimes(3);
+  cache.close();
 });

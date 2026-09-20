@@ -36,19 +36,34 @@ const preparationSchema = z
   })
   .strict();
 
-/** Build debug firmware without starting an interface; select an exact ELF identity for later immutable retention. */
-export async function prepareDebuggerProject(
-  input: unknown,
-  caller: PolicyEvaluationContext = {},
-  signal?: AbortSignal,
-) {
+/** Host-owned checkpoint hook; never accepted through a public tool schema. */
+export interface DebugPreparationCheckpoint {
+  stage<T>(name: string, execute: () => Promise<T>): Promise<T>;
+}
+
+/** Validate a preparation request before deriving a connection-owned resume identity. */
+export function parseDebugPreparationArguments(input: unknown) {
   const parsed = preparationSchema.safeParse(input);
   if (!parsed.success)
     throw new PlatformIOError(
       "Invalid debugger preparation arguments.",
       "DEBUG_ARGUMENT_INVALID",
     );
-  const args = parsed.data;
+  return parsed.data;
+}
+
+/** Build debug firmware without starting an interface; select an exact ELF identity for later immutable retention. */
+export async function prepareDebuggerProject(
+  input: unknown,
+  caller: PolicyEvaluationContext = {},
+  signal?: AbortSignal,
+  checkpoint?: DebugPreparationCheckpoint,
+) {
+  const args = parseDebugPreparationArguments(input);
+  const stage = checkpoint
+    ? checkpoint.stage.bind(checkpoint)
+    : async <T>(_name: string, execute: () => Promise<T>): Promise<T> =>
+        execute();
   const projectDir = await fs.realpath(args.projectDir);
   const context = { ...caller, workspaceDir: projectDir };
   const guard = createPolicyRevisionGuard(projectDir);
@@ -69,69 +84,77 @@ export async function prepareDebuggerProject(
     return duration;
   };
   remaining();
-  const selected = await collectDebugConfiguration(
-    {
-      projectDir,
-      environment: args.environment,
-      approvalId: args.configApprovalId,
-    },
-    context,
+  const selected = await stage("configuration", () =>
+    collectDebugConfiguration(
+      {
+        projectDir,
+        environment: args.environment,
+        approvalId: args.configApprovalId,
+      },
+      context,
+    ),
   );
   remaining();
   return hardwareLockManager.withImplicitLock(async () => {
     remaining();
-    await dispatchAuthorizedAction(
-      "build_project",
-      {
-        projectDir,
-        environment: selected.environment,
-        purpose: "debugger_build",
-        approvalId: args.buildApprovalId,
-      },
-      context,
-      async () => {
-        // Core's no-interface debug command calls predebug_project with preload=False.
-        // Never add --interface=gdb here: probe/backend ownership is established later.
-        const result = await platformioExecutor.execute(
-          "debug",
-          ["--environment", selected.environment],
-          { cwd: projectDir, timeout: remaining() },
-        );
-        remaining();
-        if (result.exitCode !== 0)
-          throw new PlatformIOError(
-            "Debug firmware preparation failed.",
-            "DEBUG_BUILD_FAILED",
-            { environment: selected.environment, exitCode: result.exitCode },
+    await stage("build", () =>
+      dispatchAuthorizedAction(
+        "build_project",
+        {
+          projectDir,
+          environment: selected.environment,
+          purpose: "debugger_build",
+          approvalId: args.buildApprovalId,
+        },
+        context,
+        async () => {
+          // Core's no-interface debug command calls predebug_project with preload=False.
+          // Never add --interface=gdb here: probe/backend ownership is established later.
+          const result = await platformioExecutor.execute(
+            "debug",
+            ["--environment", selected.environment],
+            { cwd: projectDir, timeout: remaining() },
           );
-      },
+          remaining();
+          if (result.exitCode !== 0)
+            throw new PlatformIOError(
+              "Debug firmware preparation failed.",
+              "DEBUG_BUILD_FAILED",
+              { environment: selected.environment, exitCode: result.exitCode },
+            );
+        },
+      ),
     );
-    const systemInfo = await dispatchAuthorizedAction(
-      "system_info",
-      {
-        projectDir,
-        purpose: "debugger_tools",
-        approvalId: args.systemApprovalId,
-      },
-      context,
-      async () => {
-        remaining();
-        return getSystemInfo();
-      },
+    const systemInfo = await stage("system_info", () =>
+      dispatchAuthorizedAction(
+        "system_info",
+        {
+          projectDir,
+          purpose: "debugger_tools",
+          approvalId: args.systemApprovalId,
+        },
+        context,
+        async () => {
+          remaining();
+          return getSystemInfo();
+        },
+      ),
     );
     remaining();
-    const configuration = await resolveDebugConfiguration(
-      {
-        projectDir,
-        environment: selected.environment,
-        systemInfo,
-        timeoutMs: Math.min(120000, args.timeoutMs),
-        load: args.load,
-        deadline,
-        signal,
-        approvalId: args.resolutionApprovalId,
-      },
-      context,
+    const configuration = await stage("resolution", () =>
+      resolveDebugConfiguration(
+        {
+          projectDir,
+          environment: selected.environment,
+          systemInfo,
+          timeoutMs: Math.min(120000, args.timeoutMs),
+          load: args.load,
+          deadline,
+          signal,
+          approvalId: args.resolutionApprovalId,
+        },
+        context,
+      ),
     );
     remaining();
     const trustedDebuggerRoots = await discoverDebuggerRoots(
@@ -161,34 +184,36 @@ export async function prepareDebuggerProject(
       };
     }
     remaining();
-    const identity = await dispatchAuthorizedAction(
-      "get_project_config",
-      {
-        projectDir,
-        environment: selected.environment,
-        purpose: "debugger_image_identity",
-        elfPath: configuration.elfPath,
-        approvalId: args.imageApprovalId,
-      },
-      context,
-      async () => {
-        remaining();
-        const file = await fs.realpath(configuration.elfPath);
-        const relative = path.relative(projectDir, file);
-        if (
-          !relative ||
-          relative === ".." ||
-          relative.startsWith(".." + path.sep) ||
-          path.isAbsolute(relative)
-        )
-          throw new PlatformIOError(
-            "Debugger ELF must belong to the authorized project.",
-            "DEBUG_ELF_OUTSIDE_WORKSPACE",
-          );
-        const result = await readElfIdentity(file);
-        remaining();
-        return result;
-      },
+    const identity = await stage("image_identity", () =>
+      dispatchAuthorizedAction(
+        "get_project_config",
+        {
+          projectDir,
+          environment: selected.environment,
+          purpose: "debugger_image_identity",
+          elfPath: configuration.elfPath,
+          approvalId: args.imageApprovalId,
+        },
+        context,
+        async () => {
+          remaining();
+          const file = await fs.realpath(configuration.elfPath);
+          const relative = path.relative(projectDir, file);
+          if (
+            !relative ||
+            relative === ".." ||
+            relative.startsWith(".." + path.sep) ||
+            path.isAbsolute(relative)
+          )
+            throw new PlatformIOError(
+              "Debugger ELF must belong to the authorized project.",
+              "DEBUG_ELF_OUTSIDE_WORKSPACE",
+            );
+          const result = await readElfIdentity(file);
+          remaining();
+          return result;
+        },
+      ),
     );
     remaining();
     return {
