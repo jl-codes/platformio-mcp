@@ -1551,3 +1551,9 @@ Validation: four focused protocol-to-report checks passed, with dimensional char
 ### 2026-09-20 — Explicit pinned PPK2 dependency setup
 
 Added an operator-only setup command that exclusively creates a new environment, installs two hash-pinned binary wheels using isolated pip with no dependency resolution, validates isolated package imports/versions/API methods, and emits completion evidence only after success. Included the script in npm, plugin sync, and Python runtime packaging, with optional-dependency notices. Actual Windows Python 3.14.4 installation/import verification succeeded for ppk2-api 0.9.2 and pyserial 3.5 in the ignored `.platformio-mcp/ppk2-api-092-acceptance` directory. No serial enumeration or hardware contact occurred. The host discovery/trust adapter and public integration remain incomplete; registration stays 39/40 and no release was published.
+
+### 2026-09-20 — Host PPK2 environment selection
+
+Added `resolvePpk2Environment` for explicit server-side `PIO_MCP_PPK2_ENV` configuration. It performs bounded virtual-environment configuration inspection, requires disabled system-site packages, rejects project/environment containment and executable directory escapes, and never trusts the executable pathname stored in setup evidence. The returned pathname retains the virtual environment on POSIX instead of following its interpreter symlink to a base Python that would lose the installed dependency. This resolver does not install packages, execute Python, enumerate devices or assert API/hardware availability.
+
+Validation: four focused host-selection checks plus TypeScript passed. Device discovery, runtime dependency-version validation, public routing and physical acceptance remain outstanding. Registration remains 39/40 and no release has been published.
