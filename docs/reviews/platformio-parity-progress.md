@@ -1561,3 +1561,9 @@ Validation: four focused host-selection checks plus TypeScript passed. Device di
 ### 2026-09-20 — Runtime PPK2 version enforcement
 
 The bridge now checks installed ppk2-api 0.9.2 and pyserial 3.5 before importing the driver or constructing any meter. Missing dependencies and incompatible versions produce distinct unopened terminal outcomes accepted by the bounded protocol. Added an installed-dependency verifier that imports the actual pinned API, injects version drift for each dependency, and verifies rejection without constructing hardware. Native Windows execution against the explicitly installed environment passed both drift cases; all 11 protocol cases and TypeScript passed. Host device discovery and public power routing remain incomplete; no physical acceptance or publication is claimed.
+
+### 2026-09-20 — Power device discovery binding
+
+Added host serial discovery binding for power operations using the existing canonical endpoint and USB lease keys. Both meter and DUT require host-observed USB metadata; revalidation rejects disappearance, port drift and replacement before startup. A separate list-devices permission scopes initial selection plus two pre-spawn refreshes to three snapshots and expires when the operation ends. It does not infer meter model or physical wiring. Ambiguous multi-interface devices still fail closed and require further explicit interface support before that hardware can be claimed.
+
+Validation: five focused identity/budget/lifetime checks passed (scope tests replace policy dispatch and native enumeration; identity tests exercise the actual binding). TypeScript and scoped lint passed. No hardware enumerated or powered. Public power routing, multi-interface binding and physical acceptance remain outstanding; registration is still 39/40.
