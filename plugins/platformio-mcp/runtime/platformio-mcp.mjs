@@ -101262,21 +101262,38 @@ async function buildProject(projectDir, environment, verbose, background, execut
     });
   }
 }
-async function checkProject(projectDir, environment, background) {
+async function checkProject(projectDir, environment, background, options = {}) {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto14.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
   if (environment && !validateEnvironmentName(environment)) {
     throw new BuildError(`Invalid environment name: ${environment}`, { environment });
   }
+  const severities = ["low", "medium", "high"];
+  if (options.severity !== void 0 && !severities.includes(options.severity))
+    throw new BuildError("Check severity must be low, medium, or high", { projectDir });
+  for (const value2 of [options.pattern, options.tool])
+    if (value2 !== void 0 && (typeof value2 !== "string" || !value2.length || value2.length > 4096 || /[\x00-\x1f\x7f]/.test(value2)))
+      throw new BuildError("Invalid check filter", { projectDir });
+  for (const value2 of [options.jsonOutput, options.skipPackages])
+    if (value2 !== void 0 && typeof value2 !== "boolean")
+      throw new BuildError("Check switches must be booleans", { projectDir });
+  if (options.timeoutMs !== void 0 && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 36e5))
+    throw new BuildError("Invalid check timeout", { projectDir });
   try {
     const args = [];
+    if (options.jsonOutput) args.push("--json-output");
+    if (options.severity)
+      for (const severity of severities.slice(severities.indexOf(options.severity))) args.push("--severity", severity);
+    if (options.pattern) args.push("--pattern", options.pattern);
+    if (options.skipPackages) args.push("--skip-packages");
+    if (options.tool) args.push("--tool", options.tool);
     if (environment) {
       args.push("--environment", environment);
     }
     const result = await executeWithSpooling("check", args, {
       cwd: validatedPath,
       projectDir: validatedPath,
-      timeout: background ? 36e5 : 6e5,
+      timeout: options.timeoutMs ?? (background ? 36e5 : 6e5),
       background,
       rootCommandId,
       artifactType: "check"
@@ -101285,6 +101302,7 @@ async function checkProject(projectDir, environment, background) {
     if ("status" in result) {
       return result;
     }
+    await options.onResult?.(result);
     const success = result.exitCode === 0;
     const errors = success ? void 0 : parseStderrErrors(result.finalOutput);
     return {
@@ -101295,7 +101313,7 @@ async function checkProject(projectDir, environment, background) {
     };
   } catch (error2) {
     if (error2 instanceof PlatformIOError) {
-      throw new BuildError(`Check failed: ${error2.message}`, { projectDir, environment });
+      throw error2;
     }
     throw new BuildError(`Failed to check project: ${error2}`, { projectDir, environment });
   }

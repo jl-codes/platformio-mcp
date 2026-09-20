@@ -846,3 +846,8 @@ Added optional jobs and forceExecution fields to build_project, and optional env
 
 The launcher now exposes bounded parallel build jobs, environment selection for cleanup, and a labeled fullclean switch explaining dependency redownloads. The fullclean value resets when its control unmounts; outgoing job/full/port/verbose/monitor fields are restricted to applicable actions. Dashboard builds already execute in the background and bypass cached-result replay, so no redundant force control is shown. Frontend TypeScript and production build passed; plugin rebuilt with updated dashboard assets. Browser interaction/native execution acceptance remains separate. No smoke suite or publication was run.
 
+
+### Structured checker execution and report parsing
+
+Extended the shared checker with optional JSON output, severity threshold, source pattern, package skipping, analysis tool, trusted timeout and result observer. Existing calls retain defaults. Added a bounded validated report parser retaining tool success/duration, defects, CWE, source location, severity totals and reference severity ordering. Project-relative paths require actual ancestry, avoiding sibling-prefix truncation. Missing or malformed reports fail explicitly rather than becoming empty success; unusual severity keys cannot mutate prototypes. TypeScript and eight focused parser/executor checks passed after fixing cross-platform path normalization. Public pio_check wiring, native tool reports and canonical structured presentation remain pending. Plugin rebuilt; no publication performed.
+

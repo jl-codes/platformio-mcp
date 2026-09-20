@@ -1,6 +1,6 @@
 /** Verify clean target selection without launching PlatformIO or changing project files. */
 import { beforeEach, expect, test, vi } from "vitest";
-import { buildProject, cleanProject } from "../src/tools/build.js";
+import { buildProject, checkProject, cleanProject } from "../src/tools/build.js";
 import { executeWithSpooling } from "../src/utils/spooler.js";
 import { invalidateBuildCache } from "../src/utils/build-cache.js";
 
@@ -43,4 +43,12 @@ test("fresh build passes jobs and timeout and observes nonzero output without a 
   expect(built.success).toBe(false);
   expect(onResult).toHaveBeenCalledWith(result);
   expect(executeWithSpooling).toHaveBeenCalledWith("run", ["--environment", "esp32", "--jobs", "4"], expect.objectContaining({ timeout: 1200000 }));
+});
+
+
+test("structured check forwards severity range and literal filters through the shared spooler", async () => {
+  const onResult = vi.fn().mockResolvedValue(undefined);
+  await checkProject("workspace", "native", false, { severity: "medium", pattern: "src/*.cpp", tool: "cppcheck", skipPackages: true, jsonOutput: true, timeoutMs: 1200000, onResult });
+  expect(executeWithSpooling).toHaveBeenCalledWith("check", ["--json-output", "--severity", "medium", "--severity", "high", "--pattern", "src/*.cpp", "--skip-packages", "--tool", "cppcheck", "--environment", "native"], expect.objectContaining({ timeout: 1200000 }));
+  expect(onResult).toHaveBeenCalledOnce();
 });

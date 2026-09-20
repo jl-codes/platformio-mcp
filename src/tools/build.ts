@@ -235,6 +235,17 @@ export async function buildProject(
   }
 }
 
+/** Structured static-analysis execution options, preserving legacy defaults when omitted. */
+export interface CheckExecutionOptions {
+  severity?: "low" | "medium" | "high"; // Minimum reported severity.
+  pattern?: string; // PlatformIO source pattern, passed as one argument.
+  skipPackages?: boolean; // Omit dependency source files from analysis.
+  tool?: string; // Configured analysis tool selector.
+  jsonOutput?: boolean; // Request machine-readable defects.
+  timeoutMs?: number; // Trusted bounded execution timeout.
+  onResult?: (result: SpoolingForegroundResult) => Promise<void>; // Observe completed output.
+}
+
 /**
  * Runs static analysis on a PlatformIO project.
  *
@@ -247,6 +258,7 @@ export async function checkProject(
   projectDir: string,
   environment?: string,
   background?: boolean,
+  options: CheckExecutionOptions = {},
 ): Promise<BuildResult> {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
@@ -255,8 +267,25 @@ export async function checkProject(
     throw new BuildError(`Invalid environment name: ${environment}`, { environment });
   }
 
+  const severities = ["low", "medium", "high"] as const;
+  if (options.severity !== undefined && !severities.includes(options.severity))
+    throw new BuildError("Check severity must be low, medium, or high", { projectDir });
+  for (const value of [options.pattern, options.tool])
+    if (value !== undefined && (typeof value !== "string" || !value.length || value.length > 4096 || /[\x00-\x1f\x7f]/.test(value)))
+      throw new BuildError("Invalid check filter", { projectDir });
+  for (const value of [options.jsonOutput, options.skipPackages])
+    if (value !== undefined && typeof value !== "boolean")
+      throw new BuildError("Check switches must be booleans", { projectDir });
+  if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 3600000))
+    throw new BuildError("Invalid check timeout", { projectDir });
   try {
     const args: string[] = [];
+    if (options.jsonOutput) args.push("--json-output");
+    if (options.severity)
+      for (const severity of severities.slice(severities.indexOf(options.severity))) args.push("--severity", severity);
+    if (options.pattern) args.push("--pattern", options.pattern);
+    if (options.skipPackages) args.push("--skip-packages");
+    if (options.tool) args.push("--tool", options.tool);
     if (environment) {
       args.push("--environment", environment);
     }
@@ -264,7 +293,7 @@ export async function checkProject(
     const result = await executeWithSpooling("check", args, {
       cwd: validatedPath,
       projectDir: validatedPath,
-      timeout: background ? 3600000 : 600000,
+      timeout: options.timeoutMs ?? (background ? 3600000 : 600000),
       background,
       rootCommandId,
       artifactType: "check" as any, // "check" is handled cleanly by spooler
@@ -274,6 +303,7 @@ export async function checkProject(
       return result as unknown as BuildResult;
     }
 
+    await options.onResult?.(result);
     const success = result.exitCode === 0;
     const errors = success ? undefined : parseStderrErrors(result.finalOutput);
 
@@ -285,7 +315,7 @@ export async function checkProject(
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
-      throw new BuildError(`Check failed: ${error.message}`, { projectDir, environment });
+      throw error;
     }
     throw new BuildError(`Failed to check project: ${error}`, { projectDir, environment });
   }
