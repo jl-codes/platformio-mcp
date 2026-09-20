@@ -595,3 +595,68 @@ it("requires listing context and honors a concrete session-list deny", async () 
   ).rejects.toMatchObject({ code: "POLICY_DENIED" });
   expect(f.transport).not.toHaveBeenCalled();
 });
+
+it("plans monitor capture open/read grants before transport construction and binds capture duration", async () => {
+  const f = fixture({
+    discoveryLoad: async () => ({
+      list: async () => [
+        {
+          path: "COM42",
+          vendorId: "10c4",
+          productId: "ea60",
+          serialNumber: "fixture",
+        },
+      ],
+    }),
+    resolveEndpoint: (port) =>
+      resolveSerialEndpoint(port, { platform: "win32" }),
+  });
+  f.policy({
+    profile: "monitor_only",
+    overrides: {
+      approval_required: ["serial_session_start", "serial_session_read"],
+    },
+  });
+  const run = (approvalId?: string, readApprovalId?: string, seconds = 0) =>
+    f.service.run({ approvalId, readApprovalId }, () =>
+      f.service.captureMonitorOnce(
+        f.owner,
+        { projectDir: f.projectDir, path: "COM42", baudRate: 115200 },
+        { seconds },
+      ),
+    );
+  let decisions: {
+    opening: { approvalId: string };
+    reading: { approvalId: string };
+  };
+  try {
+    await run();
+    throw new Error("Expected challenge");
+  } catch (error) {
+    expect(error).toMatchObject({ code: "APPROVAL_REQUIRED" });
+    decisions = (error as { context: { decisions: typeof decisions } }).context
+      .decisions;
+  }
+  expect(f.transport).not.toHaveBeenCalled();
+  const openId = decisions!.opening.approvalId;
+  const readId = decisions!.reading.approvalId;
+  approveRequest(openId);
+  await expect(run(openId)).rejects.toMatchObject({
+    code: "APPROVAL_REQUIRED",
+  });
+  expect(getApproval(openId)?.status).toBe("approved");
+  approveRequest(readId);
+  await expect(run(openId, readId, 1)).rejects.toMatchObject({
+    code: "APPROVAL_REQUIRED",
+  });
+  expect(f.transport).not.toHaveBeenCalled();
+  expect(await run(openId, readId)).toMatchObject({
+    session: { cleanupPending: false, state: "stopped" },
+  });
+  expect(getApproval(openId)?.status).toBe("consumed");
+  expect(getApproval(readId)?.status).toBe("consumed");
+  await expect(run(openId, readId)).rejects.toMatchObject({
+    code: "APPROVAL_REQUIRED",
+  });
+  expect(f.transport).toHaveBeenCalledOnce();
+});

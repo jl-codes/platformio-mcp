@@ -2,6 +2,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import { MonitorCaptureSchema } from "../core/serial/session-policy.js";
 import { SerialClientContext } from "./serial-client.js";
 import {
   resolveCompatibilityProject,
@@ -36,8 +37,7 @@ export const MonitorStartCompatibilitySchema = z
   .strict();
 
 /** Never guess among multiple candidate devices or bypass the startup service's identity/lease checks. */
-export async function startCompatibilityMonitor(
-  client: SerialClientContext,
+async function resolveMonitorRequest(
   input: unknown,
   defaults: CompatibilityProjectDefaults,
   caller: PolicyEvaluationContext,
@@ -118,6 +118,23 @@ export async function startCompatibilityMonitor(
     baudRate: baud ?? 115200,
     buffer: { maxLines: params.max_lines },
   };
+  return { params, request };
+}
+
+/** Resolve defaults and open one persistent owned monitor. */
+export async function startCompatibilityMonitor(
+  client: SerialClientContext,
+  input: unknown,
+  defaults: CompatibilityProjectDefaults,
+  caller: PolicyEvaluationContext,
+  projectDevices: Parameters<typeof resolveMonitorRequest>[3],
+) {
+  const { params, request } = await resolveMonitorRequest(
+    input,
+    defaults,
+    caller,
+    projectDevices,
+  );
   return client.run(
     {
       caller,
@@ -125,5 +142,40 @@ export async function startCompatibilityMonitor(
       discoveryApprovalId: params.discovery_approval_id,
     },
     (service, owner) => service.startWithDiscovery(owner, request),
+  );
+}
+
+/** Validate both phases before resolution, then use the preauthorized one-shot lifecycle. */
+export async function captureCompatibilityMonitor(
+  client: SerialClientContext,
+  input: unknown,
+  defaults: CompatibilityProjectDefaults,
+  caller: PolicyEvaluationContext,
+  projectDevices: Parameters<typeof resolveMonitorRequest>[3],
+) {
+  const schema = MonitorStartCompatibilitySchema.extend({
+    ...MonitorCaptureSchema.shape,
+    read_approval_id: z.string().max(256).optional(),
+  });
+  const { seconds, until, read_approval_id, ...start } = schema.parse(input);
+  const { params, request } = await resolveMonitorRequest(
+    start,
+    defaults,
+    caller,
+    projectDevices,
+  );
+  return client.run(
+    {
+      caller,
+      approvalId: params.approval_id,
+      readApprovalId: read_approval_id,
+      discoveryApprovalId: params.discovery_approval_id,
+    },
+    (service, owner) =>
+      service.captureMonitorOnce(owner, request, {
+        seconds,
+        until,
+        max_lines: start.max_lines,
+      }),
   );
 }

@@ -4,6 +4,7 @@
  */
 import { captureSessionMemory, MemoryCaptureSchema } from "./memory-capture.js";
 import { captureTransientMemory } from "./transient-memory-capture.js";
+import { z } from "zod";
 import { performance } from "node:perf_hooks";
 import { resolveSerialEndpoint } from "../devices/serial-endpoint.js";
 import { validateDirectSerialOptions } from "./serial-transport.js";
@@ -41,6 +42,15 @@ const OPERATIONS = Object.freeze({
   write: "serial_session_write",
 });
 
+/** Bounded one-shot serial collection parameters, validated before opening any device. */
+export const MonitorCaptureSchema = z
+  .object({
+    seconds: z.number().finite().default(5),
+    until: z.string().max(4096).nullable().optional(),
+    max_lines: z.number().int().min(1).max(10000).default(500),
+  })
+  .strict();
+
 /**
  * Joins the service to existing operator/project policy, one-use approvals and policy revision checks.
  * No host config file is treated as an implicit hardware grant. Public adapters still own authentication.
@@ -48,7 +58,10 @@ const OPERATIONS = Object.freeze({
 export class PolicySerialSessionService {
   readonly sessions: SerialSessionManager;
   private readonly transientMemoryScope = new AsyncLocalStorage<{
-    input: ReturnType<typeof MemoryCaptureSchema.parse>;
+    input:
+      | ReturnType<typeof MemoryCaptureSchema.parse>
+      | ReturnType<typeof MonitorCaptureSchema.parse>;
+    purpose: "one_shot_memory" | "one_shot_monitor";
     active: boolean;
     binding?: string;
     guard?: () => void;
@@ -61,7 +74,11 @@ export class PolicySerialSessionService {
     input: Parameters<typeof captureSessionMemory>[3] = {},
     signal?: AbortSignal,
   ) {
-    const scope = { input: MemoryCaptureSchema.parse(input), active: true };
+    const scope = {
+      input: MemoryCaptureSchema.parse(input),
+      purpose: "one_shot_memory" as const,
+      active: true,
+    };
     return this.transientMemoryScope.run(scope, async () => {
       try {
         return await captureTransientMemory(
@@ -71,6 +88,56 @@ export class PolicySerialSessionService {
           scope.input,
           signal,
         );
+      } finally {
+        scope.active = false;
+      }
+    });
+  }
+  /** Plan opening and reading together, then close the owned port on every read outcome. */
+  async captureMonitorOnce(
+    owner: SerialSessionOwner,
+    request: Parameters<PolicySerialSessionService["startWithDiscovery"]>[1],
+    input: z.input<typeof MonitorCaptureSchema> = {},
+  ) {
+    const args = MonitorCaptureSchema.parse(input);
+    const scope = {
+      input: args,
+      purpose: "one_shot_monitor" as const,
+      active: true,
+    };
+    return this.transientMemoryScope.run(scope, async () => {
+      try {
+        const started = await this.startWithDiscovery(owner, request);
+        let result: Awaited<ReturnType<SerialSessionManager["read"]>>;
+        try {
+          result = await this.sessions.read(owner, started.sessionId, {
+            cursor: 0,
+            maxLines: args.max_lines,
+            timeoutMs: Math.round(
+              Math.max(0, Math.min(args.seconds, 120)) * 1000,
+            ),
+            waitFor: args.until || undefined,
+            patternOptions: { mode: "regex", pythonNamedGroups: true },
+            referenceSemantics: true,
+          });
+        } catch (error) {
+          const stopped = await this.sessions.stop(owner, started.sessionId);
+          throw new PlatformIOError(
+            error instanceof PlatformIOError
+              ? error.message
+              : "Monitor capture failed.",
+            error instanceof PlatformIOError
+              ? error.code
+              : "SERIAL_CAPTURE_FAILED",
+            {
+              ...(error instanceof PlatformIOError ? error.context : {}),
+              sessionId: started.sessionId,
+              cleanupPending: stopped.cleanupPending,
+            },
+          );
+        }
+        const stopped = await this.sessions.stop(owner, started.sessionId);
+        return { result, session: stopped };
       } finally {
         scope.active = false;
       }
@@ -413,8 +480,12 @@ export class PolicySerialSessionService {
     };
     if (transient) {
       delete authorizationArgs.sessionId;
-      authorizationArgs.memoryCapture = transient.input;
-      authorizationArgs.purpose = "one_shot_memory";
+      authorizationArgs[
+        transient.purpose === "one_shot_memory"
+          ? "memoryCapture"
+          : "monitorCapture"
+      ] = transient.input;
+      authorizationArgs.purpose = transient.purpose;
     }
     const caller = {
       ...context.caller,
@@ -450,7 +521,7 @@ export class PolicySerialSessionService {
       const decisions = { opening, reading };
       if (opening.status !== "ready" || reading.status !== "ready")
         throw new PlatformIOError(
-          "One-shot memory capture needs opening and reading permissions before startup.",
+          "One-shot capture needs opening and reading permissions before startup.",
           opening.status === "deny" || reading.status === "deny"
             ? "POLICY_DENIED"
             : "APPROVAL_REQUIRED",

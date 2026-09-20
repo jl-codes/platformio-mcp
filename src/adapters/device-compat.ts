@@ -2,7 +2,10 @@
  * Reference serial-device presentation without opening ports or asserting hardware identity.
  * Provides projectCompatibilityDevices for authorized discovery adapters.
  */
-import { startCompatibilityMonitor } from "./monitor-start-compat.js";
+import {
+  startCompatibilityMonitor,
+  captureCompatibilityMonitor,
+} from "./monitor-start-compat.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -63,6 +66,27 @@ export async function executeDeviceCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_monitor_capture") {
+    const { result, session } = await captureCompatibilityMonitor(
+      client,
+      input,
+      defaults,
+      caller,
+      projectCompatibilityDevices,
+    );
+    return {
+      ok: !session.cleanupPending,
+      summary: `captured ${result.lines.length} line(s) from ${session.path} at ${session.baudRate} baud.${session.cleanupPending ? " Port closure is unconfirmed; device ownership is retained." : ""}`,
+      port: session.path,
+      baud: session.baudRate,
+      lines: result.lines,
+      matched: result.matched,
+      partial_line: result.partial,
+      error: result.error ?? session.cleanupError ?? null,
+      cleanup_pending: session.cleanupPending,
+      ...(session.cleanupPending ? { session_id: session.sessionId } : {}),
+    };
+  }
   if (name === "pio_monitor_start") {
     const session = await startCompatibilityMonitor(
       client,
@@ -309,6 +333,35 @@ export function withDeviceCompatibility<TResult>(
       additionalProperties: false,
     },
     handler: (args, context) => context.dispatch("pio_monitor_start", args),
+  });
+  const captureSource = result.get("pio_monitor_start")!;
+  const startProperties = captureSource.inputSchema.properties as Record<
+    string,
+    unknown
+  >;
+  result.set("pio_monitor_capture", {
+    ...captureSource,
+    name: "pio_monitor_capture",
+    annotations: { ...captureSource.annotations, title: "Capture Monitor" },
+    description:
+      "Open, read and close an owned serial monitor. Both opening and reading must be authorized before startup; unconfirmed closure retains device ownership.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...startProperties,
+        seconds: { type: "number", default: 5 },
+        until: { type: ["string", "null"], maxLength: 4096 },
+        max_lines: {
+          type: "integer",
+          minimum: 1,
+          maximum: 10000,
+          default: 500,
+        },
+        read_approval_id: { type: "string", maxLength: 256 },
+      },
+      additionalProperties: false,
+    },
+    handler: (args, context) => context.dispatch("pio_monitor_capture", args),
   });
   const readSource = base.get("query_logs");
   if (!readSource || result.has("pio_monitor_read"))

@@ -4470,6 +4470,193 @@ var init_errors2 = __esm({
   }
 });
 
+// src/core/bounded-pattern.ts
+import { Worker } from "node:worker_threads";
+function regexSource(pattern, translate) {
+  if (!translate) return pattern;
+  for (let i = 0; i < pattern.length; i++) {
+    if (pattern[i] === "\\") {
+      i++;
+      if (/[AZzGRNUae]/.test(pattern[i] ?? ""))
+        throw new PlatformIOError(
+          "Unsupported Python regex escape; use the documented ECMAScript subset.",
+          "PATTERN_UNSUPPORTED"
+        );
+    }
+  }
+  return pattern.replace(/\(\?P<([A-Za-z_][A-Za-z0-9_]*)>/g, "(?<$1>").replace(/\(\?P=([A-Za-z_][A-Za-z0-9_]*)\)/g, "\\k<$1>");
+}
+async function runBoundedPattern(lines2, pattern, options = {}, extract = false) {
+  if (typeof pattern !== "string" || pattern.length > 4096 || lines2.length > 1e4 || lines2.some((line) => typeof line !== "string") || lines2.reduce((sum, line) => sum + Buffer.byteLength(line), 0) > 1024 * 1024) {
+    throw new PlatformIOError(
+      "Pattern matching is limited to 4096 pattern characters, 10000 lines and 1 MiB of input.",
+      "PATTERN_INPUT_LIMIT"
+    );
+  }
+  if (options.mode !== void 0 && options.mode !== "literal" && options.mode !== "regex")
+    throw new PlatformIOError(
+      "Unknown pattern matching mode.",
+      "PATTERN_INVALID"
+    );
+  if ((options.mode ?? "literal") === "literal") {
+    const needle = options.ignoreCase ? pattern.toLowerCase() : pattern;
+    return {
+      captures: [],
+      indices: lines2.flatMap(
+        (line, index) => (options.ignoreCase ? line.toLowerCase() : line).includes(needle) ? [index] : []
+      )
+    };
+  }
+  const timeoutMs = options.timeoutMs ?? 1e3;
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2e3)
+    throw new PlatformIOError(
+      "Regex timeout must be between 1 and 2000 ms.",
+      "PATTERN_INVALID"
+    );
+  const source = regexSource(pattern, options.pythonNamedGroups ?? false);
+  if (activeRegexWorkers >= 4)
+    throw new PlatformIOError(
+      "Regex worker capacity is busy; retry after current searches finish.",
+      "PATTERN_BUSY"
+    );
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(WORKER_SOURCE, {
+      eval: true,
+      workerData: {
+        lines: lines2,
+        pattern: source,
+        ignoreCase: options.ignoreCase ?? false,
+        extract
+      },
+      resourceLimits: {
+        maxOldGenerationSizeMb: 32,
+        maxYoungGenerationSizeMb: 8,
+        stackSizeMb: 2
+      }
+    });
+    activeRegexWorkers++;
+    let settled = false;
+    let executing = false;
+    let timer;
+    const finish = (error2, result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      void worker.terminate().finally(() => {
+        activeRegexWorkers--;
+      }).then(() => {
+        if (error2) reject(error2);
+        else resolve(result);
+      }, reject);
+    };
+    timer = setTimeout(
+      () => finish(
+        new PlatformIOError(
+          "Regex worker exceeded its startup deadline.",
+          "PATTERN_WORKER_STARTUP_TIMEOUT"
+        )
+      ),
+      5e3
+    );
+    worker.on(
+      "message",
+      (message) => {
+        if (settled) return;
+        if (message.ready) {
+          if (executing) return;
+          executing = true;
+          clearTimeout(timer);
+          timer = setTimeout(
+            () => finish(
+              new PlatformIOError(
+                "Regex exceeded its execution deadline.",
+                "PATTERN_TIMEOUT"
+              )
+            ),
+            timeoutMs
+          );
+          worker.postMessage({ run: true });
+          return;
+        }
+        if (!executing)
+          return finish(
+            new PlatformIOError(
+              "Unexpected regex worker response.",
+              "PATTERN_WORKER_FAILED"
+            )
+          );
+        finish(
+          message.limit ? new PlatformIOError(
+            "Named capture output exceeds limits.",
+            "PATTERN_OUTPUT_LIMIT"
+          ) : message.invalid ? new PlatformIOError(
+            "Invalid or unsupported regular expression.",
+            "PATTERN_INVALID"
+          ) : void 0,
+          { indices: message.indices ?? [], captures: message.captures ?? [] }
+        );
+      }
+    );
+    worker.once(
+      "error",
+      () => finish(
+        new PlatformIOError("Regex worker failed.", "PATTERN_WORKER_FAILED")
+      )
+    );
+    worker.once("exit", () => {
+      if (!settled)
+        finish(
+          new PlatformIOError(
+            "Regex worker exited before returning a result.",
+            "PATTERN_WORKER_FAILED"
+          )
+        );
+    });
+  });
+}
+async function matchBoundedLines(lines2, pattern, options = {}) {
+  return (await runBoundedPattern(lines2, pattern, options)).indices;
+}
+async function extractBoundedCaptures(lines2, pattern, options = {}) {
+  return (await runBoundedPattern(lines2, pattern, { ...options, mode: "regex" }, true)).captures;
+}
+var WORKER_SOURCE, activeRegexWorkers;
+var init_bounded_pattern = __esm({
+  "src/core/bounded-pattern.ts"() {
+    "use strict";
+    init_errors2();
+    WORKER_SOURCE = `
+const {parentPort,workerData}=require('node:worker_threads');
+parentPort.once('message', () => {
+try {
+  const regex=new RegExp(workerData.pattern,(workerData.ignoreCase?'i':'')+(workerData.extract?'g':''));
+  if(workerData.extract) {
+    const probe=new RegExp('(?:'+workerData.pattern+')|').exec('');
+    if(!probe?.groups || !Object.hasOwn(probe.groups,'value')) throw new Error('missing value group');
+  }
+  const indices=[]; const captures=[];
+  for(let index=0;index<workerData.lines.length;index++) {
+    if(!workerData.extract) { if(regex.test(workerData.lines[index])) indices.push(index); continue; }
+    regex.lastIndex=0;
+    let match;
+    while((match=regex.exec(workerData.lines[index]))!==null) {
+      if(match.groups.value!==undefined) {
+        const value=match.groups.value; const name=match.groups.name; const unit=match.groups.unit;
+        if(captures.length>=10000 || value.length>128 || (name!==undefined && name.length>128) || (unit!==undefined && unit.length>16)) { parentPort.postMessage({limit:true}); return; }
+        captures.push({line:index,start:match.index,end:match.index+match[0].length,value,...(name!==undefined?{name}:{}),...(unit!==undefined?{unit}:{})});
+      }
+      if(match[0].length===0) regex.lastIndex++;
+    }
+  }
+  parentPort.postMessage({indices,captures});
+} catch {parentPort.postMessage({invalid:true});}
+});
+parentPort.postMessage({ready:true});
+`;
+    activeRegexWorkers = 0;
+  }
+});
+
 // node_modules/graceful-fs/polyfills.js
 var require_polyfills = __commonJS({
   "node_modules/graceful-fs/polyfills.js"(exports, module) {
@@ -6044,872 +6231,6 @@ var require_proper_lockfile = __commonJS({
     module.exports.unlockSync = unlockSync;
     module.exports.check = check2;
     module.exports.checkSync = checkSync;
-  }
-});
-
-// src/utils/paths.ts
-import path2 from "node:path";
-import { fileURLToPath } from "node:url";
-import fs2 from "node:fs";
-import os2 from "node:os";
-function canUseDir(dir) {
-  try {
-    fs2.mkdirSync(dir, { recursive: true });
-    const probe = path2.join(dir, `.write-probe-${process.pid}-${Date.now()}`);
-    fs2.writeFileSync(probe, "ok", "utf8");
-    fs2.unlinkSync(probe);
-    return true;
-  } catch {
-    return false;
-  }
-}
-function resolveServerDataDir() {
-  const override = process.env.PIO_MCP_DATA_DIR?.trim();
-  if (override && canUseDir(override)) {
-    return path2.resolve(override);
-  }
-  const homeScoped = path2.join(os2.homedir(), ".platformio-mcp");
-  if (canUseDir(homeScoped)) {
-    return homeScoped;
-  }
-  const cwdScoped = path2.join(process.cwd(), ".platformio-mcp");
-  if (canUseDir(cwdScoped)) {
-    return cwdScoped;
-  }
-  const tmpScoped = path2.join(os2.tmpdir(), ".platformio-mcp");
-  if (canUseDir(tmpScoped)) {
-    return tmpScoped;
-  }
-  return cwdScoped;
-}
-function ensureDir(dir) {
-  if (!fs2.existsSync(dir)) {
-    fs2.mkdirSync(dir, { recursive: true });
-  }
-}
-function ensureGlobalDirs() {
-  ensureDir(SERVER_DATA_DIR);
-  ensureDir(GLOBAL_LOCKS_DIR);
-}
-function sanitizePortName(port) {
-  return port.replace(/[\/\.:]/g, "_").replace(/^_+|_+$/g, "");
-}
-var __filename, __dirname2, PROJECT_ROOT, SERVER_DATA_DIR, GLOBAL_LOCKS_DIR;
-var init_paths = __esm({
-  "src/utils/paths.ts"() {
-    "use strict";
-    __filename = fileURLToPath(import.meta.url);
-    __dirname2 = path2.dirname(__filename);
-    PROJECT_ROOT = path2.resolve(__dirname2, "..", "..");
-    SERVER_DATA_DIR = resolveServerDataDir();
-    GLOBAL_LOCKS_DIR = path2.join(SERVER_DATA_DIR, "serial_ports");
-  }
-});
-
-// src/utils/workspace-registry.ts
-var workspace_registry_exports = {};
-__export(workspace_registry_exports, {
-  addWorkspace: () => addWorkspace,
-  getWorkspaces: () => getWorkspaces,
-  rewriteRegistry: () => rewriteRegistry
-});
-import fs3 from "node:fs";
-import path3 from "node:path";
-function ensureRegistryFile() {
-  ensureGlobalDirs();
-  if (!fs3.existsSync(REGISTRY_FILE)) {
-    fs3.writeFileSync(REGISTRY_FILE, "[]");
-  }
-}
-async function addWorkspace(dir) {
-  ensureRegistryFile();
-  const platformioIni = path3.join(dir, "platformio.ini");
-  if (!fs3.existsSync(platformioIni)) {
-    throw new Error(`missing platformio.ini in workspace: ${dir}`);
-  }
-  try {
-    const release = await import_proper_lockfile.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let records = [];
-      try {
-        records = JSON.parse(fs3.readFileSync(REGISTRY_FILE, "utf8"));
-      } catch {
-      }
-      if (records.length > 0) {
-        const lastRecord = records[records.length - 1];
-        if (lastRecord.dir === dir) {
-          return;
-        }
-      }
-      records.push({ dir, timestamp: Date.now() });
-      fs3.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
-    } finally {
-      await release();
-    }
-  } catch {
-  }
-}
-async function getWorkspaces() {
-  ensureRegistryFile();
-  let records = [];
-  try {
-    const release = await import_proper_lockfile.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      records = JSON.parse(fs3.readFileSync(REGISTRY_FILE, "utf8"));
-    } finally {
-      await release();
-    }
-  } catch {
-    try {
-      records = JSON.parse(fs3.readFileSync(REGISTRY_FILE, "utf8"));
-    } catch {
-      return [];
-    }
-  }
-  const seen = /* @__PURE__ */ new Map();
-  for (const parsed of records) {
-    if (parsed.dir) {
-      seen.set(parsed.dir, parsed.timestamp);
-    }
-  }
-  return Array.from(seen.entries()).sort((a, b) => b[1] - a[1]).map((entry) => entry[0]).filter((dir) => fs3.existsSync(path3.join(dir, "platformio.ini")));
-}
-async function rewriteRegistry(directories) {
-  ensureRegistryFile();
-  try {
-    const release = await import_proper_lockfile.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      const records = directories.map((dir) => ({ dir, timestamp: Date.now() }));
-      fs3.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
-    } finally {
-      await release();
-    }
-  } catch {
-  }
-}
-var import_proper_lockfile, REGISTRY_FILE;
-var init_workspace_registry = __esm({
-  "src/utils/workspace-registry.ts"() {
-    "use strict";
-    import_proper_lockfile = __toESM(require_proper_lockfile(), 1);
-    init_paths();
-    REGISTRY_FILE = path3.join(SERVER_DATA_DIR, "workspaces.json");
-  }
-});
-
-// src/core/policy/redact.ts
-function redactSecretsInText(text6) {
-  let redacted = text6;
-  for (const pattern of secretPatterns) {
-    redacted = redacted.replace(pattern, replacement);
-  }
-  return redacted;
-}
-var secretPatterns, replacement;
-var init_redact = __esm({
-  "src/core/policy/redact.ts"() {
-    "use strict";
-    secretPatterns = [
-      /OPENAI_API_KEY=[^\s]+/gi,
-      /GITHUB_TOKEN=[^\s]+/gi,
-      /SUPABASE_KEY=[^\s]+/gi,
-      /AWS_SECRET_ACCESS_KEY=[^\s]+/gi,
-      /(?:wifi|wi-fi|wlan)[_-]?(?:password|pass|psk)\s*[:=]\s*[^\s,;]+/gi,
-      /(?:api[_-]?key|client[_-]?secret|provisioning[_-]?(?:key|secret))\s*[:=]\s*[^\s,;]+/gi,
-      /authorization\s*:\s*bearer\s+[^\s]+/gi,
-      /bearer\s+[a-z0-9._~+/=-]{12,}/gi,
-      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
-      /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gi,
-      /password\s*=\s*[^\s]+/gi,
-      /token\s*=\s*[^\s]+/gi
-    ];
-    replacement = "[REDACTED_SECRET]";
-  }
-});
-
-// src/api/events.ts
-import { EventEmitter } from "events";
-import fs4 from "node:fs";
-import path4 from "node:path";
-var PortalEventEmitter, portalEvents;
-var init_events = __esm({
-  "src/api/events.ts"() {
-    "use strict";
-    init_workspace_registry();
-    init_redact();
-    PortalEventEmitter = class extends EventEmitter {
-      constructor() {
-        super();
-        this.setMaxListeners(50);
-      }
-      /**
-       * Emit an agentic activity event.
-       * @param toolName The name of the tool called
-       * @param args The arguments passed to the tool
-       * @param status The execution status (running, success, error)
-       * @param activityId A unique identifier for this activity
-       */
-      async emitActivity(toolName, args, status, activityId) {
-        const payload = {
-          timestamp: Date.now(),
-          toolName,
-          args,
-          success: status === "success",
-          // Kept for backwards compatibility
-          status,
-          activityId
-        };
-        this.emit("agent_activity", payload);
-        if (this.lastKnownProjectDir) {
-          try {
-            const workspaceDir = path4.join(this.lastKnownProjectDir, ".pio-mcp-workspace");
-            if (!fs4.existsSync(workspaceDir)) {
-              fs4.mkdirSync(workspaceDir, { recursive: true });
-            }
-            const logFile = path4.join(workspaceDir, "agent_activities.jsonl");
-            try {
-              const stat = await fs4.promises.stat(logFile);
-              if (stat.size > 2 * 1024 * 1024) {
-                await fs4.promises.rename(logFile, logFile + ".1");
-              }
-            } catch {
-            }
-            await fs4.promises.appendFile(logFile, JSON.stringify(payload) + "\n");
-          } catch {
-          }
-        }
-      }
-      artifactBuffers = {};
-      /**
-       * Emit a build log stream, buffering partial chunks into clean lines
-       * @param projectId The target project identifier
-       * @param taskId The task ID generating the log
-       * @param chunk Raw string chunk of the log
-       */
-      emitTaskLog(projectId, taskId, chunk) {
-        const safeChunk = redactSecretsInText(chunk);
-        const bufferKey = taskId || projectId;
-        if (!this.artifactBuffers[bufferKey]) {
-          this.artifactBuffers[bufferKey] = "";
-        }
-        this.artifactBuffers[bufferKey] += safeChunk;
-        let newlineIndex;
-        while ((newlineIndex = this.artifactBuffers[bufferKey].indexOf("\n")) !== -1) {
-          const logLine = this.artifactBuffers[bufferKey].substring(0, newlineIndex).trimEnd();
-          this.artifactBuffers[bufferKey] = this.artifactBuffers[bufferKey].substring(
-            newlineIndex + 1
-          );
-          this.emit("build_log", {
-            timestamp: Date.now(),
-            projectId,
-            taskId,
-            logLine
-          });
-        }
-      }
-      /**
-       * Emit a signal to clear the build terminal for a project
-       * @param projectId The target project identifier
-       * @param taskId Optional specific task ID
-       * @param logPaths Optional list of associated log files
-       */
-      clearTaskLog(projectId, taskId, logPaths) {
-        const bufferKey = taskId || projectId;
-        if (this.artifactBuffers[bufferKey]) {
-          this.artifactBuffers[bufferKey] = "";
-        }
-        this.emit("build_clear", {
-          timestamp: Date.now(),
-          projectId,
-          taskId,
-          logPaths
-        });
-      }
-      /**
-       * Emit a serial monitor read
-       * @param port Serial port emitting the log
-       * @param data Log payload data
-       * @param taskId Optional task ID
-       */
-      emitSerialLog(port, data, taskId) {
-        this.emit("serial_log", {
-          timestamp: Date.now(),
-          port,
-          taskId,
-          data: redactSecretsInText(data)
-        });
-      }
-      /**
-       * Emit general server status
-       * @param status String enum of "online" or "offline"
-       */
-      emitServerStatus(status) {
-        this.emit("server_status", {
-          timestamp: Date.now(),
-          status
-        });
-      }
-      /**
-       * Emit hardware queue lock status
-       * @param state The lock state object
-       */
-      emitLockState(state) {
-        this.emit("lock_state", {
-          timestamp: Date.now(),
-          ...state
-        });
-      }
-      /**
-       * Emit a map of all spooler connection and config properties
-       * @param states Record mapping ports to spooler states
-       */
-      emitSpoolerStates(states) {
-        this.emit("spooler_states", states);
-      }
-      /**
-       * Emit an update signal when the command history registry changes
-       * @param projectDir Target project context
-       */
-      emitCommandHistoryUpdated(projectDir) {
-        this.emit("command_history_updated", {
-          timestamp: Date.now(),
-          projectDir
-        });
-      }
-      /**
-       * Emits a lightweight invalidation signal for policy, approval, and automation state.
-       *
-       * @param projectDir Optional workspace affected by the state change.
-       */
-      emitSafetyStateUpdated(projectDir) {
-        this.emit("safety_state_updated", {
-          timestamp: Date.now(),
-          projectDir
-        });
-      }
-      /**
-       * Emit a signal containing the latest rich hardware port state
-       * @param devices List of device objects
-       */
-      emitHardwareStateUpdated(devices) {
-        this.emit("hardware_state_updated", {
-          timestamp: Date.now(),
-          devices
-        });
-      }
-      lastKnownProjectDir;
-      /**
-       * Caches and emits the last known dynamically targeted workspace directory.
-       * @param projectDir Target project directory path
-       */
-      emitWorkspaceState(projectDir) {
-        this.lastKnownProjectDir = projectDir;
-        addWorkspace(projectDir).catch(() => {
-        });
-        this.emit("workspace_state", {
-          timestamp: Date.now(),
-          projectDir
-        });
-      }
-      /**
-       * Retrieves the last known workspace path
-       * @returns The last targeted workspace directory
-       */
-      getLastKnownWorkspace() {
-        return this.lastKnownProjectDir;
-      }
-      /**
-       * Emit an update signal when the overall workspaces registry changes.
-       * @param workspaces List of available workspace directories
-       */
-      emitWorkspacesUpdated(workspaces) {
-        this.emit("workspaces_updated", {
-          timestamp: Date.now(),
-          workspaces
-        });
-      }
-    };
-    portalEvents = new PortalEventEmitter();
-  }
-});
-
-// src/utils/command-registry.ts
-import fs5 from "node:fs";
-import path5 from "node:path";
-function getRegistryFilePath(projectDir) {
-  const baseDir = projectDir || SERVER_DATA_DIR;
-  if (!projectDir) ensureGlobalDirs();
-  const dir = path5.join(baseDir, WORKSPACE_DIR, "registry");
-  if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
-  return path5.join(dir, REGISTRY_FILE2);
-}
-async function registerCommand(record2, projectDir) {
-  const file = getRegistryFilePath(projectDir);
-  if (!fs5.existsSync(file)) fs5.writeFileSync(file, "[]");
-  try {
-    const release = await import_proper_lockfile2.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let history = [];
-      try {
-        history = JSON.parse(fs5.readFileSync(file, "utf8"));
-      } catch {
-      }
-      const existingIndex = history.findIndex((cmd) => cmd.id === record2.id);
-      if (existingIndex !== -1) {
-        const existingCmd = history[existingIndex];
-        record2.tasks.forEach((newArt) => {
-          if (!existingCmd.tasks.find((a) => a.taskId === newArt.taskId)) {
-            existingCmd.tasks.push(newArt);
-          }
-        });
-        existingCmd.status = record2.status;
-      } else {
-        history.push(record2);
-        if (history.length > MAX_HISTORY_ITEMS) {
-          history = history.slice(-MAX_HISTORY_ITEMS);
-        }
-      }
-      fs5.writeFileSync(file, JSON.stringify(history, null, 2));
-      portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-}
-async function updateCommandStatus(id, updates, projectDir) {
-  const file = getRegistryFilePath(projectDir);
-  if (!fs5.existsSync(file)) return;
-  try {
-    const release = await import_proper_lockfile2.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let history = [];
-      try {
-        history = JSON.parse(fs5.readFileSync(file, "utf8"));
-      } catch {
-      }
-      const index = history.findIndex((cmd) => cmd.id === id);
-      if (index !== -1) {
-        history[index] = { ...history[index], ...updates };
-        fs5.writeFileSync(file, JSON.stringify(history, null, 2));
-        portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
-      }
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-}
-async function updateTaskStatus(commandId, taskId, updates, projectDir) {
-  const file = getRegistryFilePath(projectDir);
-  if (!fs5.existsSync(file)) return;
-  try {
-    const release = await import_proper_lockfile2.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
-    try {
-      let history = [];
-      try {
-        history = JSON.parse(fs5.readFileSync(file, "utf8"));
-      } catch {
-      }
-      const cmdIndex = history.findIndex((cmd) => cmd.id === commandId);
-      if (cmdIndex !== -1) {
-        const cmd = history[cmdIndex];
-        const artIndex = cmd.tasks?.findIndex((art) => art.taskId === taskId) ?? -1;
-        if (artIndex !== -1) {
-          cmd.tasks[artIndex] = { ...cmd.tasks[artIndex], ...updates };
-          const allSuccess = cmd.tasks.every((a) => a.status === "success");
-          const anyError = cmd.tasks.some((a) => a.status === "error");
-          const anyRunning = cmd.tasks.some((a) => a.status === "running");
-          if (anyError) {
-            cmd.status = "error";
-            const failedTask = cmd.tasks.find((a) => a.status === "error" && a.error);
-            if (failedTask?.error) {
-              cmd.error = failedTask.error;
-            }
-          } else if (anyRunning) cmd.status = "running";
-          else if (allSuccess) cmd.status = "success";
-          else cmd.status = "terminated";
-          fs5.writeFileSync(file, JSON.stringify(history, null, 2));
-          portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
-        }
-      }
-    } finally {
-      await release();
-    }
-  } catch (e) {
-    throw new Error(`Registry contention timeout: ${e.message}`);
-  }
-}
-function getCommandHistory(projectDir) {
-  const file = getRegistryFilePath(projectDir);
-  if (!fs5.existsSync(file)) return [];
-  try {
-    return JSON.parse(fs5.readFileSync(file, "utf8"));
-  } catch {
-    return [];
-  }
-}
-async function findCommandAcrossWorkspaces(taskId) {
-  const globalHistory = getCommandHistory();
-  const globalMatch = globalHistory.find(
-    (command) => command.id === taskId || command.tasks.some((task) => task.taskId === taskId)
-  );
-  if (globalMatch) return { command: globalMatch, history: globalHistory };
-  const { getWorkspaces: getWorkspaces2 } = await Promise.resolve().then(() => (init_workspace_registry(), workspace_registry_exports));
-  const workspaces = await getWorkspaces2();
-  for (const ws of workspaces) {
-    const wsHistory = getCommandHistory(ws);
-    const found = wsHistory.find(
-      (command) => command.id === taskId || command.tasks.some((task) => task.taskId === taskId)
-    );
-    if (found) return { command: found, history: wsHistory, projectDir: ws };
-  }
-  return void 0;
-}
-var import_proper_lockfile2, WORKSPACE_DIR, REGISTRY_FILE2, MAX_HISTORY_ITEMS;
-var init_command_registry = __esm({
-  "src/utils/command-registry.ts"() {
-    "use strict";
-    import_proper_lockfile2 = __toESM(require_proper_lockfile(), 1);
-    init_events();
-    init_paths();
-    WORKSPACE_DIR = ".pio-mcp-workspace";
-    REGISTRY_FILE2 = "command_history.json";
-    MAX_HISTORY_ITEMS = 30;
-  }
-});
-
-// src/utils/mcp-context.ts
-import { AsyncLocalStorage } from "node:async_hooks";
-var mcpContext;
-var init_mcp_context = __esm({
-  "src/utils/mcp-context.ts"() {
-    "use strict";
-    mcpContext = new AsyncLocalStorage();
-  }
-});
-
-// src/platformio.ts
-import { execFile, spawn } from "node:child_process";
-import fs6 from "node:fs";
-import os3 from "node:os";
-import path6 from "node:path";
-import { fileURLToPath as fileURLToPath2 } from "url";
-import crypto from "node:crypto";
-import { execSync } from "node:child_process";
-async function execPioCommand(args, options = {}) {
-  const timeout = options.timeout ?? DEFAULT_TIMEOUT;
-  const runWrappedProcess = (binary) => {
-    return new Promise((resolve, reject) => {
-      const child = execFile(
-        binary,
-        args,
-        {
-          cwd: options.cwd,
-          env: options.env,
-          timeout,
-          maxBuffer: 10 * 1024 * 1024
-        },
-        (error2, stdout, stderr) => {
-          if (error2) {
-            error2.stdout = stdout;
-            error2.stderr = stderr;
-            reject(error2);
-          } else {
-            resolve({
-              stdout: stdout.toString(),
-              stderr: stderr.toString(),
-              code: 0
-            });
-          }
-        }
-      );
-      if (options.onOutput) {
-        child.stdout?.on("data", (data) => options.onOutput(data.toString()));
-        child.stderr?.on("data", (data) => options.onOutput(data.toString()));
-      }
-    });
-  };
-  try {
-    let result;
-    try {
-      result = await runWrappedProcess("pio");
-    } catch (firstError) {
-      if (isPlatformIONotFoundError(firstError)) {
-        try {
-          result = await runWrappedProcess("platformio");
-        } catch (secondError) {
-          if (isPlatformIONotFoundError(secondError)) {
-            throw new PlatformIONotInstalledError();
-          }
-          throw secondError;
-        }
-      } else {
-        throw firstError;
-      }
-    }
-    return {
-      stdout: result.stdout,
-      stderr: result.stderr,
-      exitCode: 0
-    };
-  } catch (error2) {
-    if (error2.killed && error2.signal === "SIGTERM") {
-      throw new CommandTimeoutError(args.join(" "), timeout);
-    }
-    if (isPlatformIONotFoundError(error2)) {
-      throw new PlatformIONotInstalledError();
-    }
-    if (error2.code && error2.stdout !== void 0) {
-      return {
-        stdout: error2.stdout || "",
-        stderr: error2.stderr || "",
-        exitCode: error2.code
-      };
-    }
-    throw error2;
-  }
-}
-function parsePioJsonOutput(output, schema3) {
-  if (!output || output.trim().length === 0) {
-    throw new PlatformIOError("Empty output from PlatformIO command");
-  }
-  try {
-    const parsed = JSON.parse(output);
-    return schema3.parse(parsed);
-  } catch (error2) {
-    if (error2 instanceof external_exports.ZodError) {
-      throw new PlatformIOError(
-        `Failed to parse PlatformIO output: ${error2.message}`,
-        "PARSE_ERROR",
-        { zodError: error2.issues, output: output.substring(0, 500) }
-      );
-    }
-    if (error2 instanceof SyntaxError) {
-      throw new PlatformIOError(
-        `Invalid JSON output from PlatformIO: ${error2.message}`,
-        "INVALID_JSON",
-        { output: output.substring(0, 500) }
-      );
-    }
-    throw error2;
-  }
-}
-async function checkPlatformIOInstalled() {
-  try {
-    const result = await execPioCommand(["--version"], { timeout: 5e3 });
-    return result.exitCode === 0 && result.stdout.includes("PlatformIO");
-  } catch (error2) {
-    if (error2 instanceof PlatformIONotInstalledError) {
-      return false;
-    }
-    throw error2;
-  }
-}
-async function getPlatformIOVersion() {
-  try {
-    const result = await execPioCommand(["--version"], { timeout: 5e3 });
-    if (result.exitCode === 0) {
-      const match = result.stdout.match(/version\s+([\d\.]+)/i);
-      return match ? match[1] : result.stdout.trim();
-    }
-    throw new PlatformIOError("Failed to get PlatformIO version");
-  } catch (error2) {
-    if (error2 instanceof PlatformIONotInstalledError) {
-      throw error2;
-    }
-    throw new PlatformIOError("Failed to get PlatformIO version");
-  }
-}
-function resolvePioPath() {
-  try {
-    const whichCmd = os3.platform() === "win32" ? "where pio" : "command -v pio";
-    const out = execSync(whichCmd, { stdio: "pipe" }).toString().trim();
-    if (out) {
-      const paths = out.split("\n").map((p) => p.trim()).filter((p) => p.length > 0);
-      for (const p of paths) {
-        if (fs6.existsSync(p)) return p;
-      }
-    }
-  } catch {
-  }
-  if (os3.platform() === "win32") {
-    const winCandidate = path6.join(os3.homedir(), ".platformio", "penv", "Scripts", "pio.exe");
-    if (fs6.existsSync(winCandidate)) return winCandidate;
-    return "pio";
-  }
-  const candidates = [
-    "/usr/local/bin/pio",
-    "/opt/homebrew/bin/pio",
-    "/usr/bin/pio",
-    "/bin/pio",
-    path6.join(os3.homedir(), ".platformio", "penv", "bin", "pio")
-  ];
-  for (const c of candidates) {
-    if (fs6.existsSync(c)) return c;
-  }
-  return "pio";
-}
-var __filename2, __dirname3, DEFAULT_TIMEOUT, PlatformIOExecutor, platformioExecutor;
-var init_platformio = __esm({
-  "src/platformio.ts"() {
-    "use strict";
-    init_zod();
-    init_command_registry();
-    init_mcp_context();
-    init_errors2();
-    __filename2 = fileURLToPath2(import.meta.url);
-    __dirname3 = path6.dirname(__filename2);
-    DEFAULT_TIMEOUT = 3e5;
-    PlatformIOExecutor = class {
-      constructor() {
-      }
-      /**
-       * Executes a PlatformIO command.
-       *
-       * @param command - The PIO subcommand string.
-       * @param args - Arguments array for the command.
-       * @param options - Execution directives for the child process.
-       * @returns Structured runtime output results.
-       */
-      async execute(command, args, options) {
-        const fullArgs = [command, ...args];
-        const ctx = mcpContext.getStore();
-        const commandId = ctx?.activityId;
-        const targetProjectDir = ctx?.targetProjectDir || options?.cwd;
-        let taskId = void 0;
-        if (commandId) {
-          taskId = crypto.randomUUID();
-          try {
-            await registerCommand({
-              id: commandId,
-              commandDesc: `PIO Task: pio ${fullArgs.join(" ")}`,
-              timestamp: Date.now(),
-              status: "running",
-              tasks: [{
-                taskId,
-                type: command,
-                status: "running",
-                commandDesc: `pio ${fullArgs.join(" ")}`
-              }]
-            }, targetProjectDir);
-          } catch (e) {
-            console.error(`[PlatformIO] Inline telemetry failure: ${e.message}`);
-          }
-        }
-        try {
-          const result = await execPioCommand(fullArgs, options);
-          if (commandId && taskId) {
-            await updateTaskStatus(commandId, taskId, {
-              status: result.exitCode === 0 ? "success" : "error",
-              exitCode: result.exitCode
-            }, targetProjectDir).catch(() => {
-            });
-          }
-          return result;
-        } catch (error2) {
-          if (commandId && taskId) {
-            await updateTaskStatus(commandId, taskId, {
-              status: "error",
-              exitCode: error2.code || 1
-            }, targetProjectDir).catch(() => {
-            });
-          }
-          throw error2;
-        }
-      }
-      /**
-       * Checks if PlatformIO is installed.
-       *
-       * @returns A boolean resolving true if PlatformIO is ready.
-       */
-      async checkInstallation() {
-        return checkPlatformIOInstalled();
-      }
-      /**
-       * Gets PlatformIO version.
-       *
-       * @returns The resolved PIO version.
-       */
-      async getVersion() {
-        return getPlatformIOVersion();
-      }
-      /**
-       * Executes a command and parses JSON output.
-       *
-       * @param command - Core PlatformIO subcommand logic.
-       * @param args - Configuration and CLI flag values.
-       * @param schema - Schema for JSON output validation.
-       * @param options - Operational execution directives.
-       * @returns Parsed and validated JSON node entity.
-       */
-      async executeWithJsonOutput(command, args, schema3, options) {
-        const fullArgs = [...args];
-        if (!fullArgs.includes("--json-output")) {
-          fullArgs.push("--json-output");
-        }
-        const result = await this.execute(command, fullArgs, options);
-        if (result.exitCode !== 0) {
-          throw new PlatformIOError(
-            `PlatformIO command failed: ${command} ${args.join(" ")}`,
-            "COMMAND_FAILED",
-            { stderr: result.stderr, exitCode: result.exitCode }
-          );
-        }
-        return parsePioJsonOutput(result.stdout, schema3);
-      }
-      /**
-       * Spawns a long-running PlatformIO command (e.g., monitor).
-       * Implements the same binary resolution logic as 'execute'.
-       *
-       * @param command - The PIO subcommand.
-       * @param args - Arguments array for the PlatformIO CLI.
-       * @param options - Execution options including working directory, environment overrides, and fake TTY bridging.
-       * @returns The spawned ChildProcess instance.
-       */
-      async spawn(command, args, options = {}) {
-        let pioBinary = "pio";
-        let pioArgs = [command, ...args];
-        const env = {
-          ...process.env,
-          ...options.env
-        };
-        if (options.useFakeTty && process.platform !== "win32") {
-          const absolutePio = resolvePioPath();
-          const proxyScriptPath = path6.join(
-            __dirname3,
-            "..",
-            "src",
-            "utils",
-            "mcp_pio_proxy.py"
-          );
-          pioBinary = "python3";
-          pioArgs = [proxyScriptPath, absolutePio, command, ...args];
-        }
-        const fullCmd = `${pioBinary} ${pioArgs.join(" ")}`;
-        try {
-          const logDir = path6.join(__dirname3, "..", "logs");
-          if (!fs6.existsSync(logDir)) fs6.mkdirSync(logDir, { recursive: true });
-          await fs6.promises.appendFile(
-            path6.join(logDir, "mcp-internal.log"),
-            `[${(/* @__PURE__ */ new Date()).toISOString()}] [Spooler Executor] Spawning: ${fullCmd}
-`
-          );
-        } catch (e) {
-          console.error(`Failed to write to internal log: ${e}`);
-        }
-        return spawn(pioBinary, pioArgs, {
-          cwd: options.cwd,
-          env,
-          shell: false,
-          detached: options.detached,
-          stdio: options.stdio
-        });
-      }
-    };
-    platformioExecutor = new PlatformIOExecutor();
   }
 });
 
@@ -14243,8 +13564,394 @@ var require_dist = __commonJS({
   }
 });
 
+// src/utils/paths.ts
+import path5 from "node:path";
+import { fileURLToPath } from "node:url";
+import fs4 from "node:fs";
+import os2 from "node:os";
+function canUseDir(dir) {
+  try {
+    fs4.mkdirSync(dir, { recursive: true });
+    const probe = path5.join(dir, `.write-probe-${process.pid}-${Date.now()}`);
+    fs4.writeFileSync(probe, "ok", "utf8");
+    fs4.unlinkSync(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function resolveServerDataDir() {
+  const override = process.env.PIO_MCP_DATA_DIR?.trim();
+  if (override && canUseDir(override)) {
+    return path5.resolve(override);
+  }
+  const homeScoped = path5.join(os2.homedir(), ".platformio-mcp");
+  if (canUseDir(homeScoped)) {
+    return homeScoped;
+  }
+  const cwdScoped = path5.join(process.cwd(), ".platformio-mcp");
+  if (canUseDir(cwdScoped)) {
+    return cwdScoped;
+  }
+  const tmpScoped = path5.join(os2.tmpdir(), ".platformio-mcp");
+  if (canUseDir(tmpScoped)) {
+    return tmpScoped;
+  }
+  return cwdScoped;
+}
+function ensureDir(dir) {
+  if (!fs4.existsSync(dir)) {
+    fs4.mkdirSync(dir, { recursive: true });
+  }
+}
+function ensureGlobalDirs() {
+  ensureDir(SERVER_DATA_DIR);
+  ensureDir(GLOBAL_LOCKS_DIR);
+}
+function sanitizePortName(port) {
+  return port.replace(/[\/\.:]/g, "_").replace(/^_+|_+$/g, "");
+}
+var __filename, __dirname2, PROJECT_ROOT, SERVER_DATA_DIR, GLOBAL_LOCKS_DIR;
+var init_paths = __esm({
+  "src/utils/paths.ts"() {
+    "use strict";
+    __filename = fileURLToPath(import.meta.url);
+    __dirname2 = path5.dirname(__filename);
+    PROJECT_ROOT = path5.resolve(__dirname2, "..", "..");
+    SERVER_DATA_DIR = resolveServerDataDir();
+    GLOBAL_LOCKS_DIR = path5.join(SERVER_DATA_DIR, "serial_ports");
+  }
+});
+
+// src/utils/workspace-registry.ts
+var workspace_registry_exports = {};
+__export(workspace_registry_exports, {
+  addWorkspace: () => addWorkspace,
+  getWorkspaces: () => getWorkspaces,
+  rewriteRegistry: () => rewriteRegistry
+});
+import fs5 from "node:fs";
+import path6 from "node:path";
+function ensureRegistryFile() {
+  ensureGlobalDirs();
+  if (!fs5.existsSync(REGISTRY_FILE)) {
+    fs5.writeFileSync(REGISTRY_FILE, "[]");
+  }
+}
+async function addWorkspace(dir) {
+  ensureRegistryFile();
+  const platformioIni = path6.join(dir, "platformio.ini");
+  if (!fs5.existsSync(platformioIni)) {
+    throw new Error(`missing platformio.ini in workspace: ${dir}`);
+  }
+  try {
+    const release = await import_proper_lockfile2.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let records = [];
+      try {
+        records = JSON.parse(fs5.readFileSync(REGISTRY_FILE, "utf8"));
+      } catch {
+      }
+      if (records.length > 0) {
+        const lastRecord = records[records.length - 1];
+        if (lastRecord.dir === dir) {
+          return;
+        }
+      }
+      records.push({ dir, timestamp: Date.now() });
+      fs5.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
+    } finally {
+      await release();
+    }
+  } catch {
+  }
+}
+async function getWorkspaces() {
+  ensureRegistryFile();
+  let records = [];
+  try {
+    const release = await import_proper_lockfile2.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      records = JSON.parse(fs5.readFileSync(REGISTRY_FILE, "utf8"));
+    } finally {
+      await release();
+    }
+  } catch {
+    try {
+      records = JSON.parse(fs5.readFileSync(REGISTRY_FILE, "utf8"));
+    } catch {
+      return [];
+    }
+  }
+  const seen = /* @__PURE__ */ new Map();
+  for (const parsed of records) {
+    if (parsed.dir) {
+      seen.set(parsed.dir, parsed.timestamp);
+    }
+  }
+  return Array.from(seen.entries()).sort((a, b) => b[1] - a[1]).map((entry) => entry[0]).filter((dir) => fs5.existsSync(path6.join(dir, "platformio.ini")));
+}
+async function rewriteRegistry(directories) {
+  ensureRegistryFile();
+  try {
+    const release = await import_proper_lockfile2.default.lock(REGISTRY_FILE, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      const records = directories.map((dir) => ({ dir, timestamp: Date.now() }));
+      fs5.writeFileSync(REGISTRY_FILE, JSON.stringify(records, null, 2));
+    } finally {
+      await release();
+    }
+  } catch {
+  }
+}
+var import_proper_lockfile2, REGISTRY_FILE;
+var init_workspace_registry = __esm({
+  "src/utils/workspace-registry.ts"() {
+    "use strict";
+    import_proper_lockfile2 = __toESM(require_proper_lockfile(), 1);
+    init_paths();
+    REGISTRY_FILE = path6.join(SERVER_DATA_DIR, "workspaces.json");
+  }
+});
+
+// src/core/policy/redact.ts
+function redactSecretsInText(text6) {
+  let redacted = text6;
+  for (const pattern of secretPatterns) {
+    redacted = redacted.replace(pattern, replacement);
+  }
+  return redacted;
+}
+var secretPatterns, replacement;
+var init_redact = __esm({
+  "src/core/policy/redact.ts"() {
+    "use strict";
+    secretPatterns = [
+      /OPENAI_API_KEY=[^\s]+/gi,
+      /GITHUB_TOKEN=[^\s]+/gi,
+      /SUPABASE_KEY=[^\s]+/gi,
+      /AWS_SECRET_ACCESS_KEY=[^\s]+/gi,
+      /(?:wifi|wi-fi|wlan)[_-]?(?:password|pass|psk)\s*[:=]\s*[^\s,;]+/gi,
+      /(?:api[_-]?key|client[_-]?secret|provisioning[_-]?(?:key|secret))\s*[:=]\s*[^\s,;]+/gi,
+      /authorization\s*:\s*bearer\s+[^\s]+/gi,
+      /bearer\s+[a-z0-9._~+/=-]{12,}/gi,
+      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
+      /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gi,
+      /password\s*=\s*[^\s]+/gi,
+      /token\s*=\s*[^\s]+/gi
+    ];
+    replacement = "[REDACTED_SECRET]";
+  }
+});
+
+// src/api/events.ts
+import { EventEmitter } from "events";
+import fs6 from "node:fs";
+import path7 from "node:path";
+var PortalEventEmitter, portalEvents;
+var init_events = __esm({
+  "src/api/events.ts"() {
+    "use strict";
+    init_workspace_registry();
+    init_redact();
+    PortalEventEmitter = class extends EventEmitter {
+      constructor() {
+        super();
+        this.setMaxListeners(50);
+      }
+      /**
+       * Emit an agentic activity event.
+       * @param toolName The name of the tool called
+       * @param args The arguments passed to the tool
+       * @param status The execution status (running, success, error)
+       * @param activityId A unique identifier for this activity
+       */
+      async emitActivity(toolName, args, status, activityId) {
+        const payload = {
+          timestamp: Date.now(),
+          toolName,
+          args,
+          success: status === "success",
+          // Kept for backwards compatibility
+          status,
+          activityId
+        };
+        this.emit("agent_activity", payload);
+        if (this.lastKnownProjectDir) {
+          try {
+            const workspaceDir = path7.join(this.lastKnownProjectDir, ".pio-mcp-workspace");
+            if (!fs6.existsSync(workspaceDir)) {
+              fs6.mkdirSync(workspaceDir, { recursive: true });
+            }
+            const logFile = path7.join(workspaceDir, "agent_activities.jsonl");
+            try {
+              const stat = await fs6.promises.stat(logFile);
+              if (stat.size > 2 * 1024 * 1024) {
+                await fs6.promises.rename(logFile, logFile + ".1");
+              }
+            } catch {
+            }
+            await fs6.promises.appendFile(logFile, JSON.stringify(payload) + "\n");
+          } catch {
+          }
+        }
+      }
+      artifactBuffers = {};
+      /**
+       * Emit a build log stream, buffering partial chunks into clean lines
+       * @param projectId The target project identifier
+       * @param taskId The task ID generating the log
+       * @param chunk Raw string chunk of the log
+       */
+      emitTaskLog(projectId, taskId, chunk) {
+        const safeChunk = redactSecretsInText(chunk);
+        const bufferKey = taskId || projectId;
+        if (!this.artifactBuffers[bufferKey]) {
+          this.artifactBuffers[bufferKey] = "";
+        }
+        this.artifactBuffers[bufferKey] += safeChunk;
+        let newlineIndex;
+        while ((newlineIndex = this.artifactBuffers[bufferKey].indexOf("\n")) !== -1) {
+          const logLine = this.artifactBuffers[bufferKey].substring(0, newlineIndex).trimEnd();
+          this.artifactBuffers[bufferKey] = this.artifactBuffers[bufferKey].substring(
+            newlineIndex + 1
+          );
+          this.emit("build_log", {
+            timestamp: Date.now(),
+            projectId,
+            taskId,
+            logLine
+          });
+        }
+      }
+      /**
+       * Emit a signal to clear the build terminal for a project
+       * @param projectId The target project identifier
+       * @param taskId Optional specific task ID
+       * @param logPaths Optional list of associated log files
+       */
+      clearTaskLog(projectId, taskId, logPaths) {
+        const bufferKey = taskId || projectId;
+        if (this.artifactBuffers[bufferKey]) {
+          this.artifactBuffers[bufferKey] = "";
+        }
+        this.emit("build_clear", {
+          timestamp: Date.now(),
+          projectId,
+          taskId,
+          logPaths
+        });
+      }
+      /**
+       * Emit a serial monitor read
+       * @param port Serial port emitting the log
+       * @param data Log payload data
+       * @param taskId Optional task ID
+       */
+      emitSerialLog(port, data, taskId) {
+        this.emit("serial_log", {
+          timestamp: Date.now(),
+          port,
+          taskId,
+          data: redactSecretsInText(data)
+        });
+      }
+      /**
+       * Emit general server status
+       * @param status String enum of "online" or "offline"
+       */
+      emitServerStatus(status) {
+        this.emit("server_status", {
+          timestamp: Date.now(),
+          status
+        });
+      }
+      /**
+       * Emit hardware queue lock status
+       * @param state The lock state object
+       */
+      emitLockState(state) {
+        this.emit("lock_state", {
+          timestamp: Date.now(),
+          ...state
+        });
+      }
+      /**
+       * Emit a map of all spooler connection and config properties
+       * @param states Record mapping ports to spooler states
+       */
+      emitSpoolerStates(states) {
+        this.emit("spooler_states", states);
+      }
+      /**
+       * Emit an update signal when the command history registry changes
+       * @param projectDir Target project context
+       */
+      emitCommandHistoryUpdated(projectDir) {
+        this.emit("command_history_updated", {
+          timestamp: Date.now(),
+          projectDir
+        });
+      }
+      /**
+       * Emits a lightweight invalidation signal for policy, approval, and automation state.
+       *
+       * @param projectDir Optional workspace affected by the state change.
+       */
+      emitSafetyStateUpdated(projectDir) {
+        this.emit("safety_state_updated", {
+          timestamp: Date.now(),
+          projectDir
+        });
+      }
+      /**
+       * Emit a signal containing the latest rich hardware port state
+       * @param devices List of device objects
+       */
+      emitHardwareStateUpdated(devices) {
+        this.emit("hardware_state_updated", {
+          timestamp: Date.now(),
+          devices
+        });
+      }
+      lastKnownProjectDir;
+      /**
+       * Caches and emits the last known dynamically targeted workspace directory.
+       * @param projectDir Target project directory path
+       */
+      emitWorkspaceState(projectDir) {
+        this.lastKnownProjectDir = projectDir;
+        addWorkspace(projectDir).catch(() => {
+        });
+        this.emit("workspace_state", {
+          timestamp: Date.now(),
+          projectDir
+        });
+      }
+      /**
+       * Retrieves the last known workspace path
+       * @returns The last targeted workspace directory
+       */
+      getLastKnownWorkspace() {
+        return this.lastKnownProjectDir;
+      }
+      /**
+       * Emit an update signal when the overall workspaces registry changes.
+       * @param workspaces List of available workspace directories
+       */
+      emitWorkspacesUpdated(workspaces) {
+        this.emit("workspaces_updated", {
+          timestamp: Date.now(),
+          workspaces
+        });
+      }
+    };
+    portalEvents = new PortalEventEmitter();
+  }
+});
+
 // src/utils/validation.ts
-import path11 from "path";
+import path9 from "path";
 import { access, constants } from "fs/promises";
 function validateBoardId(boardId) {
   if (!boardId || typeof boardId !== "string") {
@@ -14261,8 +13968,8 @@ function validateProjectPath(projectPath) {
     throw new Error("Project path is required and must be a string");
   }
   const sanitized = projectPath.trim();
-  const absolutePath = path11.resolve(sanitized);
-  const normalizedPath = path11.normalize(absolutePath);
+  const absolutePath = path9.resolve(sanitized);
+  const normalizedPath = path9.normalize(absolutePath);
   if (normalizedPath.includes("..") || normalizedPath !== absolutePath) {
     throw new Error("Invalid project path: path traversal detected");
   }
@@ -14340,6 +14047,589 @@ function validateBaudRate(baud) {
 var init_validation = __esm({
   "src/utils/validation.ts"() {
     "use strict";
+  }
+});
+
+// src/core/devices/process-identity.ts
+import fs12 from "node:fs";
+import path16 from "node:path";
+import { execFileSync } from "node:child_process";
+function linuxStartToken(stat, bootId, pid) {
+  const end = stat.lastIndexOf(")");
+  const fields = stat.slice(end + 1).trim().split(/\s+/);
+  const start = fields[19];
+  if (stat.length > 8192 || end < 0 || !stat.startsWith(`${pid} (`) || !/^[0-9]+$/.test(start ?? "") || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(bootId.trim()))
+    throw new PlatformIOError(
+      "Invalid Linux process identity.",
+      "PROCESS_IDENTITY_INVALID"
+    );
+  return `${bootId.trim().toLowerCase()}:${start}`;
+}
+function inspectProcessIdentity(pid) {
+  if (!Number.isSafeInteger(pid) || pid < 1 || pid > 2147483647)
+    throw new PlatformIOError(
+      "Invalid process ID.",
+      "PROCESS_IDENTITY_INVALID"
+    );
+  try {
+    let startToken;
+    if (process.platform === "linux") {
+      startToken = linuxStartToken(
+        fs12.readFileSync(`/proc/${pid}/stat`, "utf8"),
+        fs12.readFileSync("/proc/sys/kernel/random/boot_id", "utf8"),
+        pid
+      );
+    } else if (process.platform === "win32") {
+      const systemRoot = process.env.SystemRoot;
+      if (!systemRoot || !path16.isAbsolute(systemRoot))
+        return { status: "unknown" };
+      startToken = execFileSync(
+        path16.join(
+          systemRoot,
+          "System32",
+          "WindowsPowerShell",
+          "v1.0",
+          "powershell.exe"
+        ),
+        [
+          "-NoLogo",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          `$ErrorActionPreference='Stop'; [System.Diagnostics.Process]::GetProcessById(${pid}).StartTime.ToFileTimeUtc().ToString([System.Globalization.CultureInfo]::InvariantCulture)`
+        ],
+        {
+          encoding: "utf8",
+          // Windows PowerShell cold startup can exceed three seconds on loaded hosts.
+          timeout: 1e4,
+          maxBuffer: 8192,
+          windowsHide: true,
+          stdio: ["ignore", "pipe", "pipe"]
+        }
+      ).trim();
+      if (!/^[0-9]{15,20}$/.test(startToken)) return { status: "unknown" };
+    } else if (process.platform === "darwin") {
+      startToken = execFileSync(
+        "/bin/ps",
+        ["-p", String(pid), "-o", "lstart="],
+        {
+          encoding: "utf8",
+          timeout: 3e3,
+          maxBuffer: 8192,
+          env: { ...process.env, LC_ALL: "C", TZ: "UTC" },
+          stdio: ["ignore", "pipe", "pipe"]
+        }
+      ).trim();
+      if (!/^[A-Z][a-z]{2} [A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2} \d{4}$/.test(
+        startToken
+      ))
+        return { status: "unknown" };
+    } else return { status: "unknown" };
+    return {
+      status: "running",
+      identity: { pid, platform: process.platform, startToken }
+    };
+  } catch {
+    try {
+      process.kill(pid, 0);
+    } catch (error2) {
+      if (error2.code === "ESRCH")
+        return { status: "absent" };
+    }
+    return { status: "unknown" };
+  }
+}
+function compareProcessIdentity(owner, observation) {
+  if (observation.status === "absent") return "stale";
+  if (observation.status === "unknown") return "unknown";
+  if (owner.platform !== observation.identity.platform || owner.pid !== observation.identity.pid)
+    return "unknown";
+  return owner.startToken === observation.identity.startToken ? "alive" : "stale";
+}
+var init_process_identity = __esm({
+  "src/core/devices/process-identity.ts"() {
+    "use strict";
+    init_errors2();
+  }
+});
+
+// src/utils/command-registry.ts
+import fs17 from "node:fs";
+import path21 from "node:path";
+function getRegistryFilePath(projectDir) {
+  const baseDir = projectDir || SERVER_DATA_DIR;
+  if (!projectDir) ensureGlobalDirs();
+  const dir = path21.join(baseDir, WORKSPACE_DIR, "registry");
+  if (!fs17.existsSync(dir)) fs17.mkdirSync(dir, { recursive: true });
+  return path21.join(dir, REGISTRY_FILE2);
+}
+async function registerCommand(record2, projectDir) {
+  const file = getRegistryFilePath(projectDir);
+  if (!fs17.existsSync(file)) fs17.writeFileSync(file, "[]");
+  try {
+    const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let history = [];
+      try {
+        history = JSON.parse(fs17.readFileSync(file, "utf8"));
+      } catch {
+      }
+      const existingIndex = history.findIndex((cmd) => cmd.id === record2.id);
+      if (existingIndex !== -1) {
+        const existingCmd = history[existingIndex];
+        record2.tasks.forEach((newArt) => {
+          if (!existingCmd.tasks.find((a) => a.taskId === newArt.taskId)) {
+            existingCmd.tasks.push(newArt);
+          }
+        });
+        existingCmd.status = record2.status;
+      } else {
+        history.push(record2);
+        if (history.length > MAX_HISTORY_ITEMS) {
+          history = history.slice(-MAX_HISTORY_ITEMS);
+        }
+      }
+      fs17.writeFileSync(file, JSON.stringify(history, null, 2));
+      portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+}
+async function updateCommandStatus(id, updates, projectDir) {
+  const file = getRegistryFilePath(projectDir);
+  if (!fs17.existsSync(file)) return;
+  try {
+    const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let history = [];
+      try {
+        history = JSON.parse(fs17.readFileSync(file, "utf8"));
+      } catch {
+      }
+      const index = history.findIndex((cmd) => cmd.id === id);
+      if (index !== -1) {
+        history[index] = { ...history[index], ...updates };
+        fs17.writeFileSync(file, JSON.stringify(history, null, 2));
+        portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
+      }
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+}
+async function updateTaskStatus(commandId, taskId, updates, projectDir) {
+  const file = getRegistryFilePath(projectDir);
+  if (!fs17.existsSync(file)) return;
+  try {
+    const release = await import_proper_lockfile4.default.lock(file, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    try {
+      let history = [];
+      try {
+        history = JSON.parse(fs17.readFileSync(file, "utf8"));
+      } catch {
+      }
+      const cmdIndex = history.findIndex((cmd) => cmd.id === commandId);
+      if (cmdIndex !== -1) {
+        const cmd = history[cmdIndex];
+        const artIndex = cmd.tasks?.findIndex((art) => art.taskId === taskId) ?? -1;
+        if (artIndex !== -1) {
+          cmd.tasks[artIndex] = { ...cmd.tasks[artIndex], ...updates };
+          const allSuccess = cmd.tasks.every((a) => a.status === "success");
+          const anyError = cmd.tasks.some((a) => a.status === "error");
+          const anyRunning = cmd.tasks.some((a) => a.status === "running");
+          if (anyError) {
+            cmd.status = "error";
+            const failedTask = cmd.tasks.find((a) => a.status === "error" && a.error);
+            if (failedTask?.error) {
+              cmd.error = failedTask.error;
+            }
+          } else if (anyRunning) cmd.status = "running";
+          else if (allSuccess) cmd.status = "success";
+          else cmd.status = "terminated";
+          fs17.writeFileSync(file, JSON.stringify(history, null, 2));
+          portalEvents.emitCommandHistoryUpdated(projectDir || SERVER_DATA_DIR);
+        }
+      }
+    } finally {
+      await release();
+    }
+  } catch (e) {
+    throw new Error(`Registry contention timeout: ${e.message}`);
+  }
+}
+function getCommandHistory(projectDir) {
+  const file = getRegistryFilePath(projectDir);
+  if (!fs17.existsSync(file)) return [];
+  try {
+    return JSON.parse(fs17.readFileSync(file, "utf8"));
+  } catch {
+    return [];
+  }
+}
+async function findCommandAcrossWorkspaces(taskId) {
+  const globalHistory = getCommandHistory();
+  const globalMatch = globalHistory.find(
+    (command) => command.id === taskId || command.tasks.some((task) => task.taskId === taskId)
+  );
+  if (globalMatch) return { command: globalMatch, history: globalHistory };
+  const { getWorkspaces: getWorkspaces2 } = await Promise.resolve().then(() => (init_workspace_registry(), workspace_registry_exports));
+  const workspaces = await getWorkspaces2();
+  for (const ws of workspaces) {
+    const wsHistory = getCommandHistory(ws);
+    const found = wsHistory.find(
+      (command) => command.id === taskId || command.tasks.some((task) => task.taskId === taskId)
+    );
+    if (found) return { command: found, history: wsHistory, projectDir: ws };
+  }
+  return void 0;
+}
+var import_proper_lockfile4, WORKSPACE_DIR, REGISTRY_FILE2, MAX_HISTORY_ITEMS;
+var init_command_registry = __esm({
+  "src/utils/command-registry.ts"() {
+    "use strict";
+    import_proper_lockfile4 = __toESM(require_proper_lockfile(), 1);
+    init_events();
+    init_paths();
+    WORKSPACE_DIR = ".pio-mcp-workspace";
+    REGISTRY_FILE2 = "command_history.json";
+    MAX_HISTORY_ITEMS = 30;
+  }
+});
+
+// src/utils/mcp-context.ts
+import { AsyncLocalStorage as AsyncLocalStorage2 } from "node:async_hooks";
+var mcpContext;
+var init_mcp_context = __esm({
+  "src/utils/mcp-context.ts"() {
+    "use strict";
+    mcpContext = new AsyncLocalStorage2();
+  }
+});
+
+// src/platformio.ts
+import { execFile, spawn } from "node:child_process";
+import fs18 from "node:fs";
+import os5 from "node:os";
+import path22 from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "url";
+import crypto7 from "node:crypto";
+import { execSync } from "node:child_process";
+async function execPioCommand(args, options = {}) {
+  const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+  const runWrappedProcess = (binary) => {
+    return new Promise((resolve, reject) => {
+      const child = execFile(
+        binary,
+        args,
+        {
+          cwd: options.cwd,
+          env: options.env,
+          timeout,
+          maxBuffer: 10 * 1024 * 1024
+        },
+        (error2, stdout, stderr) => {
+          if (error2) {
+            error2.stdout = stdout;
+            error2.stderr = stderr;
+            reject(error2);
+          } else {
+            resolve({
+              stdout: stdout.toString(),
+              stderr: stderr.toString(),
+              code: 0
+            });
+          }
+        }
+      );
+      if (options.onOutput) {
+        child.stdout?.on("data", (data) => options.onOutput(data.toString()));
+        child.stderr?.on("data", (data) => options.onOutput(data.toString()));
+      }
+    });
+  };
+  try {
+    let result;
+    try {
+      result = await runWrappedProcess("pio");
+    } catch (firstError) {
+      if (isPlatformIONotFoundError(firstError)) {
+        try {
+          result = await runWrappedProcess("platformio");
+        } catch (secondError) {
+          if (isPlatformIONotFoundError(secondError)) {
+            throw new PlatformIONotInstalledError();
+          }
+          throw secondError;
+        }
+      } else {
+        throw firstError;
+      }
+    }
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: 0
+    };
+  } catch (error2) {
+    if (error2.killed && error2.signal === "SIGTERM") {
+      throw new CommandTimeoutError(args.join(" "), timeout);
+    }
+    if (isPlatformIONotFoundError(error2)) {
+      throw new PlatformIONotInstalledError();
+    }
+    if (error2.code && error2.stdout !== void 0) {
+      return {
+        stdout: error2.stdout || "",
+        stderr: error2.stderr || "",
+        exitCode: error2.code
+      };
+    }
+    throw error2;
+  }
+}
+function parsePioJsonOutput(output, schema3) {
+  if (!output || output.trim().length === 0) {
+    throw new PlatformIOError("Empty output from PlatformIO command");
+  }
+  try {
+    const parsed = JSON.parse(output);
+    return schema3.parse(parsed);
+  } catch (error2) {
+    if (error2 instanceof external_exports.ZodError) {
+      throw new PlatformIOError(
+        `Failed to parse PlatformIO output: ${error2.message}`,
+        "PARSE_ERROR",
+        { zodError: error2.issues, output: output.substring(0, 500) }
+      );
+    }
+    if (error2 instanceof SyntaxError) {
+      throw new PlatformIOError(
+        `Invalid JSON output from PlatformIO: ${error2.message}`,
+        "INVALID_JSON",
+        { output: output.substring(0, 500) }
+      );
+    }
+    throw error2;
+  }
+}
+async function checkPlatformIOInstalled() {
+  try {
+    const result = await execPioCommand(["--version"], { timeout: 5e3 });
+    return result.exitCode === 0 && result.stdout.includes("PlatformIO");
+  } catch (error2) {
+    if (error2 instanceof PlatformIONotInstalledError) {
+      return false;
+    }
+    throw error2;
+  }
+}
+async function getPlatformIOVersion() {
+  try {
+    const result = await execPioCommand(["--version"], { timeout: 5e3 });
+    if (result.exitCode === 0) {
+      const match = result.stdout.match(/version\s+([\d\.]+)/i);
+      return match ? match[1] : result.stdout.trim();
+    }
+    throw new PlatformIOError("Failed to get PlatformIO version");
+  } catch (error2) {
+    if (error2 instanceof PlatformIONotInstalledError) {
+      throw error2;
+    }
+    throw new PlatformIOError("Failed to get PlatformIO version");
+  }
+}
+function resolvePioPath() {
+  try {
+    const whichCmd = os5.platform() === "win32" ? "where pio" : "command -v pio";
+    const out = execSync(whichCmd, { stdio: "pipe" }).toString().trim();
+    if (out) {
+      const paths = out.split("\n").map((p) => p.trim()).filter((p) => p.length > 0);
+      for (const p of paths) {
+        if (fs18.existsSync(p)) return p;
+      }
+    }
+  } catch {
+  }
+  if (os5.platform() === "win32") {
+    const winCandidate = path22.join(os5.homedir(), ".platformio", "penv", "Scripts", "pio.exe");
+    if (fs18.existsSync(winCandidate)) return winCandidate;
+    return "pio";
+  }
+  const candidates = [
+    "/usr/local/bin/pio",
+    "/opt/homebrew/bin/pio",
+    "/usr/bin/pio",
+    "/bin/pio",
+    path22.join(os5.homedir(), ".platformio", "penv", "bin", "pio")
+  ];
+  for (const c of candidates) {
+    if (fs18.existsSync(c)) return c;
+  }
+  return "pio";
+}
+var __filename2, __dirname3, DEFAULT_TIMEOUT, PlatformIOExecutor, platformioExecutor;
+var init_platformio = __esm({
+  "src/platformio.ts"() {
+    "use strict";
+    init_zod();
+    init_command_registry();
+    init_mcp_context();
+    init_errors2();
+    __filename2 = fileURLToPath2(import.meta.url);
+    __dirname3 = path22.dirname(__filename2);
+    DEFAULT_TIMEOUT = 3e5;
+    PlatformIOExecutor = class {
+      constructor() {
+      }
+      /**
+       * Executes a PlatformIO command.
+       *
+       * @param command - The PIO subcommand string.
+       * @param args - Arguments array for the command.
+       * @param options - Execution directives for the child process.
+       * @returns Structured runtime output results.
+       */
+      async execute(command, args, options) {
+        const fullArgs = [command, ...args];
+        const ctx = mcpContext.getStore();
+        const commandId = ctx?.activityId;
+        const targetProjectDir = ctx?.targetProjectDir || options?.cwd;
+        let taskId = void 0;
+        if (commandId) {
+          taskId = crypto7.randomUUID();
+          try {
+            await registerCommand({
+              id: commandId,
+              commandDesc: `PIO Task: pio ${fullArgs.join(" ")}`,
+              timestamp: Date.now(),
+              status: "running",
+              tasks: [{
+                taskId,
+                type: command,
+                status: "running",
+                commandDesc: `pio ${fullArgs.join(" ")}`
+              }]
+            }, targetProjectDir);
+          } catch (e) {
+            console.error(`[PlatformIO] Inline telemetry failure: ${e.message}`);
+          }
+        }
+        try {
+          const result = await execPioCommand(fullArgs, options);
+          if (commandId && taskId) {
+            await updateTaskStatus(commandId, taskId, {
+              status: result.exitCode === 0 ? "success" : "error",
+              exitCode: result.exitCode
+            }, targetProjectDir).catch(() => {
+            });
+          }
+          return result;
+        } catch (error2) {
+          if (commandId && taskId) {
+            await updateTaskStatus(commandId, taskId, {
+              status: "error",
+              exitCode: error2.code || 1
+            }, targetProjectDir).catch(() => {
+            });
+          }
+          throw error2;
+        }
+      }
+      /**
+       * Checks if PlatformIO is installed.
+       *
+       * @returns A boolean resolving true if PlatformIO is ready.
+       */
+      async checkInstallation() {
+        return checkPlatformIOInstalled();
+      }
+      /**
+       * Gets PlatformIO version.
+       *
+       * @returns The resolved PIO version.
+       */
+      async getVersion() {
+        return getPlatformIOVersion();
+      }
+      /**
+       * Executes a command and parses JSON output.
+       *
+       * @param command - Core PlatformIO subcommand logic.
+       * @param args - Configuration and CLI flag values.
+       * @param schema - Schema for JSON output validation.
+       * @param options - Operational execution directives.
+       * @returns Parsed and validated JSON node entity.
+       */
+      async executeWithJsonOutput(command, args, schema3, options) {
+        const fullArgs = [...args];
+        if (!fullArgs.includes("--json-output")) {
+          fullArgs.push("--json-output");
+        }
+        const result = await this.execute(command, fullArgs, options);
+        if (result.exitCode !== 0) {
+          throw new PlatformIOError(
+            `PlatformIO command failed: ${command} ${args.join(" ")}`,
+            "COMMAND_FAILED",
+            { stderr: result.stderr, exitCode: result.exitCode }
+          );
+        }
+        return parsePioJsonOutput(result.stdout, schema3);
+      }
+      /**
+       * Spawns a long-running PlatformIO command (e.g., monitor).
+       * Implements the same binary resolution logic as 'execute'.
+       *
+       * @param command - The PIO subcommand.
+       * @param args - Arguments array for the PlatformIO CLI.
+       * @param options - Execution options including working directory, environment overrides, and fake TTY bridging.
+       * @returns The spawned ChildProcess instance.
+       */
+      async spawn(command, args, options = {}) {
+        let pioBinary = "pio";
+        let pioArgs = [command, ...args];
+        const env = {
+          ...process.env,
+          ...options.env
+        };
+        if (options.useFakeTty && process.platform !== "win32") {
+          const absolutePio = resolvePioPath();
+          const proxyScriptPath = path22.join(
+            __dirname3,
+            "..",
+            "src",
+            "utils",
+            "mcp_pio_proxy.py"
+          );
+          pioBinary = "python3";
+          pioArgs = [proxyScriptPath, absolutePio, command, ...args];
+        }
+        const fullCmd = `${pioBinary} ${pioArgs.join(" ")}`;
+        try {
+          const logDir = path22.join(__dirname3, "..", "logs");
+          if (!fs18.existsSync(logDir)) fs18.mkdirSync(logDir, { recursive: true });
+          await fs18.promises.appendFile(
+            path22.join(logDir, "mcp-internal.log"),
+            `[${(/* @__PURE__ */ new Date()).toISOString()}] [Spooler Executor] Spawning: ${fullCmd}
+`
+          );
+        } catch (e) {
+          console.error(`Failed to write to internal log: ${e}`);
+        }
+        return spawn(pioBinary, pioArgs, {
+          cwd: options.cwd,
+          env,
+          shell: false,
+          detached: options.detached,
+          stdio: options.stdio
+        });
+      }
+    };
+    platformioExecutor = new PlatformIOExecutor();
   }
 });
 
@@ -14782,8 +15072,8 @@ var init_hardware_maps = __esm({
 });
 
 // src/utils/semaphore.ts
-import fs14 from "node:fs";
-import path18 from "node:path";
+import fs20 from "node:fs";
+import path23 from "node:path";
 var SemaphoreManager, portSemaphoreManager;
 var init_semaphore = __esm({
   "src/utils/semaphore.ts"() {
@@ -14802,7 +15092,7 @@ var init_semaphore = __esm({
       }
       getLockFilePath(port) {
         const id = sanitizePortName(port);
-        return path18.join(GLOBAL_LOCKS_DIR, `${id}.json`);
+        return path23.join(GLOBAL_LOCKS_DIR, `${id}.json`);
       }
       /**
        * Claims a physical port by creating a lock file.
@@ -14819,15 +15109,15 @@ var init_semaphore = __esm({
             timestamp: Date.now()
           }
         }, null, 2);
-        fs14.writeFileSync(filePath, content);
+        fs20.writeFileSync(filePath, content);
       }
       /**
        * Releases a claim by removing the lock file.
        */
       releasePort(port) {
         const filePath = this.getLockFilePath(port);
-        if (fs14.existsSync(filePath)) {
-          fs14.unlinkSync(filePath);
+        if (fs20.existsSync(filePath)) {
+          fs20.unlinkSync(filePath);
         }
       }
       /**
@@ -14835,16 +15125,16 @@ var init_semaphore = __esm({
        */
       isPortClaimed(port) {
         const filePath = this.getLockFilePath(port);
-        return fs14.existsSync(filePath);
+        return fs20.existsSync(filePath);
       }
       /**
        * Retrieves the current claim payload for a port, if it exists.
        */
       getClaim(port) {
         const filePath = this.getLockFilePath(port);
-        if (fs14.existsSync(filePath)) {
+        if (fs20.existsSync(filePath)) {
           try {
-            const content = fs14.readFileSync(filePath, "utf-8");
+            const content = fs20.readFileSync(filePath, "utf-8");
             const parsed = JSON.parse(content);
             return parsed.current_claim || parsed;
           } catch {
@@ -14995,296 +15285,6 @@ var init_devices2 = __esm({
   "src/core/devices.ts"() {
     "use strict";
     init_devices();
-  }
-});
-
-// src/core/bounded-pattern.ts
-import { Worker } from "node:worker_threads";
-function regexSource(pattern, translate) {
-  if (!translate) return pattern;
-  for (let i = 0; i < pattern.length; i++) {
-    if (pattern[i] === "\\") {
-      i++;
-      if (/[AZzGRNUae]/.test(pattern[i] ?? ""))
-        throw new PlatformIOError(
-          "Unsupported Python regex escape; use the documented ECMAScript subset.",
-          "PATTERN_UNSUPPORTED"
-        );
-    }
-  }
-  return pattern.replace(/\(\?P<([A-Za-z_][A-Za-z0-9_]*)>/g, "(?<$1>").replace(/\(\?P=([A-Za-z_][A-Za-z0-9_]*)\)/g, "\\k<$1>");
-}
-async function runBoundedPattern(lines2, pattern, options = {}, extract = false) {
-  if (typeof pattern !== "string" || pattern.length > 4096 || lines2.length > 1e4 || lines2.some((line) => typeof line !== "string") || lines2.reduce((sum, line) => sum + Buffer.byteLength(line), 0) > 1024 * 1024) {
-    throw new PlatformIOError(
-      "Pattern matching is limited to 4096 pattern characters, 10000 lines and 1 MiB of input.",
-      "PATTERN_INPUT_LIMIT"
-    );
-  }
-  if (options.mode !== void 0 && options.mode !== "literal" && options.mode !== "regex")
-    throw new PlatformIOError(
-      "Unknown pattern matching mode.",
-      "PATTERN_INVALID"
-    );
-  if ((options.mode ?? "literal") === "literal") {
-    const needle = options.ignoreCase ? pattern.toLowerCase() : pattern;
-    return {
-      captures: [],
-      indices: lines2.flatMap(
-        (line, index) => (options.ignoreCase ? line.toLowerCase() : line).includes(needle) ? [index] : []
-      )
-    };
-  }
-  const timeoutMs = options.timeoutMs ?? 1e3;
-  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2e3)
-    throw new PlatformIOError(
-      "Regex timeout must be between 1 and 2000 ms.",
-      "PATTERN_INVALID"
-    );
-  const source = regexSource(pattern, options.pythonNamedGroups ?? false);
-  if (activeRegexWorkers >= 4)
-    throw new PlatformIOError(
-      "Regex worker capacity is busy; retry after current searches finish.",
-      "PATTERN_BUSY"
-    );
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(WORKER_SOURCE, {
-      eval: true,
-      workerData: {
-        lines: lines2,
-        pattern: source,
-        ignoreCase: options.ignoreCase ?? false,
-        extract
-      },
-      resourceLimits: {
-        maxOldGenerationSizeMb: 32,
-        maxYoungGenerationSizeMb: 8,
-        stackSizeMb: 2
-      }
-    });
-    activeRegexWorkers++;
-    let settled = false;
-    let executing = false;
-    let timer;
-    const finish = (error2, result) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      void worker.terminate().finally(() => {
-        activeRegexWorkers--;
-      }).then(() => {
-        if (error2) reject(error2);
-        else resolve(result);
-      }, reject);
-    };
-    timer = setTimeout(
-      () => finish(
-        new PlatformIOError(
-          "Regex worker exceeded its startup deadline.",
-          "PATTERN_WORKER_STARTUP_TIMEOUT"
-        )
-      ),
-      5e3
-    );
-    worker.on(
-      "message",
-      (message) => {
-        if (settled) return;
-        if (message.ready) {
-          if (executing) return;
-          executing = true;
-          clearTimeout(timer);
-          timer = setTimeout(
-            () => finish(
-              new PlatformIOError(
-                "Regex exceeded its execution deadline.",
-                "PATTERN_TIMEOUT"
-              )
-            ),
-            timeoutMs
-          );
-          worker.postMessage({ run: true });
-          return;
-        }
-        if (!executing)
-          return finish(
-            new PlatformIOError(
-              "Unexpected regex worker response.",
-              "PATTERN_WORKER_FAILED"
-            )
-          );
-        finish(
-          message.limit ? new PlatformIOError(
-            "Named capture output exceeds limits.",
-            "PATTERN_OUTPUT_LIMIT"
-          ) : message.invalid ? new PlatformIOError(
-            "Invalid or unsupported regular expression.",
-            "PATTERN_INVALID"
-          ) : void 0,
-          { indices: message.indices ?? [], captures: message.captures ?? [] }
-        );
-      }
-    );
-    worker.once(
-      "error",
-      () => finish(
-        new PlatformIOError("Regex worker failed.", "PATTERN_WORKER_FAILED")
-      )
-    );
-    worker.once("exit", () => {
-      if (!settled)
-        finish(
-          new PlatformIOError(
-            "Regex worker exited before returning a result.",
-            "PATTERN_WORKER_FAILED"
-          )
-        );
-    });
-  });
-}
-async function matchBoundedLines(lines2, pattern, options = {}) {
-  return (await runBoundedPattern(lines2, pattern, options)).indices;
-}
-async function extractBoundedCaptures(lines2, pattern, options = {}) {
-  return (await runBoundedPattern(lines2, pattern, { ...options, mode: "regex" }, true)).captures;
-}
-var WORKER_SOURCE, activeRegexWorkers;
-var init_bounded_pattern = __esm({
-  "src/core/bounded-pattern.ts"() {
-    "use strict";
-    init_errors2();
-    WORKER_SOURCE = `
-const {parentPort,workerData}=require('node:worker_threads');
-parentPort.once('message', () => {
-try {
-  const regex=new RegExp(workerData.pattern,(workerData.ignoreCase?'i':'')+(workerData.extract?'g':''));
-  if(workerData.extract) {
-    const probe=new RegExp('(?:'+workerData.pattern+')|').exec('');
-    if(!probe?.groups || !Object.hasOwn(probe.groups,'value')) throw new Error('missing value group');
-  }
-  const indices=[]; const captures=[];
-  for(let index=0;index<workerData.lines.length;index++) {
-    if(!workerData.extract) { if(regex.test(workerData.lines[index])) indices.push(index); continue; }
-    regex.lastIndex=0;
-    let match;
-    while((match=regex.exec(workerData.lines[index]))!==null) {
-      if(match.groups.value!==undefined) {
-        const value=match.groups.value; const name=match.groups.name; const unit=match.groups.unit;
-        if(captures.length>=10000 || value.length>128 || (name!==undefined && name.length>128) || (unit!==undefined && unit.length>16)) { parentPort.postMessage({limit:true}); return; }
-        captures.push({line:index,start:match.index,end:match.index+match[0].length,value,...(name!==undefined?{name}:{}),...(unit!==undefined?{unit}:{})});
-      }
-      if(match[0].length===0) regex.lastIndex++;
-    }
-  }
-  parentPort.postMessage({indices,captures});
-} catch {parentPort.postMessage({invalid:true});}
-});
-parentPort.postMessage({ready:true});
-`;
-    activeRegexWorkers = 0;
-  }
-});
-
-// src/core/devices/process-identity.ts
-import fs19 from "node:fs";
-import path22 from "node:path";
-import { execFileSync } from "node:child_process";
-function linuxStartToken(stat, bootId, pid) {
-  const end = stat.lastIndexOf(")");
-  const fields = stat.slice(end + 1).trim().split(/\s+/);
-  const start = fields[19];
-  if (stat.length > 8192 || end < 0 || !stat.startsWith(`${pid} (`) || !/^[0-9]+$/.test(start ?? "") || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(bootId.trim()))
-    throw new PlatformIOError(
-      "Invalid Linux process identity.",
-      "PROCESS_IDENTITY_INVALID"
-    );
-  return `${bootId.trim().toLowerCase()}:${start}`;
-}
-function inspectProcessIdentity(pid) {
-  if (!Number.isSafeInteger(pid) || pid < 1 || pid > 2147483647)
-    throw new PlatformIOError(
-      "Invalid process ID.",
-      "PROCESS_IDENTITY_INVALID"
-    );
-  try {
-    let startToken;
-    if (process.platform === "linux") {
-      startToken = linuxStartToken(
-        fs19.readFileSync(`/proc/${pid}/stat`, "utf8"),
-        fs19.readFileSync("/proc/sys/kernel/random/boot_id", "utf8"),
-        pid
-      );
-    } else if (process.platform === "win32") {
-      const systemRoot = process.env.SystemRoot;
-      if (!systemRoot || !path22.isAbsolute(systemRoot))
-        return { status: "unknown" };
-      startToken = execFileSync(
-        path22.join(
-          systemRoot,
-          "System32",
-          "WindowsPowerShell",
-          "v1.0",
-          "powershell.exe"
-        ),
-        [
-          "-NoLogo",
-          "-NoProfile",
-          "-NonInteractive",
-          "-Command",
-          `$ErrorActionPreference='Stop'; [System.Diagnostics.Process]::GetProcessById(${pid}).StartTime.ToFileTimeUtc().ToString([System.Globalization.CultureInfo]::InvariantCulture)`
-        ],
-        {
-          encoding: "utf8",
-          // Windows PowerShell cold startup can exceed three seconds on loaded hosts.
-          timeout: 1e4,
-          maxBuffer: 8192,
-          windowsHide: true,
-          stdio: ["ignore", "pipe", "pipe"]
-        }
-      ).trim();
-      if (!/^[0-9]{15,20}$/.test(startToken)) return { status: "unknown" };
-    } else if (process.platform === "darwin") {
-      startToken = execFileSync(
-        "/bin/ps",
-        ["-p", String(pid), "-o", "lstart="],
-        {
-          encoding: "utf8",
-          timeout: 3e3,
-          maxBuffer: 8192,
-          env: { ...process.env, LC_ALL: "C", TZ: "UTC" },
-          stdio: ["ignore", "pipe", "pipe"]
-        }
-      ).trim();
-      if (!/^[A-Z][a-z]{2} [A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2} \d{4}$/.test(
-        startToken
-      ))
-        return { status: "unknown" };
-    } else return { status: "unknown" };
-    return {
-      status: "running",
-      identity: { pid, platform: process.platform, startToken }
-    };
-  } catch {
-    try {
-      process.kill(pid, 0);
-    } catch (error2) {
-      if (error2.code === "ESRCH")
-        return { status: "absent" };
-    }
-    return { status: "unknown" };
-  }
-}
-function compareProcessIdentity(owner, observation) {
-  if (observation.status === "absent") return "stale";
-  if (observation.status === "unknown") return "unknown";
-  if (owner.platform !== observation.identity.platform || owner.pid !== observation.identity.pid)
-    return "unknown";
-  return owner.startToken === observation.identity.startToken ? "alive" : "stale";
-}
-var init_process_identity = __esm({
-  "src/core/devices/process-identity.ts"() {
-    "use strict";
-    init_errors2();
   }
 });
 
@@ -92029,2693 +92029,8 @@ var require_ip_address = __commonJS({
 
 // src/adapters/monitor-start-compat.ts
 init_zod();
-import fs15 from "node:fs/promises";
-import path19 from "node:path";
-
-// src/adapters/compatibility-project.ts
-init_errors2();
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-async function resolveCompatibilityProject(requested, defaults) {
-  let selected = requested || defaults.projectDir || defaults.cwd || process.cwd();
-  if (selected === "~" || selected.startsWith("~/") || selected.startsWith("~\\"))
-    selected = path.join(defaults.home ?? os.homedir(), selected.slice(2));
-  else if (selected.startsWith("~"))
-    throw new PlatformIOError(
-      "Named-user home expansion is unsupported; pass an absolute project path.",
-      "COMPAT_PROJECT_INVALID"
-    );
-  const canonical3 = await fs.realpath(
-    path.resolve(defaults.cwd ?? process.cwd(), selected)
-  );
-  if (!(await fs.stat(canonical3)).isDirectory() || !(await fs.stat(path.join(canonical3, "platformio.ini"))).isFile())
-    throw new PlatformIOError(
-      "Expected a PlatformIO project directory.",
-      "COMPAT_PROJECT_INVALID"
-    );
-  return canonical3;
-}
-
-// src/tools/project-inspection.ts
-init_zod();
-init_platformio();
-import fs13 from "node:fs/promises";
-
-// src/core/action-catalog.ts
-var READ = {
-  riskLevel: "low",
-  readOnly: true,
-  destructive: false,
-  idempotent: true,
-  openWorld: false
-};
-var MCP_ACTIONS = {
-  deps_check: {
-    ...READ,
-    policyAction: "get_project_config",
-    readOnly: false,
-    idempotent: false,
-    openWorld: true
-  },
-  project_envs: {
-    policyAction: "get_project_config",
-    riskLevel: "low",
-    readOnly: true,
-    destructive: false,
-    idempotent: true,
-    openWorld: false
-  },
-  project_metadata: {
-    policyAction: "build_project",
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  list_targets: {
-    policyAction: "build_project",
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  pkg_search: {
-    policyAction: "search_libraries",
-    riskLevel: "low",
-    readOnly: true,
-    destructive: false,
-    idempotent: true,
-    openWorld: true
-  },
-  pkg_install: {
-    policyAction: "install_library",
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  pkg_uninstall: {
-    policyAction: "uninstall_library",
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: true,
-    idempotent: false,
-    openWorld: true
-  },
-  pkg_list: {
-    policyAction: "build_project",
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  pkg_outdated: {
-    policyAction: "build_project",
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  pkg_update: {
-    policyAction: "update_library",
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: true,
-    idempotent: false,
-    openWorld: true
-  },
-  decode_backtrace: {
-    policyAction: "build_project",
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  size_report: {
-    policyAction: "build_project",
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  list_boards: READ,
-  get_board_info: READ,
-  list_devices: READ,
-  init_project: {
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  build_project: {
-    riskLevel: "low",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  clean_project: {
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: true,
-    idempotent: true,
-    openWorld: false
-  },
-  upload_filesystem: {
-    riskLevel: "high",
-    readOnly: false,
-    destructive: true,
-    idempotent: false,
-    openWorld: false
-  },
-  upload_firmware: {
-    riskLevel: "high",
-    readOnly: false,
-    destructive: true,
-    idempotent: false,
-    openWorld: false
-  },
-  acquire_lock: {
-    riskLevel: "low",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: false
-  },
-  release_lock: {
-    riskLevel: "low",
-    readOnly: false,
-    destructive: false,
-    idempotent: true,
-    openWorld: false
-  },
-  get_lock_status: READ,
-  search_libraries: { ...READ, openWorld: true },
-  install_library: {
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  list_installed_libraries: READ,
-  start_monitor: {
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: true,
-    openWorld: false
-  },
-  stop_monitor: {
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: true,
-    openWorld: false
-  },
-  query_logs: READ,
-  reset_server_state: {
-    riskLevel: "high",
-    readOnly: false,
-    destructive: true,
-    idempotent: true,
-    openWorld: false
-  },
-  check_task_status: { ...READ, policyAction: "query_logs" },
-  get_dashboard_url: { ...READ, policyAction: "query_logs" },
-  get_project_context: READ,
-  get_project_config: READ,
-  agent_validate_project: READ,
-  agent_build_diagnose: {
-    riskLevel: "low",
-    policyAction: "build_project",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  agent_safe_pin_audit: READ,
-  agent_flash_monitor_verify: {
-    riskLevel: "high",
-    policyAction: "upload_firmware",
-    readOnly: false,
-    destructive: true,
-    idempotent: false,
-    openWorld: false
-  },
-  agent_get_last_report: READ,
-  agent_generate_board_report: READ,
-  get_policy_status: READ,
-  agent_resolve_target: READ,
-  get_monitor_status: READ,
-  capture_serial_window: {
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: false
-  },
-  agent_monitor_health: {
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: false
-  },
-  cancel_task: {
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: true,
-    idempotent: true,
-    openWorld: false
-  },
-  list_task_history: READ,
-  get_approval_request: READ,
-  list_pending_approvals: READ,
-  system_info: READ,
-  check_project: {
-    riskLevel: "low",
-    readOnly: false,
-    destructive: false,
-    idempotent: false,
-    openWorld: true
-  },
-  run_tests: {
-    riskLevel: "high",
-    readOnly: false,
-    destructive: true,
-    idempotent: false,
-    openWorld: false
-  },
-  uninstall_library: {
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: true,
-    idempotent: false,
-    openWorld: true
-  },
-  update_library: {
-    riskLevel: "medium",
-    readOnly: false,
-    destructive: true,
-    idempotent: false,
-    openWorld: true
-  }
-};
-var INTERNAL_ACTIONS = {
-  dependency_inventory: { ...READ, policyAction: "get_project_config" },
-  dependency_build: {
-    ...MCP_ACTIONS.build_project,
-    policyAction: "build_project"
-  },
-  serial_startup_discovery: { ...READ, policyAction: "list_devices" },
-  serial_session_start: {
-    ...MCP_ACTIONS.start_monitor,
-    policyAction: "start_monitor",
-    idempotent: false
-  },
-  serial_session_list: { ...READ, policyAction: "get_monitor_status" },
-  serial_session_read: { ...READ, policyAction: "query_logs" },
-  serial_session_write: {
-    ...MCP_ACTIONS.upload_firmware,
-    policyAction: "upload_firmware"
-  }
-};
-var actionRiskLevels = {
-  ...Object.fromEntries(
-    Object.entries({ ...MCP_ACTIONS, ...INTERNAL_ACTIONS }).map(
-      ([name2, action]) => [name2, action.riskLevel]
-    )
-  ),
-  erase_flash: "critical",
-  run_shell_command: "critical",
-  ssh_deploy: "critical"
-};
-function policyNamesForOperation(name2) {
-  const names = [];
-  let current = name2;
-  while (!names.includes(current)) {
-    names.push(current);
-    const parent = Object.hasOwn(MCP_ACTIONS, current) ? MCP_ACTIONS[current].policyAction : Object.hasOwn(INTERNAL_ACTIONS, current) ? INTERNAL_ACTIONS[current].policyAction : void 0;
-    if (!parent || parent === current) return names;
-    current = parent;
-  }
-  throw new Error(`Cyclic policy mapping for ${name2}`);
-}
-
-// src/core/policy/evaluate-policy.ts
-import path17 from "node:path";
-
-// src/core/policy/default-policy.ts
-var deniedActionPatterns = [
-  /erase_disk/i,
-  /format_drive/i,
-  /modify_system_usb_permissions_without_approval/i,
-  /curl_pipe_to_shell/i,
-  /delete_home_directory/i,
-  /run_unbounded_shell_loop/i
-];
-var defaultPolicy = {
-  approval_required: [
-    "upload_firmware",
-    "upload_filesystem",
-    "agent_flash_monitor_verify",
-    "erase_flash",
-    "reset_server_state",
-    "run_shell_command",
-    "ssh_deploy"
-  ],
-  allow: [
-    "list_devices",
-    "list_boards",
-    "get_board_info",
-    "get_project_config",
-    "get_policy_status",
-    "get_monitor_status",
-    "list_task_history",
-    "get_approval_request",
-    "list_pending_approvals",
-    "agent_resolve_target",
-    "build_project",
-    "check_project",
-    "query_logs",
-    "start_monitor",
-    "stop_monitor",
-    "capture_serial_window",
-    "agent_monitor_health",
-    "cancel_task",
-    "agent_validate_project",
-    "agent_build_diagnose",
-    "agent_safe_pin_audit",
-    "agent_get_last_report",
-    "agent_generate_board_report",
-    "get_project_context",
-    "get_lock_status",
-    "search_libraries",
-    "list_installed_libraries",
-    "system_info",
-    "get_dashboard_url",
-    "acquire_lock",
-    "release_lock",
-    "init_project",
-    "clean_project",
-    "install_library",
-    "uninstall_library",
-    "update_library"
-  ],
-  deny: [
-    "erase_disk",
-    "format_drive",
-    "modify_system_usb_permissions_without_approval",
-    "curl_pipe_to_shell",
-    "delete_home_directory",
-    "run_unbounded_shell_loop"
-  ],
-  require_workspace_boundary: true,
-  require_device_lock_for_upload: true,
-  redact_secrets_from_logs: true,
-  audit_all_agent_actions: true
-};
-
-// src/core/policy/approvals.ts
-var import_proper_lockfile3 = __toESM(require_proper_lockfile(), 1);
-init_zod();
-import fs7 from "node:fs";
-import path9 from "node:path";
-import crypto2 from "node:crypto";
-
-// src/core/policy/policy-sources.ts
-import os4 from "node:os";
-import path8 from "node:path";
-
-// src/core/policy/policy-schema.ts
-var import_yaml = __toESM(require_dist(), 1);
-init_zod();
-init_errors2();
-import path7 from "node:path";
-var PolicyProfileNameSchema = external_exports.enum([
-  "read_only",
-  "build_only",
-  "monitor_only",
-  "flash_requires_approval",
-  "lab_runner",
-  "lab_admin"
-]);
-var KNOWN_ACTIONS = /* @__PURE__ */ new Set([
-  ...Object.keys(actionRiskLevels),
-  ...defaultPolicy.deny,
-  "check_task_status"
-]);
-var ActionListSchema = external_exports.array(
-  external_exports.string().refine((action) => KNOWN_ACTIONS.has(action), "Unknown policy action")
-).max(256);
-var PolicyOverridesSchema = external_exports.object({
-  approval_required: ActionListSchema.optional(),
-  allow: ActionListSchema.optional(),
-  deny: ActionListSchema.optional(),
-  require_workspace_boundary: external_exports.boolean().optional(),
-  require_device_lock_for_upload: external_exports.boolean().optional(),
-  redact_secrets_from_logs: external_exports.boolean().optional(),
-  audit_all_agent_actions: external_exports.boolean().optional()
-}).strict();
-var PolicyProfileConfigSchema = external_exports.object({
-  profile: PolicyProfileNameSchema,
-  overrides: PolicyOverridesSchema.optional()
-}).strict();
-var PolicyDocumentSchema = external_exports.union([
-  PolicyProfileConfigSchema,
-  PolicyOverridesSchema
-]);
-var MAX_POLICY_BYTES = 64 * 1024;
-var PolicyConfigError = class extends PlatformIOError {
-  /** Creates an actionable configuration error without exposing source contents. */
-  constructor(source, detail) {
-    super(`Invalid policy at ${source}: ${detail}`, "POLICY_CONFIG_INVALID", {
-      source
-    });
-    this.source = source;
-    this.name = "PolicyConfigError";
-  }
-  source;
-};
-function parsePolicyDocument(text6, source) {
-  if (Buffer.byteLength(text6, "utf8") > MAX_POLICY_BYTES) {
-    throw new PolicyConfigError(source, "Policy exceeds the 64 KiB limit.");
-  }
-  const extension = path7.extname(source).toLowerCase();
-  if (![".json", ".yaml", ".yml"].includes(extension)) {
-    throw new PolicyConfigError(
-      source,
-      "Use a .json, .yaml or .yml policy file."
-    );
-  }
-  try {
-    if (extension === ".json") JSON.parse(text6);
-    const document2 = (0, import_yaml.parseDocument)(text6, {
-      version: "1.2",
-      strict: true,
-      uniqueKeys: true,
-      prettyErrors: false
-    });
-    if (document2.errors.length || document2.warnings.length) {
-      throw new PolicyConfigError(
-        source,
-        "Malformed, duplicate-key or unsupported YAML/JSON document."
-      );
-    }
-    const value2 = document2.toJS({ maxAliasCount: 0 });
-    const parsed = PolicyDocumentSchema.safeParse(value2);
-    if (!parsed.success) {
-      throw new PolicyConfigError(
-        source,
-        "Expected a known profile or typed policy fields containing known actions; unknown fields are not allowed."
-      );
-    }
-    return parsed.data;
-  } catch (error2) {
-    if (error2 instanceof PolicyConfigError) throw error2;
-    throw new PolicyConfigError(
-      source,
-      "Malformed JSON/YAML or unsupported aliases. Repair this file before executing operations."
-    );
-  }
-}
-
-// src/core/policy/policy-sources.ts
-var launchPolicyFile;
-function resolvePolicyFile(selected = launchPolicyFile) {
-  const environment = process.env.PIO_MCP_POLICY_FILE;
-  if (environment !== void 0 && !environment.trim()) {
-    throw new PolicyConfigError(
-      "PIO_MCP_POLICY_FILE",
-      "The configured path is empty."
-    );
-  }
-  const flagPath = selected === void 0 ? void 0 : path8.resolve(selected);
-  const environmentPath = environment === void 0 ? void 0 : path8.resolve(environment);
-  if (flagPath && environmentPath && flagPath !== environmentPath) {
-    throw new PolicyConfigError(
-      "--policy-file / PIO_MCP_POLICY_FILE",
-      "Conflicting policy paths; select the same file in both or remove one setting."
-    );
-  }
-  return flagPath ?? environmentPath;
-}
-function configurePolicyFileFromArgs(args) {
-  const remaining = [];
-  let selected;
-  for (let index = 0; index < args.length; index++) {
-    const argument2 = args[index];
-    if (argument2 === "--policy-file" || argument2.startsWith("--policy-file=")) {
-      const value2 = argument2 === "--policy-file" ? args[++index] : argument2.slice("--policy-file=".length);
-      if (!value2?.trim() || value2.startsWith("--") || selected !== void 0) {
-        throw new PolicyConfigError(
-          "--policy-file",
-          "Supply exactly one non-empty policy file path."
-        );
-      }
-      selected = value2;
-    } else {
-      remaining.push(argument2);
-    }
-  }
-  if (selected !== void 0) launchPolicyFile = resolvePolicyFile(selected);
-  return remaining;
-}
-function resolvePolicyDirectory() {
-  const configured = process.env.PIO_MCP_DATA_DIR;
-  if (configured !== void 0 && !configured.trim()) {
-    throw new PolicyConfigError(
-      "PIO_MCP_DATA_DIR",
-      "The configured directory is empty."
-    );
-  }
-  return path8.resolve(configured ?? path8.join(os4.homedir(), ".platformio-mcp"));
-}
-
-// src/core/policy/approvals.ts
-init_errors2();
-var ApprovalRecordSchema = external_exports.object({
-  id: external_exports.string().regex(/^approval-[a-f0-9-]{36}$/),
-  action: external_exports.string(),
-  riskLevel: external_exports.enum(["low", "medium", "high", "critical"]),
-  reason: external_exports.string(),
-  requestedBy: external_exports.enum(["agent", "user", "system"]),
-  status: external_exports.enum(["pending", "approved", "denied", "expired", "consumed"]),
-  createdAt: external_exports.string().datetime(),
-  expiresAt: external_exports.string().datetime().optional(),
-  scopeDigest: external_exports.string().regex(/^[a-f0-9]{64}$/).optional(),
-  consumedAt: external_exports.string().datetime().optional(),
-  metadata: external_exports.record(external_exports.unknown()).optional()
-}).strict();
-function approvalsFile() {
-  return path9.join(resolvePolicyDirectory(), "approvals.json");
-}
-function readApprovals(file = approvalsFile()) {
-  let text6;
-  try {
-    if (fs7.statSync(file).size > 8 * 1024 * 1024) throw new Error("size limit");
-    text6 = fs7.readFileSync(file, "utf8");
-  } catch (error2) {
-    if (error2.code === "ENOENT") return [];
-    throw new PlatformIOError(
-      "Approval storage is unreadable or exceeds its size limit.",
-      "APPROVAL_STORE_INVALID"
-    );
-  }
-  try {
-    return external_exports.array(ApprovalRecordSchema).parse(JSON.parse(text6));
-  } catch {
-    throw new PlatformIOError(
-      "Approval storage is malformed; operator repair is required.",
-      "APPROVAL_STORE_INVALID"
-    );
-  }
-}
-function writeApprovals(file, records) {
-  const temporary = `${file}.${crypto2.randomUUID()}.tmp`;
-  try {
-    const descriptor2 = fs7.openSync(temporary, "wx", 384);
-    try {
-      fs7.writeFileSync(descriptor2, JSON.stringify(records, null, 2), "utf8");
-      fs7.fsyncSync(descriptor2);
-    } finally {
-      fs7.closeSync(descriptor2);
-    }
-    fs7.renameSync(temporary, file);
-  } finally {
-    if (fs7.existsSync(temporary)) fs7.unlinkSync(temporary);
-  }
-}
-function mutate(operation) {
-  const file = approvalsFile();
-  fs7.mkdirSync(path9.dirname(file), { recursive: true, mode: 448 });
-  let release;
-  try {
-    release = import_proper_lockfile3.default.lockSync(file, {
-      realpath: false,
-      stale: 12e4,
-      retries: 0
-    });
-  } catch {
-    throw new PlatformIOError(
-      "Approval storage is busy or unavailable; retry the operation.",
-      "APPROVAL_STORE_BUSY"
-    );
-  }
-  try {
-    const records = readApprovals(file);
-    const result = operation(records, file);
-    writeApprovals(file, records);
-    return result;
-  } finally {
-    release();
-  }
-}
-function claimPath(file, id) {
-  return path9.join(
-    path9.dirname(file),
-    "approval-consumption",
-    crypto2.createHash("sha256").update(id).digest("hex")
-  );
-}
-function currentState(record2, file) {
-  if (fs7.existsSync(claimPath(file, record2.id)))
-    return { ...record2, status: "consumed" };
-  if ((record2.status === "pending" || record2.status === "approved") && record2.expiresAt && Date.parse(record2.expiresAt) <= Date.now())
-    return { ...record2, status: "expired" };
-  return record2;
-}
-function listApprovalRequests(opts) {
-  const file = approvalsFile();
-  const records = readApprovals(file).map(
-    (record2) => currentState(record2, file)
-  );
-  return records.filter((record2) => !opts?.status || record2.status === opts.status).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, Math.max(0, opts?.limit ?? records.length));
-}
-function createApprovalRequest(input) {
-  const minutes = input.expiresInMinutes ?? 30;
-  if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60)
-    throw new PlatformIOError(
-      "Approval lifetime must be between zero and 1440 minutes.",
-      "APPROVAL_LIFETIME_INVALID"
-    );
-  const record2 = ApprovalRecordSchema.parse({
-    id: `approval-${crypto2.randomUUID()}`,
-    action: input.action,
-    riskLevel: input.riskLevel,
-    reason: input.reason,
-    requestedBy: input.requestedBy,
-    status: "pending",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-    expiresAt: new Date(Date.now() + minutes * 6e4).toISOString(),
-    scopeDigest: input.scopeDigest,
-    metadata: input.metadata
-  });
-  return mutate((records) => {
-    records.push(record2);
-    return record2;
-  });
-}
-function transition(id, status) {
-  return mutate((records, file) => {
-    const index = records.findIndex((record3) => record3.id === id);
-    if (index < 0) return void 0;
-    const record2 = currentState(records[index], file);
-    if (record2.status !== "pending" && !(status === "denied" && record2.status === "approved")) {
-      if (record2.status === status) return record2;
-      throw new PlatformIOError(
-        `Approval is ${record2.status} and cannot become ${status}.`,
-        "APPROVAL_TRANSITION_INVALID"
-      );
-    }
-    records[index] = { ...record2, status };
-    return records[index];
-  });
-}
-function approveRequest(id) {
-  return transition(id, "approved");
-}
-function denyRequest(id) {
-  return transition(id, "denied");
-}
-function getApproval(id) {
-  const file = approvalsFile();
-  const record2 = readApprovals(file).find((item) => item.id === id);
-  return record2 ? currentState(record2, file) : void 0;
-}
-function consumeApproval(id, scopeDigest) {
-  return mutate((records, file) => {
-    const index = records.findIndex((record3) => record3.id === id);
-    if (index < 0) return void 0;
-    const record2 = currentState(records[index], file);
-    if (record2.status !== "approved" || !record2.expiresAt || record2.scopeDigest !== scopeDigest)
-      return void 0;
-    const claim = claimPath(file, id);
-    fs7.mkdirSync(path9.dirname(claim), { recursive: true, mode: 448 });
-    const consumedAt = (/* @__PURE__ */ new Date()).toISOString();
-    try {
-      const descriptor2 = fs7.openSync(claim, "wx", 384);
-      try {
-        fs7.writeFileSync(descriptor2, consumedAt, "utf8");
-        fs7.fsyncSync(descriptor2);
-      } finally {
-        fs7.closeSync(descriptor2);
-      }
-    } catch (error2) {
-      if (error2.code === "EEXIST") return void 0;
-      throw error2;
-    }
-    records[index] = { ...record2, status: "consumed", consumedAt };
-    return records[index];
-  });
-}
-function summarizeApproval(request) {
-  const metadata = request.metadata ?? {};
-  const args = typeof metadata.args === "object" && metadata.args !== null ? metadata.args : metadata;
-  return {
-    id: request.id,
-    action: request.action,
-    riskLevel: request.riskLevel,
-    reason: request.reason,
-    requestedBy: request.requestedBy,
-    status: request.status,
-    createdAt: request.createdAt,
-    expiresAt: request.expiresAt,
-    projectDir: typeof args.projectDir === "string" ? args.projectDir : void 0,
-    environment: typeof args.environment === "string" ? args.environment : void 0,
-    port: typeof args.port === "string" ? args.port : void 0
-  };
-}
-function getApprovalRequestSummary(id, projectDir) {
-  const request = getApproval(id);
-  if (!request) return void 0;
-  const summary = summarizeApproval(request);
-  if (projectDir && (!summary.projectDir || path9.resolve(summary.projectDir) !== path9.resolve(projectDir))) {
-    return void 0;
-  }
-  return summary;
-}
-function listPendingApprovalSummaries(options) {
-  return listApprovalRequests({
-    status: "pending",
-    limit: options?.limit ?? 50
-  }).map((request) => getApproval(request.id)).filter((request) => Boolean(request)).filter((request) => request.status === "pending").map(summarizeApproval).filter(
-    (request) => !options?.projectDir || Boolean(request.projectDir) && path9.resolve(request.projectDir) === path9.resolve(options.projectDir)
-  ).slice(0, Math.min(100, Math.max(1, options?.limit ?? 20)));
-}
-
-// src/core/policy/audit-log.ts
-init_paths();
-init_events();
-import fs8 from "node:fs";
-import path10 from "node:path";
-import crypto3 from "node:crypto";
-function ensureDir2(dir) {
-  if (!fs8.existsSync(dir)) fs8.mkdirSync(dir, { recursive: true });
-}
-function appendAuditEvent(input) {
-  const event = {
-    id: crypto3.randomUUID(),
-    timestamp: input.timestamp ?? (/* @__PURE__ */ new Date()).toISOString(),
-    ...input
-  };
-  const globalDir = path10.join(SERVER_DATA_DIR, "audit");
-  ensureDir2(globalDir);
-  const globalFile = path10.join(globalDir, "global-events.jsonl");
-  fs8.appendFileSync(globalFile, JSON.stringify(event) + "\n", "utf8");
-  if (input.workspaceDir) {
-    const localDir = path10.join(
-      input.workspaceDir,
-      ".pio-mcp-workspace",
-      "audit"
-    );
-    ensureDir2(localDir);
-    const localFile = path10.join(localDir, "events.jsonl");
-    fs8.appendFileSync(localFile, JSON.stringify(event) + "\n", "utf8");
-  }
-  portalEvents.emitSafetyStateUpdated(input.workspaceDir);
-  return event;
-}
-function readRecentAuditEvents(opts) {
-  const limit = Math.max(1, opts?.limit ?? 50);
-  const globalFile = path10.join(SERVER_DATA_DIR, "audit", "global-events.jsonl");
-  const localFile = opts?.workspaceDir ? path10.join(opts.workspaceDir, ".pio-mcp-workspace", "audit", "events.jsonl") : void 0;
-  const sourceFile = localFile && fs8.existsSync(localFile) ? localFile : globalFile;
-  if (!fs8.existsSync(sourceFile)) {
-    return [];
-  }
-  const lines2 = fs8.readFileSync(sourceFile, "utf8").split(/\r?\n/).filter((line) => line.trim().length > 0);
-  const events = [];
-  for (let i = lines2.length - 1; i >= 0 && events.length < limit; i--) {
-    try {
-      events.push(JSON.parse(lines2[i]));
-    } catch {
-    }
-  }
-  return events;
-}
-
-// src/core/policy/automation-policy.ts
-init_errors2();
-init_validation();
-import fs10 from "node:fs";
-import path13 from "node:path";
-
-// src/core/automation-state.ts
-var import_proper_lockfile4 = __toESM(require_proper_lockfile(), 1);
-init_errors2();
-init_validation();
-init_events();
-import crypto4 from "node:crypto";
-import fs9 from "node:fs";
-import path12 from "node:path";
-var MAX_STATE_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
-function validateAutomationKey(automationKey) {
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u.test(automationKey)) {
-    throw new PlatformIOError(
-      "automationKey must be 1-80 letters, numbers, underscores, or hyphens.",
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  return automationKey;
-}
-function getAutomationStatePath(projectDir, automationKey) {
-  const projectRoot = validateProjectPath(projectDir);
-  const key = validateAutomationKey(automationKey);
-  return path12.join(
-    projectRoot,
-    ".pio-mcp-workspace",
-    "automations",
-    `${key}.json`
-  );
-}
-function createEmptyState(automationKey, now = /* @__PURE__ */ new Date()) {
-  const timestamp = now.toISOString();
-  return {
-    schemaVersion: 1,
-    automationKey,
-    consecutiveFailures: 0,
-    consecutiveHardwareWrites: 0,
-    createdAt: timestamp,
-    updatedAt: timestamp
-  };
-}
-function readAutomationStateRecord(projectDir, automationKey, allowStale) {
-  const statePath = getAutomationStatePath(projectDir, automationKey);
-  if (!fs9.existsSync(statePath)) return createEmptyState(automationKey);
-  let state;
-  try {
-    state = JSON.parse(fs9.readFileSync(statePath, "utf8"));
-  } catch {
-    throw new PlatformIOError(
-      `Automation '${automationKey}' state is malformed and requires operator review.`,
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  const updatedAt = new Date(state.updatedAt).getTime();
-  if (state.schemaVersion !== 1 || state.automationKey !== automationKey || !Number.isFinite(updatedAt) || !Number.isInteger(state.consecutiveFailures) || state.consecutiveFailures < 0 || !Number.isInteger(state.consecutiveHardwareWrites) || state.consecutiveHardwareWrites < 0) {
-    throw new PlatformIOError(
-      `Automation '${automationKey}' state cannot be verified and requires operator review.`,
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  if (!allowStale && Date.now() - updatedAt > MAX_STATE_AGE_MS) {
-    throw new PlatformIOError(
-      `Automation '${automationKey}' write budget is stale and requires operator review.`,
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  return state;
-}
-function readAutomationState(projectDir, automationKey) {
-  try {
-    return readAutomationStateRecord(projectDir, automationKey, false);
-  } catch {
-    return createEmptyState(automationKey);
-  }
-}
-function readAutomationWriteBudgetState(projectDir, automationKey) {
-  return readAutomationStateRecord(projectDir, automationKey, false);
-}
-function writeAutomationState(projectDir, state) {
-  const statePath = getAutomationStatePath(projectDir, state.automationKey);
-  const directory = path12.dirname(statePath);
-  fs9.mkdirSync(directory, { recursive: true });
-  const nextState = {
-    ...state,
-    schemaVersion: 1,
-    updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  const temporaryPath = path12.join(
-    directory,
-    `.${state.automationKey}.${crypto4.randomUUID()}.tmp`
-  );
-  fs9.writeFileSync(temporaryPath, `${JSON.stringify(nextState, null, 2)}
-`, {
-    encoding: "utf8",
-    mode: 384
-  });
-  fs9.renameSync(temporaryPath, statePath);
-  portalEvents.emitSafetyStateUpdated(projectDir);
-  return nextState;
-}
-function listAutomationStates(projectDir) {
-  const projectRoot = validateProjectPath(projectDir);
-  const directory = path12.join(projectRoot, ".pio-mcp-workspace", "automations");
-  if (!fs9.existsSync(directory)) return [];
-  const now = Date.now();
-  return fs9.readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(".json")).slice(0, 100).map((entry) => {
-    const automationKey = entry.name.slice(0, -".json".length);
-    try {
-      validateAutomationKey(automationKey);
-      const state = JSON.parse(
-        fs9.readFileSync(path12.join(directory, entry.name), "utf8")
-      );
-      const updatedAt = new Date(state.updatedAt).getTime();
-      if (state.schemaVersion !== 1 || state.automationKey !== automationKey || !Number.isFinite(updatedAt)) {
-        throw new Error("Invalid automation state");
-      }
-      const bindingExpiresAt = state.targetBinding?.expiresAt;
-      const bindingExpired = bindingExpiresAt !== void 0 && new Date(bindingExpiresAt).getTime() <= now;
-      return {
-        automationKey,
-        state: now - updatedAt > MAX_STATE_AGE_MS ? "stale" : bindingExpired ? "binding_expired" : "healthy",
-        lastStatus: state.lastStatus,
-        consecutiveFailures: Number.isInteger(state.consecutiveFailures) ? Math.max(0, state.consecutiveFailures) : 0,
-        consecutiveHardwareWrites: Number.isInteger(
-          state.consecutiveHardwareWrites
-        ) ? Math.max(0, state.consecutiveHardwareWrites) : 0,
-        lastHardwareWriteAt: state.lastHardwareWriteAt,
-        lastHardwareWriteAction: state.lastHardwareWriteAction,
-        environment: state.targetBinding?.environment,
-        bindingExpiresAt,
-        createdAt: state.createdAt,
-        updatedAt: state.updatedAt
-      };
-    } catch {
-      return {
-        automationKey,
-        state: "invalid",
-        consecutiveFailures: 0,
-        consecutiveHardwareWrites: 0
-      };
-    }
-  }).sort(
-    (left, right) => new Date(right.updatedAt ?? 0).getTime() - new Date(left.updatedAt ?? 0).getTime()
-  );
-}
-async function clearAutomationMonitorState(projectDir, automationKey) {
-  return withAutomationStateLock(projectDir, automationKey, async () => {
-    const previous = readAutomationStateRecord(
-      projectDir,
-      automationKey,
-      true
-    );
-    const reset = createEmptyState(automationKey);
-    return writeAutomationState(projectDir, {
-      ...reset,
-      createdAt: previous.createdAt,
-      consecutiveHardwareWrites: previous.consecutiveHardwareWrites,
-      lastHardwareWriteAt: previous.lastHardwareWriteAt,
-      lastHardwareWriteAction: previous.lastHardwareWriteAction
-    });
-  });
-}
-async function withAutomationStateLock(projectDir, automationKey, operation) {
-  const statePath = getAutomationStatePath(projectDir, automationKey);
-  fs9.mkdirSync(path12.dirname(statePath), { recursive: true });
-  if (!fs9.existsSync(statePath)) {
-    writeAutomationState(projectDir, createEmptyState(automationKey));
-  }
-  let release;
-  try {
-    release = await import_proper_lockfile4.default.lock(statePath, {
-      retries: 0,
-      stale: 5 * 60 * 1e3,
-      realpath: false
-    });
-  } catch {
-    throw new PlatformIOError(
-      `Automation '${automationKey}' is already running.`,
-      "OVERLAPPING_RUN"
-    );
-  }
-  try {
-    return await operation();
-  } finally {
-    await release();
-  }
-}
-
-// src/core/policy/automation-policy.ts
-var WRITE_ACTIONS = /* @__PURE__ */ new Set([
-  "upload_firmware",
-  "upload_filesystem",
-  "agent_flash_monitor_verify"
-]);
-var SAFE_SCHEDULED_ACTIONS = /* @__PURE__ */ new Set([
-  "list_devices",
-  "list_boards",
-  "get_board_info",
-  "get_project_config",
-  "get_project_context",
-  "get_policy_status",
-  "agent_resolve_target",
-  "build_project",
-  "check_project",
-  "agent_build_diagnose",
-  "check_task_status",
-  "list_task_history",
-  "get_monitor_status",
-  "capture_serial_window",
-  "agent_monitor_health",
-  "query_logs",
-  "cancel_task"
-]);
-var DEVICE_BOUND_ACTIONS = /* @__PURE__ */ new Set(["capture_serial_window"]);
-var ENVIRONMENT_SCOPED_ACTIONS = /* @__PURE__ */ new Set([
-  "build_project",
-  "check_project",
-  "agent_build_diagnose",
-  ...DEVICE_BOUND_ACTIONS,
-  ...WRITE_ACTIONS
-]);
-var ALWAYS_DENIED_ACTIONS = /* @__PURE__ */ new Set([
-  "erase_flash",
-  "reset_server_state",
-  "run_shell_command",
-  "ssh_deploy"
-]);
-function loadLabRunnerPolicy(projectDir) {
-  const policyPath = path13.join(
-    projectDir,
-    ".pio-mcp-workspace",
-    "automation-policy.json"
-  );
-  if (!fs10.existsSync(policyPath)) return void 0;
-  try {
-    return JSON.parse(
-      fs10.readFileSync(policyPath, "utf8")
-    );
-  } catch {
-    throw new PlatformIOError(
-      "The lab-runner automation policy is malformed.",
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-}
-function validateAutomationScope(input) {
-  validateAutomationKey(input.automationKey);
-  const projectDir = validateProjectPath(input.projectDir);
-  if (projectDir === path13.parse(projectDir).root) {
-    throw new PlatformIOError(
-      "Automation cannot target a filesystem root.",
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  if (input.environment?.includes("*")) {
-    throw new PlatformIOError(
-      "Automation target selectors must be exact and cannot contain wildcards.",
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  if (!Number.isFinite(input.maxRunDurationSeconds) || input.maxRunDurationSeconds < 1 || input.maxRunDurationSeconds > 900) {
-    throw new PlatformIOError(
-      "Automation runs must have a maximum duration between 1 and 900 seconds.",
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  if (ALWAYS_DENIED_ACTIONS.has(input.action)) {
-    throw new PlatformIOError(
-      `Action '${input.action}' is never allowed in unattended automation.`,
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  const writeOperation = WRITE_ACTIONS.has(input.action);
-  if (!writeOperation && !SAFE_SCHEDULED_ACTIONS.has(input.action)) {
-    throw new PlatformIOError(
-      `Action '${input.action}' is not available to unattended automation.`,
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  if (ENVIRONMENT_SCOPED_ACTIONS.has(input.action) && !input.environment) {
-    throw new PlatformIOError(
-      `Action '${input.action}' requires an exact PlatformIO environment.`,
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  if ((writeOperation || DEVICE_BOUND_ACTIONS.has(input.action)) && !input.targetBinding) {
-    throw new PlatformIOError(
-      `Action '${input.action}' requires a current physical target binding.`,
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  if (input.targetBinding) {
-    if (input.targetBinding.port.includes("*") || input.targetBinding.deviceFingerprint.includes("*")) {
-      throw new PlatformIOError(
-        "Automation target selectors must be exact and cannot contain wildcards.",
-        "AUTOMATION_POLICY_DENIED"
-      );
-    }
-    if (path13.resolve(input.targetBinding.projectDir) !== projectDir || input.targetBinding.environment !== input.environment || new Date(input.targetBinding.expiresAt).getTime() <= Date.now()) {
-      throw new PlatformIOError(
-        "Automation target binding is expired or outside the requested scope.",
-        "AUTOMATION_POLICY_DENIED"
-      );
-    }
-  }
-  if (!writeOperation) {
-    return {
-      allowed: true,
-      writeOperation: false,
-      policyProfile: "monitor_only"
-    };
-  }
-  const policy = loadLabRunnerPolicy(projectDir);
-  if (!policy?.enabled || policy.profile !== "lab_runner" || !policy.allowedOperations.includes(input.action) || policy.environment !== input.environment || policy.deviceFingerprint !== input.targetBinding.deviceFingerprint || new Date(policy.expiresAt).getTime() <= Date.now()) {
-    throw new PlatformIOError(
-      "Unattended hardware writes require a current, exact lab-runner policy.",
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  if (input.maxRunDurationSeconds > policy.maxRunDurationSeconds) {
-    throw new PlatformIOError(
-      "Requested run duration exceeds the lab-runner policy.",
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  if ((input.consecutiveFlashes ?? 0) >= policy.maxConsecutiveFlashes) {
-    throw new PlatformIOError(
-      "The lab-runner consecutive flash limit has been reached.",
-      "AUTOMATION_POLICY_DENIED"
-    );
-  }
-  if (input.lastFlashAt) {
-    const elapsedSeconds = (Date.now() - new Date(input.lastFlashAt).getTime()) / 1e3;
-    if (elapsedSeconds < policy.cooldownSeconds) {
-      throw new PlatformIOError(
-        "The lab-runner flash cooldown has not elapsed.",
-        "AUTOMATION_POLICY_DENIED"
-      );
-    }
-  }
-  return { allowed: true, writeOperation: true, policyProfile: "lab_runner" };
-}
-async function reserveAutomationWriteBudget(input) {
-  return withAutomationStateLock(
-    input.projectDir,
-    input.automationKey,
-    async () => {
-      const state = readAutomationWriteBudgetState(
-        input.projectDir,
-        input.automationKey
-      );
-      const scope5 = validateAutomationScope({
-        ...input,
-        consecutiveFlashes: state.consecutiveHardwareWrites,
-        lastFlashAt: state.lastHardwareWriteAt
-      });
-      if (!scope5.writeOperation) {
-        throw new PlatformIOError(
-          "Only hardware-changing automation actions consume a write budget.",
-          "AUTOMATION_POLICY_DENIED"
-        );
-      }
-      const consecutiveHardwareWrites = state.consecutiveHardwareWrites + 1;
-      writeAutomationState(input.projectDir, {
-        ...state,
-        consecutiveHardwareWrites,
-        lastHardwareWriteAt: (/* @__PURE__ */ new Date()).toISOString(),
-        lastHardwareWriteAction: input.action
-      });
-      return {
-        allowed: true,
-        writeOperation: true,
-        policyProfile: "lab_runner",
-        consecutiveHardwareWrites
-      };
-    }
-  );
-}
-
-// src/core/policy/project-enrollment.ts
-import fs11 from "node:fs";
-import path14 from "node:path";
-import crypto5 from "node:crypto";
-function canonical(value2) {
-  if (Array.isArray(value2)) return `[${value2.map(canonical).join(",")}]`;
-  if (value2 !== null && typeof value2 === "object")
-    return `{${Object.keys(value2).sort().map(
-      (key) => `${JSON.stringify(key)}:${canonical(value2[key])}`
-    ).join(",")}}`;
-  return JSON.stringify(value2);
-}
-function projectEnrollmentIdentity(project, documents) {
-  const realProject = fs11.realpathSync(project);
-  if (!fs11.statSync(realProject).isDirectory())
-    throw new PolicyConfigError(
-      project,
-      "Enrollment requires a project directory."
-    );
-  const identity = { version: 1, project: realProject };
-  return {
-    ...identity,
-    digest: crypto5.createHash("sha256").update(canonical({ ...identity, documents })).digest("hex")
-  };
-}
-function realStoragePath(source) {
-  try {
-    return fs11.realpathSync(source);
-  } catch (error2) {
-    if (error2.code !== "ENOENT") throw error2;
-    const parent = path14.dirname(source);
-    if (parent === source) throw error2;
-    return path14.join(realStoragePath(parent), path14.basename(source));
-  }
-}
-function recordPath(project) {
-  const directory = realStoragePath(
-    path14.join(path14.resolve(resolvePolicyDirectory()), "project-enrollments")
-  );
-  const relative = path14.relative(project, directory);
-  if (relative === "" || !relative.startsWith(`..${path14.sep}`) && relative !== ".." && !path14.isAbsolute(relative)) {
-    throw new PolicyConfigError(
-      directory,
-      "Enrollment storage must be outside the project directory."
-    );
-  }
-  return path14.join(
-    directory,
-    `${crypto5.createHash("sha256").update(project).digest("hex")}.json`
-  );
-}
-function isProjectEnrolled(identity) {
-  const source = recordPath(identity.project);
-  try {
-    const stat = fs11.statSync(source);
-    if (!stat.isFile() || stat.size > 4096)
-      throw new Error("Invalid enrollment record");
-    const record2 = JSON.parse(fs11.readFileSync(source, "utf8"));
-    if (record2.version !== 1 || typeof record2.project !== "string" || !/^[a-f0-9]{64}$/.test(record2.digest))
-      throw new Error("Invalid enrollment record");
-    return record2.project === identity.project && record2.digest === identity.digest;
-  } catch (error2) {
-    if (error2.code === "ENOENT") return false;
-    throw new PolicyConfigError(
-      source,
-      "Invalid or unreadable enrollment record; revoke and enroll the reviewed project again."
-    );
-  }
-}
-
-// src/core/policy/load-policy.ts
-import fs12 from "node:fs";
-import path15 from "node:path";
-import crypto6 from "node:crypto";
-
-// src/core/policy/profiles.ts
-var READ_ONLY_ALLOW = [
-  "list_devices",
-  "list_boards",
-  "get_board_info",
-  "get_project_config",
-  "get_project_context",
-  "query_logs",
-  "check_task_status",
-  "system_info",
-  "agent_validate_project",
-  "agent_safe_pin_audit",
-  "agent_get_last_report",
-  "agent_generate_board_report",
-  "get_policy_status",
-  "get_monitor_status",
-  "list_task_history",
-  "get_approval_request",
-  "list_pending_approvals",
-  "agent_resolve_target",
-  "get_project_context",
-  "get_lock_status",
-  "search_libraries",
-  "list_installed_libraries",
-  "system_info",
-  "get_dashboard_url"
-];
-var BUILD_ONLY_ALLOW = [
-  ...READ_ONLY_ALLOW,
-  "build_project",
-  "check_project",
-  "run_tests",
-  "agent_build_diagnose"
-];
-var MONITOR_ONLY_ALLOW = [
-  ...READ_ONLY_ALLOW,
-  "query_logs",
-  "start_monitor",
-  "stop_monitor",
-  "capture_serial_window",
-  "agent_monitor_health",
-  "cancel_task"
-];
-var policyProfiles = {
-  read_only: {
-    ...defaultPolicy,
-    allow: READ_ONLY_ALLOW,
-    approval_required: [],
-    deny: Array.from(
-      /* @__PURE__ */ new Set([
-        ...defaultPolicy.deny,
-        "build_project",
-        "check_project",
-        "run_tests",
-        "upload_firmware",
-        "upload_filesystem",
-        "clean_project",
-        "reset_server_state",
-        "agent_build_diagnose",
-        "agent_flash_monitor_verify"
-      ])
-    )
-  },
-  build_only: {
-    ...defaultPolicy,
-    allow: BUILD_ONLY_ALLOW,
-    approval_required: [],
-    deny: Array.from(
-      /* @__PURE__ */ new Set([
-        ...defaultPolicy.deny,
-        "upload_firmware",
-        "upload_filesystem",
-        "reset_server_state",
-        "agent_flash_monitor_verify"
-      ])
-    )
-  },
-  monitor_only: {
-    ...defaultPolicy,
-    allow: MONITOR_ONLY_ALLOW,
-    approval_required: [],
-    deny: Array.from(
-      /* @__PURE__ */ new Set([
-        ...defaultPolicy.deny,
-        "build_project",
-        "check_project",
-        "run_tests",
-        "upload_firmware",
-        "upload_filesystem",
-        "clean_project",
-        "reset_server_state",
-        "agent_build_diagnose",
-        "agent_flash_monitor_verify"
-      ])
-    )
-  },
-  flash_requires_approval: {
-    ...defaultPolicy,
-    allow: Array.from(
-      /* @__PURE__ */ new Set([
-        ...defaultPolicy.allow,
-        "clean_project",
-        "run_tests",
-        "agent_validate_project",
-        "agent_build_diagnose",
-        "agent_safe_pin_audit",
-        "agent_flash_monitor_verify",
-        "agent_get_last_report",
-        "agent_generate_board_report",
-        "get_policy_status"
-      ])
-    ),
-    approval_required: Array.from(
-      /* @__PURE__ */ new Set([
-        ...defaultPolicy.approval_required,
-        "agent_flash_monitor_verify"
-      ])
-    )
-  },
-  lab_admin: {
-    ...defaultPolicy,
-    allow: Array.from(
-      /* @__PURE__ */ new Set([
-        ...defaultPolicy.allow,
-        "clean_project",
-        "run_tests",
-        "reset_server_state",
-        "upload_firmware",
-        "upload_filesystem",
-        "agent_validate_project",
-        "agent_build_diagnose",
-        "agent_safe_pin_audit",
-        "agent_flash_monitor_verify",
-        "agent_get_last_report",
-        "agent_generate_board_report",
-        "get_policy_status"
-      ])
-    ),
-    approval_required: [],
-    deny: defaultPolicy.deny
-  },
-  lab_runner: {
-    ...defaultPolicy,
-    allow: Array.from(
-      /* @__PURE__ */ new Set([
-        ...BUILD_ONLY_ALLOW,
-        ...MONITOR_ONLY_ALLOW,
-        "upload_firmware",
-        "upload_filesystem",
-        "agent_flash_monitor_verify"
-      ])
-    ),
-    approval_required: ["reset_server_state"],
-    deny: Array.from(
-      /* @__PURE__ */ new Set([...defaultPolicy.deny, "erase_flash", "run_shell_command"])
-    )
-  }
-};
-function resolvePolicyProfile(config2) {
-  const parsed = PolicyProfileConfigSchema.safeParse(config2);
-  if (!parsed.success)
-    throw new PolicyConfigError(
-      "profile",
-      "Unknown profile or invalid overrides."
-    );
-  const base2 = policyProfiles[parsed.data.profile];
-  if (!config2.overrides) return base2;
-  return {
-    approval_required: config2.overrides.approval_required ?? base2.approval_required,
-    allow: config2.overrides.allow ?? base2.allow,
-    deny: config2.overrides.deny ?? base2.deny,
-    require_workspace_boundary: config2.overrides.require_workspace_boundary ?? base2.require_workspace_boundary,
-    require_device_lock_for_upload: config2.overrides.require_device_lock_for_upload ?? base2.require_device_lock_for_upload,
-    redact_secrets_from_logs: config2.overrides.redact_secrets_from_logs ?? base2.redact_secrets_from_logs,
-    audit_all_agent_actions: config2.overrides.audit_all_agent_actions ?? base2.audit_all_agent_actions
-  };
-}
-
-// src/core/policy/load-policy.ts
-function mergePolicy(base2, override) {
-  return { ...base2, ...override };
-}
-function readLayer(source, required2) {
-  try {
-    const stat = fs12.statSync(source);
-    if (!stat.isFile() || stat.size > 64 * 1024) {
-      throw new PolicyConfigError(
-        source,
-        "Expected a regular policy file no larger than 64 KiB."
-      );
-    }
-    return fs12.readFileSync(source, "utf8");
-  } catch (error2) {
-    if (error2 instanceof PolicyConfigError) throw error2;
-    if (error2.code === "ENOENT" && !required2)
-      return void 0;
-    throw new PolicyConfigError(
-      source,
-      required2 ? "The selected policy file is missing or unreadable." : "The configured policy file is unreadable."
-    );
-  }
-}
-function recordSource(sources, kind3, source, text6) {
-  sources.push({
-    kind: kind3,
-    source,
-    present: text6 !== void 0,
-    ...text6 === void 0 ? {} : { sha256: crypto6.createHash("sha256").update(text6).digest("hex") }
-  });
-}
-function applyOperatorCeiling(policy, operator) {
-  const union2 = (left, right = []) => [
-    .../* @__PURE__ */ new Set([...left, ...right])
-  ];
-  const approvalRequired = union2(
-    policy.approval_required,
-    operator.approval_required
-  );
-  const operatorActions = operator.allow === void 0 ? void 0 : /* @__PURE__ */ new Set([...operator.allow, ...operator.approval_required ?? []]);
-  const permitted = (action) => operatorActions === void 0 || policyNamesForOperation(action).some((name2) => operatorActions.has(name2));
-  return {
-    ...policy,
-    allow: policy.allow.filter(permitted),
-    approval_required: approvalRequired.filter(permitted),
-    deny: union2(policy.deny, operator.deny),
-    require_workspace_boundary: operator.require_workspace_boundary === true || policy.require_workspace_boundary,
-    require_device_lock_for_upload: operator.require_device_lock_for_upload === true || policy.require_device_lock_for_upload,
-    redact_secrets_from_logs: operator.redact_secrets_from_logs === true || policy.redact_secrets_from_logs,
-    audit_all_agent_actions: operator.audit_all_agent_actions === true || policy.audit_all_agent_actions
-  };
-}
-function loadEffectivePolicyState(workspaceDir) {
-  let profile = "flash_requires_approval";
-  const sources = [
-    {
-      kind: "builtin",
-      source: "built-in:flash_requires_approval",
-      present: true
-    }
-  ];
-  const builtIn = resolvePolicyProfile({ profile });
-  const projectDocuments = {
-    profile: null,
-    override: null
-  };
-  let policy = builtIn;
-  if (workspaceDir) {
-    const source2 = path15.join(
-      path15.resolve(workspaceDir),
-      ".pio-mcp-policy.json"
-    );
-    const text6 = readLayer(source2, false);
-    recordSource(sources, "project-profile", source2, text6);
-    if (text6 !== void 0) {
-      const document2 = PolicyProfileConfigSchema.safeParse(
-        parsePolicyDocument(text6, source2)
-      );
-      if (!document2.success)
-        throw new PolicyConfigError(
-          source2,
-          "Project profile requires a valid profile name."
-        );
-      projectDocuments.profile = document2.data;
-      profile = document2.data.profile;
-      policy = resolvePolicyProfile(document2.data);
-    }
-  }
-  const explicit = resolvePolicyFile();
-  const operatorPath = explicit ?? path15.join(resolvePolicyDirectory(), "policy.yaml");
-  const operatorText = readLayer(operatorPath, explicit !== void 0);
-  recordSource(sources, "operator", operatorPath, operatorText);
-  let operator = {};
-  if (operatorText !== void 0) {
-    const document2 = parsePolicyDocument(operatorText, operatorPath);
-    if ("profile" in document2) {
-      profile = document2.profile;
-      operator = resolvePolicyProfile(document2);
-    } else operator = document2;
-    policy = mergePolicy(policy, operator);
-  }
-  if (workspaceDir) {
-    const source2 = path15.join(
-      path15.resolve(workspaceDir),
-      ".pio-mcp-workspace",
-      "policy.yaml"
-    );
-    const text6 = readLayer(source2, false);
-    recordSource(sources, "project-override", source2, text6);
-    if (text6 !== void 0) {
-      const document2 = parsePolicyDocument(text6, source2);
-      if ("profile" in document2)
-        throw new PolicyConfigError(
-          source2,
-          "Select a project profile in .pio-mcp-policy.json; this file contains overrides only."
-        );
-      projectDocuments.override = document2;
-      policy = mergePolicy(policy, document2);
-    }
-  }
-  let projectEnrollment;
-  if (workspaceDir && (projectDocuments.profile !== null || projectDocuments.override !== null)) {
-    const identity = projectEnrollmentIdentity(workspaceDir, projectDocuments);
-    const enrolled = isProjectEnrolled(identity);
-    projectEnrollment = { enrolled, digest: identity.digest };
-    if (!enrolled) {
-      const baseline = mergePolicy(builtIn, operator);
-      policy = applyOperatorCeiling(policy, baseline);
-    }
-  }
-  policy = applyOperatorCeiling(policy, operator);
-  const source = sources.filter((item) => item.present).at(-1).source;
-  const digest = crypto6.createHash("sha256").update(JSON.stringify({ profile, policy, sources, projectEnrollment })).digest("hex");
-  return { profile, source, policy, sources, digest, projectEnrollment };
-}
-
-// src/core/policy/approval-scope.ts
-init_errors2();
-import crypto7 from "node:crypto";
-import path16 from "node:path";
-function canonical2(value2, depth = 0) {
-  if (depth > 32)
-    throw new PlatformIOError(
-      "Approval arguments exceed the nesting limit.",
-      "APPROVAL_SCOPE_INVALID"
-    );
-  if (value2 === null || typeof value2 === "string" || typeof value2 === "boolean")
-    return JSON.stringify(value2);
-  if (typeof value2 === "number" && Number.isFinite(value2))
-    return JSON.stringify(value2);
-  if (Array.isArray(value2))
-    return `[${value2.map((item) => canonical2(item, depth + 1)).join(",")}]`;
-  if (typeof value2 === "object" && value2 !== null && Object.getPrototypeOf(value2) === Object.prototype) {
-    return `{${Object.keys(value2).sort().filter((key) => value2[key] !== void 0).map(
-      (key) => `${JSON.stringify(key)}:${canonical2(value2[key], depth + 1)}`
-    ).join(",")}}`;
-  }
-  throw new PlatformIOError(
-    "Approval arguments must contain finite JSON values.",
-    "APPROVAL_SCOPE_INVALID"
-  );
-}
-function approvalScopeDigest(action, args, policyDigest, context) {
-  const operation = { ...args };
-  for (const key of ["approvalId", "approved", "__approved"])
-    delete operation[key];
-  if (typeof operation.projectDir === "string")
-    operation.projectDir = path16.resolve(operation.projectDir);
-  const encoded = canonical2({
-    action,
-    operationName: context.operationName ?? action,
-    args: operation,
-    policyDigest,
-    workspaceDir: context.workspaceDir ? path16.resolve(context.workspaceDir) : null,
-    devicePort: context.devicePort ?? null,
-    targetBindingDigest: context.targetBindingDigest ?? null,
-    automationKey: context.automationKey ?? null,
-    actorClass: context.actorClass ?? (context.actor === "system" ? "system" : "interactive")
-  });
-  if (Buffer.byteLength(encoded) > 256 * 1024)
-    throw new PlatformIOError(
-      "Approval arguments exceed the 256 KiB limit.",
-      "APPROVAL_SCOPE_INVALID"
-    );
-  return crypto7.createHash("sha256").update(encoded).digest("hex");
-}
-
-// src/core/policy/evaluate-policy.ts
-function nowIso() {
-  return (/* @__PURE__ */ new Date()).toISOString();
-}
-function normalizeActionName(action) {
-  return action.trim().toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
-}
-function riskForAction(action) {
-  return actionRiskLevels[action] ?? "medium";
-}
-function hasProjectDir(args) {
-  return typeof args.projectDir === "string" && args.projectDir.length > 0;
-}
-function isPathBoundaryUnsafe(projectDir) {
-  const resolved = path17.resolve(projectDir);
-  const root = path17.parse(resolved).root;
-  return resolved === root;
-}
-function decision(status, reason, action, riskLevel, approvalId) {
-  return {
-    status,
-    reason,
-    action,
-    riskLevel,
-    approvalId,
-    timestamp: nowIso()
-  };
-}
-async function evaluatePolicy(actionName, args, context = {}) {
-  return evaluatePolicyInternal(actionName, args, context, false);
-}
-async function planPolicy(actionName, args, context = {}) {
-  const result = await evaluatePolicyInternal(actionName, args, context, true);
-  return {
-    ...result,
-    status: result.status === "allow" ? "ready" : result.status
-  };
-}
-async function evaluatePolicyInternal(actionName, args, context, planning) {
-  const action = normalizeActionName(actionName);
-  const riskLevel = riskForAction(action);
-  const operationNames = policyNamesForOperation(
-    context.operationName ?? action
-  );
-  const permissionNames = operationNames.at(-1) === action ? operationNames : [action];
-  let effectivePolicy;
-  try {
-    effectivePolicy = loadEffectivePolicyState(context.workspaceDir);
-  } catch (error2) {
-    if (!(error2 instanceof PolicyConfigError)) throw error2;
-    return decision(
-      action === "get_policy_status" ? "allow" : "deny",
-      error2.message,
-      action,
-      riskLevel
-    );
-  }
-  const policy = effectivePolicy.policy;
-  const auditContext = {
-    workspaceDir: context.workspaceDir,
-    devicePort: context.devicePort,
-    taskId: context.taskId,
-    automationKey: context.automationKey,
-    targetBindingDigest: context.targetBindingDigest,
-    policyProfile: effectivePolicy.profile,
-    actorClass: context.actorClass ?? (context.actor === "system" ? "system" : "interactive")
-  };
-  let scheduledScopeInput;
-  let scheduledWriteOperation = false;
-  if (context.actorClass === "scheduled" && context.automationKey) {
-    try {
-      scheduledScopeInput = {
-        automationKey: context.automationKey,
-        action,
-        projectDir: String(args.projectDir ?? context.workspaceDir ?? ""),
-        environment: typeof args.environment === "string" ? args.environment : typeof args.targetBinding?.environment === "string" ? String(
-          args.targetBinding.environment
-        ) : void 0,
-        targetBinding: typeof args.targetBinding === "object" && args.targetBinding !== null ? args.targetBinding : void 0,
-        maxRunDurationSeconds: typeof args.maxRunDurationSeconds === "number" ? args.maxRunDurationSeconds : typeof args.captureDurationSeconds === "number" ? args.captureDurationSeconds : typeof args.durationSeconds === "number" ? args.durationSeconds : typeof args.timeoutSeconds === "number" ? args.timeoutSeconds : 300
-      };
-      scheduledWriteOperation = validateAutomationScope(scheduledScopeInput).writeOperation;
-    } catch (error2) {
-      const reason = error2 instanceof Error ? error2.message : "Unattended automation scope was denied.";
-      const denied = decision("deny", reason, action, riskLevel);
-      if (!planning && policy.audit_all_agent_actions) {
-        appendAuditEvent({
-          action,
-          status: "denied",
-          reason,
-          riskLevel,
-          ...auditContext
-        });
-      }
-      return denied;
-    }
-  }
-  const reserveScheduledWrite = async () => {
-    if (planning || !scheduledScopeInput || !scheduledWriteOperation)
-      return void 0;
-    try {
-      await reserveAutomationWriteBudget(scheduledScopeInput);
-      return void 0;
-    } catch (error2) {
-      const reason = error2 instanceof Error ? error2.message : "Unattended hardware-write budget was denied.";
-      const denied = decision("deny", reason, action, riskLevel);
-      if (!planning && policy.audit_all_agent_actions) {
-        appendAuditEvent({
-          action,
-          status: "denied",
-          reason,
-          riskLevel,
-          ...auditContext
-        });
-      }
-      return denied;
-    }
-  };
-  if (permissionNames.some((name2) => policy.deny.includes(name2)) || deniedActionPatterns.some((p) => p.test(action))) {
-    const denied = decision(
-      "deny",
-      `Action '${action}' is denied by policy.`,
-      action,
-      riskLevel
-    );
-    if (!planning && policy.audit_all_agent_actions) {
-      appendAuditEvent({
-        action,
-        status: "denied",
-        reason: denied.reason,
-        riskLevel,
-        ...auditContext
-      });
-    }
-    return denied;
-  }
-  if (policy.require_workspace_boundary && hasProjectDir(args) && isPathBoundaryUnsafe(String(args.projectDir))) {
-    const denied = decision(
-      "deny",
-      "Workspace boundary violation: root directory targets are not allowed.",
-      action,
-      riskLevel
-    );
-    if (!planning && policy.audit_all_agent_actions) {
-      appendAuditEvent({
-        action,
-        status: "denied",
-        reason: denied.reason,
-        riskLevel,
-        ...auditContext
-      });
-    }
-    return denied;
-  }
-  if (policy.require_device_lock_for_upload && (action === "upload_firmware" || action === "upload_filesystem")) {
-    if (!hasProjectDir(args)) {
-      const denied = decision(
-        "deny",
-        "Upload actions require an explicit projectDir to enforce scoped device operations.",
-        action,
-        riskLevel
-      );
-      if (!planning && policy.audit_all_agent_actions) {
-        appendAuditEvent({
-          action,
-          status: "denied",
-          reason: denied.reason,
-          riskLevel,
-          ...auditContext
-        });
-      }
-      return denied;
-    }
-  }
-  if (permissionNames.some((name2) => policy.approval_required.includes(name2))) {
-    const scopeDigest = approvalScopeDigest(
-      action,
-      args,
-      effectivePolicy.digest,
-      context
-    );
-    const scopeMetadata = {
-      args: {
-        projectDir: args.projectDir,
-        environment: args.environment,
-        port: args.port
-      },
-      policyDigest: effectivePolicy.digest,
-      scopeVersion: 1,
-      operationName: context.operationName ?? action
-    };
-    const explicitApprovalId = typeof args.approvalId === "string" ? args.approvalId : void 0;
-    if (explicitApprovalId) {
-      const candidate = planning ? getApproval(explicitApprovalId) : void 0;
-      const request = planning ? candidate?.status === "approved" && candidate.expiresAt && candidate.scopeDigest === scopeDigest ? candidate : void 0 : consumeApproval(explicitApprovalId, scopeDigest);
-      if (request) {
-        const reservationDenied = await reserveScheduledWrite();
-        if (reservationDenied) return reservationDenied;
-        const allowed = decision(
-          "allow",
-          `Action '${action}' is allowed via approved request ${explicitApprovalId}.`,
-          action,
-          riskLevel,
-          explicitApprovalId
-        );
-        if (!planning && policy.audit_all_agent_actions) {
-          appendAuditEvent({
-            action,
-            status: "approved",
-            reason: allowed.reason,
-            riskLevel,
-            ...auditContext,
-            approvalId: explicitApprovalId
-          });
-        }
-        return allowed;
-      }
-    }
-    const approval = createApprovalRequest({
-      action,
-      riskLevel,
-      reason: `Operation '${context.operationName ?? action}' requires explicit approval by policy.`,
-      requestedBy: context.actor ?? "agent",
-      scopeDigest,
-      metadata: scopeMetadata,
-      expiresInMinutes: 30
-    });
-    const needsApproval = decision(
-      "requires_approval",
-      `${action} requires explicit approval by policy.`,
-      action,
-      riskLevel,
-      approval.id
-    );
-    if (!planning && policy.audit_all_agent_actions) {
-      appendAuditEvent({
-        action,
-        status: "requires_approval",
-        reason: needsApproval.reason,
-        riskLevel,
-        ...auditContext,
-        approvalId: approval.id
-      });
-    }
-    return needsApproval;
-  }
-  const allowList = policy.allow;
-  const isAllowed = permissionNames.some((name2) => allowList.includes(name2));
-  const result = isAllowed ? decision(
-    "allow",
-    `Action '${action}' is allowed by policy.`,
-    action,
-    riskLevel
-  ) : decision(
-    "deny",
-    `Action '${action}' is not permitted by policy.`,
-    action,
-    riskLevel
-  );
-  if (result.status === "allow") {
-    const reservationDenied = await reserveScheduledWrite();
-    if (reservationDenied) return reservationDenied;
-  }
-  if (!planning && policy.audit_all_agent_actions) {
-    appendAuditEvent({
-      action,
-      status: result.status === "allow" ? "allowed" : "denied",
-      reason: result.reason,
-      riskLevel,
-      ...auditContext,
-      approvalId: result.approvalId
-    });
-  }
-  return result;
-}
-
-// src/core/action-dispatcher.ts
-init_errors2();
-async function dispatchAuthorizedAction(name2, args, context, execute) {
-  const decision2 = await authorizeAction(name2, args, context);
-  if (decision2.status !== "allow")
-    throw new PlatformIOError(
-      decision2.reason,
-      decision2.status === "requires_approval" ? "APPROVAL_REQUIRED" : "POLICY_DENIED",
-      { policyDecision: decision2 }
-    );
-  return execute();
-}
-async function authorizeAction(name2, args, context) {
-  const action = name2 === "start_pio_home" ? "run_shell_command" : policyNamesForOperation(name2).at(-1);
-  if (!Object.hasOwn(actionRiskLevels, action))
-    throw new PlatformIOError(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
-  return evaluatePolicy(action, args, {
-    ...context,
-    operationName: name2
-  });
-}
-async function planAction(name2, args, context) {
-  const action = name2 === "start_pio_home" ? "run_shell_command" : policyNamesForOperation(name2).at(-1);
-  if (!Object.hasOwn(actionRiskLevels, action))
-    throw new PlatformIOError(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
-  return planPolicy(action, args, { ...context, operationName: name2 });
-}
-
-// src/core/policy/revision-guard.ts
-init_errors2();
-function createPolicyRevisionGuard(workspaceDir) {
-  const expected = loadEffectivePolicyState(workspaceDir).digest;
-  return () => {
-    if (loadEffectivePolicyState(workspaceDir).digest !== expected)
-      throw new PlatformIOError(
-        "Policy or project enrollment changed during execution; start a new authorized operation.",
-        "POLICY_CHANGED"
-      );
-  };
-}
-
-// src/core/project-inspection.ts
-init_zod();
-init_errors2();
-init_redact();
-var text = external_exports.string().max(65536);
-var value = external_exports.union([
-  text,
-  external_exports.number().finite(),
-  external_exports.boolean(),
-  external_exports.null(),
-  external_exports.array(text).max(1e4)
-]);
-var configSchema = external_exports.array(
-  external_exports.tuple([
-    external_exports.string().max(256),
-    external_exports.array(external_exports.tuple([external_exports.string().max(256), value])).max(2048)
-  ])
-).max(512);
-var targetSchema = external_exports.object({
-  name: external_exports.string().min(1).max(256),
-  title: text.nullish(),
-  description: text.nullish(),
-  group: text.nullish()
-});
-var metadataSchema = external_exports.record(
-  external_exports.object({
-    env_name: external_exports.string().optional(),
-    build_type: text.nullish(),
-    defines: external_exports.array(text).max(1e4).optional(),
-    includes: external_exports.object({
-      build: external_exports.array(text).max(1e4).optional(),
-      toolchain: external_exports.array(text).max(1e4).optional()
-    }).passthrough().nullish(),
-    libsource_dirs: external_exports.array(text).max(4096).optional(),
-    cc_path: text.nullish(),
-    cxx_path: text.nullish(),
-    gdb_path: text.nullish(),
-    prog_path: text.nullish(),
-    svd_path: text.nullish(),
-    compiler_type: text.nullish(),
-    cc_flags: external_exports.array(text).max(1e4).optional(),
-    cxx_flags: external_exports.array(text).max(1e4).optional(),
-    targets: external_exports.array(targetSchema).max(2048).optional(),
-    extra: external_exports.unknown().optional()
-  }).passthrough()
-);
-function readJson(output) {
-  if (Buffer.byteLength(output) > 10 * 1024 * 1024)
-    throw new PlatformIOError(
-      "Project output exceeds 10 MiB.",
-      "PROJECT_OUTPUT_LIMIT"
-    );
-  let raw;
-  try {
-    raw = JSON.parse(output);
-  } catch {
-    throw new PlatformIOError(
-      "Project output is not valid JSON.",
-      "PROJECT_OUTPUT_INVALID"
-    );
-  }
-  let nodes = 0;
-  const clean = (item, depth) => {
-    if (++nodes > 1e5 || depth > 24)
-      throw new PlatformIOError(
-        "Project output exceeds structural limits.",
-        "PROJECT_OUTPUT_LIMIT"
-      );
-    if (typeof item === "string") return redactSecretsInText(item);
-    if (Array.isArray(item))
-      return item.map((child) => clean(child, depth + 1));
-    if (item && typeof item === "object")
-      return Object.fromEntries(
-        Object.entries(item).map(([key, child]) => [
-          key,
-          depth > 0 && /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
-            key
-          ) ? "[REDACTED_SECRET]" : clean(child, depth + 1)
-        ])
-      );
-    return item;
-  };
-  return clean(raw, 0);
-}
-function parseProjectEnvironments(output) {
-  const parsed = configSchema.safeParse(readJson(output));
-  if (!parsed.success)
-    throw new PlatformIOError(
-      "Unexpected computed configuration shape.",
-      "PROJECT_CONFIG_INVALID"
-    );
-  const sections = /* @__PURE__ */ new Map();
-  for (const [name2, options] of parsed.data) {
-    if (sections.has(name2) || new Set(options.map(([key]) => key)).size !== options.length)
-      throw new PlatformIOError(
-        "Duplicate computed configuration section or option.",
-        "PROJECT_CONFIG_INVALID"
-      );
-    sections.set(
-      name2,
-      Object.fromEntries(
-        options.map(([key, field2]) => [
-          key,
-          /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
-            key
-          ) ? "[REDACTED_SECRET]" : field2
-        ])
-      )
-    );
-  }
-  const envs = [...sections.entries()].filter(([name2]) => name2.startsWith("env:")).map(([section, options]) => ({
-    name: section.slice(4),
-    board: options.board ?? null,
-    platform: options.platform ?? null,
-    framework: options.framework ?? null,
-    monitorSpeed: options.monitor_speed ?? null,
-    monitorPort: options.monitor_port ?? null,
-    uploadPort: options.upload_port ?? null,
-    uploadProtocol: options.upload_protocol ?? null,
-    libraryDependencies: options.lib_deps ?? [],
-    libraryExtraDirectories: options.lib_extra_dirs ?? [],
-    libraryDependencyFinderMode: options.lib_ldf_mode ?? null,
-    libraryCompatibilityMode: options.lib_compat_mode ?? null,
-    buildFlags: options.build_flags ?? [],
-    extends: options.extends ?? []
-  }));
-  if (envs.length > 256 || envs.some((env) => !env.name))
-    throw new PlatformIOError(
-      "Invalid environment inventory.",
-      "PROJECT_CONFIG_INVALID"
-    );
-  const platformioSection = sections.get("platformio") ?? {};
-  const rawDefaults = platformioSection.default_envs;
-  const defaults = typeof rawDefaults === "string" ? rawDefaults.split(/[,\r\n]/).map((item) => item.trim()).filter(Boolean) : Array.isArray(rawDefaults) ? rawDefaults : rawDefaults == null ? [] : void 0;
-  if (!defaults || defaults.some((name2) => !envs.some((env) => env.name === name2)))
-    throw new PlatformIOError(
-      "Default environments do not match the resolved inventory.",
-      "PROJECT_CONFIG_INVALID"
-    );
-  return {
-    envs,
-    defaultEnvironments: defaults.length ? defaults : envs.map((env) => env.name),
-    platformioSection
-  };
-}
-function parseProjectMetadata(output, environment) {
-  const parsed = metadataSchema.safeParse(readJson(output));
-  if (!parsed.success)
-    throw new PlatformIOError(
-      "Unexpected build metadata shape.",
-      "PROJECT_METADATA_INVALID"
-    );
-  const entries = Object.entries(parsed.data);
-  if (entries.length < 1 || entries.length > 256 || environment && (entries.length !== 1 || entries[0][0] !== environment))
-    throw new PlatformIOError(
-      "Metadata does not match the selected environments.",
-      "PROJECT_METADATA_INVALID"
-    );
-  const envs = Object.fromEntries(
-    entries.map(([name2, item]) => {
-      if (!name2 || item.env_name && item.env_name !== name2)
-        throw new PlatformIOError(
-          "Metadata environment identity disagrees with its key.",
-          "PROJECT_METADATA_INVALID"
-        );
-      return [
-        name2,
-        {
-          buildType: item.build_type ?? null,
-          defines: item.defines ?? [],
-          includeDirs: item.includes?.build?.slice(0, 40) ?? [],
-          includeDirCount: item.includes?.build?.length ?? 0,
-          toolchainIncludeDirCount: item.includes?.toolchain?.length ?? 0,
-          librarySourceDirs: item.libsource_dirs ?? [],
-          cc: item.cc_path ?? null,
-          cxx: item.cxx_path ?? null,
-          gdb: item.gdb_path ?? null,
-          compilerType: item.compiler_type ?? null,
-          ccFlags: item.cc_flags ?? [],
-          cxxFlags: item.cxx_flags ?? [],
-          programPath: item.prog_path ?? null,
-          svdPath: item.svd_path ?? null,
-          extra: item.extra ?? null,
-          targets: item.targets ?? [],
-          targetsAvailable: item.targets !== void 0
-        }
-      ];
-    })
-  );
-  return {
-    envs,
-    targets: Object.entries(envs).flatMap(
-      ([name2, item]) => item.targets.map((target) => ({ environment: name2, ...target }))
-    ),
-    targetsAvailable: Object.values(envs).every(
-      (item) => item.targetsAvailable
-    )
-  };
-}
-
-// src/tools/project-inspection.ts
-init_redact();
-init_errors2();
-var base = {
-  projectDir: external_exports.string().min(1).max(32768),
-  approvalId: external_exports.string().optional()
-};
-var envSchema = external_exports.object(base).strict();
-var metadataSchema2 = external_exports.object({
-  ...base,
-  environment: external_exports.string().min(1).max(50).regex(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/).optional()
-}).strict();
-async function executeProjectInspection(action, input, caller = {}, onAuthorized) {
-  if (!["project_envs", "project_metadata", "list_targets"].includes(action))
-    throw new PlatformIOError(
-      "Unknown project inspection operation.",
-      "UNKNOWN_ACTION"
-    );
-  const parsed = action === "project_envs" ? envSchema.parse(input) : metadataSchema2.parse(input);
-  const projectDir = await fs13.realpath(parsed.projectDir);
-  const params = { ...parsed, projectDir };
-  const environment = "environment" in parsed ? parsed.environment : void 0;
-  return dispatchAuthorizedAction(
-    action,
-    params,
-    { ...caller, workspaceDir: projectDir },
-    async () => {
-      const check2 = createPolicyRevisionGuard(projectDir);
-      await onAuthorized?.();
-      check2();
-      const args = [
-        action === "project_envs" ? "config" : "metadata",
-        "--json-output",
-        "--project-dir",
-        projectDir
-      ];
-      if (environment) args.push("--environment", environment);
-      const result = await platformioExecutor.execute("project", args, {
-        cwd: projectDir,
-        env: { ...process.env, PYTHONIOENCODING: "utf-8" },
-        timeout: action === "project_envs" ? 3e4 : 6e5
-      });
-      check2();
-      if (result.exitCode !== 0)
-        return {
-          ok: false,
-          exitCode: result.exitCode,
-          projectDir,
-          summary: `${action} failed; see outputTail.`,
-          outputTail: redactSecretsInText(
-            [result.stdout, result.stderr].join("\n")
-          ).split(/\r?\n/).slice(-40).join("\n").slice(-32768)
-        };
-      if (action === "project_envs") {
-        const report2 = parseProjectEnvironments(result.stdout);
-        return {
-          ok: true,
-          exitCode: 0,
-          projectDir,
-          ...report2,
-          summary: `${report2.envs.length} resolved environment(s); defaults: ${report2.defaultEnvironments.join(", ") || "none"}.`
-        };
-      }
-      const report = parseProjectMetadata(result.stdout, environment);
-      if (action === "list_targets")
-        return {
-          ok: report.targetsAvailable,
-          exitCode: 0,
-          projectDir,
-          targets: report.targets,
-          environments: Object.keys(report.envs),
-          summary: report.targetsAvailable ? `${report.targets.length} build target(s) from PlatformIO metadata.` : "This metadata does not expose a target inventory.",
-          ...!report.targetsAvailable ? { error: "TARGETS_UNAVAILABLE" } : {}
-        };
-      return {
-        ok: true,
-        exitCode: 0,
-        projectDir,
-        envs: report.envs,
-        summary: `Build metadata for ${Object.keys(report.envs).join(", ")}.`
-      };
-    }
-  );
-}
-
-// src/adapters/monitor-start-compat.ts
-init_devices2();
-init_errors2();
-var MonitorStartCompatibilitySchema = external_exports.object({
-  port: external_exports.string().min(1).max(512).nullable().optional(),
-  baud: external_exports.number().int().min(1).max(4e6).nullable().optional(),
-  project_dir: external_exports.string().min(1).max(32768).nullable().optional(),
-  env: external_exports.string().min(1).max(50).regex(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/).nullable().optional(),
-  max_lines: external_exports.number().int().min(1).max(1e4).default(5e3),
-  approval_id: external_exports.string().max(256).optional(),
-  config_approval_id: external_exports.string().max(256).optional(),
-  selection_approval_id: external_exports.string().max(256).optional(),
-  discovery_approval_id: external_exports.string().max(256).optional()
-}).strict();
-async function startCompatibilityMonitor(client, input, defaults, caller, projectDevices) {
-  const params = MonitorStartCompatibilitySchema.parse(input);
-  const useConfig = !!(params.project_dir || defaults.projectDir || params.env);
-  const projectDir = useConfig ? await resolveCompatibilityProject(params.project_dir, defaults) : await fs15.realpath(path19.resolve(defaults.cwd ?? process.cwd()));
-  let port = params.port || void 0;
-  let baud = params.baud || void 0;
-  if (useConfig) {
-    const report = await executeProjectInspection(
-      "project_envs",
-      { projectDir, approvalId: params.config_approval_id },
-      caller
-    );
-    if (!report.ok || !("defaultEnvironments" in report))
-      throw new PlatformIOError(
-        "Could not resolve monitor project configuration.",
-        "PROJECT_CONFIG_INVALID"
-      );
-    const environment = params.env || report.defaultEnvironments[0];
-    const selected = report.envs.find((item) => item.name === environment);
-    if (environment && !selected)
-      throw new PlatformIOError(
-        "Monitor environment does not exist.",
-        "PROJECT_ENVIRONMENT_INVALID"
-      );
-    if (!port) {
-      const configured = selected?.monitorPort || selected?.uploadPort;
-      if (configured != null && configured !== "")
-        port = external_exports.string().min(1).max(512).parse(configured);
-    }
-    if (!baud && selected?.monitorSpeed != null && selected.monitorSpeed !== "") {
-      const speed = selected.monitorSpeed;
-      if (typeof speed !== "number" && (typeof speed !== "string" || !/^\d+$/.test(speed)))
-        throw new PlatformIOError(
-          "Invalid configured monitor speed.",
-          "SERIAL_TRANSPORT_ARGUMENT_INVALID"
-        );
-      baud = external_exports.number().int().min(1).max(4e6).parse(Number(speed));
-    }
-  }
-  if (!port) {
-    port = await dispatchAuthorizedAction(
-      "list_devices",
-      { projectDir, approvalId: params.selection_approval_id },
-      { ...caller, workspaceDir: projectDir },
-      async () => {
-        const guard = createPolicyRevisionGuard(projectDir);
-        const rows = projectDevices(await listDevicesCore());
-        guard();
-        if (rows.likely_ports.length !== 1)
-          throw new PlatformIOError(
-            rows.likely_ports.length ? "Several candidate ports; pass port explicitly." : "No likely development-board port; pass port explicitly.",
-            "SERIAL_PORT_SELECTION_REQUIRED"
-          );
-        return rows.likely_ports[0];
-      }
-    );
-  }
-  const request = {
-    projectDir,
-    path: port,
-    baudRate: baud ?? 115200,
-    buffer: { maxLines: params.max_lines }
-  };
-  return client.run(
-    {
-      caller,
-      approvalId: params.approval_id,
-      discoveryApprovalId: params.discovery_approval_id
-    },
-    (service, owner) => service.startWithDiscovery(owner, request)
-  );
-}
-
-// src/adapters/device-compat.ts
-init_zod();
-import fs16 from "node:fs/promises";
-import path20 from "node:path";
-init_devices2();
-init_errors2();
-var DEVELOPMENT_BOARD_HINT = /CP210|CH34|CH9102|FTDI|FT23|Silicon Labs|SLAB|usbserial|usbmodem|wchusbserial|ttyUSB|ttyACM|ESP|Arduino|STLink|ST-Link|JLink|J-Link|CMSIS|DAPLink|Espressif|USB/i;
-var NOISE_PORT_HINT = /Bluetooth|debug-console|Jabra|AirPods|iPhone/i;
-function projectCompatibilityDevices(devices) {
-  const rows = devices.map((device) => {
-    const description = `${device.description} ${device.hwid} ${device.port}`;
-    return {
-      port: device.port,
-      description: device.description,
-      hwid: device.hwid,
-      likely_dev_board: DEVELOPMENT_BOARD_HINT.test(description) && !NOISE_PORT_HINT.test(description)
-    };
-  });
-  rows.sort(
-    (left, right) => Number(right.likely_dev_board) - Number(left.likely_dev_board)
-  );
-  const likely = rows.filter((row) => row.likely_dev_board).map((row) => row.port);
-  return {
-    ok: true,
-    summary: `${rows.length} serial port(s). ${likely.length ? `Likely dev boards: ${likely.join(", ")}.` : "No port looks like a USB dev board; check the cable (data, not charge-only) and drivers."}`,
-    devices: rows,
-    likely_ports: likely
-  };
-}
-async function executeDeviceCompatibility(client, name2, input, defaults = {}, caller = {}, onAuthorized) {
-  if (name2 === "pio_monitor_start") {
-    const session = await startCompatibilityMonitor(
-      client,
-      input,
-      defaults,
-      caller,
-      projectCompatibilityDevices
-    );
-    const info = projectCompatibilitySession(session);
-    return {
-      ok: session.state === "open",
-      summary: session.state !== "open" ? `Monitor session ${info.session_id} is ${session.state}; inspect its state before continuing.` : `Monitoring ${info.port} at ${info.baud} baud in session ${info.session_id}. Read with pio_monitor_read(session_id='${info.session_id}', cursor=0). Stop before flashing.`,
-      ...info
-    };
-  }
-  if (name2 === "pio_monitor_read") {
-    const params2 = external_exports.object({
-      session_id: external_exports.string().min(1).max(256),
-      cursor: external_exports.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
-      max_lines: external_exports.number().int().min(1).max(1e4).default(200),
-      wait_for: external_exports.string().max(4096).nullable().optional(),
-      timeout_s: external_exports.number().finite().default(10),
-      approval_id: external_exports.string().max(256).optional()
-    }).strict().parse(input);
-    return client.run(
-      { caller, approvalId: params2.approval_id },
-      async (service, owner) => {
-        const result = await service.sessions.read(owner, params2.session_id, {
-          cursor: params2.cursor,
-          maxLines: params2.max_lines,
-          timeoutMs: Math.round(
-            Math.max(0, Math.min(params2.timeout_s, 120)) * 1e3
-          ),
-          waitFor: params2.wait_for || void 0,
-          patternOptions: { mode: "regex", pythonNamedGroups: true },
-          referenceSemantics: true
-        });
-        const closed = result.state !== "open";
-        let summary = params2.wait_for ? `pattern ${result.matched ? "matched" : `not matched within ${params2.timeout_s}s`}; ${result.lines.length} new line(s). Next cursor ${result.cursor}.` : `${result.lines.length} new line(s); next cursor ${result.cursor}.` + (result.moreAvailable ? " More available, read again." : "");
-        if (result.droppedLines)
-          summary += ` ${result.droppedLines} older line(s) fell out of the buffer.`;
-        if (closed)
-          summary += ` Session closed${result.error ? `: ${result.error}` : ""}.`;
-        return {
-          ok: true,
-          summary,
-          session_id: params2.session_id,
-          lines: result.lines,
-          cursor: result.cursor,
-          dropped_before_cursor: result.droppedLines,
-          more_available: result.moreAvailable,
-          matched: result.matched,
-          matched_line: result.matchedLine ?? null,
-          partial_line: result.partial,
-          closed,
-          error: result.error ?? null,
-          redaction_applied: result.redactionApplied,
-          truncated_bytes: result.totalTruncatedBytes
-        };
-      }
-    );
-  }
-  if (name2 === "pio_monitor_write") {
-    const params2 = external_exports.object({
-      session_id: external_exports.string().min(1).max(256),
-      text: external_exports.string().max(65536),
-      newline: external_exports.boolean().default(true),
-      approval_id: external_exports.string().max(256).optional()
-    }).strict().parse(input);
-    const bytes = Buffer.from(
-      params2.text + (params2.newline ? "\n" : ""),
-      "utf8"
-    );
-    if (bytes.length > 65536)
-      throw new PlatformIOError(
-        "Serial writes are limited to 64 KiB including the newline.",
-        "SERIAL_WRITE_LIMIT"
-      );
-    return client.run(
-      { caller, approvalId: params2.approval_id },
-      async (service, owner) => {
-        const result = await service.sessions.write(
-          owner,
-          params2.session_id,
-          bytes
-        );
-        const session = service.sessions.list(owner).find((item) => item.sessionId === params2.session_id);
-        return {
-          ok: true,
-          summary: `sent ${result.bytesWritten} byte(s) to ${session?.path ?? "serial port"}.`,
-          session_id: params2.session_id,
-          bytes: result.bytesWritten
-        };
-      }
-    );
-  }
-  if (name2 === "pio_monitor_stop") {
-    const params2 = external_exports.object({ session_id: external_exports.string().min(1).max(256) }).strict().parse(input);
-    return client.run({ caller }, async (service, owner) => {
-      const session = await service.sessions.stop(owner, params2.session_id);
-      const info = projectCompatibilitySession(session);
-      return {
-        ok: !session.cleanupPending,
-        summary: session.cleanupPending ? `Session ${params2.session_id} closure is unconfirmed; device ownership is retained.` : `session ${params2.session_id} on ${info.port} closed after ${info.uptime_s}s and ${info.bytes_received} bytes.`,
-        ...info
-      };
-    });
-  }
-  if (name2 === "pio_monitor_list") {
-    const params2 = external_exports.object({ approval_id: external_exports.string().max(256).optional() }).strict().parse(input);
-    const projectDir2 = await fs16.realpath(
-      path20.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
-    );
-    return client.run(
-      { caller, approvalId: params2.approval_id },
-      async (service, owner) => {
-        const sessions = (await service.listSessions(owner, projectDir2)).map(
-          projectCompatibilitySession
-        );
-        await onAuthorized?.();
-        return {
-          ok: true,
-          summary: `${sessions.length} open session(s).`,
-          sessions
-        };
-      }
-    );
-  }
-  if (name2 !== "pio_list_devices")
-    throw new PlatformIOError(
-      "Unknown device compatibility tool.",
-      "COMPAT_TOOL_UNKNOWN"
-    );
-  const params = external_exports.object({
-    approval_id: external_exports.string().max(256).optional(),
-    monitor_approval_id: external_exports.string().max(256).optional()
-  }).strict().parse(input);
-  const projectDir = await fs16.realpath(
-    path20.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
-  );
-  const guard = createPolicyRevisionGuard(projectDir);
-  return client.run(
-    { approvalId: params.monitor_approval_id, caller },
-    (service, owner) => dispatchAuthorizedAction(
-      "list_devices",
-      { projectDir, approvalId: params.approval_id },
-      { ...caller, workspaceDir: projectDir },
-      async () => {
-        await onAuthorized?.();
-        const sessions = await service.listSessions(owner, projectDir);
-        guard();
-        const devices = await listDevicesCore();
-        guard();
-        return {
-          ...projectCompatibilityDevices(devices),
-          open_monitor_sessions: sessions.map(projectCompatibilitySession)
-        };
-      }
-    )
-  );
-}
-function withDeviceCompatibility(base2) {
-  const source = base2.get("list_devices");
-  if (!source || base2.has("pio_list_devices"))
-    throw new Error("Invalid device compatibility registry");
-  const result = new Map(base2);
-  result.set("pio_list_devices", {
-    ...source,
-    name: "pio_list_devices",
-    description: "List serial device hints and caller-owned monitor sessions under canonical permissions.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        approval_id: { type: "string" },
-        monitor_approval_id: { type: "string" }
-      },
-      additionalProperties: false
-    },
-    handler: (args, context) => context.dispatch("pio_list_devices", args)
-  });
-  const startSource = base2.get("start_monitor");
-  if (!startSource || result.has("pio_monitor_start"))
-    throw new Error("Invalid serial startup compatibility registry");
-  result.set("pio_monitor_start", {
-    ...startSource,
-    name: "pio_monitor_start",
-    policyAction: "serial_session_start",
-    annotations: {
-      ...startSource.annotations,
-      title: "Start Monitor",
-      idempotentHint: false
-    },
-    description: "Start an owned serial monitor using explicit arguments, resolved project settings, or an unambiguous device candidate. Opening requires hardware authorization and exclusive device ownership.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        port: { type: ["string", "null"], maxLength: 512 },
-        baud: { type: ["integer", "null"], minimum: 1, maximum: 4e6 },
-        project_dir: { type: ["string", "null"] },
-        env: { type: ["string", "null"] },
-        max_lines: {
-          type: "integer",
-          minimum: 1,
-          maximum: 1e4,
-          default: 5e3
-        },
-        approval_id: { type: "string" },
-        config_approval_id: { type: "string" },
-        selection_approval_id: { type: "string" },
-        discovery_approval_id: { type: "string" }
-      },
-      additionalProperties: false
-    },
-    handler: (args, context) => context.dispatch("pio_monitor_start", args)
-  });
-  const readSource = base2.get("query_logs");
-  if (!readSource || result.has("pio_monitor_read"))
-    throw new Error("Invalid serial read compatibility registry");
-  result.set("pio_monitor_read", {
-    ...readSource,
-    name: "pio_monitor_read",
-    policyAction: "serial_session_read",
-    annotations: { ...readSource.annotations, title: "Read Monitor" },
-    description: "Read an owned monitor with cursors and bounded Python-compatible regex matching on completed lines. Maximum wait 120 seconds; response and storage byte limits apply.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        session_id: { type: "string", minLength: 1, maxLength: 256 },
-        cursor: { type: "integer", minimum: 0, default: 0 },
-        max_lines: {
-          type: "integer",
-          minimum: 1,
-          maximum: 1e4,
-          default: 200
-        },
-        wait_for: { type: ["string", "null"], maxLength: 4096 },
-        timeout_s: { type: "number", default: 10 },
-        approval_id: { type: "string", maxLength: 256 }
-      },
-      required: ["session_id"],
-      additionalProperties: false
-    },
-    handler: (args, context) => context.dispatch("pio_monitor_read", args)
-  });
-  const writeSource = base2.get("upload_firmware");
-  if (!writeSource || result.has("pio_monitor_write"))
-    throw new Error("Invalid serial write compatibility registry");
-  result.set("pio_monitor_write", {
-    ...writeSource,
-    name: "pio_monitor_write",
-    policyAction: "serial_session_write",
-    annotations: {
-      ...writeSource.annotations,
-      title: "Write Monitor",
-      idempotentHint: false
-    },
-    description: "Write UTF-8 text to an owned serial session after payload-bound hardware authorization. Limited to 64 KiB including the optional newline.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        session_id: { type: "string", minLength: 1, maxLength: 256 },
-        text: { type: "string", maxLength: 65536 },
-        newline: { type: "boolean", default: true },
-        approval_id: { type: "string", maxLength: 256 }
-      },
-      required: ["session_id", "text"],
-      additionalProperties: false
-    },
-    handler: (args, context) => context.dispatch("pio_monitor_write", args)
-  });
-  for (const [name2, canonical3] of [
-    ["pio_monitor_list", "get_monitor_status"],
-    ["pio_monitor_stop", "stop_monitor"]
-  ]) {
-    const source2 = base2.get(canonical3);
-    if (!source2 || result.has(name2))
-      throw new Error("Invalid monitor compatibility registry");
-    result.set(name2, {
-      ...source2,
-      name: name2,
-      description: name2 === "pio_monitor_list" ? "List this connection's authorized monitor sessions." : "Close an owned monitor session, retaining device ownership until closure is confirmed.",
-      inputSchema: {
-        type: "object",
-        properties: name2 === "pio_monitor_list" ? { approval_id: { type: "string" } } : { session_id: { type: "string" } },
-        ...name2 === "pio_monitor_stop" ? { required: ["session_id"] } : {},
-        additionalProperties: false
-      },
-      handler: (args, context) => context.dispatch(name2, args)
-    });
-  }
-  return result;
-}
-function projectCompatibilitySession(session) {
-  return {
-    session_id: session.sessionId,
-    port: session.path,
-    baud: session.baudRate,
-    lines_buffered: session.linesBuffered,
-    next_cursor: session.nextCursor,
-    bytes_received: session.bytesReceived,
-    uptime_s: Math.round(
-      Math.max(0, Date.now() - Date.parse(session.startedAt)) / 100
-    ) / 10,
-    closed: !session.cleanupPending && ["stopped", "disconnected", "error"].includes(session.state),
-    error: session.cleanupError ?? (session.state === "error" ? "SERIAL_TRANSPORT_ERROR" : null),
-    cleanup_pending: session.cleanupPending
-  };
-}
+import fs21 from "node:fs/promises";
+import path24 from "node:path";
 
 // src/core/serial/memory-capture.ts
 init_zod();
@@ -95296,12 +92611,13 @@ async function captureTransientMemory(service, owner, request, input = {}, signa
 }
 
 // src/core/serial/session-policy.ts
+init_zod();
 import { performance as performance5 } from "node:perf_hooks";
 
 // src/core/devices/serial-endpoint.ts
 init_errors2();
-import fs17 from "node:fs";
-import path21 from "node:path";
+import fs from "node:fs";
+import path from "node:path";
 function validatePort(port) {
   if (typeof port !== "string" || !port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
     throw new PlatformIOError(
@@ -95312,9 +92628,9 @@ function validatePort(port) {
 function resolveSerialEndpoint(port, options = {}) {
   validatePort(port);
   const platform2 = options.platform ?? process.platform;
-  const realpath = options.realpath ?? fs17.realpathSync.native;
+  const realpath = options.realpath ?? fs.realpathSync.native;
   const stat = options.stat ?? ((target) => {
-    const metadata = fs17.statSync(target, { bigint: true });
+    const metadata = fs.statSync(target, { bigint: true });
     return {
       characterDevice: metadata.isCharacterDevice(),
       deviceNumber: metadata.rdev
@@ -95343,7 +92659,7 @@ function resolveSerialEndpoint(port, options = {}) {
         "Serial endpoint identity is unavailable on this platform.",
         "SERIAL_ENDPOINT_UNSUPPORTED"
       );
-    if (!path21.posix.isAbsolute(port) || !path21.posix.normalize(port).startsWith("/dev/"))
+    if (!path.posix.isAbsolute(port) || !path.posix.normalize(port).startsWith("/dev/"))
       throw new PlatformIOError(
         "Unix serial endpoints must resolve within /dev.",
         "SERIAL_ENDPOINT_INVALID"
@@ -95353,7 +92669,7 @@ function resolveSerialEndpoint(port, options = {}) {
     try {
       canonicalPort = realpath(port);
       validatePort(canonicalPort);
-      if (!path21.posix.isAbsolute(canonicalPort) || !path21.posix.normalize(canonicalPort).startsWith("/dev/"))
+      if (!path.posix.isAbsolute(canonicalPort) || !path.posix.normalize(canonicalPort).startsWith("/dev/"))
         throw new PlatformIOError(
           "Serial alias resolves outside /dev.",
           "SERIAL_ENDPOINT_INVALID"
@@ -95421,7 +92737,7 @@ function resolveSerialEndpoint(port, options = {}) {
 
 // src/core/serial/serial-backend.ts
 init_errors2();
-import fs18 from "node:fs";
+import fs2 from "node:fs";
 async function loadSerialBackend() {
   if (Number(process.versions.node.split(".")[0]) < 20)
     throw new PlatformIOError(
@@ -95431,12 +92747,12 @@ async function loadSerialBackend() {
   try {
     const bundled = new URL("./native/serialport.cjs", import.meta.url);
     const nativeDirectory = new URL("./native/", import.meta.url);
-    if (fs18.existsSync(nativeDirectory) || new URL(import.meta.url).pathname.endsWith("/platformio-mcp.mjs")) {
-      if (!fs18.existsSync(bundled))
+    if (fs2.existsSync(nativeDirectory) || new URL(import.meta.url).pathname.endsWith("/platformio-mcp.mjs")) {
+      if (!fs2.existsSync(bundled))
         throw new Error("Packaged serial backend is missing");
       const target = process.platform === "darwin" ? "darwin-x64+arm64" : `${process.platform}-${process.arch}`;
       const prebuilds = new URL(`./prebuilds/${target}/`, import.meta.url);
-      if (!fs18.existsSync(prebuilds) || !fs18.readdirSync(prebuilds).some((file) => file.endsWith(".node")))
+      if (!fs2.existsSync(prebuilds) || !fs2.readdirSync(prebuilds).some((file) => file.endsWith(".node")))
         throw new Error("Packaged native target is missing");
       const loaded = await import(bundled.href);
       const backend = loaded.default ?? loaded;
@@ -95777,8 +93093,8 @@ async function createDirectSerialTransport(options, onData) {
 }
 
 // src/core/serial/session-policy.ts
-import fs22 from "node:fs";
-import path25 from "node:path";
+import fs15 from "node:fs";
+import path19 from "node:path";
 
 // src/core/devices/native-serial-discovery.ts
 init_zod();
@@ -95891,13 +93207,1959 @@ var NativeSerialDiscovery = class {
 };
 
 // src/core/serial/session-policy.ts
-import { AsyncLocalStorage as AsyncLocalStorage2 } from "node:async_hooks";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash as createHash4 } from "node:crypto";
+
+// src/core/action-catalog.ts
+var READ = {
+  riskLevel: "low",
+  readOnly: true,
+  destructive: false,
+  idempotent: true,
+  openWorld: false
+};
+var MCP_ACTIONS = {
+  deps_check: {
+    ...READ,
+    policyAction: "get_project_config",
+    readOnly: false,
+    idempotent: false,
+    openWorld: true
+  },
+  project_envs: {
+    policyAction: "get_project_config",
+    riskLevel: "low",
+    readOnly: true,
+    destructive: false,
+    idempotent: true,
+    openWorld: false
+  },
+  project_metadata: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  list_targets: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  pkg_search: {
+    policyAction: "search_libraries",
+    riskLevel: "low",
+    readOnly: true,
+    destructive: false,
+    idempotent: true,
+    openWorld: true
+  },
+  pkg_install: {
+    policyAction: "install_library",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  pkg_uninstall: {
+    policyAction: "uninstall_library",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: true,
+    idempotent: false,
+    openWorld: true
+  },
+  pkg_list: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  pkg_outdated: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  pkg_update: {
+    policyAction: "update_library",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: true,
+    idempotent: false,
+    openWorld: true
+  },
+  decode_backtrace: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  size_report: {
+    policyAction: "build_project",
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  list_boards: READ,
+  get_board_info: READ,
+  list_devices: READ,
+  init_project: {
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  build_project: {
+    riskLevel: "low",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  clean_project: {
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: true,
+    idempotent: true,
+    openWorld: false
+  },
+  upload_filesystem: {
+    riskLevel: "high",
+    readOnly: false,
+    destructive: true,
+    idempotent: false,
+    openWorld: false
+  },
+  upload_firmware: {
+    riskLevel: "high",
+    readOnly: false,
+    destructive: true,
+    idempotent: false,
+    openWorld: false
+  },
+  acquire_lock: {
+    riskLevel: "low",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: false
+  },
+  release_lock: {
+    riskLevel: "low",
+    readOnly: false,
+    destructive: false,
+    idempotent: true,
+    openWorld: false
+  },
+  get_lock_status: READ,
+  search_libraries: { ...READ, openWorld: true },
+  install_library: {
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  list_installed_libraries: READ,
+  start_monitor: {
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: true,
+    openWorld: false
+  },
+  stop_monitor: {
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: true,
+    openWorld: false
+  },
+  query_logs: READ,
+  reset_server_state: {
+    riskLevel: "high",
+    readOnly: false,
+    destructive: true,
+    idempotent: true,
+    openWorld: false
+  },
+  check_task_status: { ...READ, policyAction: "query_logs" },
+  get_dashboard_url: { ...READ, policyAction: "query_logs" },
+  get_project_context: READ,
+  get_project_config: READ,
+  agent_validate_project: READ,
+  agent_build_diagnose: {
+    riskLevel: "low",
+    policyAction: "build_project",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  agent_safe_pin_audit: READ,
+  agent_flash_monitor_verify: {
+    riskLevel: "high",
+    policyAction: "upload_firmware",
+    readOnly: false,
+    destructive: true,
+    idempotent: false,
+    openWorld: false
+  },
+  agent_get_last_report: READ,
+  agent_generate_board_report: READ,
+  get_policy_status: READ,
+  agent_resolve_target: READ,
+  get_monitor_status: READ,
+  capture_serial_window: {
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: false
+  },
+  agent_monitor_health: {
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: false
+  },
+  cancel_task: {
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: true,
+    idempotent: true,
+    openWorld: false
+  },
+  list_task_history: READ,
+  get_approval_request: READ,
+  list_pending_approvals: READ,
+  system_info: READ,
+  check_project: {
+    riskLevel: "low",
+    readOnly: false,
+    destructive: false,
+    idempotent: false,
+    openWorld: true
+  },
+  run_tests: {
+    riskLevel: "high",
+    readOnly: false,
+    destructive: true,
+    idempotent: false,
+    openWorld: false
+  },
+  uninstall_library: {
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: true,
+    idempotent: false,
+    openWorld: true
+  },
+  update_library: {
+    riskLevel: "medium",
+    readOnly: false,
+    destructive: true,
+    idempotent: false,
+    openWorld: true
+  }
+};
+var INTERNAL_ACTIONS = {
+  dependency_inventory: { ...READ, policyAction: "get_project_config" },
+  dependency_build: {
+    ...MCP_ACTIONS.build_project,
+    policyAction: "build_project"
+  },
+  serial_startup_discovery: { ...READ, policyAction: "list_devices" },
+  serial_session_start: {
+    ...MCP_ACTIONS.start_monitor,
+    policyAction: "start_monitor",
+    idempotent: false
+  },
+  serial_session_list: { ...READ, policyAction: "get_monitor_status" },
+  serial_session_read: { ...READ, policyAction: "query_logs" },
+  serial_session_write: {
+    ...MCP_ACTIONS.upload_firmware,
+    policyAction: "upload_firmware"
+  }
+};
+var actionRiskLevels = {
+  ...Object.fromEntries(
+    Object.entries({ ...MCP_ACTIONS, ...INTERNAL_ACTIONS }).map(
+      ([name2, action]) => [name2, action.riskLevel]
+    )
+  ),
+  erase_flash: "critical",
+  run_shell_command: "critical",
+  ssh_deploy: "critical"
+};
+function policyNamesForOperation(name2) {
+  const names = [];
+  let current = name2;
+  while (!names.includes(current)) {
+    names.push(current);
+    const parent = Object.hasOwn(MCP_ACTIONS, current) ? MCP_ACTIONS[current].policyAction : Object.hasOwn(INTERNAL_ACTIONS, current) ? INTERNAL_ACTIONS[current].policyAction : void 0;
+    if (!parent || parent === current) return names;
+    current = parent;
+  }
+  throw new Error(`Cyclic policy mapping for ${name2}`);
+}
+
+// src/core/policy/evaluate-policy.ts
+import path15 from "node:path";
+
+// src/core/policy/default-policy.ts
+var deniedActionPatterns = [
+  /erase_disk/i,
+  /format_drive/i,
+  /modify_system_usb_permissions_without_approval/i,
+  /curl_pipe_to_shell/i,
+  /delete_home_directory/i,
+  /run_unbounded_shell_loop/i
+];
+var defaultPolicy = {
+  approval_required: [
+    "upload_firmware",
+    "upload_filesystem",
+    "agent_flash_monitor_verify",
+    "erase_flash",
+    "reset_server_state",
+    "run_shell_command",
+    "ssh_deploy"
+  ],
+  allow: [
+    "list_devices",
+    "list_boards",
+    "get_board_info",
+    "get_project_config",
+    "get_policy_status",
+    "get_monitor_status",
+    "list_task_history",
+    "get_approval_request",
+    "list_pending_approvals",
+    "agent_resolve_target",
+    "build_project",
+    "check_project",
+    "query_logs",
+    "start_monitor",
+    "stop_monitor",
+    "capture_serial_window",
+    "agent_monitor_health",
+    "cancel_task",
+    "agent_validate_project",
+    "agent_build_diagnose",
+    "agent_safe_pin_audit",
+    "agent_get_last_report",
+    "agent_generate_board_report",
+    "get_project_context",
+    "get_lock_status",
+    "search_libraries",
+    "list_installed_libraries",
+    "system_info",
+    "get_dashboard_url",
+    "acquire_lock",
+    "release_lock",
+    "init_project",
+    "clean_project",
+    "install_library",
+    "uninstall_library",
+    "update_library"
+  ],
+  deny: [
+    "erase_disk",
+    "format_drive",
+    "modify_system_usb_permissions_without_approval",
+    "curl_pipe_to_shell",
+    "delete_home_directory",
+    "run_unbounded_shell_loop"
+  ],
+  require_workspace_boundary: true,
+  require_device_lock_for_upload: true,
+  redact_secrets_from_logs: true,
+  audit_all_agent_actions: true
+};
+
+// src/core/policy/approvals.ts
+var import_proper_lockfile = __toESM(require_proper_lockfile(), 1);
+init_zod();
+import fs3 from "node:fs";
+import path4 from "node:path";
+import crypto from "node:crypto";
+
+// src/core/policy/policy-sources.ts
+import os from "node:os";
+import path3 from "node:path";
+
+// src/core/policy/policy-schema.ts
+var import_yaml = __toESM(require_dist(), 1);
+init_zod();
+init_errors2();
+import path2 from "node:path";
+var PolicyProfileNameSchema = external_exports.enum([
+  "read_only",
+  "build_only",
+  "monitor_only",
+  "flash_requires_approval",
+  "lab_runner",
+  "lab_admin"
+]);
+var KNOWN_ACTIONS = /* @__PURE__ */ new Set([
+  ...Object.keys(actionRiskLevels),
+  ...defaultPolicy.deny,
+  "check_task_status"
+]);
+var ActionListSchema = external_exports.array(
+  external_exports.string().refine((action) => KNOWN_ACTIONS.has(action), "Unknown policy action")
+).max(256);
+var PolicyOverridesSchema = external_exports.object({
+  approval_required: ActionListSchema.optional(),
+  allow: ActionListSchema.optional(),
+  deny: ActionListSchema.optional(),
+  require_workspace_boundary: external_exports.boolean().optional(),
+  require_device_lock_for_upload: external_exports.boolean().optional(),
+  redact_secrets_from_logs: external_exports.boolean().optional(),
+  audit_all_agent_actions: external_exports.boolean().optional()
+}).strict();
+var PolicyProfileConfigSchema = external_exports.object({
+  profile: PolicyProfileNameSchema,
+  overrides: PolicyOverridesSchema.optional()
+}).strict();
+var PolicyDocumentSchema = external_exports.union([
+  PolicyProfileConfigSchema,
+  PolicyOverridesSchema
+]);
+var MAX_POLICY_BYTES = 64 * 1024;
+var PolicyConfigError = class extends PlatformIOError {
+  /** Creates an actionable configuration error without exposing source contents. */
+  constructor(source, detail) {
+    super(`Invalid policy at ${source}: ${detail}`, "POLICY_CONFIG_INVALID", {
+      source
+    });
+    this.source = source;
+    this.name = "PolicyConfigError";
+  }
+  source;
+};
+function parsePolicyDocument(text6, source) {
+  if (Buffer.byteLength(text6, "utf8") > MAX_POLICY_BYTES) {
+    throw new PolicyConfigError(source, "Policy exceeds the 64 KiB limit.");
+  }
+  const extension = path2.extname(source).toLowerCase();
+  if (![".json", ".yaml", ".yml"].includes(extension)) {
+    throw new PolicyConfigError(
+      source,
+      "Use a .json, .yaml or .yml policy file."
+    );
+  }
+  try {
+    if (extension === ".json") JSON.parse(text6);
+    const document2 = (0, import_yaml.parseDocument)(text6, {
+      version: "1.2",
+      strict: true,
+      uniqueKeys: true,
+      prettyErrors: false
+    });
+    if (document2.errors.length || document2.warnings.length) {
+      throw new PolicyConfigError(
+        source,
+        "Malformed, duplicate-key or unsupported YAML/JSON document."
+      );
+    }
+    const value2 = document2.toJS({ maxAliasCount: 0 });
+    const parsed = PolicyDocumentSchema.safeParse(value2);
+    if (!parsed.success) {
+      throw new PolicyConfigError(
+        source,
+        "Expected a known profile or typed policy fields containing known actions; unknown fields are not allowed."
+      );
+    }
+    return parsed.data;
+  } catch (error2) {
+    if (error2 instanceof PolicyConfigError) throw error2;
+    throw new PolicyConfigError(
+      source,
+      "Malformed JSON/YAML or unsupported aliases. Repair this file before executing operations."
+    );
+  }
+}
+
+// src/core/policy/policy-sources.ts
+var launchPolicyFile;
+function resolvePolicyFile(selected = launchPolicyFile) {
+  const environment = process.env.PIO_MCP_POLICY_FILE;
+  if (environment !== void 0 && !environment.trim()) {
+    throw new PolicyConfigError(
+      "PIO_MCP_POLICY_FILE",
+      "The configured path is empty."
+    );
+  }
+  const flagPath = selected === void 0 ? void 0 : path3.resolve(selected);
+  const environmentPath = environment === void 0 ? void 0 : path3.resolve(environment);
+  if (flagPath && environmentPath && flagPath !== environmentPath) {
+    throw new PolicyConfigError(
+      "--policy-file / PIO_MCP_POLICY_FILE",
+      "Conflicting policy paths; select the same file in both or remove one setting."
+    );
+  }
+  return flagPath ?? environmentPath;
+}
+function configurePolicyFileFromArgs(args) {
+  const remaining = [];
+  let selected;
+  for (let index = 0; index < args.length; index++) {
+    const argument2 = args[index];
+    if (argument2 === "--policy-file" || argument2.startsWith("--policy-file=")) {
+      const value2 = argument2 === "--policy-file" ? args[++index] : argument2.slice("--policy-file=".length);
+      if (!value2?.trim() || value2.startsWith("--") || selected !== void 0) {
+        throw new PolicyConfigError(
+          "--policy-file",
+          "Supply exactly one non-empty policy file path."
+        );
+      }
+      selected = value2;
+    } else {
+      remaining.push(argument2);
+    }
+  }
+  if (selected !== void 0) launchPolicyFile = resolvePolicyFile(selected);
+  return remaining;
+}
+function resolvePolicyDirectory() {
+  const configured = process.env.PIO_MCP_DATA_DIR;
+  if (configured !== void 0 && !configured.trim()) {
+    throw new PolicyConfigError(
+      "PIO_MCP_DATA_DIR",
+      "The configured directory is empty."
+    );
+  }
+  return path3.resolve(configured ?? path3.join(os.homedir(), ".platformio-mcp"));
+}
+
+// src/core/policy/approvals.ts
+init_errors2();
+var ApprovalRecordSchema = external_exports.object({
+  id: external_exports.string().regex(/^approval-[a-f0-9-]{36}$/),
+  action: external_exports.string(),
+  riskLevel: external_exports.enum(["low", "medium", "high", "critical"]),
+  reason: external_exports.string(),
+  requestedBy: external_exports.enum(["agent", "user", "system"]),
+  status: external_exports.enum(["pending", "approved", "denied", "expired", "consumed"]),
+  createdAt: external_exports.string().datetime(),
+  expiresAt: external_exports.string().datetime().optional(),
+  scopeDigest: external_exports.string().regex(/^[a-f0-9]{64}$/).optional(),
+  consumedAt: external_exports.string().datetime().optional(),
+  metadata: external_exports.record(external_exports.unknown()).optional()
+}).strict();
+function approvalsFile() {
+  return path4.join(resolvePolicyDirectory(), "approvals.json");
+}
+function readApprovals(file = approvalsFile()) {
+  let text6;
+  try {
+    if (fs3.statSync(file).size > 8 * 1024 * 1024) throw new Error("size limit");
+    text6 = fs3.readFileSync(file, "utf8");
+  } catch (error2) {
+    if (error2.code === "ENOENT") return [];
+    throw new PlatformIOError(
+      "Approval storage is unreadable or exceeds its size limit.",
+      "APPROVAL_STORE_INVALID"
+    );
+  }
+  try {
+    return external_exports.array(ApprovalRecordSchema).parse(JSON.parse(text6));
+  } catch {
+    throw new PlatformIOError(
+      "Approval storage is malformed; operator repair is required.",
+      "APPROVAL_STORE_INVALID"
+    );
+  }
+}
+function writeApprovals(file, records) {
+  const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+  try {
+    const descriptor2 = fs3.openSync(temporary, "wx", 384);
+    try {
+      fs3.writeFileSync(descriptor2, JSON.stringify(records, null, 2), "utf8");
+      fs3.fsyncSync(descriptor2);
+    } finally {
+      fs3.closeSync(descriptor2);
+    }
+    fs3.renameSync(temporary, file);
+  } finally {
+    if (fs3.existsSync(temporary)) fs3.unlinkSync(temporary);
+  }
+}
+function mutate(operation) {
+  const file = approvalsFile();
+  fs3.mkdirSync(path4.dirname(file), { recursive: true, mode: 448 });
+  let release;
+  try {
+    release = import_proper_lockfile.default.lockSync(file, {
+      realpath: false,
+      stale: 12e4,
+      retries: 0
+    });
+  } catch {
+    throw new PlatformIOError(
+      "Approval storage is busy or unavailable; retry the operation.",
+      "APPROVAL_STORE_BUSY"
+    );
+  }
+  try {
+    const records = readApprovals(file);
+    const result = operation(records, file);
+    writeApprovals(file, records);
+    return result;
+  } finally {
+    release();
+  }
+}
+function claimPath(file, id) {
+  return path4.join(
+    path4.dirname(file),
+    "approval-consumption",
+    crypto.createHash("sha256").update(id).digest("hex")
+  );
+}
+function currentState(record2, file) {
+  if (fs3.existsSync(claimPath(file, record2.id)))
+    return { ...record2, status: "consumed" };
+  if ((record2.status === "pending" || record2.status === "approved") && record2.expiresAt && Date.parse(record2.expiresAt) <= Date.now())
+    return { ...record2, status: "expired" };
+  return record2;
+}
+function listApprovalRequests(opts) {
+  const file = approvalsFile();
+  const records = readApprovals(file).map(
+    (record2) => currentState(record2, file)
+  );
+  return records.filter((record2) => !opts?.status || record2.status === opts.status).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, Math.max(0, opts?.limit ?? records.length));
+}
+function createApprovalRequest(input) {
+  const minutes = input.expiresInMinutes ?? 30;
+  if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60)
+    throw new PlatformIOError(
+      "Approval lifetime must be between zero and 1440 minutes.",
+      "APPROVAL_LIFETIME_INVALID"
+    );
+  const record2 = ApprovalRecordSchema.parse({
+    id: `approval-${crypto.randomUUID()}`,
+    action: input.action,
+    riskLevel: input.riskLevel,
+    reason: input.reason,
+    requestedBy: input.requestedBy,
+    status: "pending",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    expiresAt: new Date(Date.now() + minutes * 6e4).toISOString(),
+    scopeDigest: input.scopeDigest,
+    metadata: input.metadata
+  });
+  return mutate((records) => {
+    records.push(record2);
+    return record2;
+  });
+}
+function transition(id, status) {
+  return mutate((records, file) => {
+    const index = records.findIndex((record3) => record3.id === id);
+    if (index < 0) return void 0;
+    const record2 = currentState(records[index], file);
+    if (record2.status !== "pending" && !(status === "denied" && record2.status === "approved")) {
+      if (record2.status === status) return record2;
+      throw new PlatformIOError(
+        `Approval is ${record2.status} and cannot become ${status}.`,
+        "APPROVAL_TRANSITION_INVALID"
+      );
+    }
+    records[index] = { ...record2, status };
+    return records[index];
+  });
+}
+function approveRequest(id) {
+  return transition(id, "approved");
+}
+function denyRequest(id) {
+  return transition(id, "denied");
+}
+function getApproval(id) {
+  const file = approvalsFile();
+  const record2 = readApprovals(file).find((item) => item.id === id);
+  return record2 ? currentState(record2, file) : void 0;
+}
+function consumeApproval(id, scopeDigest) {
+  return mutate((records, file) => {
+    const index = records.findIndex((record3) => record3.id === id);
+    if (index < 0) return void 0;
+    const record2 = currentState(records[index], file);
+    if (record2.status !== "approved" || !record2.expiresAt || record2.scopeDigest !== scopeDigest)
+      return void 0;
+    const claim = claimPath(file, id);
+    fs3.mkdirSync(path4.dirname(claim), { recursive: true, mode: 448 });
+    const consumedAt = (/* @__PURE__ */ new Date()).toISOString();
+    try {
+      const descriptor2 = fs3.openSync(claim, "wx", 384);
+      try {
+        fs3.writeFileSync(descriptor2, consumedAt, "utf8");
+        fs3.fsyncSync(descriptor2);
+      } finally {
+        fs3.closeSync(descriptor2);
+      }
+    } catch (error2) {
+      if (error2.code === "EEXIST") return void 0;
+      throw error2;
+    }
+    records[index] = { ...record2, status: "consumed", consumedAt };
+    return records[index];
+  });
+}
+function summarizeApproval(request) {
+  const metadata = request.metadata ?? {};
+  const args = typeof metadata.args === "object" && metadata.args !== null ? metadata.args : metadata;
+  return {
+    id: request.id,
+    action: request.action,
+    riskLevel: request.riskLevel,
+    reason: request.reason,
+    requestedBy: request.requestedBy,
+    status: request.status,
+    createdAt: request.createdAt,
+    expiresAt: request.expiresAt,
+    projectDir: typeof args.projectDir === "string" ? args.projectDir : void 0,
+    environment: typeof args.environment === "string" ? args.environment : void 0,
+    port: typeof args.port === "string" ? args.port : void 0
+  };
+}
+function getApprovalRequestSummary(id, projectDir) {
+  const request = getApproval(id);
+  if (!request) return void 0;
+  const summary = summarizeApproval(request);
+  if (projectDir && (!summary.projectDir || path4.resolve(summary.projectDir) !== path4.resolve(projectDir))) {
+    return void 0;
+  }
+  return summary;
+}
+function listPendingApprovalSummaries(options) {
+  return listApprovalRequests({
+    status: "pending",
+    limit: options?.limit ?? 50
+  }).map((request) => getApproval(request.id)).filter((request) => Boolean(request)).filter((request) => request.status === "pending").map(summarizeApproval).filter(
+    (request) => !options?.projectDir || Boolean(request.projectDir) && path4.resolve(request.projectDir) === path4.resolve(options.projectDir)
+  ).slice(0, Math.min(100, Math.max(1, options?.limit ?? 20)));
+}
+
+// src/core/policy/audit-log.ts
+init_paths();
+init_events();
+import fs7 from "node:fs";
+import path8 from "node:path";
+import crypto2 from "node:crypto";
+function ensureDir2(dir) {
+  if (!fs7.existsSync(dir)) fs7.mkdirSync(dir, { recursive: true });
+}
+function appendAuditEvent(input) {
+  const event = {
+    id: crypto2.randomUUID(),
+    timestamp: input.timestamp ?? (/* @__PURE__ */ new Date()).toISOString(),
+    ...input
+  };
+  const globalDir = path8.join(SERVER_DATA_DIR, "audit");
+  ensureDir2(globalDir);
+  const globalFile = path8.join(globalDir, "global-events.jsonl");
+  fs7.appendFileSync(globalFile, JSON.stringify(event) + "\n", "utf8");
+  if (input.workspaceDir) {
+    const localDir = path8.join(
+      input.workspaceDir,
+      ".pio-mcp-workspace",
+      "audit"
+    );
+    ensureDir2(localDir);
+    const localFile = path8.join(localDir, "events.jsonl");
+    fs7.appendFileSync(localFile, JSON.stringify(event) + "\n", "utf8");
+  }
+  portalEvents.emitSafetyStateUpdated(input.workspaceDir);
+  return event;
+}
+function readRecentAuditEvents(opts) {
+  const limit = Math.max(1, opts?.limit ?? 50);
+  const globalFile = path8.join(SERVER_DATA_DIR, "audit", "global-events.jsonl");
+  const localFile = opts?.workspaceDir ? path8.join(opts.workspaceDir, ".pio-mcp-workspace", "audit", "events.jsonl") : void 0;
+  const sourceFile = localFile && fs7.existsSync(localFile) ? localFile : globalFile;
+  if (!fs7.existsSync(sourceFile)) {
+    return [];
+  }
+  const lines2 = fs7.readFileSync(sourceFile, "utf8").split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const events = [];
+  for (let i = lines2.length - 1; i >= 0 && events.length < limit; i--) {
+    try {
+      events.push(JSON.parse(lines2[i]));
+    } catch {
+    }
+  }
+  return events;
+}
+
+// src/core/policy/automation-policy.ts
+init_errors2();
+init_validation();
+import fs9 from "node:fs";
+import path11 from "node:path";
+
+// src/core/automation-state.ts
+var import_proper_lockfile3 = __toESM(require_proper_lockfile(), 1);
+init_errors2();
+init_validation();
+init_events();
+import crypto3 from "node:crypto";
+import fs8 from "node:fs";
+import path10 from "node:path";
+var MAX_STATE_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
+function validateAutomationKey(automationKey) {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u.test(automationKey)) {
+    throw new PlatformIOError(
+      "automationKey must be 1-80 letters, numbers, underscores, or hyphens.",
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  return automationKey;
+}
+function getAutomationStatePath(projectDir, automationKey) {
+  const projectRoot = validateProjectPath(projectDir);
+  const key = validateAutomationKey(automationKey);
+  return path10.join(
+    projectRoot,
+    ".pio-mcp-workspace",
+    "automations",
+    `${key}.json`
+  );
+}
+function createEmptyState(automationKey, now = /* @__PURE__ */ new Date()) {
+  const timestamp = now.toISOString();
+  return {
+    schemaVersion: 1,
+    automationKey,
+    consecutiveFailures: 0,
+    consecutiveHardwareWrites: 0,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+}
+function readAutomationStateRecord(projectDir, automationKey, allowStale) {
+  const statePath = getAutomationStatePath(projectDir, automationKey);
+  if (!fs8.existsSync(statePath)) return createEmptyState(automationKey);
+  let state;
+  try {
+    state = JSON.parse(fs8.readFileSync(statePath, "utf8"));
+  } catch {
+    throw new PlatformIOError(
+      `Automation '${automationKey}' state is malformed and requires operator review.`,
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  const updatedAt = new Date(state.updatedAt).getTime();
+  if (state.schemaVersion !== 1 || state.automationKey !== automationKey || !Number.isFinite(updatedAt) || !Number.isInteger(state.consecutiveFailures) || state.consecutiveFailures < 0 || !Number.isInteger(state.consecutiveHardwareWrites) || state.consecutiveHardwareWrites < 0) {
+    throw new PlatformIOError(
+      `Automation '${automationKey}' state cannot be verified and requires operator review.`,
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  if (!allowStale && Date.now() - updatedAt > MAX_STATE_AGE_MS) {
+    throw new PlatformIOError(
+      `Automation '${automationKey}' write budget is stale and requires operator review.`,
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  return state;
+}
+function readAutomationState(projectDir, automationKey) {
+  try {
+    return readAutomationStateRecord(projectDir, automationKey, false);
+  } catch {
+    return createEmptyState(automationKey);
+  }
+}
+function readAutomationWriteBudgetState(projectDir, automationKey) {
+  return readAutomationStateRecord(projectDir, automationKey, false);
+}
+function writeAutomationState(projectDir, state) {
+  const statePath = getAutomationStatePath(projectDir, state.automationKey);
+  const directory = path10.dirname(statePath);
+  fs8.mkdirSync(directory, { recursive: true });
+  const nextState = {
+    ...state,
+    schemaVersion: 1,
+    updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const temporaryPath = path10.join(
+    directory,
+    `.${state.automationKey}.${crypto3.randomUUID()}.tmp`
+  );
+  fs8.writeFileSync(temporaryPath, `${JSON.stringify(nextState, null, 2)}
+`, {
+    encoding: "utf8",
+    mode: 384
+  });
+  fs8.renameSync(temporaryPath, statePath);
+  portalEvents.emitSafetyStateUpdated(projectDir);
+  return nextState;
+}
+function listAutomationStates(projectDir) {
+  const projectRoot = validateProjectPath(projectDir);
+  const directory = path10.join(projectRoot, ".pio-mcp-workspace", "automations");
+  if (!fs8.existsSync(directory)) return [];
+  const now = Date.now();
+  return fs8.readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(".json")).slice(0, 100).map((entry) => {
+    const automationKey = entry.name.slice(0, -".json".length);
+    try {
+      validateAutomationKey(automationKey);
+      const state = JSON.parse(
+        fs8.readFileSync(path10.join(directory, entry.name), "utf8")
+      );
+      const updatedAt = new Date(state.updatedAt).getTime();
+      if (state.schemaVersion !== 1 || state.automationKey !== automationKey || !Number.isFinite(updatedAt)) {
+        throw new Error("Invalid automation state");
+      }
+      const bindingExpiresAt = state.targetBinding?.expiresAt;
+      const bindingExpired = bindingExpiresAt !== void 0 && new Date(bindingExpiresAt).getTime() <= now;
+      return {
+        automationKey,
+        state: now - updatedAt > MAX_STATE_AGE_MS ? "stale" : bindingExpired ? "binding_expired" : "healthy",
+        lastStatus: state.lastStatus,
+        consecutiveFailures: Number.isInteger(state.consecutiveFailures) ? Math.max(0, state.consecutiveFailures) : 0,
+        consecutiveHardwareWrites: Number.isInteger(
+          state.consecutiveHardwareWrites
+        ) ? Math.max(0, state.consecutiveHardwareWrites) : 0,
+        lastHardwareWriteAt: state.lastHardwareWriteAt,
+        lastHardwareWriteAction: state.lastHardwareWriteAction,
+        environment: state.targetBinding?.environment,
+        bindingExpiresAt,
+        createdAt: state.createdAt,
+        updatedAt: state.updatedAt
+      };
+    } catch {
+      return {
+        automationKey,
+        state: "invalid",
+        consecutiveFailures: 0,
+        consecutiveHardwareWrites: 0
+      };
+    }
+  }).sort(
+    (left, right) => new Date(right.updatedAt ?? 0).getTime() - new Date(left.updatedAt ?? 0).getTime()
+  );
+}
+async function clearAutomationMonitorState(projectDir, automationKey) {
+  return withAutomationStateLock(projectDir, automationKey, async () => {
+    const previous = readAutomationStateRecord(
+      projectDir,
+      automationKey,
+      true
+    );
+    const reset = createEmptyState(automationKey);
+    return writeAutomationState(projectDir, {
+      ...reset,
+      createdAt: previous.createdAt,
+      consecutiveHardwareWrites: previous.consecutiveHardwareWrites,
+      lastHardwareWriteAt: previous.lastHardwareWriteAt,
+      lastHardwareWriteAction: previous.lastHardwareWriteAction
+    });
+  });
+}
+async function withAutomationStateLock(projectDir, automationKey, operation) {
+  const statePath = getAutomationStatePath(projectDir, automationKey);
+  fs8.mkdirSync(path10.dirname(statePath), { recursive: true });
+  if (!fs8.existsSync(statePath)) {
+    writeAutomationState(projectDir, createEmptyState(automationKey));
+  }
+  let release;
+  try {
+    release = await import_proper_lockfile3.default.lock(statePath, {
+      retries: 0,
+      stale: 5 * 60 * 1e3,
+      realpath: false
+    });
+  } catch {
+    throw new PlatformIOError(
+      `Automation '${automationKey}' is already running.`,
+      "OVERLAPPING_RUN"
+    );
+  }
+  try {
+    return await operation();
+  } finally {
+    await release();
+  }
+}
+
+// src/core/policy/automation-policy.ts
+var WRITE_ACTIONS = /* @__PURE__ */ new Set([
+  "upload_firmware",
+  "upload_filesystem",
+  "agent_flash_monitor_verify"
+]);
+var SAFE_SCHEDULED_ACTIONS = /* @__PURE__ */ new Set([
+  "list_devices",
+  "list_boards",
+  "get_board_info",
+  "get_project_config",
+  "get_project_context",
+  "get_policy_status",
+  "agent_resolve_target",
+  "build_project",
+  "check_project",
+  "agent_build_diagnose",
+  "check_task_status",
+  "list_task_history",
+  "get_monitor_status",
+  "capture_serial_window",
+  "agent_monitor_health",
+  "query_logs",
+  "cancel_task"
+]);
+var DEVICE_BOUND_ACTIONS = /* @__PURE__ */ new Set(["capture_serial_window"]);
+var ENVIRONMENT_SCOPED_ACTIONS = /* @__PURE__ */ new Set([
+  "build_project",
+  "check_project",
+  "agent_build_diagnose",
+  ...DEVICE_BOUND_ACTIONS,
+  ...WRITE_ACTIONS
+]);
+var ALWAYS_DENIED_ACTIONS = /* @__PURE__ */ new Set([
+  "erase_flash",
+  "reset_server_state",
+  "run_shell_command",
+  "ssh_deploy"
+]);
+function loadLabRunnerPolicy(projectDir) {
+  const policyPath = path11.join(
+    projectDir,
+    ".pio-mcp-workspace",
+    "automation-policy.json"
+  );
+  if (!fs9.existsSync(policyPath)) return void 0;
+  try {
+    return JSON.parse(
+      fs9.readFileSync(policyPath, "utf8")
+    );
+  } catch {
+    throw new PlatformIOError(
+      "The lab-runner automation policy is malformed.",
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+}
+function validateAutomationScope(input) {
+  validateAutomationKey(input.automationKey);
+  const projectDir = validateProjectPath(input.projectDir);
+  if (projectDir === path11.parse(projectDir).root) {
+    throw new PlatformIOError(
+      "Automation cannot target a filesystem root.",
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  if (input.environment?.includes("*")) {
+    throw new PlatformIOError(
+      "Automation target selectors must be exact and cannot contain wildcards.",
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  if (!Number.isFinite(input.maxRunDurationSeconds) || input.maxRunDurationSeconds < 1 || input.maxRunDurationSeconds > 900) {
+    throw new PlatformIOError(
+      "Automation runs must have a maximum duration between 1 and 900 seconds.",
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  if (ALWAYS_DENIED_ACTIONS.has(input.action)) {
+    throw new PlatformIOError(
+      `Action '${input.action}' is never allowed in unattended automation.`,
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  const writeOperation = WRITE_ACTIONS.has(input.action);
+  if (!writeOperation && !SAFE_SCHEDULED_ACTIONS.has(input.action)) {
+    throw new PlatformIOError(
+      `Action '${input.action}' is not available to unattended automation.`,
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  if (ENVIRONMENT_SCOPED_ACTIONS.has(input.action) && !input.environment) {
+    throw new PlatformIOError(
+      `Action '${input.action}' requires an exact PlatformIO environment.`,
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  if ((writeOperation || DEVICE_BOUND_ACTIONS.has(input.action)) && !input.targetBinding) {
+    throw new PlatformIOError(
+      `Action '${input.action}' requires a current physical target binding.`,
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  if (input.targetBinding) {
+    if (input.targetBinding.port.includes("*") || input.targetBinding.deviceFingerprint.includes("*")) {
+      throw new PlatformIOError(
+        "Automation target selectors must be exact and cannot contain wildcards.",
+        "AUTOMATION_POLICY_DENIED"
+      );
+    }
+    if (path11.resolve(input.targetBinding.projectDir) !== projectDir || input.targetBinding.environment !== input.environment || new Date(input.targetBinding.expiresAt).getTime() <= Date.now()) {
+      throw new PlatformIOError(
+        "Automation target binding is expired or outside the requested scope.",
+        "AUTOMATION_POLICY_DENIED"
+      );
+    }
+  }
+  if (!writeOperation) {
+    return {
+      allowed: true,
+      writeOperation: false,
+      policyProfile: "monitor_only"
+    };
+  }
+  const policy = loadLabRunnerPolicy(projectDir);
+  if (!policy?.enabled || policy.profile !== "lab_runner" || !policy.allowedOperations.includes(input.action) || policy.environment !== input.environment || policy.deviceFingerprint !== input.targetBinding.deviceFingerprint || new Date(policy.expiresAt).getTime() <= Date.now()) {
+    throw new PlatformIOError(
+      "Unattended hardware writes require a current, exact lab-runner policy.",
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  if (input.maxRunDurationSeconds > policy.maxRunDurationSeconds) {
+    throw new PlatformIOError(
+      "Requested run duration exceeds the lab-runner policy.",
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  if ((input.consecutiveFlashes ?? 0) >= policy.maxConsecutiveFlashes) {
+    throw new PlatformIOError(
+      "The lab-runner consecutive flash limit has been reached.",
+      "AUTOMATION_POLICY_DENIED"
+    );
+  }
+  if (input.lastFlashAt) {
+    const elapsedSeconds = (Date.now() - new Date(input.lastFlashAt).getTime()) / 1e3;
+    if (elapsedSeconds < policy.cooldownSeconds) {
+      throw new PlatformIOError(
+        "The lab-runner flash cooldown has not elapsed.",
+        "AUTOMATION_POLICY_DENIED"
+      );
+    }
+  }
+  return { allowed: true, writeOperation: true, policyProfile: "lab_runner" };
+}
+async function reserveAutomationWriteBudget(input) {
+  return withAutomationStateLock(
+    input.projectDir,
+    input.automationKey,
+    async () => {
+      const state = readAutomationWriteBudgetState(
+        input.projectDir,
+        input.automationKey
+      );
+      const scope5 = validateAutomationScope({
+        ...input,
+        consecutiveFlashes: state.consecutiveHardwareWrites,
+        lastFlashAt: state.lastHardwareWriteAt
+      });
+      if (!scope5.writeOperation) {
+        throw new PlatformIOError(
+          "Only hardware-changing automation actions consume a write budget.",
+          "AUTOMATION_POLICY_DENIED"
+        );
+      }
+      const consecutiveHardwareWrites = state.consecutiveHardwareWrites + 1;
+      writeAutomationState(input.projectDir, {
+        ...state,
+        consecutiveHardwareWrites,
+        lastHardwareWriteAt: (/* @__PURE__ */ new Date()).toISOString(),
+        lastHardwareWriteAction: input.action
+      });
+      return {
+        allowed: true,
+        writeOperation: true,
+        policyProfile: "lab_runner",
+        consecutiveHardwareWrites
+      };
+    }
+  );
+}
+
+// src/core/policy/project-enrollment.ts
+import fs10 from "node:fs";
+import path12 from "node:path";
+import crypto4 from "node:crypto";
+function canonical(value2) {
+  if (Array.isArray(value2)) return `[${value2.map(canonical).join(",")}]`;
+  if (value2 !== null && typeof value2 === "object")
+    return `{${Object.keys(value2).sort().map(
+      (key) => `${JSON.stringify(key)}:${canonical(value2[key])}`
+    ).join(",")}}`;
+  return JSON.stringify(value2);
+}
+function projectEnrollmentIdentity(project, documents) {
+  const realProject = fs10.realpathSync(project);
+  if (!fs10.statSync(realProject).isDirectory())
+    throw new PolicyConfigError(
+      project,
+      "Enrollment requires a project directory."
+    );
+  const identity = { version: 1, project: realProject };
+  return {
+    ...identity,
+    digest: crypto4.createHash("sha256").update(canonical({ ...identity, documents })).digest("hex")
+  };
+}
+function realStoragePath(source) {
+  try {
+    return fs10.realpathSync(source);
+  } catch (error2) {
+    if (error2.code !== "ENOENT") throw error2;
+    const parent = path12.dirname(source);
+    if (parent === source) throw error2;
+    return path12.join(realStoragePath(parent), path12.basename(source));
+  }
+}
+function recordPath(project) {
+  const directory = realStoragePath(
+    path12.join(path12.resolve(resolvePolicyDirectory()), "project-enrollments")
+  );
+  const relative = path12.relative(project, directory);
+  if (relative === "" || !relative.startsWith(`..${path12.sep}`) && relative !== ".." && !path12.isAbsolute(relative)) {
+    throw new PolicyConfigError(
+      directory,
+      "Enrollment storage must be outside the project directory."
+    );
+  }
+  return path12.join(
+    directory,
+    `${crypto4.createHash("sha256").update(project).digest("hex")}.json`
+  );
+}
+function isProjectEnrolled(identity) {
+  const source = recordPath(identity.project);
+  try {
+    const stat = fs10.statSync(source);
+    if (!stat.isFile() || stat.size > 4096)
+      throw new Error("Invalid enrollment record");
+    const record2 = JSON.parse(fs10.readFileSync(source, "utf8"));
+    if (record2.version !== 1 || typeof record2.project !== "string" || !/^[a-f0-9]{64}$/.test(record2.digest))
+      throw new Error("Invalid enrollment record");
+    return record2.project === identity.project && record2.digest === identity.digest;
+  } catch (error2) {
+    if (error2.code === "ENOENT") return false;
+    throw new PolicyConfigError(
+      source,
+      "Invalid or unreadable enrollment record; revoke and enroll the reviewed project again."
+    );
+  }
+}
+
+// src/core/policy/load-policy.ts
+import fs11 from "node:fs";
+import path13 from "node:path";
+import crypto5 from "node:crypto";
+
+// src/core/policy/profiles.ts
+var READ_ONLY_ALLOW = [
+  "list_devices",
+  "list_boards",
+  "get_board_info",
+  "get_project_config",
+  "get_project_context",
+  "query_logs",
+  "check_task_status",
+  "system_info",
+  "agent_validate_project",
+  "agent_safe_pin_audit",
+  "agent_get_last_report",
+  "agent_generate_board_report",
+  "get_policy_status",
+  "get_monitor_status",
+  "list_task_history",
+  "get_approval_request",
+  "list_pending_approvals",
+  "agent_resolve_target",
+  "get_project_context",
+  "get_lock_status",
+  "search_libraries",
+  "list_installed_libraries",
+  "system_info",
+  "get_dashboard_url"
+];
+var BUILD_ONLY_ALLOW = [
+  ...READ_ONLY_ALLOW,
+  "build_project",
+  "check_project",
+  "run_tests",
+  "agent_build_diagnose"
+];
+var MONITOR_ONLY_ALLOW = [
+  ...READ_ONLY_ALLOW,
+  "query_logs",
+  "start_monitor",
+  "stop_monitor",
+  "capture_serial_window",
+  "agent_monitor_health",
+  "cancel_task"
+];
+var policyProfiles = {
+  read_only: {
+    ...defaultPolicy,
+    allow: READ_ONLY_ALLOW,
+    approval_required: [],
+    deny: Array.from(
+      /* @__PURE__ */ new Set([
+        ...defaultPolicy.deny,
+        "build_project",
+        "check_project",
+        "run_tests",
+        "upload_firmware",
+        "upload_filesystem",
+        "clean_project",
+        "reset_server_state",
+        "agent_build_diagnose",
+        "agent_flash_monitor_verify"
+      ])
+    )
+  },
+  build_only: {
+    ...defaultPolicy,
+    allow: BUILD_ONLY_ALLOW,
+    approval_required: [],
+    deny: Array.from(
+      /* @__PURE__ */ new Set([
+        ...defaultPolicy.deny,
+        "upload_firmware",
+        "upload_filesystem",
+        "reset_server_state",
+        "agent_flash_monitor_verify"
+      ])
+    )
+  },
+  monitor_only: {
+    ...defaultPolicy,
+    allow: MONITOR_ONLY_ALLOW,
+    approval_required: [],
+    deny: Array.from(
+      /* @__PURE__ */ new Set([
+        ...defaultPolicy.deny,
+        "build_project",
+        "check_project",
+        "run_tests",
+        "upload_firmware",
+        "upload_filesystem",
+        "clean_project",
+        "reset_server_state",
+        "agent_build_diagnose",
+        "agent_flash_monitor_verify"
+      ])
+    )
+  },
+  flash_requires_approval: {
+    ...defaultPolicy,
+    allow: Array.from(
+      /* @__PURE__ */ new Set([
+        ...defaultPolicy.allow,
+        "clean_project",
+        "run_tests",
+        "agent_validate_project",
+        "agent_build_diagnose",
+        "agent_safe_pin_audit",
+        "agent_flash_monitor_verify",
+        "agent_get_last_report",
+        "agent_generate_board_report",
+        "get_policy_status"
+      ])
+    ),
+    approval_required: Array.from(
+      /* @__PURE__ */ new Set([
+        ...defaultPolicy.approval_required,
+        "agent_flash_monitor_verify"
+      ])
+    )
+  },
+  lab_admin: {
+    ...defaultPolicy,
+    allow: Array.from(
+      /* @__PURE__ */ new Set([
+        ...defaultPolicy.allow,
+        "clean_project",
+        "run_tests",
+        "reset_server_state",
+        "upload_firmware",
+        "upload_filesystem",
+        "agent_validate_project",
+        "agent_build_diagnose",
+        "agent_safe_pin_audit",
+        "agent_flash_monitor_verify",
+        "agent_get_last_report",
+        "agent_generate_board_report",
+        "get_policy_status"
+      ])
+    ),
+    approval_required: [],
+    deny: defaultPolicy.deny
+  },
+  lab_runner: {
+    ...defaultPolicy,
+    allow: Array.from(
+      /* @__PURE__ */ new Set([
+        ...BUILD_ONLY_ALLOW,
+        ...MONITOR_ONLY_ALLOW,
+        "upload_firmware",
+        "upload_filesystem",
+        "agent_flash_monitor_verify"
+      ])
+    ),
+    approval_required: ["reset_server_state"],
+    deny: Array.from(
+      /* @__PURE__ */ new Set([...defaultPolicy.deny, "erase_flash", "run_shell_command"])
+    )
+  }
+};
+function resolvePolicyProfile(config2) {
+  const parsed = PolicyProfileConfigSchema.safeParse(config2);
+  if (!parsed.success)
+    throw new PolicyConfigError(
+      "profile",
+      "Unknown profile or invalid overrides."
+    );
+  const base2 = policyProfiles[parsed.data.profile];
+  if (!config2.overrides) return base2;
+  return {
+    approval_required: config2.overrides.approval_required ?? base2.approval_required,
+    allow: config2.overrides.allow ?? base2.allow,
+    deny: config2.overrides.deny ?? base2.deny,
+    require_workspace_boundary: config2.overrides.require_workspace_boundary ?? base2.require_workspace_boundary,
+    require_device_lock_for_upload: config2.overrides.require_device_lock_for_upload ?? base2.require_device_lock_for_upload,
+    redact_secrets_from_logs: config2.overrides.redact_secrets_from_logs ?? base2.redact_secrets_from_logs,
+    audit_all_agent_actions: config2.overrides.audit_all_agent_actions ?? base2.audit_all_agent_actions
+  };
+}
+
+// src/core/policy/load-policy.ts
+function mergePolicy(base2, override) {
+  return { ...base2, ...override };
+}
+function readLayer(source, required2) {
+  try {
+    const stat = fs11.statSync(source);
+    if (!stat.isFile() || stat.size > 64 * 1024) {
+      throw new PolicyConfigError(
+        source,
+        "Expected a regular policy file no larger than 64 KiB."
+      );
+    }
+    return fs11.readFileSync(source, "utf8");
+  } catch (error2) {
+    if (error2 instanceof PolicyConfigError) throw error2;
+    if (error2.code === "ENOENT" && !required2)
+      return void 0;
+    throw new PolicyConfigError(
+      source,
+      required2 ? "The selected policy file is missing or unreadable." : "The configured policy file is unreadable."
+    );
+  }
+}
+function recordSource(sources, kind3, source, text6) {
+  sources.push({
+    kind: kind3,
+    source,
+    present: text6 !== void 0,
+    ...text6 === void 0 ? {} : { sha256: crypto5.createHash("sha256").update(text6).digest("hex") }
+  });
+}
+function applyOperatorCeiling(policy, operator) {
+  const union2 = (left, right = []) => [
+    .../* @__PURE__ */ new Set([...left, ...right])
+  ];
+  const approvalRequired = union2(
+    policy.approval_required,
+    operator.approval_required
+  );
+  const operatorActions = operator.allow === void 0 ? void 0 : /* @__PURE__ */ new Set([...operator.allow, ...operator.approval_required ?? []]);
+  const permitted = (action) => operatorActions === void 0 || policyNamesForOperation(action).some((name2) => operatorActions.has(name2));
+  return {
+    ...policy,
+    allow: policy.allow.filter(permitted),
+    approval_required: approvalRequired.filter(permitted),
+    deny: union2(policy.deny, operator.deny),
+    require_workspace_boundary: operator.require_workspace_boundary === true || policy.require_workspace_boundary,
+    require_device_lock_for_upload: operator.require_device_lock_for_upload === true || policy.require_device_lock_for_upload,
+    redact_secrets_from_logs: operator.redact_secrets_from_logs === true || policy.redact_secrets_from_logs,
+    audit_all_agent_actions: operator.audit_all_agent_actions === true || policy.audit_all_agent_actions
+  };
+}
+function loadEffectivePolicyState(workspaceDir) {
+  let profile = "flash_requires_approval";
+  const sources = [
+    {
+      kind: "builtin",
+      source: "built-in:flash_requires_approval",
+      present: true
+    }
+  ];
+  const builtIn = resolvePolicyProfile({ profile });
+  const projectDocuments = {
+    profile: null,
+    override: null
+  };
+  let policy = builtIn;
+  if (workspaceDir) {
+    const source2 = path13.join(
+      path13.resolve(workspaceDir),
+      ".pio-mcp-policy.json"
+    );
+    const text6 = readLayer(source2, false);
+    recordSource(sources, "project-profile", source2, text6);
+    if (text6 !== void 0) {
+      const document2 = PolicyProfileConfigSchema.safeParse(
+        parsePolicyDocument(text6, source2)
+      );
+      if (!document2.success)
+        throw new PolicyConfigError(
+          source2,
+          "Project profile requires a valid profile name."
+        );
+      projectDocuments.profile = document2.data;
+      profile = document2.data.profile;
+      policy = resolvePolicyProfile(document2.data);
+    }
+  }
+  const explicit = resolvePolicyFile();
+  const operatorPath = explicit ?? path13.join(resolvePolicyDirectory(), "policy.yaml");
+  const operatorText = readLayer(operatorPath, explicit !== void 0);
+  recordSource(sources, "operator", operatorPath, operatorText);
+  let operator = {};
+  if (operatorText !== void 0) {
+    const document2 = parsePolicyDocument(operatorText, operatorPath);
+    if ("profile" in document2) {
+      profile = document2.profile;
+      operator = resolvePolicyProfile(document2);
+    } else operator = document2;
+    policy = mergePolicy(policy, operator);
+  }
+  if (workspaceDir) {
+    const source2 = path13.join(
+      path13.resolve(workspaceDir),
+      ".pio-mcp-workspace",
+      "policy.yaml"
+    );
+    const text6 = readLayer(source2, false);
+    recordSource(sources, "project-override", source2, text6);
+    if (text6 !== void 0) {
+      const document2 = parsePolicyDocument(text6, source2);
+      if ("profile" in document2)
+        throw new PolicyConfigError(
+          source2,
+          "Select a project profile in .pio-mcp-policy.json; this file contains overrides only."
+        );
+      projectDocuments.override = document2;
+      policy = mergePolicy(policy, document2);
+    }
+  }
+  let projectEnrollment;
+  if (workspaceDir && (projectDocuments.profile !== null || projectDocuments.override !== null)) {
+    const identity = projectEnrollmentIdentity(workspaceDir, projectDocuments);
+    const enrolled = isProjectEnrolled(identity);
+    projectEnrollment = { enrolled, digest: identity.digest };
+    if (!enrolled) {
+      const baseline = mergePolicy(builtIn, operator);
+      policy = applyOperatorCeiling(policy, baseline);
+    }
+  }
+  policy = applyOperatorCeiling(policy, operator);
+  const source = sources.filter((item) => item.present).at(-1).source;
+  const digest = crypto5.createHash("sha256").update(JSON.stringify({ profile, policy, sources, projectEnrollment })).digest("hex");
+  return { profile, source, policy, sources, digest, projectEnrollment };
+}
+
+// src/core/policy/approval-scope.ts
+init_errors2();
+import crypto6 from "node:crypto";
+import path14 from "node:path";
+function canonical2(value2, depth = 0) {
+  if (depth > 32)
+    throw new PlatformIOError(
+      "Approval arguments exceed the nesting limit.",
+      "APPROVAL_SCOPE_INVALID"
+    );
+  if (value2 === null || typeof value2 === "string" || typeof value2 === "boolean")
+    return JSON.stringify(value2);
+  if (typeof value2 === "number" && Number.isFinite(value2))
+    return JSON.stringify(value2);
+  if (Array.isArray(value2))
+    return `[${value2.map((item) => canonical2(item, depth + 1)).join(",")}]`;
+  if (typeof value2 === "object" && value2 !== null && Object.getPrototypeOf(value2) === Object.prototype) {
+    return `{${Object.keys(value2).sort().filter((key) => value2[key] !== void 0).map(
+      (key) => `${JSON.stringify(key)}:${canonical2(value2[key], depth + 1)}`
+    ).join(",")}}`;
+  }
+  throw new PlatformIOError(
+    "Approval arguments must contain finite JSON values.",
+    "APPROVAL_SCOPE_INVALID"
+  );
+}
+function approvalScopeDigest(action, args, policyDigest, context) {
+  const operation = { ...args };
+  for (const key of ["approvalId", "approved", "__approved"])
+    delete operation[key];
+  if (typeof operation.projectDir === "string")
+    operation.projectDir = path14.resolve(operation.projectDir);
+  const encoded = canonical2({
+    action,
+    operationName: context.operationName ?? action,
+    args: operation,
+    policyDigest,
+    workspaceDir: context.workspaceDir ? path14.resolve(context.workspaceDir) : null,
+    devicePort: context.devicePort ?? null,
+    targetBindingDigest: context.targetBindingDigest ?? null,
+    automationKey: context.automationKey ?? null,
+    actorClass: context.actorClass ?? (context.actor === "system" ? "system" : "interactive")
+  });
+  if (Buffer.byteLength(encoded) > 256 * 1024)
+    throw new PlatformIOError(
+      "Approval arguments exceed the 256 KiB limit.",
+      "APPROVAL_SCOPE_INVALID"
+    );
+  return crypto6.createHash("sha256").update(encoded).digest("hex");
+}
+
+// src/core/policy/evaluate-policy.ts
+function nowIso() {
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+function normalizeActionName(action) {
+  return action.trim().toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+}
+function riskForAction(action) {
+  return actionRiskLevels[action] ?? "medium";
+}
+function hasProjectDir(args) {
+  return typeof args.projectDir === "string" && args.projectDir.length > 0;
+}
+function isPathBoundaryUnsafe(projectDir) {
+  const resolved = path15.resolve(projectDir);
+  const root = path15.parse(resolved).root;
+  return resolved === root;
+}
+function decision(status, reason, action, riskLevel, approvalId) {
+  return {
+    status,
+    reason,
+    action,
+    riskLevel,
+    approvalId,
+    timestamp: nowIso()
+  };
+}
+async function evaluatePolicy(actionName, args, context = {}) {
+  return evaluatePolicyInternal(actionName, args, context, false);
+}
+async function planPolicy(actionName, args, context = {}) {
+  const result = await evaluatePolicyInternal(actionName, args, context, true);
+  return {
+    ...result,
+    status: result.status === "allow" ? "ready" : result.status
+  };
+}
+async function evaluatePolicyInternal(actionName, args, context, planning) {
+  const action = normalizeActionName(actionName);
+  const riskLevel = riskForAction(action);
+  const operationNames = policyNamesForOperation(
+    context.operationName ?? action
+  );
+  const permissionNames = operationNames.at(-1) === action ? operationNames : [action];
+  let effectivePolicy;
+  try {
+    effectivePolicy = loadEffectivePolicyState(context.workspaceDir);
+  } catch (error2) {
+    if (!(error2 instanceof PolicyConfigError)) throw error2;
+    return decision(
+      action === "get_policy_status" ? "allow" : "deny",
+      error2.message,
+      action,
+      riskLevel
+    );
+  }
+  const policy = effectivePolicy.policy;
+  const auditContext = {
+    workspaceDir: context.workspaceDir,
+    devicePort: context.devicePort,
+    taskId: context.taskId,
+    automationKey: context.automationKey,
+    targetBindingDigest: context.targetBindingDigest,
+    policyProfile: effectivePolicy.profile,
+    actorClass: context.actorClass ?? (context.actor === "system" ? "system" : "interactive")
+  };
+  let scheduledScopeInput;
+  let scheduledWriteOperation = false;
+  if (context.actorClass === "scheduled" && context.automationKey) {
+    try {
+      scheduledScopeInput = {
+        automationKey: context.automationKey,
+        action,
+        projectDir: String(args.projectDir ?? context.workspaceDir ?? ""),
+        environment: typeof args.environment === "string" ? args.environment : typeof args.targetBinding?.environment === "string" ? String(
+          args.targetBinding.environment
+        ) : void 0,
+        targetBinding: typeof args.targetBinding === "object" && args.targetBinding !== null ? args.targetBinding : void 0,
+        maxRunDurationSeconds: typeof args.maxRunDurationSeconds === "number" ? args.maxRunDurationSeconds : typeof args.captureDurationSeconds === "number" ? args.captureDurationSeconds : typeof args.durationSeconds === "number" ? args.durationSeconds : typeof args.timeoutSeconds === "number" ? args.timeoutSeconds : 300
+      };
+      scheduledWriteOperation = validateAutomationScope(scheduledScopeInput).writeOperation;
+    } catch (error2) {
+      const reason = error2 instanceof Error ? error2.message : "Unattended automation scope was denied.";
+      const denied = decision("deny", reason, action, riskLevel);
+      if (!planning && policy.audit_all_agent_actions) {
+        appendAuditEvent({
+          action,
+          status: "denied",
+          reason,
+          riskLevel,
+          ...auditContext
+        });
+      }
+      return denied;
+    }
+  }
+  const reserveScheduledWrite = async () => {
+    if (planning || !scheduledScopeInput || !scheduledWriteOperation)
+      return void 0;
+    try {
+      await reserveAutomationWriteBudget(scheduledScopeInput);
+      return void 0;
+    } catch (error2) {
+      const reason = error2 instanceof Error ? error2.message : "Unattended hardware-write budget was denied.";
+      const denied = decision("deny", reason, action, riskLevel);
+      if (!planning && policy.audit_all_agent_actions) {
+        appendAuditEvent({
+          action,
+          status: "denied",
+          reason,
+          riskLevel,
+          ...auditContext
+        });
+      }
+      return denied;
+    }
+  };
+  if (permissionNames.some((name2) => policy.deny.includes(name2)) || deniedActionPatterns.some((p) => p.test(action))) {
+    const denied = decision(
+      "deny",
+      `Action '${action}' is denied by policy.`,
+      action,
+      riskLevel
+    );
+    if (!planning && policy.audit_all_agent_actions) {
+      appendAuditEvent({
+        action,
+        status: "denied",
+        reason: denied.reason,
+        riskLevel,
+        ...auditContext
+      });
+    }
+    return denied;
+  }
+  if (policy.require_workspace_boundary && hasProjectDir(args) && isPathBoundaryUnsafe(String(args.projectDir))) {
+    const denied = decision(
+      "deny",
+      "Workspace boundary violation: root directory targets are not allowed.",
+      action,
+      riskLevel
+    );
+    if (!planning && policy.audit_all_agent_actions) {
+      appendAuditEvent({
+        action,
+        status: "denied",
+        reason: denied.reason,
+        riskLevel,
+        ...auditContext
+      });
+    }
+    return denied;
+  }
+  if (policy.require_device_lock_for_upload && (action === "upload_firmware" || action === "upload_filesystem")) {
+    if (!hasProjectDir(args)) {
+      const denied = decision(
+        "deny",
+        "Upload actions require an explicit projectDir to enforce scoped device operations.",
+        action,
+        riskLevel
+      );
+      if (!planning && policy.audit_all_agent_actions) {
+        appendAuditEvent({
+          action,
+          status: "denied",
+          reason: denied.reason,
+          riskLevel,
+          ...auditContext
+        });
+      }
+      return denied;
+    }
+  }
+  if (permissionNames.some((name2) => policy.approval_required.includes(name2))) {
+    const scopeDigest = approvalScopeDigest(
+      action,
+      args,
+      effectivePolicy.digest,
+      context
+    );
+    const scopeMetadata = {
+      args: {
+        projectDir: args.projectDir,
+        environment: args.environment,
+        port: args.port
+      },
+      policyDigest: effectivePolicy.digest,
+      scopeVersion: 1,
+      operationName: context.operationName ?? action
+    };
+    const explicitApprovalId = typeof args.approvalId === "string" ? args.approvalId : void 0;
+    if (explicitApprovalId) {
+      const candidate = planning ? getApproval(explicitApprovalId) : void 0;
+      const request = planning ? candidate?.status === "approved" && candidate.expiresAt && candidate.scopeDigest === scopeDigest ? candidate : void 0 : consumeApproval(explicitApprovalId, scopeDigest);
+      if (request) {
+        const reservationDenied = await reserveScheduledWrite();
+        if (reservationDenied) return reservationDenied;
+        const allowed = decision(
+          "allow",
+          `Action '${action}' is allowed via approved request ${explicitApprovalId}.`,
+          action,
+          riskLevel,
+          explicitApprovalId
+        );
+        if (!planning && policy.audit_all_agent_actions) {
+          appendAuditEvent({
+            action,
+            status: "approved",
+            reason: allowed.reason,
+            riskLevel,
+            ...auditContext,
+            approvalId: explicitApprovalId
+          });
+        }
+        return allowed;
+      }
+    }
+    const approval = createApprovalRequest({
+      action,
+      riskLevel,
+      reason: `Operation '${context.operationName ?? action}' requires explicit approval by policy.`,
+      requestedBy: context.actor ?? "agent",
+      scopeDigest,
+      metadata: scopeMetadata,
+      expiresInMinutes: 30
+    });
+    const needsApproval = decision(
+      "requires_approval",
+      `${action} requires explicit approval by policy.`,
+      action,
+      riskLevel,
+      approval.id
+    );
+    if (!planning && policy.audit_all_agent_actions) {
+      appendAuditEvent({
+        action,
+        status: "requires_approval",
+        reason: needsApproval.reason,
+        riskLevel,
+        ...auditContext,
+        approvalId: approval.id
+      });
+    }
+    return needsApproval;
+  }
+  const allowList = policy.allow;
+  const isAllowed = permissionNames.some((name2) => allowList.includes(name2));
+  const result = isAllowed ? decision(
+    "allow",
+    `Action '${action}' is allowed by policy.`,
+    action,
+    riskLevel
+  ) : decision(
+    "deny",
+    `Action '${action}' is not permitted by policy.`,
+    action,
+    riskLevel
+  );
+  if (result.status === "allow") {
+    const reservationDenied = await reserveScheduledWrite();
+    if (reservationDenied) return reservationDenied;
+  }
+  if (!planning && policy.audit_all_agent_actions) {
+    appendAuditEvent({
+      action,
+      status: result.status === "allow" ? "allowed" : "denied",
+      reason: result.reason,
+      riskLevel,
+      ...auditContext,
+      approvalId: result.approvalId
+    });
+  }
+  return result;
+}
+
+// src/core/action-dispatcher.ts
+init_errors2();
+async function dispatchAuthorizedAction(name2, args, context, execute) {
+  const decision2 = await authorizeAction(name2, args, context);
+  if (decision2.status !== "allow")
+    throw new PlatformIOError(
+      decision2.reason,
+      decision2.status === "requires_approval" ? "APPROVAL_REQUIRED" : "POLICY_DENIED",
+      { policyDecision: decision2 }
+    );
+  return execute();
+}
+async function authorizeAction(name2, args, context) {
+  const action = name2 === "start_pio_home" ? "run_shell_command" : policyNamesForOperation(name2).at(-1);
+  if (!Object.hasOwn(actionRiskLevels, action))
+    throw new PlatformIOError(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
+  return evaluatePolicy(action, args, {
+    ...context,
+    operationName: name2
+  });
+}
+async function planAction(name2, args, context) {
+  const action = name2 === "start_pio_home" ? "run_shell_command" : policyNamesForOperation(name2).at(-1);
+  if (!Object.hasOwn(actionRiskLevels, action))
+    throw new PlatformIOError(`Unknown operation: ${name2}`, "UNKNOWN_ACTION");
+  return planPolicy(action, args, { ...context, operationName: name2 });
+}
+
+// src/core/policy/revision-guard.ts
+init_errors2();
+function createPolicyRevisionGuard(workspaceDir) {
+  const expected = loadEffectivePolicyState(workspaceDir).digest;
+  return () => {
+    if (loadEffectivePolicyState(workspaceDir).digest !== expected)
+      throw new PlatformIOError(
+        "Policy or project enrollment changed during execution; start a new authorized operation.",
+        "POLICY_CHANGED"
+      );
+  };
+}
+
+// src/core/serial/session-policy.ts
 init_errors2();
 
 // src/core/serial/session-manager.ts
-import fs21 from "node:fs";
-import path24 from "node:path";
+import fs14 from "node:fs";
+import path18 from "node:path";
 import { createHash as createHash3, randomUUID as randomUUID2 } from "node:crypto";
 import { performance as performance4 } from "node:perf_hooks";
 
@@ -96002,13 +95264,13 @@ init_errors2();
 // src/core/devices/device-lease.ts
 init_errors2();
 init_process_identity();
-import fs20 from "node:fs";
-import os5 from "node:os";
-import path23 from "node:path";
+import fs13 from "node:fs";
+import os3 from "node:os";
+import path17 from "node:path";
 import { createHash as createHash2, randomUUID } from "node:crypto";
 function stableDeviceLeaseRoot() {
-  return path23.join(
-    os5.userInfo().homedir,
+  return path17.join(
+    os3.userInfo().homedir,
     ".platformio-mcp",
     "device-leases-v1"
   );
@@ -96035,7 +95297,7 @@ var DeviceLeaseStore = class {
   owner;
   /** Construct a store; no file is created or device opened until acquisition. */
   constructor(options = {}) {
-    this.root = path23.resolve(options.root ?? stableDeviceLeaseRoot());
+    this.root = path17.resolve(options.root ?? stableDeviceLeaseRoot());
     this.inspect = options.inspect ?? inspectProcessIdentity;
   }
   /** Inspect persisted ownership without releasing or recovering it; acquisition must still be atomic. */
@@ -96176,7 +95438,7 @@ var DeviceLeaseStore = class {
           "Transferred child exit is not confirmed.",
           "DEVICE_OWNER_UNKNOWN"
         );
-      fs20.unlinkSync(path23.join(this.root, `${key}.json`));
+      fs13.unlinkSync(path17.join(this.root, `${key}.json`));
       this.transfers.delete(ticket);
     });
   }
@@ -96215,7 +95477,7 @@ var DeviceLeaseStore = class {
           "Cannot release unresolved child custody.",
           "DEVICE_HANDOFF_PENDING"
         );
-      fs20.unlinkSync(path23.join(this.root, `${key}.json`));
+      fs13.unlinkSync(path17.join(this.root, `${key}.json`));
       this.held.delete(lease);
     });
   }
@@ -96258,23 +95520,23 @@ var DeviceLeaseStore = class {
   }
   /** Refuse symlinked/non-directory components instead of silently splitting the global lock domain. */
   ensureRoot() {
-    const parsed = path23.parse(this.root);
+    const parsed = path17.parse(this.root);
     let current = parsed.root;
-    for (const part of this.root.slice(parsed.root.length).split(path23.sep).filter(Boolean)) {
-      current = path23.join(current, part);
+    for (const part of this.root.slice(parsed.root.length).split(path17.sep).filter(Boolean)) {
+      current = path17.join(current, part);
       try {
-        fs20.mkdirSync(current, { mode: 448 });
+        fs13.mkdirSync(current, { mode: 448 });
       } catch (error2) {
         if (error2.code !== "EEXIST") throw error2;
       }
-      const stat = fs20.lstatSync(current);
+      const stat = fs13.lstatSync(current);
       if (!stat.isDirectory() || stat.isSymbolicLink())
         throw new PlatformIOError(
           "Device lease directory must not contain symlinks.",
           "DEVICE_LEASE_PATH_INVALID"
         );
     }
-    const rootStat = fs20.statSync(this.root);
+    const rootStat = fs13.statSync(this.root);
     if (process.platform !== "win32" && (rootStat.uid !== process.getuid?.() || (rootStat.mode & 18) !== 0))
       throw new PlatformIOError(
         "Device lease directory must be owned by this user and not writable by others.",
@@ -96283,9 +95545,9 @@ var DeviceLeaseStore = class {
   }
   withGate(key, action) {
     this.ensureRoot();
-    const gate = path23.join(this.root, `${key}.gate`);
+    const gate = path17.join(this.root, `${key}.gate`);
     try {
-      fs20.mkdirSync(gate, { mode: 448 });
+      fs13.mkdirSync(gate, { mode: 448 });
     } catch (error2) {
       if (error2.code === "EEXIST")
         throw new PlatformIOError(
@@ -96297,14 +95559,14 @@ var DeviceLeaseStore = class {
     try {
       return action();
     } finally {
-      fs20.rmdirSync(gate);
+      fs13.rmdirSync(gate);
     }
   }
   readRecord(key) {
-    const file = path23.join(this.root, `${key}.json`);
+    const file = path17.join(this.root, `${key}.json`);
     let stat;
     try {
-      stat = fs20.lstatSync(file);
+      stat = fs13.lstatSync(file);
     } catch (error2) {
       if (error2.code === "ENOENT") return void 0;
       throw error2;
@@ -96315,7 +95577,7 @@ var DeviceLeaseStore = class {
         "DEVICE_LEASE_CORRUPT"
       );
     try {
-      const record2 = JSON.parse(fs20.readFileSync(file, "utf8"));
+      const record2 = JSON.parse(fs13.readFileSync(file, "utf8"));
       if (record2.version !== 1 || record2.handoffPending !== void 0 && record2.handoffPending !== true || resourceKey(record2.resource) !== key || !validProcessIdentity(record2.owner) || typeof record2.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(record2.nonce) || typeof record2.acquiredAt !== "string" || !Number.isFinite(Date.parse(record2.acquiredAt)))
         throw new Error("Invalid lease schema");
       return record2;
@@ -96327,19 +95589,19 @@ var DeviceLeaseStore = class {
     }
   }
   writeRecord(key, record2) {
-    const temporary = path23.join(this.root, `${key}.${record2.nonce}.tmp`);
+    const temporary = path17.join(this.root, `${key}.${record2.nonce}.tmp`);
     let fd;
     try {
-      fd = fs20.openSync(temporary, "wx", 384);
-      fs20.writeFileSync(fd, JSON.stringify(record2), "utf8");
-      fs20.fsyncSync(fd);
-      fs20.closeSync(fd);
+      fd = fs13.openSync(temporary, "wx", 384);
+      fs13.writeFileSync(fd, JSON.stringify(record2), "utf8");
+      fs13.fsyncSync(fd);
+      fs13.closeSync(fd);
       fd = void 0;
-      fs20.renameSync(temporary, path23.join(this.root, `${key}.json`));
+      fs13.renameSync(temporary, path17.join(this.root, `${key}.json`));
     } finally {
-      if (fd !== void 0) fs20.closeSync(fd);
+      if (fd !== void 0) fs13.closeSync(fd);
       try {
-        fs20.unlinkSync(temporary);
+        fs13.unlinkSync(temporary);
       } catch (error2) {
         if (error2.code !== "ENOENT") throw error2;
       }
@@ -96887,13 +96149,13 @@ var SerialSessionManager = class {
   async start(owner, input) {
     this.requireActiveOwner(owner);
     validateDirectSerialOptions(input);
-    if (!path24.isAbsolute(input.projectDir))
+    if (!path18.isAbsolute(input.projectDir))
       throw new PlatformIOError(
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
-    const projectDir = fs21.realpathSync.native(input.projectDir);
-    if (!fs21.statSync(projectDir).isDirectory())
+    const projectDir = fs14.realpathSync.native(input.projectDir);
+    if (!fs14.statSync(projectDir).isDirectory())
       throw new PlatformIOError(
         "Serial project directory is not a directory.",
         "SERIAL_PROJECT_INVALID"
@@ -97255,12 +96517,21 @@ var OPERATIONS = Object.freeze({
   read: "serial_session_read",
   write: "serial_session_write"
 });
+var MonitorCaptureSchema = external_exports.object({
+  seconds: external_exports.number().finite().default(5),
+  until: external_exports.string().max(4096).nullable().optional(),
+  max_lines: external_exports.number().int().min(1).max(1e4).default(500)
+}).strict();
 var PolicySerialSessionService = class {
   sessions;
-  transientMemoryScope = new AsyncLocalStorage2();
+  transientMemoryScope = new AsyncLocalStorage();
   /** Plan opening and reading against stable device identity before opening a one-shot capture. */
   async captureMemoryOnce(owner, request, input = {}, signal) {
-    const scope5 = { input: MemoryCaptureSchema.parse(input), active: true };
+    const scope5 = {
+      input: MemoryCaptureSchema.parse(input),
+      purpose: "one_shot_memory",
+      active: true
+    };
     return this.transientMemoryScope.run(scope5, async () => {
       try {
         return await captureTransientMemory(
@@ -97275,7 +96546,49 @@ var PolicySerialSessionService = class {
       }
     });
   }
-  memoryReadScope = new AsyncLocalStorage2();
+  /** Plan opening and reading together, then close the owned port on every read outcome. */
+  async captureMonitorOnce(owner, request, input = {}) {
+    const args = MonitorCaptureSchema.parse(input);
+    const scope5 = {
+      input: args,
+      purpose: "one_shot_monitor",
+      active: true
+    };
+    return this.transientMemoryScope.run(scope5, async () => {
+      try {
+        const started = await this.startWithDiscovery(owner, request);
+        let result;
+        try {
+          result = await this.sessions.read(owner, started.sessionId, {
+            cursor: 0,
+            maxLines: args.max_lines,
+            timeoutMs: Math.round(
+              Math.max(0, Math.min(args.seconds, 120)) * 1e3
+            ),
+            waitFor: args.until || void 0,
+            patternOptions: { mode: "regex", pythonNamedGroups: true },
+            referenceSemantics: true
+          });
+        } catch (error2) {
+          const stopped2 = await this.sessions.stop(owner, started.sessionId);
+          throw new PlatformIOError(
+            error2 instanceof PlatformIOError ? error2.message : "Monitor capture failed.",
+            error2 instanceof PlatformIOError ? error2.code : "SERIAL_CAPTURE_FAILED",
+            {
+              ...error2 instanceof PlatformIOError ? error2.context : {},
+              sessionId: started.sessionId,
+              cleanupPending: stopped2.cleanupPending
+            }
+          );
+        }
+        const stopped = await this.sessions.stop(owner, started.sessionId);
+        return { result, session: stopped };
+      } finally {
+        scope5.active = false;
+      }
+    });
+  }
+  memoryReadScope = new AsyncLocalStorage();
   /** Authorize one bounded capture, retaining revision checks on every page and final disclosure. */
   async captureMemory(owner, sessionId, input = {}, signal) {
     const args = MemoryCaptureSchema.parse(input);
@@ -97300,10 +96613,10 @@ var PolicySerialSessionService = class {
     });
   }
   discovery;
-  discoveryBatch = new AsyncLocalStorage2();
+  discoveryBatch = new AsyncLocalStorage();
   resolveEndpoint;
-  discoveryProject = new AsyncLocalStorage2();
-  context = new AsyncLocalStorage2();
+  discoveryProject = new AsyncLocalStorage();
+  context = new AsyncLocalStorage();
   /** Optional dependency injection supplies leases/transports only, never an authorization override. */
   constructor(dependencies = {}) {
     this.resolveEndpoint = dependencies.resolveEndpoint ?? resolveSerialEndpoint;
@@ -97320,14 +96633,14 @@ var PolicySerialSessionService = class {
   async startWithDiscovery(owner, input) {
     const checkOwner = this.sessions.createStartupGuard(owner);
     validateDirectSerialOptions(input);
-    if (!path25.isAbsolute(input.projectDir))
+    if (!path19.isAbsolute(input.projectDir))
       throw new PlatformIOError(
         "Serial project must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
     const request = Object.freeze({
       ...input,
-      projectDir: fs22.realpathSync.native(input.projectDir),
+      projectDir: fs15.realpathSync.native(input.projectDir),
       buffer: input.buffer ? Object.freeze({ ...input.buffer }) : void 0
     });
     const context = this.context.getStore();
@@ -97367,13 +96680,13 @@ var PolicySerialSessionService = class {
   }
   /** Enumerate through one shared native provider under this request's canonical workspace policy. */
   async listSerialDevices(projectDir) {
-    if (!path25.isAbsolute(projectDir))
+    if (!path19.isAbsolute(projectDir))
       throw new PlatformIOError(
         "Serial project directory must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
-    const canonical3 = fs22.realpathSync.native(projectDir);
-    if (!fs22.statSync(canonical3).isDirectory())
+    const canonical3 = fs15.realpathSync.native(projectDir);
+    if (!fs15.statSync(canonical3).isDirectory())
       throw new PlatformIOError(
         "Serial project directory is not a directory.",
         "SERIAL_PROJECT_INVALID"
@@ -97389,13 +96702,13 @@ var PolicySerialSessionService = class {
         "Session listing requires a trusted request context.",
         "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED"
       );
-    if (!path25.isAbsolute(projectDir))
+    if (!path19.isAbsolute(projectDir))
       throw new PlatformIOError(
         "Serial project must be absolute.",
         "SERIAL_PROJECT_INVALID"
       );
-    const canonical3 = fs22.realpathSync.native(projectDir);
-    if (!fs22.statSync(canonical3).isDirectory())
+    const canonical3 = fs15.realpathSync.native(projectDir);
+    if (!fs15.statSync(canonical3).isDirectory())
       throw new PlatformIOError(
         "Serial project must be a directory.",
         "SERIAL_PROJECT_INVALID"
@@ -97547,8 +96860,8 @@ var PolicySerialSessionService = class {
     };
     if (transient) {
       delete authorizationArgs.sessionId;
-      authorizationArgs.memoryCapture = transient.input;
-      authorizationArgs.purpose = "one_shot_memory";
+      authorizationArgs[transient.purpose === "one_shot_memory" ? "memoryCapture" : "monitorCapture"] = transient.input;
+      authorizationArgs.purpose = transient.purpose;
     }
     const caller = {
       ...context.caller,
@@ -97582,7 +96895,7 @@ var PolicySerialSessionService = class {
       const decisions = { opening, reading };
       if (opening.status !== "ready" || reading.status !== "ready")
         throw new PlatformIOError(
-          "One-shot memory capture needs opening and reading permissions before startup.",
+          "One-shot capture needs opening and reading permissions before startup.",
           opening.status === "deny" || reading.status === "deny" ? "POLICY_DENIED" : "APPROVAL_REQUIRED",
           { decisions }
         );
@@ -97614,6 +96927,828 @@ var PolicySerialSessionService = class {
     );
   }
 };
+
+// src/adapters/compatibility-project.ts
+init_errors2();
+import fs16 from "node:fs/promises";
+import os4 from "node:os";
+import path20 from "node:path";
+async function resolveCompatibilityProject(requested, defaults) {
+  let selected = requested || defaults.projectDir || defaults.cwd || process.cwd();
+  if (selected === "~" || selected.startsWith("~/") || selected.startsWith("~\\"))
+    selected = path20.join(defaults.home ?? os4.homedir(), selected.slice(2));
+  else if (selected.startsWith("~"))
+    throw new PlatformIOError(
+      "Named-user home expansion is unsupported; pass an absolute project path.",
+      "COMPAT_PROJECT_INVALID"
+    );
+  const canonical3 = await fs16.realpath(
+    path20.resolve(defaults.cwd ?? process.cwd(), selected)
+  );
+  if (!(await fs16.stat(canonical3)).isDirectory() || !(await fs16.stat(path20.join(canonical3, "platformio.ini"))).isFile())
+    throw new PlatformIOError(
+      "Expected a PlatformIO project directory.",
+      "COMPAT_PROJECT_INVALID"
+    );
+  return canonical3;
+}
+
+// src/tools/project-inspection.ts
+init_zod();
+init_platformio();
+import fs19 from "node:fs/promises";
+
+// src/core/project-inspection.ts
+init_zod();
+init_errors2();
+init_redact();
+var text = external_exports.string().max(65536);
+var value = external_exports.union([
+  text,
+  external_exports.number().finite(),
+  external_exports.boolean(),
+  external_exports.null(),
+  external_exports.array(text).max(1e4)
+]);
+var configSchema = external_exports.array(
+  external_exports.tuple([
+    external_exports.string().max(256),
+    external_exports.array(external_exports.tuple([external_exports.string().max(256), value])).max(2048)
+  ])
+).max(512);
+var targetSchema = external_exports.object({
+  name: external_exports.string().min(1).max(256),
+  title: text.nullish(),
+  description: text.nullish(),
+  group: text.nullish()
+});
+var metadataSchema = external_exports.record(
+  external_exports.object({
+    env_name: external_exports.string().optional(),
+    build_type: text.nullish(),
+    defines: external_exports.array(text).max(1e4).optional(),
+    includes: external_exports.object({
+      build: external_exports.array(text).max(1e4).optional(),
+      toolchain: external_exports.array(text).max(1e4).optional()
+    }).passthrough().nullish(),
+    libsource_dirs: external_exports.array(text).max(4096).optional(),
+    cc_path: text.nullish(),
+    cxx_path: text.nullish(),
+    gdb_path: text.nullish(),
+    prog_path: text.nullish(),
+    svd_path: text.nullish(),
+    compiler_type: text.nullish(),
+    cc_flags: external_exports.array(text).max(1e4).optional(),
+    cxx_flags: external_exports.array(text).max(1e4).optional(),
+    targets: external_exports.array(targetSchema).max(2048).optional(),
+    extra: external_exports.unknown().optional()
+  }).passthrough()
+);
+function readJson(output) {
+  if (Buffer.byteLength(output) > 10 * 1024 * 1024)
+    throw new PlatformIOError(
+      "Project output exceeds 10 MiB.",
+      "PROJECT_OUTPUT_LIMIT"
+    );
+  let raw;
+  try {
+    raw = JSON.parse(output);
+  } catch {
+    throw new PlatformIOError(
+      "Project output is not valid JSON.",
+      "PROJECT_OUTPUT_INVALID"
+    );
+  }
+  let nodes = 0;
+  const clean = (item, depth) => {
+    if (++nodes > 1e5 || depth > 24)
+      throw new PlatformIOError(
+        "Project output exceeds structural limits.",
+        "PROJECT_OUTPUT_LIMIT"
+      );
+    if (typeof item === "string") return redactSecretsInText(item);
+    if (Array.isArray(item))
+      return item.map((child) => clean(child, depth + 1));
+    if (item && typeof item === "object")
+      return Object.fromEntries(
+        Object.entries(item).map(([key, child]) => [
+          key,
+          depth > 0 && /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
+            key
+          ) ? "[REDACTED_SECRET]" : clean(child, depth + 1)
+        ])
+      );
+    return item;
+  };
+  return clean(raw, 0);
+}
+function parseProjectEnvironments(output) {
+  const parsed = configSchema.safeParse(readJson(output));
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Unexpected computed configuration shape.",
+      "PROJECT_CONFIG_INVALID"
+    );
+  const sections = /* @__PURE__ */ new Map();
+  for (const [name2, options] of parsed.data) {
+    if (sections.has(name2) || new Set(options.map(([key]) => key)).size !== options.length)
+      throw new PlatformIOError(
+        "Duplicate computed configuration section or option.",
+        "PROJECT_CONFIG_INVALID"
+      );
+    sections.set(
+      name2,
+      Object.fromEntries(
+        options.map(([key, field2]) => [
+          key,
+          /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
+            key
+          ) ? "[REDACTED_SECRET]" : field2
+        ])
+      )
+    );
+  }
+  const envs = [...sections.entries()].filter(([name2]) => name2.startsWith("env:")).map(([section, options]) => ({
+    name: section.slice(4),
+    board: options.board ?? null,
+    platform: options.platform ?? null,
+    framework: options.framework ?? null,
+    monitorSpeed: options.monitor_speed ?? null,
+    monitorPort: options.monitor_port ?? null,
+    uploadPort: options.upload_port ?? null,
+    uploadProtocol: options.upload_protocol ?? null,
+    libraryDependencies: options.lib_deps ?? [],
+    libraryExtraDirectories: options.lib_extra_dirs ?? [],
+    libraryDependencyFinderMode: options.lib_ldf_mode ?? null,
+    libraryCompatibilityMode: options.lib_compat_mode ?? null,
+    buildFlags: options.build_flags ?? [],
+    extends: options.extends ?? []
+  }));
+  if (envs.length > 256 || envs.some((env) => !env.name))
+    throw new PlatformIOError(
+      "Invalid environment inventory.",
+      "PROJECT_CONFIG_INVALID"
+    );
+  const platformioSection = sections.get("platformio") ?? {};
+  const rawDefaults = platformioSection.default_envs;
+  const defaults = typeof rawDefaults === "string" ? rawDefaults.split(/[,\r\n]/).map((item) => item.trim()).filter(Boolean) : Array.isArray(rawDefaults) ? rawDefaults : rawDefaults == null ? [] : void 0;
+  if (!defaults || defaults.some((name2) => !envs.some((env) => env.name === name2)))
+    throw new PlatformIOError(
+      "Default environments do not match the resolved inventory.",
+      "PROJECT_CONFIG_INVALID"
+    );
+  return {
+    envs,
+    defaultEnvironments: defaults.length ? defaults : envs.map((env) => env.name),
+    platformioSection
+  };
+}
+function parseProjectMetadata(output, environment) {
+  const parsed = metadataSchema.safeParse(readJson(output));
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Unexpected build metadata shape.",
+      "PROJECT_METADATA_INVALID"
+    );
+  const entries = Object.entries(parsed.data);
+  if (entries.length < 1 || entries.length > 256 || environment && (entries.length !== 1 || entries[0][0] !== environment))
+    throw new PlatformIOError(
+      "Metadata does not match the selected environments.",
+      "PROJECT_METADATA_INVALID"
+    );
+  const envs = Object.fromEntries(
+    entries.map(([name2, item]) => {
+      if (!name2 || item.env_name && item.env_name !== name2)
+        throw new PlatformIOError(
+          "Metadata environment identity disagrees with its key.",
+          "PROJECT_METADATA_INVALID"
+        );
+      return [
+        name2,
+        {
+          buildType: item.build_type ?? null,
+          defines: item.defines ?? [],
+          includeDirs: item.includes?.build?.slice(0, 40) ?? [],
+          includeDirCount: item.includes?.build?.length ?? 0,
+          toolchainIncludeDirCount: item.includes?.toolchain?.length ?? 0,
+          librarySourceDirs: item.libsource_dirs ?? [],
+          cc: item.cc_path ?? null,
+          cxx: item.cxx_path ?? null,
+          gdb: item.gdb_path ?? null,
+          compilerType: item.compiler_type ?? null,
+          ccFlags: item.cc_flags ?? [],
+          cxxFlags: item.cxx_flags ?? [],
+          programPath: item.prog_path ?? null,
+          svdPath: item.svd_path ?? null,
+          extra: item.extra ?? null,
+          targets: item.targets ?? [],
+          targetsAvailable: item.targets !== void 0
+        }
+      ];
+    })
+  );
+  return {
+    envs,
+    targets: Object.entries(envs).flatMap(
+      ([name2, item]) => item.targets.map((target) => ({ environment: name2, ...target }))
+    ),
+    targetsAvailable: Object.values(envs).every(
+      (item) => item.targetsAvailable
+    )
+  };
+}
+
+// src/tools/project-inspection.ts
+init_redact();
+init_errors2();
+var base = {
+  projectDir: external_exports.string().min(1).max(32768),
+  approvalId: external_exports.string().optional()
+};
+var envSchema = external_exports.object(base).strict();
+var metadataSchema2 = external_exports.object({
+  ...base,
+  environment: external_exports.string().min(1).max(50).regex(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/).optional()
+}).strict();
+async function executeProjectInspection(action, input, caller = {}, onAuthorized) {
+  if (!["project_envs", "project_metadata", "list_targets"].includes(action))
+    throw new PlatformIOError(
+      "Unknown project inspection operation.",
+      "UNKNOWN_ACTION"
+    );
+  const parsed = action === "project_envs" ? envSchema.parse(input) : metadataSchema2.parse(input);
+  const projectDir = await fs19.realpath(parsed.projectDir);
+  const params = { ...parsed, projectDir };
+  const environment = "environment" in parsed ? parsed.environment : void 0;
+  return dispatchAuthorizedAction(
+    action,
+    params,
+    { ...caller, workspaceDir: projectDir },
+    async () => {
+      const check2 = createPolicyRevisionGuard(projectDir);
+      await onAuthorized?.();
+      check2();
+      const args = [
+        action === "project_envs" ? "config" : "metadata",
+        "--json-output",
+        "--project-dir",
+        projectDir
+      ];
+      if (environment) args.push("--environment", environment);
+      const result = await platformioExecutor.execute("project", args, {
+        cwd: projectDir,
+        env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+        timeout: action === "project_envs" ? 3e4 : 6e5
+      });
+      check2();
+      if (result.exitCode !== 0)
+        return {
+          ok: false,
+          exitCode: result.exitCode,
+          projectDir,
+          summary: `${action} failed; see outputTail.`,
+          outputTail: redactSecretsInText(
+            [result.stdout, result.stderr].join("\n")
+          ).split(/\r?\n/).slice(-40).join("\n").slice(-32768)
+        };
+      if (action === "project_envs") {
+        const report2 = parseProjectEnvironments(result.stdout);
+        return {
+          ok: true,
+          exitCode: 0,
+          projectDir,
+          ...report2,
+          summary: `${report2.envs.length} resolved environment(s); defaults: ${report2.defaultEnvironments.join(", ") || "none"}.`
+        };
+      }
+      const report = parseProjectMetadata(result.stdout, environment);
+      if (action === "list_targets")
+        return {
+          ok: report.targetsAvailable,
+          exitCode: 0,
+          projectDir,
+          targets: report.targets,
+          environments: Object.keys(report.envs),
+          summary: report.targetsAvailable ? `${report.targets.length} build target(s) from PlatformIO metadata.` : "This metadata does not expose a target inventory.",
+          ...!report.targetsAvailable ? { error: "TARGETS_UNAVAILABLE" } : {}
+        };
+      return {
+        ok: true,
+        exitCode: 0,
+        projectDir,
+        envs: report.envs,
+        summary: `Build metadata for ${Object.keys(report.envs).join(", ")}.`
+      };
+    }
+  );
+}
+
+// src/adapters/monitor-start-compat.ts
+init_devices2();
+init_errors2();
+var MonitorStartCompatibilitySchema = external_exports.object({
+  port: external_exports.string().min(1).max(512).nullable().optional(),
+  baud: external_exports.number().int().min(1).max(4e6).nullable().optional(),
+  project_dir: external_exports.string().min(1).max(32768).nullable().optional(),
+  env: external_exports.string().min(1).max(50).regex(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/).nullable().optional(),
+  max_lines: external_exports.number().int().min(1).max(1e4).default(5e3),
+  approval_id: external_exports.string().max(256).optional(),
+  config_approval_id: external_exports.string().max(256).optional(),
+  selection_approval_id: external_exports.string().max(256).optional(),
+  discovery_approval_id: external_exports.string().max(256).optional()
+}).strict();
+async function resolveMonitorRequest(input, defaults, caller, projectDevices) {
+  const params = MonitorStartCompatibilitySchema.parse(input);
+  const useConfig = !!(params.project_dir || defaults.projectDir || params.env);
+  const projectDir = useConfig ? await resolveCompatibilityProject(params.project_dir, defaults) : await fs21.realpath(path24.resolve(defaults.cwd ?? process.cwd()));
+  let port = params.port || void 0;
+  let baud = params.baud || void 0;
+  if (useConfig) {
+    const report = await executeProjectInspection(
+      "project_envs",
+      { projectDir, approvalId: params.config_approval_id },
+      caller
+    );
+    if (!report.ok || !("defaultEnvironments" in report))
+      throw new PlatformIOError(
+        "Could not resolve monitor project configuration.",
+        "PROJECT_CONFIG_INVALID"
+      );
+    const environment = params.env || report.defaultEnvironments[0];
+    const selected = report.envs.find((item) => item.name === environment);
+    if (environment && !selected)
+      throw new PlatformIOError(
+        "Monitor environment does not exist.",
+        "PROJECT_ENVIRONMENT_INVALID"
+      );
+    if (!port) {
+      const configured = selected?.monitorPort || selected?.uploadPort;
+      if (configured != null && configured !== "")
+        port = external_exports.string().min(1).max(512).parse(configured);
+    }
+    if (!baud && selected?.monitorSpeed != null && selected.monitorSpeed !== "") {
+      const speed = selected.monitorSpeed;
+      if (typeof speed !== "number" && (typeof speed !== "string" || !/^\d+$/.test(speed)))
+        throw new PlatformIOError(
+          "Invalid configured monitor speed.",
+          "SERIAL_TRANSPORT_ARGUMENT_INVALID"
+        );
+      baud = external_exports.number().int().min(1).max(4e6).parse(Number(speed));
+    }
+  }
+  if (!port) {
+    port = await dispatchAuthorizedAction(
+      "list_devices",
+      { projectDir, approvalId: params.selection_approval_id },
+      { ...caller, workspaceDir: projectDir },
+      async () => {
+        const guard = createPolicyRevisionGuard(projectDir);
+        const rows = projectDevices(await listDevicesCore());
+        guard();
+        if (rows.likely_ports.length !== 1)
+          throw new PlatformIOError(
+            rows.likely_ports.length ? "Several candidate ports; pass port explicitly." : "No likely development-board port; pass port explicitly.",
+            "SERIAL_PORT_SELECTION_REQUIRED"
+          );
+        return rows.likely_ports[0];
+      }
+    );
+  }
+  const request = {
+    projectDir,
+    path: port,
+    baudRate: baud ?? 115200,
+    buffer: { maxLines: params.max_lines }
+  };
+  return { params, request };
+}
+async function startCompatibilityMonitor(client, input, defaults, caller, projectDevices) {
+  const { params, request } = await resolveMonitorRequest(
+    input,
+    defaults,
+    caller,
+    projectDevices
+  );
+  return client.run(
+    {
+      caller,
+      approvalId: params.approval_id,
+      discoveryApprovalId: params.discovery_approval_id
+    },
+    (service, owner) => service.startWithDiscovery(owner, request)
+  );
+}
+async function captureCompatibilityMonitor(client, input, defaults, caller, projectDevices) {
+  const schema3 = MonitorStartCompatibilitySchema.extend({
+    ...MonitorCaptureSchema.shape,
+    read_approval_id: external_exports.string().max(256).optional()
+  });
+  const { seconds, until, read_approval_id, ...start } = schema3.parse(input);
+  const { params, request } = await resolveMonitorRequest(
+    start,
+    defaults,
+    caller,
+    projectDevices
+  );
+  return client.run(
+    {
+      caller,
+      approvalId: params.approval_id,
+      readApprovalId: read_approval_id,
+      discoveryApprovalId: params.discovery_approval_id
+    },
+    (service, owner) => service.captureMonitorOnce(owner, request, {
+      seconds,
+      until,
+      max_lines: start.max_lines
+    })
+  );
+}
+
+// src/adapters/device-compat.ts
+init_zod();
+import fs22 from "node:fs/promises";
+import path25 from "node:path";
+init_devices2();
+init_errors2();
+var DEVELOPMENT_BOARD_HINT = /CP210|CH34|CH9102|FTDI|FT23|Silicon Labs|SLAB|usbserial|usbmodem|wchusbserial|ttyUSB|ttyACM|ESP|Arduino|STLink|ST-Link|JLink|J-Link|CMSIS|DAPLink|Espressif|USB/i;
+var NOISE_PORT_HINT = /Bluetooth|debug-console|Jabra|AirPods|iPhone/i;
+function projectCompatibilityDevices(devices) {
+  const rows = devices.map((device) => {
+    const description = `${device.description} ${device.hwid} ${device.port}`;
+    return {
+      port: device.port,
+      description: device.description,
+      hwid: device.hwid,
+      likely_dev_board: DEVELOPMENT_BOARD_HINT.test(description) && !NOISE_PORT_HINT.test(description)
+    };
+  });
+  rows.sort(
+    (left, right) => Number(right.likely_dev_board) - Number(left.likely_dev_board)
+  );
+  const likely = rows.filter((row) => row.likely_dev_board).map((row) => row.port);
+  return {
+    ok: true,
+    summary: `${rows.length} serial port(s). ${likely.length ? `Likely dev boards: ${likely.join(", ")}.` : "No port looks like a USB dev board; check the cable (data, not charge-only) and drivers."}`,
+    devices: rows,
+    likely_ports: likely
+  };
+}
+async function executeDeviceCompatibility(client, name2, input, defaults = {}, caller = {}, onAuthorized) {
+  if (name2 === "pio_monitor_capture") {
+    const { result, session } = await captureCompatibilityMonitor(
+      client,
+      input,
+      defaults,
+      caller,
+      projectCompatibilityDevices
+    );
+    return {
+      ok: !session.cleanupPending,
+      summary: `captured ${result.lines.length} line(s) from ${session.path} at ${session.baudRate} baud.${session.cleanupPending ? " Port closure is unconfirmed; device ownership is retained." : ""}`,
+      port: session.path,
+      baud: session.baudRate,
+      lines: result.lines,
+      matched: result.matched,
+      partial_line: result.partial,
+      error: result.error ?? session.cleanupError ?? null,
+      cleanup_pending: session.cleanupPending,
+      ...session.cleanupPending ? { session_id: session.sessionId } : {}
+    };
+  }
+  if (name2 === "pio_monitor_start") {
+    const session = await startCompatibilityMonitor(
+      client,
+      input,
+      defaults,
+      caller,
+      projectCompatibilityDevices
+    );
+    const info = projectCompatibilitySession(session);
+    return {
+      ok: session.state === "open",
+      summary: session.state !== "open" ? `Monitor session ${info.session_id} is ${session.state}; inspect its state before continuing.` : `Monitoring ${info.port} at ${info.baud} baud in session ${info.session_id}. Read with pio_monitor_read(session_id='${info.session_id}', cursor=0). Stop before flashing.`,
+      ...info
+    };
+  }
+  if (name2 === "pio_monitor_read") {
+    const params2 = external_exports.object({
+      session_id: external_exports.string().min(1).max(256),
+      cursor: external_exports.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+      max_lines: external_exports.number().int().min(1).max(1e4).default(200),
+      wait_for: external_exports.string().max(4096).nullable().optional(),
+      timeout_s: external_exports.number().finite().default(10),
+      approval_id: external_exports.string().max(256).optional()
+    }).strict().parse(input);
+    return client.run(
+      { caller, approvalId: params2.approval_id },
+      async (service, owner) => {
+        const result = await service.sessions.read(owner, params2.session_id, {
+          cursor: params2.cursor,
+          maxLines: params2.max_lines,
+          timeoutMs: Math.round(
+            Math.max(0, Math.min(params2.timeout_s, 120)) * 1e3
+          ),
+          waitFor: params2.wait_for || void 0,
+          patternOptions: { mode: "regex", pythonNamedGroups: true },
+          referenceSemantics: true
+        });
+        const closed = result.state !== "open";
+        let summary = params2.wait_for ? `pattern ${result.matched ? "matched" : `not matched within ${params2.timeout_s}s`}; ${result.lines.length} new line(s). Next cursor ${result.cursor}.` : `${result.lines.length} new line(s); next cursor ${result.cursor}.` + (result.moreAvailable ? " More available, read again." : "");
+        if (result.droppedLines)
+          summary += ` ${result.droppedLines} older line(s) fell out of the buffer.`;
+        if (closed)
+          summary += ` Session closed${result.error ? `: ${result.error}` : ""}.`;
+        return {
+          ok: true,
+          summary,
+          session_id: params2.session_id,
+          lines: result.lines,
+          cursor: result.cursor,
+          dropped_before_cursor: result.droppedLines,
+          more_available: result.moreAvailable,
+          matched: result.matched,
+          matched_line: result.matchedLine ?? null,
+          partial_line: result.partial,
+          closed,
+          error: result.error ?? null,
+          redaction_applied: result.redactionApplied,
+          truncated_bytes: result.totalTruncatedBytes
+        };
+      }
+    );
+  }
+  if (name2 === "pio_monitor_write") {
+    const params2 = external_exports.object({
+      session_id: external_exports.string().min(1).max(256),
+      text: external_exports.string().max(65536),
+      newline: external_exports.boolean().default(true),
+      approval_id: external_exports.string().max(256).optional()
+    }).strict().parse(input);
+    const bytes = Buffer.from(
+      params2.text + (params2.newline ? "\n" : ""),
+      "utf8"
+    );
+    if (bytes.length > 65536)
+      throw new PlatformIOError(
+        "Serial writes are limited to 64 KiB including the newline.",
+        "SERIAL_WRITE_LIMIT"
+      );
+    return client.run(
+      { caller, approvalId: params2.approval_id },
+      async (service, owner) => {
+        const result = await service.sessions.write(
+          owner,
+          params2.session_id,
+          bytes
+        );
+        const session = service.sessions.list(owner).find((item) => item.sessionId === params2.session_id);
+        return {
+          ok: true,
+          summary: `sent ${result.bytesWritten} byte(s) to ${session?.path ?? "serial port"}.`,
+          session_id: params2.session_id,
+          bytes: result.bytesWritten
+        };
+      }
+    );
+  }
+  if (name2 === "pio_monitor_stop") {
+    const params2 = external_exports.object({ session_id: external_exports.string().min(1).max(256) }).strict().parse(input);
+    return client.run({ caller }, async (service, owner) => {
+      const session = await service.sessions.stop(owner, params2.session_id);
+      const info = projectCompatibilitySession(session);
+      return {
+        ok: !session.cleanupPending,
+        summary: session.cleanupPending ? `Session ${params2.session_id} closure is unconfirmed; device ownership is retained.` : `session ${params2.session_id} on ${info.port} closed after ${info.uptime_s}s and ${info.bytes_received} bytes.`,
+        ...info
+      };
+    });
+  }
+  if (name2 === "pio_monitor_list") {
+    const params2 = external_exports.object({ approval_id: external_exports.string().max(256).optional() }).strict().parse(input);
+    const projectDir2 = await fs22.realpath(
+      path25.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
+    );
+    return client.run(
+      { caller, approvalId: params2.approval_id },
+      async (service, owner) => {
+        const sessions = (await service.listSessions(owner, projectDir2)).map(
+          projectCompatibilitySession
+        );
+        await onAuthorized?.();
+        return {
+          ok: true,
+          summary: `${sessions.length} open session(s).`,
+          sessions
+        };
+      }
+    );
+  }
+  if (name2 !== "pio_list_devices")
+    throw new PlatformIOError(
+      "Unknown device compatibility tool.",
+      "COMPAT_TOOL_UNKNOWN"
+    );
+  const params = external_exports.object({
+    approval_id: external_exports.string().max(256).optional(),
+    monitor_approval_id: external_exports.string().max(256).optional()
+  }).strict().parse(input);
+  const projectDir = await fs22.realpath(
+    path25.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
+  );
+  const guard = createPolicyRevisionGuard(projectDir);
+  return client.run(
+    { approvalId: params.monitor_approval_id, caller },
+    (service, owner) => dispatchAuthorizedAction(
+      "list_devices",
+      { projectDir, approvalId: params.approval_id },
+      { ...caller, workspaceDir: projectDir },
+      async () => {
+        await onAuthorized?.();
+        const sessions = await service.listSessions(owner, projectDir);
+        guard();
+        const devices = await listDevicesCore();
+        guard();
+        return {
+          ...projectCompatibilityDevices(devices),
+          open_monitor_sessions: sessions.map(projectCompatibilitySession)
+        };
+      }
+    )
+  );
+}
+function withDeviceCompatibility(base2) {
+  const source = base2.get("list_devices");
+  if (!source || base2.has("pio_list_devices"))
+    throw new Error("Invalid device compatibility registry");
+  const result = new Map(base2);
+  result.set("pio_list_devices", {
+    ...source,
+    name: "pio_list_devices",
+    description: "List serial device hints and caller-owned monitor sessions under canonical permissions.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approval_id: { type: "string" },
+        monitor_approval_id: { type: "string" }
+      },
+      additionalProperties: false
+    },
+    handler: (args, context) => context.dispatch("pio_list_devices", args)
+  });
+  const startSource = base2.get("start_monitor");
+  if (!startSource || result.has("pio_monitor_start"))
+    throw new Error("Invalid serial startup compatibility registry");
+  result.set("pio_monitor_start", {
+    ...startSource,
+    name: "pio_monitor_start",
+    policyAction: "serial_session_start",
+    annotations: {
+      ...startSource.annotations,
+      title: "Start Monitor",
+      idempotentHint: false
+    },
+    description: "Start an owned serial monitor using explicit arguments, resolved project settings, or an unambiguous device candidate. Opening requires hardware authorization and exclusive device ownership.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        port: { type: ["string", "null"], maxLength: 512 },
+        baud: { type: ["integer", "null"], minimum: 1, maximum: 4e6 },
+        project_dir: { type: ["string", "null"] },
+        env: { type: ["string", "null"] },
+        max_lines: {
+          type: "integer",
+          minimum: 1,
+          maximum: 1e4,
+          default: 5e3
+        },
+        approval_id: { type: "string" },
+        config_approval_id: { type: "string" },
+        selection_approval_id: { type: "string" },
+        discovery_approval_id: { type: "string" }
+      },
+      additionalProperties: false
+    },
+    handler: (args, context) => context.dispatch("pio_monitor_start", args)
+  });
+  const captureSource = result.get("pio_monitor_start");
+  const startProperties = captureSource.inputSchema.properties;
+  result.set("pio_monitor_capture", {
+    ...captureSource,
+    name: "pio_monitor_capture",
+    annotations: { ...captureSource.annotations, title: "Capture Monitor" },
+    description: "Open, read and close an owned serial monitor. Both opening and reading must be authorized before startup; unconfirmed closure retains device ownership.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...startProperties,
+        seconds: { type: "number", default: 5 },
+        until: { type: ["string", "null"], maxLength: 4096 },
+        max_lines: {
+          type: "integer",
+          minimum: 1,
+          maximum: 1e4,
+          default: 500
+        },
+        read_approval_id: { type: "string", maxLength: 256 }
+      },
+      additionalProperties: false
+    },
+    handler: (args, context) => context.dispatch("pio_monitor_capture", args)
+  });
+  const readSource = base2.get("query_logs");
+  if (!readSource || result.has("pio_monitor_read"))
+    throw new Error("Invalid serial read compatibility registry");
+  result.set("pio_monitor_read", {
+    ...readSource,
+    name: "pio_monitor_read",
+    policyAction: "serial_session_read",
+    annotations: { ...readSource.annotations, title: "Read Monitor" },
+    description: "Read an owned monitor with cursors and bounded Python-compatible regex matching on completed lines. Maximum wait 120 seconds; response and storage byte limits apply.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        session_id: { type: "string", minLength: 1, maxLength: 256 },
+        cursor: { type: "integer", minimum: 0, default: 0 },
+        max_lines: {
+          type: "integer",
+          minimum: 1,
+          maximum: 1e4,
+          default: 200
+        },
+        wait_for: { type: ["string", "null"], maxLength: 4096 },
+        timeout_s: { type: "number", default: 10 },
+        approval_id: { type: "string", maxLength: 256 }
+      },
+      required: ["session_id"],
+      additionalProperties: false
+    },
+    handler: (args, context) => context.dispatch("pio_monitor_read", args)
+  });
+  const writeSource = base2.get("upload_firmware");
+  if (!writeSource || result.has("pio_monitor_write"))
+    throw new Error("Invalid serial write compatibility registry");
+  result.set("pio_monitor_write", {
+    ...writeSource,
+    name: "pio_monitor_write",
+    policyAction: "serial_session_write",
+    annotations: {
+      ...writeSource.annotations,
+      title: "Write Monitor",
+      idempotentHint: false
+    },
+    description: "Write UTF-8 text to an owned serial session after payload-bound hardware authorization. Limited to 64 KiB including the optional newline.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        session_id: { type: "string", minLength: 1, maxLength: 256 },
+        text: { type: "string", maxLength: 65536 },
+        newline: { type: "boolean", default: true },
+        approval_id: { type: "string", maxLength: 256 }
+      },
+      required: ["session_id", "text"],
+      additionalProperties: false
+    },
+    handler: (args, context) => context.dispatch("pio_monitor_write", args)
+  });
+  for (const [name2, canonical3] of [
+    ["pio_monitor_list", "get_monitor_status"],
+    ["pio_monitor_stop", "stop_monitor"]
+  ]) {
+    const source2 = base2.get(canonical3);
+    if (!source2 || result.has(name2))
+      throw new Error("Invalid monitor compatibility registry");
+    result.set(name2, {
+      ...source2,
+      name: name2,
+      description: name2 === "pio_monitor_list" ? "List this connection's authorized monitor sessions." : "Close an owned monitor session, retaining device ownership until closure is confirmed.",
+      inputSchema: {
+        type: "object",
+        properties: name2 === "pio_monitor_list" ? { approval_id: { type: "string" } } : { session_id: { type: "string" } },
+        ...name2 === "pio_monitor_stop" ? { required: ["session_id"] } : {},
+        additionalProperties: false
+      },
+      handler: (args, context) => context.dispatch(name2, args)
+    });
+  }
+  return result;
+}
+function projectCompatibilitySession(session) {
+  return {
+    session_id: session.sessionId,
+    port: session.path,
+    baud: session.baudRate,
+    lines_buffered: session.linesBuffered,
+    next_cursor: session.nextCursor,
+    bytes_received: session.bytesReceived,
+    uptime_s: Math.round(
+      Math.max(0, Date.now() - Date.parse(session.startedAt)) / 100
+    ) / 10,
+    closed: !session.cleanupPending && ["stopped", "disconnected", "error"].includes(session.state),
+    error: session.cleanupError ?? (session.state === "error" ? "SERIAL_TRANSPORT_ERROR" : null),
+    cleanup_pending: session.cleanupPending
+  };
+}
 
 // src/adapters/serial-client.ts
 init_errors2();
@@ -114435,7 +114570,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_list_targets"
   ].includes(name2);
   const dependencyCompatibility = name2 === "pio_deps_check";
-  const deviceCompatibility = ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop", "pio_monitor_write", "pio_monitor_read", "pio_monitor_start"].includes(name2);
+  const deviceCompatibility = ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop", "pio_monitor_write", "pio_monitor_read", "pio_monitor_start", "pio_monitor_capture"].includes(name2);
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name2
   );
