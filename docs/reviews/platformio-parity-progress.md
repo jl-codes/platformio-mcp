@@ -548,3 +548,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Inspected pinned reference parsers.py via GitHub contents API without executing it. Added ESP-IDF aggregate heap blocks and FreeRTOS header-gated task rows, retaining explicit stack units. Heap state expires after 128 lines and skips per-region metrics. Decimal/scientific numeric prefixes are not truncated into integers.
 - TypeScript compilation and ten telemetry tests passed. Remaining print variants, bounded custom patterns, report aggregation and serial/public integration remain open.
+
+### Memory report aggregation
+
+- Added report aggregation for parsed metrics/tasks with line-matched timestamps, 200 displayed samples, explicit truncation and unknown-unit counts. Stack thresholds apply only to byte-valued observations; fragmentation requires free/largest values from the same line. Task inventory is bounded to 256.
+- TypeScript compilation and 14 telemetry/report tests passed. Public serial capture, custom patterns and remaining format/compatibility acceptance remain open. No hardware execution or release publication occurred.
