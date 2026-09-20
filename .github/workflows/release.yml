@@ -21,6 +21,11 @@ on:
         default: false
         type: boolean
 
+      acceptance_run_id:
+        description: Completed same-commit acceptance run containing platformio-parity-acceptance evidence (required for publication)
+        required: false
+        type: string
+
 permissions:
   actions: read
   contents: write
@@ -128,6 +133,18 @@ jobs:
             echo "Release must run from $expected_ref; received $GITHUB_REF" >&2
             exit 1
           fi
+
+      - name: Require complete final-revision acceptance before publication
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_npm || inputs.publish_pypi || inputs.publish_mcp_registry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACCEPTANCE_RUN: ${{ inputs.acceptance_run_id }}
+        run: |
+          [[ "$ACCEPTANCE_RUN" =~ ^[0-9]+$ ]] || { echo 'A completed same-commit acceptance run is required for publication.' >&2; exit 1; }
+          gh run view "$ACCEPTANCE_RUN" --json conclusion,headSha > "$RUNNER_TEMP/acceptance-run.json"
+          python3 -c 'import json,os; from pathlib import Path; r=json.loads((Path(os.environ["RUNNER_TEMP"])/"acceptance-run.json").read_text()); assert r["conclusion"] == "success" and r["headSha"] == os.environ["GITHUB_SHA"], "Acceptance run must pass on the exact release commit"'
+          gh run download "$ACCEPTANCE_RUN" --name platformio-parity-acceptance --dir .release-acceptance
+          node scripts/validate-parity-acceptance.mjs .release-acceptance/manifest.json
 
       - name: Install dependencies
         run: npm ci && npm --prefix web ci
