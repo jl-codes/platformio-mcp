@@ -419,7 +419,7 @@ export async function cleanProject(
       message: "Successfully cleaned build artifacts",
     };
   } catch (error) {
-    if (error instanceof BuildError) {
+    if (error instanceof PlatformIOError) {
       throw error;
     }
     throw new BuildError(`Failed to clean project: ${error}`, { projectDir });

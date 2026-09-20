@@ -16564,6 +16564,8 @@ async function executeWithSpooling(command, args, options) {
       } catch {
       }
     }
+    if (error2 instanceof PlatformIOError)
+      throw new PlatformIOError(error2.message, error2.code, { ...error2.context, cleanupPending, fullLogPath: logFile });
     throw error2;
   }
   let errorMessage = void 0;
@@ -101359,7 +101361,7 @@ async function cleanProject(projectDir, background, options = {}) {
       message: "Successfully cleaned build artifacts"
     };
   } catch (error2) {
-    if (error2 instanceof BuildError) {
+    if (error2 instanceof PlatformIOError) {
       throw error2;
     }
     throw new BuildError(`Failed to clean project: ${error2}`, { projectDir });
@@ -101572,11 +101574,15 @@ var HardwareLockManager = class _HardwareLockManager {
   async withImplicitLock(action) {
     const implicitSessionId = `__IMPLICIT_${randomUUID3()}__`;
     this.acquireLock(implicitSessionId, "Implicit Tool Execution");
+    let cleanupPending = false;
     try {
       const result = await action();
       return result;
+    } catch (error2) {
+      cleanupPending = error2 instanceof PlatformIOError && error2.context?.cleanupPending === true;
+      throw error2;
     } finally {
-      this.releaseLock(implicitSessionId);
+      if (!cleanupPending) this.releaseLock(implicitSessionId);
     }
   }
 };
@@ -101613,53 +101619,61 @@ async function executeCleanCompatibility(input, defaults = {}, caller = {}, onAu
         guard();
         const started = performance.now();
         let completed;
+        const collect = async (exitCode, fullLogPath, timedOut2 = false) => {
+          guard();
+          const handle = await fs39.open(fullLogPath, "r");
+          let output;
+          try {
+            const stat = await handle.stat();
+            const limit = 16 * 1024 * 1024;
+            if (!stat.isFile() || stat.size > limit)
+              throw new PlatformIOError(
+                "Clean output exceeds the report limit",
+                "COMMAND_LOG_LIMIT"
+              );
+            const buffer = Buffer.alloc(stat.size + 1);
+            let offset = 0;
+            while (offset < buffer.length) {
+              const read = await handle.read(
+                buffer,
+                offset,
+                buffer.length - offset,
+                offset
+              );
+              if (!read.bytesRead) break;
+              offset += read.bytesRead;
+            }
+            if (offset > stat.size)
+              throw new PlatformIOError(
+                "Clean output changed during collection",
+                "COMMAND_LOG_CHANGED"
+              );
+            output = redactSecretsInText(
+              buffer.subarray(0, offset).toString("utf8")
+            ).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+          } finally {
+            await handle.close();
+          }
+          guard();
+          if (timedOut2) output += "\n[platformio-mcp] timed out after 120s";
+          const logPath = await retainCommandLog("clean", output, "");
+          return { exitCode, output, logPath };
+        };
+        let timedOut = false;
         try {
           await cleanProject(projectDir, false, {
             environment,
             full: params.full,
             timeoutMs: 12e4,
             onResult: async (result) => {
-              guard();
-              const handle = await fs39.open(result.fullLogPath, "r");
-              let output;
-              try {
-                const stat = await handle.stat();
-                const limit = 16 * 1024 * 1024;
-                if (!stat.isFile() || stat.size > limit)
-                  throw new PlatformIOError(
-                    "Clean output exceeds the report limit",
-                    "COMMAND_LOG_LIMIT"
-                  );
-                const buffer = Buffer.alloc(stat.size + 1);
-                let offset = 0;
-                while (offset < buffer.length) {
-                  const read = await handle.read(
-                    buffer,
-                    offset,
-                    buffer.length - offset,
-                    offset
-                  );
-                  if (!read.bytesRead) break;
-                  offset += read.bytesRead;
-                }
-                if (offset > stat.size)
-                  throw new PlatformIOError(
-                    "Clean output changed during collection",
-                    "COMMAND_LOG_CHANGED"
-                  );
-                output = redactSecretsInText(
-                  buffer.subarray(0, offset).toString("utf8")
-                ).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
-              } finally {
-                await handle.close();
-              }
-              guard();
-              const logPath = await retainCommandLog("clean", output, "");
-              completed = { exitCode: result.exitCode, output, logPath };
+              completed = await collect(result.exitCode, result.fullLogPath);
             }
           });
         } catch (error2) {
-          if (!(error2 instanceof BuildError) || !completed || error2.context?.exitCode !== completed.exitCode)
+          if (error2 instanceof PlatformIOError && error2.code === "COMMAND_TIMEOUT" && error2.context?.cleanupPending === false && typeof error2.context.fullLogPath === "string") {
+            timedOut = true;
+            completed = await collect(-1, error2.context.fullLogPath, true);
+          } else if (!(error2 instanceof BuildError) || !completed || error2.context?.exitCode !== completed.exitCode)
             throw error2;
         }
         guard();
@@ -101671,13 +101685,14 @@ async function executeCleanCompatibility(input, defaults = {}, caller = {}, onAu
         return cleanCompatibilityResult(
           completed,
           environment,
-          (performance.now() - started) / 1e3
+          (performance.now() - started) / 1e3,
+          timedOut
         );
       });
     }
   );
 }
-function cleanCompatibilityResult(result, environment, duration3) {
+function cleanCompatibilityResult(result, environment, duration3, timedOut = false) {
   const output = normalizeCleanOutput(result.output);
   const lines2 = output.split("\n");
   const diagnostics = [];
@@ -101752,8 +101767,8 @@ function cleanCompatibilityResult(result, environment, duration3) {
   diagnostics.push(...linkerDiagnostics, ...stepDiagnostics);
   const errors = diagnostics.filter((item) => item.kind === "error");
   const warnings = diagnostics.filter((item) => item.kind === "warning");
-  const ok = result.exitCode === 0 && !failed;
-  const status = ok ? "success" : "failed";
+  const ok = !timedOut && result.exitCode === 0 && !failed;
+  const status = timedOut ? "timeout" : ok ? "success" : "failed";
   const durationSeconds = Math.round(duration3 * 100) / 100;
   const summary = [
     `clean ${status} for env ${environment || environments.join(",") || "default"} in ${durationSeconds}s.`
@@ -101766,6 +101781,10 @@ function cleanCompatibilityResult(result, environment, duration3) {
   if (Object.keys(memory).length)
     summary.push(
       `RAM ${(memory.ram?.percent ?? 0).toFixed(1)}%, Flash ${(memory.flash?.percent ?? 0).toFixed(1)}%.`
+    );
+  if (timedOut)
+    summary.push(
+      "The command timed out; first builds download toolchains and can take several minutes, retry once."
     );
   return {
     ok,

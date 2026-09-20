@@ -296,6 +296,8 @@ export async function executeWithSpooling(
       try { fs.closeSync(outFd); } catch {}
       try { watcher?.close(); } catch {}
     }
+    if (error instanceof PlatformIOError)
+      throw new PlatformIOError(error.message, error.code, { ...error.context, cleanupPending, fullLogPath: logFile });
     throw error;
   }
 

@@ -826,3 +826,8 @@ Added opt-in pio_clean, increasing the compatibility surface to 79 tools while p
 
 Completed cleanup diagnostic category ordering and overlapping compiler/linker/SCons matches, with per-category deduplication and uncapped counts. Summary now includes first-error location, warning count and memory percentages. Tail output removes ANSI, CR progress delimiters, obsolete-core banners, reference boilerplate and trailing blank lines. Port errors follow reference precedence. TypeScript and six focused mocked adapter/parser checks passed; plugin rebuilt. Native execution and timeout response projection remain pending, so full clean acceptance is not claimed.
 
+
+### Cleanup timeout and uncertain process custody
+
+Foreground spooler failures now carry their log path and explicit cleanup state. Clean preserves typed execution errors. Confirmed timeout termination permits bounded redacted output collection, reference timeout marker/status/exit -1 and retry guidance. Unconfirmed termination remains an error, is not read as completed output, and retains the shared implicit hardware lock until recovery instead of releasing it in finally. TypeScript and 21 focused mocked cleanup/spooler/lock checks passed; plugin rebuilt. Native host/process-tree/hardware acceptance remains required; this does not prove termination of arbitrary descendants or complete the overall parity goal.
+

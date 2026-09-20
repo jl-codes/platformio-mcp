@@ -64,7 +64,7 @@ it.each([
     if (background) {
       expect(await operation).toMatchObject({ status: "running" });
       await vi.waitFor(() => expect(mocks.close).toHaveBeenCalledOnce());
-    } else await expect(operation).rejects.toBe(error);
+    } else await expect(operation).rejects.toMatchObject({ code: "COMMAND_TIMEOUT", context: { cleanupPending, fullLogPath: expect.any(String) } });
     expect(mocks.close).toHaveBeenCalledOnce();
     expect(closeFd).toHaveBeenCalled();
     expect(mocks.release).toHaveBeenCalledTimes(cleanupPending ? 0 : 1);

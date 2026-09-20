@@ -34,7 +34,7 @@ import {
   executeCleanCompatibility,
   cleanCompatibilityResult,
 } from "../src/adapters/clean-compat.js";
-import { BuildError } from "../src/utils/errors.js";
+import { BuildError, PlatformIOError } from "../src/utils/errors.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -168,4 +168,20 @@ test("reference output removes banners, ANSI, boilerplate and trailing blank lin
   );
   expect(result.output_tail).toBe("Clean done");
   expect(result.port_error).toBeNull();
+});
+
+
+test("confirmed timeout retains output and projects reference timeout status", async () => {
+  mocks.clean.mockRejectedValueOnce(new PlatformIOError("timeout", "COMMAND_TIMEOUT", { cleanupPending: false, fullLogPath: "raw.log" }));
+  const result = await executeCleanCompatibility({});
+  expect(result).toMatchObject({ ok: false, status: "timeout", exit_code: -1, log_path: "redacted-clean.log" });
+  expect(result.output_tail).toContain("timed out after 120s");
+  expect(result.summary).toContain("The command timed out");
+});
+
+test("uncertain termination remains an error and cannot be projected as completed timeout", async () => {
+  const error = new PlatformIOError("still running", "PROCESS_CLEANUP_PENDING", { cleanupPending: true, fullLogPath: "raw.log" });
+  mocks.clean.mockRejectedValueOnce(error);
+  await expect(executeCleanCompatibility({})).rejects.toBe(error);
+  expect(mocks.log).not.toHaveBeenCalled();
 });
