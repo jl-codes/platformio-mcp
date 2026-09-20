@@ -1255,3 +1255,7 @@ Verified connect/load/host startup approvals against the real approval store and
 Reviewed PlatformIO Core v6.1.18 debug/config/base.py, factory.py and generic.py. DebugConfigBase resolves server cwd/executable/arguments and can install a missing backend package during configuration, so discovery cannot be treated as a read-only operation. Source: https://github.com/platformio/platformio-core/blob/v6.1.18/platformio/debug/config/base.py .
 
 Added a bounded parser for the resolved server object, preserving argument boundaries and package-relative executable resolution; null explicitly represents an external backend. Ambiguous PATH-only commands, shell shims, control characters and oversized arguments fail. Parsing grants no executable/probe trust. Eight focused cases, TypeScript and lint passed. Authorized config collection, process-tree containment and public probe startup remain unfinished.
+
+### Physical USB probe selection
+
+Added unique probe selection from trusted USB inventory using vendor/product/serial identity, independent of backend names. Duplicate interfaces at one physical location share an identity; duplicate serials at different locations and ambiguous candidates fail explicitly. Missing serial metadata does not fabricate a stable identity. Four focused selection cases, TypeScript and lint passed. OS inventory collection, serial-less probe support and integration with backend selection/custody remain incomplete. CI runs 35502231269 and 35502233612 were still live on b17f2acb while this change was prepared.
