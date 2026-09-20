@@ -4,7 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { retainElfSnapshot } from "../src/core/analysis/elf-archive.js";
+import {
+  retainElfSnapshot,
+  resolveRetainedElf,
+} from "../src/core/analysis/elf-archive.js";
 import { readElfIdentity } from "../src/core/analysis/elf-identity.js";
 let root: string;
 beforeEach(() => {
@@ -99,10 +102,11 @@ it("retains distinct content across rebuilds and reuses a verified archived hash
   fs.writeFileSync(file, newer);
   const second = await readElfIdentity(file);
   const next = await retainElfSnapshot(file, second.sha256, archive);
+  expect(await resolveRetainedElf(file, first.sha256, archive)).toBe(retained);
   fs.unlinkSync(file);
   expect(fs.readFileSync(retained)).toEqual(old);
   expect(fs.readFileSync(next)).toEqual(newer);
-  expect(fs.readdirSync(archive).sort()).toEqual(
+  expect(fs.readdirSync(path.dirname(retained)).sort()).toEqual(
     [first.sha256 + ".elf", second.sha256 + ".elf"].sort(),
   );
 });
@@ -120,5 +124,20 @@ it("rejects corrupted archived content without overwriting it", async () => {
     code: "ANALYSIS_ELF_MISMATCH",
   });
   expect(fs.readFileSync(retained)).toEqual(corrupt);
-  expect(fs.readdirSync(archive)).toEqual([identity.sha256 + ".elf"]);
+  expect(fs.readdirSync(path.dirname(retained))).toEqual([
+    identity.sha256 + ".elf",
+  ]);
+});
+
+it("does not resolve a hash retained only for another source path", async () => {
+  const first = path.join(root, "first.elf");
+  const second = path.join(root, "second.elf");
+  fs.writeFileSync(first, header(94));
+  fs.writeFileSync(second, header(94));
+  const identity = await readElfIdentity(first);
+  const archive = path.join(root, "archive");
+  await retainElfSnapshot(first, identity.sha256, archive);
+  await expect(
+    resolveRetainedElf(second, identity.sha256, archive),
+  ).rejects.toThrow();
 });

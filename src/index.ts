@@ -493,7 +493,7 @@ const toolDefinitions: ToolDefinition[] = [
   {
     name: "decode_backtrace",
     description:
-      "Decode crash addresses against the selected current ELF. Requires build permission for metadata; does not prove flashed-device identity.",
+      "Decode crash addresses against the selected current or retained ELF. Requires build permission for metadata; does not prove flashed-device identity.",
     inputSchema: {
       type: "object",
       properties: {
@@ -510,6 +510,11 @@ const toolDefinitions: ToolDefinition[] = [
         },
         approvalId: {
           type: "string",
+        },
+        archivedElfSha256: {
+          type: "string",
+          pattern: "^[a-fA-F0-9]{64}$",
+          description: "Retained ELF hash from this environment source path, for an earlier build.",
         },
         expectedElfSha256: {
           type: "string",

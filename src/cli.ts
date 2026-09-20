@@ -514,6 +514,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           ...scope,
           text: file !== undefined ? readCrashTextFile(file) : text,
           includeAllHex: asBoolean(options["include-all-hex"]),
+          archivedElfSha256: asString(options["archived-elf-sha256"]),
         };
       } else
         parameters = {

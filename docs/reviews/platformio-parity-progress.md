@@ -949,3 +949,8 @@ Removed both first-device fallbacks after firmware/filesystem upload. Reconnect 
 
 Analysis snapshots now publish a hash-verified content-addressed ELF copy and expose its archivePath in report identity. Concurrent publication reuses only a verified object; corrupted existing objects are never overwritten. Two new cases exercise rebuild retention, concurrent reuse and corruption rejection; 15 focused ELF/report checks passed and TypeScript passed. Complete CI run 35491602875 passed at source 3d70d44058c54a84a78ac4e87bb387000158e3e4, before this archive change. The connected MCP device inventory returned no serial devices; hardware-availability.json records this as availability evidence, not PR-runtime acceptance. Full upload-image/offset manifests and physical acceptance remain incomplete.
 
+
+### Archived ELF selection
+
+Canonical decode_backtrace and its CLI now accept archivedElfSha256/--archived-elf-sha256. Retained history is indexed by the canonical original ELF source path; lookup verifies hash and regular-file identity and cannot retrieve another source's archive by hash alone. The request-bound analysis grant includes this selection. A handler regression changes the current firmware and confirms the decoder receives the earlier retained bytes and keeps the same archivePath. TypeScript and 26 focused handler/ELF/report checks passed. Current metadata/toolchain discovery is still required; historical toolchain manifests, source-path deletion/movement recovery, read-only explicit-ELF operation, and flashed-image identity remain incomplete.
+

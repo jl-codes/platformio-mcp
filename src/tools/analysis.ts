@@ -1,6 +1,7 @@
 /** Validated firmware analysis handlers shared by future MCP/CLI compatibility adapters. */
 import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
 import crypto from "node:crypto";
+import { resolveRetainedElf } from "../core/analysis/elf-archive.js";
 import fs from "node:fs/promises";
 import { z } from "zod";
 import { getSystemInfo } from "./projects.js";
@@ -33,6 +34,10 @@ const analysisScope = {
 export const DecodeBacktraceParamsSchema = z
   .object({
     ...analysisScope,
+    archivedElfSha256: z
+      .string()
+      .regex(/^[a-fA-F0-9]{64}$/)
+      .optional(),
     text: z
       .string()
       .min(1)
@@ -81,13 +86,16 @@ async function resolveContext(
     systemInfo,
     projectDir,
   );
-  const identity = await readElfIdentity(
-    metadata.elfPath,
-    input.expectedElfSha256,
-  );
+  const selectedElf =
+    "archivedElfSha256" in input && input.archivedElfSha256
+      ? await resolveRetainedElf(metadata.elfPath, input.archivedElfSha256)
+      : metadata.elfPath;
+  const identity = await readElfIdentity(selectedElf, input.expectedElfSha256);
   return {
     projectDir,
     ...metadata,
+    elfPath: selectedElf,
+    sourceElfPath: metadata.elfPath,
     trustedToolchainRoots,
     expectedElfSha256: identity.sha256,
     validatePolicy,

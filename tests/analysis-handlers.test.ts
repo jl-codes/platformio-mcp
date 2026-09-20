@@ -216,3 +216,31 @@ it("enforces the public analysis operation's restriction at its composite grant 
   ).rejects.toMatchObject({ code: "POLICY_DENIED" });
   expect(platformioExecutor.execute).not.toHaveBeenCalled();
 });
+
+it("decodes an earlier retained ELF after the current build changes", async () => {
+  const original = fs.readFileSync(elfPath);
+  const first = await decodeBacktrace({
+    projectDir: project,
+    environment: "fixture",
+    text: "PC: 0x08001234",
+  });
+  if (!("elf" in first)) throw new Error("Missing fixture ELF identity");
+  const changed = Buffer.from(original);
+  changed[100] = 42;
+  fs.writeFileSync(elfPath, changed);
+  vi.mocked(runAnalysisProcess).mockImplementationOnce(async (_tool, args) => {
+    expect(fs.readFileSync(args[2])).toEqual(original);
+    return { stdout: "0x08001234: old() at /fixture/old.cpp:8", stderr: "" };
+  });
+  const earlier = await decodeBacktrace({
+    projectDir: project,
+    environment: "fixture",
+    text: "PC: 0x08001234",
+    archivedElfSha256: first.elf.sha256,
+  });
+  expect(earlier).toMatchObject({
+    elf: { sha256: first.elf.sha256, archivePath: first.elf.archivePath },
+    flashedFirmwareVerified: false,
+    frames: [{ function: "old()", line: 8 }],
+  });
+});

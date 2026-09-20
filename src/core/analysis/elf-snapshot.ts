@@ -10,6 +10,7 @@ export async function withElfSnapshot<T>(
   elfPath: string,
   expectedSha256: string | undefined,
   analyze: (snapshot: string, identity: ElfIdentity) => Promise<T>,
+  sourcePath = elfPath,
 ): Promise<T> {
   const identity = await readElfIdentity(elfPath, expectedSha256);
   const directory = await fs.mkdtemp(
@@ -20,7 +21,12 @@ export async function withElfSnapshot<T>(
     const snapshot = path.join(directory, "firmware.elf");
     await fs.copyFile(identity.path, snapshot);
     await readElfIdentity(snapshot, identity.sha256);
-    const archivePath = await retainElfSnapshot(snapshot, identity.sha256);
+    const archivePath = await retainElfSnapshot(
+      snapshot,
+      identity.sha256,
+      undefined,
+      sourcePath,
+    );
     return await analyze(snapshot, { ...identity, archivePath });
   } finally {
     await fs.rm(directory, { recursive: true, force: true });

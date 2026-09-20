@@ -32,3 +32,6 @@ Automatic monitoring follows only a unique exact USB VID:PID and SER identity fr
 
 Crash and size reports include elf.archivePath, a hash-verified ELF copy retained under the server data directory in artifacts/elf. Later builds do not overwrite these copies, and a corrupt existing object is rejected rather than replaced. Private working snapshots are still removed after analysis. Retention is currently manual; archived ELF files may contain symbols and source paths and remain until explicitly removed. A retained ELF does not by itself prove which binary was flashed: flashedFirmwareVerified stays false until upload-manifest evidence establishes that relationship.
 
+
+To decode an earlier retained build, pass archivedElfSha256 to decode_backtrace or --archived-elf-sha256 to the decode-backtrace CLI command. Use the hash returned by the original report. Retained history is scoped to the exact metadata-resolved ELF source path; it is not a global hash lookup across projects. The original source path must still resolve, and current environment metadata/toolchain discovery still requires build permission. Historical toolchain and flashed-image correspondence remain separate manifest requirements.
+

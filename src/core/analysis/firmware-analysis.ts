@@ -26,6 +26,7 @@ export interface FirmwareAnalysisContext {
   projectDir: string;
   environment: string;
   elfPath: string;
+  sourceElfPath?: string; // Host-resolved original path scopes retained history for archived analysis.
   compilerPath: string;
   trustedToolchainRoots: readonly string[];
   expectedElfSha256?: string;
@@ -104,6 +105,7 @@ export async function decodeFirmwareCrash(
         frames,
       };
     },
+    context.sourceElfPath,
   );
 }
 
@@ -244,5 +246,6 @@ export async function reportFirmwareSize(
         ],
       };
     },
+    context.sourceElfPath,
   );
 }
