@@ -98033,7 +98033,6 @@ async function executeCoredump(input, caller = {}, onAuthorized) {
       };
       const execute3 = async () => {
         validatePolicy();
-        const tools = request.analyze ? await resolveEspCoredumpTools(projectDir) : null;
         const capture = request.device ? await acquireProjectCoredump(
           request.device.table,
           {
@@ -98071,7 +98070,18 @@ async function executeCoredump(input, caller = {}, onAuthorized) {
             dump_export: exported
           };
         const capturedBytes = capture?.present ? capture.bytes : void 0;
-        if (!request.analyze) {
+        let tools = null;
+        let analysisUnavailable = null;
+        if (request.analyze) {
+          try {
+            tools = await resolveEspCoredumpTools(projectDir);
+          } catch (error2) {
+            if (!exported || !(error2 instanceof PlatformIOError) || error2.code !== "COREDUMP_TOOLS_UNCONFIGURED")
+              throw error2;
+            analysisUnavailable = error2.code;
+          }
+        }
+        if (!request.analyze || analysisUnavailable) {
           const artifact = capturedBytes ? inspectCapturedEspCoredump(
             capturedBytes,
             request.expectedInputSha256
@@ -98080,6 +98090,7 @@ async function executeCoredump(input, caller = {}, onAuthorized) {
           return {
             ok: true,
             analyzed: false,
+            analysis_unavailable: analysisUnavailable,
             source: artifact.source,
             identity: artifact.identity,
             firmwareIdentity: artifact.firmwareIdentity,

@@ -145,9 +145,6 @@ export async function executeCoredump(
       };
       const execute = async () => {
         validatePolicy();
-        const tools = request.analyze
-          ? await resolveEspCoredumpTools(projectDir)
-          : null;
         const capture = request.device
           ? await acquireProjectCoredump(
               request.device.table,
@@ -198,7 +195,25 @@ export async function executeCoredump(
             dump_export: exported,
           };
         const capturedBytes = capture?.present ? capture.bytes : undefined;
-        if (!request.analyze) {
+        let tools: Awaited<ReturnType<typeof resolveEspCoredumpTools>> | null =
+          null;
+        let analysisUnavailable: string | null = null;
+        if (request.analyze) {
+          try {
+            tools = await resolveEspCoredumpTools(projectDir);
+          } catch (error) {
+            // Only an explicitly unconfigured optional analyzer permits capture-only success.
+            // Invalid executable trust, policy failures and analysis errors still propagate.
+            if (
+              !exported ||
+              !(error instanceof PlatformIOError) ||
+              error.code !== "COREDUMP_TOOLS_UNCONFIGURED"
+            )
+              throw error;
+            analysisUnavailable = error.code;
+          }
+        }
+        if (!request.analyze || analysisUnavailable) {
           const artifact = capturedBytes
             ? inspectCapturedEspCoredump(
                 capturedBytes,
@@ -209,6 +224,7 @@ export async function executeCoredump(
           return {
             ok: true as const,
             analyzed: false as const,
+            analysis_unavailable: analysisUnavailable,
             source: artifact.source,
             identity: artifact.identity,
             firmwareIdentity: artifact.firmwareIdentity,

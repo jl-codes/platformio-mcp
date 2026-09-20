@@ -8,6 +8,11 @@ vi.mock("../src/tools/coredump-device.js", () => ({
   acquireProjectCoredump: vi.fn(),
 }));
 import { acquireProjectCoredump } from "../src/tools/coredump-device.js";
+vi.mock("../src/core/analysis/esp-coredump-tools.js", () => ({
+  resolveEspCoredumpTools: vi.fn(),
+}));
+import { resolveEspCoredumpTools } from "../src/core/analysis/esp-coredump-tools.js";
+import { PlatformIOError } from "../src/utils/errors.js";
 import { executeCoredump } from "../src/tools/coredump.js";
 let root: string, state: string;
 beforeEach(() => {
@@ -117,6 +122,78 @@ it.each([false, true])(
     });
     expect(result).not.toHaveProperty("bytes");
     expect(fs.readFileSync(path.join(root, "crash.bin"))).toEqual(bytes);
+  },
+  20000,
+);
+
+it.each([
+  ["COREDUMP_TOOLS_UNCONFIGURED", true, true],
+  ["COREDUMP_TOOLS_INVALID", true, false],
+  ["COREDUMP_TOOLS_UNCONFIGURED", false, false],
+] as const)(
+  "only saved captures tolerate an unconfigured analyzer (%s, save=%s)",
+  async (code, save, succeeds) => {
+    const policy = path.join(state, "operator.json");
+    vi.stubEnv("PIO_MCP_POLICY_FILE", policy);
+    fs.writeFileSync(
+      policy,
+      JSON.stringify({
+        profile: "lab_admin",
+        overrides: {
+          allow: ["run_shell_command", "get_project_config"],
+          deny: [],
+          approval_required: [],
+          audit_all_agent_actions: false,
+        },
+      }),
+    );
+    const bytes = Buffer.from(
+      "2400000003000000010000000400000000000000020000006669787475726521168fe1cf",
+      "hex",
+    );
+    vi.mocked(acquireProjectCoredump).mockResolvedValueOnce({
+      present: true,
+      bytes,
+      source: {
+        port: "port",
+        offset: 0x310000,
+        length: bytes.length,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        logPath: "log",
+        partition: "crash",
+      },
+      layout: {
+        table: { path: "table", size: 1, sha256: "fixture" },
+        table_offset: 0x8000,
+        environment: null,
+        table_source: "explicit",
+        evidence: "offline_layout",
+      },
+    } as Awaited<ReturnType<typeof acquireProjectCoredump>>);
+    vi.mocked(resolveEspCoredumpTools).mockRejectedValueOnce(
+      new PlatformIOError("Unavailable fixture tool", code),
+    );
+    const selected = {
+      ...request(),
+      analyze: true,
+      elfPath: "firmware.elf",
+      outPath: save ? "crash.bin" : undefined,
+    };
+    if (succeeds) {
+      const result = await executeCoredump(selected);
+      expect(result).toMatchObject({
+        ok: true,
+        analyzed: false,
+        analysis_unavailable: "COREDUMP_TOOLS_UNCONFIGURED",
+        dump_export: { size: bytes.length },
+      });
+      expect(result).not.toHaveProperty("bytes");
+    } else {
+      await expect(executeCoredump(selected)).rejects.toMatchObject({ code });
+    }
+    expect(acquireProjectCoredump).toHaveBeenCalledTimes(1);
+    if (save)
+      expect(fs.readFileSync(path.join(root, "crash.bin"))).toEqual(bytes);
   },
   20000,
 );
