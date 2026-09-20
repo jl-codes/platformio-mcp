@@ -1,13 +1,23 @@
 /** Execute the fixed Python bridge with an isolated fake converter, without optional installs. */
+import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { expect, it } from "vitest";
 import { ESP_COREDUMP_CONVERTER } from "../src/core/analysis/esp-coredump-converter.js";
-const python = process.platform === "win32" ? "python" : "python3";
+// Use the exact setup-python runtime in CI, and skip unrelated site startup for this stdlib/fake-module harness.
+const python = process.env.pythonLocation
+  ? path.join(
+      process.env.pythonLocation,
+      process.platform === "win32" ? "python.exe" : "bin/python3",
+    )
+  : process.platform === "win32"
+    ? "python"
+    : "python3";
 it("returns a typed error for an installed but unapproved converter version", () => {
   const result = spawnSync(
     python,
     [
       "-I",
+      "-S",
       "-c",
       'import importlib.metadata\nimportlib.metadata.version = lambda name: "0.0.0"\n' +
         ESP_COREDUMP_CONVERTER,
@@ -51,6 +61,7 @@ with tempfile.TemporaryDirectory() as directory:
     python,
     [
       "-I",
+      "-S",
       "-c",
       "PROGRAM = " + JSON.stringify(ESP_COREDUMP_CONVERTER) + "\n" + harness,
     ],
