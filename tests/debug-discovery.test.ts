@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import {
+  discoverDebuggerRoots,
   resolveDebuggerExecutable,
   selectDebugMetadata,
 } from "../src/core/debug/debug-discovery.js";
@@ -83,4 +84,61 @@ it("rejects a directory alias that redirects an installed path into the project"
   ).rejects.toMatchObject({
     code: "GDB_EXECUTABLE_UNTRUSTED",
   });
+});
+
+it("discovers a registered standalone debugger package from host Core metadata", async () => {
+  const packages = path.join(root, "core", "packages");
+  const pkg = path.join(packages, "tool-xtensa-esp-elf-gdb");
+  fs.mkdirSync(pkg, { recursive: true });
+  const executable = path.join(pkg, "xtensa-esp32-elf-gdb");
+  fs.writeFileSync(executable, "fixture");
+  fs.writeFileSync(
+    path.join(pkg, "package.json"),
+    JSON.stringify({
+      name: "tool-xtensa-esp-elf-gdb",
+      version: "12.1",
+    }),
+  );
+  const record = path.join(pkg, ".piopm");
+  fs.writeFileSync(
+    record,
+    JSON.stringify({
+      type: "tool",
+      name: "tool-xtensa-esp-elf-gdb",
+      version: "12.1",
+    }),
+  );
+  const info = { core_dir: { value: path.join(root, "core") } };
+  expect(await discoverDebuggerRoots(executable, info, project, {})).toEqual([
+    fs.realpathSync(pkg),
+  ]);
+  fs.writeFileSync(
+    record,
+    JSON.stringify({
+      type: "tool",
+      name: "tool-xtensa-esp-elf-gdb",
+      version: "11",
+    }),
+  );
+  await expect(
+    discoverDebuggerRoots(executable, info, project, {}),
+  ).rejects.toMatchObject({
+    code: "GDB_EXECUTABLE_UNTRUSTED",
+  });
+});
+it("accepts an explicit operator installation without requiring Core metadata", async () => {
+  expect(
+    await discoverDebuggerRoots(gdb, null, project, {
+      PIO_MCP_DEBUGGER_ROOTS: JSON.stringify([install]),
+    }),
+  ).toEqual([fs.realpathSync(install)]);
+});
+it("does not silently fall back when explicit debugger configuration is malformed", async () => {
+  for (const value of ["", "[]", "{}", '["relative"]']) {
+    await expect(
+      discoverDebuggerRoots(gdb, {}, project, {
+        PIO_MCP_DEBUGGER_ROOTS: value,
+      }),
+    ).rejects.toMatchObject({ code: "GDB_EXECUTABLE_UNTRUSTED" });
+  }
 });

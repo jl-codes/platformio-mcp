@@ -14,12 +14,16 @@ import {
   initializeGdbInspection,
 } from "./debug-initialization.js";
 import { GdbMiSession } from "./gdb-mi-session.js";
-import { resolveDebuggerExecutable } from "./debug-discovery.js";
+import {
+  discoverDebuggerRoots,
+  resolveDebuggerExecutable,
+} from "./debug-discovery.js";
 
 /** Trusted process owner inputs; never accept this structure directly from MCP arguments. */
 export interface DebugProcessOptions {
   executable: string;
-  trustedDebuggerRoots: readonly string[];
+  trustedDebuggerRoots?: readonly string[];
+  systemInfo?: unknown; // Trusted host system-info result used for registered package discovery.
   projectDir: string;
   elfPath: string;
   custody: ProcessDeviceCustody;
@@ -97,9 +101,16 @@ export class DebugProcess {
           "Debugger paths must be host-resolved.",
           "GDB_PATH_INVALID",
         );
+      const roots =
+        options.trustedDebuggerRoots ??
+        (await discoverDebuggerRoots(
+          options.executable,
+          options.systemInfo,
+          options.projectDir,
+        ));
       const executable = await resolveDebuggerExecutable(
         options.executable,
-        options.trustedDebuggerRoots,
+        roots,
         options.projectDir,
       );
       options.custody.prepareSpawn();

@@ -92,3 +92,107 @@ export async function resolveDebuggerExecutable(
     );
   return executable;
 }
+
+/**
+ * Find the exact registered GDB package under the host-reported Core installation.
+ * A custom/native installation requires PIO_MCP_DEBUGGER_ROOTS in the server environment.
+ * systemInfo must come from the host's authorized system-info call, never client arguments.
+ */
+export async function discoverDebuggerRoots(
+  debuggerPath: string,
+  systemInfo: unknown,
+  projectDir: string,
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<string[]> {
+  const invalid = (message: string): never => {
+    throw new PlatformIOError(message, "GDB_EXECUTABLE_UNTRUSTED");
+  };
+  const configured = environment.PIO_MCP_DEBUGGER_ROOTS;
+  if (configured !== undefined) {
+    let roots: unknown;
+    if (Buffer.byteLength(configured) > 65536)
+      return invalid("Debugger root configuration exceeds 64 KiB.");
+    try {
+      roots = JSON.parse(configured);
+    } catch {
+      return invalid("PIO_MCP_DEBUGGER_ROOTS must be a JSON array.");
+    }
+    if (
+      !Array.isArray(roots) ||
+      roots.length < 1 ||
+      roots.length > 32 ||
+      roots.some((root) => typeof root !== "string" || !path.isAbsolute(root))
+    )
+      return invalid(
+        "Configure between 1 and 32 absolute debugger installation roots.",
+      );
+    await resolveDebuggerExecutable(debuggerPath, roots, projectDir);
+    return [
+      ...new Set(
+        await Promise.all(roots.map((root: string) => fs.realpath(root))),
+      ),
+    ];
+  }
+  const core = (systemInfo as { core_dir?: { value?: unknown } } | null)
+    ?.core_dir?.value;
+  if (typeof core !== "string" || !path.isAbsolute(core))
+    return invalid(
+      "PlatformIO system info did not identify an absolute Core directory.",
+    );
+  const packages = await fs.realpath(path.join(core, "packages"));
+  const executable = await fs.realpath(debuggerPath);
+  if (!within(packages, executable))
+    return invalid(
+      "Debugger is outside registered host packages; configure an operator root.",
+    );
+  const folder = path.relative(packages, executable).split(path.sep)[0];
+  const root = await fs.realpath(path.join(packages, folder));
+  if (!within(packages, root))
+    return invalid("Debugger package escapes the Core installation.");
+  const readRecord = async (file: string): Promise<Record<string, unknown>> => {
+    const handle = await fs.open(file, "r");
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size > 65536)
+        return invalid("Invalid debugger package record.");
+      const bytes = Buffer.alloc(65537);
+      const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
+      if (bytesRead > 65536)
+        return invalid("Debugger package record exceeds 64 KiB.");
+      const value: unknown = JSON.parse(
+        bytes.subarray(0, bytesRead).toString("utf8"),
+      );
+      if (!value || typeof value !== "object" || Array.isArray(value))
+        return invalid("Invalid debugger package record.");
+      return value as Record<string, unknown>;
+    } finally {
+      await handle.close();
+    }
+  };
+  try {
+    const [manifest, record] = await Promise.all([
+      readRecord(path.join(root, "package.json")),
+      readRecord(path.join(root, ".piopm")),
+    ]);
+    if (
+      typeof manifest.name !== "string" ||
+      !(
+        manifest.name.startsWith("toolchain-") ||
+        /^tool-.*gdb(?:-|$)/.test(manifest.name)
+      ) ||
+      typeof manifest.version !== "string" ||
+      !manifest.version ||
+      record.type !== "tool" ||
+      record.name !== manifest.name ||
+      record.version !== manifest.version
+    )
+      return invalid(
+        "Debugger package registration does not match its manifest.",
+      );
+  } catch (error) {
+    if (error instanceof PlatformIOError) throw error;
+    return invalid("Debugger package registration is missing or invalid.");
+  }
+  await resolveDebuggerExecutable(executable, [root], projectDir);
+  return [root];
+}
