@@ -639,3 +639,7 @@ Canonical and both npm alias engine declarations now require Node >=20, matching
 ### Durable child-handoff uncertainty
 
 Device leases now support a persisted pending-handoff marker before a child launch. Marked leases report unknown custody, reject normal release, and cannot be automatically reclaimed even after the coordinator is proven stale. Verified transfer clears the marker while recording child identity; cancellation requires the original trusted release capability and proof by the launcher that no child remains. TypeScript checking and 19 lease tests pass, including a real separate coordinator that writes the marker and exits. Launcher integration and explicit unresolved-handoff recovery remain outstanding; no hardware was exercised.
+
+### Verified transferred-child cleanup
+
+Transfers now retain a process-local receipt capability. finishTransfer removes only the original unadopted lease with the same persisted owner and nonce, after OS identity proves that child stale; it never signals a process. Copied/reused receipts, live/unknown owners, and reacquired resources reject cleanup. TypeScript checking and all 21 lease tests pass. This is an internal custody primitive; legacy launcher integration and recovery of interrupted handoffs remain outstanding.

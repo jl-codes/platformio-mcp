@@ -112,6 +112,7 @@ export class DeviceLeaseStore {
   private readonly root: string;
   private readonly inspect: (pid: number) => ProcessObservation;
   private readonly held = new WeakMap<DeviceLease, LeaseRecord>();
+  private readonly transfers = new WeakMap<DeviceLeaseTransfer, LeaseRecord>();
   private owner?: ProcessIdentity;
 
   /** Construct a store; no file is created or device opened until acquisition. */
@@ -240,10 +241,39 @@ export class DeviceLeaseStore {
       };
       this.writeRecord(key, transferred);
       this.held.delete(lease);
-      return Object.freeze({
+      const ticket = Object.freeze({
         resource: Object.freeze({ ...current.resource }),
         nonce: transferred.nonce,
       });
+      this.transfers.set(ticket, transferred);
+      return ticket;
+    });
+  }
+
+  /** Retire an unadopted handoff only after its exact child owner is proven stale; never kill a process. */
+  finishTransfer(ticket: DeviceLeaseTransfer): void {
+    const transferred = this.transfers.get(ticket);
+    if (!transferred)
+      throw new PlatformIOError(
+        "Unknown or completed transfer receipt.",
+        "DEVICE_TRANSFER_INVALID",
+      );
+    const key = resourceKey(transferred.resource);
+    this.withGate(key, () => {
+      const current = this.requirePersistedOwner(key, transferred);
+      if (
+        current.handoffPending ||
+        compareProcessIdentity(
+          current.owner,
+          this.inspect(current.owner.pid),
+        ) !== "stale"
+      )
+        throw new PlatformIOError(
+          "Transferred child exit is not confirmed.",
+          "DEVICE_OWNER_UNKNOWN",
+        );
+      fs.unlinkSync(path.join(this.root, `${key}.json`));
+      this.transfers.delete(ticket);
     });
   }
 

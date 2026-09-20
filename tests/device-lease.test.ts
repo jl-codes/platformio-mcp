@@ -649,3 +649,62 @@ it("retains unresolved custody after the real coordinator process exits", () => 
     expect.objectContaining({ code: "DEVICE_HANDOFF_PENDING" }),
   );
 }, 20000);
+
+it("retires only an issued, unadopted transfer whose exact child is gone", () => {
+  const root = directory();
+  const child = {
+    pid: process.pid + 1,
+    platform: process.platform,
+    startToken: "child",
+  };
+  let observation: ProcessObservation = { status: "running", identity: child };
+  const store = new DeviceLeaseStore({
+    root,
+    inspect: (pid) => (pid === child.pid ? observation : running()),
+  });
+  const lease = store.acquire(resource);
+  store.beginHandoff(lease);
+  const ticket = store.transfer(lease, child);
+  expect(() => store.finishTransfer({ ...ticket })).toThrow(
+    expect.objectContaining({ code: "DEVICE_TRANSFER_INVALID" }),
+  );
+  expect(() => store.finishTransfer(ticket)).toThrow(
+    expect.objectContaining({ code: "DEVICE_OWNER_UNKNOWN" }),
+  );
+  observation = { status: "unknown" };
+  expect(() => store.finishTransfer(ticket)).toThrow(
+    expect.objectContaining({ code: "DEVICE_OWNER_UNKNOWN" }),
+  );
+  observation = { status: "absent" };
+  store.finishTransfer(ticket);
+  expect(store.status(resource).status).toBe("unclaimed");
+  expect(() => store.finishTransfer(ticket)).toThrow(
+    expect.objectContaining({ code: "DEVICE_TRANSFER_INVALID" }),
+  );
+});
+it("cannot retire a transferred resource that has since been reacquired", () => {
+  const root = directory();
+  const child = {
+    pid: process.pid + 1,
+    platform: process.platform,
+    startToken: "child",
+  };
+  let alive = true;
+  const store = new DeviceLeaseStore({
+    root,
+    inspect: (pid) =>
+      pid === child.pid
+        ? alive
+          ? { status: "running", identity: child }
+          : { status: "absent" }
+        : running(),
+  });
+  const ticket = store.transfer(store.acquire(resource), child);
+  alive = false;
+  const replacement = store.acquire(resource);
+  expect(() => store.finishTransfer(ticket)).toThrow(
+    expect.objectContaining({ code: "DEVICE_LEASE_NOT_OWNED" }),
+  );
+  expect(store.status(resource).status).toBe("owned");
+  store.release(replacement);
+});
