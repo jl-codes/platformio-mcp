@@ -60,6 +60,7 @@ def accept(directory, host, evidence):
                 raise ValueError(f"Wrong installed version from {module}")
         executable = binary / ("pio-agent.exe" if os.name == "nt" else "pio-agent")
         protocol = load_script("installed_mcp", "test-installed-python-mcp.py").check(executable, version)
+        signals = load_script("installed_signals", "test-installed-python-signals.py").check(executable, version)
         subprocess.run([str(python), "-m", "pip", "uninstall", "-y", *[item["name"] for item in aliases]], check=True, timeout=30)
         result = subprocess.run([str(executable), "--version"], capture_output=True, text=True, env=environment, cwd=root, timeout=30, check=True)
         if result.stdout.strip() != version:
@@ -68,7 +69,7 @@ def accept(directory, host, evidence):
               "environment": {"os": platform.platform(), "python": platform.python_version(), "machine": platform.machine()},
               "timestamp": datetime.now(timezone.utc).isoformat(), "artifacts": selected, "commands": commands,
               "functionalAliases": [item["name"] for item in aliases], "aliasUninstallPreservesCanonical": True,
-              "mcp": protocol, "scope": "native installation, CLI aliases, MCP stdio and EOF shutdown; hardware, signals, minimum-OS and public-registry acceptance remain separate"}
+              "mcp": protocol, "signals": signals, "scope": "native installation, CLI aliases, MCP stdio, EOF and POSIX idle-server signal shutdown; hardware, Windows console controls, active-session cleanup, minimum-OS and public-registry acceptance remain separate"}
     evidence.parent.mkdir(parents=True, exist_ok=True)
     evidence.write_text(json.dumps(report, indent=2) + "\n")
     return report

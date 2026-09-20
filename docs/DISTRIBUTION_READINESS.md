@@ -150,3 +150,14 @@ All seven requested families now have functional scoped npm candidate sources:
 `@forkbomb/flashagent`. These are prepared packages, not published names or a claim
 that npm will permit every same-scope punctuation variant. The two existing unscoped
 aliases and unscoped flashagent candidate bring the wrapper source count to ten.
+
+### Installed launcher signal acceptance
+
+The native Python gate now runs `scripts/test-installed-python-signals.py` after
+installed MCP verification. On Linux and macOS, it initializes the exact installed
+version, keeps stdin open, sends SIGINT and SIGTERM to the launcher PID separately,
+and requires zero-exit shutdown within fifteen seconds. Failure cleanup targets only
+the new process group created for that invocation. The host report retains per-signal
+results. Windows reports `not_verified` until a separate console-control procedure
+is supplied. Idle shutdown does not establish cleanup of active hardware sessions.
+Historical native reports predate this check and cannot be counted as signal evidence.

@@ -2095,3 +2095,8 @@ CI run 35533859317 timed out the dependency CLI case at five seconds while it se
 
 - Compared pinned reference project.py pio_board_info and core.py guard/run_json branches against the actual adapters. Unknown boards now expose KeyError, and failed board catalog commands expose RuntimeError, through the compatibility error formatter. Canonical errors remain unchanged and their codes remain available in compatibility details.
 - Sixteen affected board/error tests and TypeScript checking passed; plugin runtime regenerated. This verifies those error categories only, not full PAR-01/PAR-13 acceptance or live Core execution.
+
+### 2026-09-20: Installed Python signal acceptance procedure
+
+- Added a native-gate procedure for initialized installed-launcher SIGINT/SIGTERM routing on POSIX with stdin left open, bounded wait, exact server-version checking, and owned process-group failure cleanup. Windows console-control behavior is explicitly not verified.
+- Python syntax and diff checks passed on the current Windows host. Actual POSIX installed-wheel execution is pending; no passing signal evidence or hardware acceptance is claimed. Historical five-host reports remain unchanged.
