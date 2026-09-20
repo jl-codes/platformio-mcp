@@ -43,3 +43,21 @@ test("rate limited responses retain backoff and changes ignore observation times
  const changed=structuredClone(second);changed.entries[0].status="third_party";
  assert.deepEqual(namespaceChanges(first,changed)[0].changed,["status"]);
 });
+
+
+test("coverage reports verified authority without implying new-release deployment", async () => {
+ const {namespaceCoverage}=await import("../scripts/namespace-coverage.mjs");
+ const inventory={requestedAliases:["fixture"],canonicalSource:"https://github.com/example/project",entries:[
+  {registry:"npm",name:"fixture",role:"canonical",publishIntent:true,publicationControlVerified:true},
+  {registry:"npm",name:"@owner/fixture",role:"candidate_alias",publishIntent:false,publicationControlVerified:true}
+ ]};
+ const observations={entries:[{registry:"npm",name:"fixture",status:"observed_project_link",version:"old"}]};
+ const row=namespaceCoverage(inventory,observations).rows.find(row=>row.channel==="npm");
+ assert.equal(row.disposition,"published_metadata_observed_authority_verified");
+ assert.equal(row.entries[0].observedVersion,"old");
+ assert.equal(row.scopedAlternatives[0].authorityVerified,true);
+ assert.equal(row.scopedAlternatives[0].namingEligibilityVerified,false);
+ assert.equal(row.scopedAlternatives[0].publishIntent,false);
+ inventory.entries[0].publicationControlVerified=false;
+ assert.equal(namespaceCoverage(inventory,observations).rows.find(row=>row.channel==="npm").disposition,"published_metadata_observed_authority_unproven");
+});

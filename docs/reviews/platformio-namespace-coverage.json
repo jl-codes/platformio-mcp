@@ -20,7 +20,7 @@
           "role": "canonical",
           "packagePath": ".",
           "publishIntent": true,
-          "authorityVerified": false,
+          "authorityVerified": true,
           "namingEligibilityVerified": false,
           "publicObservation": "observed_project_link",
           "observedVersion": "3.0.0",
@@ -28,12 +28,15 @@
           "reason": null
         }
       ],
-      "disposition": "published_metadata_observed_authority_unproven",
+      "disposition": "published_metadata_observed_authority_verified",
       "scopedAlternatives": [
         {
           "name": "@forkbomb/platformio-mcp",
           "role": "candidate_alias",
-          "publishIntent": false
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
         }
       ]
     },
@@ -175,7 +178,7 @@
           "role": "functional_alias",
           "packagePath": "packages/pio-mcp",
           "publishIntent": true,
-          "authorityVerified": false,
+          "authorityVerified": true,
           "namingEligibilityVerified": false,
           "publicObservation": "observed_project_link",
           "observedVersion": "3.0.0",
@@ -183,12 +186,15 @@
           "reason": null
         }
       ],
-      "disposition": "published_metadata_observed_authority_unproven",
+      "disposition": "published_metadata_observed_authority_verified",
       "scopedAlternatives": [
         {
           "name": "@forkbomb/pio-mcp",
           "role": "candidate_alias",
-          "publishIntent": false
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
         }
       ]
     },
@@ -317,7 +323,10 @@
         {
           "name": "@forkbomb/platformio.mcp",
           "role": "candidate_alias",
-          "publishIntent": false
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
         }
       ]
     },
@@ -433,7 +442,7 @@
           "role": "functional_alias",
           "packagePath": "packages/pio-agent",
           "publishIntent": true,
-          "authorityVerified": false,
+          "authorityVerified": true,
           "namingEligibilityVerified": false,
           "publicObservation": "observed_project_link",
           "observedVersion": "3.0.0",
@@ -441,12 +450,15 @@
           "reason": null
         }
       ],
-      "disposition": "published_metadata_observed_authority_unproven",
+      "disposition": "published_metadata_observed_authority_verified",
       "scopedAlternatives": [
         {
           "name": "@forkbomb/pio-agent",
           "role": "candidate_alias",
-          "publishIntent": false
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
         }
       ]
     },
@@ -575,7 +587,10 @@
         {
           "name": "@forkbomb/platformiomcp",
           "role": "watch",
-          "publishIntent": false
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
         }
       ]
     },
@@ -704,7 +719,10 @@
         {
           "name": "@forkbomb/pioagent",
           "role": "watch",
-          "publishIntent": false
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
         }
       ]
     },
@@ -833,7 +851,10 @@
         {
           "name": "@forkbomb/flashagent",
           "role": "candidate_alias",
-          "publishIntent": false
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
         }
       ]
     },

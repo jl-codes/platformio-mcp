@@ -1721,3 +1721,8 @@ Validation: sixteen focused serial/projection/trigger checks passed, followed by
 ### Authenticated npm package and personal-scope authority
 
 The current npm session returned `forkbomb`; npm access metadata confirmed read-write permissions for platformio-mcp, pio-mcp and pio-agent. npm's documented personal-scope assignment establishes control of @forkbomb, so the five prepared scoped candidates now record publicationControlVerified. Evidence and limitations are in npm-publisher-authority.json. Candidate publishIntent remains false pending name-specific eligibility and release configuration; no package was published, reserved or overwritten. This removes the stale scope-authority blocker without asserting CI identity or successful registration.
+
+
+### Namespace coverage preserves verified authority
+
+The generated seven-name coverage matrix now includes personal-scope authority and naming eligibility for scoped alternatives. Existing npm packages with directly verified write access are recorded as authority-verified, while observed registry versions remain separate from final-release deployment. Candidate packages still do not count as published or secured. Six namespace audit/coverage cases passed, including metadata-only observations remaining authority-unproven and verified scoped candidates remaining unpublished. Regenerated platformio-namespace-coverage.json from the current inventory without new registry lookups.

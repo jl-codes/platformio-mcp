@@ -30,8 +30,8 @@ export function namespaceCoverage(inventory, observations) {
       };
     });
     rows.push({ alias, channel, entries,
-      disposition: !entries.length ? "not_implemented" : entries.some(entry => entry.role === "excluded_third_party") ? "excluded_third_party" : entries.some(entry => entry.role === "blocked_naming_rule") ? "blocked_naming_rule" : entries.some(entry => entry.publicObservation === "observed_project_link") ? "published_metadata_observed_authority_unproven" : "candidate_not_secured",
-      scopedAlternatives: channel === "npm" ? inventory.entries.filter(entry => entry.registry === "npm" && entry.name.startsWith("@") && entry.name.endsWith("/" + alias)).map(entry => ({name: entry.name, role: entry.role, publishIntent: entry.publishIntent === true})) : [],
+      disposition: !entries.length ? "not_implemented" : entries.some(entry => entry.role === "excluded_third_party") ? "excluded_third_party" : entries.some(entry => entry.role === "blocked_naming_rule") ? "blocked_naming_rule" : entries.some(entry => entry.publicObservation === "observed_project_link") ? (entries.some(entry => entry.publicObservation === "observed_project_link" && entry.authorityVerified) ? "published_metadata_observed_authority_verified" : "published_metadata_observed_authority_unproven") : "candidate_not_secured",
+      scopedAlternatives: channel === "npm" ? inventory.entries.filter(entry => entry.registry === "npm" && entry.name.startsWith("@") && entry.name.endsWith("/" + alias)).map(entry => ({name: entry.name, role: entry.role, publishIntent: entry.publishIntent === true, authorityVerified: entry.publicationControlVerified === true, namingEligibilityVerified: entry.namingEligibilityVerified === true, reason: entry.reason ?? null})) : [],
     });
   }
   return {schemaVersion: 1, canonicalSource: inventory.canonicalSource, requestedAliases: requested, rows,

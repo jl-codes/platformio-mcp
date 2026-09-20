@@ -10,7 +10,8 @@
       "role": "canonical",
       "source": "https://github.com/jl-codes/platformio-mcp",
       "publishIntent": true,
-      "packagePath": "."
+      "packagePath": ".",
+      "publicationControlVerified": true
     },
     {
       "registry": "npm",
@@ -18,7 +19,8 @@
       "role": "functional_alias",
       "source": "https://github.com/jl-codes/platformio-mcp",
       "publishIntent": true,
-      "packagePath": "packages/pio-agent"
+      "packagePath": "packages/pio-agent",
+      "publicationControlVerified": true
     },
     {
       "registry": "npm",
@@ -26,7 +28,8 @@
       "role": "functional_alias",
       "source": "https://github.com/jl-codes/platformio-mcp",
       "publishIntent": true,
-      "packagePath": "packages/pio-mcp"
+      "packagePath": "packages/pio-mcp",
+      "publicationControlVerified": true
     },
     {
       "registry": "npm",
