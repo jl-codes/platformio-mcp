@@ -9,6 +9,9 @@
  */
 
 import fs from "node:fs";
+import { inspectProcessIdentity, compareProcessIdentity, type ProcessIdentity } from "../core/devices/process-identity.js";
+import { PlatformIOError } from "./errors.js";
+import { setTimeout as delay } from "node:timers/promises";
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
@@ -49,6 +52,18 @@ function getPidsFilePath(projectDir?: string, file: string = SERIAL_PIDS_FILE): 
   return path.join(baseDir, WORKSPACE_DIR, LOCKS_DIR, file);
 }
 
+/** Read bounded supplemental start identities; legacy numeric PID files remain unchanged. */
+function readMonitorIdentities(pidsFile: string): Record<string, ProcessIdentity> {
+  const file = pidsFile + ".identities.json";
+  if (!fs.existsSync(file)) return {};
+  if (fs.statSync(file).size > 1024 * 1024)
+    throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
+  const value = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
+  return value;
+}
+
 /**
  * Records a given process ID belonging to a started serial monitor.
  */
@@ -73,6 +88,11 @@ export async function registerPioMonitorPid(
       try {
         pids = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
       } catch {}
+      const identities = readMonitorIdentities(pidsFile);
+      const observed = inspectProcessIdentity(pid);
+      if (observed.status === "running") identities[port] = observed.identity;
+      else delete identities[port];
+      fs.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
       pids[port] = pid;
       fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
     } finally {
@@ -119,6 +139,9 @@ export async function unregisterPioMonitorPid(port: string, projectDir?: string)
         const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
         if (pids[port]) {
           delete pids[port];
+          const identities = readMonitorIdentities(pidsFile);
+          delete identities[port];
+          fs.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
           fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
         }
       } finally {
@@ -149,51 +172,43 @@ export async function unregisterPioMonitorPid(port: string, projectDir?: string)
 /**
  * Target-kills a stray or explicitly stopped monitor process via tree-kill.
  */
-export function killPioMonitorByPort(port: string, projectDir?: string): Promise<void> {
-  return new Promise((resolve) => {
-    let targetPid: number | undefined;
-    
-    const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-    if (fs.existsSync(pidsFile)) {
-      try {
-        const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
-        targetPid = pids[port];
-      } catch {}
+export async function killPioMonitorByPort(port: string, projectDir?: string): Promise<boolean> {
+  const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
+  if (!fs.existsSync(pidsFile)) return false;
+  let stoppedPid: number | undefined;
+  const release = await lockfile.lock(pidsFile, {retries: {retries: 5, minTimeout: 50, maxTimeout: 200}});
+  try {
+    const pids = JSON.parse(fs.readFileSync(pidsFile, "utf8")) as Record<string, number>;
+    const pid = pids[port];
+    if (!pid) return false;
+    stoppedPid = pid;
+    const identity = readMonitorIdentities(pidsFile)[port];
+    const observation = inspectProcessIdentity(pid);
+    if (observation.status === "absent") { /* Nothing remains to terminate. */ }
+    else {
+      if (!identity || identity.pid !== pid || compareProcessIdentity(identity, observation) !== "alive")
+        throw new PlatformIOError("Monitor process identity is unavailable or changed; refusing PID-only termination.", "PROCESS_IDENTITY_UNVERIFIED");
+      await new Promise<void>((resolve, reject) => treeKill(pid, "SIGKILL", error => error ? reject(error) : resolve()));
+      let confirmed = false;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if (compareProcessIdentity(identity, inspectProcessIdentity(pid)) === "stale") {confirmed = true; break;}
+        await delay(50);
+      }
+      if (!confirmed) throw new PlatformIOError("Monitor exit could not be confirmed.", "PROCESS_CLEANUP_PENDING");
     }
-
-    if (!targetPid) {
-      try {
-        const history = getCommandHistory(projectDir);
-        for (const cmd of history) {
-          if (cmd.status === "running" && cmd.tasks) {
-            for (const task of cmd.tasks) {
-              if (task.type === "monitor" && task.status === "running" && task.port === port && task.pid) {
-                targetPid = task.pid;
-                break;
-              }
-            }
-          }
-          if (targetPid) break;
-        }
-      } catch {}
+    delete pids[port];
+    const identities = readMonitorIdentities(pidsFile); delete identities[port];
+    fs.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+    fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+  } finally {await release();}
+  const history = getCommandHistory(projectDir);
+  for (const command of history) {
+    for (const task of command.tasks ?? []) {
+      if (task.type === "monitor" && task.port === port && task.pid === stoppedPid && task.status === "running")
+        await updateTaskStatus(command.id, task.taskId, {status: "terminated"}, projectDir);
     }
-
-    if (targetPid) {
-      logDiag(`[ProcessManager Diagnostic] Found tracked PID ${targetPid} for port ${port}. Yielding to tree-kill...`, projectDir);
-      treeKill(targetPid, "SIGKILL", async (err) => {
-        if (err) {
-          logDiag(`[ProcessManager Diagnostic] Failed to tree-kill PID ${targetPid}: ${err.message}`, projectDir);
-        } else {
-          logDiag(`[ProcessManager Diagnostic] Successfully tree-killed PID ${targetPid}.`, projectDir);
-        }
-        await unregisterPioMonitorPid(port, projectDir);
-        resolve();
-      });
-    } else {
-      // Always ensure we unregister and update command status even if the PID was missing or already died
-      unregisterPioMonitorPid(port, projectDir).finally(resolve);
-    }
-  });
+  }
+  return true;
 }
 
 /**

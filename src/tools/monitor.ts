@@ -155,18 +155,17 @@ export async function stopMonitor(port: string, projectDir?: string) {
         daemon.watcher.close();
       } catch {}
     }
-    delete activeDaemons[port];
-    portalEvents.emitSpoolerStates(getSpoolerStates());
-    try {
-      portSemaphoreManager.releasePort(port);
-    } catch {}
+
   }
 
   logDiag(
     `[Spooler Diagnostic] Triggering killPioMonitorByPort on ${port}...`,
     projectDir,
   );
-  await killPioMonitorByPort(port, projectDir);
+  const stopped = await killPioMonitorByPort(port, projectDir);
+  if (stopped) portSemaphoreManager.releasePort(port);
+  delete activeDaemons[port];
+  portalEvents.emitSpoolerStates(getSpoolerStates());
   logDiag(`[Spooler Diagnostic] killPioMonitorByPort completed.`, projectDir);
 }
 

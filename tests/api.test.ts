@@ -9,21 +9,20 @@ import path from "node:path";
 import os from "node:os";
 
 // Mock platformio hardware runner to avoid hanging threads
-vi.mock("../src/platformio.js", () => ({
-  platformioExecutor: {
-    spawn: vi.fn(() => ({
-      pid: 12345,
-      on: vi.fn((event, callback) => {
-        if (event === "close") {
-          setTimeout(() => callback(0), 10);
-        }
+vi.mock("../src/platformio.js", async () => {
+  const {EventEmitter} = await import("node:events");
+  return {
+    platformioExecutor: {
+      spawn: vi.fn(() => {
+        const proc = Object.assign(new EventEmitter(), {pid: 12345, exitCode: null as number | null, signalCode: null, unref: vi.fn(), kill: vi.fn()});
+        setTimeout(() => {proc.exitCode = 0; proc.emit("exit", 0); proc.emit("close", 0);}, 10);
+        return proc;
       }),
-      unref: vi.fn(),
-    })),
-    executeWithJsonOutput: vi.fn(() => Promise.resolve([])),
-  },
-  checkPlatformIOInstalled: vi.fn(() => Promise.resolve(true)),
-}));
+      executeWithJsonOutput: vi.fn(() => Promise.resolve([])),
+    },
+    checkPlatformIOInstalled: vi.fn(() => Promise.resolve(true)),
+  };
+});
 
 describe("Portal API Security & Telemetry Tailing", () => {
   let app: any;
