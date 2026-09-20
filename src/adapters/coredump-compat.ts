@@ -1,6 +1,7 @@
 /** Reference core-dump workflow delegates acquisition, retention and analysis to authorized canonical actions. */
 import fs from "node:fs/promises";
 import { z } from "zod";
+import { PlatformIOError } from "../utils/errors.js";
 import { executeCoredump } from "../tools/coredump.js";
 import { resolveTargetSerialSelection } from "../tools/run-target.js";
 import { collectBuildMetadata } from "../core/analysis/collect-build-context.js";
@@ -50,7 +51,13 @@ export async function executeCoredumpCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
-  const params = CoredumpCompatibilitySchema.parse(input);
+  const parsed = CoredumpCompatibilitySchema.safeParse(input);
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Invalid core-dump compatibility arguments.",
+      "COMPAT_ARGUMENT_INVALID",
+    );
+  const params = parsed.data;
   const projectDir = await resolveCompatibilityProject(
     params.project_dir,
     defaults,

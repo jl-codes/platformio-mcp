@@ -98125,6 +98125,7 @@ async function executeCoredump(input, caller = {}, onAuthorized) {
 
 // src/adapters/coredump-compat.ts
 init_zod();
+init_errors();
 import fs52 from "node:fs/promises";
 
 // src/tools/run-target.ts
@@ -104195,7 +104196,13 @@ var CoredumpCompatibilitySchema = external_exports.object({
   export_approval_id: external_exports.string().max(256).optional()
 }).strict();
 async function executeCoredumpCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
-  const params = CoredumpCompatibilitySchema.parse(input);
+  const parsed = CoredumpCompatibilitySchema.safeParse(input);
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Invalid core-dump compatibility arguments.",
+      "COMPAT_ARGUMENT_INVALID"
+    );
+  const params = parsed.data;
   const projectDir = await resolveCompatibilityProject(
     params.project_dir,
     defaults

@@ -1215,3 +1215,5 @@ Added the internal reference workflow with launch/project defaults, authorized e
 ### Public core-dump compatibility registration
 
 Registered pio_coredump in opt-in mode with the reference arguments and explicit grant extensions, routing MCP dispatch to the implemented adapter. Inventory is 57 canonical plus 33 aliases. Seven adapter/real-stdio exposure cases passed; an additional targeted real-stdio invocation verified malformed core-dump arguments reach compatibility validation. TypeScript and lint passed. Physical capture and full result-contract acceptance remain unproven.
+
+Dispatch-check correction: the initial name filter selected no cases. Running the full focused file exposed untyped Zod failures from the new adapter. The adapter now emits COMPAT_ARGUMENT_INVALID before configuration/device work. All seven adapter/MCP cases and TypeScript passed after this fix.
