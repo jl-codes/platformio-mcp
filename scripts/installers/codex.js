@@ -1,3 +1,4 @@
+import { mcpServerConfigBlock } from "./_shared.js";
 /**
  * Codex MCP and plugin installers.
  * TOML syntax-tree edits preserve permissions, server options and other entries.
@@ -26,11 +27,11 @@ const BLOCK_KEY = "platformio";
  * @returns {string} TOML text terminated with a single trailing newline.
  */
 function renderTomlBlock() {
-  const command = process.platform === "win32" ? "npx.cmd" : "npx";
+  const launch = mcpServerConfigBlock();
   return [
     `[mcp_servers.${BLOCK_KEY}]`,
-    `command = "${command}"`,
-    `args = ["-y", "platformio-mcp", "--open-dashboard-on-start"]`,
+    `command = ${JSON.stringify(launch.command)}`,
+    `args = ${JSON.stringify(launch.args)}`,
     "",
   ].join("\n");
 }

@@ -1,3 +1,4 @@
+import { mcpServerConfigBlock } from "./_shared.js";
 /**
  * Lossless Codex TOML launch configuration edits and user-config discovery.
  * Provides mergeCodexToml, findBlockRange and resolveCodexConfigPath.
@@ -65,7 +66,7 @@ export function mergeCodexToml(source) {
     }
   }
   visit(ast.body[0], []);
-  const command = process.platform === "win32" ? "npx.cmd" : "npx";
+  const launch = mcpServerConfigBlock();
   // Retain runtime flags such as --policy-file when refreshing an npm launcher.
   const priorArgs = Array.isArray(server?.args) ? server.args : [];
   const packageIndex = priorArgs.findIndex(
@@ -82,12 +83,11 @@ export function mergeCodexToml(source) {
     command:
       customLaunch && typeof server?.command === "string"
         ? server.command
-        : command,
+        : launch.command,
     args: customLaunch
       ? priorArgs
       : [
-          "-y",
-          "platformio-mcp",
+          ...launch.args.slice(0, -1),
           ...(runtimeArgs.length ? runtimeArgs : ["--open-dashboard-on-start"]),
         ],
   };

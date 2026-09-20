@@ -78,6 +78,7 @@ def launch_spec(root, arguments, host=None):
     if node not in verified or entry not in verified:
         raise ValueError("Wheel is missing its verified Node runtime or CLI entry point")
     environment = os.environ.copy()
+    environment["PIO_MCP_PYTHON_EXECUTABLE"] = sys.executable
     environment.setdefault("PIO_MCP_NO_BROWSER", "true")
     environment["PIO_MCP_WEB_DIST"] = str(root / "runtime" / "web")
     return [str(root / node), str(root / entry), *arguments], environment

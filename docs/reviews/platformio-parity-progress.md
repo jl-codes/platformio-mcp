@@ -703,3 +703,7 @@ The namespace audit now enforces its actual per-run lookup budget, rejects malfo
 ### Maintainer-enabled weekly namespace workflow
 
 Added manual/weekly audit workflow guarded by the explicit repository enable variable for scheduled runs. Cache restoration and saving retain prior observations; evidence is uploaded before changed ownership/source/integrity signals or newly blocked/unknown lookups affect workflow status. Same-version integrity changes are distinguished from routine version updates. Release artifacts now include namespace observations. YAML and JavaScript syntax parsing pass; no live schedule, network audit or runtime smoke test was started. Existing CI run 35482677676 is still live, so these commits remain local until it finishes.
+
+### Preserve Python runtime in host installer configuration
+
+Wheel-launched installers now receive the absolute Python interpreter from the launcher and write an interpreter/module command for fresh host configuration, keeping the bundled Node path usable without global npm. JSON host installers share this behavior; Codex new/updated npm-style entries use the same command while retaining runtime flags, and existing custom launchers remain preserved. Interpreter paths must be absolute existing files. Syntax and diff checks pass; no runtime smoke run was started. Both existing CI workflows for 7a2a20dd completed successfully (35482677676 and 35482679272); that result does not cover these newer local edits.
