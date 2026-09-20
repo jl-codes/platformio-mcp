@@ -2,6 +2,7 @@
  * Reference serial-device presentation without opening ports or asserting hardware identity.
  * Provides projectCompatibilityDevices for authorized discovery adapters.
  */
+import { executeSizeCompatibility } from "./size-compat.js";
 import { executeDecodeCompatibility } from "./decode-compat.js";
 import { inspectPortDiagnostics } from "../core/devices/port-diagnostics.js";
 import { executeMemoryCompatibility } from "./memory-compat.js";
@@ -70,6 +71,8 @@ export async function executeDeviceCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_size_report")
+    return executeSizeCompatibility(input, defaults, caller, onAuthorized);
   if (name === "pio_decode_backtrace")
     return executeDecodeCompatibility(
       client,
@@ -449,6 +452,30 @@ export function withDeviceCompatibility<TResult>(
       },
     },
     handler: (args, context) => context.dispatch("pio_decode_backtrace", args),
+  });
+  const sizeSource = base.get("size_report");
+  if (!sizeSource || result.has("pio_size_report"))
+    throw new Error("Invalid size compatibility registry");
+  result.set("pio_size_report", {
+    ...sizeSource,
+    name: "pio_size_report",
+    description:
+      "Report ELF sections, largest symbols/files and partition-aware PlatformIO accounting under canonical build permissions. Static RAM excludes runtime heap and stack.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], maxLength: 32768 },
+        env: { type: ["string", "null"], maxLength: 50 },
+        top: { type: "integer", minimum: 1, maximum: 1000, default: 25 },
+        filter: { type: ["string", "null"], maxLength: 4096 },
+        approval_id: { type: "string", maxLength: 256 },
+        config_approval_id: { type: "string", maxLength: 256 },
+        board_approval_id: { type: "string", maxLength: 256 },
+        expected_elf_sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_size_report", args),
   });
   const startSource = base.get("start_monitor");
   if (!startSource || result.has("pio_monitor_start"))
