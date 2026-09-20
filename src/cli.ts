@@ -142,6 +142,7 @@ COMMANDS:
   project-metadata|list-targets --project-dir <dir> [--environment <env>]
   coredump --project-dir <dir> (--dump-path <file> | --port <port> --table-path <csv> --table-offset <bytes>) [--format <raw|base64>] [--analyze false | --elf-path <file>]
   partition-table --project-dir <dir> [--environment <env>] [--table-path <file>] [--format <csv|binary>] [--table-offset <bytes> | --sdkconfig-path <file>] [--flash-size <bytes>] [--firmware-path <file>] [--observed-table-path <file>]
+  port-diagnose --project-dir <dir> [--port <port>] [--environment <env>] [--approve]
   monitor-capture --project-dir <dir> [--port <port>] [--baud <rate>] [--seconds <n>] [--until <regex>] [--max-lines <n>] [--approve]
   memory-watch --project-dir <dir> [--port <port>] [--baud <rate>] [--seconds <n>] [--pattern <regex>] [--stack-unit bytes|words] [--stack-word-bytes <n>] [--approve]
   debug-run --project-dir <dir> --commands <JSON-array> [--environment <env>] [--load false] [--timeout <seconds>] [--command-timeout <seconds>] [--probe-serial <id>] [--process-only] [--approve]
@@ -460,10 +461,10 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       if (!result.ok) process.exitCode = 1;
       return;
     }
-    if (command === "monitor-capture" || command === "memory-watch") {
+    if (command === "monitor-capture" || command === "memory-watch" || command === "port-diagnose") {
       const input = parseSerialObservationCli(command, options, positionals, projectDirForPolicy);
       const client = new SerialClientContext();
-      const operation = command === "monitor-capture" ? "monitor_capture" : "memory_watch";
+      const operation = command === "monitor-capture" ? "monitor_capture" : command === "memory-watch" ? "memory_watch" : "port_diagnose";
       const caller = { workspaceDir: projectDirForPolicy, actor: "user" as const };
       try {
         const execute = () => dispatchAuthorizedAction(operation, input, caller, () => executeDeviceCompatibility(client, "pio_" + operation, input, {}, caller));
@@ -1342,6 +1343,7 @@ async function main() {
     "power-profile",
     "debug-run",
     "monitor-capture",
+    "port-diagnose",
     "memory-watch",
     "upload-ota",
     "deps-check",

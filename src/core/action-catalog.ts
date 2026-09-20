@@ -347,6 +347,7 @@ export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
     policyAction: "build_project",
   },
   serial_startup_discovery: { ...READ, policyAction: "list_devices" },
+  port_diagnose: { ...READ, policyAction: "list_devices" },
   monitor_capture: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor" },
   memory_watch: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor" },
   serial_session_start: {
@@ -377,6 +378,8 @@ export const actionRiskLevels: Record<string, PolicyRiskLevel> = {
 /** Resolves the existing CLI spelling to its concrete operation. */
 export function operationForCliCommand(command: string): string {
   switch (command) {
+    case "port-diagnose":
+      return "port_diagnose";
     case "monitor-capture":
       return "monitor_capture";
     case "memory-watch":

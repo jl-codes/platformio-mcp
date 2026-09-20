@@ -62,6 +62,19 @@ export function projectCompatibilityDevices(devices: readonly SerialDevice[]) {
   };
 }
 
+/** Read-only port diagnosis arguments shared by MCP and CLI. */
+export const PortDiagnoseCompatibilitySchema = z
+  .object({
+    port: z.string().min(1).max(512).nullable().optional(),
+    project_dir: z.string().min(1).max(32768).nullable().optional(),
+    env: z.string().min(1).max(50).nullable().optional(),
+    approval_id: z.string().max(256).optional(),
+    config_approval_id: z.string().max(256).optional(),
+    selection_approval_id: z.string().max(256).optional(),
+    monitor_approval_id: z.string().max(256).optional(),
+  })
+  .strict();
+
 /** Discover devices and caller-owned sessions through both canonical permission checks. */
 export async function executeDeviceCompatibility(
   client: SerialClientContext,
@@ -82,18 +95,7 @@ export async function executeDeviceCompatibility(
       onAuthorized,
     );
   if (name === "pio_port_diagnose") {
-    const params = z
-      .object({
-        port: z.string().min(1).max(512).nullable().optional(),
-        project_dir: z.string().min(1).max(32768).nullable().optional(),
-        env: z.string().min(1).max(50).nullable().optional(),
-        approval_id: z.string().max(256).optional(),
-        config_approval_id: z.string().max(256).optional(),
-        selection_approval_id: z.string().max(256).optional(),
-        monitor_approval_id: z.string().max(256).optional(),
-      })
-      .strict()
-      .parse(input);
+    const params = PortDiagnoseCompatibilitySchema.parse(input);
     const { monitor_approval_id, ...resolution } = params;
     const { request } = await resolveMonitorRequest(
       resolution,

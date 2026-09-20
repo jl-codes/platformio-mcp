@@ -93022,6 +93022,7 @@ var INTERNAL_ACTIONS = {
     policyAction: "build_project"
   },
   serial_startup_discovery: { ...READ, policyAction: "list_devices" },
+  port_diagnose: { ...READ, policyAction: "list_devices" },
   monitor_capture: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor" },
   memory_watch: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor" },
   serial_session_start: {
@@ -104388,6 +104389,15 @@ function projectCompatibilityDevices(devices) {
     likely_ports: likely
   };
 }
+var PortDiagnoseCompatibilitySchema = external_exports.object({
+  port: external_exports.string().min(1).max(512).nullable().optional(),
+  project_dir: external_exports.string().min(1).max(32768).nullable().optional(),
+  env: external_exports.string().min(1).max(50).nullable().optional(),
+  approval_id: external_exports.string().max(256).optional(),
+  config_approval_id: external_exports.string().max(256).optional(),
+  selection_approval_id: external_exports.string().max(256).optional(),
+  monitor_approval_id: external_exports.string().max(256).optional()
+}).strict();
 async function executeDeviceCompatibility(client, name2, input, defaults = {}, caller = {}, onAuthorized) {
   if (name2 === "pio_size_report")
     return executeSizeCompatibility(input, defaults, caller, onAuthorized);
@@ -104400,15 +104410,7 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
       onAuthorized
     );
   if (name2 === "pio_port_diagnose") {
-    const params2 = external_exports.object({
-      port: external_exports.string().min(1).max(512).nullable().optional(),
-      project_dir: external_exports.string().min(1).max(32768).nullable().optional(),
-      env: external_exports.string().min(1).max(50).nullable().optional(),
-      approval_id: external_exports.string().max(256).optional(),
-      config_approval_id: external_exports.string().max(256).optional(),
-      selection_approval_id: external_exports.string().max(256).optional(),
-      monitor_approval_id: external_exports.string().max(256).optional()
-    }).strict().parse(input);
+    const params2 = PortDiagnoseCompatibilitySchema.parse(input);
     const { monitor_approval_id, ...resolution } = params2;
     const { request } = await resolveMonitorRequest(
       resolution,

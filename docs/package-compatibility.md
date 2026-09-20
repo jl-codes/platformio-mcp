@@ -106,3 +106,9 @@ an explicit word size. Both commands retain opening/read permissions and report
 uncertain cleanup. They cannot borrow another process's session; use the MCP
 session tools for persistent interactive monitoring. Missing instrumentation or
 incomplete capture is not proof of healthy firmware or a memory leak.
+
+`port-diagnose --project-dir <dir> [--port <port>] [--environment <env>]`
+uses the shared read-only metadata and holder inspection path. It does not open or
+reset the port, change OS permissions, or stop other processes. Missing holder
+information remains unknown; it does not prove exclusive access. CLI session
+listings cannot see another MCP connection's owned session inventory.

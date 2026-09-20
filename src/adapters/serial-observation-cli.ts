@@ -1,10 +1,11 @@
 /** CLI translation for bounded serial capture and memory telemetry. */
+import { PortDiagnoseCompatibilitySchema } from "./device-compat.js";
 import { MemoryWatchCompatibilitySchema } from "./memory-compat.js";
 import { MonitorCaptureCompatibilitySchema } from "./monitor-start-compat.js";
 import { PlatformIOError } from "../utils/errors.js";
 /** Reuse shared schemas and never accept another connection's session ID. */
 export function parseSerialObservationCli(
-  command: "monitor-capture" | "memory-watch",
+  command: "monitor-capture" | "memory-watch" | "port-diagnose",
   options: Record<string, string | boolean>,
   positionals: readonly string[],
   projectDir?: string,
@@ -19,19 +20,24 @@ export function parseSerialObservationCli(
     environment: "env",
     ...(command === "memory-watch"
       ? { pattern: "pattern", "stack-unit": "stack_unit" }
-      : { until: "until" }),
+      : command === "monitor-capture"
+        ? { until: "until" }
+        : {}),
   };
-  const numbers: Record<string, string> = {
-    baud: "baud",
-    seconds: "seconds",
-    "max-lines": "max_lines",
-    ...(command === "memory-watch"
-      ? {
-          "stack-warn-bytes": "stack_warn_bytes",
-          "stack-word-bytes": "stack_word_bytes",
-        }
-      : {}),
-  };
+  const numbers: Record<string, string> =
+    command === "port-diagnose"
+      ? {}
+      : {
+          baud: "baud",
+          seconds: "seconds",
+          "max-lines": "max_lines",
+          ...(command === "memory-watch"
+            ? {
+                "stack-warn-bytes": "stack_warn_bytes",
+                "stack-word-bytes": "stack_word_bytes",
+              }
+            : {}),
+        };
   const allowed = new Set([
     "json",
     "approve",
@@ -71,7 +77,9 @@ export function parseSerialObservationCli(
   const schema =
     command === "memory-watch"
       ? MemoryWatchCompatibilitySchema
-      : MonitorCaptureCompatibilitySchema;
+      : command === "port-diagnose"
+        ? PortDiagnoseCompatibilitySchema
+        : MonitorCaptureCompatibilitySchema;
   const parsed = schema.safeParse(input);
   if (!parsed.success) throw invalid();
   if (input.stack_unit === "words" && input.stack_word_bytes === undefined)
