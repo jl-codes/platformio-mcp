@@ -1221,3 +1221,7 @@ Dispatch-check correction: the initial name filter selected no cases. Running th
 ### Debugger connection ownership
 
 Added a bounded per-connection debugger session registry. Pending launches count toward capacity; IDs from another connection cannot dispatch commands. Command approvals bind the owned session ID as well as the process project. Disconnect waits for pending launches, coalesces process cleanup and preserves failed cleanup records for retry. Process-only cleanup does not claim target resume/detach. Eleven focused ownership/process cases, TypeScript and lint passed. Public debugger startup/probe discovery and physical acceptance remain incomplete.
+
+### Debugger target attachment and download
+
+Added typed internal attachment to an explicitly selected numeric TCP endpoint after probe/server custody is established by the startup adapter. Connection and optional image download are preflighted and separately authorized, with a shared deadline and policy revision checks. load=false never sends target-download; failed attachment invalidates transport before downloading. Detach is classified as a target mutation. Thirty-nine focused policy/MI/command cases, TypeScript and lint passed. Public startup, managed debug-server/probe custody and physical acceptance remain unfinished.

@@ -38,6 +38,7 @@ it.each([
   ["break main", '-break-insert -- "main"', "target", false],
   ["watch counter", '-break-watch "counter"', "target", false],
   ["quit", "-gdb-exit", "target", false],
+  ["detach", "-target-detach", "target", false],
   [
     "shell echo hello",
     '-interpreter-exec console "shell echo hello"',
@@ -76,6 +77,7 @@ it.each([
   "watch counter",
   "set counter = 1",
   "quit",
+  "detach",
   "monitor reset halt",
   "python print(1)",
   "source commands.gdb",

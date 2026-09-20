@@ -71,6 +71,8 @@ export function prepareDebugCommand(
   };
   if (Object.hasOwn(execute, command))
     return make(execute[command], "target", true);
+  if (command === "detach" || command === "-target-detach")
+    return make("-target-detach", "target");
   if (command === "quit" || command === "-gdb-exit")
     return make("-gdb-exit", "target");
   if (Object.values(inspect).includes(command)) return make(command, "inspect");

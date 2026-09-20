@@ -1,0 +1,100 @@
+/** Target startup exercises real policy and MI ordering without contacting a probe. */
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { GdbMiSession } from "../src/core/debug/gdb-mi-session.js";
+import { attachDebuggerTarget } from "../src/core/debug/debug-target.js";
+let root: string;
+beforeEach(() => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-debug-target-"));
+  const policy = path.join(root, "operator.json");
+  vi.stubEnv("PIO_MCP_POLICY_FILE", policy);
+  fs.writeFileSync(
+    policy,
+    JSON.stringify({
+      profile: "lab_admin",
+      overrides: {
+        allow: ["upload_firmware"],
+        deny: [],
+        approval_required: [],
+        audit_all_agent_actions: false,
+      },
+    }),
+  );
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  fs.rmSync(root, { recursive: true, force: true });
+});
+function fixture(fail = false) {
+  const lines: string[] = [];
+  const session = new GdbMiSession(async (line) => {
+    lines.push(line);
+    const token = /^(\d+)/.exec(line)![1];
+    queueMicrotask(() =>
+      session.accept(
+        Buffer.from(
+          token +
+            (fail
+              ? '^error,msg="failed"\n'
+              : lines.length === 1
+                ? "^connected\n"
+                : "^done\n"),
+        ),
+      ),
+    );
+  });
+  return { session, lines };
+}
+function selection(load: boolean) {
+  return {
+    projectDir: root,
+    sessionId: "owned",
+    host: "127.0.0.1",
+    port: 3333,
+    load,
+  };
+}
+it.each([false, true])(
+  "downloads only when requested (load=%s)",
+  async (load) => {
+    const { session, lines } = fixture();
+    await attachDebuggerTarget(session, selection(load), {});
+    expect(lines.map((line) => line.replace(/^\d+/, "").trim())).toEqual([
+      "-target-select extended-remote 127.0.0.1:3333",
+      ...(load ? ["-target-download"] : []),
+    ]);
+  },
+);
+it("never downloads after a failed attachment", async () => {
+  const { session, lines } = fixture(true);
+  await expect(
+    attachDebuggerTarget(session, selection(true), {}),
+  ).rejects.toMatchObject({ code: "DEBUG_TARGET_FAILED" });
+  expect(lines).toHaveLength(1);
+  await expect(session.execute("-target-download")).rejects.toMatchObject({
+    code: "GDB_TRANSPORT_FAILED",
+  });
+});
+it("rejects command-bearing destinations before transport writes", async () => {
+  const { session, lines } = fixture();
+  await expect(
+    attachDebuggerTarget(session, { ...selection(false), host: "|evil" }, {}),
+  ).rejects.toMatchObject({ code: "DEBUG_TARGET_INVALID" });
+  expect(lines).toEqual([]);
+});
+it("denies target access before connecting", async () => {
+  fs.writeFileSync(
+    path.join(root, "operator.json"),
+    JSON.stringify({
+      profile: "read_only",
+      overrides: { audit_all_agent_actions: false },
+    }),
+  );
+  const { session, lines } = fixture();
+  await expect(
+    attachDebuggerTarget(session, selection(true), {}),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(lines).toEqual([]);
+});

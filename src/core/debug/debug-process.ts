@@ -8,6 +8,10 @@ import { StringDecoder } from "node:string_decoder";
 import { PlatformIOError } from "../../utils/errors.js";
 import type { PolicyEvaluationContext } from "../policy/types.js";
 import type { ProcessDeviceCustody } from "../devices/process-device-custody.js";
+import {
+  attachDebuggerTarget,
+  type DebugTargetSelection,
+} from "./debug-target.js";
 import { dispatchDebuggerCommand } from "./debug-command.js";
 import {
   GDB_STARTUP_ARGS,
@@ -144,6 +148,18 @@ export class DebugProcess {
         },
       );
     }
+  }
+
+  /** Attach only after the startup adapter has established probe/server custody. */
+  attach(
+    selection: Omit<DebugTargetSelection, "projectDir">,
+    caller: PolicyEvaluationContext,
+  ) {
+    return attachDebuggerTarget(
+      this.transport,
+      { ...selection, projectDir: this.options.projectDir },
+      caller,
+    );
   }
 
   /** Reauthorize every classified command using this process's actual project identity. */
