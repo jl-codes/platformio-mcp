@@ -94,14 +94,8 @@ export function projectMemoryCompatibility(
 }
 
 /** Read an existing owned session or preauthorize opening/reading and clean up a one-shot session. */
-export async function executeMemoryCompatibility(
-  client: SerialClientContext,
-  input: unknown,
-  defaults: CompatibilityProjectDefaults,
-  caller: PolicyEvaluationContext,
-  projectDevices: Parameters<typeof resolveMonitorRequest>[3],
-) {
-  const params = MonitorStartCompatibilitySchema.extend({
+export const MemoryWatchCompatibilitySchema =
+  MonitorStartCompatibilitySchema.extend({
     session_id: z.string().min(1).max(256).nullable().optional(),
     seconds: z.number().finite().default(15),
     pattern: z.string().max(4096).nullable().optional(),
@@ -114,7 +108,17 @@ export async function executeMemoryCompatibility(
     stack_unit: z.enum(["bytes", "words"]).optional(),
     stack_word_bytes: z.number().int().min(1).max(16).optional(),
     read_approval_id: z.string().max(256).optional(),
-  }).parse(input);
+  });
+
+/** Collect bounded memory telemetry through the shared owned-session service. */
+export async function executeMemoryCompatibility(
+  client: SerialClientContext,
+  input: unknown,
+  defaults: CompatibilityProjectDefaults,
+  caller: PolicyEvaluationContext,
+  projectDevices: Parameters<typeof resolveMonitorRequest>[3],
+) {
+  const params = MemoryWatchCompatibilitySchema.parse(input);
   if (params.stack_unit === "words" && params.stack_word_bytes === undefined)
     throw new PlatformIOError(
       "Word-valued stack telemetry requires stack_word_bytes.",

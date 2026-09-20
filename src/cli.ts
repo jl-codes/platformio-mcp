@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { parseSerialObservationCli } from "./adapters/serial-observation-cli.js";
+import { executeDeviceCompatibility } from "./adapters/device-compat.js";
 import { parseDebugRunCli, executeDebugRunCli } from "./adapters/debug-run-cli.js";
 import { parseOtaCli } from "./adapters/ota-cli.js";
 import { executeOtaCompatibility } from "./adapters/ota-compat.js";
@@ -78,7 +80,7 @@ import {
 import { resolveTarget } from "./core/target-resolution.js";
 import { getDashboardStatusCore } from "./core/dashboard.js";
 import { toCliStructuredError } from "./core/cli-diagnostics.js";
-import { authorizeAction } from "./core/action-dispatcher.js";
+import { authorizeAction, dispatchAuthorizedAction } from "./core/action-dispatcher.js";
 import { getPolicyStatus } from "./core/policy/status.js";
 import {
   approveRequest,
@@ -140,6 +142,8 @@ COMMANDS:
   project-metadata|list-targets --project-dir <dir> [--environment <env>]
   coredump --project-dir <dir> (--dump-path <file> | --port <port> --table-path <csv> --table-offset <bytes>) [--format <raw|base64>] [--analyze false | --elf-path <file>]
   partition-table --project-dir <dir> [--environment <env>] [--table-path <file>] [--format <csv|binary>] [--table-offset <bytes> | --sdkconfig-path <file>] [--flash-size <bytes>] [--firmware-path <file>] [--observed-table-path <file>]
+  monitor-capture --project-dir <dir> [--port <port>] [--baud <rate>] [--seconds <n>] [--until <regex>] [--max-lines <n>] [--approve]
+  memory-watch --project-dir <dir> [--port <port>] [--baud <rate>] [--seconds <n>] [--pattern <regex>] [--stack-unit bytes|words] [--stack-word-bytes <n>] [--approve]
   debug-run --project-dir <dir> --commands <JSON-array> [--environment <env>] [--load false] [--timeout <seconds>] [--command-timeout <seconds>] [--probe-serial <id>] [--process-only] [--approve]
   upload-ota --project-dir <dir> --host <address> [--environment <env>] [--port <port>] [--filesystem] [--build false] [--verify-reachable false] [--timeout <seconds>] [--auth-env <variable>] [--approve]
   power-profile --project-dir <dir> [--source serial|ppk2] [--port <meter>] [--seconds <n>] [--baud <rate>] [--mode ampere|source --dut-port <port> --voltage-mv <mV> --current-limit-ma <mA>] [--approve]
@@ -454,6 +458,24 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       }, {workspaceDir: projectDirForPolicy, actor: "user"});
       printOutput(result, jsonMode);
       if (!result.ok) process.exitCode = 1;
+      return;
+    }
+    if (command === "monitor-capture" || command === "memory-watch") {
+      const input = parseSerialObservationCli(command, options, positionals, projectDirForPolicy);
+      const client = new SerialClientContext();
+      const operation = command === "monitor-capture" ? "monitor_capture" : "memory_watch";
+      const caller = { workspaceDir: projectDirForPolicy, actor: "user" as const };
+      try {
+        const execute = () => dispatchAuthorizedAction(operation, input, caller, () => executeDeviceCompatibility(client, "pio_" + operation, input, {}, caller));
+        const result = (approvalOpt === true || (!jsonMode && approvalOpt !== false))
+          ? await withInteractiveApprovals(async request => approvalOpt === true || promptApproval(request.reason), execute)
+          : await execute();
+        printOutput(result, jsonMode);
+        if (!(result as { ok?: boolean }).ok) process.exitCode = 1;
+      } finally {
+        const sessions = await client.close();
+        if (sessions.some(session => session.cleanupPending)) throw new PlatformIOError("Serial cleanup remains pending.", "SERIAL_CLI_CLEANUP_PENDING");
+      }
       return;
     }
     if (command === "debug-run") {
@@ -1319,6 +1341,8 @@ async function main() {
     "flash-verify",
     "power-profile",
     "debug-run",
+    "monitor-capture",
+    "memory-watch",
     "upload-ota",
     "deps-check",
     "project-envs",

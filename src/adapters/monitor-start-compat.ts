@@ -153,6 +153,13 @@ export async function startCompatibilityMonitor(
   );
 }
 
+/** Shared public capture validation for MCP and CLI adapters. */
+export const MonitorCaptureCompatibilitySchema =
+  MonitorStartCompatibilitySchema.extend({
+    ...MonitorCaptureSchema.shape,
+    read_approval_id: z.string().max(256).optional(),
+  });
+
 /** Validate both phases before resolution, then use the preauthorized one-shot lifecycle. */
 export async function captureCompatibilityMonitor(
   client: SerialClientContext,
@@ -161,11 +168,8 @@ export async function captureCompatibilityMonitor(
   caller: PolicyEvaluationContext,
   projectDevices: Parameters<typeof resolveMonitorRequest>[3],
 ) {
-  const schema = MonitorStartCompatibilitySchema.extend({
-    ...MonitorCaptureSchema.shape,
-    read_approval_id: z.string().max(256).optional(),
-  });
-  const { seconds, until, read_approval_id, ...start } = schema.parse(input);
+  const { seconds, until, read_approval_id, ...start } =
+    MonitorCaptureCompatibilitySchema.parse(input);
   const { params, request } = await resolveMonitorRequest(
     start,
     defaults,

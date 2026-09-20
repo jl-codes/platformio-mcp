@@ -2051,3 +2051,7 @@ Validation: five focused argument/ownership/failure/cleanup tests passed; TypeSc
 ### Debugger CLI canonical permission gates (2026-09-20)
 
 Review found the new CLI initially called shared debugger services without the outer canonical debug_start/debug_cmd/debug_stop gates. Added those gates around startup, command execution and normal target-affecting stop; explicit process-only cleanup remains independently available. Six focused tests and TypeScript pass. A real CLI invocation with --approve and a debug_start denial returned PolicyDenied at the normalized run_shell_command gate before startup. The manual verification initially expected the internal uppercase error code/tool name, while the CLI exposes a normalized errorType/action; the actual result was denial, not a successful operation. No hardware was contacted.
+
+### Serial observation CLI coverage (2026-09-20)
+
+Added monitor-capture and memory-watch using the existing shared capture/memory schemas, canonical opening gates, lower read permissions, and owned cleanup. No cross-process session selector is accepted. Exported the existing schemas rather than duplicating their bounds/defaults. Added explicit stack-word-size validation before startup. Four focused parser/memory cases and TypeScript passed; rebuilt the plugin. No ports were opened and no smoke suite was run. Persistent serial interaction remains available through MCP.

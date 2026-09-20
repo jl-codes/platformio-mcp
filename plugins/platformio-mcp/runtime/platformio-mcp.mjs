@@ -93022,6 +93022,8 @@ var INTERNAL_ACTIONS = {
     policyAction: "build_project"
   },
   serial_startup_discovery: { ...READ, policyAction: "list_devices" },
+  monitor_capture: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor" },
+  memory_watch: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor" },
   serial_session_start: {
     ...MCP_ACTIONS.start_monitor,
     policyAction: "start_monitor",
@@ -104181,12 +104183,12 @@ async function startCompatibilityMonitor(client, input, defaults, caller, projec
     (service, owner) => service.startWithDiscovery(owner, request)
   );
 }
+var MonitorCaptureCompatibilitySchema = MonitorStartCompatibilitySchema.extend({
+  ...MonitorCaptureSchema.shape,
+  read_approval_id: external_exports.string().max(256).optional()
+});
 async function captureCompatibilityMonitor(client, input, defaults, caller, projectDevices) {
-  const schema5 = MonitorStartCompatibilitySchema.extend({
-    ...MonitorCaptureSchema.shape,
-    read_approval_id: external_exports.string().max(256).optional()
-  });
-  const { seconds, until, read_approval_id, ...start } = schema5.parse(input);
+  const { seconds, until, read_approval_id, ...start } = MonitorCaptureCompatibilitySchema.parse(input);
   const { params, request } = await resolveMonitorRequest(
     start,
     defaults,
@@ -104275,16 +104277,17 @@ function projectMemoryCompatibility(report, source) {
     } : {}
   };
 }
+var MemoryWatchCompatibilitySchema = MonitorStartCompatibilitySchema.extend({
+  session_id: external_exports.string().min(1).max(256).nullable().optional(),
+  seconds: external_exports.number().finite().default(15),
+  pattern: external_exports.string().max(4096).nullable().optional(),
+  stack_warn_bytes: external_exports.number().int().min(0).max(1024 * 1024 * 1024).default(512),
+  stack_unit: external_exports.enum(["bytes", "words"]).optional(),
+  stack_word_bytes: external_exports.number().int().min(1).max(16).optional(),
+  read_approval_id: external_exports.string().max(256).optional()
+});
 async function executeMemoryCompatibility(client, input, defaults, caller, projectDevices) {
-  const params = MonitorStartCompatibilitySchema.extend({
-    session_id: external_exports.string().min(1).max(256).nullable().optional(),
-    seconds: external_exports.number().finite().default(15),
-    pattern: external_exports.string().max(4096).nullable().optional(),
-    stack_warn_bytes: external_exports.number().int().min(0).max(1024 * 1024 * 1024).default(512),
-    stack_unit: external_exports.enum(["bytes", "words"]).optional(),
-    stack_word_bytes: external_exports.number().int().min(1).max(16).optional(),
-    read_approval_id: external_exports.string().max(256).optional()
-  }).parse(input);
+  const params = MemoryWatchCompatibilitySchema.parse(input);
   if (params.stack_unit === "words" && params.stack_word_bytes === void 0)
     throw new PlatformIOError(
       "Word-valued stack telemetry requires stack_word_bytes.",

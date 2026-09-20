@@ -94,3 +94,15 @@ stages in this invocation but cannot override policy denial. The sequence uses
 the same local backend limitations as MCP; it does not create a session that a
 later CLI process can borrow. Use the persistent MCP connection for interactive
 step-by-step debugging.
+
+### Serial observation CLI
+
+`monitor-capture --project-dir <dir>` opens, captures, and closes a temporary owned
+serial session. Use `--port`, `--environment`, `--baud`, `--seconds`, `--until`,
+and `--max-lines` to narrow the capture. `memory-watch --project-dir <dir>` uses
+the same ownership path and accepts `--pattern`, `--stack-unit`,
+`--stack-word-bytes`, and `--stack-warn-bytes`. Word-valued stack telemetry requires
+an explicit word size. Both commands retain opening/read permissions and report
+uncertain cleanup. They cannot borrow another process's session; use the MCP
+session tools for persistent interactive monitoring. Missing instrumentation or
+incomplete capture is not proof of healthy firmware or a memory leak.
