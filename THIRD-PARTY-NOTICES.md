@@ -8,7 +8,7 @@ at commit `a7b31021982f20b5406eaf80732899f8e75bd464`.
 The reference project is independent of jl-codes/platformio-mcp; compatibility
 names do not imply affiliation or ownership of its distribution identities.
 
-The heap label patterns in `src/core/memory-telemetry-parser.ts` are adapted
+The heap, stack, and generic memory label patterns in `src/core/memory-telemetry-parser.ts` are adapted
 from the pinned reference `parsers.py`, with bounded numeric parsing, explicit
 word-size handling, and source-order observations.
 

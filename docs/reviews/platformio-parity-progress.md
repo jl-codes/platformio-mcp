@@ -583,3 +583,7 @@ Validated capture through the real session manager and byte-at-a-time mock trans
 ### Reference heap-label coverage
 
 Adapted the pinned reference heap-label and trailer patterns, retaining the MIT attribution. Built-in parsing now covers minimum/free/allocated heap, largest allocation, PSRAM, ESP helper labels, and binary-scaled KiB/KB/MB. Overlapping labels are counted once and observations retain source order. Word-valued measurements remain unknown unless an explicit word size is supplied. TypeScript checking and 19 parser/report/capture tests pass. Stack variants, generic memory labels, exact custom-span precedence, and public tool wiring remain incomplete.
+
+### Stack and generic telemetry coverage
+
+Adapted reference stack HWM/headroom/remaining, function-call, task free-space and generic memory-label patterns with bounded task names and numeric validation. Explicit units scale correctly; anonymous and unitless stack headroom remain unknown rather than assumed bytes. Task tables now tolerate separator rows. Total observations are capped at 10,000 even when each line contains multiple measurements. Attribution updated. TypeScript checking and 22 parser/report/capture tests pass. Public memory tool integration, exact custom-match overlap precedence, and full reference output compatibility remain outstanding.

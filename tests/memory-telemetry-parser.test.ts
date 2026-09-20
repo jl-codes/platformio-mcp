@@ -94,3 +94,43 @@ it("recognizes reference heap labels, units and overlapping minimum labels once"
     parse(["free heap: 2 words"], { stackWordBytes: 4 }).samples[0],
   ).toMatchObject({ value: 8, unit: "bytes" });
 });
+
+it("recognizes named, anonymous and function-style stack headroom", () => {
+  const result = parse(
+    [
+      "Stack HWM for loopTask: 2 KiB",
+      "uxTaskGetStackHighWaterMark(NULL) = 812",
+      "uxTaskGetStackHighWaterMark(worker) = 100 words",
+      "idle: 1234 bytes free",
+      "stack remaining (network): 4 KB",
+      "heap: 100 bytes free",
+    ],
+    { stackWordBytes: 4 },
+  );
+  expect(
+    result.samples
+      .filter((s) => s.metric === "stack_free")
+      .map((s) => [s.task, s.value, s.unit]),
+  ).toEqual([
+    ["loopTask", 2048, "bytes"],
+    ["unknown", 812, "unknown"],
+    ["worker", 400, "bytes"],
+    ["idle", 1234, "bytes"],
+    ["network", 4096, "bytes"],
+  ]);
+});
+it("bounds the number of observations across multi-measurement lines", () => {
+  expect(() => parse(Array(5001).fill("Free heap: 100 min: 50"))).toThrow(
+    "observation limits",
+  );
+});
+
+it("supports generic memory labels and task table separator rows", () => {
+  expect(parse(["custom heap pool: 4 KB"]).samples).toMatchObject([
+    { metric: "custom_heap_pool", value: 4096, unit: "bytes" },
+  ]);
+  expect(
+    parse(["Name State Prio Stack Num", "---- ====", "worker R 1 22 3"])
+      .samples,
+  ).toMatchObject([{ task: "worker", value: 22, unit: "unknown" }]);
+});

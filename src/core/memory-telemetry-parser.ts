@@ -52,6 +52,11 @@ export function parseMemoryTelemetry(
         "Telemetry value is outside integer bounds.",
         "MEMORY_VALUE_INVALID",
       );
+    if (samples.length >= 10000)
+      throw new PlatformIOError(
+        "Telemetry exceeds observation limits.",
+        "MEMORY_TELEMETRY_LIMIT",
+      );
     samples.push({ line, metric, value, unit, ...(task ? { task } : {}) });
   };
   let heapSummaryUntil = -1,
@@ -119,6 +124,7 @@ export function parseMemoryTelemetry(
         return;
       }
       if (/^[-= ]+$/.test(trimmed)) return;
+      if (/^[-= ]+$/.test(trimmed)) return;
       taskTable = false;
     }
     // Match specific labels first so a minimum-heap label is not also counted as free heap.
@@ -185,24 +191,84 @@ export function parseMemoryTelemetry(
       );
       formats.add("arduino_heap");
     }
-    const stack =
-      /(?:^|\s)([A-Za-z0-9_.-]{1,128}):\s*stack\s+hwm\s*[:=]?\s*(\d+)\b(?![.eE])(?:\s*(bytes|words)\b)?/i.exec(
-        text,
+    const stackNumber = String.raw`(?<value>\d+)\b(?![.eE])(?:\s*(?<unit>KiB|KB|MB|bytes?|B|words?)\b)?`;
+    const stackPatterns = [
+      String.raw`(?:(?<task>[\w.-]{1,128})\s*[:\-]\s*)?(?:stack[\s_]*(?:hwm|high[\s_-]*water[\s_-]*mark|free|headroom|remaining|left)|high[\s_-]*water[\s_-]*mark|uxTaskGetStackHighWaterMark(?:\((?<arg>[^)]{0,128})\))?)(?:\s*(?:for|of)\s+(?<task2>[\w.-]{1,128}))?(?:\s*\((?<task3>[^)]{1,128})\))?\s*(?:[:=]|\bis\b)?\s*` +
+        stackNumber,
+      String.raw`^\s*(?<task>[\w.-]{1,128})\s*[:=]\s*` +
+        stackNumber +
+        String.raw`\s*(?:free|left|remaining)\b`,
+    ];
+    for (const pattern of stackPatterns) {
+      for (const match of text.matchAll(new RegExp(pattern, "gi"))) {
+        const end = match.index + match[0].length;
+        if (claimed.some(([a, b]) => match.index < b && end > a)) continue;
+        const groups = match.groups!;
+        const task = (
+          groups.task ||
+          groups.task2 ||
+          groups.task3 ||
+          (groups.arg?.trim().toUpperCase() !== "NULL"
+            ? groups.arg
+            : undefined) ||
+          "unknown"
+        ).trim();
+        if (/heap|psram|dram|iram/i.test(task)) continue;
+        const unit = groups.unit?.toLowerCase() ?? settings.stackUnit;
+        const scale =
+          unit === "words" || unit === "word"
+            ? settings.stackWordBytes
+            : unit === "kib" || unit === "kb"
+              ? 1024
+              : unit === "mb"
+                ? 1024 * 1024
+                : unit === "bytes" || unit === "byte" || unit === "b"
+                  ? 1
+                  : undefined;
+        add(
+          line,
+          "stack_free",
+          groups.value,
+          scale === undefined ? "unknown" : "bytes",
+          task,
+          scale ?? 1,
+        );
+        claimed.push([match.index, end]);
+        formats.add("stack_high_water_mark");
+      }
+    }
+    if (claimed.length === 0) {
+      const generic = new RegExp(
+        String.raw`(?<name>(?:[A-Za-z_][\w .-]{0,40}?)?(?:heap|stack|psram)[\w .-]{0,30}?)\s*[:=]\s*` +
+          stackNumber,
+        "gi",
       );
-    if (stack) {
-      const unit = stack[3]?.toLowerCase() ?? settings.stackUnit;
-      const known =
-        unit === "bytes" ||
-        (unit === "words" && settings.stackWordBytes !== undefined);
-      add(
-        line,
-        "stack_free",
-        stack[2],
-        known ? "bytes" : "unknown",
-        stack[1],
-        unit === "words" && known ? settings.stackWordBytes : 1,
-      );
-      formats.add("stack_high_water_mark");
+      for (const match of text.matchAll(generic)) {
+        const groups = match.groups!;
+        const metric = groups.name
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_|_$/g, "");
+        const unit = groups.unit?.toLowerCase();
+        const scale =
+          unit === "word" || unit === "words"
+            ? settings.stackWordBytes
+            : unit === "kib" || unit === "kb"
+              ? 1024
+              : unit === "mb"
+                ? 1024 * 1024
+                : 1;
+        add(
+          line,
+          metric,
+          groups.value,
+          scale === undefined ? "unknown" : "bytes",
+          undefined,
+          scale ?? 1,
+        );
+        formats.add("generic");
+      }
     }
   });
   return {
