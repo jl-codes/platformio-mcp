@@ -29,9 +29,9 @@ async function sha256(file) {
 }
 
 /** Verify the entire asset set, upload missing names without clobber, then verify the resulting release. */
-export async function attachGithubAssets(tag, directory, repo = process.env.GITHUB_REPOSITORY) {
+export async function attachGithubAssets(tag, directory, repo = process.env.GITHUB_REPOSITORY, runGh) {
   if (!repo || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo) || !/^v[0-9][A-Za-z0-9.+-]*$/.test(tag)) throw new Error("Explicit repository and version tag required");
-  const gh = args => execFileSync("gh", args, { encoding: "utf8", timeout: 120000, maxBuffer: 4 * 1024 * 1024, windowsHide: true });
+  const gh = runGh ?? (args => execFileSync("gh", args, { encoding: "utf8", timeout: 120000, maxBuffer: 4 * 1024 * 1024, windowsHide: true }));
   const local = [];
   for (const name of readdirSync(directory).sort()) {
     const file = path.resolve(directory, name), stat = statSync(file);
