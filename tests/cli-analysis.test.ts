@@ -100,3 +100,21 @@ it("routes project metadata and target discovery through the shared CLI permissi
     expect(run(command).errorType).toBe("PolicyDenied");
   expect(run("project-envs").errorType).toBe("PROJECT_INPUT_INVALID"); // This helper adds --environment, unsupported for the complete environment inventory.
 });
+
+it("rejects invalid dependency flags and honors concrete tool denial", () => {
+  expect(run("deps-check", "--build", "maybe").errorType).toBe(
+    "DEPENDENCY_INPUT_INVALID",
+  );
+  expect(run("deps-check", "--approve").errorType).toBe(
+    "DEPENDENCY_INPUT_INVALID",
+  );
+  fs.writeFileSync(
+    path.join(project, ".pio-mcp-policy.json"),
+    JSON.stringify({
+      profile: "read_only",
+      overrides: { deny: ["deps_check"] },
+    }),
+  );
+  expect(run("deps-check").errorType).toBe("PolicyDenied");
+  expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
+});

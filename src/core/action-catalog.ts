@@ -343,6 +343,8 @@ export function operationForCliCommand(command: string): string {
     case "pkg-update":
       return "pkg_update";
 
+    case "deps-check":
+      return "deps_check";
     case "decode-backtrace":
       return "decode_backtrace";
     case "size-report":

@@ -500,3 +500,9 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Updated plugin skill/coverage and runtime. Compatibility mode now has 63 tools (54 canonical plus nine aliases); the dependency alias and CLI remain pending.
 - TypeScript compilation passed. Initial registry suite found its explicit fixture missing the new name; corrected it. Focused MCP/service checks passed (7 tests), five other registry/plugin/authorization files passed (32 tests), and the final registry/service/serial-policy run passed 23 tests. Plugin and all three npm archive validations passed.
 - Full parity, dependency CLI/reference adapter and actual build-output acceptance remain incomplete. No release was published.
+
+### Dependency CLI integration
+
+- Added `deps-check` through the canonical service with strict options and separate request/configuration/inventory/build approval identifiers. It does not reuse the generic one-stage `--approve` retry for this composite operation.
+- Added dependency workflow documentation. TypeScript compilation, nine CLI acceptance tests, plugin validation and three npm archive validations passed; runtime rebuilt.
+- Reference dependency alias, actual build-output acceptance and remaining parity/release work remain open.

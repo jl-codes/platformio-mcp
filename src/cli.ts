@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { inspectDependencies } from "./tools/dependency-inspection.js";
 import { parseCompatibilityLaunch } from "./adapters/compatibility-mode.js";
 import {
   executeProjectInspection,
@@ -111,6 +112,7 @@ COMMANDS:
   agent-board-report --project-dir <dir> --board <id>
   decode-backtrace --project-dir <dir> --environment <env> <--text <value>|--text-file <path>> [--include-all-hex]
   size-report --project-dir <dir> --environment <env> [--top <n>] [--filter <regex>]
+  deps-check --project-dir <dir> [--environment <env>] [--build]
   project-envs --project-dir <dir>
   project-metadata|list-targets --project-dir <dir> [--environment <env>]
   pkg-search --query <query> [--kind library|platform|tool] [--page <n>]
@@ -373,6 +375,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       return;
     }
     if (
+      command === "deps-check" ||
       command === "decode-backtrace" ||
       command === "size-report" ||
       command.startsWith("pkg-") ||
@@ -385,7 +388,45 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         expectedElfSha256: asString(options["expected-elf-sha256"]),
       };
       let parameters: Record<string, unknown>;
-      if (projectInspection) {
+      if (command === "deps-check") {
+        const allowed = new Set([
+          "json",
+          "project-dir",
+          "environment",
+          "build",
+          "approval-id",
+          "configuration-approval-id",
+          "inventory-approval-id",
+          "build-approval-id",
+        ]);
+        if (
+          positionals.length ||
+          Object.keys(options).some((key) => !allowed.has(key))
+        )
+          throw new PlatformIOError(
+            "Unknown dependency inspection option or positional argument.",
+            "DEPENDENCY_INPUT_INVALID",
+          );
+        if (
+          options.build !== undefined &&
+          ![true, false, "true", "false"].includes(options.build)
+        )
+          throw new PlatformIOError(
+            "--build must be true or false.",
+            "DEPENDENCY_INPUT_INVALID",
+          );
+        parameters = {
+          projectDir: scope.projectDir,
+          environment: scope.environment,
+          build: asBoolean(options.build) ?? false,
+          approvalId: scope.approvalId,
+          configurationApprovalId: asString(
+            options["configuration-approval-id"],
+          ),
+          inventoryApprovalId: asString(options["inventory-approval-id"]),
+          buildApprovalId: asString(options["build-approval-id"]),
+        };
+      } else if (projectInspection) {
         const allowed = new Set([
           "json",
           "approve",
@@ -484,33 +525,39 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           filter: asString(options.filter),
         };
       const run = (args: Record<string, unknown>) =>
-        projectInspection
-          ? executeProjectInspection(
-              command.replaceAll("-", "_") as ProjectInspectionAction,
-              args,
-              { actor: "user", actorClass: "interactive" },
-            )
-          : command.startsWith("pkg-")
-            ? executePackageAction(
-                command.replace("pkg-", "pkg_") as PackageAction,
+        command === "deps-check"
+          ? inspectDependencies(args, {
+              actor: "user",
+              actorClass: "interactive",
+            })
+          : projectInspection
+            ? executeProjectInspection(
+                command.replaceAll("-", "_") as ProjectInspectionAction,
                 args,
-                {
+                { actor: "user", actorClass: "interactive" },
+              )
+            : command.startsWith("pkg-")
+              ? executePackageAction(
+                  command.replace("pkg-", "pkg_") as PackageAction,
+                  args,
+                  {
+                    actor: "user",
+                    actorClass: "interactive",
+                    workspaceDir: projectDirForPolicy,
+                  },
+                )
+              : (command === "decode-backtrace"
+                  ? decodeBacktrace
+                  : firmwareSizeReport)(args, {
                   actor: "user",
                   actorClass: "interactive",
-                  workspaceDir: projectDirForPolicy,
-                },
-              )
-            : (command === "decode-backtrace"
-                ? decodeBacktrace
-                : firmwareSizeReport)(args, {
-                actor: "user",
-                actorClass: "interactive",
-              });
+                });
       let result;
       try {
         result = await run(parameters);
       } catch (error) {
         if (
+          command === "deps-check" ||
           !(error instanceof PlatformIOError) ||
           error.code !== "APPROVAL_REQUIRED" ||
           (jsonMode && approvalOpt !== true)
@@ -1042,6 +1089,7 @@ async function main() {
   );
   const command = args[0];
   const knownCommands = new Set([
+    "deps-check",
     "project-envs",
     "project-metadata",
     "list-targets",
