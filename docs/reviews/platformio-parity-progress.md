@@ -1229,3 +1229,7 @@ Added typed internal attachment to an explicitly selected numeric TCP endpoint a
 ### Authorized debugger metadata collection
 
 Added selected-environment debugger metadata collection using the existing build-authorized collection path. It selects gdb_path independently of cc_path, rejects missing debugger metadata and rechecks policy revision before delivering collected metadata. No implicit compiler-adjacent debugger selection or package installation is introduced. Twelve focused metadata/capability cases, TypeScript and lint passed. Public debugger startup and persistent ELF/probe lifecycle integration remain incomplete.
+
+### Persistent debugger ELF ownership
+
+Added workspace-contained, hash-verified ELF retention in owner-private storage for persistent sessions. The retained bytes survive project rebuilds. A process wrapper releases the snapshot only after confirmed process/probe cleanup; cleanup failure preserves the artifact for retry. Three real filesystem/lifecycle cases passed on Windows, including outside-workspace rejection and expected-hash mismatch; TypeScript and lint passed. Startup orchestration and physical debugger acceptance remain unfinished.
