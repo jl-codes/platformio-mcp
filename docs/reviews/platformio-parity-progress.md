@@ -695,3 +695,7 @@ Python runtime assembly now uses esbuild input metadata to identify and copy lic
 ### Distinguish clean release wheels from development builds
 
 Canonical and alias wheel builders now reject modified tracked source and untracked build inputs by default, record source identity, and recheck source state after assembly. Explicit --allow-dirty supports unpublished development artifacts with sourceDirty metadata; release validation rejects those artifacts. Alias wheels also ship source.json bound to the release commit. Python syntax compilation and diff checks passed; no runtime smoke tests were performed. The source-status digest describes checkout state, not a cryptographic attestation or a filesystem snapshot; artifact hashes and release provenance remain separate requirements.
+
+### Bounded cached namespace observations
+
+The namespace audit now enforces its actual per-run lookup budget, rejects malformed limits, reuses six-hour public metadata observations, and respects bounded Retry-After backoff for rate limiting. Failed lookups retain an hour of backoff; no retry loop sleeps or repeats requests. Public authority remains unverified even for cached entries. Change reporting compares status/version/source/maintainers/integrity while ignoring observation timestamps and raw-response formatting. Five focused mocked-registry unit checks pass; no network audit or runtime smoke run was started. Existing CI run 35482677676 remained in progress; this change is committed locally before pushing so that run can finish without another cancellation.

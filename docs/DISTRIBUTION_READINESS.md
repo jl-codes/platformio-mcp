@@ -48,3 +48,5 @@ The first Windows wheel (`pio-agent-platformio`) was built with pinned setuptool
 The release workflow now assembles five canonical platform wheels and both aliases as a required preceding job, validates the exact seven-wheel set, and collects those artifacts alongside npm tarballs. `python-release-identity.json` records source commit and SHA-256 hashes. Cross-assembly does not prove that a wheel runs on its target host; target-host acceptance and PyPI publication remain separate unfinished gates.
 
 Python release builders require clean committed source. Use `--allow-dirty` only for local development wheels; their sourceDirty marker makes them ineligible for release validation. Both canonical and alias wheels record the source commit, and builders recheck checkout state after assembly.
+
+Namespace audits now reuse bounded cached observations from the output file, enforce the configured lookup budget, honor capped rate-limit backoff, and record meaningful metadata changes. Scheduled execution/notification remains unwired; cache and backoff never establish ownership or reserve names.
