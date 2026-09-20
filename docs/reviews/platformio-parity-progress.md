@@ -1019,3 +1019,7 @@ Failed device targets now expose the classified port error and an actionable dia
 ### Firmware upload compatibility and registry inventories
 
 Registered pio_upload as a strict fixed-upload adapter over the shared target executor, preserving the existing canonical upload_firmware tool. Two focused cases verified target injection rejection and upload-policy denial before session effects; TypeScript passed. Canonical inventory remains 55; compatibility inventory becomes 85 (30 optional aliases). CI 35494668456 exposed stale 54-tool fixtures, an omitted run_target registry fixture and missing plugin skill coverage; those inventories now include the new canonical tool. Network/probe destinations, complete artifact binding and physical acceptance remain outstanding.
+
+### System information compatibility
+
+Added pio_system_info through canonical system, policy and owned-session permissions. Missing Core and absent metadata are explicit. Focused permission/report regressions and TypeScript validation passed. Corrected the named-target denial fixture to use the supported overrides schema. The prior pushed revision passed CI. npm publisher forkbomb is authenticated with read-write access to platformio-mcp, pio-mcp and pio-agent; no packages were published. Full parity and release acceptance remain incomplete.

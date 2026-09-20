@@ -239,8 +239,7 @@ it("honors a public run_target denial before executing an allowed build category
     path.join(project, ".pio-mcp-policy.json"),
     JSON.stringify({
       profile: "build_only",
-      deny: ["run_target"],
-      overrides: { audit_all_agent_actions: false },
+      overrides: { deny: ["run_target"], audit_all_agent_actions: false },
     }),
   );
   await expect(

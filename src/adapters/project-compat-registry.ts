@@ -216,5 +216,25 @@ export function withProjectCompatibility<TResult>(
     },
     handler: (args, context) => context.dispatch("pio_upload", args),
   });
+  const system = base.get("system_info");
+  if (!system || result.has("pio_system_info"))
+    throw new Error("Invalid system compatibility registry");
+  result.set("pio_system_info", {
+    ...system,
+    name: "pio_system_info",
+    description:
+      "Inspect PlatformIO Core, effective server policy and caller-owned monitors through canonical permissions.",
+    inputSchema: {
+      type: "object",
+      required: [],
+      additionalProperties: false,
+      properties: {
+        approval_id: { type: "string" },
+        policy_approval_id: { type: "string" },
+        monitor_approval_id: { type: "string" },
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_system_info", args),
+  });
   return result;
 }
