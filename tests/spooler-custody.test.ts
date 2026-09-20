@@ -5,12 +5,21 @@ import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   wait: vi.fn(),
+  acquire: vi.fn(),
+  prepare: vi.fn(),
+  finish: vi.fn(),
   spawn: vi.fn(async () => ({})),
   register: vi.fn(),
   release: vi.fn(),
   unregister: vi.fn(),
   close: vi.fn(),
   update: vi.fn(),
+}));
+vi.mock("../src/core/devices/process-device-custody.js", () => ({
+  acquireProcessDeviceCustody: (...args: unknown[]) => {
+    mocks.acquire(...args);
+    return { prepareSpawn: mocks.prepare, releaseAfterExit: mocks.finish };
+  },
 }));
 vi.mock("../src/platformio.js", () => ({
   platformioExecutor: { spawn: mocks.spawn },
@@ -74,6 +83,7 @@ it.each([
     expect(mocks.close).toHaveBeenCalledOnce();
     expect(closeFd).toHaveBeenCalled();
     expect(mocks.release).toHaveBeenCalledTimes(cleanupPending ? 0 : 1);
+    expect(mocks.finish).toHaveBeenCalledTimes(cleanupPending ? 0 : 1);
     expect(mocks.unregister).toHaveBeenCalledTimes(cleanupPending ? 0 : 1);
     expect(mocks.update).toHaveBeenCalledWith(
       expect.any(String),
@@ -140,6 +150,64 @@ it.each([false, true])(
     });
     expect(closed).toHaveBeenCalledWith(opened.mock.results[0].value);
     expect(mocks.release).toHaveBeenCalledTimes(cleanupPending ? 0 : 1);
+    expect(mocks.finish).toHaveBeenCalledTimes(cleanupPending ? 0 : 1);
     expect(mocks.unregister).toHaveBeenCalledTimes(cleanupPending ? 0 : 1);
   },
 );
+
+it("does not spawn when another serial owner holds the endpoint", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-spool-busy-"));
+  roots.push(root);
+  mocks.acquire.mockImplementationOnce(() => {
+    throw new PlatformIOError("busy", "DEVICE_BUSY");
+  });
+  await expect(
+    executeWithSpooling("run", [], { cwd: root, activePort: "COM99" }),
+  ).rejects.toThrow("busy");
+  expect(mocks.spawn).not.toHaveBeenCalled();
+  expect(mocks.prepare).not.toHaveBeenCalled();
+  expect(mocks.finish).not.toHaveBeenCalled();
+});
+
+it("acquires and prepares custody before spawn, then releases on successful completion", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-spool-lease-"));
+  roots.push(root);
+  mocks.wait.mockResolvedValueOnce(0);
+  mocks.spawn.mockImplementationOnce(async () => {
+    expect(mocks.acquire).toHaveBeenCalledWith("COM99");
+    expect(mocks.prepare).toHaveBeenCalledOnce();
+    expect(mocks.finish).not.toHaveBeenCalled();
+    return {};
+  });
+  await expect(
+    executeWithSpooling("run", [], { cwd: root, activePort: "COM99" }),
+  ).resolves.toMatchObject({ exitCode: 0 });
+  expect(mocks.finish).toHaveBeenCalledOnce();
+});
+
+it("closes local resources when confirmed-exit lease release fails", async () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pio-spool-lease-cleanup-"),
+  );
+  roots.push(root);
+  mocks.wait.mockResolvedValueOnce(0);
+  const watcher = { on: vi.fn(), close: mocks.close };
+  vi.spyOn(fs, "watch").mockReturnValue(watcher as unknown as fs.FSWatcher);
+  const closed = vi.spyOn(fs, "closeSync");
+  mocks.finish.mockImplementationOnce(() => {
+    throw new PlatformIOError(
+      "lease cleanup failed",
+      "DEVICE_CLEANUP_PENDING",
+      { cleanupPending: true },
+    );
+  });
+  await expect(
+    executeWithSpooling("run", [], { cwd: root, activePort: "COM99" }),
+  ).rejects.toMatchObject({
+    code: "DEVICE_CLEANUP_PENDING",
+    context: { cleanupPending: true },
+  });
+  expect(closed).toHaveBeenCalled();
+  expect(mocks.close).toHaveBeenCalledOnce();
+  expect(mocks.release).not.toHaveBeenCalled();
+});

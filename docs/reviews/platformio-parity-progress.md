@@ -934,3 +934,8 @@ Added the planned target-effects service: exact known targets map to build, clea
 
 Both firmware and filesystem uploads previously selected a port for locks/reporting but omitted --upload-port from the actual command. They now pass that same selected destination explicitly, including the existing device-resolution path. Typed PlatformIO errors now survive both wrappers, preserving cleanupPending and retained log evidence. TypeScript and nine focused mocked upload checks passed; plugin runtime rebuilt. Shared device leases, owned monitor handling, immutable artifact binding and physical upload evidence remain incomplete.
 
+
+### Upload spooler joins shared endpoint custody
+
+Spooling operations with an active serial port now acquire the same canonical endpoint lease as direct serial sessions before spawning. Pending-child custody is persisted before launch and is not automatically recovered after coordinator death. Confirmed cleanup releases the lease; uncertain cleanup retains it. Local log descriptors/watchers now close even if persistent cleanup fails, and background cleanup errors are recorded instead of becoming unhandled rejections. TypeScript and 14 focused isolated lease/spooler checks passed; no device was opened. Plugin runtime rebuilt. This covers endpoint aliases during upload execution, not stable USB identity across re-enumeration, descendant containment, legacy monitor handoff or hardware acceptance. Those remain required.
+

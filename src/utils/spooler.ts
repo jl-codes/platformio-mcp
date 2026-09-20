@@ -8,6 +8,7 @@
  * - executeWithSpooling: Spawns child processes mapped to disk limits.
  */
 import fs from "node:fs";
+import { acquireProcessDeviceCustody, type ProcessDeviceCustody } from "../core/devices/process-device-custody.js";
 import { waitForOwnedProcess } from "./owned-process-wait.js";
 
 import path from "node:path";
@@ -154,7 +155,12 @@ export async function executeWithSpooling(
 
   // 3. Spawning
   let proc: Awaited<ReturnType<typeof platformioExecutor.spawn>>;
+  let deviceCustody: ProcessDeviceCustody | undefined;
   try {
+    if (options.activePort) {
+      deviceCustody = acquireProcessDeviceCustody(options.activePort);
+      deviceCustody.prepareSpawn();
+    }
     proc = await platformioExecutor.spawn(command, args, {
       cwd: options.cwd,
       stdio: ["ignore", outFd, outFd],
@@ -162,6 +168,7 @@ export async function executeWithSpooling(
     });
   } catch (error) {
     try { fs.closeSync(outFd); } catch {}
+    deviceCustody?.releaseAfterExit();
     if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
     throw new PlatformIOError(
       error instanceof Error ? error.message : "Process could not be started.",
@@ -211,6 +218,7 @@ export async function executeWithSpooling(
     }
     try {
       if (!cleanupPending) {
+        deviceCustody?.releaseAfterExit();
         await unregisterBuildPid(targetProjectArea).catch(() => {});
         if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
       }
@@ -257,6 +265,28 @@ export async function executeWithSpooling(
     });
   } catch {}
 
+  // Close local resources even when persistent registry/lease cleanup fails.
+  const closeOutput = () => {
+    try { fs.closeSync(outFd); } catch {}
+    if (watcher) {
+      let fd: number | undefined;
+      try {
+        const size = fs.statSync(logFile).size;
+        if (size > fileOffset) {
+          const start = Math.max(fileOffset, size - 512 * 1024);
+          const buffer = Buffer.alloc(size - start);
+          fd = fs.openSync(logFile, "r");
+          const bytes = fs.readSync(fd, buffer, 0, buffer.length, start);
+          portalEvents.emitTaskLog(targetProjectArea || "global", taskId, buffer.subarray(0, bytes).toString());
+        }
+      } catch {}
+      finally {
+        if (fd !== undefined) { try { fs.closeSync(fd); } catch {} }
+        try { watcher.close(); } catch {}
+      }
+    }
+  };
+
   // 4. Wait for termination
   if (options.background) {
     const p = completion;
@@ -282,29 +312,14 @@ export async function executeWithSpooling(
         exitCode: code,
         ...(errorMessage ? { error: errorMessage } : {})
       }, targetProjectArea).catch(() => {});
-      if (!cleanupPending) {
-        await unregisterBuildPid(targetProjectArea);
-        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
-      }
-      try { fs.closeSync(outFd); } catch {}
-      if (watcher) {
-        // ARCHITECTURAL EXCEPTION: While synchronous fs calls are broadly banned to prevent 
-        // event loop blocking, fs.statSync and fs.readSync are mathematically required here 
-        // at the exact nanosecond of process termination. Using asynchronous promises yields 
-        // to the event loop, causing the FSEvents watcher to close before the OS can flush 
-        // the final chunk event, permanently dropping the trailing output lines from the UI.
-        try {
-          const stat = fs.statSync(logFile);
-          if (stat.size > fileOffset) {
-            const buffer = Buffer.alloc(stat.size - fileOffset);
-            const fd = fs.openSync(logFile, "r");
-            fs.readSync(fd, buffer, 0, buffer.length, fileOffset);
-            fs.closeSync(fd);
-            portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
-            fileOffset = stat.size;
-          }
-        } catch {}
-        try { watcher.close(); } catch {}
+      try {
+        if (!cleanupPending) {
+          deviceCustody?.releaseAfterExit();
+          await unregisterBuildPid(targetProjectArea);
+          if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+        }
+      } finally {
+        closeOutput();
       }
 
       if (code === 0 && options.onSuccess) {
@@ -314,6 +329,9 @@ export async function executeWithSpooling(
           console.error(`[Spooler Diagnostic] Background onSuccess hook failed: ${e.message}`);
         }
       }
+    }).catch(async (error) => {
+      console.error("[Background Task Cleanup Error]:", error instanceof Error ? error.message : "Cleanup failed.");
+      await updateTaskStatus(commandId, taskId, { status: "error", error: error instanceof Error ? error.message : "Cleanup failed." }, targetProjectArea).catch(() => {});
     });
 
     return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
@@ -327,12 +345,12 @@ export async function executeWithSpooling(
     await updateTaskStatus(commandId, taskId, {status: "error", error: error instanceof Error ? error.message : "Process failed."}, projectArea).catch(() => {});
     try {
       if (!cleanupPending) {
+        deviceCustody?.releaseAfterExit();
         await unregisterBuildPid(projectArea);
         if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
       }
     } finally {
-      try { fs.closeSync(outFd); } catch {}
-      try { watcher?.close(); } catch {}
+      closeOutput();
     }
     if (error instanceof PlatformIOError)
       throw new PlatformIOError(error.message, error.code, { ...error.context, cleanupPending, fullLogPath: logFile });
@@ -355,29 +373,12 @@ export async function executeWithSpooling(
   }, projectArea).catch(() => {});
 
   // Cleanup
-  await unregisterBuildPid(projectArea);
-  if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
   try {
-    fs.closeSync(outFd);
-  } catch {}
-  if (watcher) {
-    // ARCHITECTURAL EXCEPTION: While synchronous fs calls are broadly banned to prevent 
-    // event loop blocking, fs.statSync and fs.readSync are mathematically required here 
-    // at the exact nanosecond of process termination. Using asynchronous promises yields 
-    // to the event loop, causing the FSEvents watcher to close before the OS can flush 
-    // the final chunk event, permanently dropping the trailing output lines from the UI.
-    try {
-      const stat = fs.statSync(logFile);
-      if (stat.size > fileOffset) {
-        const buffer = Buffer.alloc(stat.size - fileOffset);
-        const fd = fs.openSync(logFile, "r");
-        fs.readSync(fd, buffer, 0, buffer.length, fileOffset);
-        fs.closeSync(fd);
-        portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
-        fileOffset = stat.size;
-      }
-    } catch {}
-    try { watcher.close(); } catch {}
+    deviceCustody?.releaseAfterExit();
+    await unregisterBuildPid(projectArea);
+    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+  } finally {
+    closeOutput();
   }
 
   if (exitCode === 0 && options.onSuccess) {

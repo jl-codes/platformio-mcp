@@ -15637,6 +15637,132 @@ parentPort.postMessage({ready:true});
   }
 });
 
+// src/core/devices/serial-endpoint.ts
+import fs24 from "node:fs";
+import path29 from "node:path";
+function validatePort(port) {
+  if (typeof port !== "string" || !port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
+    throw new PlatformIOError(
+      "Invalid serial endpoint name.",
+      "SERIAL_ENDPOINT_INVALID"
+    );
+}
+function resolveSerialEndpoint(port, options = {}) {
+  validatePort(port);
+  const platform2 = options.platform ?? process.platform;
+  const realpath = options.realpath ?? fs24.realpathSync.native;
+  const stat = options.stat ?? ((target) => {
+    const metadata = fs24.statSync(target, { bigint: true });
+    return {
+      characterDevice: metadata.isCharacterDevice(),
+      deviceNumber: metadata.rdev
+    };
+  });
+  const snapshot = () => {
+    if (platform2 === "win32") {
+      const localPrefix = "\\\\.\\";
+      const name2 = port.startsWith(localPrefix) ? port.slice(localPrefix.length) : port;
+      const match = /^COM([1-9][0-9]{0,8})$/i.exec(name2);
+      if (!match)
+        throw new PlatformIOError(
+          "Expected a COM port or its local device-path spelling.",
+          "SERIAL_ENDPOINT_INVALID"
+        );
+      const canonicalPort2 = `COM${match[1]}`;
+      return {
+        canonicalPort: canonicalPort2,
+        identity: `endpoint:win32:${canonicalPort2}`,
+        identityBasis: "windows-port-name",
+        presence: "unverified"
+      };
+    }
+    if (platform2 !== "linux" && platform2 !== "darwin")
+      throw new PlatformIOError(
+        "Serial endpoint identity is unavailable on this platform.",
+        "SERIAL_ENDPOINT_UNSUPPORTED"
+      );
+    if (!path29.posix.isAbsolute(port) || !path29.posix.normalize(port).startsWith("/dev/"))
+      throw new PlatformIOError(
+        "Unix serial endpoints must resolve within /dev.",
+        "SERIAL_ENDPOINT_INVALID"
+      );
+    let canonicalPort;
+    let metadata;
+    try {
+      canonicalPort = realpath(port);
+      validatePort(canonicalPort);
+      if (!path29.posix.isAbsolute(canonicalPort) || !path29.posix.normalize(canonicalPort).startsWith("/dev/"))
+        throw new PlatformIOError(
+          "Serial alias resolves outside /dev.",
+          "SERIAL_ENDPOINT_INVALID"
+        );
+      metadata = stat(canonicalPort);
+    } catch (error2) {
+      if (error2 instanceof PlatformIOError) throw error2;
+      throw new PlatformIOError(
+        "Serial endpoint metadata is unavailable.",
+        "SERIAL_ENDPOINT_UNAVAILABLE"
+      );
+    }
+    if (!metadata.characterDevice || typeof metadata.deviceNumber !== "bigint" || metadata.deviceNumber < 0n || metadata.deviceNumber > 0xffffffffffffffffn)
+      throw new PlatformIOError(
+        "Serial endpoint is not a valid character device.",
+        "SERIAL_ENDPOINT_INVALID"
+      );
+    const deviceNumber = metadata.deviceNumber.toString();
+    if (platform2 === "darwin") {
+      const match = /^\/dev\/(?:cu|tty)\.([a-zA-Z0-9_.-]+)$/.exec(
+        canonicalPort
+      );
+      if (!match)
+        throw new PlatformIOError(
+          "Expected a Darwin callout/dial-in serial endpoint.",
+          "SERIAL_ENDPOINT_INVALID"
+        );
+      return {
+        canonicalPort,
+        identity: `endpoint:darwin:serial:${match[1]}`,
+        deviceNumber,
+        identityBasis: "darwin-serial-pair",
+        presence: "character-device"
+      };
+    }
+    return {
+      canonicalPort,
+      identity: `endpoint:linux:char:${deviceNumber}`,
+      deviceNumber,
+      identityBasis: "unix-device-number",
+      presence: "character-device"
+    };
+  };
+  const expected = snapshot();
+  return Object.freeze({
+    requestedPort: port,
+    canonicalPort: expected.canonicalPort,
+    resource: Object.freeze({
+      kind: "serial",
+      identity: expected.identity
+    }),
+    identityBasis: expected.identityBasis,
+    presence: expected.presence,
+    survivesReenumeration: false,
+    revalidate() {
+      const current = snapshot();
+      if (current.canonicalPort !== expected.canonicalPort || current.identity !== expected.identity || current.deviceNumber !== expected.deviceNumber)
+        throw new PlatformIOError(
+          "Serial endpoint changed after selection; resolve and authorize again.",
+          "SERIAL_ENDPOINT_CHANGED"
+        );
+    }
+  });
+}
+var init_serial_endpoint = __esm({
+  "src/core/devices/serial-endpoint.ts"() {
+    "use strict";
+    init_errors2();
+  }
+});
+
 // src/core/devices/process-identity.ts
 import fs26 from "node:fs";
 import path30 from "node:path";
@@ -15740,6 +15866,360 @@ var init_process_identity = __esm({
   }
 });
 
+// src/core/devices/device-lease.ts
+import fs27 from "node:fs";
+import os6 from "node:os";
+import path31 from "node:path";
+import { createHash as createHash2, randomUUID } from "node:crypto";
+function stableDeviceLeaseRoot() {
+  return path31.join(
+    os6.userInfo().homedir,
+    ".platformio-mcp",
+    "device-leases-v1"
+  );
+}
+function resourceKey(resource) {
+  if (!resource || !["serial", "probe"].includes(resource.kind) || typeof resource.identity !== "string" || !resource.identity.trim() || resource.identity.length > 1024 || /[\x00-\x1f\x7f]/.test(resource.identity))
+    throw new PlatformIOError(
+      "Invalid physical resource identity.",
+      "DEVICE_IDENTITY_INVALID"
+    );
+  return createHash2("sha256").update(JSON.stringify([resource.kind, resource.identity])).digest("hex");
+}
+function validProcessIdentity(value2) {
+  return !!value2 && Number.isSafeInteger(value2.pid) && value2.pid >= 1 && value2.pid <= 2147483647 && ["win32", "linux", "darwin"].includes(value2.platform) && typeof value2.startToken === "string" && value2.startToken.length > 0 && value2.startToken.length <= 256;
+}
+function sameProcessIdentity(first, second) {
+  return first.pid === second.pid && first.platform === second.platform && first.startToken === second.startToken;
+}
+var DeviceLeaseStore;
+var init_device_lease = __esm({
+  "src/core/devices/device-lease.ts"() {
+    "use strict";
+    init_errors2();
+    init_process_identity();
+    DeviceLeaseStore = class {
+      root;
+      inspect;
+      held = /* @__PURE__ */ new WeakMap();
+      transfers = /* @__PURE__ */ new WeakMap();
+      owner;
+      /** Construct a store; no file is created or device opened until acquisition. */
+      constructor(options = {}) {
+        this.root = path31.resolve(options.root ?? stableDeviceLeaseRoot());
+        this.inspect = options.inspect ?? inspectProcessIdentity;
+      }
+      /** Inspect persisted ownership without releasing or recovering it; acquisition must still be atomic. */
+      status(resource) {
+        const key = resourceKey(resource);
+        return this.withGate(key, () => {
+          const record2 = this.readRecord(key);
+          if (!record2) return { status: "unclaimed", resource: { ...resource } };
+          if (record2.handoffPending)
+            return {
+              status: "unknown",
+              resource: { ...record2.resource },
+              ownerPid: record2.owner.pid,
+              acquiredAt: record2.acquiredAt
+            };
+          const identity = compareProcessIdentity(
+            record2.owner,
+            this.inspect(record2.owner.pid)
+          );
+          return {
+            status: identity === "alive" ? "owned" : identity,
+            resource: { ...record2.resource },
+            ownerPid: record2.owner.pid,
+            acquiredAt: record2.acquiredAt
+          };
+        });
+      }
+      /** Acquire exclusively, recovering a previous lease only after its owner is proven stale. */
+      acquire(resource) {
+        const key = resourceKey(resource);
+        const owner = this.currentOwner();
+        return this.withGate(key, () => {
+          const previous = this.readRecord(key);
+          if (previous) {
+            if (previous.handoffPending)
+              throw new PlatformIOError(
+                "Device custody handoff is unresolved; automatic stale recovery is disabled.",
+                "DEVICE_HANDOFF_PENDING"
+              );
+            const status = compareProcessIdentity(
+              previous.owner,
+              this.inspect(previous.owner.pid)
+            );
+            if (status !== "stale")
+              throw new PlatformIOError(
+                status === "alive" ? "Physical resource is already owned." : "Physical resource ownership cannot be verified.",
+                status === "alive" ? "DEVICE_BUSY" : "DEVICE_OWNER_UNKNOWN"
+              );
+          }
+          const record2 = {
+            version: 1,
+            resource: { kind: resource.kind, identity: resource.identity },
+            owner: { ...owner },
+            nonce: randomUUID(),
+            acquiredAt: (/* @__PURE__ */ new Date()).toISOString()
+          };
+          this.writeRecord(key, record2);
+          return this.createHandle(record2);
+        });
+      }
+      /** Persist uncertainty before launching a child, so a coordinator crash cannot expose its hardware. */
+      beginHandoff(lease) {
+        const held = this.requireHandle(lease);
+        const key = resourceKey(held.resource);
+        this.withGate(key, () => {
+          const current = this.requirePersistedOwner(key, held);
+          if (current.handoffPending)
+            throw new PlatformIOError(
+              "Device handoff is already pending.",
+              "DEVICE_HANDOFF_PENDING"
+            );
+          this.writeRecord(key, { ...current, handoffPending: true });
+        });
+      }
+      /** Cancel only after the trusted launcher proves no child started or all started children exited. */
+      cancelHandoff(lease) {
+        const held = this.requireHandle(lease);
+        const key = resourceKey(held.resource);
+        this.withGate(key, () => {
+          const current = this.requirePersistedOwner(key, held);
+          const rest = { ...current };
+          delete rest.handoffPending;
+          this.writeRecord(key, rest);
+        });
+      }
+      /**
+       * Atomically transfer ownership to an already-started, verified child waiting behind an IPC barrier.
+       * The caller must keep the child from opening hardware until adoption succeeds. No process is spawned here.
+       * On success the old handle is invalid, even if delivery of the returned ticket subsequently fails.
+       */
+      transfer(lease, target) {
+        const held = this.requireHandle(lease);
+        const key = resourceKey(held.resource);
+        if (!validProcessIdentity(target) || target.platform !== held.owner.platform || target.pid === held.owner.pid)
+          throw new PlatformIOError(
+            "Invalid lease transfer target.",
+            "DEVICE_TRANSFER_INVALID"
+          );
+        return this.withGate(key, () => {
+          const current = this.requirePersistedOwner(key, held);
+          if (compareProcessIdentity(target, this.inspect(target.pid)) !== "alive")
+            throw new PlatformIOError(
+              "Lease transfer target is unavailable or its process identity changed.",
+              "DEVICE_TRANSFER_INVALID"
+            );
+          const transferred = {
+            ...current,
+            owner: { ...target },
+            handoffPending: void 0,
+            nonce: randomUUID()
+          };
+          this.writeRecord(key, transferred);
+          this.held.delete(lease);
+          const ticket = Object.freeze({
+            resource: Object.freeze({ ...current.resource }),
+            nonce: transferred.nonce
+          });
+          this.transfers.set(ticket, transferred);
+          return ticket;
+        });
+      }
+      /** Retire an unadopted handoff only after its exact child owner is proven stale; never kill a process. */
+      finishTransfer(ticket) {
+        const transferred = this.transfers.get(ticket);
+        if (!transferred)
+          throw new PlatformIOError(
+            "Unknown or completed transfer receipt.",
+            "DEVICE_TRANSFER_INVALID"
+          );
+        const key = resourceKey(transferred.resource);
+        this.withGate(key, () => {
+          const current = this.requirePersistedOwner(key, transferred);
+          if (current.handoffPending || compareProcessIdentity(
+            current.owner,
+            this.inspect(current.owner.pid)
+          ) !== "stale")
+            throw new PlatformIOError(
+              "Transferred child exit is not confirmed.",
+              "DEVICE_OWNER_UNKNOWN"
+            );
+          fs27.unlinkSync(path31.join(this.root, `${key}.json`));
+          this.transfers.delete(ticket);
+        });
+      }
+      /**
+       * Consume an IPC ticket only in the target OS process, rotating its nonce to prevent ticket replay.
+       * This grants lease custody, not tool authorization; public adapters must not accept transfer tickets.
+       */
+      adopt(ticket) {
+        const key = resourceKey(ticket?.resource);
+        if (typeof ticket.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(ticket.nonce))
+          throw new PlatformIOError(
+            "Invalid lease transfer ticket.",
+            "DEVICE_TRANSFER_INVALID"
+          );
+        const owner = this.currentOwner();
+        return this.withGate(key, () => {
+          const current = this.readRecord(key);
+          if (!current || current.nonce !== ticket.nonce || !sameProcessIdentity(current.owner, owner))
+            throw new PlatformIOError(
+              "Lease transfer ticket is stale or belongs to another process.",
+              "DEVICE_TRANSFER_INVALID"
+            );
+          const adopted = { ...current, nonce: randomUUID() };
+          this.writeRecord(key, adopted);
+          return this.createHandle(adopted);
+        });
+      }
+      /** Release only a capability issued by this store whose persisted nonce and owner still match. */
+      release(lease) {
+        const held = this.requireHandle(lease);
+        const key = resourceKey(held.resource);
+        this.withGate(key, () => {
+          const current = this.requirePersistedOwner(key, held);
+          if (current.handoffPending)
+            throw new PlatformIOError(
+              "Cannot release unresolved child custody.",
+              "DEVICE_HANDOFF_PENDING"
+            );
+          fs27.unlinkSync(path31.join(this.root, `${key}.json`));
+          this.held.delete(lease);
+        });
+      }
+      createHandle(record2) {
+        const lease = Object.freeze({
+          resource: Object.freeze({ ...record2.resource }),
+          acquiredAt: record2.acquiredAt
+        });
+        this.held.set(lease, record2);
+        return lease;
+      }
+      requireHandle(lease) {
+        const held = this.held.get(lease);
+        if (!held)
+          throw new PlatformIOError(
+            "Unknown or already released device lease.",
+            "DEVICE_LEASE_NOT_OWNED"
+          );
+        return held;
+      }
+      requirePersistedOwner(key, held) {
+        const current = this.readRecord(key);
+        if (!current || current.nonce !== held.nonce || !sameProcessIdentity(current.owner, held.owner))
+          throw new PlatformIOError(
+            "Device lease ownership changed; refusing mutation.",
+            "DEVICE_LEASE_NOT_OWNED"
+          );
+        return current;
+      }
+      currentOwner() {
+        if (this.owner) return this.owner;
+        const observation = this.inspect(process.pid);
+        if (observation.status !== "running" || observation.identity.pid !== process.pid || !validProcessIdentity(observation.identity))
+          throw new PlatformIOError(
+            "Cannot establish this process's start identity.",
+            "DEVICE_OWNER_UNKNOWN"
+          );
+        this.owner = { ...observation.identity };
+        return this.owner;
+      }
+      /** Refuse symlinked/non-directory components instead of silently splitting the global lock domain. */
+      ensureRoot() {
+        const parsed = path31.parse(this.root);
+        let current = parsed.root;
+        for (const part of this.root.slice(parsed.root.length).split(path31.sep).filter(Boolean)) {
+          current = path31.join(current, part);
+          try {
+            fs27.mkdirSync(current, { mode: 448 });
+          } catch (error2) {
+            if (error2.code !== "EEXIST") throw error2;
+          }
+          const stat = fs27.lstatSync(current);
+          if (!stat.isDirectory() || stat.isSymbolicLink())
+            throw new PlatformIOError(
+              "Device lease directory must not contain symlinks.",
+              "DEVICE_LEASE_PATH_INVALID"
+            );
+        }
+        const rootStat = fs27.statSync(this.root);
+        if (process.platform !== "win32" && (rootStat.uid !== process.getuid?.() || (rootStat.mode & 18) !== 0))
+          throw new PlatformIOError(
+            "Device lease directory must be owned by this user and not writable by others.",
+            "DEVICE_LEASE_PATH_INVALID"
+          );
+      }
+      withGate(key, action) {
+        this.ensureRoot();
+        const gate = path31.join(this.root, `${key}.gate`);
+        try {
+          fs27.mkdirSync(gate, { mode: 448 });
+        } catch (error2) {
+          if (error2.code === "EEXIST")
+            throw new PlatformIOError(
+              "Device lease update is busy or interrupted; retry, then inspect the gate if it persists.",
+              "DEVICE_LEASE_GATE_BUSY"
+            );
+          throw error2;
+        }
+        try {
+          return action();
+        } finally {
+          fs27.rmdirSync(gate);
+        }
+      }
+      readRecord(key) {
+        const file = path31.join(this.root, `${key}.json`);
+        let stat;
+        try {
+          stat = fs27.lstatSync(file);
+        } catch (error2) {
+          if (error2.code === "ENOENT") return void 0;
+          throw error2;
+        }
+        if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 8192)
+          throw new PlatformIOError(
+            "Invalid device lease record.",
+            "DEVICE_LEASE_CORRUPT"
+          );
+        try {
+          const record2 = JSON.parse(fs27.readFileSync(file, "utf8"));
+          if (record2.version !== 1 || record2.handoffPending !== void 0 && record2.handoffPending !== true || resourceKey(record2.resource) !== key || !validProcessIdentity(record2.owner) || typeof record2.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(record2.nonce) || typeof record2.acquiredAt !== "string" || !Number.isFinite(Date.parse(record2.acquiredAt)))
+            throw new Error("Invalid lease schema");
+          return record2;
+        } catch {
+          throw new PlatformIOError(
+            "Invalid device lease record; ownership is not assumed stale.",
+            "DEVICE_LEASE_CORRUPT"
+          );
+        }
+      }
+      writeRecord(key, record2) {
+        const temporary = path31.join(this.root, `${key}.${record2.nonce}.tmp`);
+        let fd;
+        try {
+          fd = fs27.openSync(temporary, "wx", 384);
+          fs27.writeFileSync(fd, JSON.stringify(record2), "utf8");
+          fs27.fsyncSync(fd);
+          fs27.closeSync(fd);
+          fd = void 0;
+          fs27.renameSync(temporary, path31.join(this.root, `${key}.json`));
+        } finally {
+          if (fd !== void 0) fs27.closeSync(fd);
+          try {
+            fs27.unlinkSync(temporary);
+          } catch (error2) {
+            if (error2.code !== "ENOENT") throw error2;
+          }
+        }
+      }
+    };
+  }
+});
+
 // src/core/devices.ts
 async function listDevicesCore() {
   return listDevices();
@@ -15748,6 +16228,39 @@ var init_devices2 = __esm({
   "src/core/devices.ts"() {
     "use strict";
     init_devices();
+  }
+});
+
+// src/core/devices/process-device-custody.ts
+function acquireProcessDeviceCustody(port, dependencies = {}) {
+  const store = dependencies.store ?? new DeviceLeaseStore();
+  const endpoint = (dependencies.resolve ?? resolveSerialEndpoint)(port);
+  const lease = store.acquire(endpoint.resource);
+  return {
+    prepareSpawn() {
+      endpoint.revalidate();
+      store.beginHandoff(lease);
+    },
+    releaseAfterExit() {
+      try {
+        store.cancelHandoff(lease);
+        store.release(lease);
+      } catch (error2) {
+        throw new PlatformIOError(
+          error2 instanceof Error ? error2.message : "Device lease cleanup failed.",
+          "DEVICE_CLEANUP_PENDING",
+          { cleanupPending: true }
+        );
+      }
+    }
+  };
+}
+var init_process_device_custody = __esm({
+  "src/core/devices/process-device-custody.ts"() {
+    "use strict";
+    init_errors2();
+    init_device_lease();
+    init_serial_endpoint();
   }
 });
 
@@ -16451,7 +16964,12 @@ async function executeWithSpooling(command, args, options) {
   const { logFile, latestLog } = rotateSpoolerStreams(verb, projectArea);
   const outFd = fs37.openSync(logFile, "a");
   let proc;
+  let deviceCustody;
   try {
+    if (options.activePort) {
+      deviceCustody = acquireProcessDeviceCustody(options.activePort);
+      deviceCustody.prepareSpawn();
+    }
     proc = await platformioExecutor.spawn(command, args, {
       cwd: options.cwd,
       stdio: ["ignore", outFd, outFd],
@@ -16462,6 +16980,7 @@ async function executeWithSpooling(command, args, options) {
       fs37.closeSync(outFd);
     } catch {
     }
+    deviceCustody?.releaseAfterExit();
     if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
     throw new PlatformIOError(
       error2 instanceof Error ? error2.message : "Process could not be started.",
@@ -16508,6 +17027,7 @@ async function executeWithSpooling(command, args, options) {
     }
     try {
       if (!cleanupPending) {
+        deviceCustody?.releaseAfterExit();
         await unregisterBuildPid(targetProjectArea).catch(() => {
         });
         if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
@@ -16555,6 +17075,37 @@ async function executeWithSpooling(command, args, options) {
     });
   } catch {
   }
+  const closeOutput = () => {
+    try {
+      fs37.closeSync(outFd);
+    } catch {
+    }
+    if (watcher) {
+      let fd;
+      try {
+        const size = fs37.statSync(logFile).size;
+        if (size > fileOffset) {
+          const start = Math.max(fileOffset, size - 512 * 1024);
+          const buffer = Buffer.alloc(size - start);
+          fd = fs37.openSync(logFile, "r");
+          const bytes = fs37.readSync(fd, buffer, 0, buffer.length, start);
+          portalEvents.emitTaskLog(targetProjectArea || "global", taskId, buffer.subarray(0, bytes).toString());
+        }
+      } catch {
+      } finally {
+        if (fd !== void 0) {
+          try {
+            fs37.closeSync(fd);
+          } catch {
+          }
+        }
+        try {
+          watcher.close();
+        } catch {
+        }
+      }
+    }
+  };
   if (options.background) {
     const p = completion;
     let cleanupPending = false;
@@ -16580,31 +17131,14 @@ async function executeWithSpooling(command, args, options) {
         ...errorMessage2 ? { error: errorMessage2 } : {}
       }, targetProjectArea).catch(() => {
       });
-      if (!cleanupPending) {
-        await unregisterBuildPid(targetProjectArea);
-        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
-      }
       try {
-        fs37.closeSync(outFd);
-      } catch {
-      }
-      if (watcher) {
-        try {
-          const stat = fs37.statSync(logFile);
-          if (stat.size > fileOffset) {
-            const buffer = Buffer.alloc(stat.size - fileOffset);
-            const fd = fs37.openSync(logFile, "r");
-            fs37.readSync(fd, buffer, 0, buffer.length, fileOffset);
-            fs37.closeSync(fd);
-            portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
-            fileOffset = stat.size;
-          }
-        } catch {
+        if (!cleanupPending) {
+          deviceCustody?.releaseAfterExit();
+          await unregisterBuildPid(targetProjectArea);
+          if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
         }
-        try {
-          watcher.close();
-        } catch {
-        }
+      } finally {
+        closeOutput();
       }
       if (code === 0 && options.onSuccess) {
         try {
@@ -16613,6 +17147,10 @@ async function executeWithSpooling(command, args, options) {
           console.error(`[Spooler Diagnostic] Background onSuccess hook failed: ${e.message}`);
         }
       }
+    }).catch(async (error2) => {
+      console.error("[Background Task Cleanup Error]:", error2 instanceof Error ? error2.message : "Cleanup failed.");
+      await updateTaskStatus(commandId, taskId, { status: "error", error: error2 instanceof Error ? error2.message : "Cleanup failed." }, targetProjectArea).catch(() => {
+      });
     });
     return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
   }
@@ -16625,18 +17163,12 @@ async function executeWithSpooling(command, args, options) {
     });
     try {
       if (!cleanupPending) {
+        deviceCustody?.releaseAfterExit();
         await unregisterBuildPid(projectArea);
         if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
       }
     } finally {
-      try {
-        fs37.closeSync(outFd);
-      } catch {
-      }
-      try {
-        watcher?.close();
-      } catch {
-      }
+      closeOutput();
     }
     if (error2 instanceof PlatformIOError)
       throw new PlatformIOError(error2.message, error2.code, { ...error2.context, cleanupPending, fullLogPath: logFile });
@@ -16657,29 +17189,12 @@ async function executeWithSpooling(command, args, options) {
     ...errorMessage ? { error: errorMessage } : {}
   }, projectArea).catch(() => {
   });
-  await unregisterBuildPid(projectArea);
-  if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
   try {
-    fs37.closeSync(outFd);
-  } catch {
-  }
-  if (watcher) {
-    try {
-      const stat = fs37.statSync(logFile);
-      if (stat.size > fileOffset) {
-        const buffer = Buffer.alloc(stat.size - fileOffset);
-        const fd = fs37.openSync(logFile, "r");
-        fs37.readSync(fd, buffer, 0, buffer.length, fileOffset);
-        fs37.closeSync(fd);
-        portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
-        fileOffset = stat.size;
-      }
-    } catch {
-    }
-    try {
-      watcher.close();
-    } catch {
-    }
+    deviceCustody?.releaseAfterExit();
+    await unregisterBuildPid(projectArea);
+    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+  } finally {
+    closeOutput();
   }
   if (exitCode === 0 && options.onSuccess) {
     try {
@@ -16723,6 +17238,7 @@ var WORKSPACE_DIR3;
 var init_spooler = __esm({
   "src/utils/spooler.ts"() {
     "use strict";
+    init_process_device_custody();
     init_owned_process_wait();
     init_platformio();
     init_process_manager();
@@ -96631,128 +97147,8 @@ async function captureTransientMemory(service, owner, request, input = {}, signa
 
 // src/core/serial/session-policy.ts
 init_zod();
+init_serial_endpoint();
 import { performance as performance5 } from "node:perf_hooks";
-
-// src/core/devices/serial-endpoint.ts
-init_errors2();
-import fs24 from "node:fs";
-import path29 from "node:path";
-function validatePort(port) {
-  if (typeof port !== "string" || !port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port))
-    throw new PlatformIOError(
-      "Invalid serial endpoint name.",
-      "SERIAL_ENDPOINT_INVALID"
-    );
-}
-function resolveSerialEndpoint(port, options = {}) {
-  validatePort(port);
-  const platform2 = options.platform ?? process.platform;
-  const realpath = options.realpath ?? fs24.realpathSync.native;
-  const stat = options.stat ?? ((target) => {
-    const metadata = fs24.statSync(target, { bigint: true });
-    return {
-      characterDevice: metadata.isCharacterDevice(),
-      deviceNumber: metadata.rdev
-    };
-  });
-  const snapshot = () => {
-    if (platform2 === "win32") {
-      const localPrefix = "\\\\.\\";
-      const name2 = port.startsWith(localPrefix) ? port.slice(localPrefix.length) : port;
-      const match = /^COM([1-9][0-9]{0,8})$/i.exec(name2);
-      if (!match)
-        throw new PlatformIOError(
-          "Expected a COM port or its local device-path spelling.",
-          "SERIAL_ENDPOINT_INVALID"
-        );
-      const canonicalPort2 = `COM${match[1]}`;
-      return {
-        canonicalPort: canonicalPort2,
-        identity: `endpoint:win32:${canonicalPort2}`,
-        identityBasis: "windows-port-name",
-        presence: "unverified"
-      };
-    }
-    if (platform2 !== "linux" && platform2 !== "darwin")
-      throw new PlatformIOError(
-        "Serial endpoint identity is unavailable on this platform.",
-        "SERIAL_ENDPOINT_UNSUPPORTED"
-      );
-    if (!path29.posix.isAbsolute(port) || !path29.posix.normalize(port).startsWith("/dev/"))
-      throw new PlatformIOError(
-        "Unix serial endpoints must resolve within /dev.",
-        "SERIAL_ENDPOINT_INVALID"
-      );
-    let canonicalPort;
-    let metadata;
-    try {
-      canonicalPort = realpath(port);
-      validatePort(canonicalPort);
-      if (!path29.posix.isAbsolute(canonicalPort) || !path29.posix.normalize(canonicalPort).startsWith("/dev/"))
-        throw new PlatformIOError(
-          "Serial alias resolves outside /dev.",
-          "SERIAL_ENDPOINT_INVALID"
-        );
-      metadata = stat(canonicalPort);
-    } catch (error2) {
-      if (error2 instanceof PlatformIOError) throw error2;
-      throw new PlatformIOError(
-        "Serial endpoint metadata is unavailable.",
-        "SERIAL_ENDPOINT_UNAVAILABLE"
-      );
-    }
-    if (!metadata.characterDevice || typeof metadata.deviceNumber !== "bigint" || metadata.deviceNumber < 0n || metadata.deviceNumber > 0xffffffffffffffffn)
-      throw new PlatformIOError(
-        "Serial endpoint is not a valid character device.",
-        "SERIAL_ENDPOINT_INVALID"
-      );
-    const deviceNumber = metadata.deviceNumber.toString();
-    if (platform2 === "darwin") {
-      const match = /^\/dev\/(?:cu|tty)\.([a-zA-Z0-9_.-]+)$/.exec(
-        canonicalPort
-      );
-      if (!match)
-        throw new PlatformIOError(
-          "Expected a Darwin callout/dial-in serial endpoint.",
-          "SERIAL_ENDPOINT_INVALID"
-        );
-      return {
-        canonicalPort,
-        identity: `endpoint:darwin:serial:${match[1]}`,
-        deviceNumber,
-        identityBasis: "darwin-serial-pair",
-        presence: "character-device"
-      };
-    }
-    return {
-      canonicalPort,
-      identity: `endpoint:linux:char:${deviceNumber}`,
-      deviceNumber,
-      identityBasis: "unix-device-number",
-      presence: "character-device"
-    };
-  };
-  const expected = snapshot();
-  return Object.freeze({
-    requestedPort: port,
-    canonicalPort: expected.canonicalPort,
-    resource: Object.freeze({
-      kind: "serial",
-      identity: expected.identity
-    }),
-    identityBasis: expected.identityBasis,
-    presence: expected.presence,
-    survivesReenumeration: false,
-    revalidate() {
-      const current = snapshot();
-      if (current.canonicalPort !== expected.canonicalPort || current.identity !== expected.identity || current.deviceNumber !== expected.deviceNumber)
-        throw new PlatformIOError(
-          "Serial endpoint changed after selection; resolve and authorize again.",
-          "SERIAL_ENDPOINT_CHANGED"
-        );
-    }
-  });
-}
 
 // src/core/serial/serial-backend.ts
 init_errors2();
@@ -97332,355 +97728,9 @@ function bindSerialDiscovery(endpoint, records, resolve) {
 }
 
 // src/core/serial/session-manager.ts
+init_serial_endpoint();
 init_errors2();
-
-// src/core/devices/device-lease.ts
-init_errors2();
-init_process_identity();
-import fs27 from "node:fs";
-import os6 from "node:os";
-import path31 from "node:path";
-import { createHash as createHash2, randomUUID } from "node:crypto";
-function stableDeviceLeaseRoot() {
-  return path31.join(
-    os6.userInfo().homedir,
-    ".platformio-mcp",
-    "device-leases-v1"
-  );
-}
-function resourceKey(resource) {
-  if (!resource || !["serial", "probe"].includes(resource.kind) || typeof resource.identity !== "string" || !resource.identity.trim() || resource.identity.length > 1024 || /[\x00-\x1f\x7f]/.test(resource.identity))
-    throw new PlatformIOError(
-      "Invalid physical resource identity.",
-      "DEVICE_IDENTITY_INVALID"
-    );
-  return createHash2("sha256").update(JSON.stringify([resource.kind, resource.identity])).digest("hex");
-}
-function validProcessIdentity(value2) {
-  return !!value2 && Number.isSafeInteger(value2.pid) && value2.pid >= 1 && value2.pid <= 2147483647 && ["win32", "linux", "darwin"].includes(value2.platform) && typeof value2.startToken === "string" && value2.startToken.length > 0 && value2.startToken.length <= 256;
-}
-function sameProcessIdentity(first, second) {
-  return first.pid === second.pid && first.platform === second.platform && first.startToken === second.startToken;
-}
-var DeviceLeaseStore = class {
-  root;
-  inspect;
-  held = /* @__PURE__ */ new WeakMap();
-  transfers = /* @__PURE__ */ new WeakMap();
-  owner;
-  /** Construct a store; no file is created or device opened until acquisition. */
-  constructor(options = {}) {
-    this.root = path31.resolve(options.root ?? stableDeviceLeaseRoot());
-    this.inspect = options.inspect ?? inspectProcessIdentity;
-  }
-  /** Inspect persisted ownership without releasing or recovering it; acquisition must still be atomic. */
-  status(resource) {
-    const key = resourceKey(resource);
-    return this.withGate(key, () => {
-      const record2 = this.readRecord(key);
-      if (!record2) return { status: "unclaimed", resource: { ...resource } };
-      if (record2.handoffPending)
-        return {
-          status: "unknown",
-          resource: { ...record2.resource },
-          ownerPid: record2.owner.pid,
-          acquiredAt: record2.acquiredAt
-        };
-      const identity = compareProcessIdentity(
-        record2.owner,
-        this.inspect(record2.owner.pid)
-      );
-      return {
-        status: identity === "alive" ? "owned" : identity,
-        resource: { ...record2.resource },
-        ownerPid: record2.owner.pid,
-        acquiredAt: record2.acquiredAt
-      };
-    });
-  }
-  /** Acquire exclusively, recovering a previous lease only after its owner is proven stale. */
-  acquire(resource) {
-    const key = resourceKey(resource);
-    const owner = this.currentOwner();
-    return this.withGate(key, () => {
-      const previous = this.readRecord(key);
-      if (previous) {
-        if (previous.handoffPending)
-          throw new PlatformIOError(
-            "Device custody handoff is unresolved; automatic stale recovery is disabled.",
-            "DEVICE_HANDOFF_PENDING"
-          );
-        const status = compareProcessIdentity(
-          previous.owner,
-          this.inspect(previous.owner.pid)
-        );
-        if (status !== "stale")
-          throw new PlatformIOError(
-            status === "alive" ? "Physical resource is already owned." : "Physical resource ownership cannot be verified.",
-            status === "alive" ? "DEVICE_BUSY" : "DEVICE_OWNER_UNKNOWN"
-          );
-      }
-      const record2 = {
-        version: 1,
-        resource: { kind: resource.kind, identity: resource.identity },
-        owner: { ...owner },
-        nonce: randomUUID(),
-        acquiredAt: (/* @__PURE__ */ new Date()).toISOString()
-      };
-      this.writeRecord(key, record2);
-      return this.createHandle(record2);
-    });
-  }
-  /** Persist uncertainty before launching a child, so a coordinator crash cannot expose its hardware. */
-  beginHandoff(lease) {
-    const held = this.requireHandle(lease);
-    const key = resourceKey(held.resource);
-    this.withGate(key, () => {
-      const current = this.requirePersistedOwner(key, held);
-      if (current.handoffPending)
-        throw new PlatformIOError(
-          "Device handoff is already pending.",
-          "DEVICE_HANDOFF_PENDING"
-        );
-      this.writeRecord(key, { ...current, handoffPending: true });
-    });
-  }
-  /** Cancel only after the trusted launcher proves no child started or all started children exited. */
-  cancelHandoff(lease) {
-    const held = this.requireHandle(lease);
-    const key = resourceKey(held.resource);
-    this.withGate(key, () => {
-      const current = this.requirePersistedOwner(key, held);
-      const rest = { ...current };
-      delete rest.handoffPending;
-      this.writeRecord(key, rest);
-    });
-  }
-  /**
-   * Atomically transfer ownership to an already-started, verified child waiting behind an IPC barrier.
-   * The caller must keep the child from opening hardware until adoption succeeds. No process is spawned here.
-   * On success the old handle is invalid, even if delivery of the returned ticket subsequently fails.
-   */
-  transfer(lease, target) {
-    const held = this.requireHandle(lease);
-    const key = resourceKey(held.resource);
-    if (!validProcessIdentity(target) || target.platform !== held.owner.platform || target.pid === held.owner.pid)
-      throw new PlatformIOError(
-        "Invalid lease transfer target.",
-        "DEVICE_TRANSFER_INVALID"
-      );
-    return this.withGate(key, () => {
-      const current = this.requirePersistedOwner(key, held);
-      if (compareProcessIdentity(target, this.inspect(target.pid)) !== "alive")
-        throw new PlatformIOError(
-          "Lease transfer target is unavailable or its process identity changed.",
-          "DEVICE_TRANSFER_INVALID"
-        );
-      const transferred = {
-        ...current,
-        owner: { ...target },
-        handoffPending: void 0,
-        nonce: randomUUID()
-      };
-      this.writeRecord(key, transferred);
-      this.held.delete(lease);
-      const ticket = Object.freeze({
-        resource: Object.freeze({ ...current.resource }),
-        nonce: transferred.nonce
-      });
-      this.transfers.set(ticket, transferred);
-      return ticket;
-    });
-  }
-  /** Retire an unadopted handoff only after its exact child owner is proven stale; never kill a process. */
-  finishTransfer(ticket) {
-    const transferred = this.transfers.get(ticket);
-    if (!transferred)
-      throw new PlatformIOError(
-        "Unknown or completed transfer receipt.",
-        "DEVICE_TRANSFER_INVALID"
-      );
-    const key = resourceKey(transferred.resource);
-    this.withGate(key, () => {
-      const current = this.requirePersistedOwner(key, transferred);
-      if (current.handoffPending || compareProcessIdentity(
-        current.owner,
-        this.inspect(current.owner.pid)
-      ) !== "stale")
-        throw new PlatformIOError(
-          "Transferred child exit is not confirmed.",
-          "DEVICE_OWNER_UNKNOWN"
-        );
-      fs27.unlinkSync(path31.join(this.root, `${key}.json`));
-      this.transfers.delete(ticket);
-    });
-  }
-  /**
-   * Consume an IPC ticket only in the target OS process, rotating its nonce to prevent ticket replay.
-   * This grants lease custody, not tool authorization; public adapters must not accept transfer tickets.
-   */
-  adopt(ticket) {
-    const key = resourceKey(ticket?.resource);
-    if (typeof ticket.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(ticket.nonce))
-      throw new PlatformIOError(
-        "Invalid lease transfer ticket.",
-        "DEVICE_TRANSFER_INVALID"
-      );
-    const owner = this.currentOwner();
-    return this.withGate(key, () => {
-      const current = this.readRecord(key);
-      if (!current || current.nonce !== ticket.nonce || !sameProcessIdentity(current.owner, owner))
-        throw new PlatformIOError(
-          "Lease transfer ticket is stale or belongs to another process.",
-          "DEVICE_TRANSFER_INVALID"
-        );
-      const adopted = { ...current, nonce: randomUUID() };
-      this.writeRecord(key, adopted);
-      return this.createHandle(adopted);
-    });
-  }
-  /** Release only a capability issued by this store whose persisted nonce and owner still match. */
-  release(lease) {
-    const held = this.requireHandle(lease);
-    const key = resourceKey(held.resource);
-    this.withGate(key, () => {
-      const current = this.requirePersistedOwner(key, held);
-      if (current.handoffPending)
-        throw new PlatformIOError(
-          "Cannot release unresolved child custody.",
-          "DEVICE_HANDOFF_PENDING"
-        );
-      fs27.unlinkSync(path31.join(this.root, `${key}.json`));
-      this.held.delete(lease);
-    });
-  }
-  createHandle(record2) {
-    const lease = Object.freeze({
-      resource: Object.freeze({ ...record2.resource }),
-      acquiredAt: record2.acquiredAt
-    });
-    this.held.set(lease, record2);
-    return lease;
-  }
-  requireHandle(lease) {
-    const held = this.held.get(lease);
-    if (!held)
-      throw new PlatformIOError(
-        "Unknown or already released device lease.",
-        "DEVICE_LEASE_NOT_OWNED"
-      );
-    return held;
-  }
-  requirePersistedOwner(key, held) {
-    const current = this.readRecord(key);
-    if (!current || current.nonce !== held.nonce || !sameProcessIdentity(current.owner, held.owner))
-      throw new PlatformIOError(
-        "Device lease ownership changed; refusing mutation.",
-        "DEVICE_LEASE_NOT_OWNED"
-      );
-    return current;
-  }
-  currentOwner() {
-    if (this.owner) return this.owner;
-    const observation = this.inspect(process.pid);
-    if (observation.status !== "running" || observation.identity.pid !== process.pid || !validProcessIdentity(observation.identity))
-      throw new PlatformIOError(
-        "Cannot establish this process's start identity.",
-        "DEVICE_OWNER_UNKNOWN"
-      );
-    this.owner = { ...observation.identity };
-    return this.owner;
-  }
-  /** Refuse symlinked/non-directory components instead of silently splitting the global lock domain. */
-  ensureRoot() {
-    const parsed = path31.parse(this.root);
-    let current = parsed.root;
-    for (const part of this.root.slice(parsed.root.length).split(path31.sep).filter(Boolean)) {
-      current = path31.join(current, part);
-      try {
-        fs27.mkdirSync(current, { mode: 448 });
-      } catch (error2) {
-        if (error2.code !== "EEXIST") throw error2;
-      }
-      const stat = fs27.lstatSync(current);
-      if (!stat.isDirectory() || stat.isSymbolicLink())
-        throw new PlatformIOError(
-          "Device lease directory must not contain symlinks.",
-          "DEVICE_LEASE_PATH_INVALID"
-        );
-    }
-    const rootStat = fs27.statSync(this.root);
-    if (process.platform !== "win32" && (rootStat.uid !== process.getuid?.() || (rootStat.mode & 18) !== 0))
-      throw new PlatformIOError(
-        "Device lease directory must be owned by this user and not writable by others.",
-        "DEVICE_LEASE_PATH_INVALID"
-      );
-  }
-  withGate(key, action) {
-    this.ensureRoot();
-    const gate = path31.join(this.root, `${key}.gate`);
-    try {
-      fs27.mkdirSync(gate, { mode: 448 });
-    } catch (error2) {
-      if (error2.code === "EEXIST")
-        throw new PlatformIOError(
-          "Device lease update is busy or interrupted; retry, then inspect the gate if it persists.",
-          "DEVICE_LEASE_GATE_BUSY"
-        );
-      throw error2;
-    }
-    try {
-      return action();
-    } finally {
-      fs27.rmdirSync(gate);
-    }
-  }
-  readRecord(key) {
-    const file = path31.join(this.root, `${key}.json`);
-    let stat;
-    try {
-      stat = fs27.lstatSync(file);
-    } catch (error2) {
-      if (error2.code === "ENOENT") return void 0;
-      throw error2;
-    }
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 8192)
-      throw new PlatformIOError(
-        "Invalid device lease record.",
-        "DEVICE_LEASE_CORRUPT"
-      );
-    try {
-      const record2 = JSON.parse(fs27.readFileSync(file, "utf8"));
-      if (record2.version !== 1 || record2.handoffPending !== void 0 && record2.handoffPending !== true || resourceKey(record2.resource) !== key || !validProcessIdentity(record2.owner) || typeof record2.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(record2.nonce) || typeof record2.acquiredAt !== "string" || !Number.isFinite(Date.parse(record2.acquiredAt)))
-        throw new Error("Invalid lease schema");
-      return record2;
-    } catch {
-      throw new PlatformIOError(
-        "Invalid device lease record; ownership is not assumed stale.",
-        "DEVICE_LEASE_CORRUPT"
-      );
-    }
-  }
-  writeRecord(key, record2) {
-    const temporary = path31.join(this.root, `${key}.${record2.nonce}.tmp`);
-    let fd;
-    try {
-      fd = fs27.openSync(temporary, "wx", 384);
-      fs27.writeFileSync(fd, JSON.stringify(record2), "utf8");
-      fs27.fsyncSync(fd);
-      fs27.closeSync(fd);
-      fd = void 0;
-      fs27.renameSync(temporary, path31.join(this.root, `${key}.json`));
-    } finally {
-      if (fd !== void 0) fs27.closeSync(fd);
-      try {
-        fs27.unlinkSync(temporary);
-      } catch (error2) {
-        if (error2.code !== "ENOENT") throw error2;
-      }
-    }
-  }
-};
+init_device_lease();
 
 // src/core/serial/serial-redaction.ts
 init_redact();
