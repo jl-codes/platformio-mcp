@@ -3,6 +3,10 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { DebugClientSessions } from "../core/debug/debug-client-sessions.js";
 import { DebugPreparationCache } from "../core/debug/debug-preparation-cache.js";
+import {
+  startRemotePreparedDebugger,
+  type RemoteDebugTargetBinding,
+} from "../core/debug/debug-remote-startup.js";
 import { startLocalPreparedDebugger } from "../core/debug/debug-local-startup.js";
 import { withDebugProbeDiscovery } from "../core/devices/debug-probe-discovery.js";
 import type { PolicyEvaluationContext } from "../core/policy/types.js";
@@ -69,7 +73,16 @@ export class DebugCompatibilityClient {
   private readonly pending = new Set<Promise<unknown>>();
 
   /** Optional host verification supplements mandatory native supervisor proofs; never request-controlled. */
-  constructor(private readonly confirmProbeReleased?: () => Promise<boolean>) {}
+  constructor(
+    private readonly confirmProbeReleased?: () => Promise<boolean>,
+    private readonly resolveRemoteBinding?: (
+      selection: Readonly<{
+        projectDir: string;
+        environment: string;
+        endpoint: string | null;
+      }>,
+    ) => Promise<RemoteDebugTargetBinding>,
+  ) {}
 
   /** Prepare once across approvals, then select and revalidate the physical probe during owned startup. */
   async start(
@@ -119,29 +132,24 @@ export class DebugCompatibilityClient {
           "Debugger startup deadline expired.",
           "DEBUG_START_TIMEOUT",
         );
-      const id = await withDebugProbeDiscovery(
-        projectDir,
-        args.discovery_approval_id,
-        caller,
-        (readInventory) =>
-          startLocalPreparedDebugger(
+      const remote = prepared.configuration?.server === null;
+      if (remote && !this.resolveRemoteBinding)
+        throw new PlatformIOError(
+          "Remote debugger startup requires a trusted host target binding.",
+          "DEBUG_REMOTE_BINDING_REQUIRED",
+        );
+      const id = remote
+        ? await startRemotePreparedDebugger(
             this.sessions,
             {
               prepared,
-              readInventory: async () => {
-                const inventory = await readInventory();
-                // Unidentified peripherals are not probe candidates. The selected probe must
-                // still have a unique serial/location and be revalidated at handoff.
-                return inventory.devices;
-              },
-              confirmProbeReleased: this.confirmProbeReleased,
-              selector: args.probe
-                ? {
-                    vendorId: args.probe.vendor_id,
-                    productId: args.probe.product_id,
-                    serialNumber: args.probe.serial_number,
-                  }
-                : undefined,
+              binding: await this.resolveRemoteBinding!(
+                Object.freeze({
+                  projectDir: prepared.projectDir,
+                  environment: prepared.environment,
+                  endpoint: prepared.configuration.port,
+                }),
+              ),
               timeoutMs: preparation.timeoutMs,
               deadline,
               approvalId: args.approval_id,
@@ -149,12 +157,45 @@ export class DebugCompatibilityClient {
                 args.initialization_host_approval_id,
               initializationTargetApprovalId:
                 args.initialization_target_approval_id,
-              backendHostApprovalId: args.backend_host_approval_id,
-              backendTargetApprovalId: args.backend_target_approval_id,
             },
             caller,
-          ),
-      );
+          )
+        : await withDebugProbeDiscovery(
+            projectDir,
+            args.discovery_approval_id,
+            caller,
+            (readInventory) =>
+              startLocalPreparedDebugger(
+                this.sessions,
+                {
+                  prepared,
+                  readInventory: async () => {
+                    const inventory = await readInventory();
+                    // Unidentified peripherals are not probe candidates. The selected probe must
+                    // still have a unique serial/location and be revalidated at handoff.
+                    return inventory.devices;
+                  },
+                  confirmProbeReleased: this.confirmProbeReleased,
+                  selector: args.probe
+                    ? {
+                        vendorId: args.probe.vendor_id,
+                        productId: args.probe.product_id,
+                        serialNumber: args.probe.serial_number,
+                      }
+                    : undefined,
+                  timeoutMs: preparation.timeoutMs,
+                  deadline,
+                  approvalId: args.approval_id,
+                  initializationHostApprovalId:
+                    args.initialization_host_approval_id,
+                  initializationTargetApprovalId:
+                    args.initialization_target_approval_id,
+                  backendHostApprovalId: args.backend_host_approval_id,
+                  backendTargetApprovalId: args.backend_target_approval_id,
+                },
+                caller,
+              ),
+          );
       // Forgetting is bookkeeping: a failure must not hide an already-owned session ID.
       await this.preparation.forget(preparation, caller).catch(() => {});
       const state = this.sessions

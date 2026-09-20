@@ -108740,10 +108740,8 @@ var DebugPreparationCache = class {
   }
 };
 
-// src/core/debug/debug-endpoint-custody.ts
-init_device_lease();
+// src/core/debug/debug-remote-startup.ts
 init_errors2();
-import net from "node:net";
 
 // src/core/debug/debug-remote-endpoint.ts
 init_errors2();
@@ -108785,6 +108783,9 @@ function parseRemoteDebugEndpoint(value2) {
 }
 
 // src/core/debug/debug-endpoint-custody.ts
+init_device_lease();
+init_errors2();
+import net from "node:net";
 async function assertDebugEndpointAvailable(port) {
   const server2 = net.createServer((socket) => socket.destroy());
   await new Promise((resolve, reject) => {
@@ -108869,339 +108870,15 @@ var DebugEndpointCustody = class {
     }
   }
 };
-
-// src/core/debug/debug-local-startup.ts
-init_errors2();
-
-// src/core/devices/debug-probe.ts
-init_errors2();
-function selectDebugProbe(records, selector = {}) {
-  const invalid4 = () => {
-    throw new PlatformIOError(
-      "Invalid USB probe discovery metadata.",
-      "DEBUG_PROBE_IDENTITY_INVALID"
-    );
-  };
-  const hex2 = (value2) => {
-    if (typeof value2 !== "string" || !/^(?:0x)?[a-f0-9]{4}$/i.test(value2))
-      return invalid4();
-    return value2.replace(/^0x/i, "").toLowerCase();
-  };
-  const text9 = (value2) => {
-    if (typeof value2 !== "string" || !value2.trim() || Buffer.byteLength(value2) > 256 || /[\x00-\x1f\x7f]/.test(value2))
-      return invalid4();
-    return value2;
-  };
-  if (!Array.isArray(records) || records.length > 1024) return invalid4();
-  const vendor = selector.vendorId === void 0 ? void 0 : hex2(selector.vendorId);
-  const product = selector.productId === void 0 ? void 0 : hex2(selector.productId);
-  const serial = selector.serialNumber === void 0 ? void 0 : text9(selector.serialNumber);
-  const candidates = /* @__PURE__ */ new Map();
-  for (const record3 of records) {
-    const probe2 = {
-      vendorId: hex2(record3.vendorId),
-      productId: hex2(record3.productId),
-      serialNumber: text9(record3.serialNumber),
-      location: text9(record3.location)
-    };
-    if (vendor && probe2.vendorId !== vendor || product && probe2.productId !== product || serial && probe2.serialNumber !== serial)
-      continue;
-    const identity2 = JSON.stringify([
-      "usb",
-      probe2.vendorId,
-      probe2.productId,
-      probe2.serialNumber
-    ]);
-    const previous = candidates.get(identity2);
-    if (previous) previous.locations.add(probe2.location);
-    else
-      candidates.set(identity2, { probe: probe2, locations: /* @__PURE__ */ new Set([probe2.location]) });
-  }
-  if (candidates.size !== 1 || [...candidates.values()].some((value2) => value2.locations.size !== 1))
-    throw new PlatformIOError(
-      candidates.size ? "Select one uniquely identified physical debug probe." : "No matching debug probe is present.",
-      candidates.size ? "DEBUG_PROBE_AMBIGUOUS" : "DEBUG_PROBE_NOT_FOUND"
-    );
-  const [identity, { probe }] = [...candidates][0];
-  return {
-    resource: Object.freeze({ kind: "probe", identity }),
-    probe: Object.freeze(probe)
-  };
-}
-
-// src/core/devices/debug-probe-custody.ts
-init_errors2();
-init_device_lease();
-async function acquireDebugProbeCustody(enumerate, selector, store = new DeviceLeaseStore()) {
-  const selected = selectDebugProbe(await enumerate(), selector);
-  const lease = store.acquire(selected.resource);
-  const custody = {
-    async prepareSpawn() {
-      const observed = selectDebugProbe(await enumerate(), {
-        vendorId: selected.probe.vendorId,
-        productId: selected.probe.productId,
-        serialNumber: selected.probe.serialNumber
-      });
-      if (observed.resource.identity !== selected.resource.identity || observed.probe.location !== selected.probe.location)
-        throw new PlatformIOError(
-          "Selected debug probe changed before startup.",
-          "DEBUG_PROBE_CHANGED"
-        );
-      store.beginHandoff(lease);
+function createRemoteDebugEndpointCustody(endpoint, acquireTarget, store = new DeviceLeaseStore()) {
+  return new DebugEndpointCustody(
+    endpoint.port,
+    acquireTarget,
+    store,
+    async () => {
     },
-    releaseAfterExit() {
-      try {
-        store.cancelHandoff(lease);
-        store.release(lease);
-      } catch (error2) {
-        throw new PlatformIOError(
-          error2 instanceof Error ? error2.message : "Probe lease cleanup failed.",
-          "DEVICE_CLEANUP_PENDING",
-          { cleanupPending: true }
-        );
-      }
-    }
-  };
-  return { ...selected, custody };
-}
-
-// src/core/debug/debug-backend-selection.ts
-init_errors2();
-import path65 from "node:path";
-
-// src/core/debug/debug-probe-binding.ts
-init_errors2();
-import path63 from "node:path";
-function tclWord(value2) {
-  return '"' + value2.replace(/[\\"$\[\]]/g, (character) => "\\" + character) + '"';
-}
-function selectLocalDebugEndpoint(value2) {
-  const match = /^(?:(?:127\.0\.0\.1|localhost)?):([0-9]{1,5})$/.exec(
-    value2 ?? ""
+    endpoint.host
   );
-  const port = match ? Number(match[1]) : 0;
-  if (port < 1 || port > 65535)
-    throw new PlatformIOError(
-      "A loopback TCP debug endpoint is required for an owned local backend.",
-      "DEBUG_ENDPOINT_UNSUPPORTED"
-    );
-  return Object.freeze({ host: "127.0.0.1", port });
-}
-function bindOpenOcdProbe(command, selected, port) {
-  const normalized = parseDebugServerCommand(command, command.cwd);
-  if (!/^openocd(?:\.exe)?$/i.test(path63.basename(normalized.executable)))
-    throw new PlatformIOError(
-      "This probe binding requires a trusted OpenOCD backend.",
-      "DEBUG_BACKEND_BINDING_UNSUPPORTED"
-    );
-  if (!Number.isInteger(port) || port < 1 || port > 65535)
-    throw new PlatformIOError(
-      "Invalid backend GDB port.",
-      "DEBUG_ENDPOINT_UNSUPPORTED"
-    );
-  const probe = selectDebugProbe([selected]).probe;
-  const binding = [
-    "-c",
-    "adapter serial " + tclWord(probe.serialNumber),
-    "-c",
-    "bindto 127.0.0.1",
-    "-c",
-    "gdb_port " + port,
-    "-c",
-    "tcl_port disabled",
-    "-c",
-    "telnet_port disabled"
-  ];
-  for (let index = 0; index < normalized.arguments.length; index++) {
-    const option = normalized.arguments[index];
-    if (option.startsWith("-c") || option === "--command" || option.startsWith("--command=")) {
-      const text9 = option.startsWith("--command=") ? option.slice(10) : option.startsWith("-c") && option.length > 2 ? option.slice(2) : normalized.arguments[++index];
-      if (text9 === void 0 || /(?:^|[;\n])\s*(?:init|reset|halt|resume|program|flash|adapter\s+serial|ftdi_serial|hla_serial|cmsis_dap_serial|jlink\s+serial|st-link\s+serial)(?:\s|$)/i.test(
-        text9
-      ))
-        throw new PlatformIOError(
-          "Backend arguments initialize hardware early or contain a competing probe selector.",
-          "DEBUG_BACKEND_BINDING_CONFLICT"
-        );
-    }
-  }
-  return {
-    ...normalized,
-    arguments: [...binding, ...normalized.arguments, ...binding]
-  };
-}
-
-// src/core/debug/debug-jlink-binding.ts
-init_errors2();
-import path64 from "node:path";
-function bindJLinkProbe(command, selected, port) {
-  const normalized = parseDebugServerCommand(command, command.cwd);
-  const conflict = () => {
-    throw new PlatformIOError(
-      "J-Link arguments conflict with the selected USB probe or local endpoint.",
-      "DEBUG_BACKEND_BINDING_CONFLICT"
-    );
-  };
-  if (!/^JLinkGDBServer(?:CL)?(?:Exe)?(?:\.exe)?$/i.test(
-    path64.basename(normalized.executable)
-  ))
-    throw new PlatformIOError(
-      "J-Link probe binding requires a trusted SEGGER GDB server.",
-      "DEBUG_BACKEND_BINDING_UNSUPPORTED"
-    );
-  const probe = selectDebugProbe([selected]).probe;
-  if (!/^[0-9]{1,12}$/.test(probe.serialNumber) || Number(probe.serialNumber) <= 3 || !Number.isInteger(port) || port < 1 || port > 65535)
-    return conflict();
-  const usesLegacySelector = normalized.arguments.some(
-    (argument2) => argument2.toLowerCase() === "-select"
-  ) && !normalized.arguments.some((argument2) => argument2.toLowerCase() === "-usb");
-  const args = [];
-  for (let index = 0; index < normalized.arguments.length; index++) {
-    const argument2 = normalized.arguments[index];
-    const option = argument2.toLowerCase();
-    if (option === "-ip" || option.startsWith("-ip=") || option === "-nolocalhostonly")
-      return conflict();
-    if (["-usb", "-select", "-port", "-localhostonly"].includes(option)) {
-      const next = normalized.arguments[index + 1];
-      if (option === "-localhostonly" && (next === void 0 || next.startsWith("-")))
-        continue;
-      if (next === void 0 || next.startsWith("-")) return conflict();
-      index++;
-      if (option === "-usb" && next !== probe.serialNumber) return conflict();
-      if (option === "-select" && next.toUpperCase() !== "USB" && next.toUpperCase() !== "USB=" + probe.serialNumber)
-        return conflict();
-      if (option === "-localhostonly" && next !== "1") return conflict();
-      if (option === "-port" && !/^[0-9]{1,5}$/.test(next)) return conflict();
-      continue;
-    }
-    if (/^-(?:usb|select|port|localhostonly)=/i.test(argument2))
-      return conflict();
-    args.push(argument2);
-  }
-  return parseDebugServerCommand(
-    {
-      ...normalized,
-      arguments: [
-        ...args,
-        ...usesLegacySelector ? ["-select", "USB=" + probe.serialNumber] : ["-USB", probe.serialNumber],
-        "-port",
-        String(port),
-        "-LocalhostOnly",
-        "1"
-      ]
-    },
-    normalized.cwd
-  );
-}
-
-// src/core/debug/debug-backend-readiness.ts
-init_errors2();
-init_bounded_pattern();
-import { setTimeout as delay6 } from "node:timers/promises";
-async function validateBackendReadyPattern(pattern) {
-  if (typeof pattern !== "string" || !pattern.trim() || pattern.length > 4096)
-    throw new PlatformIOError(
-      "A bounded backend readiness pattern is required.",
-      "DEBUG_READY_PATTERN_INVALID"
-    );
-  const matches = await matchBoundedLines([""], pattern, {
-    mode: "regex",
-    pythonNamedGroups: true
-  });
-  if (matches.length)
-    throw new PlatformIOError(
-      "Backend readiness must require observed output.",
-      "DEBUG_READY_PATTERN_INVALID"
-    );
-}
-async function waitForBackendReady(backend, pattern, options) {
-  if (!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 6e5)
-    throw new PlatformIOError(
-      "Invalid debugger readiness deadline.",
-      "DEBUG_READY_LIMIT_INVALID"
-    );
-  const deadline = performance.now() + options.timeoutMs;
-  const check2 = () => {
-    options.guard();
-    if (options.signal?.aborted)
-      throw new PlatformIOError(
-        "Debugger readiness cancelled.",
-        "DEBUG_CANCELLED"
-      );
-    if (performance.now() >= deadline)
-      throw new PlatformIOError(
-        "Debugger backend did not become ready before its deadline.",
-        "DEBUG_BACKEND_READY_TIMEOUT"
-      );
-    const state = backend.state();
-    if (state.failed || state.closed)
-      throw new PlatformIOError(
-        "Debugger backend exited or failed before readiness.",
-        "DEBUG_BACKEND_NOT_READY"
-      );
-    return state;
-  };
-  check2();
-  await validateBackendReadyPattern(pattern);
-  let previous;
-  while (true) {
-    const state = check2();
-    if (state.started && state.outputTail !== previous) {
-      previous = state.outputTail;
-      const matches = await matchBoundedLines([state.outputTail], pattern, {
-        mode: "regex",
-        pythonNamedGroups: true,
-        timeoutMs: Math.max(
-          1,
-          Math.min(1e3, Math.floor(deadline - performance.now()))
-        )
-      });
-      const current = check2();
-      if (matches.length && current.started) return;
-    }
-    await delay6(Math.min(25, Math.max(1, deadline - performance.now())));
-  }
-}
-
-// src/core/debug/debug-backend-selection.ts
-async function prepareLocalDebugBackend(prepared, probe) {
-  const guard = createPolicyRevisionGuard(prepared.projectDir);
-  guard();
-  const { server: server2, readyPattern, supervisorPython } = prepared.configuration;
-  if (!server2 || !prepared.trustedBackendRoots)
-    throw new PlatformIOError(
-      "Local debugger startup requires a trusted owned backend.",
-      "DEBUG_BACKEND_REQUIRED"
-    );
-  const endpoint = selectLocalDebugEndpoint(prepared.configuration.port);
-  if (!readyPattern)
-    throw new PlatformIOError(
-      "The configured backend has no readiness expression.",
-      "DEBUG_READY_PATTERN_INVALID"
-    );
-  await validateBackendReadyPattern(readyPattern);
-  const executable = await resolveDebugBackendExecutable(
-    server2.executable,
-    prepared.trustedBackendRoots,
-    prepared.projectDir
-  );
-  const selected = selectDebugProbe([probe]);
-  const command = { ...server2, executable };
-  const name2 = path65.basename(executable);
-  const bound = /^openocd(?:\.exe)?$/i.test(name2) ? bindOpenOcdProbe(command, selected.probe, endpoint.port) : /^JLinkGDBServer(?:CL)?(?:Exe)?(?:\.exe)?$/i.test(name2) ? bindJLinkProbe(command, selected.probe, endpoint.port) : void 0;
-  if (!bound)
-    throw new PlatformIOError(
-      "This backend still requires an explicit physical probe binding adapter.",
-      "DEBUG_BACKEND_BINDING_UNSUPPORTED"
-    );
-  guard();
-  return {
-    options: { pythonExecutable: supervisorPython, command: bound },
-    readyPattern,
-    endpoint,
-    probe: selected.probe,
-    resource: selected.resource
-  };
 }
 
 // src/core/debug/debug-startup.ts
@@ -109214,13 +108891,13 @@ init_errors2();
 // src/core/debug/debug-init-artifact.ts
 init_errors2();
 import fs57 from "node:fs/promises";
-import path67 from "node:path";
+import path64 from "node:path";
 import { createHash as createHash13 } from "node:crypto";
 import { isIP as isIP3 } from "node:net";
 
 // src/core/debug/debug-init-template.ts
 init_errors2();
-import path66 from "node:path";
+import path63 from "node:path";
 import { isIP as isIP2 } from "node:net";
 var DEBUG_INIT_MARKERS = Object.freeze({
   elf: "__PIO_MCP_INIT_ELF_PATH__",
@@ -109234,12 +108911,12 @@ function bindDebugInitializationTemplate(template, selection) {
       "DEBUG_INIT_TEMPLATE_INVALID"
     );
   };
-  if (typeof template !== "string" || !template.trim() || Buffer.byteLength(template) > 65536 || template.includes("\0") || !path66.isAbsolute(selection.elfPath) || /[\x00-\x1f\x7f]/.test(selection.elfPath) || !isIP2(selection.host) || !Number.isInteger(selection.port) || selection.port < 1 || selection.port > 65535)
+  if (typeof template !== "string" || !template.trim() || Buffer.byteLength(template) > 65536 || template.includes("\0") || !path63.isAbsolute(selection.elfPath) || /[\x00-\x1f\x7f]/.test(selection.elfPath) || !isIP2(selection.host) || !Number.isInteger(selection.port) || selection.port < 1 || selection.port > 65535)
     return invalid4();
   const nativePath = (value2) => process.platform === "win32" ? value2.replace(/\\/g, "/") : value2;
   const replacements = [
     [DEBUG_INIT_MARKERS.elf, nativePath(selection.elfPath)],
-    [DEBUG_INIT_MARKERS.directory, nativePath(path66.dirname(selection.elfPath))],
+    [DEBUG_INIT_MARKERS.directory, nativePath(path63.dirname(selection.elfPath))],
     [
       DEBUG_INIT_MARKERS.endpoint,
       (isIP2(selection.host) === 6 ? "[" + selection.host + "]" : selection.host) + ":" + selection.port
@@ -109296,7 +108973,7 @@ async function retainInitialization(script, binding, template) {
     );
   const directory = await fs57.realpath(await createPrivateAnalysisDirectory());
   try {
-    const file = path67.join(directory, "initialization.gdb");
+    const file = path64.join(directory, "initialization.gdb");
     if (/[\x00-\x1f\x7f]/.test(file))
       throw new PlatformIOError(
         "Invalid private debugger artifact path.",
@@ -109514,7 +109191,7 @@ var SupervisedDebugChild = class extends EventEmitter2 {
 
 // src/core/debug/debug-process.ts
 init_errors2();
-import path69 from "node:path";
+import path66 from "node:path";
 import { StringDecoder as StringDecoder5 } from "node:string_decoder";
 
 // src/core/debug/debug-command.ts
@@ -109805,7 +109482,7 @@ async function attachDebuggerTarget(transport, selection, caller) {
 
 // src/core/debug/debug-initialization.ts
 init_errors2();
-import path68 from "node:path";
+import path65 from "node:path";
 var GDB_STARTUP_ARGS = Object.freeze([
   "-nx",
   "--quiet",
@@ -109822,7 +109499,7 @@ async function initializeGdbInspection(session2, elfPath, timeoutMs = 3e4) {
       "Debugger initialization already attempted.",
       "GDB_INIT_REUSED"
     );
-  if (!path68.isAbsolute(elfPath) || /[\x00-\x1f\x7f]/.test(elfPath) || Buffer.byteLength(elfPath) > 4096 || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 6e5)
+  if (!path65.isAbsolute(elfPath) || /[\x00-\x1f\x7f]/.test(elfPath) || Buffer.byteLength(elfPath) > 4096 || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 6e5)
     throw new PlatformIOError(
       "Invalid debugger initialization arguments.",
       "GDB_INIT_INVALID"
@@ -110322,7 +109999,7 @@ var DebugProcess = class _DebugProcess {
     let child;
     let executable;
     try {
-      if (!path69.isAbsolute(options.executable) || !path69.isAbsolute(options.projectDir))
+      if (!path66.isAbsolute(options.executable) || !path66.isAbsolute(options.projectDir))
         throw new PlatformIOError(
           "Debugger paths must be host-resolved.",
           "GDB_PATH_INVALID"
@@ -110522,12 +110199,12 @@ var DebugProcess = class _DebugProcess {
 // src/core/debug/debug-elf.ts
 init_errors2();
 import fs58 from "node:fs/promises";
-import path70 from "node:path";
+import path67 from "node:path";
 async function retainDebugElf(projectDir, elfPath, expectedSha256) {
   const project = await fs58.realpath(projectDir);
-  const source = await fs58.realpath(path70.resolve(project, elfPath));
-  const relative = path70.relative(project, source);
-  if (!relative || relative === ".." || relative.startsWith(".." + path70.sep) || path70.isAbsolute(relative))
+  const source = await fs58.realpath(path67.resolve(project, elfPath));
+  const relative = path67.relative(project, source);
+  if (!relative || relative === ".." || relative.startsWith(".." + path67.sep) || path67.isAbsolute(relative))
     throw new PlatformIOError(
       "Debugger ELF must belong to the authorized project.",
       "DEBUG_ELF_OUTSIDE_WORKSPACE"
@@ -110535,7 +110212,7 @@ async function retainDebugElf(projectDir, elfPath, expectedSha256) {
   const identity = await readElfIdentity(source, expectedSha256);
   const directory = await createPrivateAnalysisDirectory();
   try {
-    const snapshot = path70.join(directory, "firmware.elf");
+    const snapshot = path67.join(directory, "firmware.elf");
     await fs58.copyFile(source, snapshot, fs58.constants.COPYFILE_EXCL);
     await fs58.chmod(snapshot, 384);
     await readElfIdentity(snapshot, identity.sha256);
@@ -110571,6 +110248,77 @@ function ownDebugElf(process9, lease) {
 
 // src/core/debug/debug-backend-session.ts
 init_errors2();
+
+// src/core/debug/debug-backend-readiness.ts
+init_errors2();
+init_bounded_pattern();
+import { setTimeout as delay6 } from "node:timers/promises";
+async function validateBackendReadyPattern(pattern) {
+  if (typeof pattern !== "string" || !pattern.trim() || pattern.length > 4096)
+    throw new PlatformIOError(
+      "A bounded backend readiness pattern is required.",
+      "DEBUG_READY_PATTERN_INVALID"
+    );
+  const matches = await matchBoundedLines([""], pattern, {
+    mode: "regex",
+    pythonNamedGroups: true
+  });
+  if (matches.length)
+    throw new PlatformIOError(
+      "Backend readiness must require observed output.",
+      "DEBUG_READY_PATTERN_INVALID"
+    );
+}
+async function waitForBackendReady(backend, pattern, options) {
+  if (!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 6e5)
+    throw new PlatformIOError(
+      "Invalid debugger readiness deadline.",
+      "DEBUG_READY_LIMIT_INVALID"
+    );
+  const deadline = performance.now() + options.timeoutMs;
+  const check2 = () => {
+    options.guard();
+    if (options.signal?.aborted)
+      throw new PlatformIOError(
+        "Debugger readiness cancelled.",
+        "DEBUG_CANCELLED"
+      );
+    if (performance.now() >= deadline)
+      throw new PlatformIOError(
+        "Debugger backend did not become ready before its deadline.",
+        "DEBUG_BACKEND_READY_TIMEOUT"
+      );
+    const state = backend.state();
+    if (state.failed || state.closed)
+      throw new PlatformIOError(
+        "Debugger backend exited or failed before readiness.",
+        "DEBUG_BACKEND_NOT_READY"
+      );
+    return state;
+  };
+  check2();
+  await validateBackendReadyPattern(pattern);
+  let previous;
+  while (true) {
+    const state = check2();
+    if (state.started && state.outputTail !== previous) {
+      previous = state.outputTail;
+      const matches = await matchBoundedLines([state.outputTail], pattern, {
+        mode: "regex",
+        pythonNamedGroups: true,
+        timeoutMs: Math.max(
+          1,
+          Math.min(1e3, Math.floor(deadline - performance.now()))
+        )
+      });
+      const current = check2();
+      if (matches.length && current.started) return;
+    }
+    await delay6(Math.min(25, Math.max(1, deadline - performance.now())));
+  }
+}
+
+// src/core/debug/debug-backend-session.ts
 async function preflightDebuggerBackend(input, caller = {}) {
   const selected = input.debugger;
   if (!input.sessionId || input.elfSha256 !== void 0 && !/^[a-f0-9]{64}$/i.test(input.elfSha256) || !Number.isSafeInteger(input.timeoutMs) || input.timeoutMs < 1 || input.timeoutMs > 6e5)
@@ -110962,6 +110710,353 @@ function startPreparedDebugger(sessions, selection, caller = {}) {
     requestIdentity,
     { debugTool: selection.debugTool }
   );
+}
+
+// src/core/debug/debug-remote-startup.ts
+async function startRemotePreparedDebugger(sessions, input, caller = {}) {
+  const { prepared, binding } = input;
+  const guard = createPolicyRevisionGuard(prepared.projectDir);
+  guard();
+  if (prepared.configuration.server)
+    throw new PlatformIOError(
+      "Remote startup cannot launch a configured local backend.",
+      "DEBUG_REMOTE_BACKEND_CONFLICT"
+    );
+  const endpoint = parseRemoteDebugEndpoint(prepared.configuration.port);
+  const authorizedEndpoint = parseRemoteDebugEndpoint(binding.endpoint);
+  const identity = binding.identity;
+  if (endpoint.resource.identity !== authorizedEndpoint.resource.identity || typeof identity !== "string" || !identity.trim() || identity.length > 1024 || /[\x00-\x1f\x7f]/.test(identity) || typeof binding.acquireTarget !== "function" || typeof binding.revalidate !== "function")
+    throw new PlatformIOError(
+      "Remote debugger endpoint has no matching host target binding.",
+      "DEBUG_REMOTE_BINDING_INVALID"
+    );
+  const revalidate = binding.revalidate.bind(binding);
+  const acquireTarget = binding.acquireTarget.bind(binding);
+  let acquired = false;
+  return startPreparedDebugger(
+    sessions,
+    {
+      projectDir: prepared.projectDir,
+      environment: prepared.environment,
+      debugTool: prepared.configuration.debugTool,
+      elfPath: prepared.elfPath,
+      expectedElfSha256: prepared.expectedElfSha256,
+      executable: prepared.executable,
+      trustedDebuggerRoots: prepared.trustedDebuggerRoots,
+      supervisorPython: prepared.configuration.supervisorPython,
+      probeIdentity: identity,
+      deadline: input.deadline,
+      approvalId: input.approvalId,
+      target: {
+        host: endpoint.host,
+        port: endpoint.port,
+        load: prepared.load,
+        timeoutMs: input.timeoutMs
+      },
+      initialization: {
+        template: prepared.configuration.generatedInitTemplate,
+        hostApprovalId: input.initializationHostApprovalId,
+        targetApprovalId: input.initializationTargetApprovalId
+      },
+      acquireCustody: async () => {
+        guard();
+        if (acquired)
+          throw new PlatformIOError(
+            "Remote debugger custody has already been acquired.",
+            "DEBUG_CUSTODY_REUSED"
+          );
+        acquired = true;
+        return {
+          custody: createRemoteDebugEndpointCustody(
+            endpoint,
+            async () => {
+              guard();
+              await revalidate();
+              guard();
+              const target = await acquireTarget();
+              return {
+                prepareSpawn: async () => {
+                  guard();
+                  await revalidate();
+                  guard();
+                  await target.prepareSpawn();
+                  guard();
+                },
+                releaseAfterExit: () => target.releaseAfterExit()
+              };
+            },
+            input.leaseStore
+          )
+        };
+      }
+    },
+    caller
+  );
+}
+
+// src/core/debug/debug-local-startup.ts
+init_errors2();
+
+// src/core/devices/debug-probe.ts
+init_errors2();
+function selectDebugProbe(records, selector = {}) {
+  const invalid4 = () => {
+    throw new PlatformIOError(
+      "Invalid USB probe discovery metadata.",
+      "DEBUG_PROBE_IDENTITY_INVALID"
+    );
+  };
+  const hex2 = (value2) => {
+    if (typeof value2 !== "string" || !/^(?:0x)?[a-f0-9]{4}$/i.test(value2))
+      return invalid4();
+    return value2.replace(/^0x/i, "").toLowerCase();
+  };
+  const text9 = (value2) => {
+    if (typeof value2 !== "string" || !value2.trim() || Buffer.byteLength(value2) > 256 || /[\x00-\x1f\x7f]/.test(value2))
+      return invalid4();
+    return value2;
+  };
+  if (!Array.isArray(records) || records.length > 1024) return invalid4();
+  const vendor = selector.vendorId === void 0 ? void 0 : hex2(selector.vendorId);
+  const product = selector.productId === void 0 ? void 0 : hex2(selector.productId);
+  const serial = selector.serialNumber === void 0 ? void 0 : text9(selector.serialNumber);
+  const candidates = /* @__PURE__ */ new Map();
+  for (const record3 of records) {
+    const probe2 = {
+      vendorId: hex2(record3.vendorId),
+      productId: hex2(record3.productId),
+      serialNumber: text9(record3.serialNumber),
+      location: text9(record3.location)
+    };
+    if (vendor && probe2.vendorId !== vendor || product && probe2.productId !== product || serial && probe2.serialNumber !== serial)
+      continue;
+    const identity2 = JSON.stringify([
+      "usb",
+      probe2.vendorId,
+      probe2.productId,
+      probe2.serialNumber
+    ]);
+    const previous = candidates.get(identity2);
+    if (previous) previous.locations.add(probe2.location);
+    else
+      candidates.set(identity2, { probe: probe2, locations: /* @__PURE__ */ new Set([probe2.location]) });
+  }
+  if (candidates.size !== 1 || [...candidates.values()].some((value2) => value2.locations.size !== 1))
+    throw new PlatformIOError(
+      candidates.size ? "Select one uniquely identified physical debug probe." : "No matching debug probe is present.",
+      candidates.size ? "DEBUG_PROBE_AMBIGUOUS" : "DEBUG_PROBE_NOT_FOUND"
+    );
+  const [identity, { probe }] = [...candidates][0];
+  return {
+    resource: Object.freeze({ kind: "probe", identity }),
+    probe: Object.freeze(probe)
+  };
+}
+
+// src/core/devices/debug-probe-custody.ts
+init_errors2();
+init_device_lease();
+async function acquireDebugProbeCustody(enumerate, selector, store = new DeviceLeaseStore()) {
+  const selected = selectDebugProbe(await enumerate(), selector);
+  const lease = store.acquire(selected.resource);
+  const custody = {
+    async prepareSpawn() {
+      const observed = selectDebugProbe(await enumerate(), {
+        vendorId: selected.probe.vendorId,
+        productId: selected.probe.productId,
+        serialNumber: selected.probe.serialNumber
+      });
+      if (observed.resource.identity !== selected.resource.identity || observed.probe.location !== selected.probe.location)
+        throw new PlatformIOError(
+          "Selected debug probe changed before startup.",
+          "DEBUG_PROBE_CHANGED"
+        );
+      store.beginHandoff(lease);
+    },
+    releaseAfterExit() {
+      try {
+        store.cancelHandoff(lease);
+        store.release(lease);
+      } catch (error2) {
+        throw new PlatformIOError(
+          error2 instanceof Error ? error2.message : "Probe lease cleanup failed.",
+          "DEVICE_CLEANUP_PENDING",
+          { cleanupPending: true }
+        );
+      }
+    }
+  };
+  return { ...selected, custody };
+}
+
+// src/core/debug/debug-backend-selection.ts
+init_errors2();
+import path70 from "node:path";
+
+// src/core/debug/debug-probe-binding.ts
+init_errors2();
+import path68 from "node:path";
+function tclWord(value2) {
+  return '"' + value2.replace(/[\\"$\[\]]/g, (character) => "\\" + character) + '"';
+}
+function selectLocalDebugEndpoint(value2) {
+  const match = /^(?:(?:127\.0\.0\.1|localhost)?):([0-9]{1,5})$/.exec(
+    value2 ?? ""
+  );
+  const port = match ? Number(match[1]) : 0;
+  if (port < 1 || port > 65535)
+    throw new PlatformIOError(
+      "A loopback TCP debug endpoint is required for an owned local backend.",
+      "DEBUG_ENDPOINT_UNSUPPORTED"
+    );
+  return Object.freeze({ host: "127.0.0.1", port });
+}
+function bindOpenOcdProbe(command, selected, port) {
+  const normalized = parseDebugServerCommand(command, command.cwd);
+  if (!/^openocd(?:\.exe)?$/i.test(path68.basename(normalized.executable)))
+    throw new PlatformIOError(
+      "This probe binding requires a trusted OpenOCD backend.",
+      "DEBUG_BACKEND_BINDING_UNSUPPORTED"
+    );
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new PlatformIOError(
+      "Invalid backend GDB port.",
+      "DEBUG_ENDPOINT_UNSUPPORTED"
+    );
+  const probe = selectDebugProbe([selected]).probe;
+  const binding = [
+    "-c",
+    "adapter serial " + tclWord(probe.serialNumber),
+    "-c",
+    "bindto 127.0.0.1",
+    "-c",
+    "gdb_port " + port,
+    "-c",
+    "tcl_port disabled",
+    "-c",
+    "telnet_port disabled"
+  ];
+  for (let index = 0; index < normalized.arguments.length; index++) {
+    const option = normalized.arguments[index];
+    if (option.startsWith("-c") || option === "--command" || option.startsWith("--command=")) {
+      const text9 = option.startsWith("--command=") ? option.slice(10) : option.startsWith("-c") && option.length > 2 ? option.slice(2) : normalized.arguments[++index];
+      if (text9 === void 0 || /(?:^|[;\n])\s*(?:init|reset|halt|resume|program|flash|adapter\s+serial|ftdi_serial|hla_serial|cmsis_dap_serial|jlink\s+serial|st-link\s+serial)(?:\s|$)/i.test(
+        text9
+      ))
+        throw new PlatformIOError(
+          "Backend arguments initialize hardware early or contain a competing probe selector.",
+          "DEBUG_BACKEND_BINDING_CONFLICT"
+        );
+    }
+  }
+  return {
+    ...normalized,
+    arguments: [...binding, ...normalized.arguments, ...binding]
+  };
+}
+
+// src/core/debug/debug-jlink-binding.ts
+init_errors2();
+import path69 from "node:path";
+function bindJLinkProbe(command, selected, port) {
+  const normalized = parseDebugServerCommand(command, command.cwd);
+  const conflict = () => {
+    throw new PlatformIOError(
+      "J-Link arguments conflict with the selected USB probe or local endpoint.",
+      "DEBUG_BACKEND_BINDING_CONFLICT"
+    );
+  };
+  if (!/^JLinkGDBServer(?:CL)?(?:Exe)?(?:\.exe)?$/i.test(
+    path69.basename(normalized.executable)
+  ))
+    throw new PlatformIOError(
+      "J-Link probe binding requires a trusted SEGGER GDB server.",
+      "DEBUG_BACKEND_BINDING_UNSUPPORTED"
+    );
+  const probe = selectDebugProbe([selected]).probe;
+  if (!/^[0-9]{1,12}$/.test(probe.serialNumber) || Number(probe.serialNumber) <= 3 || !Number.isInteger(port) || port < 1 || port > 65535)
+    return conflict();
+  const usesLegacySelector = normalized.arguments.some(
+    (argument2) => argument2.toLowerCase() === "-select"
+  ) && !normalized.arguments.some((argument2) => argument2.toLowerCase() === "-usb");
+  const args = [];
+  for (let index = 0; index < normalized.arguments.length; index++) {
+    const argument2 = normalized.arguments[index];
+    const option = argument2.toLowerCase();
+    if (option === "-ip" || option.startsWith("-ip=") || option === "-nolocalhostonly")
+      return conflict();
+    if (["-usb", "-select", "-port", "-localhostonly"].includes(option)) {
+      const next = normalized.arguments[index + 1];
+      if (option === "-localhostonly" && (next === void 0 || next.startsWith("-")))
+        continue;
+      if (next === void 0 || next.startsWith("-")) return conflict();
+      index++;
+      if (option === "-usb" && next !== probe.serialNumber) return conflict();
+      if (option === "-select" && next.toUpperCase() !== "USB" && next.toUpperCase() !== "USB=" + probe.serialNumber)
+        return conflict();
+      if (option === "-localhostonly" && next !== "1") return conflict();
+      if (option === "-port" && !/^[0-9]{1,5}$/.test(next)) return conflict();
+      continue;
+    }
+    if (/^-(?:usb|select|port|localhostonly)=/i.test(argument2))
+      return conflict();
+    args.push(argument2);
+  }
+  return parseDebugServerCommand(
+    {
+      ...normalized,
+      arguments: [
+        ...args,
+        ...usesLegacySelector ? ["-select", "USB=" + probe.serialNumber] : ["-USB", probe.serialNumber],
+        "-port",
+        String(port),
+        "-LocalhostOnly",
+        "1"
+      ]
+    },
+    normalized.cwd
+  );
+}
+
+// src/core/debug/debug-backend-selection.ts
+async function prepareLocalDebugBackend(prepared, probe) {
+  const guard = createPolicyRevisionGuard(prepared.projectDir);
+  guard();
+  const { server: server2, readyPattern, supervisorPython } = prepared.configuration;
+  if (!server2 || !prepared.trustedBackendRoots)
+    throw new PlatformIOError(
+      "Local debugger startup requires a trusted owned backend.",
+      "DEBUG_BACKEND_REQUIRED"
+    );
+  const endpoint = selectLocalDebugEndpoint(prepared.configuration.port);
+  if (!readyPattern)
+    throw new PlatformIOError(
+      "The configured backend has no readiness expression.",
+      "DEBUG_READY_PATTERN_INVALID"
+    );
+  await validateBackendReadyPattern(readyPattern);
+  const executable = await resolveDebugBackendExecutable(
+    server2.executable,
+    prepared.trustedBackendRoots,
+    prepared.projectDir
+  );
+  const selected = selectDebugProbe([probe]);
+  const command = { ...server2, executable };
+  const name2 = path70.basename(executable);
+  const bound = /^openocd(?:\.exe)?$/i.test(name2) ? bindOpenOcdProbe(command, selected.probe, endpoint.port) : /^JLinkGDBServer(?:CL)?(?:Exe)?(?:\.exe)?$/i.test(name2) ? bindJLinkProbe(command, selected.probe, endpoint.port) : void 0;
+  if (!bound)
+    throw new PlatformIOError(
+      "This backend still requires an explicit physical probe binding adapter.",
+      "DEBUG_BACKEND_BINDING_UNSUPPORTED"
+    );
+  guard();
+  return {
+    options: { pythonExecutable: supervisorPython, command: bound },
+    readyPattern,
+    endpoint,
+    probe: selected.probe,
+    resource: selected.resource
+  };
 }
 
 // src/core/debug/debug-local-startup.ts
@@ -111476,10 +111571,12 @@ var DebugStartCompatibilitySchema = external_exports.object({
 }).strict();
 var DebugCompatibilityClient = class {
   /** Optional host verification supplements mandatory native supervisor proofs; never request-controlled. */
-  constructor(confirmProbeReleased) {
+  constructor(confirmProbeReleased, resolveRemoteBinding) {
     this.confirmProbeReleased = confirmProbeReleased;
+    this.resolveRemoteBinding = resolveRemoteBinding;
   }
   confirmProbeReleased;
+  resolveRemoteBinding;
   taskId = randomUUID9();
   sessions = new DebugClientSessions();
   preparation = new DebugPreparationCache();
@@ -111528,7 +111625,31 @@ var DebugCompatibilityClient = class {
           "Debugger startup deadline expired.",
           "DEBUG_START_TIMEOUT"
         );
-      const id = await withDebugProbeDiscovery(
+      const remote = prepared.configuration?.server === null;
+      if (remote && !this.resolveRemoteBinding)
+        throw new PlatformIOError(
+          "Remote debugger startup requires a trusted host target binding.",
+          "DEBUG_REMOTE_BINDING_REQUIRED"
+        );
+      const id = remote ? await startRemotePreparedDebugger(
+        this.sessions,
+        {
+          prepared,
+          binding: await this.resolveRemoteBinding(
+            Object.freeze({
+              projectDir: prepared.projectDir,
+              environment: prepared.environment,
+              endpoint: prepared.configuration.port
+            })
+          ),
+          timeoutMs: preparation.timeoutMs,
+          deadline,
+          approvalId: args.approval_id,
+          initializationHostApprovalId: args.initialization_host_approval_id,
+          initializationTargetApprovalId: args.initialization_target_approval_id
+        },
+        caller
+      ) : await withDebugProbeDiscovery(
         projectDir,
         args.discovery_approval_id,
         caller,

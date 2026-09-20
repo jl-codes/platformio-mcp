@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   forget: vi.fn(),
   close: vi.fn(),
   start: vi.fn(),
+  remote: vi.fn(),
   inventory: vi.fn(),
   project: vi.fn(),
 }));
@@ -17,6 +18,9 @@ vi.mock("../src/core/debug/debug-preparation-cache.js", () => ({
 }));
 vi.mock("../src/core/debug/debug-local-startup.js", () => ({
   startLocalPreparedDebugger: mocks.start,
+}));
+vi.mock("../src/core/debug/debug-remote-startup.js", () => ({
+  startRemotePreparedDebugger: mocks.remote,
 }));
 vi.mock("../src/adapters/compatibility-project.js", () => ({
   resolveCompatibilityProject: mocks.project,
@@ -143,4 +147,43 @@ it("returns the initial observed stop frame instead of requiring a later list ca
     },
   });
   await client.close();
+});
+
+it("requires a host remote binding and never falls back to local USB discovery", async () => {
+  mocks.prepare.mockResolvedValue({
+    projectDir: "/project",
+    environment: "debug",
+    load: false,
+    configuration: { server: null, port: "192.0.2.1:3333" },
+  });
+  await expect(new DebugCompatibilityClient().start({})).rejects.toMatchObject({
+    code: "DEBUG_REMOTE_BINDING_REQUIRED",
+  });
+  expect(mocks.start).not.toHaveBeenCalled();
+  expect(mocks.inventory).not.toHaveBeenCalled();
+  const binding = {
+    endpoint: "192.0.2.1:3333",
+    identity: "host-target",
+    revalidate: vi.fn(),
+    acquireTarget: vi.fn(async () => ({
+      prepareSpawn: vi.fn(),
+      releaseAfterExit: vi.fn(),
+    })),
+  };
+  const resolve = vi.fn(async () => binding);
+  mocks.remote.mockResolvedValue("remote-id");
+  const client = new DebugCompatibilityClient(undefined, resolve);
+  await expect(client.start({ load: false })).resolves.toMatchObject({
+    session_id: "remote-id",
+  });
+  expect(resolve).toHaveBeenCalledWith({
+    projectDir: "/project",
+    environment: "debug",
+    endpoint: "192.0.2.1:3333",
+  });
+  expect(mocks.remote.mock.calls[0][1].binding).toBe(binding);
+  await expect(client.start({ binding })).rejects.toMatchObject({
+    code: "COMPAT_ARGUMENT_INVALID",
+  });
+  expect(resolve).toHaveBeenCalledOnce();
 });
