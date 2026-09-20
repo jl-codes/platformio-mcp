@@ -34,6 +34,10 @@ export async function executeDecodeCompatibility(
       approval_id: z.string().max(256).optional(),
       config_approval_id: z.string().max(256).optional(),
       read_approval_id: z.string().max(256).optional(),
+      archived_elf_sha256: z
+        .string()
+        .regex(/^[a-fA-F0-9]{64}$/)
+        .optional(),
       expected_elf_sha256: z
         .string()
         .regex(/^[a-fA-F0-9]{64}$/)
@@ -101,6 +105,7 @@ export async function executeDecodeCompatibility(
         includeAllHex: params.include_all_hex,
         approvalId: params.approval_id,
         expectedElfSha256: params.expected_elf_sha256,
+        archivedElfSha256: params.archived_elf_sha256,
       },
       caller,
       onAuthorized,
@@ -124,6 +129,7 @@ export async function executeDecodeCompatibility(
       frames: report.frames,
       elf_path: report.elf.path,
       elf_sha256: report.elf.sha256,
+      elf_archive_path: report.elf.archivePath ?? null,
       env: report.environment,
       addr2line: report.addr2line,
       flashed_firmware_verified: report.flashedFirmwareVerified,

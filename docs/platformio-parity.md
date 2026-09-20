@@ -35,3 +35,5 @@ Crash and size reports include elf.archivePath, a hash-verified ELF copy retaine
 
 To decode an earlier retained build, pass archivedElfSha256 to decode_backtrace or --archived-elf-sha256 to the decode-backtrace CLI command. Use the hash returned by the original report. Retained history is scoped to the exact metadata-resolved ELF source path; it is not a global hash lookup across projects. The original source path must still resolve, and current environment metadata/toolchain discovery still requires build permission. Historical toolchain and flashed-image correspondence remain separate manifest requirements.
 
+
+The optional compatibility extension archived_elf_sha256 provides the same retained-build selection through pio_decode_backtrace. Its result includes elf_archive_path. Canonical project/configuration, analysis and owned-session permissions still apply.

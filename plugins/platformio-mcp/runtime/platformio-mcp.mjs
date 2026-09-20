@@ -96406,6 +96406,7 @@ async function executeDecodeCompatibility(client, input, defaults, caller, onAut
     approval_id: external_exports.string().max(256).optional(),
     config_approval_id: external_exports.string().max(256).optional(),
     read_approval_id: external_exports.string().max(256).optional(),
+    archived_elf_sha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
     expected_elf_sha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional()
   }).strict().parse(input);
   const decode = async (text7, collection) => {
@@ -96452,7 +96453,8 @@ async function executeDecodeCompatibility(client, input, defaults, caller, onAut
         text: text7,
         includeAllHex: params.include_all_hex,
         approvalId: params.approval_id,
-        expectedElfSha256: params.expected_elf_sha256
+        expectedElfSha256: params.expected_elf_sha256,
+        archivedElfSha256: params.archived_elf_sha256
       },
       caller,
       onAuthorized
@@ -96476,6 +96478,7 @@ async function executeDecodeCompatibility(client, input, defaults, caller, onAut
       frames: report.frames,
       elf_path: report.elf.path,
       elf_sha256: report.elf.sha256,
+      elf_archive_path: report.elf.archivePath ?? null,
       env: report.environment,
       addr2line: report.addr2line,
       flashed_firmware_verified: report.flashedFirmwareVerified,
@@ -99768,7 +99771,8 @@ function withDeviceCompatibility(base2) {
         approval_id: { type: "string", maxLength: 256 },
         config_approval_id: { type: "string", maxLength: 256 },
         read_approval_id: { type: "string", maxLength: 256 },
-        expected_elf_sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" }
+        expected_elf_sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
+        archived_elf_sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" }
       }
     },
     handler: (args, context) => context.dispatch("pio_decode_backtrace", args)

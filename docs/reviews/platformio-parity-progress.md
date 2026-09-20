@@ -954,3 +954,7 @@ Analysis snapshots now publish a hash-verified content-addressed ELF copy and ex
 
 Canonical decode_backtrace and its CLI now accept archivedElfSha256/--archived-elf-sha256. Retained history is indexed by the canonical original ELF source path; lookup verifies hash and regular-file identity and cannot retrieve another source's archive by hash alone. The request-bound analysis grant includes this selection. A handler regression changes the current firmware and confirms the decoder receives the earlier retained bytes and keeps the same archivePath. TypeScript and 26 focused handler/ELF/report checks passed. Current metadata/toolchain discovery is still required; historical toolchain manifests, source-path deletion/movement recovery, read-only explicit-ELF operation, and flashed-image identity remain incomplete.
 
+
+### Compatibility archive selection
+
+The pio_decode_backtrace adapter now accepts archived_elf_sha256, maps it into the canonical request-bound analysis call, and returns elf_archive_path. Malformed hashes fail before configuration inspection or owned-session reads. TypeScript and four focused adapter checks passed. This is an additive extension; all pinned decoder parameters remain supported.

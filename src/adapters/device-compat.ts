@@ -449,6 +449,7 @@ export function withDeviceCompatibility<TResult>(
         config_approval_id: { type: "string", maxLength: 256 },
         read_approval_id: { type: "string", maxLength: 256 },
         expected_elf_sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
+        archived_elf_sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
       },
     },
     handler: (args, context) => context.dispatch("pio_decode_backtrace", args),

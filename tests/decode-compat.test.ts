@@ -59,7 +59,11 @@ it("passes separate config and analysis grants and retains ELF identity", async 
     causes: [],
     resetReasons: [],
     backtraceCorrupted: false,
-    elf: { path: "/project/fw.elf", sha256: "a".repeat(64) },
+    elf: {
+      path: "/project/fw.elf",
+      sha256: "a".repeat(64),
+      archivePath: "/retained/fw.elf",
+    },
     environment: "esp",
     addr2line: "/trusted/addr2line",
     flashedFirmwareVerified: false,
@@ -70,6 +74,7 @@ it("passes separate config and analysis grants and retains ELF identity", async 
       text: "Backtrace: 0x40001234:0x3ffb0000",
       config_approval_id: "configuration",
       approval_id: "analysis",
+      archived_elf_sha256: "a".repeat(64),
     },
     {},
     {},
@@ -77,10 +82,27 @@ it("passes separate config and analysis grants and retains ELF identity", async 
   expect(mocks.config.mock.calls[0][1].approvalId).toBe("configuration");
   expect(mocks.decode.mock.calls[0][0]).toMatchObject({
     approvalId: "analysis",
+    archivedElfSha256: "a".repeat(64),
     environment: "esp",
   });
   expect(result).toMatchObject({
     elf_sha256: "a".repeat(64),
+    elf_archive_path: "/retained/fw.elf",
     flashed_firmware_verified: false,
   });
+});
+
+it("rejects malformed archive identities before project inspection or session access", async () => {
+  const run = vi.fn();
+  await expect(
+    executeDecodeCompatibility(
+      { run } as unknown as SerialClientContext,
+      { session_id: "owned", archived_elf_sha256: "../other-project" },
+      {},
+      {},
+    ),
+  ).rejects.toThrow();
+  expect(run).not.toHaveBeenCalled();
+  expect(mocks.config).not.toHaveBeenCalled();
+  expect(mocks.decode).not.toHaveBeenCalled();
 });
