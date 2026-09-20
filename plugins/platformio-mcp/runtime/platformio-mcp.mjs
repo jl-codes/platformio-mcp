@@ -101678,9 +101678,12 @@ async function executeCleanCompatibility(input, defaults = {}, caller = {}, onAu
   );
 }
 function cleanCompatibilityResult(result, environment, duration3) {
-  const lines2 = result.output.split(/\r?\n/);
+  const output = normalizeCleanOutput(result.output);
+  const lines2 = output.split("\n");
   const diagnostics = [];
   const seen = /* @__PURE__ */ new Set();
+  const linkerDiagnostics = [];
+  const stepDiagnostics = [];
   const environments = [];
   const memory = {};
   let failed = false;
@@ -101704,39 +101707,70 @@ function cleanCompatibilityResult(result, environment, duration3) {
       line
     );
     const step = /^\*\*\* \[([^\]]+)\] (.*)$/.exec(line);
-    const diagnostic = compiler ? {
-      kind: compiler[4].replace("fatal ", ""),
-      file: compiler[1],
-      line: Number(compiler[2]),
-      column: compiler[3] ? Number(compiler[3]) : null,
-      message: compiler[5].trim()
-    } : linker ? {
-      kind: "error",
-      file: "<linker>",
-      line: 0,
-      column: null,
-      message: linker[1].trim()
-    } : step ? {
-      kind: "error",
-      file: step[1],
-      line: 0,
-      column: null,
-      message: `build step failed: ${step[2]}`
-    } : null;
-    if (diagnostic && !seen.has(JSON.stringify(diagnostic))) {
-      seen.add(JSON.stringify(diagnostic));
-      diagnostics.push(diagnostic);
+    const candidates = [
+      compiler ? {
+        bucket: diagnostics,
+        key: JSON.stringify(["compiler", ...compiler.slice(1)]),
+        value: {
+          kind: compiler[4].replace("fatal ", ""),
+          file: compiler[1],
+          line: Number(compiler[2]),
+          column: compiler[3] ? Number(compiler[3]) : null,
+          message: compiler[5].trim()
+        }
+      } : null,
+      linker ? {
+        bucket: linkerDiagnostics,
+        key: JSON.stringify(["linker", linker[1].trim()]),
+        value: {
+          kind: "error",
+          file: "<linker>",
+          line: 0,
+          column: null,
+          message: linker[1].trim()
+        }
+      } : null,
+      step ? {
+        bucket: stepDiagnostics,
+        key: JSON.stringify(["scons", step[1], step[2]]),
+        value: {
+          kind: "error",
+          file: step[1],
+          line: 0,
+          column: null,
+          message: `build step failed: ${step[2]}`
+        }
+      } : null
+    ];
+    for (const candidate of candidates) {
+      if (candidate && !seen.has(candidate.key)) {
+        seen.add(candidate.key);
+        candidate.bucket.push(candidate.value);
+      }
     }
   }
+  diagnostics.push(...linkerDiagnostics, ...stepDiagnostics);
   const errors = diagnostics.filter((item) => item.kind === "error");
   const warnings = diagnostics.filter((item) => item.kind === "warning");
   const ok = result.exitCode === 0 && !failed;
   const status = ok ? "success" : "failed";
   const durationSeconds = Math.round(duration3 * 100) / 100;
+  const summary = [
+    `clean ${status} for env ${environment || environments.join(",") || "default"} in ${durationSeconds}s.`
+  ];
+  if (errors.length)
+    summary.push(
+      `${errors.length} error(s); first: ${errors[0].file}:${errors[0].line}: ${errors[0].message}`
+    );
+  if (warnings.length) summary.push(`${warnings.length} warning(s).`);
+  if (Object.keys(memory).length)
+    summary.push(
+      `RAM ${(memory.ram?.percent ?? 0).toFixed(1)}%, Flash ${(memory.flash?.percent ?? 0).toFixed(1)}%.`
+    );
   return {
     ok,
     status,
-    summary: `clean ${status} for env ${environment || environments.join(",") || "default"} in ${durationSeconds}s.`,
+    summary: summary.join(" "),
     environments,
     errors: errors.slice(0, 50),
     warnings: warnings.slice(0, 50),
@@ -101747,8 +101781,46 @@ function cleanCompatibilityResult(result, environment, duration3) {
     exit_code: result.exitCode,
     log_path: result.logPath,
     output_tail: lines2.slice(-40).join("\n"),
-    port_error: null
+    port_error: ok ? null : classifyCleanPortError(output)
   };
+}
+function normalizeCleanOutput(output) {
+  const lines2 = output.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r\n?/g, "\n").split("\n");
+  const result = [];
+  let banner = false;
+  for (const line of lines2) {
+    const stripped = line.trim();
+    if (/^\*{21,}$/.test(stripped)) {
+      banner = !banner;
+      continue;
+    }
+    if (banner || stripped === "Verbose mode can be enabled via `-v, --verbose` option" || stripped === "LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf")
+      continue;
+    result.push(line.trimEnd());
+  }
+  while (result.length && result.at(-1) === "") result.pop();
+  return result.join("\n");
+}
+function classifyCleanPortError(output) {
+  const patterns = [
+    [
+      "port_permission",
+      /PermissionError\(13|Access is denied|Permission denied|Errno 13/i
+    ],
+    [
+      "port_busy",
+      /Device or resource busy|Resource busy|Errno 16|port is busy|already in use/i
+    ],
+    [
+      "no_response",
+      /Timed out waiting for packet header|Failed to connect to ESP|No serial data received|Wrong boot mode|Invalid head of packet|programmer is not responding|not in sync|stk500_recv\(\)|stk500_getsync\(\)|Failed to open the debug port|No device found on/i
+    ],
+    [
+      "port_missing",
+      /could not open port|A fatal error occurred: Could not open|SerialException|No such file or directory: '?\/dev|Errno 2\b.*(?:tty|cu\.|COM)|FileNotFoundError.*(?:tty|cu\.|COM)|Could not find a port|No serial ports found/i
+    ]
+  ];
+  return patterns.find(([, pattern]) => pattern.test(output))?.[0] ?? null;
 }
 
 // src/adapters/init-compat.ts

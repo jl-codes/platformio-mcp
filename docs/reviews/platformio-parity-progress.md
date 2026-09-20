@@ -821,3 +821,8 @@ The shared clean executor now supports validated environment selection and an ex
 
 Added opt-in pio_clean, increasing the compatibility surface to 79 tools while preserving 54 canonical tools. Environment/fullclean parameters bind to canonical clean_project authorization; execution retains the shared implicit hardware lock and checks policy revisions around effects and disclosure. The adapter uses the reference two-minute clean timeout, collects completed logs with a 16 MiB limit, retains redacted output, reports nonzero exits, compiler diagnostics/counts, environment markers, memory lines and a 40-line tail. Existing canonical callers retain their timeout and return shape. TypeScript and seven focused mocked cleanup checks passed; bundled plugin rebuilt. Native cleanup, exact diagnostic ordering/summary/port-error parity, timeout response projection and full final-revision acceptance remain pending. No publication performed.
 
+
+### Cleanup result projection fidelity
+
+Completed cleanup diagnostic category ordering and overlapping compiler/linker/SCons matches, with per-category deduplication and uncapped counts. Summary now includes first-error location, warning count and memory percentages. Tail output removes ANSI, CR progress delimiters, obsolete-core banners, reference boilerplate and trailing blank lines. Port errors follow reference precedence. TypeScript and six focused mocked adapter/parser checks passed; plugin rebuilt. Native execution and timeout response projection remain pending, so full clean acceptance is not claimed.
+
