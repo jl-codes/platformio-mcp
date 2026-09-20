@@ -11,7 +11,7 @@ The release objective includes all seven requested names: `platformio-mcp`, `pio
 | GHCR | Publish all seven candidate image names under the verified project owner, pointing to the same multi-platform image digest. |
 | MCP Registry | Publish the canonical server identity; evaluate alternate names against current registry eligibility and duplicate-listing rules. |
 | Plugin distribution | Keep the supported plugin installable and linked to the canonical source; evaluate aliases against marketplace identity rules. |
-| Docker Hub | Evaluate all four image names after establishing a controlled publisher namespace and a reproducible image release. |
+| Docker Hub | Evaluate all seven requested name families after establishing a controlled publisher namespace and a reproducible image release. |
 | Homebrew, winget, Chocolatey | Evaluate supported installer/formula names and aliases against each channel's rules; ship working installation and removal behavior. |
 | VS Code Marketplace, Open VSX | Evaluate only with a functional extension distribution; package-name reservations alone are not delivery. |
 | Domains | Track separately from package distribution. Domain purchase requires an explicit domain and spending authorization. |
@@ -22,7 +22,7 @@ Functional aliases must install the same release, preserve existing commands and
 
 This coverage reduces impersonation opportunities. No finite alias list can guarantee that all possible confusing names on all services are unavailable to other publishers.
 
-The additional `platformiomcp` and `pioagent` spellings already have npm punctuation-collision entries. Their PyPI spellings are distinct from hyphenated names and require separate evaluation. `flashagent` has a functional npm candidate package; all three additional Python aliases remain packaging candidates.
+The additional `platformiomcp` and `pioagent` spellings already have npm punctuation-collision entries. Their PyPI spellings are distinct from hyphenated names and require separate evaluation. `flashagent` has a functional npm candidate package; the additional Python aliases are buildable and have passed the historical five-host installation gate, while publication remains pending.
 
 When changing the canonical npm version, run `npm run aliases:sync` to update every functional alias, including candidates, then `npm run aliases:check`. This changes version pins only and does not enable publication. Python alias versions derive directly from the canonical manifest during wheel assembly.
 

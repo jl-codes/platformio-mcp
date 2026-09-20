@@ -9,7 +9,7 @@ The parity branch is not a releasable version yet. Implementation, acceptance, a
 | Additional npm aliases | Inventory-defined scoped and unscoped candidates | Functional wrappers are implemented; authenticated `forkbomb` has write access to the three existing npm packages and controls the matching personal scope | Verify each name and CI trusted publisher; publish exact-version wrappers and verify installed routing |
 | PyPI canonical | `pio-agent-platformio` | Native wheel installation passed on all five planned hosts | Final-version artifact checks, trusted publisher, actual name acceptance and registry-installed verification |
 | PyPI aliases | `pio-agent`, `pio-mcp`, `platformiomcp`, `pioagent`, `flashagent`, `flash-agent` | All six installed and routed successfully on five hosts; alias removal preserved canonical commands | Final-version and public uvx acceptance, name-specific authority and publication |
-| GHCR | Ten inventory-defined names under `ghcr.io/jl-codes/` | Native amd64 and arm64 image builds passed in run 35515777379 | Full release artifact gate, protected publisher configuration, publication and registry pull verification |
+| GHCR | Ten inventory-defined names under `ghcr.io/jl-codes/` | Native amd64 and arm64 image builds passed in 3.1.0 artifact run 35529831694 | Full release artifact gate, protected publisher configuration, publication and registry pull verification |
 | Official MCP Registry | `io.github.jl-codes/platformio-mcp` | Pinned official schema, server manifest and npm ownership metadata validate locally | Publisher authentication, new published npm version with matching mcpName, publish and verify registry result |
 | Codex plugin | `platformio-mcp` from this repository | Local bundled plugin validation passes | Release version/source consistency, install/upgrade smoke against published source |
 | GitHub release | `jl-codes/platformio-mcp` | Authenticated repository admin access verified | Reviewed release commit/tag, immutable artifact identity and release gates |
@@ -24,15 +24,15 @@ The finite source inventory is `distribution/namespaces.json`. `npm run namespac
 ## Concrete blockers observed
 
 - On 2026-09-20, local npm authentication returned `forkbomb`. GitHub reported no release environments and no repository publication verification variables. Local login does not configure CI trusted publishing; verify package-specific npm OIDC and PyPI/GHCR/MCP publisher authority before publication.
-- Local manifests still use 3.0.0, already published. Select and consistently apply a new release version after compatibility review. Do not treat the existing 3.0.0 packages as the new implementation.
-- Native installation passed on Windows x64, macOS arm64/x64 and Linux arm64/x64, including all six Python aliases. Exact evidence is recorded in `reviews/native-python-installation-evidence.json`; it belongs to its recorded source commit, not a final release. MCP Registry publication automation is implemented but has not published this version.
+- Source manifests prepare 3.1.0. Historical 3.1.0 build evidence is recorded below; this version remains unpublished. Do not treat the existing public 3.0.0 packages as this implementation.
+- Native installation passed on Windows x64, macOS arm64/x64 and Linux arm64/x64, including all six Python aliases. The 3.1.0 evidence is recorded in `reviews/native-python-310-evidence.json`; it belongs to source commit `6a2e956661e09b7659c807c5df0ad281a29de9f7`, not a final release. MCP Registry publication automation is implemented but has not published this version.
 - Full parity, cross-host/hardware acceptance, and the release gate remain incomplete. No new release has been published by this goal.
 
 ## Release identity enforcement
 
 The release workflow builds the canonical npm tarball and inventory-defined functional aliases and checks names, versions, exact alias dependencies, and SHA-512 integrity before publishing any artifact. Existing versions are accepted only when their exact artifact integrity matches; registry errors fail closed. Publishing requests npm provenance and rechecks registry artifact integrity. This does not replace installed-artifact smoke tests or cryptographic attestation verification, which remain required.
 
-`npm run test:namespaces` tests normalization, lookup failure handling, wrong-package rejection, and changed artifact identity. These controls are now part of CI and release gates. Namespace audit backoff/cache/change notification, wheel identity, and end-to-end publication checks remain outstanding.
+`npm run test:namespaces` tests normalization, lookup failure handling, wrong-package rejection, and changed artifact identity. These controls are now part of CI and release gates. Namespace cache/backoff, change reporting and wheel identity validation are implemented. Scheduled audit activation and end-to-end public release verification remain outstanding.
 
 ## MCP Registry identity
 
@@ -42,7 +42,7 @@ Publication now reads the previously uploaded npm preflight manifest and rejects
 
 ## Python runtime preparation
 
-`distribution/python-runtime.json` pins Node 24.15.0 archive hashes for five planned wheel hosts and records the upstream OS/libc requirements. `scripts/prepare-python-node.py` downloads only the exact official archive at build time, validates its SHA-256, and stages the executable with its full license; the installed launcher never downloads Node. Windows x64 download/hash/extraction and `--version` passed locally. Other host launches and all installed-wheel acceptance remain pending. Wheel tags in this manifest are intended targets, not evidence of native dependency compatibility.
+`distribution/python-runtime.json` pins Node 24.15.0 archive hashes for five planned wheel hosts and records the upstream OS/libc requirements. `scripts/prepare-python-node.py` downloads only the exact official archive at build time, validates its SHA-256, and stages the executable with its full license; the installed launcher never downloads Node. Windows x64 download/hash/extraction and `--version` passed locally. The five-host 3.1.0 installed-wheel gate passed in run 35529831694, including native dependency loading and MCP stdio checks. Minimum-OS and signal-forwarding acceptance remain pending; wheel tags alone do not establish those guarantees.
 
 The first Windows wheel (`pio-agent-platformio`) was built with pinned setuptools/wheel tooling, installed offline into a fresh Python 3.14 environment, and launched successfully with only that environment's Scripts directory on PATH. The `pio-agent`, `platformio-mcp`, and `pio-mcp` commands exercised version, plugin validation and help. Evidence and artifact hash are in `docs/reviews/python-wheel-windows-evidence.json`. This development artifact uses 3.0.0 and is not approved for publication; complete installed MCP/signal checks and all release gates remain required.
 
@@ -50,7 +50,7 @@ The release workflow now assembles five canonical platform wheels and every conf
 
 Python release builders require clean committed source. Use `--allow-dirty` only for local development wheels; their sourceDirty marker makes them ineligible for release validation. Both canonical and alias wheels record the source commit, and builders recheck checkout state after assembly.
 
-Namespace audits now reuse bounded cached observations from the output file, enforce the configured lookup budget, honor capped rate-limit backoff, and record meaningful metadata changes. Scheduled execution/notification remains unwired; cache and backoff never establish ownership or reserve names.
+Namespace audits now reuse bounded cached observations from the output file, enforce the configured lookup budget, honor capped rate-limit backoff, and record meaningful metadata changes. A maintainer-enabled scheduled workflow is implemented below, but has not been activated or exercised by this work; cache and backoff never establish ownership or reserve names.
 
 ## Maintainer-enabled namespace audit
 
@@ -61,7 +61,7 @@ The Namespace audit workflow can be run manually. Weekly lookups are disabled un
 
 The release workflow now requires local-wheel installation on Windows x64, macOS arm64/x64 and Linux arm64/x64 before its artifact/publication job can proceed. Runner labels follow [GitHub's hosted-runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners). Each job validates the complete wheel set against the checked-out source, installs the matching canonical wheel and every configured exact-version alias without registry fallback, checks the canonical commands, every alias-owned command and every alias module without global Node on PATH, verifies MCP stdio/EOF behavior, and verifies alias removal preserves the canonical command. Evidence records wheel SHA-256 identities, source commit and actual host details.
 
-This gate passed on all five hosts in historical runs 35515440936 and 35515777379; see `reviews/native-python-installation-evidence.json` and `reviews/distribution-build-evidence.json`. The results are source-bound and do not cover the current revision. It does not establish minimum-OS compatibility, signal forwarding, hardware behavior, publisher authority or public-registry installation acceptance. Those remain required separate release evidence.
+This gate passed for 3.1.0 on all five hosts in run 35529831694; see `reviews/native-python-310-evidence.json` and `reviews/distribution-310-build-evidence.json`. Earlier 3.0.0 runs remain historical evidence only. The results are source-bound and do not cover the current revision. It does not establish minimum-OS compatibility, signal forwarding, hardware behavior, publisher authority or public-registry installation acceptance. Those remain required separate release evidence.
 
 
 ### PyPI publisher configuration
