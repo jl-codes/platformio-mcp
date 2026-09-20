@@ -1998,3 +1998,13 @@ names, and retained reports plus original file hashes in native-python-310-evide
 All six aliases were included on every host. Both native container jobs remained in
 progress at collection. This is actual 3.1.0 installation evidence, not public-registry,
 minimum-OS, physical hardware, or complete final-revision acceptance.
+
+### 2026-09-20: bind PR acceptance to the actual source revision
+
+Installer Actions run 35530163173 passed and emitted POL-05 evidence. Inspecting the
+actual downloaded manifest showed sourceCommit 6290f9b8 (GitHub synthetic merge),
+while the producer run headSha is ee1b0c60. That packet cannot satisfy the exact-source
+collector and was not accepted as release evidence. Updated the read-only workflow
+checkout to pull_request.head.sha (github.sha for manual dispatch), so future packets
+and producer metadata bind the same revision. The mismatch was found through actual
+artifact inspection; no validator was weakened and no release acceptance was claimed.
