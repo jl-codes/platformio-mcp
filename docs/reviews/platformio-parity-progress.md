@@ -861,3 +861,8 @@ Added pio_check with reference severity/pattern/skip_packages/tool defaults, bou
 
 Added optional static-analysis filters and structuredReport to canonical check_project. Foreground structured calls attach validated analysisReport while retaining legacy fields; omitted options retain old behavior. Dashboard API forwards analysis filters. Extracted completed-log reading into a descriptor-based 16 MiB bounded helper shared by compatibility and canonical reporting, rejecting growth or truncation during collection. TypeScript and 21 focused mocked adapter/executor/parser checks passed; plugin rebuilt. Background structured report retrieval, dashboard filter controls, native analyzer acceptance and broader parity remain pending. No distribution publication occurred.
 
+
+### Dashboard static-analysis filters
+
+The launcher exposes minimum severity, source pattern, configured analyzer and dependency-source exclusion. Optional fields preserve defaults when left empty, and filter fields are sent only for the checker action. Frontend TypeScript and production build passed; plugin rebuilt with current assets. Browser interaction, background structured-report retrieval and native analyzer acceptance remain separate. No publication occurred.
+

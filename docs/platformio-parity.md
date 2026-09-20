@@ -7,5 +7,5 @@ The canonical build_project tool accepts optional jobs (integer 1–1024) and fo
 
 ### Static analysis
 
-The canonical check_project tool accepts optional severity (low, medium or high), pattern, skipPackages and tool fields. For foreground calls, structuredReport=true adds analysisReport with defect locations, severity totals, CWE and tool status. Existing calls keep their response shape. Background calls still return task metadata; structured report retrieval from completed background tasks remains unfinished. The dashboard command API accepts the filtering fields.
+The canonical check_project tool accepts optional severity (low, medium or high), pattern, skipPackages and tool fields. For foreground calls, structuredReport=true adds analysisReport with defect locations, severity totals, CWE and tool status. Existing calls keep their response shape. Background calls still return task metadata; structured report retrieval from completed background tasks remains unfinished. The dashboard launcher and command API accept severity, source-pattern, analyzer and dependency-exclusion filters. Leaving optional fields empty preserves the project defaults.
 
