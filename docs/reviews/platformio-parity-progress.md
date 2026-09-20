@@ -1958,3 +1958,13 @@ source/output artifacts and hashes. The producer ran successfully on 7075a492 wi
 source-bound, not final-release acceptance. Synthetic report rejection checks passed
 and are included in test:namespaces. The full acceptance validator remains unchanged;
 other requirement packets and physical/publisher prerequisites are still missing.
+
+### 2026-09-20: prepare unused 3.1.0 release identity
+
+Public npm version histories for platformio-mcp, pio-agent, and pio-mcp contained no
+3.1.0. Updated canonical package/lock, all eight existing functional npm wrapper
+versions and exact dependencies, plugin manifest, and MCP Registry descriptor to
+3.1.0. Python and container builders derive their version from package.json. Alias
+synchronization, MCP descriptor validation, and plugin validation passed. No tag,
+release, authority flag, or publication was created; eligibility must be rechecked at
+publication, and all final-revision acceptance gates remain required.

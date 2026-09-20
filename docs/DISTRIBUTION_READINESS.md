@@ -120,7 +120,7 @@ name-specific authority/eligibility. GHCR prepares ten repository names. npm can
 wrappers remain subject to ownership and punctuation-collision rules. No new release
 has been published, and candidate artifacts do not reserve names.
 
-Current publication status: local npm authentication is verified as `forkbomb`; repository release environments and publisher variables remain absent; version remains the already-published 3.0.0. Full same-commit acceptance, native/hardware evidence and actual registry publication are not complete. Green CI alone cannot certify full plan completion.
+Current publication status: local npm authentication is verified as `forkbomb`; repository release environments and publisher variables remain absent; source manifests now prepare 3.1.0, which was absent from all three existing npm package version histories on 2026-09-20; no tag or publication exists. Full same-commit acceptance, native/hardware evidence and actual registry publication are not complete. Green CI alone cannot certify full plan completion.
 
 ### Assemble final acceptance evidence
 

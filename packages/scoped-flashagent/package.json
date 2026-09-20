@@ -1,6 +1,6 @@
 {
   "name": "@forkbomb/flashagent",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Functional npm alias for the canonical platformio-mcp CLI and MCP server.",
   "type": "module",
   "bin": {
@@ -12,7 +12,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "platformio-mcp": "3.0.0"
+    "platformio-mcp": "3.1.0"
   },
   "engines": {
     "node": ">=20.0.0"
