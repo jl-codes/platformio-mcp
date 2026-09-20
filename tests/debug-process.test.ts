@@ -207,3 +207,43 @@ it("rejects direct GDB without descendant release verification before spawning",
   ).rejects.toMatchObject({ code: "GDB_RELEASE_VERIFIER_REQUIRED" });
   expect(f.launch).not.toHaveBeenCalled();
 });
+
+it.each(["prepare", "spawn"])(
+  "retains failed %s custody for connection-owned cleanup retries",
+  async (stage) => {
+    const f = fixture();
+    const fail = () => {
+      throw new Error("startup rejected");
+    };
+    if (stage === "prepare") f.custody.prepareSpawn.mockImplementation(fail);
+    else f.launch.mockImplementation(fail);
+    f.custody.releaseAfterExit.mockImplementation(() => {
+      throw new Error("lock unavailable");
+    });
+    const client = new DebugClientSessions();
+    await expect(
+      client.start(project, "native", () => DebugProcess.start(f.options)),
+    ).rejects.toMatchObject({
+      code: "GDB_START_FAILED",
+      context: { cleanupPending: true },
+    });
+    const [session] = client.list();
+    expect(session).toMatchObject({
+      closed: true,
+      running: false,
+      cleanupPending: true,
+    });
+    if (stage === "prepare") expect(f.launch).not.toHaveBeenCalled();
+    await expect(
+      client.command(session.session_id, "continue", { workspaceDir: project }),
+    ).rejects.toMatchObject({ code: "GDB_CLOSED" });
+    await expect(client.stop(session.session_id)).rejects.toThrow(
+      "lock unavailable",
+    );
+    expect(client.list()).toHaveLength(1);
+    f.custody.releaseAfterExit.mockImplementation(() => {});
+    await client.stop(session.session_id);
+    expect(client.list()).toEqual([]);
+    expect(f.lines).toEqual([]);
+  },
+);

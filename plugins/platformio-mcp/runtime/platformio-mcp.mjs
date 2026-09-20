@@ -103970,6 +103970,29 @@ var DebugStartupFailure = class extends PlatformIOError {
     return this.#process;
   }
 };
+function retainUnstartedDebugCustody(custody) {
+  let cleanupPending = true;
+  return {
+    command: async () => {
+      throw new PlatformIOError("Debugger never started.", "GDB_CLOSED");
+    },
+    state: () => ({
+      running: false,
+      closed: true,
+      failed: true,
+      exitCode: null,
+      lastStop: void 0,
+      pid: void 0,
+      stderr: "",
+      cleanupPending
+    }),
+    cleanupProcess: async () => {
+      if (!cleanupPending) return;
+      custody.releaseAfterExit();
+      cleanupPending = false;
+    }
+  };
+}
 
 // src/core/debug/debug-client-sessions.ts
 init_errors2();
@@ -106543,7 +106566,13 @@ var DebugProcess = class _DebugProcess {
         stdio: "pipe"
       });
     } catch (error2) {
-      options.custody.releaseAfterExit();
+      try {
+        options.custody.releaseAfterExit();
+      } catch {
+        throw new DebugStartupFailure(
+          retainUnstartedDebugCustody(options.custody)
+        );
+      }
       throw error2;
     }
     const owner = new _DebugProcess(child, options, executable);

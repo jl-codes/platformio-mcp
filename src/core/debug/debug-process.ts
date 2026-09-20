@@ -7,7 +7,10 @@ import {
   type DebugInitializationInput,
 } from "./debug-init-execution.js";
 import type { DebugInitArtifact } from "./debug-init-artifact.js";
-import { DebugStartupFailure } from "./debug-start-failure.js";
+import {
+  DebugStartupFailure,
+  retainUnstartedDebugCustody,
+} from "./debug-start-failure.js";
 import { spawn } from "node:child_process";
 import {
   SupervisedDebugChild,
@@ -160,7 +163,13 @@ export class DebugProcess {
             stdio: "pipe",
           }) as GdbProcessChild);
     } catch (error) {
-      options.custody.releaseAfterExit();
+      try {
+        options.custody.releaseAfterExit();
+      } catch {
+        throw new DebugStartupFailure(
+          retainUnstartedDebugCustody(options.custody),
+        );
+      }
       throw error;
     }
     const owner = new DebugProcess(child, options, executable);
