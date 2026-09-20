@@ -10,9 +10,12 @@ vi.mock("../src/tools/project-inspection.js", () => ({
 }));
 import { getSystemInfo } from "../src/tools/projects.js";
 vi.mock("../src/tools/projects.js", () => ({ getSystemInfo: vi.fn() }));
+import { getBoardInfo } from "../src/tools/boards.js";
+vi.mock("../src/tools/boards.js", () => ({ getBoardInfo: vi.fn() }));
 let root: string;
 let state: string;
 beforeEach(() => {
+  vi.clearAllMocks();
   root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-partition-policy-"));
   state = fs.mkdtempSync(path.join(os.tmpdir(), "pio-partition-state-"));
   vi.stubEnv("PIO_MCP_DATA_DIR", state);
@@ -154,6 +157,7 @@ it("does not silently choose among multiple default environments", async () => {
 });
 
 it("reports the actual metadata-selected binary source", async () => {
+  fs.writeFileSync(path.join(root, "firmware.bin"), Buffer.alloc(120));
   const table = path.join(root, "partitions.bin");
   const bytes = Buffer.alloc(96, 255);
   bytes.writeUInt16LE(0x50aa, 0);
@@ -195,6 +199,7 @@ it("reports the actual metadata-selected binary source", async () => {
     ok: true,
     table_source: "metadata:extra.flash_images",
     table_offset: 0x10000,
+    firmware_size: 120,
   });
   expect(result.artifacts.table.path).toBe(fs.realpathSync.native(table));
 });
@@ -382,4 +387,65 @@ it("inspects the configured CSV in the selected registered framework", async () 
     comparison: [],
   });
   expect(result.artifacts.table.path).toBe(fs.realpathSync.native(csv));
+});
+
+it("labels catalogue flash capacity and respects configured MCU precedence", async () => {
+  fs.writeFileSync(path.join(root, "table.csv"), "app,app,factory,,1M,");
+  vi.mocked(executeProjectInspection).mockResolvedValue({
+    ok: true,
+    defaultEnvironments: ["custom"],
+    envs: [
+      {
+        name: "custom",
+        partitionTable: "table.csv",
+        partitionTableUploadOffset: "0x8000",
+        flashSize: null,
+        board: "fixture",
+        mcu: "esp32s3",
+      },
+    ],
+  } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>);
+  vi.mocked(getBoardInfo).mockResolvedValue({
+    id: "fixture",
+    rom: 0x400000,
+    mcu: "esp32",
+  } as Awaited<ReturnType<typeof getBoardInfo>>);
+  const result = await executePartitionTable({ projectDir: root });
+  expect(result).toMatchObject({
+    flash_size: 0x400000,
+    flash_size_source: "board_catalogue",
+    mcu: "esp32s3",
+  });
+});
+
+it("keeps capacity unknown when catalogue permission is denied", async () => {
+  fs.writeFileSync(path.join(root, "table.csv"), "app,app,factory,,1M,");
+  fs.writeFileSync(
+    path.join(root, ".pio-mcp-policy.json"),
+    JSON.stringify({
+      profile: "read_only",
+      overrides: { deny: ["get_board_info"], audit_all_agent_actions: false },
+    }),
+  );
+  vi.mocked(executeProjectInspection).mockResolvedValue({
+    ok: true,
+    defaultEnvironments: ["custom"],
+    envs: [
+      {
+        name: "custom",
+        partitionTable: "table.csv",
+        partitionTableUploadOffset: "0x8000",
+        flashSize: null,
+        board: "fixture",
+        mcu: null,
+      },
+    ],
+  } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>);
+  const result = await executePartitionTable({ projectDir: root });
+  expect(result).toMatchObject({
+    flash_size: null,
+    flash_size_source: "unknown",
+    board_lookup: { status: "not_authorized" },
+  });
+  expect(getBoardInfo).not.toHaveBeenCalled();
 });

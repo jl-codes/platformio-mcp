@@ -3,6 +3,8 @@
  * Framework package discovery is separate: a missing project file never selects an unrelated package.
  */
 import path from "node:path";
+import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
+import { getBoardInfo } from "./boards.js";
 import { partitionOffsetFromFlashImages } from "../core/esp-partition-location.js";
 import { executeProjectInspection } from "./project-inspection.js";
 import type { PolicyEvaluationContext } from "../core/policy/types.js";
@@ -178,4 +180,47 @@ export async function resolveBuildPartitionInputs(
     environment,
     frameworkCandidates: entry.partitionFrameworkCandidates,
   };
+}
+
+/** Optional catalogue evidence never becomes a claim that a physical chip was measured. */
+export async function resolvePartitionBoardInfo(
+  projectDir: string,
+  boardId: unknown,
+  caller: PolicyEvaluationContext,
+  approvalId?: string,
+) {
+  if (typeof boardId !== "string" || !boardId)
+    return { status: "unknown" as const, flashSize: null, mcu: null };
+  try {
+    const board = await dispatchAuthorizedAction(
+      "get_board_info",
+      { projectDir, boardId, approvalId },
+      { ...caller, workspaceDir: projectDir },
+      () => getBoardInfo(boardId),
+    );
+    const flashSize =
+      typeof board?.rom === "number" &&
+      Number.isSafeInteger(board.rom) &&
+      board.rom > 0 &&
+      board.rom <= 0x100000000
+        ? board.rom
+        : null;
+    return {
+      status: "catalogue" as const,
+      flashSize,
+      mcu: typeof board?.mcu === "string" ? board.mcu : null,
+    };
+  } catch (error) {
+    const code =
+      error instanceof PlatformIOError ? error.code : "BOARD_LOOKUP_FAILED";
+    return {
+      status:
+        code === "POLICY_DENIED" || code === "APPROVAL_REQUIRED"
+          ? ("not_authorized" as const)
+          : ("unavailable" as const),
+      flashSize: null,
+      mcu: null,
+      error_code: code,
+    };
+  }
 }

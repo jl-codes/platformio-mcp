@@ -95456,6 +95456,86 @@ async function readEspFlash(input, caller = {}) {
 // src/tools/partition-project.ts
 import path29 from "node:path";
 
+// src/tools/boards.ts
+init_zod();
+init_platformio();
+init_types2();
+init_validation();
+init_errors2();
+var PioBoardsOutputSchema = external_exports.union([
+  external_exports.array(BoardInfoSchema),
+  external_exports.record(external_exports.string(), external_exports.array(BoardInfoSchema))
+]);
+function normalizeBoardsOutput(output) {
+  if (Array.isArray(output)) {
+    return output;
+  }
+  const flattened = [];
+  for (const platformBoards of Object.values(
+    output
+  )) {
+    flattened.push(...platformBoards);
+  }
+  return flattened;
+}
+async function listBoards(filter) {
+  try {
+    const args = [];
+    if (filter && filter.trim().length > 0) {
+      args.push(filter.trim());
+    }
+    const result = await platformioExecutor.executeWithJsonOutput(
+      "boards",
+      args,
+      PioBoardsOutputSchema,
+      { timeout: 3e4 }
+    );
+    const allBoards = normalizeBoardsOutput(result);
+    if (filter && filter.trim().length > 0) {
+      const filterLower = filter.trim().toLowerCase();
+      return allBoards.filter(
+        (board) => board.id.toLowerCase().includes(filterLower) || board.name.toLowerCase().includes(filterLower) || board.platform.toLowerCase().includes(filterLower) || board.mcu.toLowerCase().includes(filterLower) || board.frameworks?.some(
+          (fw) => fw.toLowerCase().includes(filterLower)
+        )
+      );
+    }
+    return allBoards;
+  } catch (error2) {
+    throw new PlatformIOError(
+      `Failed to list boards${filter ? ` with filter '${filter}'` : ""}: ${error2}`,
+      "LIST_BOARDS_FAILED",
+      { filter }
+    );
+  }
+}
+async function getBoardInfo(boardId) {
+  if (!validateBoardId(boardId)) {
+    throw new BoardNotFoundError(boardId);
+  }
+  try {
+    const result = await platformioExecutor.executeWithJsonOutput(
+      "boards",
+      [boardId],
+      PioBoardsOutputSchema,
+      { timeout: 3e4 }
+    );
+    const board = normalizeBoardsOutput(result).find((b) => b.id === boardId);
+    if (board) {
+      return board;
+    }
+    throw new BoardNotFoundError(boardId);
+  } catch (error2) {
+    if (error2 instanceof BoardNotFoundError) {
+      throw error2;
+    }
+    throw new PlatformIOError(
+      `Failed to get board info for '${boardId}': ${error2}`,
+      "GET_BOARD_INFO_FAILED",
+      { boardId }
+    );
+  }
+}
+
 // src/core/esp-partition-location.ts
 init_errors2();
 function offset(value2) {
@@ -95955,6 +96035,32 @@ async function resolveBuildPartitionInputs(projectDir, environment, caller, appr
     frameworkCandidates: entry.partitionFrameworkCandidates
   };
 }
+async function resolvePartitionBoardInfo(projectDir, boardId, caller, approvalId) {
+  if (typeof boardId !== "string" || !boardId)
+    return { status: "unknown", flashSize: null, mcu: null };
+  try {
+    const board = await dispatchAuthorizedAction(
+      "get_board_info",
+      { projectDir, boardId, approvalId },
+      { ...caller, workspaceDir: projectDir },
+      () => getBoardInfo(boardId)
+    );
+    const flashSize = typeof board?.rom === "number" && Number.isSafeInteger(board.rom) && board.rom > 0 && board.rom <= 4294967296 ? board.rom : null;
+    return {
+      status: "catalogue",
+      flashSize,
+      mcu: typeof board?.mcu === "string" ? board.mcu : null
+    };
+  } catch (error2) {
+    const code = error2 instanceof PlatformIOError ? error2.code : "BOARD_LOOKUP_FAILED";
+    return {
+      status: code === "POLICY_DENIED" || code === "APPROVAL_REQUIRED" ? "not_authorized" : "unavailable",
+      flashSize: null,
+      mcu: null,
+      error_code: code
+    };
+  }
+}
 
 // src/tools/partition-table.ts
 init_zod();
@@ -95967,6 +96073,7 @@ var PartitionTableSchema = external_exports.object({
   buildMetadata: external_exports.boolean().default(false),
   metadataApprovalId: external_exports.string().max(256).optional(),
   systemApprovalId: external_exports.string().max(256).optional(),
+  boardApprovalId: external_exports.string().max(256).optional(),
   format: external_exports.enum(["csv", "binary"]).default("csv"),
   tableOffset: external_exports.number().int().min(0).max(4294963200).optional(),
   sdkconfigPath: external_exports.string().min(1).max(32768).optional(),
@@ -95989,6 +96096,7 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
     configApprovalId,
     metadataApprovalId,
     systemApprovalId,
+    boardApprovalId,
     readApprovalId,
     commandApprovalId,
     ...operation
@@ -96103,6 +96211,15 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
           }
         }
       }
+      const boardInfo = project && ((params.flashSize ?? project.flashSize) === void 0 || project.mcu === null) ? await resolvePartitionBoardInfo(
+        projectDir,
+        project.board,
+        caller,
+        boardApprovalId
+      ) : null;
+      guard();
+      const flashSize = params.flashSize ?? project?.flashSize ?? boardInfo?.flashSize ?? void 0;
+      const flashSizeSource = params.flashSize !== void 0 ? "explicit:flashSize" : project?.flashSize !== void 0 ? "board_upload.flash_size" : boardInfo?.flashSize != null ? "board_catalogue" : "unknown";
       const result = await inspectEspPartitionArtifacts({
         workspaceDir: projectDir,
         tablePath,
@@ -96110,7 +96227,7 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
         trustedTableRoot,
         layout: {
           tableOffset: location.tableOffset,
-          flashSize: params.flashSize ?? project?.flashSize
+          flashSize
         },
         firmwarePath,
         observedTablePath: params.observedTablePath ?? (format === "csv" && build ? build.tablePath : void 0)
@@ -96184,7 +96301,9 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
         table_source: tableSource,
         framework_package: framework ? { name: framework.packageName, version: framework.packageVersion } : null,
         board: project?.board ?? null,
-        mcu: project?.mcu ?? null,
+        mcu: project?.mcu ?? boardInfo?.mcu ?? null,
+        flash_size_source: flashSizeSource,
+        board_lookup: boardInfo,
         offset_evidence: location.evidence,
         sdkconfig_artifact: sdkconfig?.identity ?? null,
         ok: result.ok && !mismatch,
@@ -97590,86 +97709,6 @@ async function firmwareSizeReport(input, caller = {}, onAuthorized) {
       return reportFirmwareSize(context, params.top, params.filter);
     }
   );
-}
-
-// src/tools/boards.ts
-init_zod();
-init_platformio();
-init_types2();
-init_validation();
-init_errors2();
-var PioBoardsOutputSchema = external_exports.union([
-  external_exports.array(BoardInfoSchema),
-  external_exports.record(external_exports.string(), external_exports.array(BoardInfoSchema))
-]);
-function normalizeBoardsOutput(output) {
-  if (Array.isArray(output)) {
-    return output;
-  }
-  const flattened = [];
-  for (const platformBoards of Object.values(
-    output
-  )) {
-    flattened.push(...platformBoards);
-  }
-  return flattened;
-}
-async function listBoards(filter) {
-  try {
-    const args = [];
-    if (filter && filter.trim().length > 0) {
-      args.push(filter.trim());
-    }
-    const result = await platformioExecutor.executeWithJsonOutput(
-      "boards",
-      args,
-      PioBoardsOutputSchema,
-      { timeout: 3e4 }
-    );
-    const allBoards = normalizeBoardsOutput(result);
-    if (filter && filter.trim().length > 0) {
-      const filterLower = filter.trim().toLowerCase();
-      return allBoards.filter(
-        (board) => board.id.toLowerCase().includes(filterLower) || board.name.toLowerCase().includes(filterLower) || board.platform.toLowerCase().includes(filterLower) || board.mcu.toLowerCase().includes(filterLower) || board.frameworks?.some(
-          (fw) => fw.toLowerCase().includes(filterLower)
-        )
-      );
-    }
-    return allBoards;
-  } catch (error2) {
-    throw new PlatformIOError(
-      `Failed to list boards${filter ? ` with filter '${filter}'` : ""}: ${error2}`,
-      "LIST_BOARDS_FAILED",
-      { filter }
-    );
-  }
-}
-async function getBoardInfo(boardId) {
-  if (!validateBoardId(boardId)) {
-    throw new BoardNotFoundError(boardId);
-  }
-  try {
-    const result = await platformioExecutor.executeWithJsonOutput(
-      "boards",
-      [boardId],
-      PioBoardsOutputSchema,
-      { timeout: 3e4 }
-    );
-    const board = normalizeBoardsOutput(result).find((b) => b.id === boardId);
-    if (board) {
-      return board;
-    }
-    throw new BoardNotFoundError(boardId);
-  } catch (error2) {
-    if (error2 instanceof BoardNotFoundError) {
-      throw error2;
-    }
-    throw new PlatformIOError(
-      `Failed to get board info for '${boardId}': ${error2}`,
-      "GET_BOARD_INFO_FAILED",
-      { boardId }
-    );
-  }
 }
 
 // src/adapters/compatibility-project.ts
@@ -102709,6 +102748,7 @@ var schema2 = external_exports.object({
   config_approval_id: external_exports.string().max(256).optional(),
   metadata_approval_id: external_exports.string().max(256).optional(),
   system_approval_id: external_exports.string().max(256).optional(),
+  board_approval_id: external_exports.string().max(256).optional(),
   selection_approval_id: external_exports.string().max(256).optional(),
   read_approval_id: external_exports.string().max(256).optional(),
   command_approval_id: external_exports.string().max(256).optional()
@@ -102749,6 +102789,7 @@ async function executePartitionCompatibility(input, defaults = {}, caller = {}, 
       configApprovalId: params.config_approval_id,
       metadataApprovalId: params.metadata_approval_id,
       systemApprovalId: params.system_approval_id,
+      boardApprovalId: params.board_approval_id,
       readApprovalId: params.read_approval_id,
       commandApprovalId: params.command_approval_id
     },
@@ -102763,7 +102804,7 @@ async function executePartitionCompatibility(input, defaults = {}, caller = {}, 
     csv_source: binary ? null : result.table_source,
     effective_table_path: result.artifacts.table.path,
     effective_table_format: binary ? "binary" : "csv",
-    flash_size_source: result.flash_size === null ? "unknown" : "board_upload.flash_size",
+    flash_size_source: result.flash_size_source,
     firmware_bin: result.artifacts.firmware?.path ?? null,
     device: result.device ?? {}
   };
@@ -104048,6 +104089,7 @@ function withProjectCompatibility(base2) {
         config_approval_id: { type: "string" },
         metadata_approval_id: { type: "string" },
         system_approval_id: { type: "string" },
+        board_approval_id: { type: "string" },
         selection_approval_id: { type: "string" },
         read_approval_id: { type: "string" },
         command_approval_id: { type: "string" }
@@ -117294,6 +117336,7 @@ var toolDefinitions = [
         buildMetadata: { type: "boolean", default: false, description: "Generate build metadata under build permission; may execute project scripts." },
         metadataApprovalId: { type: "string", maxLength: 256 },
         systemApprovalId: { type: "string", maxLength: 256 },
+        boardApprovalId: { type: "string", maxLength: 256 },
         flashSize: { type: "integer", minimum: 1, maximum: 4294967296 },
         firmwarePath: { type: "string", minLength: 1, maxLength: 32768 },
         observedTablePath: { type: "string", minLength: 1, maxLength: 32768 },

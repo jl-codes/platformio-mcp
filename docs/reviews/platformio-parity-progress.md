@@ -1079,3 +1079,7 @@ Added framework candidates from the complete selected build include inventory (i
 ### Partition compatibility adapter
 
 Registered pio_partition_table over the shared canonical workflow, preserving reference project/env/read_device/port names and default false device access. Adapter metadata discovery retains build permission; offline override and scoped grants are explicit extensions. Omitted serial destinations use authorized config/unique-port selection. Built-only layouts explicitly omit CSV identity instead of fabricating it. Added existing firmware.bin discovery beside selected build partitions. Sixteen focused adapter/workflow cases, targeted lint and TypeScript passed. Compatibility tool inventory is 88 (56 canonical plus 32 aliases); registration is not full reference acceptance. CI 35497188383/35497184861 remained live, so this change is saved locally.
+
+### Board capacity and firmware fit evidence
+
+Added separately authorized optional catalogue fallback for absent flash size/MCU, preserving explicit/project precedence and unknown states on denial/failure. Corrected compatibility flash-size provenance to use the canonical source. Eighteen focused adapter/workflow tests passed, including catalogue denial and existing firmware.bin discovery; targeted lint and TypeScript passed. CI 35497188383 passed at a5dee8ce. The saved compatibility adapter and catalogue change can now be pushed together; full physical/reference acceptance remains incomplete.

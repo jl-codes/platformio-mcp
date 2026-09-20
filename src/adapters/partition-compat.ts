@@ -26,6 +26,7 @@ const schema = z
     config_approval_id: z.string().max(256).optional(),
     metadata_approval_id: z.string().max(256).optional(),
     system_approval_id: z.string().max(256).optional(),
+    board_approval_id: z.string().max(256).optional(),
     selection_approval_id: z.string().max(256).optional(),
     read_approval_id: z.string().max(256).optional(),
     command_approval_id: z.string().max(256).optional(),
@@ -74,6 +75,7 @@ export async function executePartitionCompatibility(
       configApprovalId: params.config_approval_id,
       metadataApprovalId: params.metadata_approval_id,
       systemApprovalId: params.system_approval_id,
+      boardApprovalId: params.board_approval_id,
       readApprovalId: params.read_approval_id,
       commandApprovalId: params.command_approval_id,
     },
@@ -88,8 +90,7 @@ export async function executePartitionCompatibility(
     csv_source: binary ? null : result.table_source,
     effective_table_path: result.artifacts.table.path,
     effective_table_format: binary ? "binary" : "csv",
-    flash_size_source:
-      result.flash_size === null ? "unknown" : "board_upload.flash_size",
+    flash_size_source: result.flash_size_source,
     firmware_bin: result.artifacts.firmware?.path ?? null,
     device: result.device ?? {},
   };

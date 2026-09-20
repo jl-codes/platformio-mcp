@@ -14,6 +14,7 @@ import {
 } from "../core/esp-partition-report.js";
 import {
   resolveProjectPartitionInputs,
+  resolvePartitionBoardInfo,
   resolveBuildPartitionInputs,
 } from "./partition-project.js";
 import { z } from "zod";
@@ -46,6 +47,7 @@ export const PartitionTableSchema = z
     buildMetadata: z.boolean().default(false),
     metadataApprovalId: z.string().max(256).optional(),
     systemApprovalId: z.string().max(256).optional(),
+    boardApprovalId: z.string().max(256).optional(),
     format: z.enum(["csv", "binary"]).default("csv"),
     tableOffset: z.number().int().min(0).max(0xfffff000).optional(),
     sdkconfigPath: z.string().min(1).max(32768).optional(),
@@ -76,6 +78,7 @@ export async function executePartitionTable(
     configApprovalId,
     metadataApprovalId,
     systemApprovalId,
+    boardApprovalId,
     readApprovalId,
     commandApprovalId,
     ...operation
@@ -222,6 +225,31 @@ export async function executePartitionTable(
           }
         }
       }
+      const boardInfo =
+        project &&
+        ((params.flashSize ?? project.flashSize) === undefined ||
+          project.mcu === null)
+          ? await resolvePartitionBoardInfo(
+              projectDir,
+              project.board,
+              caller,
+              boardApprovalId,
+            )
+          : null;
+      guard();
+      const flashSize =
+        params.flashSize ??
+        project?.flashSize ??
+        boardInfo?.flashSize ??
+        undefined;
+      const flashSizeSource =
+        params.flashSize !== undefined
+          ? "explicit:flashSize"
+          : project?.flashSize !== undefined
+            ? "board_upload.flash_size"
+            : boardInfo?.flashSize != null
+              ? "board_catalogue"
+              : "unknown";
       const result = await inspectEspPartitionArtifacts({
         workspaceDir: projectDir,
         tablePath,
@@ -229,7 +257,7 @@ export async function executePartitionTable(
         trustedTableRoot,
         layout: {
           tableOffset: location.tableOffset,
-          flashSize: params.flashSize ?? project?.flashSize,
+          flashSize,
         },
         firmwarePath,
         observedTablePath:
@@ -321,7 +349,9 @@ export async function executePartitionTable(
           ? { name: framework.packageName, version: framework.packageVersion }
           : null,
         board: project?.board ?? null,
-        mcu: project?.mcu ?? null,
+        mcu: project?.mcu ?? boardInfo?.mcu ?? null,
+        flash_size_source: flashSizeSource,
+        board_lookup: boardInfo,
         offset_evidence: location.evidence,
         sdkconfig_artifact: sdkconfig?.identity ?? null,
         ok: result.ok && !mismatch,

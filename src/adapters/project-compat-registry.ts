@@ -68,6 +68,7 @@ export function withProjectCompatibility<TResult>(
         config_approval_id: { type: "string" },
         metadata_approval_id: { type: "string" },
         system_approval_id: { type: "string" },
+        board_approval_id: { type: "string" },
         selection_approval_id: { type: "string" },
         read_approval_id: { type: "string" },
         command_approval_id: { type: "string" },
