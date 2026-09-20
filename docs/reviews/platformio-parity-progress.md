@@ -675,3 +675,7 @@ Implemented pyproject metadata, functional command entry points, pinned packagin
 ### Correct runtime version identity
 
 Removed the hardcoded MCP 1.0.0 version and unified CLI, MCP handshake and startup diagnostics around package/plugin metadata using URL-safe paths. Rebuilt the plugin and development Windows wheel. The already-running installed check completed successfully with version 3.0.0, 54 normal tools and 64 compatibility tools, JSON-only stdout and clean EOF exit. TypeScript and targeted lint passed. User explicitly requested stopping repeated smoke-test work; continue implementation directly and avoid redundant validation runs. Full parity and publication remain incomplete.
+
+### Functional Python alias wheels
+
+Implemented pio-agent and pio-mcp alias distributions with exact canonical version dependencies, delegated PlatformIO extra and useful Python module entry points. The canonical package alone owns console scripts, avoiding overlapping installed command files. Both platform-independent alias wheels build successfully; direct artifact metadata inspection confirmed exact 3.0.0 dependency pins, module delegates and no conflicting entry-point files. No repeated runtime smoke tests were run. Publisher control, uvx installation and uninstall behavior remain acceptance requirements; nothing was published.

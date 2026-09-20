@@ -8,7 +8,7 @@ The parity branch is not a releasable version yet. Implementation, acceptance, a
 | npm aliases | `pio-agent`, `pio-mcp` | Both published at 3.0.0; local functional wrappers now pin the exact canonical version | Publish canonical first, then matching aliases; verify installed command routing |
 | npm scoped alias | `@forkbomb/platformio-mcp` | Public lookup missing | Authenticate scope control, implement/test functional wrapper; do not assume availability |
 | PyPI canonical | `pio-agent-platformio` | Public lookup missing | Functional wheels for all five planned host targets, trusted publisher, actual name acceptance and installed-artifact verification |
-| PyPI aliases | `pio-agent`, `pio-mcp` | Public lookups missing | Exact canonical dependency, executable collision tests, authority and publication |
+| PyPI aliases | `pio-agent`, `pio-mcp` | Both functional alias wheels build with exact canonical pins and no shared command-file ownership | Installed uvx/uninstall acceptance, authority and publication |
 | Official MCP Registry | `io.github.jl-codes/platformio-mcp` | Pinned official schema, server manifest and npm ownership metadata validate locally | Publisher authentication, new published npm version with matching mcpName, publish and verify registry result |
 | Codex plugin | `platformio-mcp` from this repository | Local bundled plugin validation passes | Release version/source consistency, install/upgrade smoke against published source |
 | GitHub release | `jl-codes/platformio-mcp` | Authenticated repository admin access verified | Reviewed release commit/tag, immutable artifact identity and release gates |
