@@ -2,6 +2,11 @@
   "schemaVersion": 1,
   "files": [
     {
+      "path": "capabilities.json",
+      "bytes": 4630,
+      "sha256": "a5c27c5e02fd3373eae929c8189f23d5745bd63e9d4b324fb60c10406ad550a4"
+    },
+    {
       "path": "native/dependencies.json",
       "bytes": 2226,
       "sha256": "346258bdd97cc283e03d144232469f37890ddb5cdf83a74b6437a402fe63b16a"

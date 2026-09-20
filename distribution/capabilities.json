@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "scope": "Declared implementation and installation requirements; not a runtime availability probe or physical acceptance certificate.",
+  "automaticDependencyInstallation": false,
+  "backends": [
+    {
+      "id": "platformio-core",
+      "tools": [
+        "build_project",
+        "upload_firmware",
+        "upload_ota"
+      ],
+      "implementation": "available",
+      "requirements": [
+        "Host-installed PlatformIO Core and selected platform/toolchain packages"
+      ],
+      "installation": "Install PlatformIO Core explicitly, then install the project's selected platform and framework packages through authorized PlatformIO operations.",
+      "limits": [
+        "Project scripts and package hooks execute host code under their respective permissions.",
+        "OTA supports configured ESP32/ESP8266 firmware/filesystem paths; physical release acceptance remains pending."
+      ]
+    },
+    {
+      "id": "elf-analysis",
+      "tools": [
+        "decode_backtrace",
+        "size_report"
+      ],
+      "implementation": "available",
+      "requirements": [
+        "Matching firmware ELF",
+        "Selected PlatformIO toolchain addr2line, nm and size utilities"
+      ],
+      "installation": "Install the selected PlatformIO platform/toolchain explicitly; tool paths are resolved from trusted installed packages.",
+      "limits": [
+        "ELF identity is not proof of firmware running on the device.",
+        "Static sizes are not runtime heap or stack measurements."
+      ]
+    },
+    {
+      "id": "esp-coredump",
+      "tools": [
+        "coredump"
+      ],
+      "implementation": "available",
+      "requirements": [
+        "esp-coredump==1.10.0",
+        "Matching firmware ELF and architecture-specific GDB",
+        "Host Python interpreter outside the project"
+      ],
+      "installation": "Explicitly provision the pinned esp-coredump dependency and matching GDB; set PIO_MCP_COREDUMP_PYTHON and PIO_MCP_COREDUMP_GDB on the server.",
+      "limits": [
+        "Unknown or encrypted formats are rejected.",
+        "Device retrieval requires independent hardware permission.",
+        "Physical release acceptance remains pending."
+      ]
+    },
+    {
+      "id": "owned-debugger",
+      "tools": [
+        "debug_start",
+        "debug_cmd",
+        "debug_list",
+        "debug_stop"
+      ],
+      "implementation": "partial",
+      "requirements": [
+        "PlatformIO-resolved GDB",
+        "OpenOCD or J-Link GDB server",
+        "Host Python for process supervision",
+        "Uniquely identified USB probe"
+      ],
+      "installation": "Explicitly install the selected PlatformIO debug packages and host USB drivers. Configure the project debug environment and tool.",
+      "limits": [
+        "Owned local loopback TCP backends only.",
+        "ST-Link probes through OpenOCD are implemented; standalone st-util, remote and pipe backend custody remain unsupported.",
+        "Physical release acceptance remains pending."
+      ]
+    },
+    {
+      "id": "serial",
+      "tools": [
+        "serial_session_start",
+        "serial_session_read",
+        "serial_session_write",
+        "serial_session_list",
+        "serial_session_stop",
+        "monitor_capture",
+        "memory_watch",
+        "power_profile"
+      ],
+      "implementation": "available",
+      "requirements": [
+        "Packaged serialport native binding for the host platform",
+        "Host serial device access and an unambiguous device selection",
+        "Firmware instrumentation for memory/current telemetry"
+      ],
+      "installation": "Install a supported runtime package and the board's required host drivers; do not change OS permissions automatically.",
+      "limits": [
+        "Opening can reset hardware and is separately authorized from reading and writing.",
+        "Serial power values are firmware estimates, not external meter measurements."
+      ]
+    },
+    {
+      "id": "ppk2",
+      "tools": [
+        "power_profile"
+      ],
+      "implementation": "available",
+      "requirements": [
+        "ppk2-api==0.9.2",
+        "pyserial==3.5",
+        "Nordic PPK2 and an explicitly bound DUT"
+      ],
+      "installation": "Run scripts/setup-ppk2.py with a new dedicated environment directory, then set PIO_MCP_PPK2_ENV on the server to that directory.",
+      "limits": [
+        "Mode and source voltage/current envelope require explicit selection and authorization.",
+        "Software overcurrent handling is not a hardware current limiter.",
+        "Physical measurement and output-off release acceptance remain pending."
+      ]
+    }
+  ]
+}

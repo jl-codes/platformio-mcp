@@ -134,6 +134,7 @@ export async function buildCodexPlugin() {
 
   await buildSerialRuntime(REPO_ROOT, RUNTIME_ROOT);
   cpSync(webDist, join(RUNTIME_ROOT, "web"), { recursive: true });
+  cpSync(join(REPO_ROOT, "distribution", "capabilities.json"), join(RUNTIME_ROOT, "capabilities.json"));
   normalizeRuntimeText(RUNTIME_ROOT);
   const inventory = createInventory(RUNTIME_ROOT);
   writeFileSync(

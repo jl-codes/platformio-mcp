@@ -2035,3 +2035,9 @@ Validation: 47 focused debugger tests passed, including existing approval-retry 
 ### Shipped skill coverage (2026-09-20)
 
 Updated the existing platformio-debug and serial-diagnostics plugin skills to cover canonical crash decoding, size analysis, owned serial lifecycle, bounded capture/memory telemetry, and policy provenance. Preserved the legacy build/monitor workflows. Instructions distinguish host permissions from server policy, serial read from write authority, ELF identity from running firmware, and static symbol sizes from runtime memory use. Checked tool names, parameter vocabulary and returned status/cursor fields directly against current handlers and schemas. Documentation-only change; no hardware or smoke tests were run.
+
+### Packaged optional-backend requirements (2026-09-20)
+
+Added distribution/capabilities.json covering PlatformIO Core/OTA, ELF tools, esp-coredump 1.10.0, owned local debugging, serial telemetry, and PPK2 with pinned dependencies. Plugin assembly copies this declaration into runtime/capabilities.json before creating the checksum inventory; existing npm/Python/container packaging carries that shared runtime. Partial backend support and pending physical acceptance are explicit, and no availability probe or automatic installation is claimed. Rebuilt the runtime and verified all six entries and the inventory entry.
+
+The rebuild also revealed that plugin skill edits must originate in .skills. Moved the earlier analysis/serial/policy guidance to those source skills and regenerated the plugin, preserving the shipped changes across future builds.

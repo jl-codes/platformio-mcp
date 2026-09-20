@@ -31,3 +31,10 @@ Additional spelling coverage now includes the `flash-agent`, `flash.agent`, and 
 The container inventory now contains ten candidate image names. Publication requires the original seven targets and includes every additional valid project-owned inventory entry; no extra entry can bypass the existing verified-authority requirements. Current packaging sources cover ten npm aliases plus the canonical npm package, and six Python aliases plus the canonical Python runtime. These counts describe prepared source packages, not published namespace ownership.
 
 Run `npm run namespace:coverage` after refreshing registry observations to regenerate `docs/reviews/platformio-namespace-coverage.json`. It covers every explicitly requested name across the supported and evaluated channels, including missing implementations, normalized-name collisions and scoped alternatives. It never treats prepared artifacts or public repository links as secured namespace ownership. Additional channels remain visible even when no installer or publisher exists yet.
+
+The shared runtime contains `capabilities.json`, generated from
+`distribution/capabilities.json` and included in its checksum inventory. It lists
+optional backend dependencies, explicit installation steps, and implementation
+limits. It is a declaration, not an installed-dependency probe or a hardware
+acceptance certificate. npm ships the plugin runtime; Python staging copies the
+same runtime, and containers install those wheels.
