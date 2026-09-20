@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { withFlashVerificationTools } from "./adapters/flash-verification-registry.js";
 import { withOtaTools } from "./adapters/ota-registry.js";
 import { withPowerCompatibility } from "./adapters/power-compat-registry.js";
 import { executePowerCompatibility } from "./adapters/power-compat.js";
@@ -1699,7 +1700,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     projectCompatibility ||
     name === "pio_run_target" ||
     name === "pio_upload" ||
-    name === "pio_flash_and_verify" ||
+    name === "flash_verification" || name === "pio_flash_and_verify" ||
     name === "upload_ota" || name === "pio_upload_ota" ||
     name === "pio_partition_table" ||
     name === "pio_coredump" ||
@@ -1781,7 +1782,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
                 : tool === "upload_ota" || tool === "pio_upload_ota"
                   ? executeOtaCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
-                : tool === "pio_flash_and_verify"
+                : tool === "flash_verification" || tool === "pio_flash_and_verify"
                   ? executeFlashVerificationCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
                 : tool === "pio_upload"
                   ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
@@ -2765,7 +2766,7 @@ async function main() {
   // ---------------------------------------------------------------------------
   const compatibility = parseCompatibilityLaunch(process.argv.slice(2));
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
-  toolRegistry = withOtaTools(withDebugCompatibility(withPowerCompatibility(toolRegistry, "power_profile"), true));
+  toolRegistry = withFlashVerificationTools(withOtaTools(withDebugCompatibility(withPowerCompatibility(toolRegistry, "power_profile"), true)));
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
     toolRegistry = withPowerCompatibility(withDebugCompatibility(withDependencyCompatibility(

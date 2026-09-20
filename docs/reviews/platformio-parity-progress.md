@@ -1884,3 +1884,9 @@ Seventeen focused OTA composition/option checks passed, followed by the eight co
 Added `upload_ota` to normal MCP mode using the same schema, handler and immutable transfer path as opt-in `pio_upload_ota`. The reference name inherits canonical restrictions; lower firmware and filesystem transfer operations both retain canonical/reference deny and approval ancestry. Legacy upload registration remains unchanged. There are now 63 normal tools and 103 with all 40 reference aliases enabled.
 
 Eleven focused registry/options checks passed, followed by thirteen real-policy transfer and real-stdio cases. The actual MCP server lists and dispatches upload_ota in normal and compatibility modes; firmware/filesystem denial is preserved for both names before custody or transfer. TypeScript and scoped lint pass; plugin rebuilt. Both preceding CI runs 35527462301 and 35527460387 passed on f9088383. No OTA network traffic or publication was performed.
+
+### Normal-mode retained flash verification and advertised resume inputs
+
+Added canonical flash_verification over the same retained upload/fresh monitor implementation as pio_flash_and_verify; the existing agent_flash_monitor_verify remains unchanged. Extracted one shared registry definition and added missing advertised resume_id, manifest_approval_id and system_approval_id fields. This fixes a schema gap that could prevent clients from sending the implemented resume controls. Normal mode now lists 64 tools; compatibility mode lists 104 including all 40 reference aliases.
+
+A focused registry check compares advertised field names with every accepted schema field. Four real stdio entrypoint/mode cases confirmed normal-mode listing and dispatch, including rejection of invalid resume IDs through the intended handler. TypeScript and scoped lint pass; plugin rebuilt. CI runs 35527948640/35527946768 still cover the preceding 9b15cb5e batch. No physical flash or publication occurred.

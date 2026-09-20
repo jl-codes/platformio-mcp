@@ -53,7 +53,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 103 : 63);
+      expect(tools).toHaveLength(enabled ? 104 : 64);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -92,6 +92,23 @@ it.each([
       ]) {
         expect(tools.some((tool) => tool.name === name)).toBe(enabled);
       }
+      const flashDefinition = tools.find(
+        (tool) => tool.name === "flash_verification",
+      );
+      expect(flashDefinition?.inputSchema.properties).toHaveProperty(
+        "resume_id",
+      );
+      expect(flashDefinition?.inputSchema.properties).toHaveProperty(
+        "manifest_approval_id",
+      );
+      const flashInvalid = await client.callTool({
+        name: "flash_verification",
+        arguments: { resume_id: "invalid" },
+      });
+      expect(flashInvalid.isError).toBe(true);
+      expect(flashInvalid.structuredContent).toMatchObject({
+        details: { code: "COMPAT_ARGUMENT_INVALID" },
+      });
       expect(tools.some((tool) => tool.name === "upload_ota")).toBe(true);
       const otaInvalid = await client.callTool({
         name: "upload_ota",
