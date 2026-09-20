@@ -179,3 +179,8 @@ it.each([
   },
   20000,
 );
+
+it("routes power profiling through policy even with explicit CLI approval", () => {
+  expect(run("power-profile", "--port", "COM42", "--approve").errorType).toBe("PolicyDenied");
+  expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
+}, 20000);
