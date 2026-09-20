@@ -156,3 +156,10 @@ it("rejects invalid deadline or option-like environment before any process", asy
     ).rejects.toThrow();
   expect(runAnalysisProcess).not.toHaveBeenCalled();
 });
+
+it("expired workflow deadline cannot launch the resolver", async () => {
+  await expect(
+    resolveDebugConfiguration({ ...input(), deadline: performance.now() - 1 }),
+  ).rejects.toMatchObject({ code: "DEBUG_PREPARATION_TIMEOUT" });
+  expect(runAnalysisProcess).not.toHaveBeenCalled();
+});

@@ -103,6 +103,7 @@ export interface DebugConfigurationResolution {
   approvalId?: string;
   timeoutMs?: number;
   signal?: AbortSignal;
+  deadline?: number; // Trusted monotonic workflow deadline; grants bind the stable requested timeout.
 }
 
 /** Resolve package hooks and debug metadata under build permission; this can install packages and execute project code. */
@@ -123,6 +124,11 @@ export async function resolveDebugConfiguration(
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000)
     throw new PlatformIOError(
       "Debugger configuration timeout must be between 1 and 120000 ms.",
+      "DEBUG_CONFIG_LIMIT_INVALID",
+    );
+  if (input.deadline !== undefined && !Number.isFinite(input.deadline))
+    throw new PlatformIOError(
+      "Invalid debugger workflow deadline.",
       "DEBUG_CONFIG_LIMIT_INVALID",
     );
   const info = input.systemInfo as Record<string, { value?: unknown }> | null;
@@ -165,12 +171,21 @@ export async function resolveDebugConfiguration(
     { ...caller, workspaceDir: projectDir },
     async () => {
       guard();
+      const executionTimeout =
+        input.deadline === undefined
+          ? timeoutMs
+          : Math.min(timeoutMs, Math.floor(input.deadline - performance.now()));
+      if (executionTimeout < 1)
+        throw new PlatformIOError(
+          "Debugger configuration deadline expired.",
+          "DEBUG_PREPARATION_TIMEOUT",
+        );
       const result = await runAnalysisProcess(
         executable,
         ["-I", "-c", resolutionScript, input.environment],
         {
           cwd: projectDir,
-          timeoutMs,
+          timeoutMs: executionTimeout,
           maxOutputBytes: 1024 * 1024,
           signal: input.signal,
           environment: {
