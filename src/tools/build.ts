@@ -511,6 +511,7 @@ export async function cleanProject(
 
 /** Trusted controls for an already-authorized named target; this helper does not grant device access. */
 export interface TargetExecutionOptions {
+  captureEnvironment?: NodeJS.ProcessEnv; // Host-only capture hook environment; never accepted from public tool arguments.
   deviceCustody?: ProcessDeviceCustody; // Trusted retained upload-to-monitor ownership, never public arguments.
   cancellation?: AbortSignal; // Owned workflow stop request; closure still must be confirmed.
   serialPort?: string; // Host-resolved endpoint custody, separate from network upload destinations.
@@ -570,6 +571,7 @@ export async function buildTarget(
       cwd: validatedPath,
       projectDir: validatedPath,
       timeout: execution.timeoutMs ?? 600000,
+      environment: execution.captureEnvironment,
       devicePort: execution.serialPort,
       deviceCustody: execution.deviceCustody,
       cancellation: execution.cancellation,

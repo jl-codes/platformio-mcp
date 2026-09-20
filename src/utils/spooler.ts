@@ -139,7 +139,7 @@ function ensureLatestLogPointer(logFile: string, latestLog: string): { mirrorLat
 export async function executeWithSpooling(
   command: string,
   args: string[],
-  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; devicePort?: string; deviceCustody?: ProcessDeviceCustody; cancellation?: AbortSignal; onSuccess?: () => Promise<void>; rootCommandId?: string; artifactType?: "build" | "upload" | "monitor" | "test" | "debug" }
+  options: { cwd: string; environment?: NodeJS.ProcessEnv; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; devicePort?: string; deviceCustody?: ProcessDeviceCustody; cancellation?: AbortSignal; onSuccess?: () => Promise<void>; rootCommandId?: string; artifactType?: "build" | "upload" | "monitor" | "test" | "debug" }
 ): Promise<SpoolingResult> {
   const projectArea = options.projectDir ?? options.cwd;
 
@@ -168,6 +168,7 @@ export async function executeWithSpooling(
       throw new PlatformIOError("Command cancelled before spawn.", "PROCESS_CANCELLED");
     proc = await platformioExecutor.spawn(command, args, {
       cwd: options.cwd,
+      env: options.environment,
       stdio: ["ignore", outFd, outFd],
       detached: false,
     });

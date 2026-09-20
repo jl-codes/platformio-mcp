@@ -16986,6 +16986,7 @@ async function executeWithSpooling(command, args, options) {
       throw new PlatformIOError("Command cancelled before spawn.", "PROCESS_CANCELLED");
     proc = await platformioExecutor.spawn(command, args, {
       cwd: options.cwd,
+      env: options.environment,
       stdio: ["ignore", outFd, outFd],
       detached: false
     });
@@ -109587,6 +109588,7 @@ async function buildTarget(projectDir, target, environment, verbose, execution =
       cwd: validatedPath,
       projectDir: validatedPath,
       timeout: execution.timeoutMs ?? 6e5,
+      environment: execution.captureEnvironment,
       devicePort: execution.serialPort,
       deviceCustody: execution.deviceCustody,
       cancellation: execution.cancellation

@@ -1768,3 +1768,19 @@ options, unsupported reset settings and non-write commands before creating an ar
 It does not grant permission, launch an uploader, or establish hardware parity;
 those live workflow connections remain required. The focused command and manifest
 regressions pass (21 cases), as do TypeScript and scoped lint checks.
+
+### Owned upload capture execution
+
+`captureTargetUpload` now installs the private SCons hook through a child-only
+`PLATFORMIO_EXTRA_SCRIPTS` extension, executes the selected upload target through
+the existing spooler and custody controls, and ingests the capture only after an
+observed stopped process. The project file is not rewritten. Inherited modern or
+legacy script settings remain before the final hook; ambiguous comma-only inherited
+lists are rejected by this new path, while the legacy uploader remains unchanged.
+The implementation follows Core 6.1.16 project/config.py's append behavior.
+Unconfirmed process closure keeps the private hook directory. A zero exit status
+is rejected instead of being called a successful capture. The 28 focused capture,
+target and spooler regressions pass; TypeScript and scoped lint pass. The affected
+plugin runtime was rebuilt. No physical upload was run. Public flash workflow
+selection, multi-phase custody, retained uploader execution and hash-bound approval
+are still required before firmware correspondence can be claimed publicly.
