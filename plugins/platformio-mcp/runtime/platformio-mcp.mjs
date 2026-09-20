@@ -92653,6 +92653,62 @@ var require_ip_address = __commonJS({
   }
 });
 
+// src/adapters/ota-registry.ts
+function withOtaTools(base2, name2 = "upload_ota") {
+  const result = new Map(base2);
+  const ota = base2.get("upload_firmware");
+  if (!ota || result.has(name2))
+    throw new Error("Invalid OTA compatibility registry");
+  result.set(name2, {
+    ...ota,
+    name: name2,
+    annotations: { ...ota.annotations, openWorldHint: true },
+    description: "Upload ESP32/ESP8266 firmware or filesystem images over ArduinoOTA using a fixed network target, immutable image and private credentials. Build and uploader permissions are separate; transfer success does not verify runtime health.",
+    inputSchema: {
+      type: "object",
+      required: ["host"],
+      additionalProperties: false,
+      properties: {
+        host: { type: "string", minLength: 1, maxLength: 253 },
+        project_dir: { type: ["string", "null"], default: null },
+        env: { type: ["string", "null"], default: null },
+        port: {
+          type: ["integer", "null"],
+          minimum: 1,
+          maximum: 65535,
+          default: null
+        },
+        auth: { type: ["string", "null"], maxLength: 1024, default: null },
+        filesystem: { type: "boolean", default: false },
+        build: { type: "boolean", default: true },
+        timeout_s: {
+          type: "number",
+          minimum: 1e-3,
+          maximum: 600,
+          default: 180
+        },
+        verify_reachable: { type: "boolean", default: true },
+        image_path: { type: "string" },
+        elf_path: { type: "string", minLength: 1, maxLength: 32768 },
+        expected_image_sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
+        ...Object.fromEntries(
+          [
+            "approval_id",
+            "command_approval_id",
+            "config_approval_id",
+            "build_approval_id",
+            "image_approval_id",
+            "system_approval_id",
+            "resolve_approval_id"
+          ].map((name3) => [name3, { type: "string", maxLength: 256 }])
+        )
+      }
+    },
+    handler: (args, context) => context.dispatch(name2, args)
+  });
+  return result;
+}
+
 // src/adapters/power-compat-registry.ts
 function withPowerCompatibility(base2, name2 = "pio_power_profile") {
   const result = new Map(base2);
@@ -93032,7 +93088,8 @@ var INTERNAL_ACTIONS = {
   power_meter_measure: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", idempotent: false },
   power_source: { riskLevel: "critical", readOnly: false, destructive: true, idempotent: false, openWorld: false },
   power_meter_command: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
-  pio_upload_ota: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
+  upload_ota: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware", openWorld: true },
+  pio_upload_ota: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_ota", openWorld: true },
   ota_upload_firmware: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware", openWorld: true },
   ota_upload_filesystem: { ...MCP_ACTIONS.upload_filesystem, policyAction: "upload_filesystem", openWorld: true },
   ota_uploader_command: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command", riskLevel: "critical" },
@@ -93108,7 +93165,7 @@ function policyNamesForOperation(name2) {
   let current = name2;
   while (!names.includes(current)) {
     names.push(current);
-    if (["ota_upload_firmware", "ota_upload_filesystem"].includes(current)) names.push("pio_upload_ota");
+    if (["ota_upload_firmware", "ota_upload_filesystem"].includes(current)) names.push("upload_ota", "pio_upload_ota");
     if (current === "flash_verification" && !names.includes("pio_flash_and_verify")) names.push("pio_flash_and_verify");
     if (current === name2 && Object.hasOwn(INTERNAL_ACTIONS, name2) && name2.startsWith("target_"))
       names.push("run_target", "pio_run_target");
@@ -115940,7 +115997,7 @@ function withBoardCompatibility(base2) {
 
 // src/adapters/project-compat-registry.ts
 function withProjectCompatibility(base2) {
-  const result = new Map(base2);
+  let result = new Map(base2);
   for (const canonical3 of [
     "project_envs",
     "project_metadata",
@@ -116261,56 +116318,7 @@ function withProjectCompatibility(base2) {
     },
     handler: (args, context) => context.dispatch("pio_flash_and_verify", args)
   });
-  const ota = base2.get("upload_firmware");
-  if (!ota || result.has("pio_upload_ota"))
-    throw new Error("Invalid OTA compatibility registry");
-  result.set("pio_upload_ota", {
-    ...ota,
-    name: "pio_upload_ota",
-    annotations: { ...ota.annotations, openWorldHint: true },
-    description: "Upload ESP32/ESP8266 firmware or filesystem images over ArduinoOTA using a fixed network target, immutable image and private credentials. Build and uploader permissions are separate; transfer success does not verify runtime health.",
-    inputSchema: {
-      type: "object",
-      required: ["host"],
-      additionalProperties: false,
-      properties: {
-        host: { type: "string", minLength: 1, maxLength: 253 },
-        project_dir: { type: ["string", "null"], default: null },
-        env: { type: ["string", "null"], default: null },
-        port: {
-          type: ["integer", "null"],
-          minimum: 1,
-          maximum: 65535,
-          default: null
-        },
-        auth: { type: ["string", "null"], maxLength: 1024, default: null },
-        filesystem: { type: "boolean", default: false },
-        build: { type: "boolean", default: true },
-        timeout_s: {
-          type: "number",
-          minimum: 1e-3,
-          maximum: 600,
-          default: 180
-        },
-        verify_reachable: { type: "boolean", default: true },
-        image_path: { type: "string" },
-        elf_path: { type: "string", minLength: 1, maxLength: 32768 },
-        expected_image_sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
-        ...Object.fromEntries(
-          [
-            "approval_id",
-            "command_approval_id",
-            "config_approval_id",
-            "build_approval_id",
-            "image_approval_id",
-            "system_approval_id",
-            "resolve_approval_id"
-          ].map((name2) => [name2, { type: "string", maxLength: 256 }])
-        )
-      }
-    },
-    handler: (args, context) => context.dispatch("pio_upload_ota", args)
-  });
+  result = new Map(withOtaTools(result, "pio_upload_ota"));
   const upload = base2.get("upload_firmware");
   if (!upload || result.has("pio_upload"))
     throw new Error("Invalid firmware upload compatibility registry");
@@ -130618,7 +130626,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     name2
   );
   const debugCompatibility = isDebugToolName(name2);
-  const compatibilityTool = name2 === "power_profile" || name2 === "pio_power_profile" || debugCompatibility || packageCompatibility || projectCompatibility || name2 === "pio_run_target" || name2 === "pio_upload" || name2 === "pio_flash_and_verify" || name2 === "pio_upload_ota" || name2 === "pio_partition_table" || name2 === "pio_coredump" || name2 === "pio_system_info" || dependencyCompatibility || boardCompatibility || deviceCompatibility;
+  const compatibilityTool = name2 === "power_profile" || name2 === "pio_power_profile" || debugCompatibility || packageCompatibility || projectCompatibility || name2 === "pio_run_target" || name2 === "pio_upload" || name2 === "pio_flash_and_verify" || name2 === "upload_ota" || name2 === "pio_upload_ota" || name2 === "pio_partition_table" || name2 === "pio_coredump" || name2 === "pio_system_info" || dependencyCompatibility || boardCompatibility || deviceCompatibility;
   const projectInspection = [
     "project_envs",
     "project_metadata",
@@ -130660,7 +130668,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const result = await mcpContext.run(
         { activityId, targetProjectDir },
         () => registeredTool.handler(args, {
-          dispatch: async (tool, parameters) => tool === "power_profile" || tool === "pio_power_profile" ? executePowerCompatibility(serialClient, powerClient, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, tool) : isDebugToolName(tool) ? executeDebugTool(debugClient, tool, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller) : tool === "coredump" ? executeCoredump(parameters, caller, onAuthorized) : tool === "partition_table" ? executePartitionTable(parameters, caller, onAuthorized) : tool === "run_target" ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized) : tool === "pio_coredump" ? executeCoredumpCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_partition_table" ? executePartitionCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_system_info" ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload_ota" ? executeOtaCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_flash_and_verify" ? executeFlashVerificationCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload" ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_run_target" ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (deviceCompatibility ? executeDeviceCompatibility.bind(null, serialClient) : boardCompatibility ? executeBoardCompatibility : dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
+          dispatch: async (tool, parameters) => tool === "power_profile" || tool === "pio_power_profile" ? executePowerCompatibility(serialClient, powerClient, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, tool) : isDebugToolName(tool) ? executeDebugTool(debugClient, tool, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller) : tool === "coredump" ? executeCoredump(parameters, caller, onAuthorized) : tool === "partition_table" ? executePartitionTable(parameters, caller, onAuthorized) : tool === "run_target" ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized) : tool === "pio_coredump" ? executeCoredumpCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_partition_table" ? executePartitionCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_system_info" ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "upload_ota" || tool === "pio_upload_ota" ? executeOtaCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_flash_and_verify" ? executeFlashVerificationCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_upload" ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "pio_run_target" ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized) : tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (deviceCompatibility ? executeDeviceCompatibility.bind(null, serialClient) : boardCompatibility ? executeBoardCompatibility : dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
             tool,
             parameters,
             {
@@ -131484,7 +131492,7 @@ ENV VARS:
 async function main() {
   const compatibility = parseCompatibilityLaunch(process.argv.slice(2));
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
-  toolRegistry = withDebugCompatibility(withPowerCompatibility(toolRegistry, "power_profile"), true);
+  toolRegistry = withOtaTools(withDebugCompatibility(withPowerCompatibility(toolRegistry, "power_profile"), true));
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
     toolRegistry = withPowerCompatibility(withDebugCompatibility(withDependencyCompatibility(

@@ -53,7 +53,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 102 : 62);
+      expect(tools).toHaveLength(enabled ? 103 : 63);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -92,6 +92,15 @@ it.each([
       ]) {
         expect(tools.some((tool) => tool.name === name)).toBe(enabled);
       }
+      expect(tools.some((tool) => tool.name === "upload_ota")).toBe(true);
+      const otaInvalid = await client.callTool({
+        name: "upload_ota",
+        arguments: {},
+      });
+      expect(otaInvalid.isError).toBe(true);
+      expect(otaInvalid.structuredContent).toMatchObject({
+        details: { code: "COMPAT_ARGUMENT_INVALID" },
+      });
       expect(tools.some((tool) => tool.name === "power_profile")).toBe(true);
       const canonicalPowerList = await client.callTool({
         name: "power_profile",

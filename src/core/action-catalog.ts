@@ -301,7 +301,8 @@ export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
   power_meter_measure: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", idempotent: false },
   power_source: { riskLevel: "critical", readOnly: false, destructive: true, idempotent: false, openWorld: false },
   power_meter_command: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command" },
-  pio_upload_ota: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
+  upload_ota: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware", openWorld: true },
+  pio_upload_ota: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_ota", openWorld: true },
   ota_upload_firmware: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware", openWorld: true },
   ota_upload_filesystem: { ...MCP_ACTIONS.upload_filesystem, policyAction: "upload_filesystem", openWorld: true },
   ota_uploader_command: { ...MCP_ACTIONS.run_target, policyAction: "run_shell_command", riskLevel: "critical" },
@@ -482,7 +483,7 @@ export function policyNamesForOperation(name: string): string[] {
   let current = name;
   while (!names.includes(current)) {
     names.push(current);
-    if (["ota_upload_firmware", "ota_upload_filesystem"].includes(current)) names.push("pio_upload_ota");
+    if (["ota_upload_firmware", "ota_upload_filesystem"].includes(current)) names.push("upload_ota", "pio_upload_ota");
     if (current === "flash_verification" && !names.includes("pio_flash_and_verify")) names.push("pio_flash_and_verify");
     if (current === name && Object.hasOwn(INTERNAL_ACTIONS, name) && name.startsWith("target_"))
       names.push("run_target", "pio_run_target");
