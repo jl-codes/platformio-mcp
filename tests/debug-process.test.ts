@@ -82,6 +82,12 @@ it("initializes fixed arguments, routes permissions, and cleans up without targe
     expect.arrayContaining(["-nx", "--interpreter=mi2"]),
     { cwd: project, shell: false, windowsHide: true, stdio: "pipe" },
   ]);
+  expect(owner.state().command).toEqual(
+    f.launch.mock.calls[0].slice(0, 2).flat(),
+  );
+  expect(owner.state().init_script).toBeNull();
+  owner.state().command?.push("tampered");
+  expect(owner.state().command).not.toContain("tampered");
   const before = f.lines.length;
   await expect(
     owner.command("continue", { workspaceDir: project }),

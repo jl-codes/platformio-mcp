@@ -168,6 +168,8 @@ export class DebugCompatibilityClient {
         debug_tool:
           state?.debug_tool ?? prepared.configuration?.debugTool ?? null,
         uptime_s: state?.uptime_s ?? null,
+        command: state?.command ?? null,
+        init_script: state?.init_script ?? null,
         stopped: normalizeDebuggerStop(state?.lastStop),
         running: state?.running ?? null,
         closed: state?.closed ?? null,

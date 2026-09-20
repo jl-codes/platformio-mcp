@@ -163,6 +163,7 @@ it("retains the script until process cleanup succeeds", async () => {
     cleanupProcess,
   } as OwnedDebugProcess;
   const owner = ownDebugInitialization(process, artifact);
+  expect(owner.state().init_script).toBe(artifact.path);
   await expect(owner.cleanupProcess()).rejects.toThrow("pending");
   await artifact.verify();
   await owner.cleanupProcess();

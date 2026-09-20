@@ -105541,7 +105541,7 @@ function ownDebugInitialization(process9, artifact) {
   assertDebugInitArtifact(artifact);
   return {
     command: process9.command.bind(process9),
-    state: process9.state.bind(process9),
+    state: () => ({ ...process9.state(), init_script: artifact.path }),
     async cleanupProcess() {
       await process9.cleanupProcess();
       await artifact.release();
@@ -106404,9 +106404,10 @@ var GdbMiSession = class {
 
 // src/core/debug/debug-process.ts
 var DebugProcess = class _DebugProcess {
-  constructor(child, options) {
+  constructor(child, options, executable) {
     this.child = child;
     this.options = options;
+    this.executable = executable;
     this.closedPromise = new Promise((resolve) => {
       this.markClosed = resolve;
     });
@@ -106448,6 +106449,7 @@ var DebugProcess = class _DebugProcess {
   }
   child;
   options;
+  executable;
   transport;
   decoder = new StringDecoder5("utf8");
   stderr = "";
@@ -106460,6 +106462,7 @@ var DebugProcess = class _DebugProcess {
   /** Launch only after authorization; initialization failure always attempts bounded cleanup. */
   static async start(options) {
     let child;
+    let executable;
     try {
       if (!path54.isAbsolute(options.executable) || !path54.isAbsolute(options.projectDir))
         throw new PlatformIOError(
@@ -106476,7 +106479,7 @@ var DebugProcess = class _DebugProcess {
         options.systemInfo,
         options.projectDir
       );
-      const executable = await resolveDebuggerExecutable(
+      executable = await resolveDebuggerExecutable(
         options.executable,
         roots,
         options.projectDir
@@ -106496,7 +106499,7 @@ var DebugProcess = class _DebugProcess {
       options.custody.releaseAfterExit();
       throw error2;
     }
-    const owner = new _DebugProcess(child, options);
+    const owner = new _DebugProcess(child, options, executable);
     try {
       if (child instanceof SupervisedDebugChild)
         await child.supervisor.waitStarted(options.startupTimeoutMs);
@@ -106557,7 +106560,9 @@ var DebugProcess = class _DebugProcess {
       ...this.transport.state(),
       pid: this.child.pid,
       cleanupPending: !this.released,
-      stderr: this.stderr
+      stderr: this.stderr,
+      command: [this.executable, ...GDB_STARTUP_ARGS],
+      init_script: null
     };
   }
   /** Kill only the owned child, then require independent proof before releasing device custody. */
@@ -107659,6 +107664,8 @@ var DebugCompatibilityClient = class {
         load: prepared.load,
         debug_tool: state?.debug_tool ?? prepared.configuration?.debugTool ?? null,
         uptime_s: state?.uptime_s ?? null,
+        command: state?.command ?? null,
+        init_script: state?.init_script ?? null,
         stopped: normalizeDebuggerStop(state?.lastStop),
         running: state?.running ?? null,
         closed: state?.closed ?? null,

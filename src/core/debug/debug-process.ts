@@ -49,6 +49,15 @@ export interface DebugProcessOptions {
   launch?: typeof spawn;
 }
 
+/** Observed process state, with optional launch metadata for alternate host-owned process implementations. */
+export type DebugProcessState = ReturnType<GdbMiSession["state"]> & {
+  pid: number | undefined;
+  cleanupPending: boolean;
+  stderr: string;
+  command?: string[];
+  init_script?: string | null;
+};
+
 /** One owned debugger process; process-only cleanup never sends resume/reset/quit commands. */
 export class DebugProcess {
   private readonly transport: GdbMiSession;
@@ -64,6 +73,7 @@ export class DebugProcess {
   private constructor(
     private readonly child: GdbProcessChild,
     private readonly options: DebugProcessOptions,
+    private readonly executable: string,
   ) {
     this.closedPromise = new Promise((resolve) => {
       this.markClosed = resolve;
@@ -107,6 +117,7 @@ export class DebugProcess {
   /** Launch only after authorization; initialization failure always attempts bounded cleanup. */
   static async start(options: DebugProcessOptions): Promise<DebugProcess> {
     let child: GdbProcessChild;
+    let executable: string;
     try {
       if (
         !path.isAbsolute(options.executable) ||
@@ -128,7 +139,7 @@ export class DebugProcess {
           options.systemInfo,
           options.projectDir,
         ));
-      const executable = await resolveDebuggerExecutable(
+      executable = await resolveDebuggerExecutable(
         options.executable,
         roots,
         options.projectDir,
@@ -150,7 +161,7 @@ export class DebugProcess {
       options.custody.releaseAfterExit();
       throw error;
     }
-    const owner = new DebugProcess(child, options);
+    const owner = new DebugProcess(child, options, executable);
     try {
       if (child instanceof SupervisedDebugChild)
         await child.supervisor.waitStarted(options.startupTimeoutMs);
@@ -226,12 +237,14 @@ export class DebugProcess {
   }
 
   /** Observed process state and bounded diagnostics; closed alone does not mean probe released. */
-  state() {
+  state(): DebugProcessState {
     return {
       ...this.transport.state(),
       pid: this.child.pid,
       cleanupPending: !this.released,
       stderr: this.stderr,
+      command: [this.executable, ...GDB_STARTUP_ARGS],
+      init_script: null,
     };
   }
 

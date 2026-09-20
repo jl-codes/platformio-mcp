@@ -196,7 +196,7 @@ export function ownDebugInitialization(
   assertDebugInitArtifact(artifact);
   return {
     command: process.command.bind(process),
-    state: process.state.bind(process),
+    state: () => ({ ...process.state(), init_script: artifact.path }),
     async cleanupProcess() {
       await process.cleanupProcess();
       await artifact.release();

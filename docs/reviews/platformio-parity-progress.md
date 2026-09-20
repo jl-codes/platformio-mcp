@@ -1660,3 +1660,10 @@ Added a single-borrower internal monitor hold with exact resource snapshots, per
 Power discovery now accepts an explicitly selected endpoint when multiple host-observed serial interfaces share its USB descriptor. It retains the existing whole-device USB exclusion key alongside the selected endpoint key; selecting another interface cannot evade physical-device custody. Revalidation pins the complete normalized interface set and rejects interface removal, addition, identity replacement or endpoint drift. Enumeration order and equivalent endpoint aliases do not change that set. Other serial callers retain the conservative default rejection of shared descriptors. This does not authenticate USB descriptors, infer the correct PPK2 protocol interface, auto-select a meter, or establish physical wiring.
 
 Validation: 18 focused discovery and power-custody cases passed, including shared-interface identity, stable enumeration reorder and changed topology. TypeScript and scoped lint passed; the shipped plugin was rebuilt. Physical multi-interface hardware acceptance and reference auto-discovery behavior remain outstanding.
+
+
+### Debugger launch and initialization response metadata
+
+Debugger startup and owned-session listings now expose `command` from the resolved executable and actual fixed GDB argument vector, plus `init_script` from the retained initialization artifact. Script ownership wrappers preserve this path until confirmed cleanup, and command arrays are fresh snapshots rather than mutable internal state. Alternate host-owned implementations without this metadata return null in startup responses. This reports the actual directly supervised GDB launch, not a reconstructed PlatformIO CLI invocation. Version-banner reporting remains outstanding.
+
+Validation: 38 focused process, initialization, compatibility and connection-ownership cases passed; TypeScript and scoped lint passed. The plugin was rebuilt. No debugger hardware was accessed.
