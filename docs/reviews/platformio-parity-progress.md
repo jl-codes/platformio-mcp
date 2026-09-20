@@ -559,3 +559,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Extended the existing worker boundary to extract named value/name groups, preserving four-worker capacity, startup/execution deadlines and termination-before-resolution. Limits: 10000 captures and 128 characters per selected group. Missing value groups and oversized output fail explicitly. Literal/regex line matching retains its existing public contract.
 - TypeScript compilation and 14 matching/lifecycle/capture tests passed, including supported Python group translation and pathological expression timeout. Plugin and three npm archive validations passed after rebuilding shared-worker runtime.
 - Custom captures are not yet connected to memory reports; report merge/units and serial/public integration remain open.
+
+### Custom memory pattern report integration
+
+- Connected bounded named value/name captures to report aggregation for explicit integer-byte custom metrics. Built-in observations with the same metric on the same line are replaced to avoid duplicate counts; metric cardinality is bounded to 256. Invalid/fractional/unsafe integers fail rather than being rounded.
+- TypeScript compilation and 16 capture/parser/report tests passed. Custom unit captures and exact span-overlap semantics remain incomplete, as do public serial/MCP/CLI integrations.

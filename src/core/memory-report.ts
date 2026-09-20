@@ -1,4 +1,5 @@
 /** Aggregate bounded telemetry into evidence-qualified memory and stack reports. */
+import { extractBoundedCaptures } from "./bounded-pattern.js";
 import { z } from "zod";
 import {
   parseMemoryTelemetry,
@@ -10,15 +11,26 @@ import {
   type MemoryObservation,
 } from "./memory-telemetry.js";
 import { PlatformIOError } from "../utils/errors.js";
+/** Explicit input units and timestamps for supplied telemetry. */
+export interface MemoryReportOptions {
+  stackUnit?: "bytes" | "words";
+  stackWordBytes?: number;
+  stackWarnBytes?: number;
+  elapsedSeconds?: readonly number[];
+}
 /** Analyze supplied observations without opening hardware or interpreting unknown stack units. */
 export function analyzeMemoryTelemetry(
   lines: readonly string[],
-  options: {
-    stackUnit?: "bytes" | "words";
-    stackWordBytes?: number;
-    stackWarnBytes?: number;
-    elapsedSeconds?: readonly number[];
-  } = {},
+  options: MemoryReportOptions = {},
+) {
+  return analyzeParsedTelemetry(lines, options);
+}
+
+/** Shared aggregation for built-in and worker-extracted observations. */
+function analyzeParsedTelemetry(
+  lines: readonly string[],
+  options: MemoryReportOptions,
+  custom?: MemoryTelemetrySample[],
 ) {
   const settings = z
     .object({
@@ -49,6 +61,22 @@ export function analyzeMemoryTelemetry(
     stackUnit: settings.stackUnit,
     stackWordBytes: settings.stackWordBytes,
   });
+  if (custom?.length) {
+    const claimed = new Set(
+      custom.map((sample) => `${sample.line}:${sample.metric}`),
+    );
+    parsed.samples = [
+      ...parsed.samples.filter(
+        (sample) => !claimed.has(`${sample.line}:${sample.metric}`),
+      ),
+      ...custom,
+    ].sort((a, b) => a.line - b.line);
+    parsed.unknownUnitSamples = parsed.samples.filter(
+      (sample) => sample.unit === "unknown",
+    ).length;
+    parsed.recognized = true;
+    parsed.formats.push("custom");
+  }
   const series = new Map<string, MemoryObservation[]>();
   const tasks = new Map<string, MemoryTelemetrySample[]>();
   const paired = new Map<number, { free?: number; largest?: number }>();
@@ -73,6 +101,11 @@ export function analyzeMemoryTelemetry(
         : {}),
     });
     series.set(sample.metric, values);
+    if (series.size > 256)
+      throw new PlatformIOError(
+        "Telemetry exceeds 256 metrics.",
+        "MEMORY_TELEMETRY_LIMIT",
+      );
     const pair = paired.get(sample.line) ?? {};
     if (sample.metric === "free_heap") pair.free = sample.value;
     if (sample.metric === "largest_free_block") pair.largest = sample.value;
@@ -130,4 +163,37 @@ export function analyzeMemoryTelemetry(
       ? `${parsed.samples.length} memory observations in ${lines.length} lines; trends describe this sample window and do not confirm a leak.`
       : `No recognized memory telemetry in ${lines.length} lines. Add heap or stack instrumentation with explicit units.`,
   };
+}
+
+/** Analyze custom integer byte metrics using a bounded worker and the same report aggregation. */
+export async function analyzeMemoryTelemetryPattern(
+  lines: readonly string[],
+  pattern: string,
+  options: MemoryReportOptions = {},
+) {
+  // Validate all built-in bounds and options before creating a regex worker.
+  analyzeMemoryTelemetry(lines, options);
+  const captures = await extractBoundedCaptures(lines, pattern, {
+    pythonNamedGroups: true,
+  });
+  const samples = captures.map((capture) => {
+    if (!/^\d+$/.test(capture.value))
+      throw new PlatformIOError(
+        "Custom telemetry requires nonnegative integer byte values.",
+        "MEMORY_VALUE_INVALID",
+      );
+    const value = Number(capture.value);
+    if (!Number.isSafeInteger(value))
+      throw new PlatformIOError(
+        "Custom telemetry exceeds integer bounds.",
+        "MEMORY_VALUE_INVALID",
+      );
+    const metric =
+      (capture.name ?? "custom")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "") || "custom";
+    return { line: capture.line, metric, value, unit: "bytes" as const };
+  });
+  return analyzeParsedTelemetry(lines, options, samples);
 }

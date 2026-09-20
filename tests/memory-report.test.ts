@@ -1,6 +1,9 @@
 /** Memory reports preserve sample pairing, timestamp scope and unknown unit evidence. */
 import { expect, it } from "vitest";
-import { analyzeMemoryTelemetry as report } from "../src/core/memory-report.js";
+import {
+  analyzeMemoryTelemetry as report,
+  analyzeMemoryTelemetryPattern,
+} from "../src/core/memory-report.js";
 it("aggregates heap trends and paired fragmentation without inventing timestamps", () => {
   const result = report([
     "Free heap: 10000 min: 9000 largest: 4000",
@@ -45,4 +48,30 @@ it("validates line timestamps and returns explicit unrecognized telemetry", () =
   );
   expect(report(["hello board"]).recognized).toBe(false);
   expect(report(["hello board"]).fragmentation).toBeNull();
+});
+
+it("merges custom named byte metrics with built-in telemetry", async () => {
+  const result = await analyzeMemoryTelemetryPattern(
+    ["Free heap: 1000", "mem=200", "mem=300"],
+    "mem=(?P<value>\\d+)",
+  );
+  expect(result.metrics.free_heap.last).toBe(1000);
+  expect(result.metrics.custom).toMatchObject({
+    samples: 2,
+    first: 200,
+    last: 300,
+  });
+  expect(result.formats).toContain("custom");
+});
+it("does not double count a custom metric overriding the same line and name", async () => {
+  const result = await analyzeMemoryTelemetryPattern(
+    ["Free heap: 1000"],
+    "(?P<name>Free heap): (?P<value>\\d+)",
+  );
+  expect(result.metrics.free_heap.samples).toBe(1);
+});
+it("rejects custom values that would otherwise be coerced or rounded", async () => {
+  await expect(
+    analyzeMemoryTelemetryPattern(["mem=1.5"], "mem=(?P<value>.+)"),
+  ).rejects.toMatchObject({ code: "MEMORY_VALUE_INVALID" });
 });
