@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { MCPTestHarness } from "../tests/setup.js";
-const [fixtureArg, output] = process.argv.slice(2);
+const [fixtureArg, output, expectedLibrary] = process.argv.slice(2);
 assert(
   fixtureArg && output,
   "Usage: verify-dependency-mcp.ts FIXTURE OUTPUT_JSON",
@@ -34,6 +34,19 @@ try {
   assert(data?.build?.ok, JSON.stringify(data));
   assert.equal(data.inventoryTiming, "before_build");
   assert.equal(data.graphStatus, "complete");
+  if (expectedLibrary) {
+    const pending = [...data.graph];
+    let found = false;
+    while (pending.length) {
+      const node = pending.pop();
+      if (node.name === expectedLibrary) found = true;
+      pending.push(...node.dependencies);
+    }
+    assert(
+      found,
+      `Expected dependency ${expectedLibrary} in ${JSON.stringify(data.graph)}`,
+    );
+  }
   const compatibility = await harness.client.callTool(
     {
       name: "pio_deps_check",
@@ -64,6 +77,7 @@ try {
       canonicalBuildSucceeded: data.build.ok,
       compatibilityInspectionSucceeded: compact.ok,
       inventoryTiming: data.inventoryTiming,
+      expectedLibraryObserved: expectedLibrary ?? null,
     },
     graphStatus: data.graphStatus,
     graph: data.graph,

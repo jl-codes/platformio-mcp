@@ -525,3 +525,9 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Real output exposed Core's `Scanning dependencies...` / `No dependencies` form without a graph heading. Added parsing and regression coverage, then reran MCP acceptance successfully with complete empty-graph evidence.
 - TypeScript compilation, 11 graph/service tests, real MCP build/alias checks, plugin validation and three npm archive validations passed. Runtime rebuilt.
 - This proves Windows empty-graph fixture behavior only. Populated graph, other hosts, exact result equivalence and remaining full-plan acceptance/release work remain open. No release publication occurred.
+
+### Populated dependency MCP acceptance
+
+- Added repository-owned ESP32-S3 build-only fixture with AuditParent/AuditChild manifests and headers. Real MCP canonical build and compatibility inspection succeeded on Windows. Evidence: `dependency-populated-mcp-windows-evidence.json`.
+- Observed printed graph contains AuditParent 1.2.3 as a root. Normal Core output did not expose its transitive child; documentation explicitly limits graph completeness to parsing the printed tree. No hardware was accessed.
+- Prior pushed 78098466 CI runs 35477876325/35477873538 succeeded. Remaining cross-platform/hardware and full reference acceptance/release gates remain open.

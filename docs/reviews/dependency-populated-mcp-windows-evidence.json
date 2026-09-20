@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-20T00:11:27.940Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.15.0"
+  },
+  "transport": "MCP stdio",
+  "toolCount": 64,
+  "checks": {
+    "canonicalBuildSucceeded": true,
+    "compatibilityInspectionSucceeded": true,
+    "inventoryTiming": "before_build",
+    "expectedLibraryObserved": "AuditParent"
+  },
+  "graphStatus": "complete",
+  "graph": [
+    {
+      "name": "AuditParent",
+      "version": "1.2.3",
+      "dependencies": []
+    }
+  ],
+  "inventoryComplete": true,
+  "counts": {
+    "error": 0,
+    "warning": 0,
+    "info": 0
+  },
+  "build": {
+    "ok": true,
+    "exitCode": 0,
+    "durationSeconds": 7.587087800000001,
+    "outputTail": "Compiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\esp32-hal-rmt.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\esp32-hal-sigmadelta.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\esp32-hal-spi.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\esp32-hal-time.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\esp32-hal-timer.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\esp32-hal-tinyusb.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\esp32-hal-touch.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\esp32-hal-uart.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\firmware_msc_fat.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\libb64\\cdecode.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\libb64\\cencode.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\main.cpp.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\stdlib_noniso.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\wiring_pulse.c.o\nCompiling .pio\\build\\analysis-esp32s3\\FrameworkArduino\\wiring_shift.c.o\nArchiving .pio\\build\\analysis-esp32s3\\libFrameworkArduino.a\nLinking .pio\\build\\analysis-esp32s3\\firmware.elf\nRetrieving maximum program size .pio\\build\\analysis-esp32s3\\firmware.elf\nChecking size .pio\\build\\analysis-esp32s3\\firmware.elf\nAdvanced Memory Usage is available via \"PlatformIO Home > Project Inspect\"\nRAM:   [=         ]   5.5% (used 18040 bytes from 327680 bytes)\nFlash: [=         ]   7.0% (used 233149 bytes from 3342336 bytes)\nBuilding .pio\\build\\analysis-esp32s3\\firmware.bin\nesptool.py v4.11.0\nCreating esp32s3 image...\nMerged 2 ELF sections\nSuccessfully created esp32s3 image.\n========================= [SUCCESS] Took 6.92 seconds =========================\n\n",
+    "logPath": null
+  },
+  "physicalDeviceTest": false,
+  "limitations": [
+    "Normal PlatformIO output exposed only the root library; this does not prove transitive graph completeness."
+  ]
+}
