@@ -14,10 +14,12 @@ import {
   initializeGdbInspection,
 } from "./debug-initialization.js";
 import { GdbMiSession } from "./gdb-mi-session.js";
+import { resolveDebuggerExecutable } from "./debug-discovery.js";
 
 /** Trusted process owner inputs; never accept this structure directly from MCP arguments. */
 export interface DebugProcessOptions {
   executable: string;
+  trustedDebuggerRoots: readonly string[];
   projectDir: string;
   elfPath: string;
   custody: ProcessDeviceCustody;
@@ -85,27 +87,28 @@ export class DebugProcess {
 
   /** Launch only after authorization; initialization failure always attempts bounded cleanup. */
   static async start(options: DebugProcessOptions): Promise<DebugProcess> {
-    if (
-      !path.isAbsolute(options.executable) ||
-      !path.isAbsolute(options.projectDir)
-    )
-      throw new PlatformIOError(
-        "Debugger paths must be host-resolved.",
-        "GDB_PATH_INVALID",
-      );
-    options.custody.prepareSpawn();
     let child: ChildProcessWithoutNullStreams;
     try {
-      child = (options.launch ?? spawn)(
+      if (
+        !path.isAbsolute(options.executable) ||
+        !path.isAbsolute(options.projectDir)
+      )
+        throw new PlatformIOError(
+          "Debugger paths must be host-resolved.",
+          "GDB_PATH_INVALID",
+        );
+      const executable = await resolveDebuggerExecutable(
         options.executable,
-        [...GDB_STARTUP_ARGS],
-        {
-          cwd: options.projectDir,
-          shell: false,
-          windowsHide: true,
-          stdio: "pipe",
-        },
-      ) as ChildProcessWithoutNullStreams;
+        options.trustedDebuggerRoots,
+        options.projectDir,
+      );
+      options.custody.prepareSpawn();
+      child = (options.launch ?? spawn)(executable, [...GDB_STARTUP_ARGS], {
+        cwd: options.projectDir,
+        shell: false,
+        windowsHide: true,
+        stdio: "pipe",
+      }) as ChildProcessWithoutNullStreams;
     } catch (error) {
       options.custody.releaseAfterExit();
       throw error;

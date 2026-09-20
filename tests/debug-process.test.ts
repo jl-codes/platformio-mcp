@@ -8,7 +8,10 @@ import type { spawn } from "node:child_process";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { DebugProcess } from "../src/core/debug/debug-process.js";
 let project: string;
+let install: string;
 beforeEach(() => {
+  install = fs.mkdtempSync(path.join(os.tmpdir(), "pio-debug-install-"));
+  fs.writeFileSync(path.join(install, "gdb"), "synthetic test executable");
   project = fs.mkdtempSync(path.join(os.tmpdir(), "pio-debug-owner-"));
   fs.writeFileSync(
     path.join(project, "platformio.ini"),
@@ -22,7 +25,10 @@ beforeEach(() => {
     }),
   );
 });
-afterEach(() => fs.rmSync(project, { recursive: true, force: true }));
+afterEach(() => {
+  fs.rmSync(project, { recursive: true, force: true });
+  fs.rmSync(install, { recursive: true, force: true });
+});
 function fixture(rejectSetup = false) {
   const child = new EventEmitter() as EventEmitter & {
     stdin: Writable;
@@ -56,7 +62,8 @@ function fixture(rejectSetup = false) {
   const confirmProbeReleased = vi.fn(async () => true);
   const launch = vi.fn(() => child);
   const options = {
-    executable: path.resolve("trusted-gdb"),
+    executable: fs.realpathSync(path.join(install, "gdb")),
+    trustedDebuggerRoots: [install],
     projectDir: project,
     elfPath: path.join(project, "firmware.elf"),
     custody,
@@ -152,4 +159,18 @@ it("does not release on successful kill requests without confirmed close", async
   } finally {
     vi.useRealTimers();
   }
+});
+
+it("rejects project executables before spawn and releases unused custody", async () => {
+  const f = fixture();
+  const local = path.join(project, "gdb");
+  fs.writeFileSync(local, "untrusted");
+  await expect(
+    DebugProcess.start({ ...f.options, executable: local }),
+  ).rejects.toMatchObject({
+    code: "GDB_EXECUTABLE_UNTRUSTED",
+  });
+  expect(f.launch).not.toHaveBeenCalled();
+  expect(f.custody.prepareSpawn).not.toHaveBeenCalled();
+  expect(f.custody.releaseAfterExit).toHaveBeenCalledOnce();
 });
