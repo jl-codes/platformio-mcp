@@ -41,6 +41,8 @@ def validate(directory):
                 payload=json.loads(archive.read(prefix+"payload.json"))
                 if (payload["host"],payload["version"],payload["sourceCommit"],payload["nodeVersion"],payload["wheelTag"])!=(host,version,commit,support["nodeVersion"],support["targets"][host]["wheelTag"]):
                     raise ValueError("Wheel payload source/runtime identity mismatch")
+                if payload.get("minimums") != support["minimums"]:
+                    raise ValueError("Wheel OS requirements differ from the support manifest")
                 inventory=payload["files"]
                 paths={item["path"] for item in inventory}
                 packed={name[len(prefix):] for name in names if name.startswith(prefix) and name!=prefix+"payload.json"}

@@ -39,7 +39,7 @@ def build_wheel(host, destination):
                 digest = hashlib.file_digest(stream, "sha256").hexdigest()
             inventory.append({"path":item.relative_to(payload).as_posix(),"bytes":item.stat().st_size,"sha256":digest})
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    (payload / "payload.json").write_text(json.dumps({"schemaVersion":1,"host":host,"wheelTag":target["wheelTag"],"version":package["version"],"sourceCommit":commit,"nodeVersion":support["nodeVersion"],"files":inventory},indent=2)+"\n")
+    (payload / "payload.json").write_text(json.dumps({"schemaVersion":1,"host":host,"wheelTag":target["wheelTag"],"version":package["version"],"sourceCommit":commit,"nodeVersion":support["nodeVersion"],"minimums":support["minimums"],"files":inventory},indent=2)+"\n")
     subprocess.run([sys.executable,"-m","build","--wheel","--no-isolation",str(destination)],check=True)
     return destination / "dist"
 

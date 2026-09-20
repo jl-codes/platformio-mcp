@@ -6,7 +6,7 @@ import sys
 import tempfile
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from pio_agent_launcher.__main__ import launch_spec
+from pio_agent_launcher.__main__ import launch_spec, MINIMUMS
 
 
 class LauncherTests(unittest.TestCase):
@@ -14,7 +14,7 @@ class LauncherTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.manifest = {"schemaVersion":1, "host":"win32-x64", "files":[]}
+        self.manifest = {"schemaVersion":1, "host":"win32-x64", "minimums":MINIMUMS, "files":[]}
         for name in ["node/node.exe", "runtime/cli.mjs"]:
             target = self.root / name
             target.parent.mkdir(parents=True, exist_ok=True)

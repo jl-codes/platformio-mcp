@@ -683,3 +683,7 @@ Implemented pio-agent and pio-mcp alias distributions with exact canonical versi
 ### Release workflow assembles complete Python distribution set
 
 Added a release build job that assembles all five pinned platform wheels and both functional aliases, validates package versions/source commit/runtime hashes/alias pins and inventory coverage, and retains the artifacts. Existing release job now depends on that job and downloads its exact-run artifact set before upload/attachment. A Python release identity manifest records wheel SHA-256 hashes. YAML parsing and dependency inspection pass; the complete workflow has not been run and no host execution acceptance is inferred from cross-assembly. PyPI publication remains unwired pending verified authority and release acceptance. No runtime smoke tests or publication were performed this turn.
+
+### Enforce Python wheel operating-system floors
+
+The launcher now requires the pinned platform contract and rejects older Windows/macOS/Linux kernels, older glibc and musl before executing bundled Node. The wheel builder embeds those requirements, and release validation checks them against the support manifest. Syntax compilation passed; no repeated smoke tests were run. Linux libstdc++ symbol-version acceptance remains an explicit target-host requirement, not proven by these checks. No publication occurred.

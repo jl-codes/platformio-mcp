@@ -4,9 +4,43 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import platform
+import re
 import signal
 import subprocess
 import sys
+
+
+# Node 24.15.0 official platform floors; kept in sync with the distribution manifest.
+MINIMUMS = {"windows": "10", "macos": "13.5", "glibc": "2.28", "linuxKernel": "4.18", "libstdcxx": "GLIBCXX_3.4.25"}
+
+
+def numeric_version(value):
+    """Read a major/minor version prefix without accepting an unknown platform value."""
+    match = re.match(r"^(\d+)(?:\.(\d+))?", value)
+    if not match:
+        raise ValueError("Cannot determine the operating system compatibility version")
+    return int(match[1]), int(match[2] or 0)
+
+
+def check_platform(host, minimums):
+    """Reject known unsupported OS/libc combinations before starting bundled Node."""
+    if minimums != MINIMUMS:
+        raise ValueError("Wheel platform requirements differ from the launcher contract")
+    if host.startswith("win32-"):
+        if sys.getwindowsversion().major < int(minimums["windows"]):
+            raise ValueError("Bundled Node requires Windows 10 or newer")
+    elif host.startswith("darwin-"):
+        if numeric_version(platform.mac_ver()[0]) < numeric_version(minimums["macos"]):
+            raise ValueError("Bundled Node requires macOS 13.5 or newer")
+    elif host.startswith("linux-"):
+        try:
+            libc = os.confstr("CS_GNU_LIBC_VERSION") or ""
+        except (ValueError, OSError, AttributeError):
+            libc = ""
+        if not libc.startswith("glibc ") or numeric_version(libc[6:]) < numeric_version(minimums["glibc"]):
+            raise ValueError("Bundled Node requires glibc 2.28 or newer; musl wheels are not supported")
+        if numeric_version(platform.release()) < numeric_version(minimums["linuxKernel"]):
+            raise ValueError("Bundled Node requires Linux kernel 4.18 or newer")
 
 
 def launch_spec(root, arguments, host=None):
@@ -19,6 +53,7 @@ def launch_spec(root, arguments, host=None):
     supported = {"win32-x64", "darwin-x64", "darwin-arm64", "linux-x64", "linux-arm64"}
     if actual not in supported or manifest.get("schemaVersion") != 1 or manifest.get("host") != actual:
         raise ValueError("Unsupported wheel/host combination; install platformio-mcp through npm instead.")
+    check_platform(actual, manifest.get("minimums"))
     files = manifest.get("files")
     if not isinstance(files, list) or not files or len(files) > 10000:
         raise ValueError("Invalid wheel payload inventory")
