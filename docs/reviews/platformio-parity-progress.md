@@ -1142,3 +1142,8 @@ Added explicit server-environment Python/GDB selection, rejecting project-owned 
 
 Registered coredump in MCP and CLI with strict artifact arguments, staged permissions and host-only executable configuration. Added conservative action annotations, plugin coverage and usage instructions; rebuilt the plugin runtime. Canonical inventory is 57 and compatibility-enabled inventory is 89. Twenty-two focused policy/registry/manifest checks passed; TypeScript and targeted lint passed (existing index any warnings remain). Device acquisition and the reference pio_coredump adapter remain unfinished.
 
+
+### Private bounded core partition acquisition
+
+Added a core-dump partition reader reusing existing flash-read approvals, endpoint ownership and exact-byte checks. Invalid, oversized or encrypted selections fail before device access; erased partitions return an explicit absent-crash result. Shared flash reads now establish owner-only Windows ACL/POSIX staging before writing bytes and retain their existing uncertain-process cleanup behavior. Ten focused selection/flash-policy/private-storage cases passed with mocked hardware; lint and TypeScript passed. Actual hardware and effective-table/public adapter integration remain outstanding.
+

@@ -3,7 +3,7 @@
  * The serial lease excludes monitors; uncertain process exit retains custody and private staging.
  */
 import fs from "node:fs/promises";
-import os from "node:os";
+import { createPrivateAnalysisDirectory } from "./analysis/private-analysis-directory.js";
 import path from "node:path";
 import { z } from "zod";
 import { dispatchAuthorizedAction, planAction } from "./action-dispatcher.js";
@@ -71,10 +71,7 @@ export async function readEspFlash(
         return hardwareLockManager.withImplicitLock(async () => {
           guard();
           endpoint.revalidate();
-          const temporary = await fs.mkdtemp(
-            path.join(os.tmpdir(), "pio-flash-read-"),
-          );
-          await fs.chmod(temporary, 0o700);
+          const temporary = await createPrivateAnalysisDirectory();
           const output = path.join(temporary, "flash.bin");
           let retain = false;
           try {
