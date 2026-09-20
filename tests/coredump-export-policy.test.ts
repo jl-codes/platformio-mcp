@@ -36,20 +36,29 @@ function request() {
     },
   };
 }
-it("preflights export denial before device acquisition", async () => {
-  fs.writeFileSync(
-    path.join(root, ".pio-mcp-policy.json"),
-    JSON.stringify({
-      profile: "read_only",
-      overrides: { audit_all_agent_actions: false },
-    }),
-  );
-  await expect(executeCoredump(request())).rejects.toMatchObject({
-    code: "POLICY_DENIED",
-  });
-  expect(acquireProjectCoredump).not.toHaveBeenCalled();
-  expect(fs.existsSync(path.join(root, "crash.bin"))).toBe(false);
-});
+it.each([false, true])(
+  "preflights saving before device acquisition (managed=%s)",
+  async (managed) => {
+    fs.writeFileSync(
+      path.join(root, ".pio-mcp-policy.json"),
+      JSON.stringify({
+        profile: "read_only",
+        overrides: { audit_all_agent_actions: false },
+      }),
+    );
+    await expect(
+      executeCoredump({
+        ...request(),
+        outPath: managed ? undefined : "crash.bin",
+        retainDump: managed,
+      }),
+    ).rejects.toMatchObject({
+      code: "POLICY_DENIED",
+    });
+    expect(acquireProjectCoredump).not.toHaveBeenCalled();
+    expect(fs.existsSync(path.join(root, "crash.bin"))).toBe(false);
+  },
+);
 it.each([false, true])(
   "checks erased input identity before export (mismatch=%s)",
   async (mismatch) => {

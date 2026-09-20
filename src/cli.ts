@@ -372,10 +372,10 @@ async function runCliCommand(command: string, rawArgs: string[]) {
 
   try {
     if (command === "coredump") {
-      const allowed = new Set(["out-path", "export-approval-id", "json", "project-dir", "dump-path", "format", "analyze", "elf-path", "expected-input-sha256", "expected-elf-sha256", "encrypted", "approval-id", "command-approval-id", "port", "partition-name", "table-path", "table-format", "table-offset", "sdkconfig-path", "environment", "flash-size", "build-metadata", "table-approval-id", "config-approval-id", "metadata-approval-id", "system-approval-id", "board-approval-id", "read-approval-id", "read-command-approval-id"]);
+      const allowed = new Set(["retain-dump", "out-path", "export-approval-id", "json", "project-dir", "dump-path", "format", "analyze", "elf-path", "expected-input-sha256", "expected-elf-sha256", "encrypted", "approval-id", "command-approval-id", "port", "partition-name", "table-path", "table-format", "table-offset", "sdkconfig-path", "environment", "flash-size", "build-metadata", "table-approval-id", "config-approval-id", "metadata-approval-id", "system-approval-id", "board-approval-id", "read-approval-id", "read-command-approval-id"]);
       if (positionals.length || Object.keys(options).some((key) => !allowed.has(key)))
         throw new PlatformIOError("Unknown core-dump option or positional argument.", "COREDUMP_INPUT_INVALID");
-      for (const key of ["analyze", "encrypted", "build-metadata"])
+      for (const key of ["analyze", "encrypted", "build-metadata", "retain-dump"])
         if (options[key] !== undefined && ![true, false, "true", "false"].includes(options[key]))
           throw new PlatformIOError("Expected true or false for --" + key, "COREDUMP_INPUT_INVALID");
       const port = asString(options.port);
@@ -402,7 +402,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         },
       } : undefined;
       const result = await executeCoredump({
-        device, outPath: asString(options["out-path"]), exportApprovalId: asString(options["export-approval-id"]),
+        device, retainDump: asBoolean(options["retain-dump"]) ?? false, outPath: asString(options["out-path"]), exportApprovalId: asString(options["export-approval-id"]),
         projectDir: projectDirForPolicy, dumpPath: asString(options["dump-path"]),
         format: asString(options.format), analyze: asBoolean(options.analyze) ?? true,
         elfPath: asString(options["elf-path"]), encrypted: asBoolean(options.encrypted) ?? false,

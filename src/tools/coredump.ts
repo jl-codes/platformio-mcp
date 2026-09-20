@@ -1,6 +1,7 @@
 /** Permission-gated offline core-dump handler shared by MCP and CLI adapters. */
 import fs from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { retainEspCoredump } from "../core/analysis/esp-coredump-retention.js";
 import { exportEspCoredump } from "../core/analysis/esp-coredump-export.js";
 import { z } from "zod";
 import { PlatformIOError } from "../utils/errors.js";
@@ -37,6 +38,7 @@ export const CoredumpSchema = z
     format: z.enum(["raw", "base64"]).default("raw"),
     analyze: z.boolean().default(true),
     outPath: z.string().min(1).max(32768).optional(),
+    retainDump: z.boolean().default(false),
     exportApprovalId: z.string().max(256).optional(),
     elfPath: z.string().min(1).max(32768).optional(),
     expectedInputSha256: z
@@ -53,7 +55,11 @@ export const CoredumpSchema = z
   })
   .strict()
   .refine(
-    (value) => !value.outPath || !!value.device,
+    (value) => !(value.outPath && value.retainDump),
+    "Select explicit export or managed retention, not both.",
+  )
+  .refine(
+    (value) => !(value.outPath || value.retainDump) || !!value.device,
     "Dump export requires device acquisition.",
   )
   .refine(
@@ -110,7 +116,8 @@ export async function executeCoredump(
   const stages: Array<[string, Record<string, unknown>]> = [
     ["coredump_inspect", args],
   ];
-  if (request.outPath) stages.push(["coredump_export", exportArgs]);
+  if (request.outPath || request.retainDump)
+    stages.push(["coredump_export", exportArgs]);
   if (request.analyze) stages.push(["coredump_analyze", commandArgs]);
   for (const [name, parameters] of stages) {
     const plan = await planAction(name, parameters, context);
@@ -165,17 +172,19 @@ export async function executeCoredump(
             "COREDUMP_IDENTITY_MISMATCH",
           );
         const exported =
-          request.outPath && capture
+          (request.outPath || request.retainDump) && capture
             ? await dispatchAuthorizedAction(
                 "coredump_export",
                 exportArgs,
                 context,
-                () =>
-                  exportEspCoredump(
-                    projectDir,
-                    request.outPath!,
-                    capture.bytes,
-                  ),
+                async () =>
+                  request.retainDump
+                    ? retainEspCoredump(capture.bytes)
+                    : exportEspCoredump(
+                        projectDir,
+                        request.outPath!,
+                        capture.bytes,
+                      ),
               )
             : null;
         validatePolicy();

@@ -84,3 +84,6 @@ CLI device acquisition is available with `coredump --project-dir <workspace> --p
 
 Device acquisition accepts outPath (CLI --out-path) with a separate exportApprovalId (--export-approval-id). The existing parent directory must be inside the authorized project. Export is private and never replaces an existing destination. Empty partitions can still be exported, while the result remains no_coredump. Explicit exports have user-managed retention; delete them when no longer needed.
 
+
+For private managed storage, device requests can select retainDump: true (CLI --retain-dump true) instead of outPath. This uses the same export permission and returns the saved path, hash and expiresAt timestamp. At most 32 dumps of up to 16 MiB are retained. Expiry cleanup runs on subsequent retention access and a live-process timer; a stopped server cannot delete expired files until cleanup resumes. Explicit paths remain user-managed. Canonical requests do not retain dumps unless one of these save options is selected.
+

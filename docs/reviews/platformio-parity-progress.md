@@ -1193,3 +1193,8 @@ Moved captured-partition expected hash verification ahead of any export, includi
 
 Added private managed storage with a maximum of 32 objects at 16 MiB each, serialized across processes using the existing lock library. Entries carry a 24-hour expiry, checked during access and by a live-process expiry timer; stopped servers cannot physically delete files until cleanup runs again. Corrupt records fail closed; unrelated store files are not pruned. Three real filesystem cases passed for exact bytes/expiry, quota and unrelated-file preservation; lint and TypeScript passed. Startup/access integration and default reference-adapter retention remain incomplete.
 
+
+### Public managed retention integration
+
+Added retainDump to MCP and CLI with mutual exclusion against explicit outPath, device-only validation, and the same export preflight as explicit saving. Thirteen existing policy/storage cases passed, then the expanded four-case export-policy suite confirmed both save modes deny before acquisition. TypeScript and lint passed; runtime rebuilt. The reference adapter and startup cleanup wiring remain unfinished; live retention expiry is not claimed while the server is stopped.
+
