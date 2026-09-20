@@ -98102,13 +98102,27 @@ function selectBuildMetadata(output, environment) {
 }
 
 // src/core/debug/debug-discovery.ts
+var debuggerTrust = {
+  environmentKey: "PIO_MCP_DEBUGGER_ROOTS",
+  errorCode: "GDB_EXECUTABLE_UNTRUSTED",
+  executable: /^(?:[a-z0-9_]+-)*gdb(?:\.exe)?$/i,
+  package: /^(?:toolchain-|tool-.*gdb(?:-|$))/
+};
 function within3(root, file) {
   const relative = path42.relative(root, file);
   return relative !== "" && relative !== ".." && !relative.startsWith(".." + path42.sep) && !path42.isAbsolute(relative);
 }
-async function resolveDebuggerExecutable(candidate, trustedRoots, projectDir) {
+function resolveDebuggerExecutable(candidate, trustedRoots, projectDir) {
+  return resolveInstalledDebugExecutable(
+    candidate,
+    trustedRoots,
+    projectDir,
+    debuggerTrust
+  );
+}
+async function resolveInstalledDebugExecutable(candidate, trustedRoots, projectDir, trust) {
   const invalid4 = (message) => {
-    throw new PlatformIOError(message, "GDB_EXECUTABLE_UNTRUSTED");
+    throw new PlatformIOError(message, trust.errorCode);
   };
   if (!path42.isAbsolute(candidate) || !path42.isAbsolute(projectDir) || trustedRoots.length < 1 || trustedRoots.length > 32 || trustedRoots.some((root) => !path42.isAbsolute(root)))
     return invalid4("Debugger requires absolute host installation roots.");
@@ -98123,17 +98137,26 @@ async function resolveDebuggerExecutable(candidate, trustedRoots, projectDir) {
         "Debugger installation roots cannot contain or belong to the project."
       );
   }
-  if (!roots.some((root) => within3(root, executable)) || !/^(?:[a-z0-9_]+-)*gdb(?:\.exe)?$/i.test(path42.basename(executable)) || !(await fs36.stat(executable)).isFile())
+  if (!roots.some((root) => within3(root, executable)) || !trust.executable.test(path42.basename(executable)) || !(await fs36.stat(executable)).isFile())
     return invalid4(
-      "Debugger is not a native GDB within the trusted installation."
+      "Debug tool is not a supported native executable within the trusted installation."
     );
   return executable;
 }
-async function discoverDebuggerRoots(debuggerPath, systemInfo, projectDir, environment = process.env) {
+function discoverDebuggerRoots(debuggerPath, systemInfo, projectDir, environment = process.env) {
+  return discoverInstalledDebugRoots(
+    debuggerPath,
+    systemInfo,
+    projectDir,
+    environment,
+    debuggerTrust
+  );
+}
+async function discoverInstalledDebugRoots(debuggerPath, systemInfo, projectDir, environment, trust) {
   const invalid4 = (message) => {
-    throw new PlatformIOError(message, "GDB_EXECUTABLE_UNTRUSTED");
+    throw new PlatformIOError(message, trust.errorCode);
   };
-  const configured = environment.PIO_MCP_DEBUGGER_ROOTS;
+  const configured = environment[trust.environmentKey];
   if (configured !== void 0) {
     let roots;
     if (Buffer.byteLength(configured) > 65536)
@@ -98141,13 +98164,18 @@ async function discoverDebuggerRoots(debuggerPath, systemInfo, projectDir, envir
     try {
       roots = JSON.parse(configured);
     } catch {
-      return invalid4("PIO_MCP_DEBUGGER_ROOTS must be a JSON array.");
+      return invalid4(trust.environmentKey + " must be a JSON array.");
     }
     if (!Array.isArray(roots) || roots.length < 1 || roots.length > 32 || roots.some((root2) => typeof root2 !== "string" || !path42.isAbsolute(root2)))
       return invalid4(
         "Configure between 1 and 32 absolute debugger installation roots."
       );
-    await resolveDebuggerExecutable(debuggerPath, roots, projectDir);
+    await resolveInstalledDebugExecutable(
+      debuggerPath,
+      roots,
+      projectDir,
+      trust
+    );
     return [
       ...new Set(
         await Promise.all(roots.map((root2) => fs36.realpath(root2)))
@@ -98194,7 +98222,7 @@ async function discoverDebuggerRoots(debuggerPath, systemInfo, projectDir, envir
       readRecord(path42.join(root, "package.json")),
       readRecord(path42.join(root, ".piopm"))
     ]);
-    if (typeof manifest.name !== "string" || !(manifest.name.startsWith("toolchain-") || /^tool-.*gdb(?:-|$)/.test(manifest.name)) || typeof manifest.version !== "string" || !manifest.version || record2.type !== "tool" || record2.name !== manifest.name || record2.version !== manifest.version)
+    if (typeof manifest.name !== "string" || !trust.package.test(manifest.name) || typeof manifest.version !== "string" || !manifest.version || record2.type !== "tool" || record2.name !== manifest.name || record2.version !== manifest.version)
       return invalid4(
         "Debugger package registration does not match its manifest."
       );
@@ -98202,7 +98230,7 @@ async function discoverDebuggerRoots(debuggerPath, systemInfo, projectDir, envir
     if (error2 instanceof PlatformIOError) throw error2;
     return invalid4("Debugger package registration is missing or invalid.");
   }
-  await resolveDebuggerExecutable(executable, [root], projectDir);
+  await resolveInstalledDebugExecutable(executable, [root], projectDir, trust);
   return [root];
 }
 
