@@ -22,7 +22,7 @@ def prepare(wheels, destination):
     (destination / "wheels").mkdir(parents=True)
     for item in selected:
         shutil.copyfile(wheels / item["file"], destination / "wheels" / item["file"])
-    for name in ("Dockerfile", ".dockerignore", "requirements.txt"):
+    for name in ("Dockerfile", ".dockerignore", "requirements.txt", "build-requirements.txt"):
         shutil.copyfile(ROOT / "distribution/container" / name, destination / name)
     (destination / "identity.json").write_text(json.dumps({"schemaVersion":1,"sourceCommit":identity["sourceCommit"],"artifacts":selected,"acceptance":"not established by context preparation"},indent=2)+"\n")
 

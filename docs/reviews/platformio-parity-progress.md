@@ -1614,3 +1614,8 @@ Start/list/stop responses now expose the host-resolved debug tool and monotonic 
 ### Five-host installed Python evidence
 
 Run 35515440936 passed installation, every functional alias, MCP stdio/EOF and alias-removal preservation on Windows x64, macOS arm64/x64 and Linux arm64/x64. Exact source 0dd30afd8358a7d0b7ff8d8b1f0e018f7708c421 and per-wheel hashes are retained in native-python-installation-evidence.json. This validates the packaging fixes, not the later debugger metadata commit or a published/final release. The container jobs continue in the same run.
+
+
+### Container dependency build correction
+
+Both native container jobs in run 35515440936 failed because PlatformIO 6.1.16 has only a source distribution and the image required wheels for every dependency. The image now installs hash-pinned setuptools 84.0.0, wheel 0.48.0 and packaging 26.3, then permits only PlatformIO to build from its existing hash-pinned source with build isolation disabled. Other dependencies still require wheels and hashes. Official PyPI metadata supplied the build-tool wheel hashes. A fresh no-cache local source build succeeded and the full locked dependency set resolved; this is not native Linux container acceptance. The minimal context and Docker allowlist include the new build-tool lock.
