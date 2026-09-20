@@ -143,6 +143,7 @@ export class DebugClientSessions {
     caller: PolicyEvaluationContext,
     timeoutMs = 30000,
     approvalId?: string,
+    targetApprovalId?: string,
   ) {
     if (this.closed)
       throw new PlatformIOError(
@@ -158,6 +159,7 @@ export class DebugClientSessions {
     return entry.process.command(command, caller, timeoutMs, {
       sessionId: id,
       approvalId,
+      targetApprovalId,
     });
   }
 
