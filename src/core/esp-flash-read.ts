@@ -6,7 +6,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
-import { dispatchAuthorizedAction } from "./action-dispatcher.js";
+import { dispatchAuthorizedAction, planAction } from "./action-dispatcher.js";
 import type { PolicyEvaluationContext } from "./policy/types.js";
 import { createPolicyRevisionGuard } from "./policy/revision-guard.js";
 import { resolveSerialEndpoint } from "./devices/serial-endpoint.js";
@@ -41,16 +41,29 @@ export async function readEspFlash(
 ) {
   const request = schema.parse(input);
   const projectDir = await fs.realpath(request.projectDir);
-  const args = { ...request, projectDir };
+  const { commandApprovalId, ...operation } = request;
+  const args = { ...operation, projectDir };
   const context = { ...caller, workspaceDir: projectDir };
+  const commandArgs = { ...args, approvalId: commandApprovalId };
+  for (const [name, parameters] of [
+    ["esp_flash_read", args],
+    ["esp_flash_read_command", commandArgs],
+  ] as const) {
+    const plan = await planAction(name, parameters, context);
+    if (plan.status !== "ready")
+      throw new PlatformIOError(
+        plan.reason,
+        plan.status === "requires_approval"
+          ? "APPROVAL_REQUIRED"
+          : "POLICY_DENIED",
+        { policyDecision: plan },
+      );
+  }
   return dispatchAuthorizedAction("esp_flash_read", args, context, async () => {
     const guard = createPolicyRevisionGuard(projectDir);
     return dispatchAuthorizedAction(
       "esp_flash_read_command",
-      {
-        ...args,
-        approvalId: request.commandApprovalId,
-      },
+      commandArgs,
       context,
       async () => {
         guard();
@@ -71,8 +84,6 @@ export async function readEspFlash(
               "pkg",
               [
                 "exec",
-                "--package",
-                "tool-esptoolpy",
                 "--",
                 "esptool.py",
                 "--port",

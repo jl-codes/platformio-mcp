@@ -1059,3 +1059,7 @@ CI run 35496158937 completed with a stale 55-tool assertion in mcp-authorization
 ### Serial partition reads
 
 Implemented bounded readEspFlash using shared spooling/process custody, an explicit serial port/range, separate device and host-package-command permissions, exact output-length validation and completed staging cleanup. Connected readDevice/port and scoped approvals to MCP and CLI; device partitions are decoded, hashed and compared with the inspected layout. Worst-case MCP annotations now reflect hardware effects. Thirteen targeted authorization/executor/workflow cases and TypeScript passed with hardware mocked. Physical reset/read behavior, installed esptool version compatibility and descendant containment remain acceptance gaps. CI runs 35496366805 and 35496364780 were still live; saved locally to preserve those runs.
+
+### Flash-read grant and installation review
+
+CI 35496366805 passed for 49da3211. Reviewed official Core v6.1.16 package/commands/exec.py: --package installs missing packages, so removed that selector to use installed-executable discovery only. Added two-stage readiness checks before grant consumption and kept transport grant IDs outside concrete operation payloads. A real scoped-approval regression proves the first approval survives waiting for the second; fourteen focused cases and TypeScript passed. Serial implementation plus these fixes are now ready to push; no physical execution or publication occurred.

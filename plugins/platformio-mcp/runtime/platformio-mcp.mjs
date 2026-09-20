@@ -95242,16 +95242,27 @@ var schema = external_exports.object({
 async function readEspFlash(input, caller = {}) {
   const request = schema.parse(input);
   const projectDir = await fs21.realpath(request.projectDir);
-  const args = { ...request, projectDir };
+  const { commandApprovalId, ...operation } = request;
+  const args = { ...operation, projectDir };
   const context = { ...caller, workspaceDir: projectDir };
+  const commandArgs = { ...args, approvalId: commandApprovalId };
+  for (const [name2, parameters] of [
+    ["esp_flash_read", args],
+    ["esp_flash_read_command", commandArgs]
+  ]) {
+    const plan = await planAction(name2, parameters, context);
+    if (plan.status !== "ready")
+      throw new PlatformIOError(
+        plan.reason,
+        plan.status === "requires_approval" ? "APPROVAL_REQUIRED" : "POLICY_DENIED",
+        { policyDecision: plan }
+      );
+  }
   return dispatchAuthorizedAction("esp_flash_read", args, context, async () => {
     const guard = createPolicyRevisionGuard(projectDir);
     return dispatchAuthorizedAction(
       "esp_flash_read_command",
-      {
-        ...args,
-        approvalId: request.commandApprovalId
-      },
+      commandArgs,
       context,
       async () => {
         guard();
@@ -95272,8 +95283,6 @@ async function readEspFlash(input, caller = {}) {
               "pkg",
               [
                 "exec",
-                "--package",
-                "tool-esptoolpy",
                 "--",
                 "esptool.py",
                 "--port",
@@ -95837,9 +95846,16 @@ var PartitionTableSchema = external_exports.object({
 async function executePartitionTable(input, caller = {}, onAuthorized) {
   const params = PartitionTableSchema.parse(input);
   const projectDir = await fs23.realpath(params.projectDir);
+  const {
+    configApprovalId: _configGrant,
+    metadataApprovalId: _metadataGrant,
+    readApprovalId: _readGrant,
+    commandApprovalId: _commandGrant,
+    ...operation
+  } = params;
   return dispatchAuthorizedAction(
     "partition_table",
-    { ...params, projectDir },
+    { ...operation, projectDir },
     { ...caller, workspaceDir: projectDir },
     async () => {
       const guard = createPolicyRevisionGuard(projectDir);

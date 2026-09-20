@@ -68,9 +68,16 @@ export async function executePartitionTable(
 ) {
   const params = PartitionTableSchema.parse(input);
   const projectDir = await fs.realpath(params.projectDir);
+  const {
+    configApprovalId: _configGrant,
+    metadataApprovalId: _metadataGrant,
+    readApprovalId: _readGrant,
+    commandApprovalId: _commandGrant,
+    ...operation
+  } = params;
   return dispatchAuthorizedAction(
     "partition_table",
-    { ...params, projectDir },
+    { ...operation, projectDir },
     { ...caller, workspaceDir: projectDir },
     async () => {
       const guard = createPolicyRevisionGuard(projectDir);
