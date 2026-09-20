@@ -1281,3 +1281,9 @@ Unique-ID capability basis: https://devblogs.microsoft.com/windows-music-dev/the
 Added bounded macOS system_profiler JSON parsing and a fixed native collector, then joined Windows/Linux/macOS inventory behind debugger_discover inheriting list_devices permission. Six parser/real-policy cases, TypeScript and lint passed. Native macOS discovery remains unverified.
 
 CI 35502553441 failed because the new probe-custody fixture used macOS's symlinked temporary path, which the lease store correctly rejects. The fixture now resolves the temporary root before constructing the lease store, matching existing lease tests. Its three focused cases pass locally; macOS confirmation awaits CI.
+
+### Scoped discovery refresh approval
+
+Added a bounded operation-owned discovery callback allowing exactly two inventory reads for initial selection and pre-spawn refresh. Authority expires when the operation ends, cannot be reused by later requests, and checks policy revisions around each read. Five focused real-policy/approval-store cases, TypeScript and lint passed. This remains an internal integration primitive; it does not complete public debugger startup.
+
+Current completion gap: 33 reference tools are registered. The seven unregistered reference workflows are pio_debug_start, pio_debug_cmd, pio_debug_list, pio_debug_stop, pio_upload_ota, pio_power_profile and pio_flash_and_verify. Registration is not behavioral acceptance; complete hardware/platform/distribution acceptance and actual publication remain outstanding.
