@@ -341,16 +341,39 @@ export async function runTests(
   }
 }
 
+/** Optional clean target selection used by compatibility adapters. */
+export interface CleanProjectOptions {
+  environment?: string; // Restrict cleanup to this validated environment.
+  full?: boolean; // Request PlatformIO fullclean, including downloaded dependencies.
+}
+
 /**
  * Cleans build artifacts from a project.
 
  *
  * @param projectDir - Discard compilation output for this project workspace.
+ * @param background - Return after dispatch when requested by an existing caller.
+ * @param options - Optional environment and fullclean target; defaults preserve canonical behavior.
  * @returns Indicates successful cleanup execution metadata.
  */
-export async function cleanProject(projectDir: string, background?: boolean): Promise<CleanResult> {
+export async function cleanProject(
+  projectDir: string,
+  background?: boolean,
+  options: CleanProjectOptions = {},
+): Promise<CleanResult> {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
+
+  if (options.environment !== undefined && !validateEnvironmentName(options.environment)) {
+    throw new BuildError(`Invalid environment name: ${options.environment}`, {
+      environment: options.environment,
+    });
+  }
+  if (options.full !== undefined && typeof options.full !== "boolean") {
+    throw new BuildError("Clean full option must be a boolean", { projectDir });
+  }
+  const args = ["--target", options.full ? "fullclean" : "clean"];
+  if (options.environment) args.push("--environment", options.environment);
 
   // Any user-initiated clean must wipe our cache; otherwise the next
   // `build_project` would short-circuit and return "success" without
@@ -360,7 +383,7 @@ export async function cleanProject(projectDir: string, background?: boolean): Pr
   try {
     const result = await executeWithSpooling(
       "run",
-      ["--target", "clean"],
+      args,
       {
         cwd: validatedPath,
         projectDir: validatedPath,

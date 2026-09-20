@@ -109307,14 +109307,24 @@ async function runTests(projectDir, environment, background, compileOnly) {
     throw new BuildError(`Failed to run tests: ${error2}`, { projectDir, environment });
   }
 }
-async function cleanProject(projectDir, background) {
+async function cleanProject(projectDir, background, options = {}) {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto15.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
+  if (options.environment !== void 0 && !validateEnvironmentName(options.environment)) {
+    throw new BuildError(`Invalid environment name: ${options.environment}`, {
+      environment: options.environment
+    });
+  }
+  if (options.full !== void 0 && typeof options.full !== "boolean") {
+    throw new BuildError("Clean full option must be a boolean", { projectDir });
+  }
+  const args = ["--target", options.full ? "fullclean" : "clean"];
+  if (options.environment) args.push("--environment", options.environment);
   invalidateBuildCache(validatedPath);
   try {
     const result = await executeWithSpooling(
       "run",
-      ["--target", "clean"],
+      args,
       {
         cwd: validatedPath,
         projectDir: validatedPath,

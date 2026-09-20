@@ -811,3 +811,8 @@ Unified initialization and size-check output retention in a bounded, redacted co
 
 The Python publisher resolver now requires one exact canonical PyPI identity with an enabled boolean publication flag and canonical role. Missing, disabled, duplicate normalized, misspelled and excluded identities fail before publisher selection. Two focused regression checks passed, covering six invalid inventory cases; the current selected publishers remain pio-agent-platformio, pio-agent and pio-mcp. All six functional Python alias sources remain buildable candidates; this change does not enable or claim publication. PR accounting was refreshed to 78 compatibility-visible tools, eight npm aliases, six Python aliases and ten GHCR names.
 
+
+### Shared clean target options
+
+The shared clean executor now supports validated environment selection and an explicit fullclean target while retaining the existing canonical clean target, timeout, background behavior and return shape. Invalid options fail before cache invalidation or command dispatch; valid cleanup still invalidates build cache and uses the existing spooler. TypeScript and three focused mocked checks passed. Plugin runtime rebuilt. The public pio_clean adapter and reference result/timeout projection remain pending; no native cleanup or hardware operation was performed.
+
