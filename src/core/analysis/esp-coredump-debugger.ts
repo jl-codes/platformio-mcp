@@ -34,6 +34,7 @@ function gdbFile(file: string): string {
 export async function analyzeEspCoredump(
   input: EspCoredumpAnalysisInput,
   options: EspCoredumpReportOptions,
+  capturedBytes?: Uint8Array, // Internal acquisition transport; no public raw-byte argument.
 ) {
   input.validatePolicy();
   options.validatePolicy();
@@ -42,78 +43,81 @@ export async function analyzeEspCoredump(
     options.trustedDebuggerRoots,
     input.workspaceDir,
   );
-  return withEspCoredumpArtifacts(input, async (artifacts) =>
-    withConvertedEspCoredump(
-      artifacts,
-      options,
-      async (corePath, coreSha256) => {
-        const script = path.join(path.dirname(corePath), "report.gdb");
-        const coreName = path.basename(corePath);
-        if (!/^[a-zA-Z0-9_.-]+$/.test(coreName))
-          throw new PlatformIOError(
-            "Invalid converted core filename.",
-            "COREDUMP_PATH_INVALID",
-          );
-        // GDB stops a sourced command file at the first error, before any later file-loading command.
-        const commands = [
-          "set auto-load off",
-          "set may-call-functions off",
-          "set auto-solib-add off",
-          "set pagination off",
-          "set confirm off",
-          "set print elements 128",
-          "file " + gdbFile(artifacts.elfPath),
-          "core-file " + coreName,
-          "echo ==================== CURRENT THREAD REGISTERS ====================\\n",
-          "info registers",
-          "echo ==================== CURRENT THREAD STACK ====================\\n",
-          "backtrace 256",
-          "echo ==================== THREADS INFO ====================\\n",
-          "info threads",
-        ];
-        await fs.writeFile(script, commands.join("\n") + "\n", {
-          flag: "wx",
-          mode: 0o600,
-        });
-        options.validatePolicy();
-        const output = await runAnalysisProcess(
-          debuggerExecutable,
-          [
-            "-nx",
-            "-nh",
-            "--batch",
-            "--quiet",
-            "-iex",
+  return withEspCoredumpArtifacts(
+    input,
+    async (artifacts) =>
+      withConvertedEspCoredump(
+        artifacts,
+        options,
+        async (corePath, coreSha256) => {
+          const script = path.join(path.dirname(corePath), "report.gdb");
+          const coreName = path.basename(corePath);
+          if (!/^[a-zA-Z0-9_.-]+$/.test(coreName))
+            throw new PlatformIOError(
+              "Invalid converted core filename.",
+              "COREDUMP_PATH_INVALID",
+            );
+          // GDB stops a sourced command file at the first error, before any later file-loading command.
+          const commands = [
             "set auto-load off",
-            "-iex",
             "set may-call-functions off",
-            "-x",
-            script,
-          ],
-          {
-            cwd: path.dirname(corePath),
-            signal: options.signal,
-            timeoutMs: 60000,
-            maxOutputBytes: 4 * 1024 * 1024,
-            environment: { DEBUGINFOD_URLS: "" },
-          },
-        );
-        options.validatePolicy();
-        const report = parseEspCoredumpReport(output.stdout);
-        return {
-          ok: true as const,
-          ...report,
-          dump: {
-            source: artifacts.dump.source,
-            identity: artifacts.dump.identity,
-          },
-          elf: artifacts.elfIdentity,
-          firmware_correspondence: artifacts.correspondence,
-          core_sha256: coreSha256,
-          debugger: debuggerExecutable,
-          stderr_present: output.stderr.length > 0,
-        };
-      },
-    ),
+            "set auto-solib-add off",
+            "set pagination off",
+            "set confirm off",
+            "set print elements 128",
+            "file " + gdbFile(artifacts.elfPath),
+            "core-file " + coreName,
+            "echo ==================== CURRENT THREAD REGISTERS ====================\\n",
+            "info registers",
+            "echo ==================== CURRENT THREAD STACK ====================\\n",
+            "backtrace 256",
+            "echo ==================== THREADS INFO ====================\\n",
+            "info threads",
+          ];
+          await fs.writeFile(script, commands.join("\n") + "\n", {
+            flag: "wx",
+            mode: 0o600,
+          });
+          options.validatePolicy();
+          const output = await runAnalysisProcess(
+            debuggerExecutable,
+            [
+              "-nx",
+              "-nh",
+              "--batch",
+              "--quiet",
+              "-iex",
+              "set auto-load off",
+              "-iex",
+              "set may-call-functions off",
+              "-x",
+              script,
+            ],
+            {
+              cwd: path.dirname(corePath),
+              signal: options.signal,
+              timeoutMs: 60000,
+              maxOutputBytes: 4 * 1024 * 1024,
+              environment: { DEBUGINFOD_URLS: "" },
+            },
+          );
+          options.validatePolicy();
+          const report = parseEspCoredumpReport(output.stdout);
+          return {
+            ok: true as const,
+            ...report,
+            dump: {
+              source: artifacts.dump.source,
+              identity: artifacts.dump.identity,
+            },
+            elf: artifacts.elfIdentity,
+            firmware_correspondence: artifacts.correspondence,
+            core_sha256: coreSha256,
+            debugger: debuggerExecutable,
+            stderr_present: output.stderr.length > 0,
+          };
+        },
+      ),
+    capturedBytes,
   );
 }

@@ -4,6 +4,7 @@ import path from "node:path";
 import { PlatformIOError } from "../../utils/errors.js";
 import {
   readEspCoredumpArtifact,
+  inspectCapturedEspCoredump,
   type EspCoredumpArtifactInput,
 } from "./esp-coredump-artifact.js";
 import { matchEspCoredumpFirmware } from "./esp-coredump-firmware.js";
@@ -19,7 +20,9 @@ export interface EspCoredumpAnalysisInput extends EspCoredumpArtifactInput {
 
 /** Stable analysis inputs; dump bytes remain in memory until the analyzer explicitly stages them. */
 export interface EspCoredumpAnalysisArtifacts {
-  dump: Awaited<ReturnType<typeof readEspCoredumpArtifact>>;
+  dump:
+    | Awaited<ReturnType<typeof readEspCoredumpArtifact>>
+    | ReturnType<typeof inspectCapturedEspCoredump>;
   elfPath: string;
   elfIdentity: ElfIdentity;
   correspondence: ReturnType<typeof matchEspCoredumpFirmware>;
@@ -29,6 +32,7 @@ export interface EspCoredumpAnalysisArtifacts {
 export async function withEspCoredumpArtifacts<T>(
   input: EspCoredumpAnalysisInput,
   analyze: (artifacts: EspCoredumpAnalysisArtifacts) => Promise<T>,
+  capturedBytes?: Uint8Array, // Internal acquisition result; never accepted by public request schemas.
 ): Promise<T> {
   input.validatePolicy();
   const root = await fs.realpath(input.workspaceDir);
@@ -44,7 +48,14 @@ export async function withEspCoredumpArtifacts<T>(
       "Selected ELF is outside the authorized workspace.",
       "COREDUMP_ELF_OUTSIDE_WORKSPACE",
     );
-  const dump = await readEspCoredumpArtifact({ ...input, workspaceDir: root });
+  const dump =
+    capturedBytes === undefined
+      ? await readEspCoredumpArtifact({ ...input, workspaceDir: root })
+      : inspectCapturedEspCoredump(
+          capturedBytes,
+          input.expectedInputSha256,
+          input.encrypted,
+        );
   const identity = await readElfIdentity(elf, input.expectedElfSha256);
   const machine = ["esp32", "esp32s2", "esp32s3"].includes(dump.identity.chip)
     ? 94

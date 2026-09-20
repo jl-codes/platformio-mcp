@@ -59,7 +59,18 @@ export async function readEspCoredumpArtifact(input: EspCoredumpArtifactInput) {
     }
     bytes = decodeEspCoredumpBase64(text);
   }
-  const inspected = inspectRawEspCoredump(bytes, input.encrypted);
+  return {
+    ...inspectEspCoredumpContent(bytes, input.encrypted),
+    source: { ...artifact.identity, format: input.format },
+  };
+}
+
+/** Validate captured or decoded bytes without assigning a fictional source file. */
+export function inspectEspCoredumpContent(
+  bytes: Uint8Array,
+  encrypted = false,
+) {
+  const inspected = inspectRawEspCoredump(bytes, encrypted);
   const formatVersion = inspected.identity.version & 65535;
   const headerSize =
     formatVersion === 0x102 || formatVersion === 0x103 ? 24 : 20;
@@ -78,6 +89,32 @@ export async function readEspCoredumpArtifact(input: EspCoredumpArtifactInput) {
     bytes: inspected.bytes,
     identity: inspected.identity,
     firmwareIdentity,
-    source: { ...artifact.identity, format: input.format },
+  };
+}
+
+/** Prepare an internal device capture with the same envelope and firmware-note checks as files. */
+export function inspectCapturedEspCoredump(
+  bytes: Uint8Array,
+  expectedInputSha256?: string,
+  encrypted = false,
+) {
+  const dump = inspectEspCoredumpContent(bytes, encrypted);
+  if (
+    expectedInputSha256 !== undefined &&
+    (!/^[a-fA-F0-9]{64}$/.test(expectedInputSha256) ||
+      dump.identity.input_sha256 !== expectedInputSha256.toLowerCase())
+  )
+    throw new PlatformIOError(
+      "Captured dump does not match the selected input identity.",
+      "COREDUMP_IDENTITY_MISMATCH",
+    );
+  return {
+    ...dump,
+    source: {
+      path: null,
+      size: bytes.byteLength,
+      sha256: dump.identity.input_sha256,
+      format: "raw" as const,
+    },
   };
 }

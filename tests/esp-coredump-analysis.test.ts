@@ -81,3 +81,31 @@ it("honors revoked permission before any artifact reads", async () => {
     "revoked",
   );
 });
+it("analyzes an internal capture without requiring or creating a project dump file", async () => {
+  await fs.unlink(path.join(root, "dump.bin"));
+  const capture = Buffer.concat([dump, Buffer.alloc(128, 255)]);
+  await withEspCoredumpArtifacts(
+    input(),
+    async (artifacts) => {
+      expect(artifacts.dump.source.path).toBeNull();
+      expect(artifacts.dump.source.size).toBe(capture.length);
+      expect(artifacts.dump.identity.trailing_bytes).toBe(128);
+      expect(artifacts.dump.bytes).toEqual(dump);
+    },
+    capture,
+  );
+  await expect(fs.stat(path.join(root, "dump.bin"))).rejects.toMatchObject({
+    code: "ENOENT",
+  });
+});
+it("rejects a mismatching captured identity before invoking analysis", async () => {
+  const analyze = vi.fn();
+  await expect(
+    withEspCoredumpArtifacts(
+      { ...input(), expectedInputSha256: "0".repeat(64) },
+      analyze,
+      dump,
+    ),
+  ).rejects.toMatchObject({ code: "COREDUMP_IDENTITY_MISMATCH" });
+  expect(analyze).not.toHaveBeenCalled();
+});

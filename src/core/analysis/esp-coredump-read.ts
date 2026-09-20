@@ -66,7 +66,7 @@ export async function readEspCoredumpPartition(
     const dump = inspectRawEspCoredump(result.bytes);
     return {
       present: true as const,
-      bytes: dump.bytes,
+      bytes: result.bytes,
       identity: dump.identity,
       source,
     };

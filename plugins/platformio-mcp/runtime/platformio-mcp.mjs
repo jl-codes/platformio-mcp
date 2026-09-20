@@ -95380,7 +95380,13 @@ async function readEspCoredumpArtifact(input) {
     }
     bytes = decodeEspCoredumpBase64(text7);
   }
-  const inspected = inspectRawEspCoredump(bytes, input.encrypted);
+  return {
+    ...inspectEspCoredumpContent(bytes, input.encrypted),
+    source: { ...artifact.identity, format: input.format }
+  };
+}
+function inspectEspCoredumpContent(bytes, encrypted = false) {
+  const inspected = inspectRawEspCoredump(bytes, encrypted);
   const formatVersion = inspected.identity.version & 65535;
   const headerSize = formatVersion === 258 || formatVersion === 259 ? 24 : 20;
   const checksumSize = inspected.identity.checksum === "sha256" ? 32 : 4;
@@ -95394,8 +95400,24 @@ async function readEspCoredumpArtifact(input) {
   return {
     bytes: inspected.bytes,
     identity: inspected.identity,
-    firmwareIdentity,
-    source: { ...artifact.identity, format: input.format }
+    firmwareIdentity
+  };
+}
+function inspectCapturedEspCoredump(bytes, expectedInputSha256, encrypted = false) {
+  const dump = inspectEspCoredumpContent(bytes, encrypted);
+  if (expectedInputSha256 !== void 0 && (!/^[a-fA-F0-9]{64}$/.test(expectedInputSha256) || dump.identity.input_sha256 !== expectedInputSha256.toLowerCase()))
+    throw new PlatformIOError(
+      "Captured dump does not match the selected input identity.",
+      "COREDUMP_IDENTITY_MISMATCH"
+    );
+  return {
+    ...dump,
+    source: {
+      path: null,
+      size: bytes.byteLength,
+      sha256: dump.identity.input_sha256,
+      format: "raw"
+    }
   };
 }
 
@@ -95906,7 +95928,7 @@ async function withElfSnapshot(elfPath, expectedSha256, analyze, sourcePath = el
 }
 
 // src/core/analysis/esp-coredump-analysis.ts
-async function withEspCoredumpArtifacts(input, analyze) {
+async function withEspCoredumpArtifacts(input, analyze, capturedBytes) {
   input.validatePolicy();
   const root = await fs17.realpath(input.workspaceDir);
   const elf = await fs17.realpath(path22.resolve(root, input.elfPath));
@@ -95916,7 +95938,11 @@ async function withEspCoredumpArtifacts(input, analyze) {
       "Selected ELF is outside the authorized workspace.",
       "COREDUMP_ELF_OUTSIDE_WORKSPACE"
     );
-  const dump = await readEspCoredumpArtifact({ ...input, workspaceDir: root });
+  const dump = capturedBytes === void 0 ? await readEspCoredumpArtifact({ ...input, workspaceDir: root }) : inspectCapturedEspCoredump(
+    capturedBytes,
+    input.expectedInputSha256,
+    input.encrypted
+  );
   const identity = await readElfIdentity(elf, input.expectedElfSha256);
   const machine = ["esp32", "esp32s2", "esp32s3"].includes(dump.identity.chip) ? 94 : 243;
   if (identity.machine !== machine || identity.bits !== 32 || identity.byteOrder !== "little")
@@ -96256,7 +96282,7 @@ function gdbFile(file) {
     );
   return JSON.stringify(file.replace(/\\/g, "/"));
 }
-async function analyzeEspCoredump(input, options) {
+async function analyzeEspCoredump(input, options, capturedBytes) {
   input.validatePolicy();
   options.validatePolicy();
   const debuggerExecutable = await resolveDebuggerExecutable(
@@ -96336,7 +96362,8 @@ async function analyzeEspCoredump(input, options) {
           stderr_present: output.stderr.length > 0
         };
       }
-    )
+    ),
+    capturedBytes
   );
 }
 

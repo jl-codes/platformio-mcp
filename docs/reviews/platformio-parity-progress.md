@@ -1158,3 +1158,8 @@ Connected core reads to the authorized partition workflow, retaining exact table
 Corrected coredump_inspect to inherit the public coredump policy identity before get_project_config, preserving explicit denials on all three names. Eighteen focused policy/dispatcher cases passed and TypeScript passed. Refreshed the bundled plugin runtime for current permission and private flash-read behavior. CI on 18cb94a1 remains separately tracked; no publication or hardware acceptance is claimed.
 
 
+
+### Captured-byte analysis transport
+
+Unified decoded-file and device-capture envelope/firmware-note validation. Internal captures can now use the same stable ELF and private converter/GDB report path without creating a dump file in the project. Full partition input identity is preserved separately from trimmed dump identity; capture sources have null file paths. Fifteen focused analysis/artifact/acquisition cases passed, including absent workspace dump files and mismatching capture identities; lint and TypeScript passed. Plugin runtime refreshed. Public device adapter and physical acquisition acceptance remain unfinished.
+
