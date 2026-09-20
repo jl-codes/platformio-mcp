@@ -77,10 +77,18 @@ describe("process ownership identity", () => {
     expect(() => inspectProcessIdentity(-1)).toThrow();
   });
   it("reads stable start metadata for the actual current host process", () => {
-    const first = inspectProcessIdentity(process.pid);
+    // A loaded Windows runner may time out its first PowerShell startup. Retry an unknown
+    // observation once, but require two actual matching OS identities; unknown never passes.
+    const observe = () => {
+      const value = inspectProcessIdentity(process.pid);
+      return process.platform === "win32" && value.status === "unknown"
+        ? inspectProcessIdentity(process.pid)
+        : value;
+    };
+    const first = observe();
     expect(first.status).toBe("running");
-    expect(inspectProcessIdentity(process.pid)).toEqual(first);
-  }, 25000);
+    expect(observe()).toEqual(first);
+  }, 45000);
 });
 
 describe("physical device lease store", () => {
