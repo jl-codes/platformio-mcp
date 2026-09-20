@@ -179,10 +179,11 @@ export async function inspectDependencies(
         issues,
         counts,
         inventoryComplete: inventory.complete,
+        inventoryTiming: "before_build" as const,
         diagnostics: inventory.diagnostics,
         build,
         ...dependencyGraphFields(graphEvidence),
-        summary: `${selected.environment}: ${selected.declared.length} declarations, ${inventory.libraries.length} observed libraries; ${counts.error} errors, ${counts.warning} warnings, ${counts.info} notes.${inventory.complete ? "" : " Inventory evidence is incomplete."}`,
+        summary: `${selected.environment}: ${selected.declared.length} declarations, ${inventory.libraries.length} observed libraries; ${counts.error} errors, ${counts.warning} warnings, ${counts.info} notes.${inventory.complete ? "" : " Inventory evidence is incomplete."}${build ? ` Build ${build.ok ? "succeeded" : "failed"}; inventory describes the pre-build state.` : ""}`,
       };
     },
   );

@@ -77,6 +77,7 @@ export function dependencyCompatibilityResult(
     graph: result.graph,
     graph_status: result.graphStatus,
     inventory_complete: result.inventoryComplete,
+    inventory_timing: result.inventoryTiming,
     diagnostics: result.diagnostics,
     recursion_error_observed: result.recursionErrorObserved,
     build: result.build

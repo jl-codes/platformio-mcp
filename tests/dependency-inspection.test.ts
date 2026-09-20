@@ -75,3 +75,79 @@ it("honors a concrete deps_check denial before configuration execution", async (
   ).rejects.toMatchObject({ code: "POLICY_DENIED" });
   expect(platformioExecutor.execute).not.toHaveBeenCalled();
 });
+
+it.each([0, 1])(
+  "retains authorized build exit %s and graph evidence independently of inventory",
+  async (exitCode) => {
+    await fs.writeFile(
+      path.join(project, ".pio-mcp-policy.json"),
+      '{"profile":"build_only"}',
+    );
+    vi.mocked(platformioExecutor.execute)
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: JSON.stringify([["env:fixture", []]]),
+        stderr: "",
+      })
+      .mockImplementationOnce(async () => {
+        await fs.mkdir(path.join(project, "lib", "New"), { recursive: true });
+        await fs.writeFile(
+          path.join(project, "lib", "New", "library.json"),
+          '{"name":"New"}',
+        );
+        return {
+          exitCode,
+          stdout: "Dependency Graph\n|-- New @ 1.0\nBuilding in release mode",
+          stderr: "password=private-fixture",
+        };
+      });
+    const result = await inspectDependencies({
+      projectDir: project,
+      build: true,
+    });
+    expect(result).toMatchObject({
+      ok: exitCode === 0,
+      inventoryTiming: "before_build",
+      installed: [],
+      graphStatus: "complete",
+      graph: [{ name: "New", version: "1.0" }],
+      build: { ok: exitCode === 0, exitCode },
+    });
+    expect(result.summary).toContain(
+      exitCode === 0 ? "Build succeeded" : "Build failed",
+    );
+    expect(JSON.stringify(result)).not.toContain("private-fixture");
+    expect(platformioExecutor.execute).toHaveBeenLastCalledWith(
+      "run",
+      ["--project-dir", await fs.realpath(project), "--environment", "fixture"],
+      expect.objectContaining({ timeout: 600000 }),
+    );
+  },
+);
+
+it("rejects results if policy changes while the build is running", async () => {
+  await fs.writeFile(
+    path.join(project, ".pio-mcp-policy.json"),
+    '{"profile":"build_only"}',
+  );
+  vi.mocked(platformioExecutor.execute)
+    .mockResolvedValueOnce({
+      exitCode: 0,
+      stdout: JSON.stringify([["env:fixture", []]]),
+      stderr: "",
+    })
+    .mockImplementationOnce(async () => {
+      await fs.writeFile(
+        path.join(project, ".pio-mcp-policy.json"),
+        '{"profile":"read_only"}',
+      );
+      return {
+        exitCode: 0,
+        stdout: "Dependency Graph\nNo dependencies",
+        stderr: "",
+      };
+    });
+  await expect(
+    inspectDependencies({ projectDir: project, build: true }),
+  ).rejects.toMatchObject({ code: "POLICY_CHANGED" });
+});

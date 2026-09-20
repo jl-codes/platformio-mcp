@@ -94697,10 +94697,11 @@ ${result.stderr}`
         issues,
         counts,
         inventoryComplete: inventory.complete,
+        inventoryTiming: "before_build",
         diagnostics: inventory.diagnostics,
         build,
         ...dependencyGraphFields(graphEvidence),
-        summary: `${selected.environment}: ${selected.declared.length} declarations, ${inventory.libraries.length} observed libraries; ${counts.error} errors, ${counts.warning} warnings, ${counts.info} notes.${inventory.complete ? "" : " Inventory evidence is incomplete."}`
+        summary: `${selected.environment}: ${selected.declared.length} declarations, ${inventory.libraries.length} observed libraries; ${counts.error} errors, ${counts.warning} warnings, ${counts.info} notes.${inventory.complete ? "" : " Inventory evidence is incomplete."}${build ? ` Build ${build.ok ? "succeeded" : "failed"}; inventory describes the pre-build state.` : ""}`
       };
     }
   );
@@ -94794,6 +94795,7 @@ function dependencyCompatibilityResult(result) {
     graph: result.graph,
     graph_status: result.graphStatus,
     inventory_complete: result.inventoryComplete,
+    inventory_timing: result.inventoryTiming,
     diagnostics: result.diagnostics,
     recursion_error_observed: result.recursionErrorObserved,
     build: result.build ? {
