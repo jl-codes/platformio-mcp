@@ -1168,3 +1168,8 @@ Unified decoded-file and device-capture envelope/firmware-note validation. Inter
 
 MCP coredump now selects exactly one offline dump or explicit device/table acquisition. The shared handler validates same-project table scope, preserves nested grant-independent parent request identity, resolves analysis tools before capture, keeps raw bytes internal and returns explicit empty-crash results. Ten focused real policy/partition checks passed; TypeScript and targeted lint passed with existing index warnings. Plugin runtime refreshed. CLI device options, reference adapter, output retention and physical acceptance remain incomplete.
 
+
+### CLI device core acquisition
+
+Added explicit port/partition/table selection, integer/boolean validation and separate read/table/analysis grants to the coredump CLI. Device-only options without a port are rejected rather than silently ignored; no-crash results set an unsuccessful exit status. TypeScript and lint passed. An actual CLI invocation returned COREDUMP_INPUT_INVALID before hardware access for missing-port input. Reference pio_coredump adapter, retained output and physical acceptance remain outstanding.
+

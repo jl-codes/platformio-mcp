@@ -129,7 +129,7 @@ COMMANDS:
   deps-check --project-dir <dir> [--environment <env>] [--build]
   project-envs --project-dir <dir>
   project-metadata|list-targets --project-dir <dir> [--environment <env>]
-  coredump --project-dir <dir> --dump-path <file> [--format <raw|base64>] [--analyze false | --elf-path <file>]
+  coredump --project-dir <dir> (--dump-path <file> | --port <port> --table-path <csv> --table-offset <bytes>) [--format <raw|base64>] [--analyze false | --elf-path <file>]
   partition-table --project-dir <dir> [--environment <env>] [--table-path <file>] [--format <csv|binary>] [--table-offset <bytes> | --sdkconfig-path <file>] [--flash-size <bytes>] [--firmware-path <file>] [--observed-table-path <file>]
   run-target --project-dir <dir> --target <name> [--environment <env>] [--upload-port <port>]
   pkg-search --query <query> [--kind library|platform|tool] [--page <n>]
@@ -372,13 +372,37 @@ async function runCliCommand(command: string, rawArgs: string[]) {
 
   try {
     if (command === "coredump") {
-      const allowed = new Set(["json", "project-dir", "dump-path", "format", "analyze", "elf-path", "expected-input-sha256", "expected-elf-sha256", "encrypted", "approval-id", "command-approval-id"]);
+      const allowed = new Set(["json", "project-dir", "dump-path", "format", "analyze", "elf-path", "expected-input-sha256", "expected-elf-sha256", "encrypted", "approval-id", "command-approval-id", "port", "partition-name", "table-path", "table-format", "table-offset", "sdkconfig-path", "environment", "flash-size", "build-metadata", "table-approval-id", "config-approval-id", "metadata-approval-id", "system-approval-id", "board-approval-id", "read-approval-id", "read-command-approval-id"]);
       if (positionals.length || Object.keys(options).some((key) => !allowed.has(key)))
         throw new PlatformIOError("Unknown core-dump option or positional argument.", "COREDUMP_INPUT_INVALID");
-      for (const key of ["analyze", "encrypted"])
+      for (const key of ["analyze", "encrypted", "build-metadata"])
         if (options[key] !== undefined && ![true, false, "true", "false"].includes(options[key]))
           throw new PlatformIOError("Expected true or false for --" + key, "COREDUMP_INPUT_INVALID");
+      const port = asString(options.port);
+      const deviceOptions = ["partition-name", "table-path", "table-format", "table-offset", "sdkconfig-path", "environment", "flash-size", "build-metadata", "table-approval-id", "config-approval-id", "metadata-approval-id", "system-approval-id", "board-approval-id", "read-approval-id", "read-command-approval-id"];
+      if (!port && deviceOptions.some((key) => options[key] !== undefined))
+        throw new PlatformIOError("Device/table options require --port.", "COREDUMP_INPUT_INVALID");
+      const integerOption = (key: string) => {
+        const value = asString(options[key]);
+        if (value === undefined) return undefined;
+        if (!/^(?:0x[0-9a-f]+|[0-9]+)$/i.test(value))
+          throw new PlatformIOError("Expected integer bytes for --" + key, "COREDUMP_INPUT_INVALID");
+        return Number(value);
+      };
+      const device = port ? {
+        port, partitionName: asString(options["partition-name"]),
+        approvalId: asString(options["read-approval-id"]), commandApprovalId: asString(options["read-command-approval-id"]),
+        table: {
+          projectDir: projectDirForPolicy, tablePath: asString(options["table-path"]),
+          format: asString(options["table-format"]), tableOffset: integerOption("table-offset"),
+          sdkconfigPath: asString(options["sdkconfig-path"]), environment: asString(options.environment),
+          flashSize: integerOption("flash-size"), buildMetadata: asBoolean(options["build-metadata"]) ?? false,
+          approvalId: asString(options["table-approval-id"]), configApprovalId: asString(options["config-approval-id"]),
+          metadataApprovalId: asString(options["metadata-approval-id"]), systemApprovalId: asString(options["system-approval-id"]), boardApprovalId: asString(options["board-approval-id"]),
+        },
+      } : undefined;
       const result = await executeCoredump({
+        device,
         projectDir: projectDirForPolicy, dumpPath: asString(options["dump-path"]),
         format: asString(options.format), analyze: asBoolean(options.analyze) ?? true,
         elfPath: asString(options["elf-path"]), encrypted: asBoolean(options.encrypted) ?? false,
@@ -386,6 +410,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         approvalId: asString(options["approval-id"]), commandApprovalId: asString(options["command-approval-id"]),
       }, { workspaceDir: projectDirForPolicy, actor: "user" });
       printOutput(result, jsonMode);
+      if (!result.ok) process.exitCode = 1;
       return;
     }
     if (command === "partition-table") {
