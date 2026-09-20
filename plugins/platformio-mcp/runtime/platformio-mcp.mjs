@@ -98398,7 +98398,16 @@ async function collectionStage(input, args, caller, authorization, execute3) {
   return execute3();
 }
 async function collectBuildMetadata(input, caller = {}, authorization) {
+  return collectSelectedMetadata(
+    input,
+    caller,
+    selectBuildMetadata,
+    authorization
+  );
+}
+async function collectSelectedMetadata(input, caller, select, authorization) {
   const selected = scope(input);
+  const guard = createPolicyRevisionGuard(selected.projectDir);
   return collectionStage(
     selected,
     {
@@ -98419,7 +98428,8 @@ async function collectBuildMetadata(input, caller = {}, authorization) {
           "PlatformIO metadata collection failed.",
           "ANALYSIS_METADATA_FAILED"
         );
-      return selectBuildMetadata(result.stdout, selected.environment);
+      guard();
+      return select(result.stdout, selected.environment);
     }
   );
 }
@@ -98443,7 +98453,11 @@ async function collectProgramMemory(input, elfPath, caller = {}, authorization) 
         { cwd: selected.projectDir, timeout: 6e5 }
       );
       await readElfIdentity(elfPath, before.sha256);
-      const logPath = await retainCommandLog("program-size", result.stdout, result.stderr);
+      const logPath = await retainCommandLog(
+        "program-size",
+        result.stdout,
+        result.stderr
+      );
       return {
         environment: selected.environment,
         elfSha256: before.sha256,

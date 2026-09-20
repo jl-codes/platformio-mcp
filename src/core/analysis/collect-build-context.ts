@@ -9,6 +9,7 @@ import {
 import { PlatformIOError } from "../../utils/errors.js";
 import { dispatchAuthorizedAction } from "../action-dispatcher.js";
 import type { PolicyEvaluationContext } from "../policy/types.js";
+import { selectDebugMetadata } from "../debug/debug-discovery.js";
 import { selectBuildMetadata } from "./build-metadata.js";
 import { readElfIdentity } from "./elf-identity.js";
 import type { ProgramMemoryEvidence } from "./platformio-memory.js";
@@ -126,7 +127,31 @@ export async function collectBuildMetadata(
   caller: PolicyEvaluationContext = {},
   authorization?: BuildCollectionAuthorization,
 ) {
+  return collectSelectedMetadata(
+    input,
+    caller,
+    selectBuildMetadata,
+    authorization,
+  );
+}
+
+/** Collect the actual selected GDB/ELF metadata under a distinct build-authorized request. */
+export function collectDebugMetadata(
+  input: BuildContextInput,
+  caller: PolicyEvaluationContext = {},
+) {
+  return collectSelectedMetadata(input, caller, selectDebugMetadata);
+}
+
+/** Share the bounded collection operation without granting debugger requests analysis capabilities. */
+async function collectSelectedMetadata<T>(
+  input: BuildContextInput,
+  caller: PolicyEvaluationContext,
+  select: (output: string, environment: string) => T,
+  authorization?: BuildCollectionAuthorization,
+): Promise<T> {
   const selected = scope(input);
+  const guard = createPolicyRevisionGuard(selected.projectDir);
   return collectionStage(
     selected,
     {
@@ -147,7 +172,8 @@ export async function collectBuildMetadata(
           "PlatformIO metadata collection failed.",
           "ANALYSIS_METADATA_FAILED",
         );
-      return selectBuildMetadata(result.stdout, selected.environment);
+      guard();
+      return select(result.stdout, selected.environment);
     },
   );
 }
@@ -181,7 +207,11 @@ export async function collectProgramMemory(
         { cwd: selected.projectDir, timeout: 600000 },
       );
       await readElfIdentity(elfPath, before.sha256);
-      const logPath = await retainCommandLog("program-size", result.stdout, result.stderr);
+      const logPath = await retainCommandLog(
+        "program-size",
+        result.stdout,
+        result.stderr,
+      );
       return {
         environment: selected.environment,
         elfSha256: before.sha256,

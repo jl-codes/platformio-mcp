@@ -6,6 +6,7 @@ import { platformioExecutor } from "../src/platformio.js";
 import {
   withAuthorizedBuildCollection,
   collectBuildMetadata,
+  collectDebugMetadata,
   collectProgramMemory,
 } from "../src/core/analysis/collect-build-context.js";
 vi.mock("../src/platformio.js", () => ({
@@ -152,4 +153,49 @@ it("invalidates internal collection authority when its authorized callback finis
     collectBuildMetadata(input, {}, authority),
   ).rejects.toMatchObject({ code: "ANALYSIS_AUTHORITY_INVALID" });
   expect(platformioExecutor.execute).not.toHaveBeenCalled();
+});
+
+it("selects the configured debugger independently of the compiler path", async () => {
+  const debuggerPath = path.join(project, "separate-tool-package", "gdb");
+  vi.mocked(platformioExecutor.execute).mockResolvedValue({
+    exitCode: 0,
+    stderr: "",
+    stdout: JSON.stringify({
+      fixture: {
+        cc_path: path.join(project, "compiler-package", "gcc"),
+        prog_path: path.join(project, "firmware.elf"),
+        gdb_path: debuggerPath,
+      },
+      other: { gdb_path: "unselected" },
+    }),
+  });
+  expect(
+    await collectDebugMetadata({ projectDir: project, environment: "fixture" }),
+  ).toMatchObject({ environment: "fixture", debuggerPath });
+  expect(platformioExecutor.execute).toHaveBeenCalledTimes(1);
+});
+it("denies debugger metadata execution under read-only policy", async () => {
+  fs.writeFileSync(
+    path.join(project, ".pio-mcp-policy.json"),
+    '{"profile":"read_only"}',
+  );
+  await expect(
+    collectDebugMetadata({ projectDir: project, environment: "fixture" }),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(platformioExecutor.execute).not.toHaveBeenCalled();
+});
+it("does not guess a debugger if selected metadata lacks gdb_path", async () => {
+  vi.mocked(platformioExecutor.execute).mockResolvedValue({
+    exitCode: 0,
+    stderr: "",
+    stdout: JSON.stringify({
+      fixture: {
+        cc_path: path.join(project, "gcc"),
+        prog_path: path.join(project, "firmware.elf"),
+      },
+    }),
+  });
+  await expect(
+    collectDebugMetadata({ projectDir: project, environment: "fixture" }),
+  ).rejects.toMatchObject({ code: "GDB_METADATA_INVALID" });
 });

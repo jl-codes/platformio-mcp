@@ -1225,3 +1225,7 @@ Added a bounded per-connection debugger session registry. Pending launches count
 ### Debugger target attachment and download
 
 Added typed internal attachment to an explicitly selected numeric TCP endpoint after probe/server custody is established by the startup adapter. Connection and optional image download are preflighted and separately authorized, with a shared deadline and policy revision checks. load=false never sends target-download; failed attachment invalidates transport before downloading. Detach is classified as a target mutation. Thirty-nine focused policy/MI/command cases, TypeScript and lint passed. Public startup, managed debug-server/probe custody and physical acceptance remain unfinished.
+
+### Authorized debugger metadata collection
+
+Added selected-environment debugger metadata collection using the existing build-authorized collection path. It selects gdb_path independently of cc_path, rejects missing debugger metadata and rechecks policy revision before delivering collected metadata. No implicit compiler-adjacent debugger selection or package installation is introduced. Twelve focused metadata/capability cases, TypeScript and lint passed. Public debugger startup and persistent ELF/probe lifecycle integration remain incomplete.
