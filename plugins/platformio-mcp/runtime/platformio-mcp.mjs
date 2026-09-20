@@ -4471,8 +4471,8 @@ var init_errors2 = __esm({
 });
 
 // src/core/policy/redact.ts
-function redactSecretsInText(text5) {
-  let redacted = text5;
+function redactSecretsInText(text6) {
+  let redacted = text6;
   for (const pattern of secretPatterns) {
     redacted = redacted.replace(pattern, replacement);
   }
@@ -7880,14 +7880,14 @@ var require_foldFlowLines = __commonJS({
     var FOLD_FLOW = "flow";
     var FOLD_BLOCK = "block";
     var FOLD_QUOTED = "quoted";
-    function foldFlowLines(text5, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
+    function foldFlowLines(text6, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
       if (!lineWidth || lineWidth < 0)
-        return text5;
+        return text6;
       if (lineWidth < minContentWidth)
         minContentWidth = 0;
       const endStep = Math.max(1 + minContentWidth, 1 + lineWidth - indent.length);
-      if (text5.length <= endStep)
-        return text5;
+      if (text6.length <= endStep)
+        return text6;
       const folds = [];
       const escapedFolds = {};
       let end = lineWidth - indent.length;
@@ -7904,14 +7904,14 @@ var require_foldFlowLines = __commonJS({
       let escStart = -1;
       let escEnd = -1;
       if (mode === FOLD_BLOCK) {
-        i = consumeMoreIndentedLines(text5, i, indent.length);
+        i = consumeMoreIndentedLines(text6, i, indent.length);
         if (i !== -1)
           end = i + endStep;
       }
-      for (let ch; ch = text5[i += 1]; ) {
+      for (let ch; ch = text6[i += 1]; ) {
         if (mode === FOLD_QUOTED && ch === "\\") {
           escStart = i;
-          switch (text5[i + 1]) {
+          switch (text6[i + 1]) {
             case "x":
               i += 3;
               break;
@@ -7928,12 +7928,12 @@ var require_foldFlowLines = __commonJS({
         }
         if (ch === "\n") {
           if (mode === FOLD_BLOCK)
-            i = consumeMoreIndentedLines(text5, i, indent.length);
+            i = consumeMoreIndentedLines(text6, i, indent.length);
           end = i + indent.length + endStep;
           split = void 0;
         } else {
           if (ch === " " && prev && prev !== " " && prev !== "\n" && prev !== "	") {
-            const next = text5[i + 1];
+            const next = text6[i + 1];
             if (next && next !== " " && next !== "\n" && next !== "	")
               split = i;
           }
@@ -7945,12 +7945,12 @@ var require_foldFlowLines = __commonJS({
             } else if (mode === FOLD_QUOTED) {
               while (prev === " " || prev === "	") {
                 prev = ch;
-                ch = text5[i += 1];
+                ch = text6[i += 1];
                 overflow = true;
               }
               const j = i > escEnd + 1 ? i - 2 : escStart - 1;
               if (escapedFolds[j])
-                return text5;
+                return text6;
               folds.push(j);
               escapedFolds[j] = true;
               end = j + endStep;
@@ -7965,39 +7965,39 @@ var require_foldFlowLines = __commonJS({
       if (overflow && onOverflow)
         onOverflow();
       if (folds.length === 0)
-        return text5;
+        return text6;
       if (onFold)
         onFold();
-      let res = text5.slice(0, folds[0]);
+      let res = text6.slice(0, folds[0]);
       for (let i2 = 0; i2 < folds.length; ++i2) {
         const fold = folds[i2];
-        const end2 = folds[i2 + 1] || text5.length;
+        const end2 = folds[i2 + 1] || text6.length;
         if (fold === 0)
           res = `
-${indent}${text5.slice(0, end2)}`;
+${indent}${text6.slice(0, end2)}`;
         else {
           if (mode === FOLD_QUOTED && escapedFolds[fold])
-            res += `${text5[fold]}\\`;
+            res += `${text6[fold]}\\`;
           res += `
-${indent}${text5.slice(fold + 1, end2)}`;
+${indent}${text6.slice(fold + 1, end2)}`;
         }
       }
       return res;
     }
-    function consumeMoreIndentedLines(text5, i, indent) {
+    function consumeMoreIndentedLines(text6, i, indent) {
       let end = i;
       let start = i + 1;
-      let ch = text5[start];
+      let ch = text6[start];
       while (ch === " " || ch === "	") {
         if (i < start + indent) {
-          ch = text5[++i];
+          ch = text6[++i];
         } else {
           do {
-            ch = text5[++i];
+            ch = text6[++i];
           } while (ch && ch !== "\n");
           end = i;
           start = i + 1;
-          ch = text5[start];
+          ch = text6[start];
         }
       }
       return end;
@@ -14343,6 +14343,363 @@ var init_validation = __esm({
   }
 });
 
+// src/types.ts
+var BoardInfoSchema, BoardsArraySchema, SerialDeviceSchema, DevicesArraySchema, ProjectConfigSchema, UploadConfigSchema, LibraryInfoSchema, LibrariesArraySchema, LibrariesObjectSchema, LibrarySearchResponseSchema, LibrarySearchConfigSchema, LibraryInstallConfigSchema, ListBoardsParamsSchema, AcquireLockParamsSchema, ReleaseLockParamsSchema, GetBoardInfoParamsSchema, InitProjectParamsSchema, GetProjectConfigParamsSchema, SystemInfoParamsSchema, BuildProjectParamsSchema, CleanProjectParamsSchema, CheckProjectParamsSchema, RunTestsParamsSchema, UploadFirmwareParamsSchema, UploadFilesystemParamsSchema, SearchLibrariesParamsSchema, InstallLibraryParamsSchema, UninstallLibraryParamsSchema, UpdateLibraryParamsSchema, ListInstalledLibrariesParamsSchema, StartMonitorParamsSchema, StopMonitorParamsSchema, QueryLogsParamsSchema, CheckTaskStatusParamsSchema, TargetBindingSchema, AgentResolveTargetParamsSchema, GetMonitorStatusParamsSchema, CaptureSerialWindowParamsSchema, AgentMonitorHealthParamsSchema, CancelTaskParamsSchema, ListTaskHistoryParamsSchema, GetApprovalRequestParamsSchema, ListPendingApprovalsParamsSchema, GetDashboardUrlParamsSchema, GetProjectContextParamsSchema, AgentValidateProjectParamsSchema, AgentBuildDiagnoseParamsSchema, AgentSafePinAuditParamsSchema, AgentFlashMonitorVerifyParamsSchema, AgentGetLastReportParamsSchema, AgentGenerateBoardReportParamsSchema, GetPolicyStatusParamsSchema;
+var init_types2 = __esm({
+  "src/types.ts"() {
+    "use strict";
+    init_zod();
+    BoardInfoSchema = external_exports.object({
+      id: external_exports.string(),
+      name: external_exports.string(),
+      platform: external_exports.string(),
+      mcu: external_exports.string(),
+      frequency: external_exports.string().optional(),
+      flash: external_exports.number().optional(),
+      ram: external_exports.number().optional(),
+      fcpu: external_exports.number().optional(),
+      rom: external_exports.number().optional(),
+      frameworks: external_exports.array(external_exports.string()).optional(),
+      vendor: external_exports.string().optional(),
+      url: external_exports.string().optional(),
+      connectivity: external_exports.array(external_exports.string()).optional(),
+      debug: external_exports.object({
+        tools: external_exports.record(external_exports.object({ default: external_exports.boolean().optional() }).passthrough()).optional()
+      }).passthrough().nullable().optional()
+    });
+    BoardsArraySchema = external_exports.array(BoardInfoSchema);
+    SerialDeviceSchema = external_exports.object({
+      port: external_exports.string(),
+      description: external_exports.string(),
+      hwid: external_exports.string(),
+      detectedBoard: external_exports.string().optional(),
+      claim: external_exports.any().optional()
+    });
+    DevicesArraySchema = external_exports.array(SerialDeviceSchema);
+    ProjectConfigSchema = external_exports.object({
+      board: external_exports.string().min(1, "Board ID is required"),
+      framework: external_exports.string().optional(),
+      projectDir: external_exports.string().optional(),
+      platformOptions: external_exports.record(external_exports.string(), external_exports.string()).optional()
+    });
+    UploadConfigSchema = external_exports.object({
+      projectDir: external_exports.string().min(1, "Project directory is required"),
+      port: external_exports.string().optional(),
+      environment: external_exports.string().optional()
+    });
+    LibraryInfoSchema = external_exports.object({
+      id: external_exports.number().optional(),
+      name: external_exports.string(),
+      description: external_exports.string().optional(),
+      keywords: external_exports.array(external_exports.string()).optional(),
+      authors: external_exports.array(
+        external_exports.object({
+          name: external_exports.string(),
+          email: external_exports.string().optional(),
+          maintainer: external_exports.boolean().optional()
+        })
+      ).optional(),
+      repository: external_exports.object({
+        type: external_exports.string(),
+        url: external_exports.string()
+      }).optional(),
+      version: external_exports.string().optional(),
+      frameworks: external_exports.array(external_exports.unknown()).optional(),
+      platforms: external_exports.array(external_exports.unknown()).optional(),
+      homepage: external_exports.string().optional()
+    });
+    LibrariesArraySchema = external_exports.array(LibraryInfoSchema);
+    LibrariesObjectSchema = external_exports.record(
+      external_exports.string(),
+      external_exports.array(LibraryInfoSchema)
+    );
+    LibrarySearchResponseSchema = external_exports.object({
+      searchQuery: external_exports.string().optional(),
+      total: external_exports.number().optional(),
+      page: external_exports.number().optional(),
+      items: external_exports.array(LibraryInfoSchema)
+    });
+    LibrarySearchConfigSchema = external_exports.object({
+      query: external_exports.string().min(1, "Search query is required"),
+      limit: external_exports.number().positive().optional()
+    });
+    LibraryInstallConfigSchema = external_exports.object({
+      library: external_exports.string().min(1, "Library name is required"),
+      projectDir: external_exports.string().optional(),
+      version: external_exports.string().optional()
+    });
+    ListBoardsParamsSchema = external_exports.object({
+      filter: external_exports.string().optional().describe("Optional filter by platform, framework, or MCU")
+    });
+    AcquireLockParamsSchema = external_exports.object({
+      sessionId: external_exports.string().min(1).describe(
+        "Unique ID of the agent session acquiring the lock for a multi-step pipeline"
+      ),
+      reason: external_exports.string().optional().describe("Reason for acquiring the lock (e.g., Task Name)")
+    });
+    ReleaseLockParamsSchema = external_exports.object({
+      sessionId: external_exports.string().min(1).describe("Unique ID of the agent session releasing the lock")
+    });
+    GetBoardInfoParamsSchema = external_exports.object({
+      boardId: external_exports.string().min(1).describe("Board ID to retrieve information for")
+    });
+    InitProjectParamsSchema = external_exports.object({
+      board: external_exports.string().min(1).describe("Board ID for the project"),
+      framework: external_exports.string().optional().describe("Framework to use (e.g., arduino, espidf)"),
+      projectDir: external_exports.string().describe("Directory path where the project should be created"),
+      platformOptions: external_exports.record(external_exports.string(), external_exports.string()).optional().describe("Additional platform-specific options")
+    });
+    GetProjectConfigParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory")
+    });
+    SystemInfoParamsSchema = external_exports.object({});
+    BuildProjectParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
+      environment: external_exports.string().optional().describe("Specific environment to build (from platformio.ini)"),
+      sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
+      verbose: external_exports.boolean().optional().describe(
+        "If true, returns the complete verbose build log in the result instead of truncating it on success"
+      ),
+      background: external_exports.boolean().optional().describe(
+        "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
+      )
+    });
+    CleanProjectParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
+      sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
+      background: external_exports.boolean().optional().describe(
+        "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
+      )
+    });
+    CheckProjectParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
+      environment: external_exports.string().optional().describe("Specific environment to check (from platformio.ini)"),
+      background: external_exports.boolean().optional().describe(
+        "If true, dispatches the static analysis to the background and returns immediately."
+      )
+    });
+    RunTestsParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
+      sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
+      environment: external_exports.string().optional().describe("Specific environment to test (from platformio.ini)"),
+      compileOnly: external_exports.boolean().optional().describe(
+        "Build tests without uploading or executing them. Always enforced by the build_only profile."
+      ),
+      background: external_exports.boolean().optional().describe(
+        "If true, dispatches the test execution to the background and returns immediately."
+      )
+    });
+    UploadFirmwareParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
+      port: external_exports.string().optional().describe("Upload port (auto-detected if not specified)"),
+      environment: external_exports.string().optional().describe("Specific environment to upload (from platformio.ini)"),
+      sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
+      verbose: external_exports.boolean().optional().describe(
+        "If true, returns the complete verbose upload log in the result instead of truncating it"
+      ),
+      background: external_exports.boolean().optional().describe(
+        "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
+      ),
+      startMonitorAfter: external_exports.boolean().optional().describe(
+        "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."
+      ),
+      targetBinding: external_exports.lazy(() => TargetBindingSchema).optional().describe("Optional short-lived binding returned by agent_resolve_target."),
+      automationKey: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional(),
+      maxRunDurationSeconds: external_exports.number().int().min(1).max(900).optional()
+    });
+    UploadFilesystemParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
+      port: external_exports.string().optional().describe("Upload port (auto-detected if not specified)"),
+      environment: external_exports.string().optional().describe("Specific environment to upload (from platformio.ini)"),
+      sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
+      verbose: external_exports.boolean().optional().describe(
+        "If true, returns the complete verbose upload log in the result instead of truncating it"
+      ),
+      background: external_exports.boolean().optional().describe(
+        "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
+      ),
+      startMonitorAfter: external_exports.boolean().optional().describe(
+        "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."
+      ),
+      targetBinding: external_exports.lazy(() => TargetBindingSchema).optional().describe("Optional short-lived binding returned by agent_resolve_target."),
+      automationKey: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional(),
+      maxRunDurationSeconds: external_exports.number().int().min(1).max(900).optional()
+    });
+    SearchLibrariesParamsSchema = external_exports.object({
+      query: external_exports.string().min(1).describe("Search query for libraries"),
+      limit: external_exports.number().optional().default(20).describe("Maximum number of results to return")
+    });
+    InstallLibraryParamsSchema = external_exports.object({
+      library: external_exports.string().min(1).describe("Library name or ID to install"),
+      projectDir: external_exports.string().optional().describe("Project directory (installs globally if not specified)"),
+      version: external_exports.string().optional().describe("Specific version to install"),
+      global: external_exports.boolean().optional().describe("If true, installs the library globally")
+    });
+    UninstallLibraryParamsSchema = external_exports.object({
+      library: external_exports.string().min(1).describe("Library name or ID to uninstall"),
+      projectDir: external_exports.string().optional().describe("Project directory (uninstalls globally if not specified)"),
+      global: external_exports.boolean().optional().describe("If true, uninstalls from global storage")
+    });
+    UpdateLibraryParamsSchema = external_exports.object({
+      library: external_exports.string().min(1).describe("Library name or ID to update"),
+      projectDir: external_exports.string().optional().describe("Project directory (updates globally if not specified)"),
+      global: external_exports.boolean().optional().describe("If true, updates from global storage")
+    });
+    ListInstalledLibrariesParamsSchema = external_exports.object({
+      projectDir: external_exports.string().optional().describe("Project directory (lists global libraries if not specified)"),
+      global: external_exports.boolean().optional().describe("If true, lists global libraries")
+    });
+    StartMonitorParamsSchema = external_exports.object({
+      port: external_exports.string().optional().describe(
+        "Optional serial port to monitor (auto-detected if not specified)"
+      ),
+      baudRate: external_exports.number().optional().describe("Baud rate for serial connection (defaults to 115200)"),
+      projectDir: external_exports.string().optional().describe("Optional project directory for workspace log storage"),
+      environment: external_exports.string().optional().describe("Optional PlatformIO environment context")
+    });
+    StopMonitorParamsSchema = external_exports.object({
+      port: external_exports.string().describe("Serial port to stop monitoring"),
+      projectDir: external_exports.string().optional().describe("Optional project directory containing the workspace logs")
+    });
+    QueryLogsParamsSchema = external_exports.object({
+      lines: external_exports.number().int().min(1).max(1e3).optional().describe(
+        "Fetch this many tail lines from the end of the log (default: 100, maximum: 1000)"
+      ),
+      searchPattern: external_exports.string().max(128).optional().describe(
+        "Optional bounded pattern to filter the spool for specific keywords."
+      ),
+      taskId: external_exports.string().optional().describe("Target standard task ID to retrieve logs for."),
+      logPath: external_exports.string().optional().describe("Optional relative path to a log to query directly."),
+      port: external_exports.string().optional().describe("Specific COM port to query logs for."),
+      projectDir: external_exports.string().optional().describe(
+        "Target project checkout to query local .log cache instead of global cache."
+      )
+    });
+    CheckTaskStatusParamsSchema = external_exports.object({
+      taskId: external_exports.string().optional().describe("Optional task ID to check status."),
+      logPath: external_exports.string().optional().describe("Optional relative log path to check."),
+      projectDir: external_exports.string().optional().describe("Optional project directory to scope the check.")
+    });
+    TargetBindingSchema = external_exports.object({
+      digest: external_exports.string().length(64),
+      projectDir: external_exports.string().min(1).max(4096),
+      environment: external_exports.string().min(1).max(80),
+      board: external_exports.string().min(1).max(100),
+      port: external_exports.string().min(1).max(512),
+      deviceFingerprint: external_exports.string().length(64),
+      createdAt: external_exports.string().datetime(),
+      expiresAt: external_exports.string().datetime()
+    });
+    AgentResolveTargetParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).max(4096),
+      environment: external_exports.string().min(1).max(80).optional(),
+      port: external_exports.string().min(1).max(512).optional(),
+      bindingTtlSeconds: external_exports.number().int().min(30).max(900).optional()
+    });
+    GetMonitorStatusParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).max(4096).optional(),
+      port: external_exports.string().min(1).max(512).optional()
+    });
+    CaptureSerialWindowParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).max(4096),
+      port: external_exports.string().min(1).max(512).optional(),
+      environment: external_exports.string().min(1).max(80).optional(),
+      baudRate: external_exports.number().int().min(1).max(2e6).optional(),
+      durationSeconds: external_exports.number().int().min(1).max(60).optional(),
+      maxBytes: external_exports.number().int().min(256).max(65536).optional(),
+      cursor: external_exports.string().min(1).max(512).optional(),
+      targetBinding: TargetBindingSchema.optional(),
+      automationKey: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional()
+    });
+    AgentMonitorHealthParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).max(4096),
+      port: external_exports.string().min(1).max(512).optional(),
+      environment: external_exports.string().min(1).max(80).optional(),
+      baudRate: external_exports.number().int().min(1).max(2e6).optional(),
+      captureDurationSeconds: external_exports.number().int().min(1).max(60).optional(),
+      maxBytes: external_exports.number().int().min(256).max(65536).optional(),
+      expectedMarkers: external_exports.array(external_exports.string().min(1).max(128)).max(20).optional(),
+      rejectedPatterns: external_exports.array(external_exports.string().min(1).max(128)).max(20).optional(),
+      automationKey: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional(),
+      cursor: external_exports.string().min(1).max(512).optional(),
+      failureThreshold: external_exports.number().int().min(1).max(10).optional()
+    });
+    CancelTaskParamsSchema = external_exports.object({
+      taskId: external_exports.string().min(1).max(128),
+      projectDir: external_exports.string().min(1).max(4096).optional()
+    });
+    ListTaskHistoryParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).max(4096),
+      limit: external_exports.number().int().min(1).max(100).optional(),
+      status: external_exports.enum(["inactive", "running", "success", "error", "terminated"]).optional()
+    });
+    GetApprovalRequestParamsSchema = external_exports.object({
+      approvalId: external_exports.string().min(1).max(128),
+      projectDir: external_exports.string().min(1).max(4096).optional()
+    });
+    ListPendingApprovalsParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).max(4096).optional(),
+      limit: external_exports.number().int().min(1).max(100).optional()
+    });
+    GetDashboardUrlParamsSchema = external_exports.object({
+      open: external_exports.boolean().optional().describe(
+        "If true, automatically opens the local dashboard UI in the system's default browser."
+      ),
+      projectDir: external_exports.string().optional().describe("Optional project directory to initialize the dashboard with.")
+    });
+    GetProjectContextParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
+      includeBuildHistory: external_exports.boolean().optional().describe(
+        "If true, include the most recent build/upload status summary from the workspace log directory."
+      )
+    });
+    AgentValidateProjectParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory")
+    });
+    AgentBuildDiagnoseParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
+      environment: external_exports.string().optional().describe("Optional specific environment from platformio.ini"),
+      verbose: external_exports.boolean().optional().describe("If true, preserve verbose build output."),
+      background: external_exports.boolean().optional().describe("If true, dispatches build asynchronously.")
+    });
+    AgentSafePinAuditParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
+      boardId: external_exports.string().min(1).describe("Target PlatformIO board ID")
+    });
+    AgentFlashMonitorVerifyParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
+      environment: external_exports.string().optional().describe("Optional specific environment from platformio.ini"),
+      port: external_exports.string().optional().describe("Optional serial upload port"),
+      targetBinding: TargetBindingSchema.optional().describe(
+        "Short-lived exact target binding returned by agent_resolve_target."
+      ),
+      expect_all: external_exports.array(external_exports.string()).optional().describe(
+        "All expected runtime markers that should appear in serial output."
+      ),
+      reject_patterns: external_exports.array(external_exports.string()).optional().describe("Runtime patterns that must not appear in serial output."),
+      timeoutSeconds: external_exports.number().int().positive().max(300).optional().describe("Total verification timeout window in seconds."),
+      stabilityWindowSeconds: external_exports.number().int().positive().max(120).optional().describe("Required quiet serial window at the tail of capture."),
+      autoBuild: external_exports.boolean().optional().describe(
+        "If true, build before flashing when no firmware artifact is detected."
+      ),
+      automationKey: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional(),
+      maxRunDurationSeconds: external_exports.number().int().min(1).max(900).optional()
+    });
+    AgentGetLastReportParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory")
+    });
+    AgentGenerateBoardReportParamsSchema = external_exports.object({
+      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
+      boardId: external_exports.string().min(1).describe("Target PlatformIO board ID")
+    });
+    GetPolicyStatusParamsSchema = external_exports.object({
+      projectDir: external_exports.string().optional().describe(
+        "Optional project directory to resolve local policy profile context."
+      )
+    });
+  }
+});
+
 // node_modules/ajv/dist/compile/codegen/code.js
 var require_code = __commonJS({
   "node_modules/ajv/dist/compile/codegen/code.js"(exports) {
@@ -18934,7 +19291,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text5, msg) => text5 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text6, msg) => text6 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -21508,357 +21865,6 @@ var require_dist2 = __commonJS({
   }
 });
 
-// src/types.ts
-var BoardInfoSchema, BoardsArraySchema, SerialDeviceSchema, DevicesArraySchema, ProjectConfigSchema, UploadConfigSchema, LibraryInfoSchema, LibrariesArraySchema, LibrariesObjectSchema, LibrarySearchResponseSchema, LibrarySearchConfigSchema, LibraryInstallConfigSchema, ListBoardsParamsSchema, AcquireLockParamsSchema, ReleaseLockParamsSchema, GetBoardInfoParamsSchema, InitProjectParamsSchema, GetProjectConfigParamsSchema, SystemInfoParamsSchema, BuildProjectParamsSchema, CleanProjectParamsSchema, CheckProjectParamsSchema, RunTestsParamsSchema, UploadFirmwareParamsSchema, UploadFilesystemParamsSchema, SearchLibrariesParamsSchema, InstallLibraryParamsSchema, UninstallLibraryParamsSchema, UpdateLibraryParamsSchema, ListInstalledLibrariesParamsSchema, StartMonitorParamsSchema, StopMonitorParamsSchema, QueryLogsParamsSchema, CheckTaskStatusParamsSchema, TargetBindingSchema, AgentResolveTargetParamsSchema, GetMonitorStatusParamsSchema, CaptureSerialWindowParamsSchema, AgentMonitorHealthParamsSchema, CancelTaskParamsSchema, ListTaskHistoryParamsSchema, GetApprovalRequestParamsSchema, ListPendingApprovalsParamsSchema, GetDashboardUrlParamsSchema, GetProjectContextParamsSchema, AgentValidateProjectParamsSchema, AgentBuildDiagnoseParamsSchema, AgentSafePinAuditParamsSchema, AgentFlashMonitorVerifyParamsSchema, AgentGetLastReportParamsSchema, AgentGenerateBoardReportParamsSchema, GetPolicyStatusParamsSchema;
-var init_types2 = __esm({
-  "src/types.ts"() {
-    "use strict";
-    init_zod();
-    BoardInfoSchema = external_exports.object({
-      id: external_exports.string(),
-      name: external_exports.string(),
-      platform: external_exports.string(),
-      mcu: external_exports.string(),
-      frequency: external_exports.string().optional(),
-      flash: external_exports.number().optional(),
-      ram: external_exports.number().optional(),
-      fcpu: external_exports.number().optional(),
-      rom: external_exports.number().optional(),
-      frameworks: external_exports.array(external_exports.string()).optional(),
-      vendor: external_exports.string().optional(),
-      url: external_exports.string().optional()
-    });
-    BoardsArraySchema = external_exports.array(BoardInfoSchema);
-    SerialDeviceSchema = external_exports.object({
-      port: external_exports.string(),
-      description: external_exports.string(),
-      hwid: external_exports.string(),
-      detectedBoard: external_exports.string().optional(),
-      claim: external_exports.any().optional()
-    });
-    DevicesArraySchema = external_exports.array(SerialDeviceSchema);
-    ProjectConfigSchema = external_exports.object({
-      board: external_exports.string().min(1, "Board ID is required"),
-      framework: external_exports.string().optional(),
-      projectDir: external_exports.string().optional(),
-      platformOptions: external_exports.record(external_exports.string(), external_exports.string()).optional()
-    });
-    UploadConfigSchema = external_exports.object({
-      projectDir: external_exports.string().min(1, "Project directory is required"),
-      port: external_exports.string().optional(),
-      environment: external_exports.string().optional()
-    });
-    LibraryInfoSchema = external_exports.object({
-      id: external_exports.number().optional(),
-      name: external_exports.string(),
-      description: external_exports.string().optional(),
-      keywords: external_exports.array(external_exports.string()).optional(),
-      authors: external_exports.array(
-        external_exports.object({
-          name: external_exports.string(),
-          email: external_exports.string().optional(),
-          maintainer: external_exports.boolean().optional()
-        })
-      ).optional(),
-      repository: external_exports.object({
-        type: external_exports.string(),
-        url: external_exports.string()
-      }).optional(),
-      version: external_exports.string().optional(),
-      frameworks: external_exports.array(external_exports.unknown()).optional(),
-      platforms: external_exports.array(external_exports.unknown()).optional(),
-      homepage: external_exports.string().optional()
-    });
-    LibrariesArraySchema = external_exports.array(LibraryInfoSchema);
-    LibrariesObjectSchema = external_exports.record(
-      external_exports.string(),
-      external_exports.array(LibraryInfoSchema)
-    );
-    LibrarySearchResponseSchema = external_exports.object({
-      searchQuery: external_exports.string().optional(),
-      total: external_exports.number().optional(),
-      page: external_exports.number().optional(),
-      items: external_exports.array(LibraryInfoSchema)
-    });
-    LibrarySearchConfigSchema = external_exports.object({
-      query: external_exports.string().min(1, "Search query is required"),
-      limit: external_exports.number().positive().optional()
-    });
-    LibraryInstallConfigSchema = external_exports.object({
-      library: external_exports.string().min(1, "Library name is required"),
-      projectDir: external_exports.string().optional(),
-      version: external_exports.string().optional()
-    });
-    ListBoardsParamsSchema = external_exports.object({
-      filter: external_exports.string().optional().describe("Optional filter by platform, framework, or MCU")
-    });
-    AcquireLockParamsSchema = external_exports.object({
-      sessionId: external_exports.string().min(1).describe(
-        "Unique ID of the agent session acquiring the lock for a multi-step pipeline"
-      ),
-      reason: external_exports.string().optional().describe("Reason for acquiring the lock (e.g., Task Name)")
-    });
-    ReleaseLockParamsSchema = external_exports.object({
-      sessionId: external_exports.string().min(1).describe("Unique ID of the agent session releasing the lock")
-    });
-    GetBoardInfoParamsSchema = external_exports.object({
-      boardId: external_exports.string().min(1).describe("Board ID to retrieve information for")
-    });
-    InitProjectParamsSchema = external_exports.object({
-      board: external_exports.string().min(1).describe("Board ID for the project"),
-      framework: external_exports.string().optional().describe("Framework to use (e.g., arduino, espidf)"),
-      projectDir: external_exports.string().describe("Directory path where the project should be created"),
-      platformOptions: external_exports.record(external_exports.string(), external_exports.string()).optional().describe("Additional platform-specific options")
-    });
-    GetProjectConfigParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory")
-    });
-    SystemInfoParamsSchema = external_exports.object({});
-    BuildProjectParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      environment: external_exports.string().optional().describe("Specific environment to build (from platformio.ini)"),
-      sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
-      verbose: external_exports.boolean().optional().describe(
-        "If true, returns the complete verbose build log in the result instead of truncating it on success"
-      ),
-      background: external_exports.boolean().optional().describe(
-        "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
-      )
-    });
-    CleanProjectParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
-      background: external_exports.boolean().optional().describe(
-        "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
-      )
-    });
-    CheckProjectParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      environment: external_exports.string().optional().describe("Specific environment to check (from platformio.ini)"),
-      background: external_exports.boolean().optional().describe(
-        "If true, dispatches the static analysis to the background and returns immediately."
-      )
-    });
-    RunTestsParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
-      environment: external_exports.string().optional().describe("Specific environment to test (from platformio.ini)"),
-      compileOnly: external_exports.boolean().optional().describe("Build tests without uploading or executing them. Always enforced by the build_only profile."),
-      background: external_exports.boolean().optional().describe(
-        "If true, dispatches the test execution to the background and returns immediately."
-      )
-    });
-    UploadFirmwareParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      port: external_exports.string().optional().describe("Upload port (auto-detected if not specified)"),
-      environment: external_exports.string().optional().describe("Specific environment to upload (from platformio.ini)"),
-      sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
-      verbose: external_exports.boolean().optional().describe(
-        "If true, returns the complete verbose upload log in the result instead of truncating it"
-      ),
-      background: external_exports.boolean().optional().describe(
-        "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
-      ),
-      startMonitorAfter: external_exports.boolean().optional().describe(
-        "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."
-      ),
-      targetBinding: external_exports.lazy(() => TargetBindingSchema).optional().describe("Optional short-lived binding returned by agent_resolve_target."),
-      automationKey: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional(),
-      maxRunDurationSeconds: external_exports.number().int().min(1).max(900).optional()
-    });
-    UploadFilesystemParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      port: external_exports.string().optional().describe("Upload port (auto-detected if not specified)"),
-      environment: external_exports.string().optional().describe("Specific environment to upload (from platformio.ini)"),
-      sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
-      verbose: external_exports.boolean().optional().describe(
-        "If true, returns the complete verbose upload log in the result instead of truncating it"
-      ),
-      background: external_exports.boolean().optional().describe(
-        "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
-      ),
-      startMonitorAfter: external_exports.boolean().optional().describe(
-        "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."
-      ),
-      targetBinding: external_exports.lazy(() => TargetBindingSchema).optional().describe("Optional short-lived binding returned by agent_resolve_target."),
-      automationKey: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional(),
-      maxRunDurationSeconds: external_exports.number().int().min(1).max(900).optional()
-    });
-    SearchLibrariesParamsSchema = external_exports.object({
-      query: external_exports.string().min(1).describe("Search query for libraries"),
-      limit: external_exports.number().optional().default(20).describe("Maximum number of results to return")
-    });
-    InstallLibraryParamsSchema = external_exports.object({
-      library: external_exports.string().min(1).describe("Library name or ID to install"),
-      projectDir: external_exports.string().optional().describe("Project directory (installs globally if not specified)"),
-      version: external_exports.string().optional().describe("Specific version to install"),
-      global: external_exports.boolean().optional().describe("If true, installs the library globally")
-    });
-    UninstallLibraryParamsSchema = external_exports.object({
-      library: external_exports.string().min(1).describe("Library name or ID to uninstall"),
-      projectDir: external_exports.string().optional().describe("Project directory (uninstalls globally if not specified)"),
-      global: external_exports.boolean().optional().describe("If true, uninstalls from global storage")
-    });
-    UpdateLibraryParamsSchema = external_exports.object({
-      library: external_exports.string().min(1).describe("Library name or ID to update"),
-      projectDir: external_exports.string().optional().describe("Project directory (updates globally if not specified)"),
-      global: external_exports.boolean().optional().describe("If true, updates from global storage")
-    });
-    ListInstalledLibrariesParamsSchema = external_exports.object({
-      projectDir: external_exports.string().optional().describe("Project directory (lists global libraries if not specified)"),
-      global: external_exports.boolean().optional().describe("If true, lists global libraries")
-    });
-    StartMonitorParamsSchema = external_exports.object({
-      port: external_exports.string().optional().describe(
-        "Optional serial port to monitor (auto-detected if not specified)"
-      ),
-      baudRate: external_exports.number().optional().describe("Baud rate for serial connection (defaults to 115200)"),
-      projectDir: external_exports.string().optional().describe("Optional project directory for workspace log storage"),
-      environment: external_exports.string().optional().describe("Optional PlatformIO environment context")
-    });
-    StopMonitorParamsSchema = external_exports.object({
-      port: external_exports.string().describe("Serial port to stop monitoring"),
-      projectDir: external_exports.string().optional().describe("Optional project directory containing the workspace logs")
-    });
-    QueryLogsParamsSchema = external_exports.object({
-      lines: external_exports.number().int().min(1).max(1e3).optional().describe(
-        "Fetch this many tail lines from the end of the log (default: 100, maximum: 1000)"
-      ),
-      searchPattern: external_exports.string().max(128).optional().describe(
-        "Optional bounded pattern to filter the spool for specific keywords."
-      ),
-      taskId: external_exports.string().optional().describe("Target standard task ID to retrieve logs for."),
-      logPath: external_exports.string().optional().describe("Optional relative path to a log to query directly."),
-      port: external_exports.string().optional().describe("Specific COM port to query logs for."),
-      projectDir: external_exports.string().optional().describe(
-        "Target project checkout to query local .log cache instead of global cache."
-      )
-    });
-    CheckTaskStatusParamsSchema = external_exports.object({
-      taskId: external_exports.string().optional().describe("Optional task ID to check status."),
-      logPath: external_exports.string().optional().describe("Optional relative log path to check."),
-      projectDir: external_exports.string().optional().describe("Optional project directory to scope the check.")
-    });
-    TargetBindingSchema = external_exports.object({
-      digest: external_exports.string().length(64),
-      projectDir: external_exports.string().min(1).max(4096),
-      environment: external_exports.string().min(1).max(80),
-      board: external_exports.string().min(1).max(100),
-      port: external_exports.string().min(1).max(512),
-      deviceFingerprint: external_exports.string().length(64),
-      createdAt: external_exports.string().datetime(),
-      expiresAt: external_exports.string().datetime()
-    });
-    AgentResolveTargetParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).max(4096),
-      environment: external_exports.string().min(1).max(80).optional(),
-      port: external_exports.string().min(1).max(512).optional(),
-      bindingTtlSeconds: external_exports.number().int().min(30).max(900).optional()
-    });
-    GetMonitorStatusParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).max(4096).optional(),
-      port: external_exports.string().min(1).max(512).optional()
-    });
-    CaptureSerialWindowParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).max(4096),
-      port: external_exports.string().min(1).max(512).optional(),
-      environment: external_exports.string().min(1).max(80).optional(),
-      baudRate: external_exports.number().int().min(1).max(2e6).optional(),
-      durationSeconds: external_exports.number().int().min(1).max(60).optional(),
-      maxBytes: external_exports.number().int().min(256).max(65536).optional(),
-      cursor: external_exports.string().min(1).max(512).optional(),
-      targetBinding: TargetBindingSchema.optional(),
-      automationKey: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional()
-    });
-    AgentMonitorHealthParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).max(4096),
-      port: external_exports.string().min(1).max(512).optional(),
-      environment: external_exports.string().min(1).max(80).optional(),
-      baudRate: external_exports.number().int().min(1).max(2e6).optional(),
-      captureDurationSeconds: external_exports.number().int().min(1).max(60).optional(),
-      maxBytes: external_exports.number().int().min(256).max(65536).optional(),
-      expectedMarkers: external_exports.array(external_exports.string().min(1).max(128)).max(20).optional(),
-      rejectedPatterns: external_exports.array(external_exports.string().min(1).max(128)).max(20).optional(),
-      automationKey: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional(),
-      cursor: external_exports.string().min(1).max(512).optional(),
-      failureThreshold: external_exports.number().int().min(1).max(10).optional()
-    });
-    CancelTaskParamsSchema = external_exports.object({
-      taskId: external_exports.string().min(1).max(128),
-      projectDir: external_exports.string().min(1).max(4096).optional()
-    });
-    ListTaskHistoryParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).max(4096),
-      limit: external_exports.number().int().min(1).max(100).optional(),
-      status: external_exports.enum(["inactive", "running", "success", "error", "terminated"]).optional()
-    });
-    GetApprovalRequestParamsSchema = external_exports.object({
-      approvalId: external_exports.string().min(1).max(128),
-      projectDir: external_exports.string().min(1).max(4096).optional()
-    });
-    ListPendingApprovalsParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).max(4096).optional(),
-      limit: external_exports.number().int().min(1).max(100).optional()
-    });
-    GetDashboardUrlParamsSchema = external_exports.object({
-      open: external_exports.boolean().optional().describe(
-        "If true, automatically opens the local dashboard UI in the system's default browser."
-      ),
-      projectDir: external_exports.string().optional().describe("Optional project directory to initialize the dashboard with.")
-    });
-    GetProjectContextParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      includeBuildHistory: external_exports.boolean().optional().describe(
-        "If true, include the most recent build/upload status summary from the workspace log directory."
-      )
-    });
-    AgentValidateProjectParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory")
-    });
-    AgentBuildDiagnoseParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      environment: external_exports.string().optional().describe("Optional specific environment from platformio.ini"),
-      verbose: external_exports.boolean().optional().describe("If true, preserve verbose build output."),
-      background: external_exports.boolean().optional().describe("If true, dispatches build asynchronously.")
-    });
-    AgentSafePinAuditParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      boardId: external_exports.string().min(1).describe("Target PlatformIO board ID")
-    });
-    AgentFlashMonitorVerifyParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      environment: external_exports.string().optional().describe("Optional specific environment from platformio.ini"),
-      port: external_exports.string().optional().describe("Optional serial upload port"),
-      targetBinding: TargetBindingSchema.optional().describe(
-        "Short-lived exact target binding returned by agent_resolve_target."
-      ),
-      expect_all: external_exports.array(external_exports.string()).optional().describe(
-        "All expected runtime markers that should appear in serial output."
-      ),
-      reject_patterns: external_exports.array(external_exports.string()).optional().describe("Runtime patterns that must not appear in serial output."),
-      timeoutSeconds: external_exports.number().int().positive().max(300).optional().describe("Total verification timeout window in seconds."),
-      stabilityWindowSeconds: external_exports.number().int().positive().max(120).optional().describe("Required quiet serial window at the tail of capture."),
-      autoBuild: external_exports.boolean().optional().describe(
-        "If true, build before flashing when no firmware artifact is detected."
-      ),
-      automationKey: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional(),
-      maxRunDurationSeconds: external_exports.number().int().min(1).max(900).optional()
-    });
-    AgentGetLastReportParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory")
-    });
-    AgentGenerateBoardReportParamsSchema = external_exports.object({
-      projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      boardId: external_exports.string().min(1).describe("Target PlatformIO board ID")
-    });
-    GetPolicyStatusParamsSchema = external_exports.object({
-      projectDir: external_exports.string().optional().describe(
-        "Optional project directory to resolve local policy profile context."
-      )
-    });
-  }
-});
-
 // src/utils/build-cache.ts
 import fs17 from "node:fs";
 import path23 from "node:path";
@@ -22526,8 +22532,8 @@ async function getProjectContext(projectDir, includeBuildHistory) {
   let libDeps;
   if (hasPlatformioIni) {
     try {
-      const text5 = fs19.readFileSync(iniPath, "utf8");
-      const parsed = parsePlatformioIni(text5);
+      const text6 = fs19.readFileSync(iniPath, "utf8");
+      const parsed = parsePlatformioIni(text6);
       environments = parsed.environments;
       libDeps = parsed.libDeps;
     } catch {
@@ -23593,11 +23599,11 @@ async function executeWithSpooling(command, args, options) {
           if (stat.size > fileOffset) {
             const stream = fs29.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on("data", (chunk) => {
-              const text5 = chunk.toString();
-              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text5);
+              const text6 = chunk.toString();
+              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text6);
               if (latestPointer.mirrorLatest) {
                 try {
-                  fs29.appendFileSync(latestLog, text5);
+                  fs29.appendFileSync(latestLog, text6);
                 } catch {
                 }
               }
@@ -24129,9 +24135,9 @@ function emitNewLogBytes(port, daemon) {
     const buffer = Buffer.alloc(stat.size - start);
     fd = fs32.openSync(daemon.logFile, "r");
     fs32.readSync(fd, buffer, 0, buffer.length, start);
-    const text5 = buffer.toString();
-    if (text5.length > 0) {
-      portalEvents.emitSerialLog(port, text5, daemon.taskId);
+    const text6 = buffer.toString();
+    if (text6.length > 0) {
+      portalEvents.emitSerialLog(port, text6, daemon.taskId);
       daemon.lastActivityAt = (/* @__PURE__ */ new Date()).toISOString();
     }
     daemon.fileOffset = stat.size;
@@ -40689,8 +40695,8 @@ var require_text = __commonJS({
     var debug = require_src()("body-parser:text");
     var read = require_read();
     var { normalizeOptions, passthrough } = require_utils2();
-    module.exports = text5;
-    function text5(options) {
+    module.exports = text6;
+    function text6(options) {
       const normalizedOptions = normalizeOptions(options, "text/plain");
       return function textParser(req, res, next) {
         read(req, res, next, passthrough, debug, normalizedOptions);
@@ -54510,11 +54516,11 @@ var require_dist5 = __commonJS({
     exports.TokenData = TokenData;
     var PathError = class extends TypeError {
       constructor(message, originalPath) {
-        let text5 = message;
+        let text6 = message;
         if (originalPath)
-          text5 += `: ${originalPath}`;
-        text5 += `; visit https://git.new/pathToRegexpError for info`;
-        super(text5);
+          text6 += `: ${originalPath}`;
+        text6 += `; visit https://git.new/pathToRegexpError for info`;
+        super(text6);
         this.originalPath = originalPath;
       }
     };
@@ -92571,8 +92577,8 @@ var PolicyConfigError = class extends PlatformIOError {
   }
   source;
 };
-function parsePolicyDocument(text5, source) {
-  if (Buffer.byteLength(text5, "utf8") > MAX_POLICY_BYTES) {
+function parsePolicyDocument(text6, source) {
+  if (Buffer.byteLength(text6, "utf8") > MAX_POLICY_BYTES) {
     throw new PolicyConfigError(source, "Policy exceeds the 64 KiB limit.");
   }
   const extension = path6.extname(source).toLowerCase();
@@ -92583,8 +92589,8 @@ function parsePolicyDocument(text5, source) {
     );
   }
   try {
-    if (extension === ".json") JSON.parse(text5);
-    const document2 = (0, import_yaml.parseDocument)(text5, {
+    if (extension === ".json") JSON.parse(text6);
+    const document2 = (0, import_yaml.parseDocument)(text6, {
       version: "1.2",
       strict: true,
       uniqueKeys: true,
@@ -92685,10 +92691,10 @@ function approvalsFile() {
   return path8.join(resolvePolicyDirectory(), "approvals.json");
 }
 function readApprovals(file = approvalsFile()) {
-  let text5;
+  let text6;
   try {
     if (fs6.statSync(file).size > 8 * 1024 * 1024) throw new Error("size limit");
-    text5 = fs6.readFileSync(file, "utf8");
+    text6 = fs6.readFileSync(file, "utf8");
   } catch (error2) {
     if (error2.code === "ENOENT") return [];
     throw new PlatformIOError(
@@ -92697,7 +92703,7 @@ function readApprovals(file = approvalsFile()) {
     );
   }
   try {
-    return external_exports.array(ApprovalRecordSchema).parse(JSON.parse(text5));
+    return external_exports.array(ApprovalRecordSchema).parse(JSON.parse(text6));
   } catch {
     throw new PlatformIOError(
       "Approval storage is malformed; operator repair is required.",
@@ -93589,12 +93595,12 @@ function readLayer(source, required2) {
     );
   }
 }
-function recordSource(sources, kind3, source, text5) {
+function recordSource(sources, kind3, source, text6) {
   sources.push({
     kind: kind3,
     source,
-    present: text5 !== void 0,
-    ...text5 === void 0 ? {} : { sha256: crypto6.createHash("sha256").update(text5).digest("hex") }
+    present: text6 !== void 0,
+    ...text6 === void 0 ? {} : { sha256: crypto6.createHash("sha256").update(text6).digest("hex") }
   });
 }
 function applyOperatorCeiling(policy, operator) {
@@ -93638,11 +93644,11 @@ function loadEffectivePolicyState(workspaceDir) {
       path14.resolve(workspaceDir),
       ".pio-mcp-policy.json"
     );
-    const text5 = readLayer(source2, false);
-    recordSource(sources, "project-profile", source2, text5);
-    if (text5 !== void 0) {
+    const text6 = readLayer(source2, false);
+    recordSource(sources, "project-profile", source2, text6);
+    if (text6 !== void 0) {
       const document2 = PolicyProfileConfigSchema.safeParse(
-        parsePolicyDocument(text5, source2)
+        parsePolicyDocument(text6, source2)
       );
       if (!document2.success)
         throw new PolicyConfigError(
@@ -93673,10 +93679,10 @@ function loadEffectivePolicyState(workspaceDir) {
       ".pio-mcp-workspace",
       "policy.yaml"
     );
-    const text5 = readLayer(source2, false);
-    recordSource(sources, "project-override", source2, text5);
-    if (text5 !== void 0) {
-      const document2 = parsePolicyDocument(text5, source2);
+    const text6 = readLayer(source2, false);
+    recordSource(sources, "project-override", source2, text6);
+    if (text6 !== void 0) {
+      const document2 = parsePolicyDocument(text6, source2);
       if ("profile" in document2)
         throw new PolicyConfigError(
           source2,
@@ -94374,8 +94380,8 @@ function parseDependencyDeclaration(input) {
     constrained: !!match[3]?.trim()
   };
 }
-function parseDependencyManifest(text5, format) {
-  if (Buffer.byteLength(text5) > 1024 * 1024)
+function parseDependencyManifest(text6, format) {
+  if (Buffer.byteLength(text6) > 1024 * 1024)
     throw new PlatformIOError(
       "Library manifest exceeds 1 MiB.",
       "DEPENDENCY_MANIFEST_LIMIT"
@@ -94392,7 +94398,7 @@ function parseDependencyManifest(text5, format) {
         name: nameSchema.nullish(),
         version: external_exports.union([external_exports.string().max(512), external_exports.number().finite()]).nullish(),
         dependencies: external_exports.unknown().optional()
-      }).parse(JSON.parse(text5));
+      }).parse(JSON.parse(text6));
       rawName = data.name;
       rawVersion = data.version;
       if (Array.isArray(data.dependencies)) {
@@ -94410,7 +94416,7 @@ function parseDependencyManifest(text5, format) {
         throw new Error("Invalid dependencies");
     } else {
       const fields = /* @__PURE__ */ new Map();
-      for (const line of text5.split(/\r?\n/)) {
+      for (const line of text6.split(/\r?\n/)) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith("#")) continue;
         const at = line.indexOf("=");
@@ -95134,6 +95140,231 @@ function compatibilityErrorResult(error2) {
   };
 }
 
+// src/adapters/board-compat.ts
+init_zod();
+
+// src/tools/boards.ts
+init_zod();
+init_platformio();
+init_types2();
+init_validation();
+init_errors2();
+var PioBoardsOutputSchema = external_exports.union([
+  external_exports.array(BoardInfoSchema),
+  external_exports.record(external_exports.string(), external_exports.array(BoardInfoSchema))
+]);
+function normalizeBoardsOutput(output) {
+  if (Array.isArray(output)) {
+    return output;
+  }
+  const flattened = [];
+  for (const platformBoards of Object.values(
+    output
+  )) {
+    flattened.push(...platformBoards);
+  }
+  return flattened;
+}
+async function listBoards(filter) {
+  try {
+    const args = [];
+    if (filter && filter.trim().length > 0) {
+      args.push(filter.trim());
+    }
+    const result = await platformioExecutor.executeWithJsonOutput(
+      "boards",
+      args,
+      PioBoardsOutputSchema,
+      { timeout: 3e4 }
+    );
+    const allBoards = normalizeBoardsOutput(result);
+    if (filter && filter.trim().length > 0) {
+      const filterLower = filter.trim().toLowerCase();
+      return allBoards.filter(
+        (board) => board.id.toLowerCase().includes(filterLower) || board.name.toLowerCase().includes(filterLower) || board.platform.toLowerCase().includes(filterLower) || board.mcu.toLowerCase().includes(filterLower) || board.frameworks?.some(
+          (fw) => fw.toLowerCase().includes(filterLower)
+        )
+      );
+    }
+    return allBoards;
+  } catch (error2) {
+    throw new PlatformIOError(
+      `Failed to list boards${filter ? ` with filter '${filter}'` : ""}: ${error2}`,
+      "LIST_BOARDS_FAILED",
+      { filter }
+    );
+  }
+}
+async function getBoardInfo(boardId) {
+  if (!validateBoardId(boardId)) {
+    throw new BoardNotFoundError(boardId);
+  }
+  try {
+    const result = await platformioExecutor.executeWithJsonOutput(
+      "boards",
+      [boardId],
+      PioBoardsOutputSchema,
+      { timeout: 3e4 }
+    );
+    const board = normalizeBoardsOutput(result).find((b) => b.id === boardId);
+    if (board) {
+      return board;
+    }
+    throw new BoardNotFoundError(boardId);
+  } catch (error2) {
+    if (error2 instanceof BoardNotFoundError) {
+      throw error2;
+    }
+    throw new PlatformIOError(
+      `Failed to get board info for '${boardId}': ${error2}`,
+      "GET_BOARD_INFO_FAILED",
+      { boardId }
+    );
+  }
+}
+
+// src/adapters/board-compat.ts
+init_errors2();
+var text3 = external_exports.string().max(4096);
+var listSchema = external_exports.object({
+  query: text3,
+  platform: text3.nullable().optional(),
+  framework: text3.nullable().optional(),
+  limit: external_exports.number().int().min(-1e4).max(1e4).default(30),
+  approval_id: text3.optional()
+}).strict();
+var infoSchema = external_exports.object({ board_id: text3.min(1), approval_id: text3.optional() }).strict();
+function compactCompatibilityBoard(board) {
+  const rounded = (value2, divisor) => {
+    if (!value2) return null;
+    const scaled = value2 / divisor * 10;
+    const lower = Math.floor(scaled);
+    return (scaled - lower === 0.5 ? lower + lower % 2 : Math.round(scaled)) / 10;
+  };
+  return {
+    id: board.id,
+    name: board.name,
+    platform: board.platform,
+    mcu: board.mcu,
+    cpu_mhz: rounded(board.fcpu, 1e6),
+    ram_kb: rounded(board.ram, 1024),
+    flash_kb: rounded(board.rom, 1024),
+    frameworks: board.frameworks ?? [],
+    vendor: board.vendor ?? null
+  };
+}
+async function executeBoardCompatibility(name2, input, _defaults = {}, caller = {}, onAuthorized) {
+  if (name2 === "pio_list_boards") {
+    const params2 = listSchema.parse(input);
+    const query = params2.query.trim().toLowerCase();
+    if (!query && !params2.platform && !params2.framework)
+      throw new PlatformIOError(
+        "Give a query or platform/framework filter.",
+        "COMPAT_ARGUMENT_INVALID"
+      );
+    return dispatchAuthorizedAction(
+      "list_boards",
+      {
+        query: params2.query,
+        platform: params2.platform,
+        framework: params2.framework,
+        limit: params2.limit,
+        approvalId: params2.approval_id
+      },
+      caller,
+      async () => {
+        await onAuthorized?.();
+        const boards = await listBoards();
+        const matches = boards.filter(
+          (board) => (!params2.platform || board.platform.toLowerCase() === params2.platform.toLowerCase()) && (!params2.framework || (board.frameworks ?? []).some(
+            (framework) => framework.toLowerCase() === params2.framework?.toLowerCase()
+          )) && (!query || [
+            board.id,
+            board.name,
+            board.platform,
+            board.mcu,
+            board.vendor ?? ""
+          ].join(" ").toLowerCase().includes(query))
+        );
+        matches.sort(
+          (a, b) => Number(a.id.toLowerCase() !== query) - Number(b.id.toLowerCase() !== query) || a.id.length - b.id.length
+        );
+        const rows = matches.slice(0, params2.limit).map(compactCompatibilityBoard);
+        return {
+          ok: true,
+          summary: `${matches.length} boards match '${params2.query}'${params2.platform ? ` on platform ${params2.platform}` : ""}${matches.length > rows.length ? `; showing ${rows.length}` : ""}. Use the \`id\` value as the board in pio_project_init or platformio.ini.`,
+          total_matches: matches.length,
+          boards: rows
+        };
+      }
+    );
+  }
+  if (name2 !== "pio_board_info")
+    throw new PlatformIOError(
+      "Unknown board compatibility tool.",
+      "COMPAT_TOOL_UNKNOWN"
+    );
+  const params = infoSchema.parse(input);
+  return dispatchAuthorizedAction(
+    "get_board_info",
+    { boardId: params.board_id, approvalId: params.approval_id },
+    caller,
+    async () => {
+      await onAuthorized?.();
+      const board = await getBoardInfo(params.board_id);
+      const compact = compactCompatibilityBoard(board);
+      const tools = board.debug?.tools ?? {};
+      return {
+        ...compact,
+        ram_bytes: board.ram ?? null,
+        flash_bytes: board.rom ?? null,
+        connectivity: board.connectivity ?? [],
+        debug_tools: Object.keys(tools).sort(),
+        default_debug_tool: Object.entries(tools).find(([, value2]) => value2.default)?.[0] ?? null,
+        url: board.url ?? null,
+        ok: true,
+        summary: `${compact.name} (${board.id}): ${compact.mcu} @ ${compact.cpu_mhz} MHz, ${compact.ram_kb} KB RAM, ${compact.flash_kb} KB flash, frameworks ${compact.frameworks.join(", ")}, platform ${compact.platform}.`
+      };
+    }
+  );
+}
+function withBoardCompatibility(base2) {
+  const result = new Map(base2);
+  for (const [name2, canonical3] of [
+    ["pio_list_boards", "list_boards"],
+    ["pio_board_info", "get_board_info"]
+  ]) {
+    const source = base2.get(canonical3);
+    if (!source || result.has(name2))
+      throw new Error(`Invalid board alias: ${name2}`);
+    const properties = name2 === "pio_list_boards" ? {
+      query: { type: "string" },
+      platform: { type: ["string", "null"] },
+      framework: { type: ["string", "null"] },
+      limit: {
+        type: "integer",
+        default: 30,
+        minimum: -1e4,
+        maximum: 1e4
+      },
+      approval_id: { type: "string" }
+    } : { board_id: { type: "string" }, approval_id: { type: "string" } };
+    result.set(name2, {
+      ...source,
+      name: name2,
+      description: `Compatibility board discovery using canonical ${canonical3} permissions.`,
+      inputSchema: {
+        type: "object",
+        properties,
+        required: [name2 === "pio_list_boards" ? "query" : "board_id"],
+        additionalProperties: false
+      },
+      handler: (args, context) => context.dispatch(name2, args)
+    });
+  }
+  return result;
+}
+
 // src/adapters/project-compat-registry.ts
 function withProjectCompatibility(base2) {
   const result = new Map(base2);
@@ -95181,15 +95412,15 @@ function withProjectCompatibility(base2) {
 init_zod();
 import path21 from "node:path";
 init_errors2();
-var text3 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
+var text4 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var scope = {
-  project_dir: text3.nullable().optional(),
-  approval_id: text3.optional()
+  project_dir: text4.nullable().optional(),
+  approval_id: text4.optional()
 };
 var schemas = {
   pio_project_envs: external_exports.object(scope).strict(),
-  pio_list_targets: external_exports.object({ ...scope, env: text3.nullable().optional() }).strict(),
-  pio_project_metadata: external_exports.object({ ...scope, env: text3.nullable().optional() }).strict()
+  pio_list_targets: external_exports.object({ ...scope, env: text4.nullable().optional() }).strict(),
+  pio_project_metadata: external_exports.object({ ...scope, env: text4.nullable().optional() }).strict()
 };
 async function mapProjectCompatibilityRequest(name2, input, defaults = {}) {
   if (!Object.hasOwn(schemas, name2))
@@ -95419,9 +95650,9 @@ function invalid2() {
     "PACKAGE_CONFIG_CONFLICT"
   );
 }
-function parse(text5) {
-  if (Buffer.byteLength(text5) > 1024 * 1024) invalid2();
-  const lines2 = text5.split(/\r?\n/);
+function parse(text6) {
+  if (Buffer.byteLength(text6) > 1024 * 1024) invalid2();
+  const lines2 = text6.split(/\r?\n/);
   const sections = /* @__PURE__ */ new Map();
   let section;
   let entry;
@@ -95456,7 +95687,7 @@ function parse(text5) {
   for (const section2 of sections.values())
     for (const entry2 of section2.entries.values())
       entry2.value = entry2.value.trim();
-  return { lines: lines2, sections, newline: text5.includes("\r\n") ? "\r\n" : "\n" };
+  return { lines: lines2, sections, newline: text6.includes("\r\n") ? "\r\n" : "\n" };
 }
 function mergePackageConfiguration(before, after, options) {
   const original = parse(before), updated = parse(after);
@@ -95628,9 +95859,9 @@ var mutationSchema = external_exports.object({
     "Package specification cannot be an option"
   )
 }).strict();
-function safeOutput(text5) {
+function safeOutput(text6) {
   return redactSecretsInText(
-    text5.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1[REDACTED]@")
+    text6.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1[REDACTED]@")
   );
 }
 async function readConfiguration(projectDir) {
@@ -95819,7 +96050,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
           after = merged;
         }
       }
-      const digest = (text5) => text5 === null ? null : crypto8.createHash("sha256").update(text5).digest("hex");
+      const digest = (text6) => text6 === null ? null : crypto8.createHash("sha256").update(text6).digest("hex");
       validatePolicy();
       const detail = action === "pkg_search" ? parsePackageSearch(safeOutput(result.stdout)) : action === "pkg_list" ? parsePackageList(safeOutput(result.stdout)) : void 0;
       const parsedOk = !detail || detail.parseStatus === "complete";
@@ -95852,28 +96083,28 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
 }
 
 // src/adapters/package-compat.ts
-var text4 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
+var text5 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var scope3 = {
-  project_dir: text4.nullable().optional(),
-  env: text4.nullable().optional(),
-  approval_id: text4.optional()
+  project_dir: text5.nullable().optional(),
+  env: text5.nullable().optional(),
+  approval_id: text5.optional()
 };
 var kind2 = external_exports.enum(["library", "platform", "tool"]).default("library");
 var schemas2 = {
   pio_pkg_search: external_exports.object({
-    query: text4,
+    query: text5,
     type: kind2,
     page: external_exports.number().int().min(1).max(1e5).default(1),
-    approval_id: text4.optional()
+    approval_id: text5.optional()
   }).strict(),
   pio_pkg_install: external_exports.object({
     ...scope3,
-    spec: text4.refine((value2) => value2.length > 0),
+    spec: text5.refine((value2) => value2.length > 0),
     type: kind2
   }).strict(),
   pio_pkg_uninstall: external_exports.object({
     ...scope3,
-    spec: text4.refine((value2) => value2.length > 0),
+    spec: text5.refine((value2) => value2.length > 0),
     type: kind2
   }).strict(),
   pio_pkg_list: external_exports.object(scope3).strict(),
@@ -103523,13 +103754,13 @@ init_errors2();
 init_errors2();
 var HEX = "0x[0-9a-fA-F]{6,16}";
 var MAX_ADDRESSES = 4096;
-function linesOf(text5) {
-  if (Buffer.byteLength(text5) > 1024 * 1024)
+function linesOf(text6) {
+  if (Buffer.byteLength(text6) > 1024 * 1024)
     throw new PlatformIOError(
       "Analysis text exceeds 1 MiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
-  const lines2 = text5.split(/\r?\n/);
+  const lines2 = text6.split(/\r?\n/);
   if (lines2.some((line) => line.length > 16384))
     throw new PlatformIOError(
       "Analysis line exceeds 16 KiB.",
@@ -103545,8 +103776,8 @@ function normalizeAddress(address) {
     );
   return `0x${BigInt(address).toString(16).padStart(8, "0")}`;
 }
-function extractCrash(text5, includeAllHex = false) {
-  const lines2 = linesOf(text5);
+function extractCrash(text6, includeAllHex = false) {
+  const lines2 = linesOf(text6);
   const evidence = {
     addresses: [],
     causes: [],
@@ -103554,7 +103785,7 @@ function extractCrash(text5, includeAllHex = false) {
     backtraceCorrupted: false
   };
   const seen = /* @__PURE__ */ new Set();
-  const riscvDump = /\b(?:MEPC|MTVAL|MCAUSE)\s*[:=]/i.test(text5);
+  const riscvDump = /\b(?:MEPC|MTVAL|MCAUSE)\s*[:=]/i.test(text6);
   let inBacktrace = false;
   let backtraceFrame = 0;
   const add = (raw, role, register = null, frame = null) => {
@@ -103623,8 +103854,8 @@ function extractCrash(text5, includeAllHex = false) {
 function parseAddr2line(output) {
   const frames = /* @__PURE__ */ new Map();
   let current;
-  const location = (text5) => {
-    const match = text5.match(
+  const location = (text6) => {
+    const match = text6.match(
       /^(.*?)\s+at\s+(.+):(\d+|\?)(?:\s+\(discriminator \d+\))?\s*$/
     );
     if (!match) return void 0;
@@ -103725,17 +103956,17 @@ function parseSizeTotals(output) {
   for (const line of lines(output)) {
     const match = line.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+/);
     if (!match) continue;
-    const [text5, data, bss, total] = match.slice(1).map(BigInt);
-    if (text5 + data + bss !== total)
+    const [text6, data, bss, total] = match.slice(1).map(BigInt);
+    if (text6 + data + bss !== total)
       throw new PlatformIOError(
         "Inconsistent GNU size totals.",
         "ANALYSIS_SIZE_INVALID"
       );
     rows.push({
-      text: exact(text5),
+      text: exact(text6),
       data: exact(data),
       bss: exact(bss),
-      flashEstimate: exact(text5 + data),
+      flashEstimate: exact(text6 + data),
       ramEstimate: exact(data + bss)
     });
   }
@@ -103897,9 +104128,9 @@ function executionOptions(context, deadline) {
     );
   return { cwd: context.projectDir, signal: context.signal, timeoutMs };
 }
-async function decodeFirmwareCrash(context, text5, includeAllHex = false) {
+async function decodeFirmwareCrash(context, text6, includeAllHex = false) {
   context.validatePolicy?.();
-  const crash = extractCrash(text5, includeAllHex);
+  const crash = extractCrash(text6, includeAllHex);
   if (!crash.addresses.length)
     return { ok: false, error: "no_addresses", ...crash, frames: [] };
   const deadline = Date.now() + 3e4;
@@ -103972,11 +104203,11 @@ async function filterSizeSymbols(symbols, pattern, deadline) {
     bytes = 0;
   };
   for (let index = 0; index < symbols.length; index++) {
-    for (const text5 of [symbols[index].name, symbols[index].file]) {
-      if (!text5) continue;
-      const length = Buffer.byteLength(text5);
+    for (const text6 of [symbols[index].name, symbols[index].file]) {
+      if (!text6) continue;
+      const length = Buffer.byteLength(text6);
       if (texts.length >= 4096 || bytes + length > 1024 * 1024) await flush();
-      texts.push(text5);
+      texts.push(text6);
       owners.push(index);
       bytes += length;
     }
@@ -104163,86 +104394,6 @@ async function firmwareSizeReport(input, caller = {}, onAuthorized) {
       return reportFirmwareSize(context, params.top, params.filter);
     }
   );
-}
-
-// src/tools/boards.ts
-init_zod();
-init_platformio();
-init_types2();
-init_validation();
-init_errors2();
-var PioBoardsOutputSchema = external_exports.union([
-  external_exports.array(BoardInfoSchema),
-  external_exports.record(external_exports.string(), external_exports.array(BoardInfoSchema))
-]);
-function normalizeBoardsOutput(output) {
-  if (Array.isArray(output)) {
-    return output;
-  }
-  const flattened = [];
-  for (const platformBoards of Object.values(
-    output
-  )) {
-    flattened.push(...platformBoards);
-  }
-  return flattened;
-}
-async function listBoards(filter) {
-  try {
-    const args = [];
-    if (filter && filter.trim().length > 0) {
-      args.push(filter.trim());
-    }
-    const result = await platformioExecutor.executeWithJsonOutput(
-      "boards",
-      args,
-      PioBoardsOutputSchema,
-      { timeout: 3e4 }
-    );
-    const allBoards = normalizeBoardsOutput(result);
-    if (filter && filter.trim().length > 0) {
-      const filterLower = filter.trim().toLowerCase();
-      return allBoards.filter(
-        (board) => board.id.toLowerCase().includes(filterLower) || board.name.toLowerCase().includes(filterLower) || board.platform.toLowerCase().includes(filterLower) || board.mcu.toLowerCase().includes(filterLower) || board.frameworks?.some(
-          (fw) => fw.toLowerCase().includes(filterLower)
-        )
-      );
-    }
-    return allBoards;
-  } catch (error2) {
-    throw new PlatformIOError(
-      `Failed to list boards${filter ? ` with filter '${filter}'` : ""}: ${error2}`,
-      "LIST_BOARDS_FAILED",
-      { filter }
-    );
-  }
-}
-async function getBoardInfo(boardId) {
-  if (!validateBoardId(boardId)) {
-    throw new BoardNotFoundError(boardId);
-  }
-  try {
-    const result = await platformioExecutor.executeWithJsonOutput(
-      "boards",
-      [boardId],
-      PioBoardsOutputSchema,
-      { timeout: 3e4 }
-    );
-    const board = normalizeBoardsOutput(result).find((b) => b.id === boardId);
-    if (board) {
-      return board;
-    }
-    throw new BoardNotFoundError(boardId);
-  } catch (error2) {
-    if (error2 instanceof BoardNotFoundError) {
-      throw error2;
-    }
-    throw new PlatformIOError(
-      `Failed to get board info for '${boardId}': ${error2}`,
-      "GET_BOARD_INFO_FAILED",
-      { boardId }
-    );
-  }
 }
 
 // src/index.ts
@@ -108883,25 +109034,25 @@ function collectPinUsages(projectDir) {
   const defineRegex = /^\s*#define\s+([A-Za-z_][A-Za-z0-9_]*)\s+(\d{1,2})\b/gm;
   const callRegex = /\b(pinMode|digitalWrite|analogWrite|analogRead)\s*\(\s*([A-Za-z_][A-Za-z0-9_]*|\d{1,2})/g;
   for (const absPath of srcFiles) {
-    let text5 = "";
+    let text6 = "";
     try {
-      text5 = fs40.readFileSync(absPath, "utf8");
+      text6 = fs40.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
     defineRegex.lastIndex = 0;
-    for (const match of text5.matchAll(defineRegex)) {
+    for (const match of text6.matchAll(defineRegex)) {
       macroMap.set(match[1], Number.parseInt(match[2], 10));
     }
   }
   for (const absPath of srcFiles) {
-    let text5 = "";
+    let text6 = "";
     try {
-      text5 = fs40.readFileSync(absPath, "utf8");
+      text6 = fs40.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
-    const lines2 = text5.split(/\r?\n/);
+    const lines2 = text6.split(/\r?\n/);
     for (const line of lines2) {
       callRegex.lastIndex = 0;
       for (const match of line.matchAll(callRegex)) {
@@ -109521,12 +109672,12 @@ function ensureStructuredToolResult(toolName, response) {
   if (response.structuredContent) {
     return response;
   }
-  const text5 = response.content?.find(
+  const text6 = response.content?.find(
     (item) => item.type === "text" && typeof item.text === "string"
   )?.text;
-  let data = text5;
+  let data = text6;
   try {
-    data = text5 ? JSON.parse(text5) : void 0;
+    data = text6 ? JSON.parse(text6) : void 0;
   } catch {
   }
   const record2 = typeof data === "object" && data !== null ? data : void 0;
@@ -110887,7 +111038,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_list_targets"
   ].includes(name2);
   const dependencyCompatibility = name2 === "pio_deps_check";
-  const compatibilityTool = packageCompatibility || projectCompatibility || dependencyCompatibility;
+  const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
+    name2
+  );
+  const compatibilityTool = packageCompatibility || projectCompatibility || dependencyCompatibility || boardCompatibility;
   const projectInspection = [
     "project_envs",
     "project_metadata",
@@ -110929,7 +111083,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const result = await mcpContext.run(
         { activityId, targetProjectDir },
         () => registeredTool.handler(args, {
-          dispatch: async (tool, parameters) => tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
+          dispatch: async (tool, parameters) => tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (boardCompatibility ? executeBoardCompatibility : dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
             tool,
             parameters,
             {
@@ -111742,7 +111896,9 @@ async function main() {
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
     toolRegistry = withDependencyCompatibility(
-      withProjectCompatibility(withPackageCompatibility(toolRegistry))
+      withBoardCompatibility(
+        withProjectCompatibility(withPackageCompatibility(toolRegistry))
+      )
     );
   }
   const subcommand = cliArgs.find((a) => !a.startsWith("--"));

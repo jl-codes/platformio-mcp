@@ -47,6 +47,11 @@ export interface BoardInfo {
   fcpu?: number; // Optional CPU frequency in Hz
   rom?: number; // Optional ROM size in bytes
   frameworks?: string[]; // List of supported software frameworks (e.g., 'arduino', 'espidf')
+  connectivity?: string[]; // Catalog connectivity hints, not confirmed device identity
+  debug?: {
+    tools?: Record<string, { default?: boolean; [key: string]: unknown }>;
+    [key: string]: unknown;
+  } | null; // Catalog debugger metadata
   vendor?: string; // Board manufacturer or vendor
   url?: string; // URL to the board's documentation or landing page
 }
@@ -67,6 +72,16 @@ export const BoardInfoSchema = z.object({
   frameworks: z.array(z.string()).optional(),
   vendor: z.string().optional(),
   url: z.string().optional(),
+  connectivity: z.array(z.string()).optional(),
+  debug: z
+    .object({
+      tools: z
+        .record(z.object({ default: z.boolean().optional() }).passthrough())
+        .optional(),
+    })
+    .passthrough()
+    .nullable()
+    .optional(),
 });
 
 /**
@@ -502,7 +517,12 @@ export const RunTestsParamsSchema = z.object({
     .string()
     .optional()
     .describe("Specific environment to test (from platformio.ini)"),
-  compileOnly: z.boolean().optional().describe("Build tests without uploading or executing them. Always enforced by the build_only profile."),
+  compileOnly: z
+    .boolean()
+    .optional()
+    .describe(
+      "Build tests without uploading or executing them. Always enforced by the build_only profile.",
+    ),
   background: z
     .boolean()
     .optional()
@@ -1030,8 +1050,16 @@ export interface AgentGetLastReportResult {
  * Effective policy status payload returned by `get_policy_status`.
  */
 export interface PolicyStatusResult {
-  serverPolicy: { enforcement: "platformio-mcp"; valid: boolean; digest?: string };
-  hostPolicy: { enforcement: "external"; effectivePermissions: "unknown"; message: string };
+  serverPolicy: {
+    enforcement: "platformio-mcp";
+    valid: boolean;
+    digest?: string;
+  };
+  hostPolicy: {
+    enforcement: "external";
+    effectivePermissions: "unknown";
+    message: string;
+  };
 
   projectEnrollment?: { enrolled: boolean; digest: string }; // Exact project policy enrollment state
 

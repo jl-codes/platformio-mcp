@@ -17,6 +17,10 @@ import {
 } from "./adapters/dependency-compat.js";
 import { inspectDependencies } from "./tools/dependency-inspection.js";
 import { compatibilityErrorResult } from "./adapters/compatibility-error.js";
+import {
+  executeBoardCompatibility,
+  withBoardCompatibility,
+} from "./adapters/board-compat.js";
 import { withProjectCompatibility } from "./adapters/project-compat-registry.js";
 import { executeProjectCompatibility } from "./adapters/project-compat.js";
 import { parseCompatibilityLaunch } from "./adapters/compatibility-mode.js";
@@ -1550,8 +1554,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_list_targets",
   ].includes(name);
   const dependencyCompatibility = name === "pio_deps_check";
+  const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
+    name,
+  );
   const compatibilityTool =
-    packageCompatibility || projectCompatibility || dependencyCompatibility;
+    packageCompatibility ||
+    projectCompatibility ||
+    dependencyCompatibility ||
+    boardCompatibility;
   const projectInspection = [
     "project_envs",
     "project_metadata",
@@ -1608,11 +1618,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               tool === "deps_check"
                 ? inspectDependencies(parameters, caller, onAuthorized)
                 : compatibilityTool
-                  ? (dependencyCompatibility
-                      ? executeDependencyCompatibility
-                      : projectCompatibility
-                        ? executeProjectCompatibility
-                        : executePackageCompatibility)(
+                  ? (boardCompatibility
+                      ? executeBoardCompatibility
+                      : dependencyCompatibility
+                        ? executeDependencyCompatibility
+                        : projectCompatibility
+                          ? executeProjectCompatibility
+                          : executePackageCompatibility)(
                       tool,
                       parameters,
                       {
@@ -2569,7 +2581,9 @@ async function main() {
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
     toolRegistry = withDependencyCompatibility(
-      withProjectCompatibility(withPackageCompatibility(toolRegistry)),
+      withBoardCompatibility(
+        withProjectCompatibility(withPackageCompatibility(toolRegistry)),
+      ),
     );
   }
   const subcommand = cliArgs.find((a) => !a.startsWith("--"));

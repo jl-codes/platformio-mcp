@@ -12,6 +12,8 @@ The heap, stack, and generic memory label patterns in `src/core/memory-telemetry
 from the pinned reference `parsers.py`, with bounded numeric parsing, explicit
 word-size handling, and source-order observations.
 
+Board compatibility filtering, compact fields and summaries in `src/adapters/board-compat.ts` are adapted from the pinned reference `project.py` and use this project's canonical catalog and permission dispatcher.
+
 The pinned reference license follows:
 
 MIT License
