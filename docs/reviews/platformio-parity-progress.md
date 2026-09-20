@@ -1035,3 +1035,7 @@ Added deterministic layout comparison including flag changes, capacity/OTA/NVS/c
 ### Public offline partition inspection
 
 Connected bounded artifact inspection to canonical partition_table and partition-table CLI with strict arguments, shared get_project_config authorization, concrete action denials and policy revision checks. Supplied comparison mismatches make the public result unsuccessful. Updated tool inventories and plugin coverage. Nineteen focused registry/manifest checks, three permission cases and TypeScript validation passed. The source now exposes 56 canonical tools and 31 optional aliases; pio_partition_table is deliberately not advertised until its project resolution and device-read contract exists. Full PAR acceptance remains incomplete.
+
+### Partition location evidence
+
+Computed environment reports now preserve board_build.partitions, board_upload.partition_table_offset, board_upload.flash_size and board_build.mcu. Added bounded sdkconfig offset extraction, exact normalized flash-image path matching and generation/upload conflict rejection. Verified the upload override and SDK setting against the official PlatformIO platform-espressif32 v6.9.0 ESP-IDF builder (https://github.com/platformio/platform-espressif32/blob/v6.9.0/builder/frameworks/espidf.py). Nineteen focused location/project-inspection checks and TypeScript passed. The new resolution helpers still need orchestration into automatic project partition inspection; explicit offline inspection remains functional.
