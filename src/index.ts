@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { startCoredumpRetentionCleanup } from "./core/analysis/esp-coredump-retention.js";
 import { executeCoredump } from "./tools/coredump.js";
 import { executePartitionCompatibility } from "./adapters/partition-compat.js";
 import { executePartitionTable } from "./tools/partition-table.js";
@@ -2795,6 +2796,11 @@ async function main() {
 
   // Fall through to default MCP stdio server boot
   // ---------------------------------------------------------------------------
+
+  const stopRetentionCleanup = await startCoredumpRetentionCleanup((code) => {
+    void logDiag("Core-dump retention cleanup requires attention: " + code);
+  });
+  registerShutdownTask(stopRetentionCleanup);
 
   // Check if PlatformIO is installed
   let isInstalled = false;

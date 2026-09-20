@@ -1198,3 +1198,8 @@ Added private managed storage with a maximum of 32 objects at 16 MiB each, seria
 
 Added retainDump to MCP and CLI with mutual exclusion against explicit outPath, device-only validation, and the same export preflight as explicit saving. Thirteen existing policy/storage cases passed, then the expanded four-case export-policy suite confirmed both save modes deny before acquisition. TypeScript and lint passed; runtime rebuilt. The reference adapter and startup cleanup wiring remain unfinished; live retention expiry is not claimed while the server is stopped.
 
+
+### Retention restart lifecycle
+
+MCP startup now sweeps expired managed dumps and runs non-overlapping minute sweeps while active, with a coordinated shutdown hook. Cleanup failures emit bounded diagnostic codes and are retried by subsequent sweeps; absent stores are not created by startup cleanup. Five focused filesystem/lifecycle cases, lint and TypeScript passed; runtime rebuilt. The reference adapter and remaining full-parity acceptance are still unfinished.
+

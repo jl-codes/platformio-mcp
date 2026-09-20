@@ -92641,10 +92641,6 @@ var require_ip_address = __commonJS({
   }
 });
 
-// src/tools/coredump.ts
-import fs40 from "node:fs/promises";
-import { createHash as createHash9 } from "node:crypto";
-
 // src/core/analysis/esp-coredump-retention.ts
 var import_proper_lockfile = __toESM(require_proper_lockfile(), 1);
 init_paths();
@@ -93325,6 +93321,43 @@ async function retainEspCoredump(input, root = ROOT, now = Date.now()) {
     }
   });
 }
+async function startCoredumpRetentionCleanup(reportFailure, root = ROOT) {
+  let pending = null;
+  const sweep = () => {
+    if (pending) return pending;
+    pending = (async () => {
+      try {
+        try {
+          await fs4.access(root);
+        } catch (error2) {
+          if (error2.code === "ENOENT") return;
+          throw error2;
+        }
+        await pruneRetainedEspCoredumps(root);
+      } catch (error2) {
+        reportFailure(
+          error2 instanceof PlatformIOError ? error2.code ?? "COREDUMP_CLEANUP_FAILED" : "COREDUMP_CLEANUP_FAILED"
+        );
+      }
+    })().finally(() => {
+      pending = null;
+    });
+    return pending;
+  };
+  await sweep();
+  const timer = setInterval(() => {
+    void sweep();
+  }, 6e4);
+  timer.unref();
+  return async () => {
+    clearInterval(timer);
+    await pending;
+  };
+}
+
+// src/tools/coredump.ts
+import fs40 from "node:fs/promises";
+import { createHash as createHash9 } from "node:crypto";
 
 // src/core/analysis/esp-coredump-export.ts
 init_errors();
@@ -120898,6 +120931,10 @@ async function main() {
     printCliHelp();
     process.exit(1);
   }
+  const stopRetentionCleanup = await startCoredumpRetentionCleanup((code) => {
+    void logDiagnostic("Core-dump retention cleanup requires attention: " + code);
+  });
+  registerShutdownTask(stopRetentionCleanup);
   let isInstalled = false;
   try {
     isInstalled = await checkPlatformIOInstalled();

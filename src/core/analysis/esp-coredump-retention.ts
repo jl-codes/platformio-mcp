@@ -145,3 +145,43 @@ export async function retainEspCoredump(
     }
   });
 }
+
+/** Sweep on server startup and once per minute; report cleanup failures and retry without overlapping sweeps. */
+export async function startCoredumpRetentionCleanup(
+  reportFailure: (code: string) => void,
+  root = ROOT,
+): Promise<() => Promise<void>> {
+  let pending: Promise<void> | null = null;
+  const sweep = () => {
+    if (pending) return pending;
+    pending = (async () => {
+      try {
+        try {
+          await fs.access(root);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+          throw error;
+        }
+        await pruneRetainedEspCoredumps(root);
+      } catch (error) {
+        reportFailure(
+          error instanceof PlatformIOError
+            ? (error.code ?? "COREDUMP_CLEANUP_FAILED")
+            : "COREDUMP_CLEANUP_FAILED",
+        );
+      }
+    })().finally(() => {
+      pending = null;
+    });
+    return pending;
+  };
+  await sweep();
+  const timer = setInterval(() => {
+    void sweep();
+  }, 60000);
+  timer.unref();
+  return async () => {
+    clearInterval(timer);
+    await pending;
+  };
+}
