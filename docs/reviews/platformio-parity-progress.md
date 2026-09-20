@@ -999,3 +999,7 @@ Added executeNamedTarget with strict inputs, exact effect authorization, revisio
 ### Named-target serial selection
 
 The target service now preflights effect policy, resolves omitted serial destinations through separately authorized project configuration/device discovery, and binds the selected environment/port to final execution authorization. It uses the configured upload port or one likely board and rejects ambiguous/missing candidates rather than selecting the first device. Nine focused workflow/selection checks and TypeScript passed. Network/glob/probe destinations, immutable artifact binding, public registration and complete reference error presentation remain unfinished; PAR-35 is not complete.
+
+### Scoped target cleanup acceptance
+
+Extended workflow regression coverage through the real policy/approval service with isolated operator storage outside each test project. An approved filesystem target refuses a held monitor by default; stop_open_sessions closes only the supplied owner capability's session; cleanupPending prevents buildTarget; confirmed closure forwards the same selected port into argv and endpoint custody. Twelve focused workflow checks passed. This is synthetic transport acceptance, not physical-device or public-MCP parity.

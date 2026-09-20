@@ -9,6 +9,7 @@ import {
 } from "../src/tools/run-target.js";
 import { executeProjectInspection } from "../src/tools/project-inspection.js";
 import { listDevicesCore } from "../src/core/devices.js";
+import { approveRequest } from "../src/core/policy/approvals.js";
 import { buildTarget } from "../src/tools/build.js";
 import { SerialClientContext } from "../src/adapters/serial-client.js";
 vi.mock("../src/tools/project-inspection.js", () => ({
@@ -36,8 +37,11 @@ vi.mock("../src/utils/command-log.js", () => ({
   retainCommandLog: vi.fn(async () => "retained.log"),
 }));
 let project: string;
+let operator: string;
 beforeEach(() => {
   project = fs.mkdtempSync(path.join(os.tmpdir(), "pio-run-target-"));
+  operator = fs.mkdtempSync(path.join(os.tmpdir(), "pio-target-operator-"));
+  vi.stubEnv("PIO_MCP_DATA_DIR", operator);
   fs.writeFileSync(
     path.join(project, "platformio.ini"),
     "[env:native]\nplatform=native\n",
@@ -61,7 +65,11 @@ beforeEach(() => {
     },
   );
 });
-afterEach(() => fs.rmSync(project, { recursive: true, force: true }));
+afterEach(() => {
+  vi.unstubAllEnvs();
+  fs.rmSync(operator, { recursive: true, force: true });
+  fs.rmSync(project, { recursive: true, force: true });
+});
 it("executes a permitted named build and retains the reference result shape", async () => {
   const client = { run: vi.fn() } as unknown as SerialClientContext;
   const result = await executeNamedTarget(
@@ -145,3 +153,76 @@ it("resolves one likely board when no upload port is configured", async () => {
     resolveTargetSerialSelection(project, undefined, {}, {}),
   ).resolves.toEqual({ environment: "native", port: "COM9" });
 });
+
+it.each([
+  [false, false, "TARGET_PORT_BUSY"],
+  [true, true, "DEVICE_CLEANUP_PENDING"],
+  [true, false, null],
+] as const)(
+  "handles monitor cleanup enabled=%s pending=%s",
+  async (stopOpen, cleanupPending, code) => {
+    fs.writeFileSync(
+      path.join(project, ".pio-mcp-policy.json"),
+      JSON.stringify({
+        profile: "lab_runner",
+        overrides: { audit_all_agent_actions: false },
+      }),
+    );
+    const stop = vi.fn(async () => ({ cleanupPending }));
+    const service = {
+      sessions: {
+        list: () => [
+          {
+            sessionId: "owned",
+            path: "COM9",
+            projectDir: project,
+            state: "open",
+            cleanupPending: false,
+          },
+        ],
+        stop,
+      },
+    };
+    const owner = {};
+    const client = {
+      run: async (
+        _context: unknown,
+        execute: (service: unknown, owner: unknown) => Promise<unknown>,
+      ) => execute(service, owner),
+    } as unknown as SerialClientContext;
+    const request = {
+      target: "uploadfs",
+      project_dir: project,
+      upload_port: "COM9",
+      stop_open_sessions: stopOpen,
+    };
+    const decision = await executeNamedTarget(request, client).catch(
+      (error) => error,
+    );
+    expect(decision.code).toBe("APPROVAL_REQUIRED");
+    const approvalId = decision.context.policyDecision.approvalId;
+    approveRequest(approvalId);
+    const operation = executeNamedTarget(
+      { ...request, approval_id: approvalId },
+      client,
+    );
+    if (code) {
+      await expect(operation).rejects.toMatchObject({ code });
+      expect(buildTarget).not.toHaveBeenCalled();
+    } else {
+      await expect(operation).resolves.toMatchObject({
+        ok: true,
+        stopped_sessions: ["owned"],
+      });
+      expect(buildTarget).toHaveBeenCalledWith(
+        expect.any(String),
+        "uploadfs",
+        undefined,
+        false,
+        expect.objectContaining({ uploadPort: "COM9", serialPort: "COM9" }),
+      );
+    }
+    expect(stop).toHaveBeenCalledTimes(stopOpen ? 1 : 0);
+    if (stopOpen) expect(stop).toHaveBeenCalledWith(owner, "owned");
+  },
+);
