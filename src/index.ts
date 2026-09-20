@@ -10,6 +10,10 @@
  * - CallToolRequestSchema handler: Routes tool requests to their respective backend logic.
  */
 
+import {
+  executeDependencyCompatibility,
+  withDependencyCompatibility,
+} from "./adapters/dependency-compat.js";
 import { inspectDependencies } from "./tools/dependency-inspection.js";
 import { compatibilityErrorResult } from "./adapters/compatibility-error.js";
 import { withProjectCompatibility } from "./adapters/project-compat-registry.js";
@@ -1544,7 +1548,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_project_metadata",
     "pio_list_targets",
   ].includes(name);
-  const compatibilityTool = packageCompatibility || projectCompatibility;
+  const dependencyCompatibility = name === "pio_deps_check";
+  const compatibilityTool =
+    packageCompatibility || projectCompatibility || dependencyCompatibility;
   const projectInspection = [
     "project_envs",
     "project_metadata",
@@ -1601,9 +1607,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               tool === "deps_check"
                 ? inspectDependencies(parameters, caller, onAuthorized)
                 : compatibilityTool
-                  ? (projectCompatibility
-                      ? executeProjectCompatibility
-                      : executePackageCompatibility)(
+                  ? (dependencyCompatibility
+                      ? executeDependencyCompatibility
+                      : projectCompatibility
+                        ? executeProjectCompatibility
+                        : executePackageCompatibility)(
                       tool,
                       parameters,
                       {
@@ -2559,8 +2567,8 @@ async function main() {
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
-    toolRegistry = withProjectCompatibility(
-      withPackageCompatibility(toolRegistry),
+    toolRegistry = withDependencyCompatibility(
+      withProjectCompatibility(withPackageCompatibility(toolRegistry)),
     );
   }
   const subcommand = cliArgs.find((a) => !a.startsWith("--"));

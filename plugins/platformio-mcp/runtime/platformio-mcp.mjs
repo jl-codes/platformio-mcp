@@ -48,352 +48,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// src/utils/errors.ts
-function formatPlatformIOError(error2) {
-  if (error2 instanceof PlatformIONotInstalledError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Install PlatformIO Core CLI: https://docs.platformio.org/en/latest/core/installation.html
-2. Ensure 'pio' or 'platformio' is in your system PATH
-3. Try running: pip install platformio`;
-  }
-  if (error2 instanceof BoardNotFoundError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Check board ID spelling (case-sensitive)
-2. List available boards with: pio boards
-3. Search for your board at: https://docs.platformio.org/en/latest/boards/`;
-  }
-  if (error2 instanceof ProjectInitError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Ensure the target directory exists and is writable
-2. Verify the board ID is correct
-3. Check that the framework is supported for this board`;
-  }
-  if (error2 instanceof BuildError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Check your source code for syntax errors
-2. Ensure all required libraries are installed
-3. Verify platformio.ini configuration is correct
-4. Try cleaning the project: pio run -t clean`;
-  }
-  if (error2 instanceof UploadError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Ensure the device is connected and powered
-2. Check USB cable and drivers
-3. Verify the correct port is specified
-4. Try resetting the device
-5. Check that no other programs are using the serial port`;
-  }
-  if (error2 instanceof LibraryError) {
-    return `${error2.message}
-
-Troubleshooting:
-1. Check library name spelling
-2. Verify internet connection
-3. Try updating library registry: pio lib update`;
-  }
-  if (error2 instanceof PlatformIOError) {
-    let message = error2.message;
-    if (error2.context) {
-      message += "\n\nContext: " + JSON.stringify(error2.context, null, 2);
-    }
-    return message;
-  }
-  if (error2 instanceof Error) {
-    return error2.message;
-  }
-  return String(error2);
-}
-function parseStderrErrors(stderr) {
-  const errors = [];
-  const lines2 = stderr.split("\n");
-  for (const line of lines2) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (trimmed.includes("error:") || trimmed.includes("Error:") || trimmed.includes("ERROR:") || trimmed.includes("fatal:") || trimmed.includes("Failed")) {
-      errors.push(trimmed);
-    }
-  }
-  return errors;
-}
-function parseStructuredBuildErrors(log) {
-  if (!log) return [];
-  const out = [];
-  const lines2 = log.split(/\r?\n/);
-  const reMissingHeader = /^(.*?):(\d+)(?::\d+)?:\s*fatal error:\s*([^:]+?):\s*No such file or directory/i;
-  const reSyntax = /^(.*?):(\d+)(?::\d+)?:\s*error:\s*(.+)$/i;
-  const reUndefRef = /undefined reference to\s+[`']?([^'"`\s]+)[`']?/i;
-  const reMissingIni = /(platformio\.ini.*not (found|exist))|Project does not seem to be a PlatformIO Project/i;
-  const reMissingEnv = /UnknownEnvNames|environment.*not found|UndefinedEnvError/i;
-  const reLibMissing = /Library Manager:\s*(Warning|Error).*not found|LibraryNotFound/i;
-  const rePermission = /(EACCES|Permission denied|EPERM)/i;
-  const reToolchain = /(Could not install package|failed to download|PackageException)/i;
-  for (const line of lines2) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    let m;
-    if (m = reMissingHeader.exec(trimmed)) {
-      out.push({
-        category: "missing_header",
-        message: `Missing header: ${m[3]} (in ${m[1]}:${m[2]})`,
-        file: m[1],
-        line: Number(m[2]),
-        raw: trimmed
-      });
-      continue;
-    }
-    if (m = reUndefRef.exec(trimmed)) {
-      out.push({
-        category: "undefined_reference",
-        message: `Undefined reference to '${m[1]}' \u2014 symbol not linked.`,
-        raw: trimmed
-      });
-      continue;
-    }
-    if (m = reSyntax.exec(trimmed)) {
-      out.push({
-        category: "syntax",
-        message: `${m[3]} (in ${m[1]}:${m[2]})`,
-        file: m[1],
-        line: Number(m[2]),
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reMissingIni.test(trimmed)) {
-      out.push({
-        category: "missing_platformio_ini",
-        message: "platformio.ini missing or invalid \u2014 project is not initialized.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reMissingEnv.test(trimmed)) {
-      out.push({
-        category: "missing_environment",
-        message: "Requested environment is not defined in platformio.ini.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reLibMissing.test(trimmed)) {
-      out.push({
-        category: "missing_library",
-        message: "A required library is missing or could not be resolved.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (rePermission.test(trimmed)) {
-      out.push({
-        category: "permission",
-        message: "Permission denied accessing project / build artifacts.",
-        raw: trimmed
-      });
-      continue;
-    }
-    if (reToolchain.test(trimmed)) {
-      out.push({
-        category: "toolchain",
-        message: "Toolchain/package install failed \u2014 likely a network or registry issue.",
-        raw: trimmed
-      });
-      continue;
-    }
-  }
-  const seen = /* @__PURE__ */ new Set();
-  return out.filter((e) => {
-    const k = e.category + "|" + e.message;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-}
-function deriveNextSteps(errors, success) {
-  if (success) {
-    return [
-      "Build succeeded. Call upload_firmware (preferred over `pio run --target upload`) to flash the device.",
-      "Optionally call start_monitor to capture serial output, then query_logs to inspect it."
-    ];
-  }
-  const tips = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const e of errors) {
-    if (seen.has(e.category)) continue;
-    seen.add(e.category);
-    switch (e.category) {
-      case "missing_header":
-        tips.push(
-          "Header file not found \u2014 add the providing library to `lib_deps` in platformio.ini (search via `search_libraries`), then call `build_project` again."
-        );
-        break;
-      case "undefined_reference":
-        tips.push(
-          "Undefined linker reference \u2014 ensure the source/library that defines this symbol is present. If it's from a third-party library, add it to `lib_deps` and rebuild."
-        );
-        break;
-      case "syntax":
-        tips.push(
-          "Syntax error in source \u2014 open the indicated file:line, fix the offending statement, then call `build_project` again. Avoid re-issuing the same edit twice."
-        );
-        break;
-      case "missing_library":
-        tips.push(
-          "Library could not be resolved \u2014 verify the entry in `lib_deps`, run `search_libraries` to confirm the registry id, then rebuild."
-        );
-        break;
-      case "missing_platformio_ini":
-        tips.push(
-          "platformio.ini is missing or malformed \u2014 run `init_project` to regenerate the scaffold, then `build_project` again."
-        );
-        break;
-      case "missing_environment":
-        tips.push(
-          "Environment not declared in platformio.ini \u2014 call `get_project_config` to inspect available environments, then pass the correct `environment` argument to `build_project`."
-        );
-        break;
-      case "permission":
-        tips.push(
-          "Filesystem permission error \u2014 verify the project directory is writable and not held by another process; on macOS check that Terminal/IDE has Full Disk Access."
-        );
-        break;
-      case "toolchain":
-        tips.push(
-          "Toolchain/package install failed \u2014 check network access; if behind a proxy, configure PlatformIO accordingly, then rebuild."
-        );
-        break;
-      case "unknown":
-      default:
-        break;
-    }
-  }
-  if (tips.length === 0) {
-    tips.push(
-      "Build failed but no structured error was matched. Read the bottom of the build log for the actual gcc/clang error, then make the smallest targeted edit and call `build_project` again."
-    );
-  }
-  tips.push(
-    "Use the `build_project` MCP tool to compile \u2014 do NOT run `pio run` in a terminal; the MCP path integrates with the hardware lock, cache, and structured error parser."
-  );
-  return tips;
-}
-function isPlatformIONotFoundError(error2) {
-  if (error2 instanceof Error) {
-    const message = error2.message.toLowerCase();
-    return message.includes("enoent") || message.includes("not found") || message.includes("command not found") || message.includes("platformio") && message.includes("not recognized");
-  }
-  return false;
-}
-var PlatformIOError, PlatformIONotInstalledError, BoardNotFoundError, ProjectInitError, BuildError, UploadError, LibraryError, CommandTimeoutError;
-var init_errors = __esm({
-  "src/utils/errors.ts"() {
-    "use strict";
-    PlatformIOError = class extends Error {
-      constructor(message, code, context) {
-        super(message);
-        this.code = code;
-        this.context = context;
-        this.name = "PlatformIOError";
-        Error.captureStackTrace(this, this.constructor);
-      }
-      code;
-      context;
-    };
-    PlatformIONotInstalledError = class extends PlatformIOError {
-      constructor(message = "PlatformIO CLI is not installed or not found in PATH") {
-        super(message, "PLATFORMIO_NOT_INSTALLED");
-        this.name = "PlatformIONotInstalledError";
-      }
-    };
-    BoardNotFoundError = class extends PlatformIOError {
-      constructor(boardId) {
-        super(
-          `Board '${boardId}' not found in PlatformIO registry`,
-          "BOARD_NOT_FOUND",
-          { boardId }
-        );
-        this.name = "BoardNotFoundError";
-      }
-    };
-    ProjectInitError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "PROJECT_INIT_FAILED", context);
-        this.name = "ProjectInitError";
-      }
-    };
-    BuildError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "BUILD_FAILED", context);
-        this.name = "BuildError";
-      }
-    };
-    UploadError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "UPLOAD_FAILED", context);
-        this.name = "UploadError";
-      }
-    };
-    LibraryError = class extends PlatformIOError {
-      constructor(message, context) {
-        super(message, "LIBRARY_ERROR", context);
-        this.name = "LibraryError";
-      }
-    };
-    CommandTimeoutError = class extends PlatformIOError {
-      constructor(command, timeout) {
-        super(
-          `Command '${command}' timed out after ${timeout}ms`,
-          "COMMAND_TIMEOUT",
-          {
-            command,
-            timeout
-          }
-        );
-        this.name = "CommandTimeoutError";
-      }
-    };
-  }
-});
-
-// src/core/policy/redact.ts
-function redactSecretsInText(text4) {
-  let redacted = text4;
-  for (const pattern of secretPatterns) {
-    redacted = redacted.replace(pattern, replacement);
-  }
-  return redacted;
-}
-var secretPatterns, replacement;
-var init_redact = __esm({
-  "src/core/policy/redact.ts"() {
-    "use strict";
-    secretPatterns = [
-      /OPENAI_API_KEY=[^\s]+/gi,
-      /GITHUB_TOKEN=[^\s]+/gi,
-      /SUPABASE_KEY=[^\s]+/gi,
-      /AWS_SECRET_ACCESS_KEY=[^\s]+/gi,
-      /(?:wifi|wi-fi|wlan)[_-]?(?:password|pass|psk)\s*[:=]\s*[^\s,;]+/gi,
-      /(?:api[_-]?key|client[_-]?secret|provisioning[_-]?(?:key|secret))\s*[:=]\s*[^\s,;]+/gi,
-      /authorization\s*:\s*bearer\s+[^\s]+/gi,
-      /bearer\s+[a-z0-9._~+/=-]{12,}/gi,
-      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
-      /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gi,
-      /password\s*=\s*[^\s]+/gi,
-      /token\s*=\s*[^\s]+/gi
-    ];
-    replacement = "[REDACTED_SECRET]";
-  }
-});
-
 // node_modules/zod/v3/helpers/util.js
 var util, objectUtil, ZodParsedType, getParsedType;
 var init_util = __esm({
@@ -773,7 +427,7 @@ function getErrorMap() {
   return overrideErrorMap;
 }
 var overrideErrorMap;
-var init_errors2 = __esm({
+var init_errors = __esm({
   "node_modules/zod/v3/errors.js"() {
     init_en();
     overrideErrorMap = en_default;
@@ -803,7 +457,7 @@ function addIssueToContext(ctx, issueData) {
 var makeIssue, EMPTY_PATH, ParseStatus, INVALID, DIRTY, OK, isAborted, isDirty, isValid, isAsync;
 var init_parseUtil = __esm({
   "node_modules/zod/v3/helpers/parseUtil.js"() {
-    init_errors2();
+    init_errors();
     init_en();
     makeIssue = (params) => {
       const { data, path: path43, errorMaps, issueData } = params;
@@ -1008,30 +662,30 @@ function floatSafeRemainder(val, step) {
   const stepInt = Number.parseInt(step.toFixed(decCount).replace(".", ""));
   return valInt % stepInt / 10 ** decCount;
 }
-function deepPartialify(schema2) {
-  if (schema2 instanceof ZodObject) {
+function deepPartialify(schema3) {
+  if (schema3 instanceof ZodObject) {
     const newShape = {};
-    for (const key in schema2.shape) {
-      const fieldSchema = schema2.shape[key];
+    for (const key in schema3.shape) {
+      const fieldSchema = schema3.shape[key];
       newShape[key] = ZodOptional.create(deepPartialify(fieldSchema));
     }
     return new ZodObject({
-      ...schema2._def,
+      ...schema3._def,
       shape: () => newShape
     });
-  } else if (schema2 instanceof ZodArray) {
+  } else if (schema3 instanceof ZodArray) {
     return new ZodArray({
-      ...schema2._def,
-      type: deepPartialify(schema2.element)
+      ...schema3._def,
+      type: deepPartialify(schema3.element)
     });
-  } else if (schema2 instanceof ZodOptional) {
-    return ZodOptional.create(deepPartialify(schema2.unwrap()));
-  } else if (schema2 instanceof ZodNullable) {
-    return ZodNullable.create(deepPartialify(schema2.unwrap()));
-  } else if (schema2 instanceof ZodTuple) {
-    return ZodTuple.create(schema2.items.map((item) => deepPartialify(item)));
+  } else if (schema3 instanceof ZodOptional) {
+    return ZodOptional.create(deepPartialify(schema3.unwrap()));
+  } else if (schema3 instanceof ZodNullable) {
+    return ZodNullable.create(deepPartialify(schema3.unwrap()));
+  } else if (schema3 instanceof ZodTuple) {
+    return ZodTuple.create(schema3.items.map((item) => deepPartialify(item)));
   } else {
-    return schema2;
+    return schema3;
   }
 }
 function mergeValues(a, b) {
@@ -1110,7 +764,7 @@ var ParseInputLazyPath, handleResult, ZodType, cuidRegex, cuid2Regex, ulidRegex,
 var init_types = __esm({
   "node_modules/zod/v3/types.js"() {
     init_ZodError();
-    init_errors2();
+    init_errors();
     init_errorUtil();
     init_parseUtil();
     init_util();
@@ -2758,9 +2412,9 @@ var init_types = __esm({
         return this.min(1, message);
       }
     };
-    ZodArray.create = (schema2, params) => {
+    ZodArray.create = (schema3, params) => {
       return new ZodArray({
-        type: schema2,
+        type: schema3,
         minLength: null,
         maxLength: null,
         exactLength: null,
@@ -2981,8 +2635,8 @@ var init_types = __esm({
       //   }) as any;
       //   return merged;
       // }
-      setKey(key, schema2) {
-        return this.augment({ [key]: schema2 });
+      setKey(key, schema3) {
+        return this.augment({ [key]: schema3 });
       }
       // merge<Incoming extends AnyZodObject>(
       //   merging: Incoming
@@ -3390,10 +3044,10 @@ var init_types = __esm({
           status.dirty();
         }
         const items = [...ctx.data].map((item, itemIndex) => {
-          const schema2 = this._def.items[itemIndex] || this._def.rest;
-          if (!schema2)
+          const schema3 = this._def.items[itemIndex] || this._def.rest;
+          if (!schema3)
             return null;
-          return schema2._parse(new ParseInputLazyPath(ctx, item, ctx.path, itemIndex));
+          return schema3._parse(new ParseInputLazyPath(ctx, item, ctx.path, itemIndex));
         }).filter((x) => !!x);
         if (ctx.common.async) {
           return Promise.all(items).then((results) => {
@@ -3900,9 +3554,9 @@ var init_types = __esm({
         }));
       }
     };
-    ZodPromise.create = (schema2, params) => {
+    ZodPromise.create = (schema3, params) => {
       return new ZodPromise({
-        type: schema2,
+        type: schema3,
         typeName: ZodFirstPartyTypeKind.ZodPromise,
         ...processCreateParams(params)
       });
@@ -4030,17 +3684,17 @@ var init_types = __esm({
         util.assertNever(effect);
       }
     };
-    ZodEffects.create = (schema2, effect, params) => {
+    ZodEffects.create = (schema3, effect, params) => {
       return new ZodEffects({
-        schema: schema2,
+        schema: schema3,
         typeName: ZodFirstPartyTypeKind.ZodEffects,
         effect,
         ...processCreateParams(params)
       });
     };
-    ZodEffects.createWithPreprocess = (preprocess2, schema2, params) => {
+    ZodEffects.createWithPreprocess = (preprocess2, schema3, params) => {
       return new ZodEffects({
-        schema: schema2,
+        schema: schema3,
         effect: { type: "preprocess", transform: preprocess2 },
         typeName: ZodFirstPartyTypeKind.ZodEffects,
         ...processCreateParams(params)
@@ -4483,7 +4137,7 @@ __export(external_exports, {
 });
 var init_external = __esm({
   "node_modules/zod/v3/external.js"() {
-    init_errors2();
+    init_errors();
     init_parseUtil();
     init_typeAliases();
     init_util();
@@ -4497,6 +4151,352 @@ var init_zod = __esm({
   "node_modules/zod/index.js"() {
     init_external();
     init_external();
+  }
+});
+
+// src/utils/errors.ts
+function formatPlatformIOError(error2) {
+  if (error2 instanceof PlatformIONotInstalledError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Install PlatformIO Core CLI: https://docs.platformio.org/en/latest/core/installation.html
+2. Ensure 'pio' or 'platformio' is in your system PATH
+3. Try running: pip install platformio`;
+  }
+  if (error2 instanceof BoardNotFoundError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Check board ID spelling (case-sensitive)
+2. List available boards with: pio boards
+3. Search for your board at: https://docs.platformio.org/en/latest/boards/`;
+  }
+  if (error2 instanceof ProjectInitError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Ensure the target directory exists and is writable
+2. Verify the board ID is correct
+3. Check that the framework is supported for this board`;
+  }
+  if (error2 instanceof BuildError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Check your source code for syntax errors
+2. Ensure all required libraries are installed
+3. Verify platformio.ini configuration is correct
+4. Try cleaning the project: pio run -t clean`;
+  }
+  if (error2 instanceof UploadError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Ensure the device is connected and powered
+2. Check USB cable and drivers
+3. Verify the correct port is specified
+4. Try resetting the device
+5. Check that no other programs are using the serial port`;
+  }
+  if (error2 instanceof LibraryError) {
+    return `${error2.message}
+
+Troubleshooting:
+1. Check library name spelling
+2. Verify internet connection
+3. Try updating library registry: pio lib update`;
+  }
+  if (error2 instanceof PlatformIOError) {
+    let message = error2.message;
+    if (error2.context) {
+      message += "\n\nContext: " + JSON.stringify(error2.context, null, 2);
+    }
+    return message;
+  }
+  if (error2 instanceof Error) {
+    return error2.message;
+  }
+  return String(error2);
+}
+function parseStderrErrors(stderr) {
+  const errors = [];
+  const lines2 = stderr.split("\n");
+  for (const line of lines2) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.includes("error:") || trimmed.includes("Error:") || trimmed.includes("ERROR:") || trimmed.includes("fatal:") || trimmed.includes("Failed")) {
+      errors.push(trimmed);
+    }
+  }
+  return errors;
+}
+function parseStructuredBuildErrors(log) {
+  if (!log) return [];
+  const out = [];
+  const lines2 = log.split(/\r?\n/);
+  const reMissingHeader = /^(.*?):(\d+)(?::\d+)?:\s*fatal error:\s*([^:]+?):\s*No such file or directory/i;
+  const reSyntax = /^(.*?):(\d+)(?::\d+)?:\s*error:\s*(.+)$/i;
+  const reUndefRef = /undefined reference to\s+[`']?([^'"`\s]+)[`']?/i;
+  const reMissingIni = /(platformio\.ini.*not (found|exist))|Project does not seem to be a PlatformIO Project/i;
+  const reMissingEnv = /UnknownEnvNames|environment.*not found|UndefinedEnvError/i;
+  const reLibMissing = /Library Manager:\s*(Warning|Error).*not found|LibraryNotFound/i;
+  const rePermission = /(EACCES|Permission denied|EPERM)/i;
+  const reToolchain = /(Could not install package|failed to download|PackageException)/i;
+  for (const line of lines2) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let m;
+    if (m = reMissingHeader.exec(trimmed)) {
+      out.push({
+        category: "missing_header",
+        message: `Missing header: ${m[3]} (in ${m[1]}:${m[2]})`,
+        file: m[1],
+        line: Number(m[2]),
+        raw: trimmed
+      });
+      continue;
+    }
+    if (m = reUndefRef.exec(trimmed)) {
+      out.push({
+        category: "undefined_reference",
+        message: `Undefined reference to '${m[1]}' \u2014 symbol not linked.`,
+        raw: trimmed
+      });
+      continue;
+    }
+    if (m = reSyntax.exec(trimmed)) {
+      out.push({
+        category: "syntax",
+        message: `${m[3]} (in ${m[1]}:${m[2]})`,
+        file: m[1],
+        line: Number(m[2]),
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reMissingIni.test(trimmed)) {
+      out.push({
+        category: "missing_platformio_ini",
+        message: "platformio.ini missing or invalid \u2014 project is not initialized.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reMissingEnv.test(trimmed)) {
+      out.push({
+        category: "missing_environment",
+        message: "Requested environment is not defined in platformio.ini.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reLibMissing.test(trimmed)) {
+      out.push({
+        category: "missing_library",
+        message: "A required library is missing or could not be resolved.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (rePermission.test(trimmed)) {
+      out.push({
+        category: "permission",
+        message: "Permission denied accessing project / build artifacts.",
+        raw: trimmed
+      });
+      continue;
+    }
+    if (reToolchain.test(trimmed)) {
+      out.push({
+        category: "toolchain",
+        message: "Toolchain/package install failed \u2014 likely a network or registry issue.",
+        raw: trimmed
+      });
+      continue;
+    }
+  }
+  const seen = /* @__PURE__ */ new Set();
+  return out.filter((e) => {
+    const k = e.category + "|" + e.message;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+function deriveNextSteps(errors, success) {
+  if (success) {
+    return [
+      "Build succeeded. Call upload_firmware (preferred over `pio run --target upload`) to flash the device.",
+      "Optionally call start_monitor to capture serial output, then query_logs to inspect it."
+    ];
+  }
+  const tips = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const e of errors) {
+    if (seen.has(e.category)) continue;
+    seen.add(e.category);
+    switch (e.category) {
+      case "missing_header":
+        tips.push(
+          "Header file not found \u2014 add the providing library to `lib_deps` in platformio.ini (search via `search_libraries`), then call `build_project` again."
+        );
+        break;
+      case "undefined_reference":
+        tips.push(
+          "Undefined linker reference \u2014 ensure the source/library that defines this symbol is present. If it's from a third-party library, add it to `lib_deps` and rebuild."
+        );
+        break;
+      case "syntax":
+        tips.push(
+          "Syntax error in source \u2014 open the indicated file:line, fix the offending statement, then call `build_project` again. Avoid re-issuing the same edit twice."
+        );
+        break;
+      case "missing_library":
+        tips.push(
+          "Library could not be resolved \u2014 verify the entry in `lib_deps`, run `search_libraries` to confirm the registry id, then rebuild."
+        );
+        break;
+      case "missing_platformio_ini":
+        tips.push(
+          "platformio.ini is missing or malformed \u2014 run `init_project` to regenerate the scaffold, then `build_project` again."
+        );
+        break;
+      case "missing_environment":
+        tips.push(
+          "Environment not declared in platformio.ini \u2014 call `get_project_config` to inspect available environments, then pass the correct `environment` argument to `build_project`."
+        );
+        break;
+      case "permission":
+        tips.push(
+          "Filesystem permission error \u2014 verify the project directory is writable and not held by another process; on macOS check that Terminal/IDE has Full Disk Access."
+        );
+        break;
+      case "toolchain":
+        tips.push(
+          "Toolchain/package install failed \u2014 check network access; if behind a proxy, configure PlatformIO accordingly, then rebuild."
+        );
+        break;
+      case "unknown":
+      default:
+        break;
+    }
+  }
+  if (tips.length === 0) {
+    tips.push(
+      "Build failed but no structured error was matched. Read the bottom of the build log for the actual gcc/clang error, then make the smallest targeted edit and call `build_project` again."
+    );
+  }
+  tips.push(
+    "Use the `build_project` MCP tool to compile \u2014 do NOT run `pio run` in a terminal; the MCP path integrates with the hardware lock, cache, and structured error parser."
+  );
+  return tips;
+}
+function isPlatformIONotFoundError(error2) {
+  if (error2 instanceof Error) {
+    const message = error2.message.toLowerCase();
+    return message.includes("enoent") || message.includes("not found") || message.includes("command not found") || message.includes("platformio") && message.includes("not recognized");
+  }
+  return false;
+}
+var PlatformIOError, PlatformIONotInstalledError, BoardNotFoundError, ProjectInitError, BuildError, UploadError, LibraryError, CommandTimeoutError;
+var init_errors2 = __esm({
+  "src/utils/errors.ts"() {
+    "use strict";
+    PlatformIOError = class extends Error {
+      constructor(message, code, context) {
+        super(message);
+        this.code = code;
+        this.context = context;
+        this.name = "PlatformIOError";
+        Error.captureStackTrace(this, this.constructor);
+      }
+      code;
+      context;
+    };
+    PlatformIONotInstalledError = class extends PlatformIOError {
+      constructor(message = "PlatformIO CLI is not installed or not found in PATH") {
+        super(message, "PLATFORMIO_NOT_INSTALLED");
+        this.name = "PlatformIONotInstalledError";
+      }
+    };
+    BoardNotFoundError = class extends PlatformIOError {
+      constructor(boardId) {
+        super(
+          `Board '${boardId}' not found in PlatformIO registry`,
+          "BOARD_NOT_FOUND",
+          { boardId }
+        );
+        this.name = "BoardNotFoundError";
+      }
+    };
+    ProjectInitError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "PROJECT_INIT_FAILED", context);
+        this.name = "ProjectInitError";
+      }
+    };
+    BuildError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "BUILD_FAILED", context);
+        this.name = "BuildError";
+      }
+    };
+    UploadError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "UPLOAD_FAILED", context);
+        this.name = "UploadError";
+      }
+    };
+    LibraryError = class extends PlatformIOError {
+      constructor(message, context) {
+        super(message, "LIBRARY_ERROR", context);
+        this.name = "LibraryError";
+      }
+    };
+    CommandTimeoutError = class extends PlatformIOError {
+      constructor(command, timeout) {
+        super(
+          `Command '${command}' timed out after ${timeout}ms`,
+          "COMMAND_TIMEOUT",
+          {
+            command,
+            timeout
+          }
+        );
+        this.name = "CommandTimeoutError";
+      }
+    };
+  }
+});
+
+// src/core/policy/redact.ts
+function redactSecretsInText(text5) {
+  let redacted = text5;
+  for (const pattern of secretPatterns) {
+    redacted = redacted.replace(pattern, replacement);
+  }
+  return redacted;
+}
+var secretPatterns, replacement;
+var init_redact = __esm({
+  "src/core/policy/redact.ts"() {
+    "use strict";
+    secretPatterns = [
+      /OPENAI_API_KEY=[^\s]+/gi,
+      /GITHUB_TOKEN=[^\s]+/gi,
+      /SUPABASE_KEY=[^\s]+/gi,
+      /AWS_SECRET_ACCESS_KEY=[^\s]+/gi,
+      /(?:wifi|wi-fi|wlan)[_-]?(?:password|pass|psk)\s*[:=]\s*[^\s,;]+/gi,
+      /(?:api[_-]?key|client[_-]?secret|provisioning[_-]?(?:key|secret))\s*[:=]\s*[^\s,;]+/gi,
+      /authorization\s*:\s*bearer\s+[^\s]+/gi,
+      /bearer\s+[a-z0-9._~+/=-]{12,}/gi,
+      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
+      /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gi,
+      /password\s*=\s*[^\s]+/gi,
+      /token\s*=\s*[^\s]+/gi
+    ];
+    replacement = "[REDACTED_SECRET]";
   }
 });
 
@@ -6672,13 +6672,13 @@ async function execPioCommand(args, options = {}) {
     throw error2;
   }
 }
-function parsePioJsonOutput(output, schema2) {
+function parsePioJsonOutput(output, schema3) {
   if (!output || output.trim().length === 0) {
     throw new PlatformIOError("Empty output from PlatformIO command");
   }
   try {
     const parsed = JSON.parse(output);
-    return schema2.parse(parsed);
+    return schema3.parse(parsed);
   } catch (error2) {
     if (error2 instanceof external_exports.ZodError) {
       throw new PlatformIOError(
@@ -6759,7 +6759,7 @@ var init_platformio = __esm({
     init_zod();
     init_command_registry();
     init_mcp_context();
-    init_errors();
+    init_errors2();
     __filename2 = fileURLToPath2(import.meta.url);
     __dirname3 = path5.dirname(__filename2);
     DEFAULT_TIMEOUT = 3e5;
@@ -6845,7 +6845,7 @@ var init_platformio = __esm({
        * @param options - Operational execution directives.
        * @returns Parsed and validated JSON node entity.
        */
-      async executeWithJsonOutput(command, args, schema2, options) {
+      async executeWithJsonOutput(command, args, schema3, options) {
         const fullArgs = [...args];
         if (!fullArgs.includes("--json-output")) {
           fullArgs.push("--json-output");
@@ -6858,7 +6858,7 @@ var init_platformio = __esm({
             { stderr: result.stderr, exitCode: result.exitCode }
           );
         }
-        return parsePioJsonOutput(result.stdout, schema2);
+        return parsePioJsonOutput(result.stdout, schema3);
       }
       /**
        * Spawns a long-running PlatformIO command (e.g., monitor).
@@ -7669,7 +7669,7 @@ var require_createNode = __commonJS({
       if (value2 instanceof String || value2 instanceof Number || value2 instanceof Boolean || typeof BigInt !== "undefined" && value2 instanceof BigInt) {
         value2 = value2.valueOf();
       }
-      const { aliasDuplicateObjects, onAnchor, onTagObj, schema: schema2, sourceObjects } = ctx;
+      const { aliasDuplicateObjects, onAnchor, onTagObj, schema: schema3, sourceObjects } = ctx;
       let ref = void 0;
       if (aliasDuplicateObjects && value2 && typeof value2 === "object") {
         ref = sourceObjects.get(value2);
@@ -7683,7 +7683,7 @@ var require_createNode = __commonJS({
       }
       if (tagName?.startsWith("!!"))
         tagName = defaultTagPrefix + tagName.slice(2);
-      let tagObj = findTagObject(value2, tagName, schema2.tags);
+      let tagObj = findTagObject(value2, tagName, schema3.tags);
       if (!tagObj) {
         if (value2 && typeof value2.toJSON === "function") {
           value2 = value2.toJSON();
@@ -7694,7 +7694,7 @@ var require_createNode = __commonJS({
             ref.node = node2;
           return node2;
         }
-        tagObj = value2 instanceof Map ? schema2[identity.MAP] : Symbol.iterator in Object(value2) ? schema2[identity.SEQ] : schema2[identity.MAP];
+        tagObj = value2 instanceof Map ? schema3[identity.MAP] : Symbol.iterator in Object(value2) ? schema3[identity.SEQ] : schema3[identity.MAP];
       }
       if (onTagObj) {
         onTagObj(tagObj);
@@ -7720,7 +7720,7 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema2, path43, value2) {
+    function collectionFromPath(schema3, path43, value2) {
       let v = value2;
       for (let i = path43.length - 1; i >= 0; --i) {
         const k = path43[i];
@@ -7738,16 +7738,16 @@ var require_Collection = __commonJS({
         onAnchor: () => {
           throw new Error("This should not happen, please report a bug.");
         },
-        schema: schema2,
+        schema: schema3,
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
     var isEmptyPath = (path43) => path43 == null || typeof path43 === "object" && !!path43[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
-      constructor(type, schema2) {
+      constructor(type, schema3) {
         super(type);
         Object.defineProperty(this, "schema", {
-          value: schema2,
+          value: schema3,
           configurable: true,
           enumerable: false,
           writable: true
@@ -7758,11 +7758,11 @@ var require_Collection = __commonJS({
        *
        * @param schema - If defined, overwrites the original's schema
        */
-      clone(schema2) {
+      clone(schema3) {
         const copy = Object.create(Object.getPrototypeOf(this), Object.getOwnPropertyDescriptors(this));
-        if (schema2)
-          copy.schema = schema2;
-        copy.items = copy.items.map((it) => identity.isNode(it) || identity.isPair(it) ? it.clone(schema2) : it);
+        if (schema3)
+          copy.schema = schema3;
+        copy.items = copy.items.map((it) => identity.isNode(it) || identity.isPair(it) ? it.clone(schema3) : it);
         if (this.range)
           copy.range = this.range.slice();
         return copy;
@@ -7880,14 +7880,14 @@ var require_foldFlowLines = __commonJS({
     var FOLD_FLOW = "flow";
     var FOLD_BLOCK = "block";
     var FOLD_QUOTED = "quoted";
-    function foldFlowLines(text4, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
+    function foldFlowLines(text5, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
       if (!lineWidth || lineWidth < 0)
-        return text4;
+        return text5;
       if (lineWidth < minContentWidth)
         minContentWidth = 0;
       const endStep = Math.max(1 + minContentWidth, 1 + lineWidth - indent.length);
-      if (text4.length <= endStep)
-        return text4;
+      if (text5.length <= endStep)
+        return text5;
       const folds = [];
       const escapedFolds = {};
       let end = lineWidth - indent.length;
@@ -7904,14 +7904,14 @@ var require_foldFlowLines = __commonJS({
       let escStart = -1;
       let escEnd = -1;
       if (mode === FOLD_BLOCK) {
-        i = consumeMoreIndentedLines(text4, i, indent.length);
+        i = consumeMoreIndentedLines(text5, i, indent.length);
         if (i !== -1)
           end = i + endStep;
       }
-      for (let ch; ch = text4[i += 1]; ) {
+      for (let ch; ch = text5[i += 1]; ) {
         if (mode === FOLD_QUOTED && ch === "\\") {
           escStart = i;
-          switch (text4[i + 1]) {
+          switch (text5[i + 1]) {
             case "x":
               i += 3;
               break;
@@ -7928,12 +7928,12 @@ var require_foldFlowLines = __commonJS({
         }
         if (ch === "\n") {
           if (mode === FOLD_BLOCK)
-            i = consumeMoreIndentedLines(text4, i, indent.length);
+            i = consumeMoreIndentedLines(text5, i, indent.length);
           end = i + indent.length + endStep;
           split = void 0;
         } else {
           if (ch === " " && prev && prev !== " " && prev !== "\n" && prev !== "	") {
-            const next = text4[i + 1];
+            const next = text5[i + 1];
             if (next && next !== " " && next !== "\n" && next !== "	")
               split = i;
           }
@@ -7945,12 +7945,12 @@ var require_foldFlowLines = __commonJS({
             } else if (mode === FOLD_QUOTED) {
               while (prev === " " || prev === "	") {
                 prev = ch;
-                ch = text4[i += 1];
+                ch = text5[i += 1];
                 overflow = true;
               }
               const j = i > escEnd + 1 ? i - 2 : escStart - 1;
               if (escapedFolds[j])
-                return text4;
+                return text5;
               folds.push(j);
               escapedFolds[j] = true;
               end = j + endStep;
@@ -7965,39 +7965,39 @@ var require_foldFlowLines = __commonJS({
       if (overflow && onOverflow)
         onOverflow();
       if (folds.length === 0)
-        return text4;
+        return text5;
       if (onFold)
         onFold();
-      let res = text4.slice(0, folds[0]);
+      let res = text5.slice(0, folds[0]);
       for (let i2 = 0; i2 < folds.length; ++i2) {
         const fold = folds[i2];
-        const end2 = folds[i2 + 1] || text4.length;
+        const end2 = folds[i2 + 1] || text5.length;
         if (fold === 0)
           res = `
-${indent}${text4.slice(0, end2)}`;
+${indent}${text5.slice(0, end2)}`;
         else {
           if (mode === FOLD_QUOTED && escapedFolds[fold])
-            res += `${text4[fold]}\\`;
+            res += `${text5[fold]}\\`;
           res += `
-${indent}${text4.slice(fold + 1, end2)}`;
+${indent}${text5.slice(fold + 1, end2)}`;
         }
       }
       return res;
     }
-    function consumeMoreIndentedLines(text4, i, indent) {
+    function consumeMoreIndentedLines(text5, i, indent) {
       let end = i;
       let start = i + 1;
-      let ch = text4[start];
+      let ch = text5[start];
       while (ch === " " || ch === "	") {
         if (i < start + indent) {
-          ch = text4[++i];
+          ch = text5[++i];
         } else {
           do {
-            ch = text4[++i];
+            ch = text5[++i];
           } while (ch && ch !== "\n");
           end = i;
           start = i + 1;
-          ch = text4[start];
+          ch = text5[start];
         }
       }
       return end;
@@ -8714,12 +8714,12 @@ var require_Pair = __commonJS({
         this.key = key;
         this.value = value2;
       }
-      clone(schema2) {
+      clone(schema3) {
         let { key, value: value2 } = this;
         if (identity.isNode(key))
-          key = key.clone(schema2);
+          key = key.clone(schema3);
         if (identity.isNode(value2))
-          value2 = value2.clone(schema2);
+          value2 = value2.clone(schema3);
         return new _Pair(key, value2);
       }
       toJSON(_, ctx) {
@@ -8912,17 +8912,17 @@ var require_YAMLMap = __commonJS({
       static get tagName() {
         return "tag:yaml.org,2002:map";
       }
-      constructor(schema2) {
-        super(identity.MAP, schema2);
+      constructor(schema3) {
+        super(identity.MAP, schema3);
         this.items = [];
       }
       /**
        * A generic collection parsing method that can be extended
        * to other node classes that inherit from YAMLMap
        */
-      static from(schema2, obj, ctx) {
+      static from(schema3, obj, ctx) {
         const { keepUndefined, replacer } = ctx;
-        const map = new this(schema2);
+        const map = new this(schema3);
         const add = (key, value2) => {
           if (typeof replacer === "function")
             value2 = replacer.call(obj, key, value2);
@@ -8938,8 +8938,8 @@ var require_YAMLMap = __commonJS({
           for (const key of Object.keys(obj))
             add(key, obj[key]);
         }
-        if (typeof schema2.sortMapEntries === "function") {
-          map.items.sort(schema2.sortMapEntries);
+        if (typeof schema3.sortMapEntries === "function") {
+          map.items.sort(schema3.sortMapEntries);
         }
         return map;
       }
@@ -9046,7 +9046,7 @@ var require_map = __commonJS({
           onError("Expected a mapping for this tag");
         return map2;
       },
-      createNode: (schema2, obj, ctx) => YAMLMap.YAMLMap.from(schema2, obj, ctx)
+      createNode: (schema3, obj, ctx) => YAMLMap.YAMLMap.from(schema3, obj, ctx)
     };
     exports.map = map;
   }
@@ -9066,8 +9066,8 @@ var require_YAMLSeq = __commonJS({
       static get tagName() {
         return "tag:yaml.org,2002:seq";
       }
-      constructor(schema2) {
-        super(identity.SEQ, schema2);
+      constructor(schema3) {
+        super(identity.SEQ, schema3);
         this.items = [];
       }
       add(value2) {
@@ -9142,9 +9142,9 @@ var require_YAMLSeq = __commonJS({
           onComment
         });
       }
-      static from(schema2, obj, ctx) {
+      static from(schema3, obj, ctx) {
         const { replacer } = ctx;
-        const seq = new this(schema2);
+        const seq = new this(schema3);
         if (obj && Symbol.iterator in Object(obj)) {
           let i = 0;
           for (let it of obj) {
@@ -9184,7 +9184,7 @@ var require_seq = __commonJS({
           onError("Expected a sequence for this tag");
         return seq2;
       },
-      createNode: (schema2, obj, ctx) => YAMLSeq.YAMLSeq.from(schema2, obj, ctx)
+      createNode: (schema3, obj, ctx) => YAMLSeq.YAMLSeq.from(schema3, obj, ctx)
     };
     exports.seq = seq;
   }
@@ -9380,7 +9380,7 @@ var require_schema = __commonJS({
     var bool = require_bool();
     var float = require_float();
     var int2 = require_int();
-    var schema2 = [
+    var schema3 = [
       map.map,
       seq.seq,
       string3.string,
@@ -9393,7 +9393,7 @@ var require_schema = __commonJS({
       float.floatExp,
       float.float
     ];
-    exports.schema = schema2;
+    exports.schema = schema3;
   }
 });
 
@@ -9459,8 +9459,8 @@ var require_schema2 = __commonJS({
         return str;
       }
     };
-    var schema2 = [map.map, seq.seq].concat(jsonScalars, jsonError);
-    exports.schema = schema2;
+    var schema3 = [map.map, seq.seq].concat(jsonScalars, jsonError);
+    exports.schema = schema3;
   }
 });
 
@@ -9564,9 +9564,9 @@ ${cn.comment}` : item.comment;
         onError("Expected a sequence for this tag");
       return seq;
     }
-    function createPairs(schema2, iterable, ctx) {
+    function createPairs(schema3, iterable, ctx) {
       const { replacer } = ctx;
-      const pairs2 = new YAMLSeq.YAMLSeq(schema2);
+      const pairs2 = new YAMLSeq.YAMLSeq(schema3);
       pairs2.tag = "tag:yaml.org,2002:pairs";
       let i = 0;
       if (iterable && Symbol.iterator in Object(iterable))
@@ -9651,8 +9651,8 @@ var require_omap = __commonJS({
         }
         return map;
       }
-      static from(schema2, iterable, ctx) {
-        const pairs$1 = pairs.createPairs(schema2, iterable, ctx);
+      static from(schema3, iterable, ctx) {
+        const pairs$1 = pairs.createPairs(schema3, iterable, ctx);
         const omap2 = new this();
         omap2.items = pairs$1.items;
         return omap2;
@@ -9679,7 +9679,7 @@ var require_omap = __commonJS({
         }
         return Object.assign(new YAMLOMap(), pairs$1);
       },
-      createNode: (schema2, iterable, ctx) => YAMLOMap.from(schema2, iterable, ctx)
+      createNode: (schema3, iterable, ctx) => YAMLOMap.from(schema3, iterable, ctx)
     };
     exports.YAMLOMap = YAMLOMap;
     exports.omap = omap;
@@ -9854,8 +9854,8 @@ var require_set = __commonJS({
     var Pair = require_Pair();
     var YAMLMap = require_YAMLMap();
     var YAMLSet = class _YAMLSet extends YAMLMap.YAMLMap {
-      constructor(schema2) {
-        super(schema2);
+      constructor(schema3) {
+        super(schema3);
         this.tag = _YAMLSet.tag;
       }
       add(key) {
@@ -9899,9 +9899,9 @@ var require_set = __commonJS({
         else
           throw new Error("Set items must all have null values");
       }
-      static from(schema2, iterable, ctx) {
+      static from(schema3, iterable, ctx) {
         const { replacer } = ctx;
-        const set2 = new this(schema2);
+        const set2 = new this(schema3);
         if (iterable && Symbol.iterator in Object(iterable))
           for (let value2 of iterable) {
             if (typeof replacer === "function")
@@ -9918,7 +9918,7 @@ var require_set = __commonJS({
       nodeClass: YAMLSet,
       default: false,
       tag: "tag:yaml.org,2002:set",
-      createNode: (schema2, iterable, ctx) => YAMLSet.from(schema2, iterable, ctx),
+      createNode: (schema3, iterable, ctx) => YAMLSet.from(schema3, iterable, ctx),
       resolve(map, onError) {
         if (identity.isMap(map)) {
           if (map.hasAllNullValues(true))
@@ -10040,7 +10040,7 @@ var require_schema3 = __commonJS({
     var pairs = require_pairs();
     var set = require_set();
     var timestamp = require_timestamp();
-    var schema2 = [
+    var schema3 = [
       map.map,
       seq.seq,
       string3.string,
@@ -10063,7 +10063,7 @@ var require_schema3 = __commonJS({
       timestamp.floatTime,
       timestamp.timestamp
     ];
-    exports.schema = schema2;
+    exports.schema = schema3;
   }
 });
 
@@ -10078,7 +10078,7 @@ var require_tags = __commonJS({
     var bool = require_bool();
     var float = require_float();
     var int2 = require_int();
-    var schema2 = require_schema();
+    var schema3 = require_schema();
     var schema$1 = require_schema2();
     var binary = require_binary();
     var merge2 = require_merge();
@@ -10088,7 +10088,7 @@ var require_tags = __commonJS({
     var set = require_set();
     var timestamp = require_timestamp();
     var schemas3 = /* @__PURE__ */ new Map([
-      ["core", schema2.schema],
+      ["core", schema3.schema],
       ["failsafe", [map.map, seq.seq, string3.string]],
       ["json", schema$1.schema],
       ["yaml11", schema$2.schema],
@@ -10172,9 +10172,9 @@ var require_Schema = __commonJS({
     var tags = require_tags();
     var sortMapEntriesByKey = (a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
     var Schema = class _Schema {
-      constructor({ compat, customTags, merge: merge2, resolveKnownTags, schema: schema2, sortMapEntries, toStringDefaults }) {
+      constructor({ compat, customTags, merge: merge2, resolveKnownTags, schema: schema3, sortMapEntries, toStringDefaults }) {
         this.compat = Array.isArray(compat) ? tags.getTags(compat, "compat") : compat ? tags.getTags(null, compat) : null;
-        this.name = typeof schema2 === "string" && schema2 || "core";
+        this.name = typeof schema3 === "string" && schema3 || "core";
         this.knownTags = resolveKnownTags ? tags.coreKnownTags : {};
         this.tags = tags.getTags(customTags, this.name, merge2);
         this.toStringOptions = toStringDefaults ?? null;
@@ -11763,11 +11763,11 @@ var require_compose_scalar = __commonJS({
         scalar.comment = comment;
       return scalar;
     }
-    function findScalarTagByName(schema2, value2, tagName, tagToken, onError) {
+    function findScalarTagByName(schema3, value2, tagName, tagToken, onError) {
       if (tagName === "!")
-        return schema2[identity.SCALAR];
+        return schema3[identity.SCALAR];
       const matchWithTest = [];
-      for (const tag of schema2.tags) {
+      for (const tag of schema3.tags) {
         if (!tag.collection && tag.tag === tagName) {
           if (tag.default && tag.test)
             matchWithTest.push(tag);
@@ -11778,18 +11778,18 @@ var require_compose_scalar = __commonJS({
       for (const tag of matchWithTest)
         if (tag.test?.test(value2))
           return tag;
-      const kt = schema2.knownTags[tagName];
+      const kt = schema3.knownTags[tagName];
       if (kt && !kt.collection) {
-        schema2.tags.push(Object.assign({}, kt, { default: false, test: void 0 }));
+        schema3.tags.push(Object.assign({}, kt, { default: false, test: void 0 }));
         return kt;
       }
       onError(tagToken, "TAG_RESOLVE_FAILED", `Unresolved tag: ${tagName}`, tagName !== "tag:yaml.org,2002:str");
-      return schema2[identity.SCALAR];
+      return schema3[identity.SCALAR];
     }
-    function findScalarTagByTest({ atKey, directives, schema: schema2 }, value2, token, onError) {
-      const tag = schema2.tags.find((tag2) => (tag2.default === true || atKey && tag2.default === "key") && tag2.test?.test(value2)) || schema2[identity.SCALAR];
-      if (schema2.compat) {
-        const compat = schema2.compat.find((tag2) => tag2.default && tag2.test?.test(value2)) ?? schema2[identity.SCALAR];
+    function findScalarTagByTest({ atKey, directives, schema: schema3 }, value2, token, onError) {
+      const tag = schema3.tags.find((tag2) => (tag2.default === true || atKey && tag2.default === "key") && tag2.test?.test(value2)) || schema3[identity.SCALAR];
+      if (schema3.compat) {
+        const compat = schema3.compat.find((tag2) => tag2.default && tag2.test?.test(value2)) ?? schema3[identity.SCALAR];
         if (tag.tag !== compat.tag) {
           const ts = directives.tagString(tag.tag);
           const cs = directives.tagString(compat.tag);
@@ -15377,52 +15377,52 @@ var require_util = __commonJS({
       return hash;
     }
     exports.toHash = toHash;
-    function alwaysValidSchema(it, schema2) {
-      if (typeof schema2 == "boolean")
-        return schema2;
-      if (Object.keys(schema2).length === 0)
+    function alwaysValidSchema(it, schema3) {
+      if (typeof schema3 == "boolean")
+        return schema3;
+      if (Object.keys(schema3).length === 0)
         return true;
-      checkUnknownRules(it, schema2);
-      return !schemaHasRules(schema2, it.self.RULES.all);
+      checkUnknownRules(it, schema3);
+      return !schemaHasRules(schema3, it.self.RULES.all);
     }
     exports.alwaysValidSchema = alwaysValidSchema;
-    function checkUnknownRules(it, schema2 = it.schema) {
+    function checkUnknownRules(it, schema3 = it.schema) {
       const { opts, self } = it;
       if (!opts.strictSchema)
         return;
-      if (typeof schema2 === "boolean")
+      if (typeof schema3 === "boolean")
         return;
       const rules = self.RULES.keywords;
-      for (const key in schema2) {
+      for (const key in schema3) {
         if (!rules[key])
           checkStrictMode(it, `unknown keyword: "${key}"`);
       }
     }
     exports.checkUnknownRules = checkUnknownRules;
-    function schemaHasRules(schema2, rules) {
-      if (typeof schema2 == "boolean")
-        return !schema2;
-      for (const key in schema2)
+    function schemaHasRules(schema3, rules) {
+      if (typeof schema3 == "boolean")
+        return !schema3;
+      for (const key in schema3)
         if (rules[key])
           return true;
       return false;
     }
     exports.schemaHasRules = schemaHasRules;
-    function schemaHasRulesButRef(schema2, RULES) {
-      if (typeof schema2 == "boolean")
-        return !schema2;
-      for (const key in schema2)
+    function schemaHasRulesButRef(schema3, RULES) {
+      if (typeof schema3 == "boolean")
+        return !schema3;
+      for (const key in schema3)
         if (key !== "$ref" && RULES.all[key])
           return true;
       return false;
     }
     exports.schemaHasRulesButRef = schemaHasRulesButRef;
-    function schemaRefOrVal({ topSchemaRef, schemaPath }, schema2, keyword, $data) {
+    function schemaRefOrVal({ topSchemaRef, schemaPath }, schema3, keyword, $data) {
       if (!$data) {
-        if (typeof schema2 == "number" || typeof schema2 == "boolean")
-          return schema2;
-        if (typeof schema2 == "string")
-          return (0, codegen_1._)`${schema2}`;
+        if (typeof schema3 == "number" || typeof schema3 == "boolean")
+          return schema3;
+        if (typeof schema3 == "string")
+          return (0, codegen_1._)`${schema3}`;
       }
       return (0, codegen_1._)`${topSchemaRef}${schemaPath}${(0, codegen_1.getProperty)(keyword)}`;
     }
@@ -15703,10 +15703,10 @@ var require_boolSchema = __commonJS({
       message: "boolean schema is false"
     };
     function topBoolOrEmptySchema(it) {
-      const { gen, schema: schema2, validateName } = it;
-      if (schema2 === false) {
+      const { gen, schema: schema3, validateName } = it;
+      if (schema3 === false) {
         falseSchemaError(it, false);
-      } else if (typeof schema2 == "object" && schema2.$async === true) {
+      } else if (typeof schema3 == "object" && schema3.$async === true) {
         gen.return(names_1.default.data);
       } else {
         gen.assign((0, codegen_1._)`${validateName}.errors`, null);
@@ -15715,8 +15715,8 @@ var require_boolSchema = __commonJS({
     }
     exports.topBoolOrEmptySchema = topBoolOrEmptySchema;
     function boolOrEmptySchema(it, valid) {
-      const { gen, schema: schema2 } = it;
-      if (schema2 === false) {
+      const { gen, schema: schema3 } = it;
+      if (schema3 === false) {
         gen.var(valid, false);
         falseSchemaError(it);
       } else {
@@ -15778,18 +15778,18 @@ var require_applicability = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.shouldUseRule = exports.shouldUseGroup = exports.schemaHasRulesForType = void 0;
-    function schemaHasRulesForType({ schema: schema2, self }, type) {
+    function schemaHasRulesForType({ schema: schema3, self }, type) {
       const group = self.RULES.types[type];
-      return group && group !== true && shouldUseGroup(schema2, group);
+      return group && group !== true && shouldUseGroup(schema3, group);
     }
     exports.schemaHasRulesForType = schemaHasRulesForType;
-    function shouldUseGroup(schema2, group) {
-      return group.rules.some((rule) => shouldUseRule(schema2, rule));
+    function shouldUseGroup(schema3, group) {
+      return group.rules.some((rule) => shouldUseRule(schema3, rule));
     }
     exports.shouldUseGroup = shouldUseGroup;
-    function shouldUseRule(schema2, rule) {
+    function shouldUseRule(schema3, rule) {
       var _a;
-      return schema2[rule.keyword] !== void 0 || ((_a = rule.definition.implements) === null || _a === void 0 ? void 0 : _a.some((kwd) => schema2[kwd] !== void 0));
+      return schema3[rule.keyword] !== void 0 || ((_a = rule.definition.implements) === null || _a === void 0 ? void 0 : _a.some((kwd) => schema3[kwd] !== void 0));
     }
     exports.shouldUseRule = shouldUseRule;
   }
@@ -15811,17 +15811,17 @@ var require_dataType = __commonJS({
       DataType2[DataType2["Correct"] = 0] = "Correct";
       DataType2[DataType2["Wrong"] = 1] = "Wrong";
     })(DataType || (exports.DataType = DataType = {}));
-    function getSchemaTypes(schema2) {
-      const types = getJSONTypes(schema2.type);
+    function getSchemaTypes(schema3) {
+      const types = getJSONTypes(schema3.type);
       const hasNull = types.includes("null");
       if (hasNull) {
-        if (schema2.nullable === false)
+        if (schema3.nullable === false)
           throw new Error("type: null contradicts nullable: false");
       } else {
-        if (!types.length && schema2.nullable !== void 0) {
+        if (!types.length && schema3.nullable !== void 0) {
           throw new Error('"nullable" cannot be used without "type"');
         }
-        if (schema2.nullable === true)
+        if (schema3.nullable === true)
           types.push("null");
       }
       return types;
@@ -15953,8 +15953,8 @@ var require_dataType = __commonJS({
     }
     exports.checkDataTypes = checkDataTypes;
     var typeError = {
-      message: ({ schema: schema2 }) => `must be ${schema2}`,
-      params: ({ schema: schema2, schemaValue }) => typeof schema2 == "string" ? (0, codegen_1._)`{type: ${schema2}}` : (0, codegen_1._)`{type: ${schemaValue}}`
+      message: ({ schema: schema3 }) => `must be ${schema3}`,
+      params: ({ schema: schema3, schemaValue }) => typeof schema3 == "string" ? (0, codegen_1._)`{type: ${schema3}}` : (0, codegen_1._)`{type: ${schemaValue}}`
     };
     function reportTypeError(it) {
       const cxt = getTypeErrorContext(it);
@@ -15962,16 +15962,16 @@ var require_dataType = __commonJS({
     }
     exports.reportTypeError = reportTypeError;
     function getTypeErrorContext(it) {
-      const { gen, data, schema: schema2 } = it;
-      const schemaCode = (0, util_1.schemaRefOrVal)(it, schema2, "type");
+      const { gen, data, schema: schema3 } = it;
+      const schemaCode = (0, util_1.schemaRefOrVal)(it, schema3, "type");
       return {
         gen,
         keyword: "type",
         data,
-        schema: schema2.type,
+        schema: schema3.type,
         schemaCode,
         schemaValue: schemaCode,
-        parentSchema: schema2,
+        parentSchema: schema3,
         params: {},
         it
       };
@@ -16124,15 +16124,15 @@ var require_code2 = __commonJS({
     }
     exports.validateArray = validateArray;
     function validateUnion(cxt) {
-      const { gen, schema: schema2, keyword, it } = cxt;
-      if (!Array.isArray(schema2))
+      const { gen, schema: schema3, keyword, it } = cxt;
+      if (!Array.isArray(schema3))
         throw new Error("ajv implementation error");
-      const alwaysValid = schema2.some((sch) => (0, util_1.alwaysValidSchema)(it, sch));
+      const alwaysValid = schema3.some((sch) => (0, util_1.alwaysValidSchema)(it, sch));
       if (alwaysValid && !it.opts.unevaluated)
         return;
       const valid = gen.let("valid", false);
       const schValid = gen.name("_valid");
-      gen.block(() => schema2.forEach((_sch, i) => {
+      gen.block(() => schema3.forEach((_sch, i) => {
         const schCxt = cxt.subschema({
           keyword,
           schemaProp: i,
@@ -16160,8 +16160,8 @@ var require_keyword = __commonJS({
     var code_1 = require_code2();
     var errors_1 = require_errors2();
     function macroKeywordCode(cxt, def) {
-      const { gen, keyword, schema: schema2, parentSchema, it } = cxt;
-      const macroSchema = def.macro.call(it.self, schema2, parentSchema, it);
+      const { gen, keyword, schema: schema3, parentSchema, it } = cxt;
+      const macroSchema = def.macro.call(it.self, schema3, parentSchema, it);
       const schemaRef = useKeyword(gen, keyword, macroSchema);
       if (it.opts.validateSchema !== false)
         it.self.validateSchema(macroSchema, true);
@@ -16178,9 +16178,9 @@ var require_keyword = __commonJS({
     exports.macroKeywordCode = macroKeywordCode;
     function funcKeywordCode(cxt, def) {
       var _a;
-      const { gen, keyword, schema: schema2, parentSchema, $data, it } = cxt;
+      const { gen, keyword, schema: schema3, parentSchema, $data, it } = cxt;
       checkAsyncKeyword(it, def);
-      const validate = !$data && def.compile ? def.compile.call(it.self, schema2, parentSchema, it) : def.validate;
+      const validate = !$data && def.compile ? def.compile.call(it.self, schema3, parentSchema, it) : def.validate;
       const validateRef = useKeyword(gen, keyword, validate);
       const valid = gen.let("valid");
       cxt.block$data(valid, validateKeyword);
@@ -16240,20 +16240,20 @@ var require_keyword = __commonJS({
         throw new Error(`keyword "${keyword}" failed to compile`);
       return gen.scopeValue("keyword", typeof result == "function" ? { ref: result } : { ref: result, code: (0, codegen_1.stringify)(result) });
     }
-    function validSchemaType(schema2, schemaType, allowUndefined = false) {
-      return !schemaType.length || schemaType.some((st) => st === "array" ? Array.isArray(schema2) : st === "object" ? schema2 && typeof schema2 == "object" && !Array.isArray(schema2) : typeof schema2 == st || allowUndefined && typeof schema2 == "undefined");
+    function validSchemaType(schema3, schemaType, allowUndefined = false) {
+      return !schemaType.length || schemaType.some((st) => st === "array" ? Array.isArray(schema3) : st === "object" ? schema3 && typeof schema3 == "object" && !Array.isArray(schema3) : typeof schema3 == st || allowUndefined && typeof schema3 == "undefined");
     }
     exports.validSchemaType = validSchemaType;
-    function validateKeywordUsage({ schema: schema2, opts, self, errSchemaPath }, def, keyword) {
+    function validateKeywordUsage({ schema: schema3, opts, self, errSchemaPath }, def, keyword) {
       if (Array.isArray(def.keyword) ? !def.keyword.includes(keyword) : def.keyword !== keyword) {
         throw new Error("ajv implementation error");
       }
       const deps = def.dependencies;
-      if (deps === null || deps === void 0 ? void 0 : deps.some((kwd) => !Object.prototype.hasOwnProperty.call(schema2, kwd))) {
+      if (deps === null || deps === void 0 ? void 0 : deps.some((kwd) => !Object.prototype.hasOwnProperty.call(schema3, kwd))) {
         throw new Error(`parent schema must have dependencies of ${keyword}: ${deps.join(",")}`);
       }
       if (def.validateSchema) {
-        const valid = def.validateSchema(schema2[keyword]);
+        const valid = def.validateSchema(schema3[keyword]);
         if (!valid) {
           const msg = `keyword "${keyword}" value is invalid at path "${errSchemaPath}": ` + self.errorsText(def.validateSchema.errors);
           if (opts.validateSchema === "log")
@@ -16275,8 +16275,8 @@ var require_subschema = __commonJS({
     exports.extendSubschemaMode = exports.extendSubschemaData = exports.getSubschema = void 0;
     var codegen_1 = require_codegen();
     var util_1 = require_util();
-    function getSubschema(it, { keyword, schemaProp, schema: schema2, schemaPath, errSchemaPath, topSchemaRef }) {
-      if (keyword !== void 0 && schema2 !== void 0) {
+    function getSubschema(it, { keyword, schemaProp, schema: schema3, schemaPath, errSchemaPath, topSchemaRef }) {
+      if (keyword !== void 0 && schema3 !== void 0) {
         throw new Error('both "keyword" and "schema" passed, only one allowed');
       }
       if (keyword !== void 0) {
@@ -16291,12 +16291,12 @@ var require_subschema = __commonJS({
           errSchemaPath: `${it.errSchemaPath}/${keyword}/${(0, util_1.escapeFragment)(schemaProp)}`
         };
       }
-      if (schema2 !== void 0) {
+      if (schema3 !== void 0) {
         if (schemaPath === void 0 || errSchemaPath === void 0 || topSchemaRef === void 0) {
           throw new Error('"schemaPath", "errSchemaPath" and "topSchemaRef" are required with "schema"');
         }
         return {
-          schema: schema2,
+          schema: schema3,
           schemaPath,
           topSchemaRef,
           errSchemaPath
@@ -16389,7 +16389,7 @@ var require_fast_deep_equal = __commonJS({
 var require_json_schema_traverse = __commonJS({
   "node_modules/json-schema-traverse/index.js"(exports, module) {
     "use strict";
-    var traverse = module.exports = function(schema2, opts, cb) {
+    var traverse = module.exports = function(schema3, opts, cb) {
       if (typeof opts == "function") {
         cb = opts;
         opts = {};
@@ -16399,7 +16399,7 @@ var require_json_schema_traverse = __commonJS({
       };
       var post = cb.post || function() {
       };
-      _traverse(opts, pre, post, schema2, "", schema2);
+      _traverse(opts, pre, post, schema3, "", schema3);
     };
     traverse.keywords = {
       additionalItems: true,
@@ -16445,26 +16445,26 @@ var require_json_schema_traverse = __commonJS({
       maxProperties: true,
       minProperties: true
     };
-    function _traverse(opts, pre, post, schema2, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex) {
-      if (schema2 && typeof schema2 == "object" && !Array.isArray(schema2)) {
-        pre(schema2, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
-        for (var key in schema2) {
-          var sch = schema2[key];
+    function _traverse(opts, pre, post, schema3, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex) {
+      if (schema3 && typeof schema3 == "object" && !Array.isArray(schema3)) {
+        pre(schema3, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
+        for (var key in schema3) {
+          var sch = schema3[key];
           if (Array.isArray(sch)) {
             if (key in traverse.arrayKeywords) {
               for (var i = 0; i < sch.length; i++)
-                _traverse(opts, pre, post, sch[i], jsonPtr + "/" + key + "/" + i, rootSchema, jsonPtr, key, schema2, i);
+                _traverse(opts, pre, post, sch[i], jsonPtr + "/" + key + "/" + i, rootSchema, jsonPtr, key, schema3, i);
             }
           } else if (key in traverse.propsKeywords) {
             if (sch && typeof sch == "object") {
               for (var prop in sch)
-                _traverse(opts, pre, post, sch[prop], jsonPtr + "/" + key + "/" + escapeJsonPtr(prop), rootSchema, jsonPtr, key, schema2, prop);
+                _traverse(opts, pre, post, sch[prop], jsonPtr + "/" + key + "/" + escapeJsonPtr(prop), rootSchema, jsonPtr, key, schema3, prop);
             }
           } else if (key in traverse.keywords || opts.allKeys && !(key in traverse.skipKeywords)) {
-            _traverse(opts, pre, post, sch, jsonPtr + "/" + key, rootSchema, jsonPtr, key, schema2);
+            _traverse(opts, pre, post, sch, jsonPtr + "/" + key, rootSchema, jsonPtr, key, schema3);
           }
         }
-        post(schema2, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
+        post(schema3, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
       }
     }
     function escapeJsonPtr(str) {
@@ -16500,14 +16500,14 @@ var require_resolve = __commonJS({
       "enum",
       "const"
     ]);
-    function inlineRef(schema2, limit = true) {
-      if (typeof schema2 == "boolean")
+    function inlineRef(schema3, limit = true) {
+      if (typeof schema3 == "boolean")
         return true;
       if (limit === true)
-        return !hasRef(schema2);
+        return !hasRef(schema3);
       if (!limit)
         return false;
-      return countKeys(schema2) <= limit;
+      return countKeys(schema3) <= limit;
     }
     exports.inlineRef = inlineRef;
     var REF_KEYWORDS = /* @__PURE__ */ new Set([
@@ -16517,11 +16517,11 @@ var require_resolve = __commonJS({
       "$dynamicRef",
       "$dynamicAnchor"
     ]);
-    function hasRef(schema2) {
-      for (const key in schema2) {
+    function hasRef(schema3) {
+      for (const key in schema3) {
         if (REF_KEYWORDS.has(key))
           return true;
-        const sch = schema2[key];
+        const sch = schema3[key];
         if (Array.isArray(sch) && sch.some(hasRef))
           return true;
         if (typeof sch == "object" && hasRef(sch))
@@ -16529,16 +16529,16 @@ var require_resolve = __commonJS({
       }
       return false;
     }
-    function countKeys(schema2) {
+    function countKeys(schema3) {
       let count = 0;
-      for (const key in schema2) {
+      for (const key in schema3) {
         if (key === "$ref")
           return Infinity;
         count++;
         if (SIMPLE_INLINED.has(key))
           continue;
-        if (typeof schema2[key] == "object") {
-          (0, util_1.eachItem)(schema2[key], (sch) => count += countKeys(sch));
+        if (typeof schema3[key] == "object") {
+          (0, util_1.eachItem)(schema3[key], (sch) => count += countKeys(sch));
         }
         if (count === Infinity)
           return Infinity;
@@ -16568,16 +16568,16 @@ var require_resolve = __commonJS({
     }
     exports.resolveUrl = resolveUrl;
     var ANCHOR = /^[a-z_][-a-z0-9._]*$/i;
-    function getSchemaRefs(schema2, baseId) {
-      if (typeof schema2 == "boolean")
+    function getSchemaRefs(schema3, baseId) {
+      if (typeof schema3 == "boolean")
         return {};
       const { schemaId, uriResolver } = this.opts;
-      const schId = normalizeId(schema2[schemaId] || baseId);
+      const schId = normalizeId(schema3[schemaId] || baseId);
       const baseIds = { "": schId };
       const pathPrefix = getFullPath(uriResolver, schId, false);
       const localRefs = {};
       const schemaRefs = /* @__PURE__ */ new Set();
-      traverse(schema2, { allKeys: true }, (sch, jsonPtr, _, parentJsonPtr) => {
+      traverse(schema3, { allKeys: true }, (sch, jsonPtr, _, parentJsonPtr) => {
         if (parentJsonPtr === void 0)
           return;
         const fullPath = pathPrefix + jsonPtr;
@@ -16658,15 +16658,15 @@ var require_validate = __commonJS({
       validateFunction(it, () => (0, boolSchema_1.topBoolOrEmptySchema)(it));
     }
     exports.validateFunctionCode = validateFunctionCode;
-    function validateFunction({ gen, validateName, schema: schema2, schemaEnv, opts }, body) {
+    function validateFunction({ gen, validateName, schema: schema3, schemaEnv, opts }, body) {
       if (opts.code.es5) {
         gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${names_1.default.valCxt}`, schemaEnv.$async, () => {
-          gen.code((0, codegen_1._)`"use strict"; ${funcSourceUrl(schema2, opts)}`);
+          gen.code((0, codegen_1._)`"use strict"; ${funcSourceUrl(schema3, opts)}`);
           destructureValCxtES5(gen, opts);
           gen.code(body);
         });
       } else {
-        gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${destructureValCxt(opts)}`, schemaEnv.$async, () => gen.code(funcSourceUrl(schema2, opts)).code(body));
+        gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${destructureValCxt(opts)}`, schemaEnv.$async, () => gen.code(funcSourceUrl(schema3, opts)).code(body));
       }
     }
     function destructureValCxt(opts) {
@@ -16690,9 +16690,9 @@ var require_validate = __commonJS({
       });
     }
     function topSchemaObjCode(it) {
-      const { schema: schema2, opts, gen } = it;
+      const { schema: schema3, opts, gen } = it;
       validateFunction(it, () => {
-        if (opts.$comment && schema2.$comment)
+        if (opts.$comment && schema3.$comment)
           commentKeyword(it);
         checkNoDefault(it);
         gen.let(names_1.default.vErrors, null);
@@ -16710,8 +16710,8 @@ var require_validate = __commonJS({
       gen.if((0, codegen_1._)`${it.evaluated}.dynamicProps`, () => gen.assign((0, codegen_1._)`${it.evaluated}.props`, (0, codegen_1._)`undefined`));
       gen.if((0, codegen_1._)`${it.evaluated}.dynamicItems`, () => gen.assign((0, codegen_1._)`${it.evaluated}.items`, (0, codegen_1._)`undefined`));
     }
-    function funcSourceUrl(schema2, opts) {
-      const schId = typeof schema2 == "object" && schema2[opts.schemaId];
+    function funcSourceUrl(schema3, opts) {
+      const schId = typeof schema3 == "object" && schema3[opts.schemaId];
       return schId && (opts.code.source || opts.code.process) ? (0, codegen_1._)`/*# sourceURL=${schId} */` : codegen_1.nil;
     }
     function subschemaCode(it, valid) {
@@ -16724,10 +16724,10 @@ var require_validate = __commonJS({
       }
       (0, boolSchema_1.boolOrEmptySchema)(it, valid);
     }
-    function schemaCxtHasRules({ schema: schema2, self }) {
-      if (typeof schema2 == "boolean")
-        return !schema2;
-      for (const key in schema2)
+    function schemaCxtHasRules({ schema: schema3, self }) {
+      if (typeof schema3 == "boolean")
+        return !schema3;
+      for (const key in schema3)
         if (self.RULES.all[key])
           return true;
       return false;
@@ -16736,8 +16736,8 @@ var require_validate = __commonJS({
       return typeof it.schema != "boolean";
     }
     function subSchemaObjCode(it, valid) {
-      const { schema: schema2, gen, opts } = it;
-      if (opts.$comment && schema2.$comment)
+      const { schema: schema3, gen, opts } = it;
+      if (opts.$comment && schema3.$comment)
         commentKeyword(it);
       updateContext(it);
       checkAsyncSchema(it);
@@ -16757,14 +16757,14 @@ var require_validate = __commonJS({
       schemaKeywords(it, types, !checkedTypes, errsCount);
     }
     function checkRefsAndKeywords(it) {
-      const { schema: schema2, errSchemaPath, opts, self } = it;
-      if (schema2.$ref && opts.ignoreKeywordsWithRef && (0, util_1.schemaHasRulesButRef)(schema2, self.RULES)) {
+      const { schema: schema3, errSchemaPath, opts, self } = it;
+      if (schema3.$ref && opts.ignoreKeywordsWithRef && (0, util_1.schemaHasRulesButRef)(schema3, self.RULES)) {
         self.logger.warn(`$ref: keywords ignored in schema at path "${errSchemaPath}"`);
       }
     }
     function checkNoDefault(it) {
-      const { schema: schema2, opts } = it;
-      if (schema2.default !== void 0 && opts.useDefaults && opts.strictSchema) {
+      const { schema: schema3, opts } = it;
+      if (schema3.default !== void 0 && opts.useDefaults && opts.strictSchema) {
         (0, util_1.checkStrictMode)(it, "default is ignored in the schema root");
       }
     }
@@ -16777,8 +16777,8 @@ var require_validate = __commonJS({
       if (it.schema.$async && !it.schemaEnv.$async)
         throw new Error("async schema in sync schema");
     }
-    function commentKeyword({ gen, schemaEnv, schema: schema2, errSchemaPath, opts }) {
-      const msg = schema2.$comment;
+    function commentKeyword({ gen, schemaEnv, schema: schema3, errSchemaPath, opts }) {
+      const msg = schema3.$comment;
       if (opts.$comment === true) {
         gen.code((0, codegen_1._)`${names_1.default.self}.logger.log(${msg})`);
       } else if (typeof opts.$comment == "function") {
@@ -16805,9 +16805,9 @@ var require_validate = __commonJS({
         gen.assign((0, codegen_1._)`${evaluated}.items`, items);
     }
     function schemaKeywords(it, types, typeErrors, errsCount) {
-      const { gen, schema: schema2, data, allErrors, opts, self } = it;
+      const { gen, schema: schema3, data, allErrors, opts, self } = it;
       const { RULES } = self;
-      if (schema2.$ref && (opts.ignoreKeywordsWithRef || !(0, util_1.schemaHasRulesButRef)(schema2, RULES))) {
+      if (schema3.$ref && (opts.ignoreKeywordsWithRef || !(0, util_1.schemaHasRulesButRef)(schema3, RULES))) {
         gen.block(() => keywordCode(it, "$ref", RULES.all.$ref.definition));
         return;
       }
@@ -16819,7 +16819,7 @@ var require_validate = __commonJS({
         groupKeywords(RULES.post);
       });
       function groupKeywords(group) {
-        if (!(0, applicability_1.shouldUseGroup)(schema2, group))
+        if (!(0, applicability_1.shouldUseGroup)(schema3, group))
           return;
         if (group.type) {
           gen.if((0, dataType_2.checkDataType)(group.type, data, opts.strictNumbers));
@@ -16837,12 +16837,12 @@ var require_validate = __commonJS({
       }
     }
     function iterateKeywords(it, group) {
-      const { gen, schema: schema2, opts: { useDefaults } } = it;
+      const { gen, schema: schema3, opts: { useDefaults } } = it;
       if (useDefaults)
         (0, defaults_1.assignDefaults)(it, group.type);
       gen.block(() => {
         for (const rule of group.rules) {
-          if ((0, applicability_1.shouldUseRule)(schema2, rule)) {
+          if ((0, applicability_1.shouldUseRule)(schema3, rule)) {
             keywordCode(it, rule.keyword, rule.definition, group.type);
           }
         }
@@ -17187,17 +17187,17 @@ var require_compile = __commonJS({
         var _a;
         this.refs = {};
         this.dynamicAnchors = {};
-        let schema2;
+        let schema3;
         if (typeof env.schema == "object")
-          schema2 = env.schema;
+          schema3 = env.schema;
         this.schema = env.schema;
         this.schemaId = env.schemaId;
         this.root = env.root || this;
-        this.baseId = (_a = env.baseId) !== null && _a !== void 0 ? _a : (0, resolve_1.normalizeId)(schema2 === null || schema2 === void 0 ? void 0 : schema2[env.schemaId || "$id"]);
+        this.baseId = (_a = env.baseId) !== null && _a !== void 0 ? _a : (0, resolve_1.normalizeId)(schema3 === null || schema3 === void 0 ? void 0 : schema3[env.schemaId || "$id"]);
         this.schemaPath = env.schemaPath;
         this.localRefs = env.localRefs;
         this.meta = env.meta;
-        this.$async = schema2 === null || schema2 === void 0 ? void 0 : schema2.$async;
+        this.$async = schema3 === null || schema3 === void 0 ? void 0 : schema3.$async;
         this.refs = {};
       }
     };
@@ -17296,10 +17296,10 @@ var require_compile = __commonJS({
         return schOrFunc;
       let _sch = resolve.call(this, root, ref);
       if (_sch === void 0) {
-        const schema2 = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
+        const schema3 = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
-        if (schema2)
-          _sch = new SchemaEnv({ schema: schema2, schemaId, root, baseId });
+        if (schema3)
+          _sch = new SchemaEnv({ schema: schema3, schemaId, root, baseId });
       }
       if (_sch === void 0)
         return;
@@ -17347,12 +17347,12 @@ var require_compile = __commonJS({
       if (!schOrRef.validate)
         compileSchema.call(this, schOrRef);
       if (id === (0, resolve_1.normalizeId)(ref)) {
-        const { schema: schema2 } = schOrRef;
+        const { schema: schema3 } = schOrRef;
         const { schemaId } = this.opts;
-        const schId = schema2[schemaId];
+        const schId = schema3[schemaId];
         if (schId)
           baseId = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schId);
-        return new SchemaEnv({ schema: schema2, schemaId, root, baseId });
+        return new SchemaEnv({ schema: schema3, schemaId, root, baseId });
       }
       return getJsonPointer.call(this, p, schOrRef);
     }
@@ -17364,29 +17364,29 @@ var require_compile = __commonJS({
       "dependencies",
       "definitions"
     ]);
-    function getJsonPointer(parsedRef, { baseId, schema: schema2, root }) {
+    function getJsonPointer(parsedRef, { baseId, schema: schema3, root }) {
       var _a;
       if (((_a = parsedRef.fragment) === null || _a === void 0 ? void 0 : _a[0]) !== "/")
         return;
       for (const part of parsedRef.fragment.slice(1).split("/")) {
-        if (typeof schema2 === "boolean")
+        if (typeof schema3 === "boolean")
           return;
-        const partSchema = schema2[(0, util_1.unescapeFragment)(part)];
+        const partSchema = schema3[(0, util_1.unescapeFragment)(part)];
         if (partSchema === void 0)
           return;
-        schema2 = partSchema;
-        const schId = typeof schema2 === "object" && schema2[this.opts.schemaId];
+        schema3 = partSchema;
+        const schId = typeof schema3 === "object" && schema3[this.opts.schemaId];
         if (!PREVENT_SCOPE_CHANGE.has(part) && schId) {
           baseId = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schId);
         }
       }
       let env;
-      if (typeof schema2 != "boolean" && schema2.$ref && !(0, util_1.schemaHasRulesButRef)(schema2, this.RULES)) {
-        const $ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schema2.$ref);
+      if (typeof schema3 != "boolean" && schema3.$ref && !(0, util_1.schemaHasRulesButRef)(schema3, this.RULES)) {
+        const $ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schema3.$ref);
         env = resolveSchema.call(this, root, $ref);
       }
       const { schemaId } = this.opts;
-      env = env || new SchemaEnv({ schema: schema2, schemaId, root, baseId });
+      env = env || new SchemaEnv({ schema: schema3, schemaId, root, baseId });
       if (env.schema !== env.root.schema)
         return env;
       return void 0;
@@ -18711,16 +18711,16 @@ var require_core = __commonJS({
           this.errors = v.errors;
         return valid;
       }
-      compile(schema2, _meta) {
-        const sch = this._addSchema(schema2, _meta);
+      compile(schema3, _meta) {
+        const sch = this._addSchema(schema3, _meta);
         return sch.validate || this._compileSchemaEnv(sch);
       }
-      compileAsync(schema2, meta) {
+      compileAsync(schema3, meta) {
         if (typeof this.opts.loadSchema != "function") {
           throw new Error("options.loadSchema should be a function");
         }
         const { loadSchema } = this.opts;
-        return runCompileAsync.call(this, schema2, meta);
+        return runCompileAsync.call(this, schema3, meta);
         async function runCompileAsync(_schema, _meta) {
           await loadMetaSchema.call(this, _schema.$schema);
           const sch = this._addSchema(_schema, _meta);
@@ -18766,37 +18766,37 @@ var require_core = __commonJS({
         }
       }
       // Adds schema to the instance
-      addSchema(schema2, key, _meta, _validateSchema = this.opts.validateSchema) {
-        if (Array.isArray(schema2)) {
-          for (const sch of schema2)
+      addSchema(schema3, key, _meta, _validateSchema = this.opts.validateSchema) {
+        if (Array.isArray(schema3)) {
+          for (const sch of schema3)
             this.addSchema(sch, void 0, _meta, _validateSchema);
           return this;
         }
         let id;
-        if (typeof schema2 === "object") {
+        if (typeof schema3 === "object") {
           const { schemaId } = this.opts;
-          id = schema2[schemaId];
+          id = schema3[schemaId];
           if (id !== void 0 && typeof id != "string") {
             throw new Error(`schema ${schemaId} must be string`);
           }
         }
         key = (0, resolve_1.normalizeId)(key || id);
         this._checkUnique(key);
-        this.schemas[key] = this._addSchema(schema2, _meta, key, _validateSchema, true);
+        this.schemas[key] = this._addSchema(schema3, _meta, key, _validateSchema, true);
         return this;
       }
       // Add schema that will be used to validate other schemas
       // options in META_IGNORE_OPTIONS are alway set to false
-      addMetaSchema(schema2, key, _validateSchema = this.opts.validateSchema) {
-        this.addSchema(schema2, key, true, _validateSchema);
+      addMetaSchema(schema3, key, _validateSchema = this.opts.validateSchema) {
+        this.addSchema(schema3, key, true, _validateSchema);
         return this;
       }
       //  Validate schema against its meta-schema
-      validateSchema(schema2, throwOrLogError) {
-        if (typeof schema2 == "boolean")
+      validateSchema(schema3, throwOrLogError) {
+        if (typeof schema3 == "boolean")
           return true;
         let $schema;
-        $schema = schema2.$schema;
+        $schema = schema3.$schema;
         if ($schema !== void 0 && typeof $schema != "string") {
           throw new Error("$schema must be a string");
         }
@@ -18806,7 +18806,7 @@ var require_core = __commonJS({
           this.errors = null;
           return true;
         }
-        const valid = this.validate($schema, schema2);
+        const valid = this.validate($schema, schema3);
         if (!valid && throwOrLogError) {
           const message = "schema is invalid: " + this.errorsText();
           if (this.opts.validateSchema === "log")
@@ -18934,7 +18934,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text4, msg) => text4 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text5, msg) => text5 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -18949,9 +18949,9 @@ var require_core = __commonJS({
             if (typeof rule != "object")
               continue;
             const { $data } = rule.definition;
-            const schema2 = keywords[key];
-            if ($data && schema2)
-              keywords[key] = schemaOrData(schema2);
+            const schema3 = keywords[key];
+            if ($data && schema3)
+              keywords[key] = schemaOrData(schema3);
           }
         }
         return metaSchema;
@@ -18969,23 +18969,23 @@ var require_core = __commonJS({
           }
         }
       }
-      _addSchema(schema2, meta, baseId, validateSchema = this.opts.validateSchema, addSchema = this.opts.addUsedSchema) {
+      _addSchema(schema3, meta, baseId, validateSchema = this.opts.validateSchema, addSchema = this.opts.addUsedSchema) {
         let id;
         const { schemaId } = this.opts;
-        if (typeof schema2 == "object") {
-          id = schema2[schemaId];
+        if (typeof schema3 == "object") {
+          id = schema3[schemaId];
         } else {
           if (this.opts.jtd)
             throw new Error("schema must be object");
-          else if (typeof schema2 != "boolean")
+          else if (typeof schema3 != "boolean")
             throw new Error("schema must be object or boolean");
         }
-        let sch = this._cache.get(schema2);
+        let sch = this._cache.get(schema3);
         if (sch !== void 0)
           return sch;
         baseId = (0, resolve_1.normalizeId)(id || baseId);
-        const localRefs = resolve_1.getSchemaRefs.call(this, schema2, baseId);
-        sch = new compile_1.SchemaEnv({ schema: schema2, schemaId, meta, baseId, localRefs });
+        const localRefs = resolve_1.getSchemaRefs.call(this, schema3, baseId);
+        sch = new compile_1.SchemaEnv({ schema: schema3, schemaId, meta, baseId, localRefs });
         this._cache.set(sch.schema, sch);
         if (addSchema && !baseId.startsWith("#")) {
           if (baseId)
@@ -18993,7 +18993,7 @@ var require_core = __commonJS({
           this.refs[baseId] = sch;
         }
         if (validateSchema)
-          this.validateSchema(schema2, true);
+          this.validateSchema(schema3, true);
         return sch;
       }
       _checkUnique(id) {
@@ -19147,8 +19147,8 @@ var require_core = __commonJS({
     var $dataRef = {
       $ref: "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#"
     };
-    function schemaOrData(schema2) {
-      return { anyOf: [schema2, $dataRef] };
+    function schemaOrData(schema3) {
+      return { anyOf: [schema3, $dataRef] };
     }
   }
 });
@@ -19448,7 +19448,7 @@ var require_pattern = __commonJS({
       $data: true,
       error: error2,
       code(cxt) {
-        const { gen, data, $data, schema: schema2, schemaCode, it } = cxt;
+        const { gen, data, $data, schema: schema3, schemaCode, it } = cxt;
         const u = it.opts.unicodeRegExp ? "u" : "";
         if ($data) {
           const { regExp } = it.opts.code;
@@ -19457,7 +19457,7 @@ var require_pattern = __commonJS({
           gen.try(() => gen.assign(valid, (0, codegen_1._)`${regExpCode}(${schemaCode}, ${u}).test(${data})`), () => gen.assign(valid, false));
           cxt.fail$data((0, codegen_1._)`!${valid}`);
         } else {
-          const regExp = (0, code_1.usePattern)(cxt, schema2);
+          const regExp = (0, code_1.usePattern)(cxt, schema3);
           cxt.fail$data((0, codegen_1._)`!${regExp}.test(${data})`);
         }
       }
@@ -19514,11 +19514,11 @@ var require_required = __commonJS({
       $data: true,
       error: error2,
       code(cxt) {
-        const { gen, schema: schema2, schemaCode, data, $data, it } = cxt;
+        const { gen, schema: schema3, schemaCode, data, $data, it } = cxt;
         const { opts } = it;
-        if (!$data && schema2.length === 0)
+        if (!$data && schema3.length === 0)
           return;
-        const useLoop = schema2.length >= opts.loopRequired;
+        const useLoop = schema3.length >= opts.loopRequired;
         if (it.allErrors)
           allErrorsMode();
         else
@@ -19526,7 +19526,7 @@ var require_required = __commonJS({
         if (opts.strictRequired) {
           const props = cxt.parentSchema.properties;
           const { definedProperties } = cxt.it;
-          for (const requiredKey of schema2) {
+          for (const requiredKey of schema3) {
             if ((props === null || props === void 0 ? void 0 : props[requiredKey]) === void 0 && !definedProperties.has(requiredKey)) {
               const schemaPath = it.schemaEnv.baseId + it.errSchemaPath;
               const msg = `required property "${requiredKey}" is not defined at "${schemaPath}" (strictRequired)`;
@@ -19538,7 +19538,7 @@ var require_required = __commonJS({
           if (useLoop || $data) {
             cxt.block$data(codegen_1.nil, loopAllRequired);
           } else {
-            for (const prop of schema2) {
+            for (const prop of schema3) {
               (0, code_1.checkReportMissingProp)(cxt, prop);
             }
           }
@@ -19550,7 +19550,7 @@ var require_required = __commonJS({
             cxt.block$data(valid, () => loopUntilMissing(missing, valid));
             cxt.ok(valid);
           } else {
-            gen.if((0, code_1.checkMissingProp)(cxt, schema2, missing));
+            gen.if((0, code_1.checkMissingProp)(cxt, schema3, missing));
             (0, code_1.reportMissingProp)(cxt, missing);
             gen.else();
           }
@@ -19637,8 +19637,8 @@ var require_uniqueItems = __commonJS({
       $data: true,
       error: error2,
       code(cxt) {
-        const { gen, data, $data, schema: schema2, parentSchema, schemaCode, it } = cxt;
-        if (!$data && !schema2)
+        const { gen, data, $data, schema: schema3, parentSchema, schemaCode, it } = cxt;
+        if (!$data && !schema3)
           return;
         const valid = gen.let("valid");
         const itemTypes = parentSchema.items ? (0, dataType_1.getSchemaTypes)(parentSchema.items) : [];
@@ -19701,11 +19701,11 @@ var require_const = __commonJS({
       $data: true,
       error: error2,
       code(cxt) {
-        const { gen, data, $data, schemaCode, schema: schema2 } = cxt;
-        if ($data || schema2 && typeof schema2 == "object") {
+        const { gen, data, $data, schemaCode, schema: schema3 } = cxt;
+        if ($data || schema3 && typeof schema3 == "object") {
           cxt.fail$data((0, codegen_1._)`!${(0, util_1.useFunc)(gen, equal_1.default)}(${data}, ${schemaCode})`);
         } else {
-          cxt.fail((0, codegen_1._)`${schema2} !== ${data}`);
+          cxt.fail((0, codegen_1._)`${schema3} !== ${data}`);
         }
       }
     };
@@ -19731,10 +19731,10 @@ var require_enum = __commonJS({
       $data: true,
       error: error2,
       code(cxt) {
-        const { gen, data, $data, schema: schema2, schemaCode, it } = cxt;
-        if (!$data && schema2.length === 0)
+        const { gen, data, $data, schema: schema3, schemaCode, it } = cxt;
+        if (!$data && schema3.length === 0)
           throw new Error("enum must have non-empty array");
-        const useLoop = schema2.length >= it.opts.loopEnum;
+        const useLoop = schema3.length >= it.opts.loopEnum;
         let eql;
         const getEql = () => eql !== null && eql !== void 0 ? eql : eql = (0, util_1.useFunc)(gen, equal_1.default);
         let valid;
@@ -19742,10 +19742,10 @@ var require_enum = __commonJS({
           valid = gen.let("valid");
           cxt.block$data(valid, loopEnum);
         } else {
-          if (!Array.isArray(schema2))
+          if (!Array.isArray(schema3))
             throw new Error("ajv implementation error");
           const vSchema = gen.const("vSchema", schemaCode);
-          valid = (0, codegen_1.or)(...schema2.map((_x, i) => equalCode(vSchema, i)));
+          valid = (0, codegen_1.or)(...schema3.map((_x, i) => equalCode(vSchema, i)));
         }
         cxt.pass(valid);
         function loopEnum() {
@@ -19753,7 +19753,7 @@ var require_enum = __commonJS({
           gen.forOf("v", schemaCode, (v) => gen.if((0, codegen_1._)`${getEql()}(${data}, ${v})`, () => gen.assign(valid, true).break()));
         }
         function equalCode(vSchema, i) {
-          const sch = schema2[i];
+          const sch = schema3[i];
           return typeof sch === "object" && sch !== null ? (0, codegen_1._)`${getEql()}(${data}, ${vSchema}[${i}])` : (0, codegen_1._)`${data} === ${sch}`;
         }
       }
@@ -19829,13 +19829,13 @@ var require_additionalItems = __commonJS({
       }
     };
     function validateAdditionalItems(cxt, items) {
-      const { gen, schema: schema2, data, keyword, it } = cxt;
+      const { gen, schema: schema3, data, keyword, it } = cxt;
       it.items = true;
       const len = gen.const("len", (0, codegen_1._)`${data}.length`);
-      if (schema2 === false) {
+      if (schema3 === false) {
         cxt.setParams({ len: items.length });
         cxt.pass((0, codegen_1._)`${len} <= ${items.length}`);
-      } else if (typeof schema2 == "object" && !(0, util_1.alwaysValidSchema)(it, schema2)) {
+      } else if (typeof schema3 == "object" && !(0, util_1.alwaysValidSchema)(it, schema3)) {
         const valid = gen.var("valid", (0, codegen_1._)`${len} <= ${items.length}`);
         gen.if((0, codegen_1.not)(valid), () => validateItems(valid));
         cxt.ok(valid);
@@ -19868,11 +19868,11 @@ var require_items = __commonJS({
       schemaType: ["object", "array", "boolean"],
       before: "uniqueItems",
       code(cxt) {
-        const { schema: schema2, it } = cxt;
-        if (Array.isArray(schema2))
-          return validateTuple(cxt, "additionalItems", schema2);
+        const { schema: schema3, it } = cxt;
+        if (Array.isArray(schema3))
+          return validateTuple(cxt, "additionalItems", schema3);
         it.items = true;
-        if ((0, util_1.alwaysValidSchema)(it, schema2))
+        if ((0, util_1.alwaysValidSchema)(it, schema3))
           return;
         cxt.ok((0, code_1.validateArray)(cxt));
       }
@@ -19947,10 +19947,10 @@ var require_items2020 = __commonJS({
       before: "uniqueItems",
       error: error2,
       code(cxt) {
-        const { schema: schema2, parentSchema, it } = cxt;
+        const { schema: schema3, parentSchema, it } = cxt;
         const { prefixItems } = parentSchema;
         it.items = true;
-        if ((0, util_1.alwaysValidSchema)(it, schema2))
+        if ((0, util_1.alwaysValidSchema)(it, schema3))
           return;
         if (prefixItems)
           (0, additionalItems_1.validateAdditionalItems)(cxt, prefixItems);
@@ -19981,7 +19981,7 @@ var require_contains = __commonJS({
       trackErrors: true,
       error: error2,
       code(cxt) {
-        const { gen, schema: schema2, parentSchema, data, it } = cxt;
+        const { gen, schema: schema3, parentSchema, data, it } = cxt;
         let min;
         let max;
         const { minContains, maxContains } = parentSchema;
@@ -20002,7 +20002,7 @@ var require_contains = __commonJS({
           cxt.fail();
           return;
         }
-        if ((0, util_1.alwaysValidSchema)(it, schema2)) {
+        if ((0, util_1.alwaysValidSchema)(it, schema3)) {
           let cond = (0, codegen_1._)`${len} >= ${min}`;
           if (max !== void 0)
             cond = (0, codegen_1._)`${cond} && ${len} <= ${max}`;
@@ -20087,14 +20087,14 @@ var require_dependencies = __commonJS({
         validateSchemaDeps(cxt, schDeps);
       }
     };
-    function splitDependencies({ schema: schema2 }) {
+    function splitDependencies({ schema: schema3 }) {
       const propertyDeps = {};
       const schemaDeps = {};
-      for (const key in schema2) {
+      for (const key in schema3) {
         if (key === "__proto__")
           continue;
-        const deps = Array.isArray(schema2[key]) ? propertyDeps : schemaDeps;
-        deps[key] = schema2[key];
+        const deps = Array.isArray(schema3[key]) ? propertyDeps : schemaDeps;
+        deps[key] = schema3[key];
       }
       return [propertyDeps, schemaDeps];
     }
@@ -20167,8 +20167,8 @@ var require_propertyNames = __commonJS({
       schemaType: ["object", "boolean"],
       error: error2,
       code(cxt) {
-        const { gen, schema: schema2, data, it } = cxt;
-        if ((0, util_1.alwaysValidSchema)(it, schema2))
+        const { gen, schema: schema3, data, it } = cxt;
+        if ((0, util_1.alwaysValidSchema)(it, schema3))
           return;
         const valid = gen.name("valid");
         gen.forIn("key", data, (key) => {
@@ -20214,12 +20214,12 @@ var require_additionalProperties = __commonJS({
       trackErrors: true,
       error: error2,
       code(cxt) {
-        const { gen, schema: schema2, parentSchema, data, errsCount, it } = cxt;
+        const { gen, schema: schema3, parentSchema, data, errsCount, it } = cxt;
         if (!errsCount)
           throw new Error("ajv implementation error");
         const { allErrors, opts } = it;
         it.props = true;
-        if (opts.removeAdditional !== "all" && (0, util_1.alwaysValidSchema)(it, schema2))
+        if (opts.removeAdditional !== "all" && (0, util_1.alwaysValidSchema)(it, schema3))
           return;
         const props = (0, code_1.allSchemaProperties)(parentSchema.properties);
         const patProps = (0, code_1.allSchemaProperties)(parentSchema.patternProperties);
@@ -20252,18 +20252,18 @@ var require_additionalProperties = __commonJS({
           gen.code((0, codegen_1._)`delete ${data}[${key}]`);
         }
         function additionalPropertyCode(key) {
-          if (opts.removeAdditional === "all" || opts.removeAdditional && schema2 === false) {
+          if (opts.removeAdditional === "all" || opts.removeAdditional && schema3 === false) {
             deleteAdditional(key);
             return;
           }
-          if (schema2 === false) {
+          if (schema3 === false) {
             cxt.setParams({ additionalProperty: key });
             cxt.error();
             if (!allErrors)
               gen.break();
             return;
           }
-          if (typeof schema2 == "object" && !(0, util_1.alwaysValidSchema)(it, schema2)) {
+          if (typeof schema3 == "object" && !(0, util_1.alwaysValidSchema)(it, schema3)) {
             const valid = gen.name("valid");
             if (opts.removeAdditional === "failing") {
               applyAdditionalSchema(key, valid, false);
@@ -20313,18 +20313,18 @@ var require_properties = __commonJS({
       type: "object",
       schemaType: "object",
       code(cxt) {
-        const { gen, schema: schema2, parentSchema, data, it } = cxt;
+        const { gen, schema: schema3, parentSchema, data, it } = cxt;
         if (it.opts.removeAdditional === "all" && parentSchema.additionalProperties === void 0) {
           additionalProperties_1.default.code(new validate_1.KeywordCxt(it, additionalProperties_1.default, "additionalProperties"));
         }
-        const allProps = (0, code_1.allSchemaProperties)(schema2);
+        const allProps = (0, code_1.allSchemaProperties)(schema3);
         for (const prop of allProps) {
           it.definedProperties.add(prop);
         }
         if (it.opts.unevaluated && allProps.length && it.props !== true) {
           it.props = util_1.mergeEvaluated.props(gen, (0, util_1.toHash)(allProps), it.props);
         }
-        const properties = allProps.filter((p) => !(0, util_1.alwaysValidSchema)(it, schema2[p]));
+        const properties = allProps.filter((p) => !(0, util_1.alwaysValidSchema)(it, schema3[p]));
         if (properties.length === 0)
           return;
         const valid = gen.name("valid");
@@ -20342,7 +20342,7 @@ var require_properties = __commonJS({
           cxt.ok(valid);
         }
         function hasDefault(prop) {
-          return it.opts.useDefaults && !it.compositeRule && schema2[prop].default !== void 0;
+          return it.opts.useDefaults && !it.compositeRule && schema3[prop].default !== void 0;
         }
         function applyPropertySchema(prop) {
           cxt.subschema({
@@ -20371,10 +20371,10 @@ var require_patternProperties = __commonJS({
       type: "object",
       schemaType: "object",
       code(cxt) {
-        const { gen, schema: schema2, data, parentSchema, it } = cxt;
+        const { gen, schema: schema3, data, parentSchema, it } = cxt;
         const { opts } = it;
-        const patterns = (0, code_1.allSchemaProperties)(schema2);
-        const alwaysValidPatterns = patterns.filter((p) => (0, util_1.alwaysValidSchema)(it, schema2[p]));
+        const patterns = (0, code_1.allSchemaProperties)(schema3);
+        const alwaysValidPatterns = patterns.filter((p) => (0, util_1.alwaysValidSchema)(it, schema3[p]));
         if (patterns.length === 0 || alwaysValidPatterns.length === patterns.length && (!it.opts.unevaluated || it.props === true)) {
           return;
         }
@@ -20442,8 +20442,8 @@ var require_not = __commonJS({
       schemaType: ["object", "boolean"],
       trackErrors: true,
       code(cxt) {
-        const { gen, schema: schema2, it } = cxt;
-        if ((0, util_1.alwaysValidSchema)(it, schema2)) {
+        const { gen, schema: schema3, it } = cxt;
+        if ((0, util_1.alwaysValidSchema)(it, schema3)) {
           cxt.fail();
           return;
         }
@@ -20496,12 +20496,12 @@ var require_oneOf = __commonJS({
       trackErrors: true,
       error: error2,
       code(cxt) {
-        const { gen, schema: schema2, parentSchema, it } = cxt;
-        if (!Array.isArray(schema2))
+        const { gen, schema: schema3, parentSchema, it } = cxt;
+        if (!Array.isArray(schema3))
           throw new Error("ajv implementation error");
         if (it.opts.discriminator && parentSchema.discriminator)
           return;
-        const schArr = schema2;
+        const schArr = schema3;
         const valid = gen.let("valid", false);
         const passing = gen.let("passing", null);
         const schValid = gen.name("_valid");
@@ -20547,11 +20547,11 @@ var require_allOf = __commonJS({
       keyword: "allOf",
       schemaType: "array",
       code(cxt) {
-        const { gen, schema: schema2, it } = cxt;
-        if (!Array.isArray(schema2))
+        const { gen, schema: schema3, it } = cxt;
+        if (!Array.isArray(schema3))
           throw new Error("ajv implementation error");
         const valid = gen.name("valid");
-        schema2.forEach((sch, i) => {
+        schema3.forEach((sch, i) => {
           if ((0, util_1.alwaysValidSchema)(it, sch))
             return;
           const schCxt = cxt.subschema({ keyword: "allOf", schemaProp: i }, valid);
@@ -20626,8 +20626,8 @@ var require_if = __commonJS({
       }
     };
     function hasSchema(it, keyword) {
-      const schema2 = it.schema[keyword];
-      return schema2 !== void 0 && !(0, util_1.alwaysValidSchema)(it, schema2);
+      const schema3 = it.schema[keyword];
+      return schema3 !== void 0 && !(0, util_1.alwaysValidSchema)(it, schema3);
     }
     exports.default = def;
   }
@@ -20716,7 +20716,7 @@ var require_format = __commonJS({
       $data: true,
       error: error2,
       code(cxt, ruleType) {
-        const { gen, data, $data, schema: schema2, schemaCode, it } = cxt;
+        const { gen, data, $data, schema: schema3, schemaCode, it } = cxt;
         const { opts, errSchemaPath, schemaEnv, self } = it;
         if (!opts.validateFormats)
           return;
@@ -20746,7 +20746,7 @@ var require_format = __commonJS({
           }
         }
         function validateFormat() {
-          const formatDef = self.formats[schema2];
+          const formatDef = self.formats[schema3];
           if (!formatDef) {
             unknownFormat();
             return;
@@ -20763,12 +20763,12 @@ var require_format = __commonJS({
             }
             throw new Error(unknownMsg());
             function unknownMsg() {
-              return `unknown format "${schema2}" ignored in schema at path "${errSchemaPath}"`;
+              return `unknown format "${schema3}" ignored in schema at path "${errSchemaPath}"`;
             }
           }
           function getFormat(fmtDef) {
-            const code = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema2)}` : void 0;
-            const fmt = gen.scopeValue("formats", { key: schema2, ref: fmtDef, code });
+            const code = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema3)}` : void 0;
+            const fmt = gen.scopeValue("formats", { key: schema3, ref: fmtDef, code });
             if (typeof fmtDef == "object" && !(fmtDef instanceof RegExp)) {
               return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt}.validate`];
             }
@@ -20879,15 +20879,15 @@ var require_discriminator = __commonJS({
       schemaType: "object",
       error: error2,
       code(cxt) {
-        const { gen, data, schema: schema2, parentSchema, it } = cxt;
+        const { gen, data, schema: schema3, parentSchema, it } = cxt;
         const { oneOf } = parentSchema;
         if (!it.opts.discriminator) {
           throw new Error("discriminator: requires discriminator option");
         }
-        const tagName = schema2.propertyName;
+        const tagName = schema3.propertyName;
         if (typeof tagName != "string")
           throw new Error("discriminator: requires propertyName");
-        if (schema2.mapping)
+        if (schema3.mapping)
           throw new Error("discriminator: mapping is not supported");
         if (!oneOf)
           throw new Error("discriminator: requires oneOf keyword");
@@ -22262,7 +22262,7 @@ var init_devices = __esm({
     "use strict";
     init_platformio();
     init_types2();
-    init_errors();
+    init_errors2();
     init_hardware_maps();
     init_semaphore();
   }
@@ -22526,8 +22526,8 @@ async function getProjectContext(projectDir, includeBuildHistory) {
   let libDeps;
   if (hasPlatformioIni) {
     try {
-      const text4 = fs19.readFileSync(iniPath, "utf8");
-      const parsed = parsePlatformioIni(text4);
+      const text5 = fs19.readFileSync(iniPath, "utf8");
+      const parsed = parsePlatformioIni(text5);
       environments = parsed.environments;
       libDeps = parsed.libDeps;
     } catch {
@@ -22573,7 +22573,7 @@ var init_projects = __esm({
     init_zod();
     init_platformio();
     init_validation();
-    init_errors();
+    init_errors2();
     init_build_cache();
     PLATFORMIO_INI_ENV_RE = /^\s*\[env:([^\]\s]+)\]\s*$/gm;
     MAX_SRC_FILES = 50;
@@ -22721,7 +22721,7 @@ var WORKER_SOURCE, activeRegexWorkers;
 var init_bounded_pattern = __esm({
   "src/core/bounded-pattern.ts"() {
     "use strict";
-    init_errors();
+    init_errors2();
     WORKER_SOURCE = `
 const {parentPort,workerData}=require('node:worker_threads');
 parentPort.once('message', () => {
@@ -23407,11 +23407,11 @@ async function executeWithSpooling(command, args, options) {
           if (stat.size > fileOffset) {
             const stream = fs28.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on("data", (chunk) => {
-              const text4 = chunk.toString();
-              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text4);
+              const text5 = chunk.toString();
+              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text5);
               if (latestPointer.mirrorLatest) {
                 try {
-                  fs28.appendFileSync(latestLog, text4);
+                  fs28.appendFileSync(latestLog, text5);
                 } catch {
                 }
               }
@@ -23572,7 +23572,7 @@ var init_spooler = __esm({
     init_tail();
     init_command_registry();
     init_mcp_context();
-    init_errors();
+    init_errors2();
     init_paths();
     init_logger();
     init_events();
@@ -23874,7 +23874,7 @@ var MAX_BINDING_TTL_SECONDS;
 var init_target_resolution = __esm({
   "src/core/target-resolution.ts"() {
     "use strict";
-    init_errors();
+    init_errors2();
     init_validation();
     init_devices2();
     MAX_BINDING_TTL_SECONDS = 900;
@@ -23915,9 +23915,9 @@ function emitNewLogBytes(port, daemon) {
     const buffer = Buffer.alloc(stat.size - start);
     fd = fs31.openSync(daemon.logFile, "r");
     fs31.readSync(fd, buffer, 0, buffer.length, start);
-    const text4 = buffer.toString();
-    if (text4.length > 0) {
-      portalEvents.emitSerialLog(port, text4, daemon.taskId);
+    const text5 = buffer.toString();
+    if (text5.length > 0) {
+      portalEvents.emitSerialLog(port, text5, daemon.taskId);
       daemon.lastActivityAt = (/* @__PURE__ */ new Date()).toISOString();
     }
     daemon.fileOffset = stat.size;
@@ -24470,7 +24470,7 @@ var init_monitor = __esm({
     "use strict";
     init_bounded_pattern();
     init_validation();
-    init_errors();
+    init_errors2();
     init_semaphore();
     init_devices();
     init_process_manager();
@@ -40478,8 +40478,8 @@ var require_text = __commonJS({
     var debug = require_src()("body-parser:text");
     var read = require_read();
     var { normalizeOptions, passthrough } = require_utils2();
-    module.exports = text4;
-    function text4(options) {
+    module.exports = text5;
+    function text5(options) {
       const normalizedOptions = normalizeOptions(options, "text/plain");
       return function textParser(req, res, next) {
         read(req, res, next, passthrough, debug, normalizedOptions);
@@ -54299,11 +54299,11 @@ var require_dist5 = __commonJS({
     exports.TokenData = TokenData;
     var PathError = class extends TypeError {
       constructor(message, originalPath) {
-        let text4 = message;
+        let text5 = message;
         if (originalPath)
-          text4 += `: ${originalPath}`;
-        text4 += `; visit https://git.new/pathToRegexpError for info`;
-        super(text4);
+          text5 += `: ${originalPath}`;
+        text5 += `; visit https://git.new/pathToRegexpError for info`;
+        super(text5);
         this.originalPath = originalPath;
       }
     };
@@ -91807,8 +91807,11 @@ var require_ip_address = __commonJS({
   }
 });
 
+// src/adapters/dependency-compat.ts
+init_zod();
+
 // src/core/dependency-graph.ts
-init_errors();
+init_errors2();
 init_redact();
 function parseDependencyGraph(output) {
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
@@ -92281,7 +92284,7 @@ import path7 from "node:path";
 // src/core/policy/policy-schema.ts
 var import_yaml = __toESM(require_dist(), 1);
 init_zod();
-init_errors();
+init_errors2();
 import path6 from "node:path";
 var PolicyProfileNameSchema = external_exports.enum([
   "read_only",
@@ -92328,8 +92331,8 @@ var PolicyConfigError = class extends PlatformIOError {
   }
   source;
 };
-function parsePolicyDocument(text4, source) {
-  if (Buffer.byteLength(text4, "utf8") > MAX_POLICY_BYTES) {
+function parsePolicyDocument(text5, source) {
+  if (Buffer.byteLength(text5, "utf8") > MAX_POLICY_BYTES) {
     throw new PolicyConfigError(source, "Policy exceeds the 64 KiB limit.");
   }
   const extension = path6.extname(source).toLowerCase();
@@ -92340,8 +92343,8 @@ function parsePolicyDocument(text4, source) {
     );
   }
   try {
-    if (extension === ".json") JSON.parse(text4);
-    const document2 = (0, import_yaml.parseDocument)(text4, {
+    if (extension === ".json") JSON.parse(text5);
+    const document2 = (0, import_yaml.parseDocument)(text5, {
       version: "1.2",
       strict: true,
       uniqueKeys: true,
@@ -92424,7 +92427,7 @@ function resolvePolicyDirectory() {
 }
 
 // src/core/policy/approvals.ts
-init_errors();
+init_errors2();
 var ApprovalRecordSchema = external_exports.object({
   id: external_exports.string().regex(/^approval-[a-f0-9-]{36}$/),
   action: external_exports.string(),
@@ -92442,10 +92445,10 @@ function approvalsFile() {
   return path8.join(resolvePolicyDirectory(), "approvals.json");
 }
 function readApprovals(file = approvalsFile()) {
-  let text4;
+  let text5;
   try {
     if (fs6.statSync(file).size > 8 * 1024 * 1024) throw new Error("size limit");
-    text4 = fs6.readFileSync(file, "utf8");
+    text5 = fs6.readFileSync(file, "utf8");
   } catch (error2) {
     if (error2.code === "ENOENT") return [];
     throw new PlatformIOError(
@@ -92454,7 +92457,7 @@ function readApprovals(file = approvalsFile()) {
     );
   }
   try {
-    return external_exports.array(ApprovalRecordSchema).parse(JSON.parse(text4));
+    return external_exports.array(ApprovalRecordSchema).parse(JSON.parse(text5));
   } catch {
     throw new PlatformIOError(
       "Approval storage is malformed; operator repair is required.",
@@ -92687,14 +92690,14 @@ function readRecentAuditEvents(opts) {
 }
 
 // src/core/policy/automation-policy.ts
-init_errors();
+init_errors2();
 init_validation();
 import fs9 from "node:fs";
 import path12 from "node:path";
 
 // src/core/automation-state.ts
 var import_proper_lockfile4 = __toESM(require_proper_lockfile(), 1);
-init_errors();
+init_errors2();
 init_validation();
 init_events();
 import crypto4 from "node:crypto";
@@ -93346,12 +93349,12 @@ function readLayer(source, required2) {
     );
   }
 }
-function recordSource(sources, kind3, source, text4) {
+function recordSource(sources, kind3, source, text5) {
   sources.push({
     kind: kind3,
     source,
-    present: text4 !== void 0,
-    ...text4 === void 0 ? {} : { sha256: crypto6.createHash("sha256").update(text4).digest("hex") }
+    present: text5 !== void 0,
+    ...text5 === void 0 ? {} : { sha256: crypto6.createHash("sha256").update(text5).digest("hex") }
   });
 }
 function applyOperatorCeiling(policy, operator) {
@@ -93395,11 +93398,11 @@ function loadEffectivePolicyState(workspaceDir) {
       path14.resolve(workspaceDir),
       ".pio-mcp-policy.json"
     );
-    const text4 = readLayer(source2, false);
-    recordSource(sources, "project-profile", source2, text4);
-    if (text4 !== void 0) {
+    const text5 = readLayer(source2, false);
+    recordSource(sources, "project-profile", source2, text5);
+    if (text5 !== void 0) {
       const document2 = PolicyProfileConfigSchema.safeParse(
-        parsePolicyDocument(text4, source2)
+        parsePolicyDocument(text5, source2)
       );
       if (!document2.success)
         throw new PolicyConfigError(
@@ -93430,10 +93433,10 @@ function loadEffectivePolicyState(workspaceDir) {
       ".pio-mcp-workspace",
       "policy.yaml"
     );
-    const text4 = readLayer(source2, false);
-    recordSource(sources, "project-override", source2, text4);
-    if (text4 !== void 0) {
-      const document2 = parsePolicyDocument(text4, source2);
+    const text5 = readLayer(source2, false);
+    recordSource(sources, "project-override", source2, text5);
+    if (text5 !== void 0) {
+      const document2 = parsePolicyDocument(text5, source2);
       if ("profile" in document2)
         throw new PolicyConfigError(
           source2,
@@ -93460,7 +93463,7 @@ function loadEffectivePolicyState(workspaceDir) {
 }
 
 // src/core/policy/approval-scope.ts
-init_errors();
+init_errors2();
 import crypto7 from "node:crypto";
 import path15 from "node:path";
 function canonical2(value2, depth = 0) {
@@ -93775,7 +93778,7 @@ async function evaluatePolicy(actionName, args, context = {}) {
 }
 
 // src/core/action-dispatcher.ts
-init_errors();
+init_errors2();
 async function dispatchAuthorizedAction(name2, args, context, execute) {
   const decision2 = await authorizeAction(name2, args, context);
   if (decision2.status !== "allow")
@@ -93797,7 +93800,7 @@ async function authorizeAction(name2, args, context) {
 }
 
 // src/core/policy/revision-guard.ts
-init_errors();
+init_errors2();
 function createPolicyRevisionGuard(workspaceDir) {
   const expected = loadEffectivePolicyState(workspaceDir).digest;
   return () => {
@@ -93811,7 +93814,7 @@ function createPolicyRevisionGuard(workspaceDir) {
 
 // src/core/project-inspection.ts
 init_zod();
-init_errors();
+init_errors2();
 init_redact();
 var text = external_exports.string().max(65536);
 var value = external_exports.union([
@@ -94011,7 +94014,7 @@ function parseProjectMetadata(output, environment) {
 
 // src/tools/project-inspection.ts
 init_redact();
-init_errors();
+init_errors2();
 var base = {
   projectDir: external_exports.string().min(1).max(32768),
   approvalId: external_exports.string().optional()
@@ -94099,7 +94102,7 @@ import path17 from "node:path";
 
 // src/core/dependency-manifest.ts
 init_zod();
-init_errors();
+init_errors2();
 init_redact();
 var nameSchema = external_exports.string().trim().min(1).max(512).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 function parseDependencyDeclaration(input) {
@@ -94126,8 +94129,8 @@ function parseDependencyDeclaration(input) {
     constrained: !!match[3]?.trim()
   };
 }
-function parseDependencyManifest(text4, format) {
-  if (Buffer.byteLength(text4) > 1024 * 1024)
+function parseDependencyManifest(text5, format) {
+  if (Buffer.byteLength(text5) > 1024 * 1024)
     throw new PlatformIOError(
       "Library manifest exceeds 1 MiB.",
       "DEPENDENCY_MANIFEST_LIMIT"
@@ -94144,7 +94147,7 @@ function parseDependencyManifest(text4, format) {
         name: nameSchema.nullish(),
         version: external_exports.union([external_exports.string().max(512), external_exports.number().finite()]).nullish(),
         dependencies: external_exports.unknown().optional()
-      }).parse(JSON.parse(text4));
+      }).parse(JSON.parse(text5));
       rawName = data.name;
       rawVersion = data.version;
       if (Array.isArray(data.dependencies)) {
@@ -94162,7 +94165,7 @@ function parseDependencyManifest(text4, format) {
         throw new Error("Invalid dependencies");
     } else {
       const fields = /* @__PURE__ */ new Map();
-      for (const line of text4.split(/\r?\n/)) {
+      for (const line of text5.split(/\r?\n/)) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith("#")) continue;
         const at = line.indexOf("=");
@@ -94195,7 +94198,7 @@ function parseDependencyManifest(text4, format) {
 }
 
 // src/core/dependency-project.ts
-init_errors();
+init_errors2();
 function list(value2) {
   if (value2 == null || value2 === "") return [];
   const values = typeof value2 === "string" ? value2.split(/\r?\n/) : value2;
@@ -94262,7 +94265,7 @@ function dependencyProjectInputs(projectDir, report, environment) {
 // src/core/dependency-inventory.ts
 import fs13 from "node:fs/promises";
 import path18 from "node:path";
-init_errors();
+init_errors2();
 async function collectDependencyInventory(roots, assertAuthorized) {
   if (roots.length > 64)
     throw new PlatformIOError("Too many library roots.", "DEPENDENCY_LIMIT");
@@ -94422,7 +94425,7 @@ async function collectDependencyInventory(roots, assertAuthorized) {
 
 // src/core/dependency-audit.ts
 init_zod();
-init_errors();
+init_errors2();
 var name = external_exports.string().min(1).max(512);
 var librarySchema = external_exports.object({
   name,
@@ -94556,7 +94559,7 @@ function auditDependencies(declaredInput, installedInput) {
 // src/tools/dependency-inspection.ts
 init_redact();
 init_platformio();
-init_errors();
+init_errors2();
 var schema = external_exports.object({
   projectDir: external_exports.string().min(1).max(32768),
   approvalId: external_exports.string().max(256).optional(),
@@ -94710,6 +94713,133 @@ function dependencyGraphFields(evidence) {
   };
 }
 
+// src/adapters/compatibility-project.ts
+init_errors2();
+import fs15 from "node:fs/promises";
+import os4 from "node:os";
+import path20 from "node:path";
+async function resolveCompatibilityProject(requested, defaults) {
+  let selected = requested || defaults.projectDir || defaults.cwd || process.cwd();
+  if (selected === "~" || selected.startsWith("~/") || selected.startsWith("~\\"))
+    selected = path20.join(defaults.home ?? os4.homedir(), selected.slice(2));
+  else if (selected.startsWith("~"))
+    throw new PlatformIOError(
+      "Named-user home expansion is unsupported; pass an absolute project path.",
+      "COMPAT_PROJECT_INVALID"
+    );
+  const canonical3 = await fs15.realpath(
+    path20.resolve(defaults.cwd ?? process.cwd(), selected)
+  );
+  if (!(await fs15.stat(canonical3)).isDirectory() || !(await fs15.stat(path20.join(canonical3, "platformio.ini"))).isFile())
+    throw new PlatformIOError(
+      "Expected a PlatformIO project directory.",
+      "COMPAT_PROJECT_INVALID"
+    );
+  return canonical3;
+}
+
+// src/adapters/dependency-compat.ts
+init_errors2();
+var text2 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
+var schema2 = external_exports.object({
+  project_dir: text2.nullable().optional(),
+  env: text2.nullable().optional(),
+  build: external_exports.boolean().default(false),
+  approval_id: text2.optional(),
+  configuration_approval_id: text2.optional(),
+  inventory_approval_id: text2.optional(),
+  build_approval_id: text2.optional()
+}).strict();
+async function executeDependencyCompatibility(name2, input, defaults = {}, caller = {}, onAuthorized) {
+  if (name2 !== "pio_deps_check")
+    throw new PlatformIOError(
+      "Unknown dependency compatibility tool.",
+      "COMPAT_TOOL_UNKNOWN"
+    );
+  const parsed = schema2.safeParse(input);
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Invalid dependency compatibility arguments.",
+      "COMPAT_ARGUMENT_INVALID"
+    );
+  const args = parsed.data;
+  const result = await inspectDependencies(
+    {
+      projectDir: await resolveCompatibilityProject(args.project_dir, defaults),
+      environment: args.env || void 0,
+      build: args.build,
+      approvalId: args.approval_id,
+      configurationApprovalId: args.configuration_approval_id,
+      inventoryApprovalId: args.inventory_approval_id,
+      buildApprovalId: args.build_approval_id
+    },
+    caller,
+    onAuthorized
+  );
+  return dependencyCompatibilityResult(result);
+}
+function dependencyCompatibilityResult(result) {
+  return {
+    ok: result.ok,
+    summary: result.summary,
+    env: result.environment,
+    declared: result.declared,
+    installed: result.installed.map((lib) => ({
+      ...lib,
+      dir_name: lib.directoryName
+    })),
+    issues: result.issues,
+    issue_count: result.issues.length,
+    counts: result.counts,
+    graph: result.graph,
+    graph_status: result.graphStatus,
+    inventory_complete: result.inventoryComplete,
+    diagnostics: result.diagnostics,
+    recursion_error_observed: result.recursionErrorObserved,
+    build: result.build ? {
+      ok: result.build.ok,
+      duration_s: result.build.durationSeconds,
+      log_path: result.build.logPath,
+      output_tail: result.build.outputTail
+    } : null,
+    log_path: null
+  };
+}
+function withDependencyCompatibility(base2) {
+  const source = base2.get("deps_check");
+  if (!source || base2.has("pio_deps_check"))
+    throw new Error("Invalid dependency compatibility registry.");
+  const result = new Map(base2);
+  const properties = {
+    project_dir: {
+      anyOf: [{ type: "string" }, { type: "null" }],
+      default: null
+    },
+    env: { anyOf: [{ type: "string" }, { type: "null" }], default: null },
+    build: { type: "boolean", default: false }
+  };
+  for (const field of [
+    "approval_id",
+    "configuration_approval_id",
+    "inventory_approval_id",
+    "build_approval_id"
+  ])
+    properties[field] = { type: "string", maxLength: 256 };
+  result.set("pio_deps_check", {
+    ...source,
+    name: "pio_deps_check",
+    description: "Compatibility dependency audit using canonical permissions and optional authorized build evidence.",
+    inputSchema: {
+      type: "object",
+      properties,
+      required: [],
+      additionalProperties: false
+    },
+    handler: (args, context) => context.dispatch("pio_deps_check", args)
+  });
+  return result;
+}
+
 // src/adapters/compatibility-error.ts
 init_zod();
 init_redact();
@@ -94803,43 +94933,16 @@ function withProjectCompatibility(base2) {
 // src/adapters/project-compat.ts
 init_zod();
 import path21 from "node:path";
-
-// src/adapters/compatibility-project.ts
-init_errors();
-import fs15 from "node:fs/promises";
-import os4 from "node:os";
-import path20 from "node:path";
-async function resolveCompatibilityProject(requested, defaults) {
-  let selected = requested || defaults.projectDir || defaults.cwd || process.cwd();
-  if (selected === "~" || selected.startsWith("~/") || selected.startsWith("~\\"))
-    selected = path20.join(defaults.home ?? os4.homedir(), selected.slice(2));
-  else if (selected.startsWith("~"))
-    throw new PlatformIOError(
-      "Named-user home expansion is unsupported; pass an absolute project path.",
-      "COMPAT_PROJECT_INVALID"
-    );
-  const canonical3 = await fs15.realpath(
-    path20.resolve(defaults.cwd ?? process.cwd(), selected)
-  );
-  if (!(await fs15.stat(canonical3)).isDirectory() || !(await fs15.stat(path20.join(canonical3, "platformio.ini"))).isFile())
-    throw new PlatformIOError(
-      "Expected a PlatformIO project directory.",
-      "COMPAT_PROJECT_INVALID"
-    );
-  return canonical3;
-}
-
-// src/adapters/project-compat.ts
-init_errors();
-var text2 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
+init_errors2();
+var text3 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var scope = {
-  project_dir: text2.nullable().optional(),
-  approval_id: text2.optional()
+  project_dir: text3.nullable().optional(),
+  approval_id: text3.optional()
 };
 var schemas = {
   pio_project_envs: external_exports.object(scope).strict(),
-  pio_list_targets: external_exports.object({ ...scope, env: text2.nullable().optional() }).strict(),
-  pio_project_metadata: external_exports.object({ ...scope, env: text2.nullable().optional() }).strict()
+  pio_list_targets: external_exports.object({ ...scope, env: text3.nullable().optional() }).strict(),
+  pio_project_metadata: external_exports.object({ ...scope, env: text3.nullable().optional() }).strict()
 };
 async function mapProjectCompatibilityRequest(name2, input, defaults = {}) {
   if (!Object.hasOwn(schemas, name2))
@@ -94939,7 +95042,7 @@ async function executeProjectCompatibility(name2, input, defaults = {}, caller =
 }
 
 // src/adapters/compatibility-mode.ts
-init_errors();
+init_errors2();
 function parseCompatibilityLaunch(args, environment = process.env.PIO_MCP_COMPAT) {
   let selected;
   const remaining = [];
@@ -95046,20 +95149,20 @@ function withPackageCompatibility(base2) {
 
 // src/adapters/package-compat.ts
 init_zod();
-init_errors();
+init_errors2();
 
 // src/tools/packages.ts
 var import_proper_lockfile5 = __toESM(require_proper_lockfile(), 1);
 init_zod();
 init_platformio();
-init_errors();
+init_errors2();
 import fs16 from "node:fs/promises";
 import path22 from "node:path";
 import crypto8 from "node:crypto";
 init_redact();
 
 // src/core/package-config.ts
-init_errors();
+init_errors2();
 function uncomment(value2) {
   return value2.replace(/(^|\s)[#;].*$/, "").trim();
 }
@@ -95069,9 +95172,9 @@ function invalid2() {
     "PACKAGE_CONFIG_CONFLICT"
   );
 }
-function parse(text4) {
-  if (Buffer.byteLength(text4) > 1024 * 1024) invalid2();
-  const lines2 = text4.split(/\r?\n/);
+function parse(text5) {
+  if (Buffer.byteLength(text5) > 1024 * 1024) invalid2();
+  const lines2 = text5.split(/\r?\n/);
   const sections = /* @__PURE__ */ new Map();
   let section;
   let entry;
@@ -95106,7 +95209,7 @@ function parse(text4) {
   for (const section2 of sections.values())
     for (const entry2 of section2.entries.values())
       entry2.value = entry2.value.trim();
-  return { lines: lines2, sections, newline: text4.includes("\r\n") ? "\r\n" : "\n" };
+  return { lines: lines2, sections, newline: text5.includes("\r\n") ? "\r\n" : "\n" };
 }
 function mergePackageConfiguration(before, after, options) {
   const original = parse(before), updated = parse(after);
@@ -95151,7 +95254,7 @@ function mergePackageConfiguration(before, after, options) {
 }
 
 // src/core/packages.ts
-init_errors();
+init_errors2();
 function linesFromOutput(output) {
   if (Buffer.byteLength(output) > 10 * 1024 * 1024)
     throw new PlatformIOError(
@@ -95278,9 +95381,9 @@ var mutationSchema = external_exports.object({
     "Package specification cannot be an option"
   )
 }).strict();
-function safeOutput(text4) {
+function safeOutput(text5) {
   return redactSecretsInText(
-    text4.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1[REDACTED]@")
+    text5.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1[REDACTED]@")
   );
 }
 async function readConfiguration(projectDir) {
@@ -95469,7 +95572,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
           after = merged;
         }
       }
-      const digest = (text4) => text4 === null ? null : crypto8.createHash("sha256").update(text4).digest("hex");
+      const digest = (text5) => text5 === null ? null : crypto8.createHash("sha256").update(text5).digest("hex");
       validatePolicy();
       const detail = action === "pkg_search" ? parsePackageSearch(safeOutput(result.stdout)) : action === "pkg_list" ? parsePackageList(safeOutput(result.stdout)) : void 0;
       const parsedOk = !detail || detail.parseStatus === "complete";
@@ -95502,28 +95605,28 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
 }
 
 // src/adapters/package-compat.ts
-var text3 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
+var text4 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var scope3 = {
-  project_dir: text3.nullable().optional(),
-  env: text3.nullable().optional(),
-  approval_id: text3.optional()
+  project_dir: text4.nullable().optional(),
+  env: text4.nullable().optional(),
+  approval_id: text4.optional()
 };
 var kind2 = external_exports.enum(["library", "platform", "tool"]).default("library");
 var schemas2 = {
   pio_pkg_search: external_exports.object({
-    query: text3,
+    query: text4,
     type: kind2,
     page: external_exports.number().int().min(1).max(1e5).default(1),
-    approval_id: text3.optional()
+    approval_id: text4.optional()
   }).strict(),
   pio_pkg_install: external_exports.object({
     ...scope3,
-    spec: text3.refine((value2) => value2.length > 0),
+    spec: text4.refine((value2) => value2.length > 0),
     type: kind2
   }).strict(),
   pio_pkg_uninstall: external_exports.object({
     ...scope3,
-    spec: text3.refine((value2) => value2.length > 0),
+    spec: text4.refine((value2) => value2.length > 0),
     type: kind2
   }).strict(),
   pio_pkg_list: external_exports.object(scope3).strict(),
@@ -96007,9 +96110,9 @@ var BIGINT_FORMAT_RANGES = {
   int64: [/* @__PURE__ */ BigInt("-9223372036854775808"), /* @__PURE__ */ BigInt("9223372036854775807")],
   uint64: [/* @__PURE__ */ BigInt(0), /* @__PURE__ */ BigInt("18446744073709551615")]
 };
-function pick(schema2, mask) {
+function pick(schema3, mask) {
   const newShape = {};
-  const currDef = schema2._zod.def;
+  const currDef = schema3._zod.def;
   for (const key in mask) {
     if (!(key in currDef.shape)) {
       throw new Error(`Unrecognized key: "${key}"`);
@@ -96018,15 +96121,15 @@ function pick(schema2, mask) {
       continue;
     newShape[key] = currDef.shape[key];
   }
-  return clone(schema2, {
-    ...schema2._zod.def,
+  return clone(schema3, {
+    ...schema3._zod.def,
     shape: newShape,
     checks: []
   });
 }
-function omit(schema2, mask) {
-  const newShape = { ...schema2._zod.def.shape };
-  const currDef = schema2._zod.def;
+function omit(schema3, mask) {
+  const newShape = { ...schema3._zod.def.shape };
+  const currDef = schema3._zod.def;
   for (const key in mask) {
     if (!(key in currDef.shape)) {
       throw new Error(`Unrecognized key: "${key}"`);
@@ -96035,27 +96138,27 @@ function omit(schema2, mask) {
       continue;
     delete newShape[key];
   }
-  return clone(schema2, {
-    ...schema2._zod.def,
+  return clone(schema3, {
+    ...schema3._zod.def,
     shape: newShape,
     checks: []
   });
 }
-function extend(schema2, shape) {
+function extend(schema3, shape) {
   if (!isPlainObject(shape)) {
     throw new Error("Invalid input to extend: expected a plain object");
   }
   const def = {
-    ...schema2._zod.def,
+    ...schema3._zod.def,
     get shape() {
-      const _shape = { ...schema2._zod.def.shape, ...shape };
+      const _shape = { ...schema3._zod.def.shape, ...shape };
       assignProp(this, "shape", _shape);
       return _shape;
     },
     checks: []
     // delete existing checks
   };
-  return clone(schema2, def);
+  return clone(schema3, def);
 }
 function merge(a, b) {
   return clone(a, {
@@ -96070,8 +96173,8 @@ function merge(a, b) {
     // delete existing checks
   });
 }
-function partial(Class2, schema2, mask) {
-  const oldShape = schema2._zod.def.shape;
+function partial(Class2, schema3, mask) {
+  const oldShape = schema3._zod.def.shape;
   const shape = { ...oldShape };
   if (mask) {
     for (const key in mask) {
@@ -96093,14 +96196,14 @@ function partial(Class2, schema2, mask) {
       }) : oldShape[key];
     }
   }
-  return clone(schema2, {
-    ...schema2._zod.def,
+  return clone(schema3, {
+    ...schema3._zod.def,
     shape,
     checks: []
   });
 }
-function required(Class2, schema2, mask) {
-  const oldShape = schema2._zod.def.shape;
+function required(Class2, schema3, mask) {
+  const oldShape = schema3._zod.def.shape;
   const shape = { ...oldShape };
   if (mask) {
     for (const key in mask) {
@@ -96122,8 +96225,8 @@ function required(Class2, schema2, mask) {
       });
     }
   }
-  return clone(schema2, {
-    ...schema2._zod.def,
+  return clone(schema3, {
+    ...schema3._zod.def,
     shape,
     // optional: [],
     checks: []
@@ -96274,9 +96377,9 @@ function formatError(error2, _mapper) {
 }
 
 // node_modules/zod/v4/core/parse.js
-var _parse = (_Err) => (schema2, value2, _ctx, _params) => {
+var _parse = (_Err) => (schema3, value2, _ctx, _params) => {
   const ctx = _ctx ? Object.assign(_ctx, { async: false }) : { async: false };
-  const result = schema2._zod.run({ value: value2, issues: [] }, ctx);
+  const result = schema3._zod.run({ value: value2, issues: [] }, ctx);
   if (result instanceof Promise) {
     throw new $ZodAsyncError();
   }
@@ -96287,9 +96390,9 @@ var _parse = (_Err) => (schema2, value2, _ctx, _params) => {
   }
   return result.value;
 };
-var _parseAsync = (_Err) => async (schema2, value2, _ctx, params) => {
+var _parseAsync = (_Err) => async (schema3, value2, _ctx, params) => {
   const ctx = _ctx ? Object.assign(_ctx, { async: true }) : { async: true };
-  let result = schema2._zod.run({ value: value2, issues: [] }, ctx);
+  let result = schema3._zod.run({ value: value2, issues: [] }, ctx);
   if (result instanceof Promise)
     result = await result;
   if (result.issues.length) {
@@ -96299,9 +96402,9 @@ var _parseAsync = (_Err) => async (schema2, value2, _ctx, params) => {
   }
   return result.value;
 };
-var _safeParse = (_Err) => (schema2, value2, _ctx) => {
+var _safeParse = (_Err) => (schema3, value2, _ctx) => {
   const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
-  const result = schema2._zod.run({ value: value2, issues: [] }, ctx);
+  const result = schema3._zod.run({ value: value2, issues: [] }, ctx);
   if (result instanceof Promise) {
     throw new $ZodAsyncError();
   }
@@ -96311,9 +96414,9 @@ var _safeParse = (_Err) => (schema2, value2, _ctx) => {
   } : { success: true, data: result.value };
 };
 var safeParse = /* @__PURE__ */ _safeParse($ZodRealError);
-var _safeParseAsync = (_Err) => async (schema2, value2, _ctx) => {
+var _safeParseAsync = (_Err) => async (schema3, value2, _ctx) => {
   const ctx = _ctx ? Object.assign(_ctx, { async: true }) : { async: true };
-  let result = schema2._zod.run({ value: value2, issues: [] }, ctx);
+  let result = schema3._zod.run({ value: value2, issues: [] }, ctx);
   if (result instanceof Promise)
     result = await result;
   return result.issues.length ? {
@@ -98171,14 +98274,14 @@ var $ZodRegistry = class {
     this._map = /* @__PURE__ */ new Map();
     this._idmap = /* @__PURE__ */ new Map();
   }
-  add(schema2, ..._meta) {
+  add(schema3, ..._meta) {
     const meta = _meta[0];
-    this._map.set(schema2, meta);
+    this._map.set(schema3, meta);
     if (meta && typeof meta === "object" && "id" in meta) {
       if (this._idmap.has(meta.id)) {
         throw new Error(`ID ${meta.id} already exists in the registry`);
       }
-      this._idmap.set(meta.id, schema2);
+      this._idmap.set(meta.id, schema3);
     }
     return this;
   }
@@ -98187,25 +98290,25 @@ var $ZodRegistry = class {
     this._idmap = /* @__PURE__ */ new Map();
     return this;
   }
-  remove(schema2) {
-    const meta = this._map.get(schema2);
+  remove(schema3) {
+    const meta = this._map.get(schema3);
     if (meta && typeof meta === "object" && "id" in meta) {
       this._idmap.delete(meta.id);
     }
-    this._map.delete(schema2);
+    this._map.delete(schema3);
     return this;
   }
-  get(schema2) {
-    const p = schema2._zod.parent;
+  get(schema3) {
+    const p = schema3._zod.parent;
     if (p) {
       const pm = { ...this.get(p) ?? {} };
       delete pm.id;
-      return { ...pm, ...this._map.get(schema2) };
+      return { ...pm, ...this._map.get(schema3) };
     }
-    return this._map.get(schema2);
+    return this._map.get(schema3);
   }
-  has(schema2) {
-    return this._map.has(schema2);
+  has(schema3) {
+    return this._map.has(schema3);
   }
 };
 function registry() {
@@ -98634,47 +98737,47 @@ function _array(Class2, element, params) {
 function _custom(Class2, fn, _params) {
   const norm = normalizeParams(_params);
   norm.abort ?? (norm.abort = true);
-  const schema2 = new Class2({
+  const schema3 = new Class2({
     type: "custom",
     check: "custom",
     fn,
     ...norm
   });
-  return schema2;
+  return schema3;
 }
 function _refine(Class2, fn, _params) {
-  const schema2 = new Class2({
+  const schema3 = new Class2({
     type: "custom",
     check: "custom",
     fn,
     ...normalizeParams(_params)
   });
-  return schema2;
+  return schema3;
 }
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
 function isZ4Schema(s) {
-  const schema2 = s;
-  return !!schema2._zod;
+  const schema3 = s;
+  return !!schema3._zod;
 }
-function safeParse2(schema2, data) {
-  if (isZ4Schema(schema2)) {
-    const result2 = safeParse(schema2, data);
+function safeParse2(schema3, data) {
+  if (isZ4Schema(schema3)) {
+    const result2 = safeParse(schema3, data);
     return result2;
   }
-  const v3Schema = schema2;
+  const v3Schema = schema3;
   const result = v3Schema.safeParse(data);
   return result;
 }
-function getObjectShape(schema2) {
-  if (!schema2)
+function getObjectShape(schema3) {
+  if (!schema3)
     return void 0;
   let rawShape;
-  if (isZ4Schema(schema2)) {
-    const v4Schema = schema2;
+  if (isZ4Schema(schema3)) {
+    const v4Schema = schema3;
     rawShape = v4Schema._zod?.def?.shape;
   } else {
-    const v3Schema = schema2;
+    const v3Schema = schema3;
     rawShape = v3Schema.shape;
   }
   if (!rawShape)
@@ -98688,9 +98791,9 @@ function getObjectShape(schema2) {
   }
   return rawShape;
 }
-function getLiteralValue(schema2) {
-  if (isZ4Schema(schema2)) {
-    const v4Schema = schema2;
+function getLiteralValue(schema3) {
+  if (isZ4Schema(schema3)) {
+    const v4Schema = schema3;
     const def2 = v4Schema._zod?.def;
     if (def2) {
       if (def2.value !== void 0)
@@ -98700,7 +98803,7 @@ function getLiteralValue(schema2) {
       }
     }
   }
-  const v3Schema = schema2;
+  const v3Schema = schema3;
   const def = v3Schema._def;
   if (def) {
     if (def.value !== void 0)
@@ -98709,7 +98812,7 @@ function getLiteralValue(schema2) {
       return def.values[0];
     }
   }
-  const directValue = schema2.value;
+  const directValue = schema3.value;
   if (directValue !== void 0)
     return directValue;
   return void 0;
@@ -99403,8 +99506,8 @@ function superRefine(fn) {
   });
   return ch;
 }
-function preprocess(fn, schema2) {
-  return pipe(transform(fn), schema2);
+function preprocess(fn, schema3) {
+  return pipe(transform(fn), schema3);
 }
 
 // node_modules/zod/v4/classic/external.js
@@ -100938,8 +101041,8 @@ function isTerminal(status) {
 var ALPHA_NUMERIC = new Set("ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvxyz0123456789");
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
-function getMethodLiteral(schema2) {
-  const shape = getObjectShape(schema2);
+function getMethodLiteral(schema3) {
+  const shape = getObjectShape(schema3);
   const methodSchema = shape?.method;
   if (!methodSchema) {
     throw new Error("Schema is missing a method literal");
@@ -100950,8 +101053,8 @@ function getMethodLiteral(schema2) {
   }
   return value2;
 }
-function parseWithCompat(schema2, data) {
-  const result = safeParse2(schema2, data);
+function parseWithCompat(schema3, data) {
+  const result = safeParse2(schema3, data);
   if (!result.success) {
     throw result.error;
   }
@@ -101959,8 +102062,8 @@ var AjvJsonSchemaValidator = class {
    * @param schema - Standard JSON Schema object
    * @returns A validator function that validates input data
    */
-  getValidator(schema2) {
-    const ajvValidator = "$id" in schema2 && typeof schema2.$id === "string" ? this._ajv.getSchema(schema2.$id) ?? this._ajv.compile(schema2) : this._ajv.compile(schema2);
+  getValidator(schema3) {
+    const ajvValidator = "$id" in schema3 && typeof schema3.$id === "string" ? this._ajv.getSchema(schema3.$id) ?? this._ajv.compile(schema3) : this._ajv.compile(schema3);
     return (input) => {
       const valid = ajvValidator(input);
       if (valid) {
@@ -102715,14 +102818,14 @@ import fs24 from "node:fs/promises";
 // src/core/analysis/collect-build-context.ts
 init_platformio();
 init_validation();
-init_errors();
+init_errors2();
 
 // src/core/analysis/build-metadata.ts
-init_errors();
+init_errors2();
 import path27 from "node:path";
 
 // src/core/analysis/toolchain-resolver.ts
-init_errors();
+init_errors2();
 import fs20 from "node:fs/promises";
 import path26 from "node:path";
 function contained(root, candidate) {
@@ -102834,7 +102937,7 @@ function selectBuildMetadata(output, environment) {
 }
 
 // src/core/analysis/elf-identity.ts
-init_errors();
+init_errors2();
 import fs21 from "node:fs/promises";
 import crypto10 from "node:crypto";
 async function readElfIdentity(elfPath, expectedSha256) {
@@ -103048,7 +103151,7 @@ async function collectProgramMemory(input, elfPath, caller = {}, authorization) 
 }
 
 // src/core/analysis/toolchain-discovery.ts
-init_errors();
+init_errors2();
 import fs22 from "node:fs/promises";
 import path28 from "node:path";
 function inside(root, candidate) {
@@ -103129,7 +103232,7 @@ async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectD
 }
 
 // src/core/analysis/platformio-memory.ts
-init_errors();
+init_errors2();
 function parsePlatformioMemory(output) {
   if (Buffer.byteLength(output) > 1024 * 1024)
     throw new PlatformIOError(
@@ -103167,19 +103270,19 @@ function parsePlatformioMemory(output) {
 
 // src/core/analysis/firmware-analysis.ts
 init_bounded_pattern();
-init_errors();
+init_errors2();
 
 // src/core/analysis/crash-parser.ts
-init_errors();
+init_errors2();
 var HEX = "0x[0-9a-fA-F]{6,16}";
 var MAX_ADDRESSES = 4096;
-function linesOf(text4) {
-  if (Buffer.byteLength(text4) > 1024 * 1024)
+function linesOf(text5) {
+  if (Buffer.byteLength(text5) > 1024 * 1024)
     throw new PlatformIOError(
       "Analysis text exceeds 1 MiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
-  const lines2 = text4.split(/\r?\n/);
+  const lines2 = text5.split(/\r?\n/);
   if (lines2.some((line) => line.length > 16384))
     throw new PlatformIOError(
       "Analysis line exceeds 16 KiB.",
@@ -103195,8 +103298,8 @@ function normalizeAddress(address) {
     );
   return `0x${BigInt(address).toString(16).padStart(8, "0")}`;
 }
-function extractCrash(text4, includeAllHex = false) {
-  const lines2 = linesOf(text4);
+function extractCrash(text5, includeAllHex = false) {
+  const lines2 = linesOf(text5);
   const evidence = {
     addresses: [],
     causes: [],
@@ -103204,7 +103307,7 @@ function extractCrash(text4, includeAllHex = false) {
     backtraceCorrupted: false
   };
   const seen = /* @__PURE__ */ new Set();
-  const riscvDump = /\b(?:MEPC|MTVAL|MCAUSE)\s*[:=]/i.test(text4);
+  const riscvDump = /\b(?:MEPC|MTVAL|MCAUSE)\s*[:=]/i.test(text5);
   let inBacktrace = false;
   let backtraceFrame = 0;
   const add = (raw, role, register = null, frame = null) => {
@@ -103273,8 +103376,8 @@ function extractCrash(text4, includeAllHex = false) {
 function parseAddr2line(output) {
   const frames = /* @__PURE__ */ new Map();
   let current;
-  const location = (text4) => {
-    const match = text4.match(
+  const location = (text5) => {
+    const match = text5.match(
       /^(.*?)\s+at\s+(.+):(\d+|\?)(?:\s+\(discriminator \d+\))?\s*$/
     );
     if (!match) return void 0;
@@ -103313,7 +103416,7 @@ function parseAddr2line(output) {
 }
 
 // src/core/analysis/size-parser.ts
-init_errors();
+init_errors2();
 import path29 from "node:path";
 function lines(output) {
   if (Buffer.byteLength(output) > 16 * 1024 * 1024)
@@ -103375,17 +103478,17 @@ function parseSizeTotals(output) {
   for (const line of lines(output)) {
     const match = line.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+/);
     if (!match) continue;
-    const [text4, data, bss, total] = match.slice(1).map(BigInt);
-    if (text4 + data + bss !== total)
+    const [text5, data, bss, total] = match.slice(1).map(BigInt);
+    if (text5 + data + bss !== total)
       throw new PlatformIOError(
         "Inconsistent GNU size totals.",
         "ANALYSIS_SIZE_INVALID"
       );
     rows.push({
-      text: exact(text4),
+      text: exact(text5),
       data: exact(data),
       bss: exact(bss),
-      flashEstimate: exact(text4 + data),
+      flashEstimate: exact(text5 + data),
       ramEstimate: exact(data + bss)
     });
   }
@@ -103456,7 +103559,7 @@ function groupSymbolsByFile(symbols, projectDir) {
 }
 
 // src/core/analysis/analysis-process.ts
-init_errors();
+init_errors2();
 import { execFile as execFile2 } from "node:child_process";
 import path30 from "node:path";
 async function runAnalysisProcess(executable, args, options = {}) {
@@ -103547,9 +103650,9 @@ function executionOptions(context, deadline) {
     );
   return { cwd: context.projectDir, signal: context.signal, timeoutMs };
 }
-async function decodeFirmwareCrash(context, text4, includeAllHex = false) {
+async function decodeFirmwareCrash(context, text5, includeAllHex = false) {
   context.validatePolicy?.();
-  const crash = extractCrash(text4, includeAllHex);
+  const crash = extractCrash(text5, includeAllHex);
   if (!crash.addresses.length)
     return { ok: false, error: "no_addresses", ...crash, frames: [] };
   const deadline = Date.now() + 3e4;
@@ -103622,11 +103725,11 @@ async function filterSizeSymbols(symbols, pattern, deadline) {
     bytes = 0;
   };
   for (let index = 0; index < symbols.length; index++) {
-    for (const text4 of [symbols[index].name, symbols[index].file]) {
-      if (!text4) continue;
-      const length = Buffer.byteLength(text4);
+    for (const text5 of [symbols[index].name, symbols[index].file]) {
+      if (!text5) continue;
+      const length = Buffer.byteLength(text5);
       if (texts.length >= 4096 || bytes + length > 1024 * 1024) await flush();
-      texts.push(text4);
+      texts.push(text5);
       owners.push(index);
       bytes += length;
     }
@@ -103820,7 +103923,7 @@ init_zod();
 init_platformio();
 init_types2();
 init_validation();
-init_errors();
+init_errors2();
 var PioBoardsOutputSchema = external_exports.union([
   external_exports.array(BoardInfoSchema),
   external_exports.record(external_exports.string(), external_exports.array(BoardInfoSchema))
@@ -103902,8 +104005,8 @@ init_projects();
 init_platformio();
 init_spooler();
 init_validation();
-init_errors();
-init_errors();
+init_errors2();
+init_errors2();
 init_process_manager();
 init_tail();
 init_paths();
@@ -104508,8 +104611,8 @@ init_mcp_context();
 init_spooler();
 init_monitor();
 init_validation();
-init_errors();
-init_errors();
+init_errors2();
+init_errors2();
 init_monitor();
 init_semaphore();
 init_redact();
@@ -104756,7 +104859,7 @@ async function initProjectCore(input) {
 }
 
 // src/utils/lock-manager.ts
-init_errors();
+init_errors2();
 init_events();
 import { randomUUID } from "node:crypto";
 var QueueEnforcementError = class extends PlatformIOError {
@@ -104909,7 +105012,7 @@ async function startMonitorCore(input) {
 init_command_registry();
 init_process_manager();
 init_monitor();
-init_errors();
+init_errors2();
 async function checkTaskStatusCore(input) {
   return checkTaskStatus(input.taskId, input.logPath, input.projectDir);
 }
@@ -105002,7 +105105,7 @@ async function cancelTaskCore(input) {
 
 // src/api/server.ts
 var import_express = __toESM(require_express2(), 1);
-init_errors();
+init_errors2();
 import { createServer } from "http";
 
 // node_modules/socket.io/wrapper.mjs
@@ -106554,7 +106657,7 @@ init_zod();
 init_platformio();
 init_types2();
 init_validation();
-init_errors();
+init_errors2();
 async function searchLibraries(query, limit) {
   if (!query || query.trim().length === 0) {
     throw new LibraryError("Search query is required");
@@ -108056,7 +108159,7 @@ init_devices2();
 
 // src/core/monitor-health.ts
 init_redact();
-init_errors();
+init_errors2();
 import crypto19 from "node:crypto";
 var MAX_PATTERN_LENGTH = 128;
 var MAX_EVIDENCE_BYTES = 8192;
@@ -108533,25 +108636,25 @@ function collectPinUsages(projectDir) {
   const defineRegex = /^\s*#define\s+([A-Za-z_][A-Za-z0-9_]*)\s+(\d{1,2})\b/gm;
   const callRegex = /\b(pinMode|digitalWrite|analogWrite|analogRead)\s*\(\s*([A-Za-z_][A-Za-z0-9_]*|\d{1,2})/g;
   for (const absPath of srcFiles) {
-    let text4 = "";
+    let text5 = "";
     try {
-      text4 = fs39.readFileSync(absPath, "utf8");
+      text5 = fs39.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
     defineRegex.lastIndex = 0;
-    for (const match of text4.matchAll(defineRegex)) {
+    for (const match of text5.matchAll(defineRegex)) {
       macroMap.set(match[1], Number.parseInt(match[2], 10));
     }
   }
   for (const absPath of srcFiles) {
-    let text4 = "";
+    let text5 = "";
     try {
-      text4 = fs39.readFileSync(absPath, "utf8");
+      text5 = fs39.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
-    const lines2 = text4.split(/\r?\n/);
+    const lines2 = text5.split(/\r?\n/);
     for (const line of lines2) {
       callRegex.lastIndex = 0;
       for (const match of line.matchAll(callRegex)) {
@@ -109133,7 +109236,7 @@ async function agentMonitorHealth(input) {
 
 // src/index.ts
 init_platformio();
-init_errors();
+init_errors2();
 init_process_manager();
 init_paths();
 import fs40 from "node:fs";
@@ -109171,12 +109274,12 @@ function ensureStructuredToolResult(toolName, response) {
   if (response.structuredContent) {
     return response;
   }
-  const text4 = response.content?.find(
+  const text5 = response.content?.find(
     (item) => item.type === "text" && typeof item.text === "string"
   )?.text;
-  let data = text4;
+  let data = text5;
   try {
-    data = text4 ? JSON.parse(text4) : void 0;
+    data = text5 ? JSON.parse(text5) : void 0;
   } catch {
   }
   const record2 = typeof data === "object" && data !== null ? data : void 0;
@@ -110536,7 +110639,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_project_metadata",
     "pio_list_targets"
   ].includes(name2);
-  const compatibilityTool = packageCompatibility || projectCompatibility;
+  const dependencyCompatibility = name2 === "pio_deps_check";
+  const compatibilityTool = packageCompatibility || projectCompatibility || dependencyCompatibility;
   const projectInspection = [
     "project_envs",
     "project_metadata",
@@ -110578,7 +110682,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const result = await mcpContext.run(
         { activityId, targetProjectDir },
         () => registeredTool.handler(args, {
-          dispatch: async (tool, parameters) => tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
+          dispatch: async (tool, parameters) => tool === "deps_check" ? inspectDependencies(parameters, caller, onAuthorized) : compatibilityTool ? (dependencyCompatibility ? executeDependencyCompatibility : projectCompatibility ? executeProjectCompatibility : executePackageCompatibility)(
             tool,
             parameters,
             {
@@ -111390,8 +111494,8 @@ async function main() {
   const cliArgs = configurePolicyFileFromArgs(compatibility.args);
   if (compatibility.mode) {
     compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
-    toolRegistry = withProjectCompatibility(
-      withPackageCompatibility(toolRegistry)
+    toolRegistry = withDependencyCompatibility(
+      withProjectCompatibility(withPackageCompatibility(toolRegistry))
     );
   }
   const subcommand = cliArgs.find((a) => !a.startsWith("--"));

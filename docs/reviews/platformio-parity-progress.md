@@ -506,3 +506,9 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added `deps-check` through the canonical service with strict options and separate request/configuration/inventory/build approval identifiers. It does not reuse the generic one-stage `--approve` retry for this composite operation.
 - Added dependency workflow documentation. TypeScript compilation, nine CLI acceptance tests, plugin validation and three npm archive validations passed; runtime rebuilt.
 - Reference dependency alias, actual build-output acceptance and remaining parity/release work remain open.
+
+### Dependency compatibility alias
+
+- Added `pio_deps_check` in opt-in mode using the canonical dependency service, reference argument names and explicit stage approval extensions. Ten aliases now coexist with 54 canonical tools. Result adapters preserve incomplete inventory and graph status rather than claiming unobserved success.
+- TypeScript compilation, eight MCP/service tests, 14 plugin tests, plugin validation and three npm archive validations passed. Prior pushed 4c2416f CI runs 35477201072/35477198874 succeeded. Runtime rebuilt.
+- Exact reference row-field equivalence, actual build-output evidence, pre/post-build inventory semantics and remaining parity/release gates remain open. No publication occurred.

@@ -12,7 +12,9 @@ resolved project configuration and bounded compiler metadata as their canonical
 counterparts. Metadata generation requires build permission because project
 scripts and dependency installation may run.
 
-All 53 canonical tools remain available (62 total in compatibility mode). This is partial implementation of the
+All 54 canonical tools remain available (64 total in compatibility mode).
+`pio_deps_check` additionally maps dependency inspection and optional build
+evidence to the canonical `deps_check` service. This is partial implementation of the
 pinned 40-tool reference contract, not a declaration of complete parity.
 
 Aliases accept snake-case reference arguments. Project operations resolve an

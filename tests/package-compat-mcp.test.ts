@@ -52,7 +52,7 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 63 : 54);
+      expect(tools).toHaveLength(enabled ? 64 : 54);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
@@ -69,6 +69,14 @@ it.each([
           error: "policy_denied",
           status: "failed",
         });
+        const invalidDeps = await client.callTool({
+          name: "pio_deps_check",
+          arguments: { approved: true },
+        });
+        expect(invalidDeps.isError).toBe(true);
+        expect(JSON.stringify(invalidDeps)).toContain(
+          "COMPAT_ARGUMENT_INVALID",
+        );
         const metadata = await client.callTool({
           name: "pio_project_metadata",
           arguments: {},

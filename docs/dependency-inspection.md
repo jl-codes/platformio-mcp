@@ -20,5 +20,6 @@ The CLI accepts `--approval-id`, `--configuration-approval-id`,
 stages. Approval IDs are not interchangeable. The command does not accept a
 blanket `--approve` flag. MCP uses the corresponding camel-case argument names.
 
-The reference `pio_deps_check` adapter and full hardware/release acceptance are
-still pending in this development revision.
+Opt-in compatibility mode also provides `pio_deps_check` with `project_dir`,
+`env`, `build` and snake-case approval identifiers. Exact reference result-field
+equivalence and full build/hardware/release acceptance remain pending.
