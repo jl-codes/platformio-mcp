@@ -1643,3 +1643,8 @@ Added the planned debug_start/debug_cmd/debug_stop/debug_list names to normal mo
 ### Shared debugger endpoint custody
 
 Added an inert endpoint/probe custody owner retained before lease allocation. Startup takes the global per-user loopback-port lease before the probe, checks for an existing listener twice, and persists handoff uncertainty before backend launch. Cleanup releases the probe and then endpoint only under the existing supervisor closure proof; partial acquisition and failed releases remain retryable. Fifteen focused endpoint/local-startup/backend cases passed, including real occupied TCP binding, cross-probe contention, failed probe acquisition/release and preparation races. TypeScript and scoped lint passed. Arbitrary external-process bind races and endpoint peer authentication remain unresolved; no physical acceptance is claimed.
+
+
+### Preserve configured legacy J-Link selection
+
+Configured -select USB commands now retain -select USB=<discovered serial> instead of introducing the V8.24-only -USB option. Explicit -USB configurations retain the modern selector. Both paths preserve -LocalhostOnly 1, reject remote/conflicting selectors and keep target settings. SEGGER UM08001 v6.30 sections 3.3.5.8/3.3.5.23 and current SEGGER GDB Server documentation were inspected; links are in the parity guide. Twenty binding/backend-selection cases and TypeScript passed. Physical and installed legacy-binary acceptance remain outstanding. CI runs 35516577339 and 35516579513 passed on 0b36b9bb before this and the pending endpoint-custody changes.

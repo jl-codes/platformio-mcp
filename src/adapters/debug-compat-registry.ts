@@ -14,7 +14,7 @@ export function withDebugCompatibility<TResult>(
     {
       name: "pio_debug_start",
       description:
-        "Build and start a connection-owned GDB session using PlatformIO's generated initialization, an identified USB probe and a local OpenOCD or modern J-Link backend. Host execution and target effects require separate permissions. Probe custody remains held until owned descendant groups close.",
+        "Build and start a connection-owned GDB session using PlatformIO's generated initialization, an identified USB probe and a local OpenOCD or J-Link backend. Host execution and target effects require separate permissions. Probe custody remains held until owned descendant groups close.",
       required: [],
       properties: {
         project_dir: { type: ["string", "null"] },

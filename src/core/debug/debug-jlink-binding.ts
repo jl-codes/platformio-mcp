@@ -1,4 +1,4 @@
-/** Bind a modern SEGGER GDB server to an explicitly selected USB probe and loopback GDB port. */
+/** Bind a SEGGER GDB server to an explicitly selected USB probe and loopback GDB port. */
 import path from "node:path";
 import { PlatformIOError } from "../../utils/errors.js";
 import {
@@ -10,7 +10,7 @@ import {
   type DebugServerCommand,
 } from "./debug-server-config.js";
 
-/** Use SEGGER's -USB selector (V8.24+); preserve target setup and separately authorized scripts. */
+/** Preserve configured legacy -select syntax; otherwise use modern -USB (V8.24+). */
 export function bindJLinkProbe(
   command: DebugServerCommand,
   selected: UsbProbeRecord,
@@ -42,6 +42,11 @@ export function bindJLinkProbe(
     port > 65535
   )
     return conflict();
+  const usesLegacySelector =
+    normalized.arguments.some(
+      (argument) => argument.toLowerCase() === "-select",
+    ) &&
+    !normalized.arguments.some((argument) => argument.toLowerCase() === "-usb");
   const args: string[] = [];
   for (let index = 0; index < normalized.arguments.length; index++) {
     const argument = normalized.arguments[index];
@@ -66,7 +71,7 @@ export function bindJLinkProbe(
       if (
         option === "-select" &&
         next.toUpperCase() !== "USB" &&
-        next !== "USB=" + probe.serialNumber
+        next.toUpperCase() !== "USB=" + probe.serialNumber
       )
         return conflict();
       if (option === "-localhostonly" && next !== "1") return conflict();
@@ -82,8 +87,9 @@ export function bindJLinkProbe(
       ...normalized,
       arguments: [
         ...args,
-        "-USB",
-        probe.serialNumber,
+        ...(usesLegacySelector
+          ? ["-select", "USB=" + probe.serialNumber]
+          : ["-USB", probe.serialNumber]),
         "-port",
         String(port),
         "-LocalhostOnly",

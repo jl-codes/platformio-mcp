@@ -29,8 +29,8 @@ it("preserves target settings and emits a single explicit serial and loopback en
     "STM32F407VG",
     "-if",
     "SWD",
-    "-USB",
-    "580011111",
+    "-select",
+    "USB=580011111",
     "-port",
     "3333",
     "-LocalhostOnly",
@@ -75,3 +75,34 @@ it.each(["0", "3", "nickname", "58001;bad"])(
     ).toThrow();
   },
 );
+
+it("accepts legacy lowercase USB syntax while keeping explicit localhost-only restriction", () => {
+  const result = bindJLinkProbe(
+    { ...command, arguments: ["-select", "usb=" + probe.serialNumber] },
+    probe,
+    3333,
+  );
+  expect(result.arguments).toEqual([
+    "-select",
+    "USB=" + probe.serialNumber,
+    "-port",
+    "3333",
+    "-LocalhostOnly",
+    "1",
+  ]);
+});
+it("retains modern syntax when the configured command explicitly requires it", () => {
+  const result = bindJLinkProbe(
+    { ...command, arguments: ["-select", "USB", "-USB", probe.serialNumber] },
+    probe,
+    3333,
+  );
+  expect(result.arguments).toEqual([
+    "-USB",
+    probe.serialNumber,
+    "-port",
+    "3333",
+    "-LocalhostOnly",
+    "1",
+  ]);
+});

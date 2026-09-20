@@ -121,7 +121,7 @@ The native bridge can be checked without a board using `node --import tsx script
 
 ### Live debugger compatibility
 
-Compatibility mode now exposes `pio_debug_start`, `pio_debug_cmd`, `pio_debug_list` and `pio_debug_stop`. Sessions belong to the current MCP connection. Startup uses the installed PlatformIO configuration and generated initialization, a retained ELF, and a uniquely identified USB probe. Supply `probe: {vendor_id, product_id, serial_number}` when discovery is ambiguous. Currently implemented owned local bindings are OpenOCD and modern J-Link; standalone ST-Link and remote/pipe transports remain incomplete.
+Compatibility mode now exposes `pio_debug_start`, `pio_debug_cmd`, `pio_debug_list` and `pio_debug_stop`. Sessions belong to the current MCP connection. Startup uses the installed PlatformIO configuration and generated initialization, a retained ELF, and a uniquely identified USB probe. Supply `probe: {vendor_id, product_id, serial_number}` when discovery is ambiguous. Currently implemented owned local bindings are OpenOCD and J-Link with configured legacy or modern USB selectors; standalone ST-Link and remote/pipe transports remain incomplete.
 
 Startup approvals are separate for preparation, discovery, host code and target effects. Completed preparation stages survive approval retries on the same connection. Discovery authorization is consumed per attempt; if a later startup approval is requested, obtain a fresh discovery approval on the next attempt. Never reuse a consumed grant as permission. Normal stop authorizes the configured reset/run hook; `process_only: true` performs recovery cleanup without sending target commands. A reset/run acknowledgment does not independently prove that the physical target is running.
 
@@ -158,3 +158,6 @@ The canonical debugger names `debug_start`, `debug_cmd`, `debug_stop`, and `debu
 
 
 Local debugger startup now holds a per-user TCP endpoint lease alongside the physical probe lease. It checks the loopback port before probe acquisition and again after physical revalidation, without connecting to an existing server. Both leases remain retained through process supervision and uncertain cleanup. The port is briefly bound for each check; this is cooperative exclusion and conflict detection, not a passed socket reservation or authenticated proof that an arbitrary local process cannot bind during backend startup.
+
+
+J-Link commands that already use `-select` retain serial-bound `-select USB=<serial>` instead of receiving the newer `-USB` option. Commands with explicit `-USB`, or no configured selector, use the modern form. Both retain `-LocalhostOnly 1`; remote selectors and a different serial are rejected. This matches the selector and localhost options in [SEGGER UM08001 v6.30, sections 3.3.5.8 and 3.3.5.23](https://updates.iar.com/SuppDB/Public/UPDINFO/012876/arm/doc/JLinkARM.pdf), while [current SEGGER documentation](https://kb.segger.com/J-Link_GDB_Server) dates `-USB` to V8.24. Argument-level checks passed; no installed legacy J-Link binary or physical probe acceptance is claimed.

@@ -104963,6 +104963,9 @@ function bindJLinkProbe(command, selected, port) {
   const probe = selectDebugProbe([selected]).probe;
   if (!/^[0-9]{1,12}$/.test(probe.serialNumber) || Number(probe.serialNumber) <= 3 || !Number.isInteger(port) || port < 1 || port > 65535)
     return conflict();
+  const usesLegacySelector = normalized.arguments.some(
+    (argument2) => argument2.toLowerCase() === "-select"
+  ) && !normalized.arguments.some((argument2) => argument2.toLowerCase() === "-usb");
   const args = [];
   for (let index = 0; index < normalized.arguments.length; index++) {
     const argument2 = normalized.arguments[index];
@@ -104976,7 +104979,7 @@ function bindJLinkProbe(command, selected, port) {
       if (next === void 0 || next.startsWith("-")) return conflict();
       index++;
       if (option === "-usb" && next !== probe.serialNumber) return conflict();
-      if (option === "-select" && next.toUpperCase() !== "USB" && next !== "USB=" + probe.serialNumber)
+      if (option === "-select" && next.toUpperCase() !== "USB" && next.toUpperCase() !== "USB=" + probe.serialNumber)
         return conflict();
       if (option === "-localhostonly" && next !== "1") return conflict();
       if (option === "-port" && !/^[0-9]{1,5}$/.test(next)) return conflict();
@@ -104991,8 +104994,7 @@ function bindJLinkProbe(command, selected, port) {
       ...normalized,
       arguments: [
         ...args,
-        "-USB",
-        probe.serialNumber,
+        ...usesLegacySelector ? ["-select", "USB=" + probe.serialNumber] : ["-USB", probe.serialNumber],
         "-port",
         String(port),
         "-LocalhostOnly",
@@ -107570,7 +107572,7 @@ function withDebugCompatibility(base2, canonical3 = false) {
   const definitions = [
     {
       name: "pio_debug_start",
-      description: "Build and start a connection-owned GDB session using PlatformIO's generated initialization, an identified USB probe and a local OpenOCD or modern J-Link backend. Host execution and target effects require separate permissions. Probe custody remains held until owned descendant groups close.",
+      description: "Build and start a connection-owned GDB session using PlatformIO's generated initialization, an identified USB probe and a local OpenOCD or J-Link backend. Host execution and target effects require separate permissions. Probe custody remains held until owned descendant groups close.",
       required: [],
       properties: {
         project_dir: { type: ["string", "null"] },
