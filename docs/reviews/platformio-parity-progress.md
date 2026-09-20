@@ -914,3 +914,8 @@ Added clean/check/test command registration, help, canonical operation mapping a
 
 The contract comparator now treats properties and definition dictionaries as name-to-schema maps, allowing new optional inputs named after schema keywords (such as pattern). Existing property schemas and required fields remain protected. Three focused checks passed: all 42 pinned input contracts, additive keyword-named properties, and rejection of new restrictions. Five unrelated cases were skipped. CI run 35490494177 was confirmed completed with failure before this correction; no final-revision green CI or complete parity is claimed.
 
+
+### Shared execution startup custody
+
+Completion tracking is attached immediately after child creation, before asynchronous PID/command registration. Pre-spawn failure closes the output descriptor. PID-registration failure cancels through the same bounded waiter; confirmed exit releases custody, while uncertain termination preserves it and reports the child PID and log path. Focused ownership/spooler checks: 13 passed; TypeScript passed. Plugin runtime rebuilt. This closes a startup failure gap but does not establish process-tree containment, shared physical device leases, or hardware acceptance.
+

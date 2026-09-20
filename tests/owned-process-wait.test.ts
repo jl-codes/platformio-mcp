@@ -65,3 +65,26 @@ it("confirms a real timed-out child exits before reporting cleanup complete", as
       proc.kill("SIGKILL");
   }
 });
+
+it.each([false, true])(
+  "bounds cancellation with confirmed exit=%s",
+  async (exits) => {
+    vi.useFakeTimers();
+    const proc = child();
+    const controller = new AbortController();
+    const result = expect(
+      waitForOwnedProcess(proc, 600000, 20, controller.signal),
+    ).rejects.toMatchObject({
+      code: exits ? "PROCESS_CANCELLED" : "PROCESS_CLEANUP_PENDING",
+      context: { cleanupPending: !exits },
+    });
+    controller.abort();
+    expect(proc.kill).toHaveBeenCalledWith("SIGTERM");
+    if (exits) proc.emit("exit", null, "SIGTERM");
+    await vi.advanceTimersByTimeAsync(40);
+    await result;
+    expect(proc.kill).toHaveBeenCalledTimes(exits ? 1 : 2);
+    expect(proc.listenerCount("exit")).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  },
+);

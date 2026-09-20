@@ -7,10 +7,12 @@ export function waitForOwnedProcess(
   proc: ChildProcess,
   timeoutMs: number,
   graceMs = 1000,
+  cancellation?: AbortSignal,
 ): Promise<number> {
   return new Promise((resolve, reject) => {
     let settled = false,
-      timedOut = false;
+      timedOut = false,
+      cancelled = false;
     let escalation: ReturnType<typeof setTimeout> | undefined;
     let deadline: ReturnType<typeof setTimeout> | undefined;
     const cleanup = () => {
@@ -21,15 +23,18 @@ export function waitForOwnedProcess(
       proc.off("exit", exited);
       proc.off("close", exited);
       proc.off("error", failed);
+      cancellation?.removeEventListener("abort", cancel);
     };
     const exited = (code: number | null) => {
       if (settled) return;
       cleanup();
-      if (timedOut)
+      if (timedOut || cancelled)
         reject(
           new PlatformIOError(
-            `Command timed out after ${timeoutMs}ms`,
-            "COMMAND_TIMEOUT",
+            cancelled
+              ? "Command cancelled after startup failure."
+              : `Command timed out after ${timeoutMs}ms`,
+            cancelled ? "PROCESS_CANCELLED" : "COMMAND_TIMEOUT",
             { cleanupPending: false },
           ),
         );
@@ -45,8 +50,8 @@ export function waitForOwnedProcess(
         }),
       );
     };
-    const timer = setTimeout(() => {
-      timedOut = true;
+    const terminate = () => {
+      if (settled) return;
       try {
         proc.kill("SIGTERM");
       } catch {}
@@ -69,11 +74,23 @@ export function waitForOwnedProcess(
           );
         }, graceMs);
       }, graceMs);
+    };
+    const cancel = () => {
+      if (settled || cancelled || timedOut) return;
+      cancelled = true;
+      clearTimeout(timer);
+      terminate();
+    };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      terminate();
     }, timeoutMs);
     proc.once("exit", exited);
     proc.once("close", exited);
     proc.once("error", failed);
+    cancellation?.addEventListener("abort", cancel, { once: true });
     if (proc.exitCode !== null || proc.signalCode !== null)
       exited(proc.exitCode);
+    else if (cancellation?.aborted) cancel();
   });
 }

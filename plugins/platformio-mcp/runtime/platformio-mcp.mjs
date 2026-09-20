@@ -15752,9 +15752,9 @@ var init_devices2 = __esm({
 });
 
 // src/utils/owned-process-wait.ts
-function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
+function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3, cancellation) {
   return new Promise((resolve, reject) => {
-    let settled = false, timedOut = false;
+    let settled = false, timedOut = false, cancelled = false;
     let escalation;
     let deadline;
     const cleanup = () => {
@@ -15765,15 +15765,16 @@ function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
       proc.off("exit", exited);
       proc.off("close", exited);
       proc.off("error", failed);
+      cancellation?.removeEventListener("abort", cancel);
     };
     const exited = (code) => {
       if (settled) return;
       cleanup();
-      if (timedOut)
+      if (timedOut || cancelled)
         reject(
           new PlatformIOError(
-            `Command timed out after ${timeoutMs}ms`,
-            "COMMAND_TIMEOUT",
+            cancelled ? "Command cancelled after startup failure." : `Command timed out after ${timeoutMs}ms`,
+            cancelled ? "PROCESS_CANCELLED" : "COMMAND_TIMEOUT",
             { cleanupPending: false }
           )
         );
@@ -15788,8 +15789,8 @@ function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
         })
       );
     };
-    const timer = setTimeout(() => {
-      timedOut = true;
+    const terminate = () => {
+      if (settled) return;
       try {
         proc.kill("SIGTERM");
       } catch {
@@ -15814,12 +15815,24 @@ function waitForOwnedProcess(proc, timeoutMs, graceMs = 1e3) {
           );
         }, graceMs);
       }, graceMs);
+    };
+    const cancel = () => {
+      if (settled || cancelled || timedOut) return;
+      cancelled = true;
+      clearTimeout(timer);
+      terminate();
+    };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      terminate();
     }, timeoutMs);
     proc.once("exit", exited);
     proc.once("close", exited);
     proc.once("error", failed);
+    cancellation?.addEventListener("abort", cancel, { once: true });
     if (proc.exitCode !== null || proc.signalCode !== null)
       exited(proc.exitCode);
+    else if (cancellation?.aborted) cancel();
   });
 }
 var init_owned_process_wait = __esm({
@@ -16437,33 +16450,79 @@ async function executeWithSpooling(command, args, options) {
   const verb = options.artifactType || "build";
   const { logFile, latestLog } = rotateSpoolerStreams(verb, projectArea);
   const outFd = fs37.openSync(logFile, "a");
-  const proc = await platformioExecutor.spawn(command, args, {
-    cwd: options.cwd,
-    stdio: ["ignore", outFd, outFd],
-    detached: false
+  let proc;
+  try {
+    proc = await platformioExecutor.spawn(command, args, {
+      cwd: options.cwd,
+      stdio: ["ignore", outFd, outFd],
+      detached: false
+    });
+  } catch (error2) {
+    try {
+      fs37.closeSync(outFd);
+    } catch {
+    }
+    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+    throw new PlatformIOError(
+      error2 instanceof Error ? error2.message : "Process could not be started.",
+      "PROCESS_START_FAILED",
+      { cleanupPending: false, fullLogPath: logFile }
+    );
+  }
+  const timeoutMs = options.timeout ?? (options.background ? 36e5 : 6e5);
+  const startupCancellation = new AbortController();
+  const completion = waitForOwnedProcess(proc, timeoutMs, 1e3, startupCancellation.signal);
+  void completion.catch(() => {
   });
   const ctx = mcpContext.getStore();
   const commandId = options.rootCommandId || ctx?.activityId || crypto13.randomUUID();
   const taskId = crypto13.randomUUID();
   const artType = options.artifactType || "build";
   const targetProjectArea = projectArea || ctx?.targetProjectDir;
-  if (proc.pid) {
-    logDiagnostic(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, targetProjectArea);
-    await registerBuildPid(proc.pid, targetProjectArea);
-    await registerCommand({
-      id: commandId,
-      commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
-      timestamp: Date.now(),
-      status: "running",
-      tasks: [{
-        taskId,
-        type: artType,
+  try {
+    if (proc.pid) {
+      logDiagnostic(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, targetProjectArea);
+      await registerBuildPid(proc.pid, targetProjectArea);
+      await registerCommand({
+        id: commandId,
+        commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
+        timestamp: Date.now(),
         status: "running",
-        logPaths: [logFile],
-        pid: proc.pid,
-        commandDesc: `pio ${command} ${args.join(" ")}`
-      }]
-    }, targetProjectArea).catch((e) => logDiagnostic(`[Spooler] Registry fail: ${e.message}`, targetProjectArea));
+        tasks: [{
+          taskId,
+          type: artType,
+          status: "running",
+          logPaths: [logFile],
+          pid: proc.pid,
+          commandDesc: `pio ${command} ${args.join(" ")}`
+        }]
+      }, targetProjectArea).catch((e) => logDiagnostic(`[Spooler] Registry fail: ${e.message}`, targetProjectArea));
+    }
+  } catch (error2) {
+    startupCancellation.abort();
+    let cleanupPending = false;
+    try {
+      await completion;
+    } catch (terminationError) {
+      cleanupPending = !(terminationError instanceof PlatformIOError) || terminationError.context?.cleanupPending !== false;
+    }
+    try {
+      if (!cleanupPending) {
+        await unregisterBuildPid(targetProjectArea).catch(() => {
+        });
+        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      }
+    } finally {
+      try {
+        fs37.closeSync(outFd);
+      } catch {
+      }
+    }
+    throw new PlatformIOError(
+      error2 instanceof Error ? error2.message : "Process registration failed.",
+      "PROCESS_REGISTRATION_FAILED",
+      { cleanupPending, fullLogPath: logFile, pid: proc.pid }
+    );
   }
   const latestPointer = ensureLatestLogPointer(logFile, latestLog);
   let fileOffset = 0;
@@ -16496,9 +16555,8 @@ async function executeWithSpooling(command, args, options) {
     });
   } catch {
   }
-  const timeoutMs = options.timeout ?? (options.background ? 36e5 : 6e5);
   if (options.background) {
-    const p = waitForOwnedProcess(proc, timeoutMs);
+    const p = completion;
     let cleanupPending = false;
     p.catch((e) => {
       cleanupPending = e?.context?.cleanupPending !== false;
@@ -16560,7 +16618,7 @@ async function executeWithSpooling(command, args, options) {
   }
   let exitCode;
   try {
-    exitCode = await waitForOwnedProcess(proc, timeoutMs);
+    exitCode = await completion;
   } catch (error2) {
     const cleanupPending = !(error2 instanceof PlatformIOError) || error2.context?.cleanupPending !== false;
     await updateTaskStatus(commandId, taskId, { status: "error", error: error2 instanceof Error ? error2.message : "Process failed." }, projectArea).catch(() => {

@@ -153,11 +153,28 @@ export async function executeWithSpooling(
   const outFd = fs.openSync(logFile, "a");
 
   // 3. Spawning
-  const proc = await platformioExecutor.spawn(command, args, {
-    cwd: options.cwd,
-    stdio: ["ignore", outFd, outFd],
-    detached: false
-  });
+  let proc: Awaited<ReturnType<typeof platformioExecutor.spawn>>;
+  try {
+    proc = await platformioExecutor.spawn(command, args, {
+      cwd: options.cwd,
+      stdio: ["ignore", outFd, outFd],
+      detached: false,
+    });
+  } catch (error) {
+    try { fs.closeSync(outFd); } catch {}
+    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+    throw new PlatformIOError(
+      error instanceof Error ? error.message : "Process could not be started.",
+      "PROCESS_START_FAILED",
+      { cleanupPending: false, fullLogPath: logFile },
+    );
+  }
+
+  // Observe exit/error before registry I/O yields; startup failures use the same bounded waiter.
+  const timeoutMs = options.timeout ?? (options.background ? 3600000 : 600000);
+  const startupCancellation = new AbortController();
+  const completion = waitForOwnedProcess(proc, timeoutMs, 1000, startupCancellation.signal);
+  void completion.catch(() => {}); // The result is consumed after registration or in its failure path.
 
   const ctx = mcpContext.getStore();
   const commandId = options.rootCommandId || ctx?.activityId || crypto.randomUUID();
@@ -165,23 +182,46 @@ export async function executeWithSpooling(
   const artType = options.artifactType || "build";
   const targetProjectArea = projectArea || ctx?.targetProjectDir;
 
-  if (proc.pid) {
-    logDiag(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, targetProjectArea);
-    await registerBuildPid(proc.pid, targetProjectArea);
-    await registerCommand({
-      id: commandId,
-      commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
-      timestamp: Date.now(),
-      status: "running",
-      tasks: [{
-        taskId: taskId,
-        type: artType,
+  try {
+    if (proc.pid) {
+      logDiag(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, targetProjectArea);
+      await registerBuildPid(proc.pid, targetProjectArea);
+      await registerCommand({
+        id: commandId,
+        commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
+        timestamp: Date.now(),
         status: "running",
-        logPaths: [logFile],
-        pid: proc.pid,
-        commandDesc: `pio ${command} ${args.join(" ")}`
-      }]
-    }, targetProjectArea).catch(e => logDiag(`[Spooler] Registry fail: ${e.message}`, targetProjectArea));
+        tasks: [{
+          taskId: taskId,
+          type: artType,
+          status: "running",
+          logPaths: [logFile],
+          pid: proc.pid,
+          commandDesc: `pio ${command} ${args.join(" ")}`
+        }]
+      }, targetProjectArea).catch(e => logDiag(`[Spooler] Registry fail: ${e.message}`, targetProjectArea));
+    }
+  } catch (error) {
+    startupCancellation.abort();
+    let cleanupPending = false;
+    try { await completion; }
+    catch (terminationError) {
+      cleanupPending = !(terminationError instanceof PlatformIOError) ||
+        terminationError.context?.cleanupPending !== false;
+    }
+    try {
+      if (!cleanupPending) {
+        await unregisterBuildPid(targetProjectArea).catch(() => {});
+        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+      }
+    } finally {
+      try { fs.closeSync(outFd); } catch {}
+    }
+    throw new PlatformIOError(
+      error instanceof Error ? error.message : "Process registration failed.",
+      "PROCESS_REGISTRATION_FAILED",
+      { cleanupPending, fullLogPath: logFile, pid: proc.pid },
+    );
   }
 
   const latestPointer = ensureLatestLogPointer(logFile, latestLog);
@@ -218,10 +258,8 @@ export async function executeWithSpooling(
   } catch {}
 
   // 4. Wait for termination
-  const timeoutMs = options.timeout ?? (options.background ? 3600000 : 600000);
-
   if (options.background) {
-    const p = waitForOwnedProcess(proc, timeoutMs);
+    const p = completion;
 
     let cleanupPending = false;
     p.catch(e => {
@@ -283,7 +321,7 @@ export async function executeWithSpooling(
   
   let exitCode: number;
   try {
-    exitCode = await waitForOwnedProcess(proc, timeoutMs);
+    exitCode = await completion;
   } catch (error) {
     const cleanupPending = !(error instanceof PlatformIOError) || error.context?.cleanupPending !== false;
     await updateTaskStatus(commandId, taskId, {status: "error", error: error instanceof Error ? error.message : "Process failed."}, projectArea).catch(() => {});
