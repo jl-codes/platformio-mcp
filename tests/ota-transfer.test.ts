@@ -76,6 +76,7 @@ function fixture() {
       identity: {
         path: path.join(root, "private.bin"),
         sourcePath: path.join(project, "firmware.bin"),
+        embeddedElfSha256: null,
         size: 4,
         sha256: "a".repeat(64),
       },

@@ -1,5 +1,6 @@
 /** Private snapshots bind OTA approval to exact firmware/filesystem bytes rather than mutable build outputs. */
 import fs from "node:fs/promises";
+import { readEspAppElfHash } from "./esp-app-identity.js";
 import { archiveOtaImage } from "./ota-image-archive.js";
 import path from "node:path";
 import { createPrivateAnalysisDirectory } from "../analysis/private-analysis-directory.js";
@@ -39,6 +40,7 @@ export async function retainOtaImage(
       ...source.identity,
       path: snapshot,
       sourcePath: source.identity.path,
+      embeddedElfSha256: readEspAppElfHash(source.content),
     });
     let releasing: Promise<void> | undefined;
     return Object.freeze({

@@ -252,6 +252,9 @@ export async function executeOtaUpload(
         firmware_sha256: image.identity.sha256,
         firmware_archive_path: result.imageArchivePath,
         elf_correspondence: "identity_unverified" as const,
+        embedded_elf_sha256: args.filesystem
+          ? null
+          : image.identity.embeddedElfSha256,
         reachable: null,
         reachability_status: args.verifyReachable
           ? "icmp_not_probed"

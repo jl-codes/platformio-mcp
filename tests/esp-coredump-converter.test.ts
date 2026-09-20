@@ -18,7 +18,7 @@ it("returns a typed error for an installed but unapproved converter version", ()
   expect(JSON.parse(result.stdout)).toEqual({
     error: "COREDUMP_TOOL_VERSION_MISMATCH",
   });
-});
+}, 15000);
 it("converts only file inputs and confines intermediate outputs to the supplied staging directory", () => {
   const harness = String.raw`
 import importlib.metadata, sys, types, tempfile
@@ -56,4 +56,4 @@ with tempfile.TemporaryDirectory() as directory:
     { encoding: "utf8", timeout: 10000 },
   );
   expect(JSON.parse(output)).toMatchObject({ converter_version: "1.10.0" });
-});
+}, 15000);

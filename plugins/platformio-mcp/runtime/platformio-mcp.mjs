@@ -81858,7 +81858,7 @@ var require_websocket2 = __commonJS({
     var http = __require("http");
     var net2 = __require("net");
     var tls = __require("tls");
-    var { randomBytes, createHash: createHash18 } = __require("crypto");
+    var { randomBytes, createHash: createHash19 } = __require("crypto");
     var { Duplex, Readable } = __require("stream");
     var { URL: URL2 } = __require("url");
     var PerMessageDeflate = require_permessage_deflate();
@@ -82526,7 +82526,7 @@ var require_websocket2 = __commonJS({
           abortHandshake(websocket, socket, "Invalid Upgrade header");
           return;
         }
-        const digest = createHash18("sha1").update(key + GUID).digest("base64");
+        const digest = createHash19("sha1").update(key + GUID).digest("base64");
         if (res.headers["sec-websocket-accept"] !== digest) {
           abortHandshake(websocket, socket, "Invalid Sec-WebSocket-Accept header");
           return;
@@ -82895,7 +82895,7 @@ var require_websocket_server = __commonJS({
     var EventEmitter3 = __require("events");
     var http = __require("http");
     var { Duplex } = __require("stream");
-    var { createHash: createHash18 } = __require("crypto");
+    var { createHash: createHash19 } = __require("crypto");
     var extension = require_extension();
     var PerMessageDeflate = require_permessage_deflate();
     var subprotocol = require_subprotocol();
@@ -83202,7 +83202,7 @@ var require_websocket_server = __commonJS({
           );
         }
         if (this._state > RUNNING) return abortHandshake(socket, 503);
-        const digest = createHash18("sha1").update(key + GUID).digest("base64");
+        const digest = createHash19("sha1").update(key + GUID).digest("base64");
         const headers = [
           "HTTP/1.1 101 Switching Protocols",
           "Upgrade: websocket",
@@ -108197,12 +108197,46 @@ function acquireOtaCustody(target, store = new DeviceLeaseStore()) {
 // src/core/ota/ota-artifacts.ts
 import fs49 from "node:fs/promises";
 
+// src/core/ota/esp-app-identity.ts
+init_errors2();
+import { createHash as createHash11 } from "node:crypto";
+function readEspAppElfHash(image) {
+  if (image.length < 288 || image[0] !== 233 || image.readUInt32LE(32) !== 2882360370)
+    return null;
+  const invalid4 = () => new PlatformIOError(
+    "Invalid ESP application image structure or checksum.",
+    "OTA_APP_IMAGE_INVALID"
+  );
+  if (image[1] < 1 || image[1] > 16 || image[23] > 1 || image.readUInt32LE(28) < 256)
+    throw invalid4();
+  let position = 24;
+  let checksum = 239;
+  for (let index = 0; index < image[1]; index++) {
+    if (position + 8 > image.length) throw invalid4();
+    const size = image.readUInt32LE(position + 4);
+    position += 8;
+    if (size > image.length - position) throw invalid4();
+    for (let end = position + size; position < end; position++)
+      checksum ^= image[position];
+  }
+  const checksumOffset = Math.floor(position / 16) * 16 + 15;
+  if (checksumOffset >= image.length || image[checksumOffset] !== checksum)
+    throw invalid4();
+  if (image[23] === 1) {
+    const digestOffset = checksumOffset + 1;
+    if (digestOffset + 32 > image.length || !createHash11("sha256").update(image.subarray(0, digestOffset)).digest().equals(image.subarray(digestOffset, digestOffset + 32)))
+      throw invalid4();
+  }
+  const hash = image.subarray(176, 208);
+  return hash.every((value2) => value2 === 0) || hash.every((value2) => value2 === 255) ? null : hash.toString("hex");
+}
+
 // src/core/ota/ota-image-archive.ts
 init_paths();
 init_errors2();
 import fs48 from "node:fs/promises";
 import path60 from "node:path";
-import { createHash as createHash11, randomUUID as randomUUID8 } from "node:crypto";
+import { createHash as createHash12, randomUUID as randomUUID8 } from "node:crypto";
 async function archiveOtaImage(snapshot, sourcePath, expectedSha256, archiveRoot = path60.join(SERVER_DATA_DIR, "artifacts", "ota")) {
   const image = await readPartitionArtifact(
     path60.dirname(snapshot),
@@ -108214,7 +108248,7 @@ async function archiveOtaImage(snapshot, sourcePath, expectedSha256, archiveRoot
       "OTA snapshot changed before archival.",
       "OTA_IMAGE_CHANGED"
     );
-  const scope5 = createHash11("sha256").update(sourcePath).digest("hex");
+  const scope5 = createHash12("sha256").update(sourcePath).digest("hex");
   const directory = path60.join(archiveRoot, scope5);
   await fs48.mkdir(directory, { recursive: true, mode: 448 });
   const state = await fs48.lstat(directory);
@@ -108286,7 +108320,8 @@ async function retainOtaImage(projectDir, imagePath, expectedSha256, archiveRoot
     const identity = Object.freeze({
       ...source.identity,
       path: snapshot,
-      sourcePath: source.identity.path
+      sourcePath: source.identity.path,
+      embeddedElfSha256: readEspAppElfHash(source.content)
     });
     let releasing;
     return Object.freeze({
@@ -109722,6 +109757,7 @@ async function executeOtaUpload(input, caller = {}, onAuthorized) {
         firmware_sha256: image.identity.sha256,
         firmware_archive_path: result.imageArchivePath,
         elf_correspondence: "identity_unverified",
+        embedded_elf_sha256: args.filesystem ? null : image.identity.embeddedElfSha256,
         reachable: null,
         reachability_status: args.verifyReachable ? "icmp_not_probed" : "not_requested",
         duration_s: (performance.now() - started) / 1e3,
@@ -110725,7 +110761,7 @@ init_paths();
 init_errors2();
 import fs56 from "node:fs/promises";
 import path69 from "node:path";
-import { createHash as createHash12 } from "node:crypto";
+import { createHash as createHash13 } from "node:crypto";
 var LIFETIME_MS = 24 * 60 * 60 * 1e3;
 var ROOT = path69.join(SERVER_DATA_DIR, "artifacts", "coredumps");
 var ENTRY = /^pio-private-analysis-[A-Za-z0-9]{6}$/;
@@ -110807,7 +110843,7 @@ async function retainEspCoredump(input, root = ROOT, now = Date.now()) {
     const directory = await createPrivateAnalysisDirectory(canonical3);
     try {
       const bytes = Buffer.from(input);
-      const sha256 = createHash12("sha256").update(bytes).digest("hex");
+      const sha256 = createHash13("sha256").update(bytes).digest("hex");
       const destination = path69.join(directory, "dump.bin");
       const expiresAt = now + LIFETIME_MS;
       await fs56.writeFile(destination, bytes, { flag: "wx", mode: 384 });
@@ -110875,13 +110911,13 @@ async function startCoredumpRetentionCleanup(reportFailure, root = ROOT) {
 
 // src/tools/coredump.ts
 import fs65 from "node:fs/promises";
-import { createHash as createHash16 } from "node:crypto";
+import { createHash as createHash17 } from "node:crypto";
 
 // src/core/analysis/esp-coredump-export.ts
 init_errors2();
 import fs57 from "node:fs/promises";
 import path70 from "node:path";
-import { createHash as createHash13 } from "node:crypto";
+import { createHash as createHash14 } from "node:crypto";
 async function exportEspCoredump(workspaceDir, destination, input) {
   if (!destination || /[\x00-\x1f\x7f]/.test(destination) || input.byteLength > 16 * 1024 * 1024)
     throw new PlatformIOError(
@@ -110905,7 +110941,7 @@ async function exportEspCoredump(workspaceDir, destination, input) {
     );
   const canonicalTarget = path70.join(parent, name2);
   const bytes = Buffer.from(input);
-  const sha256 = createHash13("sha256").update(bytes).digest("hex");
+  const sha256 = createHash14("sha256").update(bytes).digest("hex");
   return withPrivateAnalysisDirectory(async (directory) => {
     const staged = path70.join(directory, "dump.bin");
     await fs57.writeFile(staged, bytes, { flag: "wx", mode: 384 });
@@ -111549,7 +111585,7 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
 
 // src/core/analysis/esp-coredump-input.ts
 init_errors2();
-import { createHash as createHash14, timingSafeEqual } from "node:crypto";
+import { createHash as createHash15, timingSafeEqual } from "node:crypto";
 var MAX_DUMP_BYTES = 16 * 1024 * 1024;
 var chips = {
   0: "esp32",
@@ -111622,7 +111658,7 @@ function inspectRawEspCoredump(input, encrypted = false) {
     );
   const payload = bytes.subarray(0, length - checksumLength);
   const checksum = bytes.subarray(length - checksumLength, length);
-  const valid = format.checksum === "sha256" ? timingSafeEqual(createHash14("sha256").update(payload).digest(), checksum) : crc32(payload) === checksum.readUInt32LE(0);
+  const valid = format.checksum === "sha256" ? timingSafeEqual(createHash15("sha256").update(payload).digest(), checksum) : crc32(payload) === checksum.readUInt32LE(0);
   if (!valid)
     throw new PlatformIOError(
       "Core-dump checksum does not match its declared bytes.",
@@ -111636,8 +111672,8 @@ function inspectRawEspCoredump(input, encrypted = false) {
   return {
     bytes: bytes.subarray(0, length),
     identity: {
-      sha256: createHash14("sha256").update(bytes.subarray(0, length)).digest("hex"),
-      input_sha256: createHash14("sha256").update(bytes).digest("hex"),
+      sha256: createHash15("sha256").update(bytes.subarray(0, length)).digest("hex"),
+      input_sha256: createHash15("sha256").update(bytes).digest("hex"),
       length,
       input_length: bytes.length,
       trailing_bytes: bytes.length - length,
@@ -112022,7 +112058,7 @@ async function withEspCoredumpArtifacts(input, analyze, capturedBytes) {
 init_errors2();
 import fs62 from "node:fs/promises";
 import path75 from "node:path";
-import { createHash as createHash15 } from "node:crypto";
+import { createHash as createHash16 } from "node:crypto";
 
 // src/core/analysis/esp-coredump-converter.ts
 var ESP_COREDUMP_VERSION = "1.10.0";
@@ -112104,7 +112140,7 @@ except Exception as error:
 // src/core/analysis/esp-coredump-conversion.ts
 async function withConvertedEspCoredump(artifacts, options, use) {
   options.validatePolicy();
-  if (createHash15("sha256").update(artifacts.dump.bytes).digest("hex") !== artifacts.dump.identity.sha256)
+  if (createHash16("sha256").update(artifacts.dump.bytes).digest("hex") !== artifacts.dump.identity.sha256)
     throw new PlatformIOError(
       "Core-dump bytes changed before conversion.",
       "COREDUMP_IDENTITY_MISMATCH"
@@ -112482,7 +112518,7 @@ async function executeCoredump(input, caller = {}, onAuthorized) {
           caller
         ) : null;
         validatePolicy();
-        if (capture && request.expectedInputSha256 && createHash16("sha256").update(capture.bytes).digest("hex") !== request.expectedInputSha256.toLowerCase())
+        if (capture && request.expectedInputSha256 && createHash17("sha256").update(capture.bytes).digest("hex") !== request.expectedInputSha256.toLowerCase())
           throw new PlatformIOError(
             "Captured partition does not match the selected input identity.",
             "COREDUMP_IDENTITY_MISMATCH"
@@ -123083,7 +123119,7 @@ var import_debug = __toESM(require_src(), 1);
 import { isIPv6 } from "node:net";
 import { isIPv6 as isIPv62 } from "node:net";
 import { Buffer as Buffer2 } from "node:buffer";
-import { createHash as createHash17 } from "node:crypto";
+import { createHash as createHash18 } from "node:crypto";
 import { isIP as isIP7 } from "node:net";
 var ipv4CompatibleSubnet = new import_ip_address.Address6("::/96");
 function ipKeyGenerator(ip, ipv6Subnet = 56) {
@@ -123265,7 +123301,7 @@ var getResetSeconds = (windowMs, resetTime) => {
   return resetSeconds;
 };
 var getPartitionKey = (key) => {
-  const hash = createHash17("sha256");
+  const hash = createHash18("sha256");
   hash.update(key);
   const partitionKey = hash.digest("hex").slice(0, 12);
   return Buffer2.from(partitionKey).toString("base64");
