@@ -155,6 +155,9 @@ jobs:
       - name: Validate plugin package and bundled MCP handshake
         run: npm run plugin:validate
 
+      - name: Validate isolated Python CLI runtime payload
+        run: npm run test:python-runtime
+
       - name: Run plugin contract and cache-portability tests
         run: npm run plugin:test
 

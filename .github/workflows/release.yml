@@ -60,6 +60,7 @@ jobs:
           npm run plugin:sync:check
           npm run plugin:build
           npm run plugin:validate
+          npm run test:python-runtime
           npm run plugin:test
           npm run smoke-test
           npm run package:validate
