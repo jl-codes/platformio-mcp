@@ -47,8 +47,9 @@ def validate(directory, loaded=False):
     inventory = json.loads((ROOT / "distribution/namespaces.json").read_text())
     names = [entry["name"] for entry in inventory["entries"] if entry["registry"] == "ghcr"]
     expected_names = [f"ghcr.io/jl-codes/{alias}" for alias in ALIASES]
-    if len(names) != len(expected_names) or set(names) != set(expected_names):
+    if len(names) != len(set(names)) or not set(expected_names).issubset(names) or any(not re.fullmatch(r"ghcr\.io/jl-codes/[a-z0-9]+(?:[._-][a-z0-9]+)*", name) for name in names):
         raise ValueError("All seven requested container aliases must be accounted for")
+    expected_names.extend(sorted(set(names) - set(expected_names)))
     artifacts = []
     for arch in ("amd64", "arm64"):
         archive = directory / f"pio-agent-{arch}.tar"

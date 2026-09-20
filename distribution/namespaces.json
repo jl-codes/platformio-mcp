@@ -268,6 +268,87 @@
       "publishIntent": false,
       "source": "https://github.com/jl-codes/platformio-mcp",
       "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
+    },
+    {
+      "registry": "npm",
+      "name": "flash-agent",
+      "role": "watch",
+      "publishIntent": false,
+      "reason": "Same punctuation-insensitive moniker family as flashagent; registry eligibility must be resolved as a family, not inferred from 404 responses."
+    },
+    {
+      "registry": "npm",
+      "name": "flash.agent",
+      "role": "watch",
+      "publishIntent": false,
+      "reason": "Same punctuation-insensitive moniker family as flashagent; registry eligibility must be resolved as a family, not inferred from 404 responses."
+    },
+    {
+      "registry": "npm",
+      "name": "flash_agent",
+      "role": "watch",
+      "publishIntent": false,
+      "reason": "Same punctuation-insensitive moniker family as flashagent; registry eligibility must be resolved as a family, not inferred from 404 responses."
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/flashagent",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "packagePath": "packages/scoped-flashagent",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Functional wrapper prepared; scope control and eligibility remain unverified."
+    },
+    {
+      "registry": "pypi",
+      "name": "flash-agent",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "packagePath": "packages/python-aliases/flash-agent",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "equivalentNames": [
+        "flash.agent",
+        "flash_agent"
+      ],
+      "reason": "Distinct normalized name from flashagent; functional wrapper prepared, authority and eligibility unverified."
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/platformiomcp",
+      "role": "watch",
+      "publishIntent": false,
+      "reason": "Punctuation-insensitive collision candidate with an existing scoped alias; not independently claimed."
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/pioagent",
+      "role": "watch",
+      "publishIntent": false,
+      "reason": "Punctuation-insensitive collision candidate with an existing scoped alias; not independently claimed."
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/flash-agent",
+      "role": "candidate_container",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Additional same-image alias candidate; eligibility, authority and public digest verification remain pending."
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/flash.agent",
+      "role": "candidate_container",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Additional same-image alias candidate; eligibility, authority and public digest verification remain pending."
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/flash_agent",
+      "role": "candidate_container",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Additional same-image alias candidate; eligibility, authority and public digest verification remain pending."
     }
   ],
   "unsupportedChannels": [
