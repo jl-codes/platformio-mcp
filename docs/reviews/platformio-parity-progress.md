@@ -866,3 +866,8 @@ Added optional static-analysis filters and structuredReport to canonical check_p
 
 The launcher exposes minimum severity, source pattern, configured analyzer and dependency-source exclusion. Optional fields preserve defaults when left empty, and filter fields are sent only for the checker action. Frontend TypeScript and production build passed; plugin rebuilt with current assets. Browser interaction, background structured-report retrieval and native analyzer acceptance remain separate. No publication occurred.
 
+
+### Shared reference test execution options
+
+The existing test runner now accepts trusted inclusion/exclusion globs, separate upload/build switches, upload port, verbose output, report destination, timeout and completed-result callback. Compile-only/build-only still force both --without-uploading and --without-testing and omit upload-port selection; contradictory skip-building requests fail before execution. Outside build-only, without-uploading does not incorrectly imply that hardware is untouched. Existing defaults remain unchanged, and typed process custody errors survive the wrapper. TypeScript and ten focused mocked execution-mode checks passed; plugin rebuilt. Public pio_test routing, owned report lifecycle/per-case parsing, explicit device selection/lease coordination and native/hardware acceptance remain pending. No publication occurred.
+

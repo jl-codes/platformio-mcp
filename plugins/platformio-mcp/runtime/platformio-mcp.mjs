@@ -101469,7 +101469,7 @@ async function checkProject(projectDir, environment, background, options = {}) {
     throw new BuildError(`Failed to check project: ${error2}`, { projectDir, environment });
   }
 }
-async function runTests(projectDir, environment, background, compileOnly) {
+async function runTests(projectDir, environment, background, compileOnly, options = {}) {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto14.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
   if (environment && !validateEnvironmentName(environment)) {
@@ -101478,19 +101478,35 @@ async function runTests(projectDir, environment, background, compileOnly) {
   if (compileOnly !== void 0 && typeof compileOnly !== "boolean") {
     throw new BuildError("compileOnly must be a boolean", { projectDir });
   }
+  for (const value2 of [options.filter, options.ignore, options.uploadPort, options.reportPath])
+    if (value2 !== void 0 && (typeof value2 !== "string" || !value2.length || value2.length > 32768 || /[\x00-\x1f\x7f]/.test(value2)))
+      throw new BuildError("Invalid test selection or report path", { projectDir });
+  for (const value2 of [options.withoutUploading, options.withoutBuilding, options.verbose])
+    if (value2 !== void 0 && typeof value2 !== "boolean")
+      throw new BuildError("Test switches must be booleans", { projectDir });
+  if (options.timeoutMs !== void 0 && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 36e5))
+    throw new BuildError("Invalid test timeout", { projectDir });
   const buildOnly = loadEffectivePolicyState(validatedPath).profile === "build_only";
+  if ((compileOnly || buildOnly) && options.withoutBuilding)
+    throw new BuildError("Cannot skip building in compile-only mode", { projectDir });
   try {
     const args = [];
     if (compileOnly || buildOnly) {
       args.push("--without-uploading", "--without-testing");
-    }
+    } else if (options.withoutUploading) args.push("--without-uploading");
+    if (options.withoutBuilding) args.push("--without-building");
+    if (options.filter) args.push("--filter", options.filter);
+    if (options.ignore) args.push("--ignore", options.ignore);
+    if (options.uploadPort && !compileOnly && !buildOnly) args.push("--upload-port", options.uploadPort);
+    if (options.verbose) args.push("--verbose");
+    if (options.reportPath) args.push("--json-output-path", options.reportPath);
     if (environment) {
       args.push("--environment", environment);
     }
     const result = await executeWithSpooling("test", args, {
       cwd: validatedPath,
       projectDir: validatedPath,
-      timeout: background ? 36e5 : 6e5,
+      timeout: options.timeoutMs ?? (background ? 36e5 : 6e5),
       background,
       artifactType: "test",
       rootCommandId
@@ -101498,6 +101514,7 @@ async function runTests(projectDir, environment, background, compileOnly) {
     if ("status" in result) {
       return result;
     }
+    await options.onResult?.(result);
     const success = result.exitCode === 0;
     const errors = success ? void 0 : parseStderrErrors(result.finalOutput);
     return {
@@ -101508,7 +101525,7 @@ async function runTests(projectDir, environment, background, compileOnly) {
     };
   } catch (error2) {
     if (error2 instanceof PlatformIOError) {
-      throw new BuildError(`Tests failed: ${error2.message}`, { projectDir, environment });
+      throw error2;
     }
     throw new BuildError(`Failed to run tests: ${error2}`, { projectDir, environment });
   }

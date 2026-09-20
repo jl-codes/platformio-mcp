@@ -71,3 +71,20 @@ describe("test execution mode", () => {
     expect(executeWithSpooling).not.toHaveBeenCalled();
   });
 });
+
+
+it("reference test filters preserve compile-only restrictions and literal argv", async () => {
+  fs.writeFileSync(path.join(project, ".pio-mcp-policy.json"), JSON.stringify({ profile: "build_only" }));
+  await runTests(project, "fixture", false, false, { filter: "test_math*", ignore: "test_slow*", withoutUploading: false, uploadPort: "COM99", verbose: true, timeoutMs: 1200000 });
+  expect(executeWithSpooling).toHaveBeenCalledWith("test", ["--without-uploading", "--without-testing", "--filter", "test_math*", "--ignore", "test_slow*", "--verbose", "--environment", "fixture"], expect.objectContaining({ timeout: 1200000 }));
+});
+
+it("without-uploading alone does not silently imply compile-only outside build-only", async () => {
+  await runTests(project, "fixture", false, false, { withoutUploading: true, withoutBuilding: true });
+  expect(executeWithSpooling).toHaveBeenCalledWith("test", ["--without-uploading", "--without-building", "--environment", "fixture"], expect.anything());
+});
+
+it("contradictory build-only and skip-building fails before execution", async () => {
+  await expect(runTests(project, "fixture", false, true, { withoutBuilding: true })).rejects.toThrow("Cannot skip building");
+  expect(executeWithSpooling).not.toHaveBeenCalled();
+});
