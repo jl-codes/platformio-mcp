@@ -103746,7 +103746,7 @@ var DebugClientSessions = class {
   activeRequests = /* @__PURE__ */ new Set();
   closed = false;
   /** Reserve capacity before asynchronous startup and clean up if the connection closes meanwhile. */
-  async start(projectDir, environment, launch, requestIdentity) {
+  async start(projectDir, environment, launch, requestIdentity, metadata = {}) {
     if (this.closed)
       throw new PlatformIOError(
         "Debugger client disconnected.",
@@ -103778,12 +103778,20 @@ var DebugClientSessions = class {
       );
     const id = (requestIdentity ? this.approvalReservations.get(requestIdentity)?.id : void 0) ?? randomUUID5();
     if (requestIdentity) this.activeRequests.add(requestIdentity);
+    const startedAt = performance.now();
+    const debugTool = metadata.debugTool ?? null;
     const pending = Promise.resolve().then(() => launch(id));
     this.starting.add(pending);
     try {
       const process9 = await pending;
       if (requestIdentity) this.approvalReservations.delete(requestIdentity);
-      this.sessions.set(id, { process: process9, projectDir, environment });
+      this.sessions.set(id, {
+        process: process9,
+        projectDir,
+        environment,
+        debugTool,
+        startedAt
+      });
       if (this.closed) {
         await this.stop(id);
         throw new PlatformIOError(
@@ -103805,7 +103813,9 @@ var DebugClientSessions = class {
         this.sessions.set(id, {
           process: error2.cleanupOwner(),
           projectDir,
-          environment
+          environment,
+          debugTool,
+          startedAt
         });
         throw new PlatformIOError(
           "Debugger startup failed; retry cleanup for the retained session.",
@@ -103825,6 +103835,8 @@ var DebugClientSessions = class {
       session_id: id,
       project_dir: entry.projectDir,
       env: entry.environment,
+      debug_tool: entry.debugTool,
+      uptime_s: Math.max(0, (performance.now() - entry.startedAt) / 1e3),
       ...entry.process.state()
     }));
   }
@@ -106751,7 +106763,8 @@ function startPreparedDebugger(sessions, selection, caller = {}) {
         }
       );
     },
-    requestIdentity
+    requestIdentity,
+    { debugTool: selection.debugTool }
   );
 }
 
@@ -106771,6 +106784,7 @@ async function startLocalPreparedDebugger(sessions, input, caller = {}) {
     {
       projectDir: prepared.projectDir,
       environment: prepared.environment,
+      debugTool: prepared.configuration.debugTool,
       elfPath: prepared.elfPath,
       expectedElfSha256: prepared.expectedElfSha256,
       executable: prepared.executable,
@@ -107206,6 +107220,8 @@ async function executeDebugSessionCompatibility(name2, input, sessions, caller =
   const parsed = DebugStopCompatibilitySchema.safeParse(input);
   if (!parsed.success) throw invalid4();
   const args = parsed.data;
+  const info = sessions.list().find((row) => row.session_id === args.session_id);
+  const stoppingAt = performance.now();
   if (args.process_only) await sessions.stop(args.session_id);
   else
     await sessions.resetRunAndStop(
@@ -107220,6 +107236,10 @@ async function executeDebugSessionCompatibility(name2, input, sessions, caller =
   return {
     ok: true,
     session_id: args.session_id,
+    project_dir: info?.project_dir,
+    env: info?.env,
+    debug_tool: info?.debug_tool ?? null,
+    uptime_s: info ? info.uptime_s + Math.max(0, (performance.now() - stoppingAt) / 1e3) : null,
     cleanup_pending: false,
     reset_run_acknowledged: !args.process_only,
     target_running_verified: false,
@@ -107342,6 +107362,8 @@ var DebugCompatibilityClient = class {
         project_dir: prepared.projectDir,
         env: prepared.environment,
         load: prepared.load,
+        debug_tool: state?.debug_tool ?? prepared.configuration?.debugTool ?? null,
+        uptime_s: state?.uptime_s ?? null,
         stopped: normalizeDebuggerStop(state?.lastStop),
         running: state?.running ?? null,
         closed: state?.closed ?? null,

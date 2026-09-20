@@ -99,6 +99,10 @@ it("retains failed cleanup and offers explicit process-only recovery without tar
     await executeDebugSessionCompatibility("pio_debug_stop", args, sessions),
   ).toMatchObject({
     ok: true,
+    project_dir: "/project",
+    env: "debug",
+    debug_tool: null,
+    uptime_s: expect.any(Number),
     reset_run_acknowledged: false,
     target_running_verified: false,
   });

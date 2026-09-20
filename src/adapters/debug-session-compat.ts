@@ -135,6 +135,10 @@ export async function executeDebugSessionCompatibility(
   const parsed = DebugStopCompatibilitySchema.safeParse(input);
   if (!parsed.success) throw invalid();
   const args = parsed.data;
+  const info = sessions
+    .list()
+    .find((row) => row.session_id === args.session_id);
+  const stoppingAt = performance.now();
   if (args.process_only) await sessions.stop(args.session_id);
   else
     await sessions.resetRunAndStop(
@@ -149,6 +153,12 @@ export async function executeDebugSessionCompatibility(
   return {
     ok: true,
     session_id: args.session_id,
+    project_dir: info?.project_dir,
+    env: info?.env,
+    debug_tool: info?.debug_tool ?? null,
+    uptime_s: info
+      ? info.uptime_s + Math.max(0, (performance.now() - stoppingAt) / 1000)
+      : null,
     cleanup_pending: false,
     reset_run_acknowledged: !args.process_only,
     target_running_verified: false,

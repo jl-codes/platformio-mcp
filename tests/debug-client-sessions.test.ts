@@ -261,3 +261,27 @@ it("disconnect cancels queued detach and still cleans its process", async () => 
   expect(process.command).not.toHaveBeenCalled();
   expect(process.cleanupProcess).toHaveBeenCalledOnce();
 });
+
+it("reports immutable host-resolved metadata and monotonic uptime", async () => {
+  const clock = vi.spyOn(performance, "now").mockReturnValue(1000);
+  try {
+    const owner = new DebugClientSessions();
+    const metadata = { debugTool: "stlink" };
+    const id = await owner.start(
+      "project",
+      "debug",
+      async () => processFixture(),
+      undefined,
+      metadata,
+    );
+    metadata.debugTool = "changed";
+    clock.mockReturnValue(4250);
+    expect(owner.list()).toMatchObject([
+      { session_id: id, debug_tool: "stlink", uptime_s: 3.25 },
+    ]);
+    await owner.stop(id);
+    expect(owner.list()).toEqual([]);
+  } finally {
+    clock.mockRestore();
+  }
+});

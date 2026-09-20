@@ -20,6 +20,8 @@ export class DebugClientSessions {
       process: OwnedDebugProcess;
       projectDir: string;
       environment: string;
+      debugTool: string | null;
+      startedAt: number;
     }
   >();
   private readonly starting = new Set<Promise<unknown>>();
@@ -37,6 +39,7 @@ export class DebugClientSessions {
     environment: string,
     launch: (sessionId: string) => Promise<OwnedDebugProcess>,
     requestIdentity?: string,
+    metadata: { debugTool?: string | null } = {},
   ): Promise<string> {
     if (this.closed)
       throw new PlatformIOError(
@@ -79,13 +82,21 @@ export class DebugClientSessions {
         ? this.approvalReservations.get(requestIdentity)?.id
         : undefined) ?? randomUUID();
     if (requestIdentity) this.activeRequests.add(requestIdentity);
+    const startedAt = performance.now();
+    const debugTool = metadata.debugTool ?? null;
     // Defer launch until its promise is tracked, including synchronous launch failures.
     const pending = Promise.resolve().then(() => launch(id));
     this.starting.add(pending);
     try {
       const process = await pending;
       if (requestIdentity) this.approvalReservations.delete(requestIdentity);
-      this.sessions.set(id, { process, projectDir, environment });
+      this.sessions.set(id, {
+        process,
+        projectDir,
+        environment,
+        debugTool,
+        startedAt,
+      });
       if (this.closed) {
         await this.stop(id);
         throw new PlatformIOError(
@@ -112,6 +123,8 @@ export class DebugClientSessions {
           process: error.cleanupOwner(),
           projectDir,
           environment,
+          debugTool,
+          startedAt,
         });
         throw new PlatformIOError(
           "Debugger startup failed; retry cleanup for the retained session.",
@@ -132,6 +145,8 @@ export class DebugClientSessions {
       session_id: id,
       project_dir: entry.projectDir,
       env: entry.environment,
+      debug_tool: entry.debugTool,
+      uptime_s: Math.max(0, (performance.now() - entry.startedAt) / 1000),
       ...entry.process.state(),
     }));
   }

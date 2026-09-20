@@ -1604,3 +1604,8 @@ Validation: 13 focused debugger response/connection cases passed, covering varia
 ### Native wheel packaging correction
 
 Release validation run 35515111803 built all five native wheels and all six Python aliases. Linux x64 and arm64 installed and exercised the complete alias set successfully. Windows failed exact alias-source comparison because checkout converted launcher newlines; alias Python sources now require LF through Git attributes, preserving exact byte validation. Both macOS hosts rejected the nonstandard 13_5 wheel tags. Wheels now conservatively target macOS 14.0; the bundled Node runtime minimum remains 13.5, but these wheels require macOS 14 or later. No publisher ran. Native acceptance must be repeated for the corrected artifacts; this is not physical or final-release acceptance.
+
+
+### Debugger session metadata parity
+
+Start/list/stop responses now expose the host-resolved debug tool and monotonic session age, including age through successful shutdown. Metadata is copied at launch admission and preserved for retained failed-start/cleanup owners. Four focused debugger suites passed (31 cases), including ownership, failure recovery and immutable metadata timing; TypeScript passed. Physical debugger acceptance remains outstanding.

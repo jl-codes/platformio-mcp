@@ -49,6 +49,7 @@ export async function startLocalPreparedDebugger(
     {
       projectDir: prepared.projectDir,
       environment: prepared.environment,
+      debugTool: prepared.configuration.debugTool,
       elfPath: prepared.elfPath,
       expectedElfSha256: prepared.expectedElfSha256,
       executable: prepared.executable,

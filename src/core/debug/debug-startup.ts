@@ -31,6 +31,7 @@ import {
 export interface PreparedDebuggerStartup {
   projectDir: string;
   environment: string;
+  debugTool?: string | null; // Resolved PlatformIO configuration, never supplied by a public session selector.
   elfPath: string;
   expectedElfSha256: string;
   executable: string;
@@ -246,5 +247,6 @@ export function startPreparedDebugger(
       );
     },
     requestIdentity,
+    { debugTool: selection.debugTool },
   );
 }

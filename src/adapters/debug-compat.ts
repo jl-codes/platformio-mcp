@@ -165,6 +165,9 @@ export class DebugCompatibilityClient {
         project_dir: prepared.projectDir,
         env: prepared.environment,
         load: prepared.load,
+        debug_tool:
+          state?.debug_tool ?? prepared.configuration?.debugTool ?? null,
+        uptime_s: state?.uptime_s ?? null,
         stopped: normalizeDebuggerStop(state?.lastStop),
         running: state?.running ?? null,
         closed: state?.closed ?? null,
