@@ -95,8 +95,8 @@ def collect(request, factory, cancelled, emit):
             for sample in samples:
                 if not isinstance(sample, (int, float)) or not math.isfinite(sample): raise RuntimeError("PPK2_SAMPLE_INVALID")
                 if abs(sample) > request["currentLimitMa"] * 1000: raise RuntimeError("PPK2_CURRENT_TRIP")
+                if count >= sample_limit: raise RuntimeError("PPK2_SAMPLE_LIMIT")
                 count += 1
-                if count > sample_limit: raise RuntimeError("PPK2_SAMPLE_LIMIT")
                 total += sample
                 in_window += 1
                 if in_window == 1000:

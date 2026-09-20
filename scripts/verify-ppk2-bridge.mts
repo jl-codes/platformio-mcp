@@ -1,6 +1,8 @@
 /** Exercise the PPK2 bridge against a fake meter API in native Python; never imports serial or opens hardware. */
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import assert from "node:assert/strict";
+import { Ppk2Protocol } from "../src/core/power/ppk2-protocol.ts";
 import { PPK2_BRIDGE } from "../src/core/power/ppk2-bridge.ts";
 const python = process.argv[2];
 if (!python || !path.isAbsolute(python)) throw new Error("Pass an absolute Python interpreter.");
@@ -44,6 +46,8 @@ class Meter:
         if self.fail == "decode": return [], []
         return [self.sample] * (len(raw) // 4), []
 
+cases = []
+
 def run(mode="source", fail=None, sample=1000.0, cancelled=False):
     Meter.events = []
     Meter.fail = fail
@@ -55,6 +59,7 @@ def run(mode="source", fail=None, sample=1000.0, cancelled=False):
     output = []
     collect({"port": "FAKE", "mode": mode, "voltageMv": 3300, "currentLimitMa": 50, "seconds": 0.01}, Meter, stop, output.append)
     assert output[-1]["event"] == "finished"
+    cases.append({"mode": mode, "output": output})
     return output, Meter.events[:]
 
 output, events = run()
@@ -86,10 +91,21 @@ for change in ({"mode": "automatic"}, {"voltageMv": 799}, {"currentLimitMa": 601
     try: validate(request)
     except ValueError: pass
     else: raise AssertionError(change)
-print(json.dumps({"passed": True, "physicalDeviceContacted": False, "scenarios": 14, "nativePython": sys.version.split()[0]}))
+print(json.dumps({"passed": True, "physicalDeviceContacted": False, "scenarios": 14, "nativePython": sys.version.split()[0], "cases": cases}))
 `;
 const result = spawnSync(python, ["-I", "-c", fixture], { input: JSON.stringify(PPK2_BRIDGE), encoding: "utf8", timeout: 10000, windowsHide: true, maxBuffer: 65536 });
-process.stdout.write(result.stdout ?? "");
+
 process.stderr.write(result.stderr ?? "");
 if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status ?? 1);
+
+const evidence = JSON.parse(result.stdout);
+for (const scenario of evidence.cases) {
+  const protocol = new Ppk2Protocol({ port: "FAKE", mode: scenario.mode, voltageMv: 3300, currentLimitMa: 50, seconds: 0.01 });
+  for (const record of scenario.output) protocol.accept(Buffer.from(JSON.stringify(record) + "\n"));
+  protocol.end();
+  assert.equal(protocol.snapshot().failed, false);
+  assert.equal(protocol.snapshot().finished?.outputOffPhysicallyVerified, false);
+}
+const { cases, ...metadata } = evidence;
+console.log(JSON.stringify({ ...metadata, protocolRoundTrips: cases.length }));
