@@ -699,3 +699,7 @@ Canonical and alias wheel builders now reject modified tracked source and untrac
 ### Bounded cached namespace observations
 
 The namespace audit now enforces its actual per-run lookup budget, rejects malformed limits, reuses six-hour public metadata observations, and respects bounded Retry-After backoff for rate limiting. Failed lookups retain an hour of backoff; no retry loop sleeps or repeats requests. Public authority remains unverified even for cached entries. Change reporting compares status/version/source/maintainers/integrity while ignoring observation timestamps and raw-response formatting. Five focused mocked-registry unit checks pass; no network audit or runtime smoke run was started. Existing CI run 35482677676 remained in progress; this change is committed locally before pushing so that run can finish without another cancellation.
+
+### Maintainer-enabled weekly namespace workflow
+
+Added manual/weekly audit workflow guarded by the explicit repository enable variable for scheduled runs. Cache restoration and saving retain prior observations; evidence is uploaded before changed ownership/source/integrity signals or newly blocked/unknown lookups affect workflow status. Same-version integrity changes are distinguished from routine version updates. Release artifacts now include namespace observations. YAML and JavaScript syntax parsing pass; no live schedule, network audit or runtime smoke test was started. Existing CI run 35482677676 is still live, so these commits remain local until it finishes.

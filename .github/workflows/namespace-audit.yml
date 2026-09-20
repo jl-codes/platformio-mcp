@@ -1,0 +1,55 @@
+name: Namespace audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: namespace-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    # Repository maintainer opts in before the weekly schedule performs lookups.
+    if: github.event_name == 'workflow_dispatch' || vars.NAMESPACE_AUDIT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.15.0'
+          package-manager-cache: false
+      - name: Restore previous public observations
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .namespace-audit/report.json
+          key: namespace-audit-${{ hashFiles('distribution/namespaces.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            namespace-audit-${{ hashFiles('distribution/namespaces.json') }}-
+      - name: Audit finite namespace inventory without installation
+        id: audit
+        run: |
+          mkdir -p .namespace-audit
+          if [ ! -f .namespace-audit/report.json ]; then
+            cp docs/reviews/platformio-namespace-observations.json .namespace-audit/report.json
+          fi
+          node scripts/audit-namespaces.mjs .namespace-audit/report.json
+      - name: Save observations before reporting changes
+        if: steps.audit.outcome == 'success'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .namespace-audit/report.json
+          key: namespace-audit-${{ hashFiles('distribution/namespaces.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Retain public observation evidence
+        if: steps.audit.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: namespace-observations
+          path: .namespace-audit/report.json
+          if-no-files-found: error
+      - name: Surface meaningful changes through workflow status
+        run: node scripts/report-namespace-changes.mjs .namespace-audit/report.json

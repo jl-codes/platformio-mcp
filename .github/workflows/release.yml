@@ -106,6 +106,12 @@ jobs:
           npm run package:validate
           git diff --exit-code -- plugins/platformio-mcp
 
+      - name: Record current public namespace observations
+        run: |
+          mkdir -p .namespace-audit
+          cp docs/reviews/platformio-namespace-observations.json .namespace-audit/report.json
+          node scripts/audit-namespaces.mjs .namespace-audit/report.json
+
       - name: Build npm tarball
         run: |
           version="$(node -p "require('./package.json').version")"
@@ -118,6 +124,7 @@ jobs:
           mv "pio-agent-${version}.tgz" release-artifacts/
           cp plugins/platformio-mcp/runtime/inventory.json release-artifacts/plugin-runtime-inventory.json
           cp server.json release-artifacts/server.json
+          cp .namespace-audit/report.json release-artifacts/namespace-observations.json
 
       - name: Collect validated Python wheels from this run
         env:

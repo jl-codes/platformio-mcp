@@ -50,3 +50,7 @@ The release workflow now assembles five canonical platform wheels and both alias
 Python release builders require clean committed source. Use `--allow-dirty` only for local development wheels; their sourceDirty marker makes them ineligible for release validation. Both canonical and alias wheels record the source commit, and builders recheck checkout state after assembly.
 
 Namespace audits now reuse bounded cached observations from the output file, enforce the configured lookup budget, honor capped rate-limit backoff, and record meaningful metadata changes. Scheduled execution/notification remains unwired; cache and backoff never establish ownership or reserve names.
+
+## Maintainer-enabled namespace audit
+
+The Namespace audit workflow can be run manually. Weekly lookups are disabled unless the repository variable `NAMESPACE_AUDIT_ENABLED` is `true`. It restores the prior observation cache, performs bounded read-only lookups, saves the new evidence before reporting changes, and retains an artifact. New third-party/blocked/unknown states, repository or maintainer changes, and same-version integrity changes fail the reporting step for maintainer review. Routine version changes and unchanged observations do not fail it. No package installation, owner contact, claim or publication occurs. Release builds also retain current observations. The schedule has not been enabled or exercised by this work.

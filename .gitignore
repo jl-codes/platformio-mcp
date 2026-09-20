@@ -79,3 +79,6 @@ web/test-results/
 # Python packaging helper bytecode
 __pycache__/
 *.pyc
+
+# Local namespace observation cache
+.namespace-audit/
