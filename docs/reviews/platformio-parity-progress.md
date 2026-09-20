@@ -1263,3 +1263,9 @@ Added unique probe selection from trusted USB inventory using vendor/product/ser
 ### Debug probe custody integration
 
 Connected trusted physical-probe discovery to DeviceLeaseStore. Selection acquires a probe lease, startup refreshes inventory before persisting child handoff uncertainty, and only confirmed cleanup releases custody. Process launch callers now await potentially asynchronous identity revalidation. Fifteen focused real lease-store/process cases, TypeScript and lint passed; USB inventory and actual debugger launches were not performed. Backend command binding and OS enumeration remain unfinished. Prior CI runs 35502231269 and 35502233612 remain live; this batch is committed locally pending their completion.
+
+### Linux kernel USB probe inventory
+
+Added bounded physical USB discovery from Linux sysfs vendor/product/serial attributes, excluding interface entries and reporting serial-less devices as unidentified. Disappearing devices are omitted; invalid/oversized identities fail. Four kernel-shaped filesystem cases, TypeScript and lint passed on Windows; real Linux host discovery and connected-probe acceptance remain unverified. Windows/macOS enumerators and public discovery authorization are still required.
+
+CI runs 35502231269 and 35502233612 both completed successfully on b17f2acb, including all three host unit/plugin jobs, dependency audit, dashboard and CLI checks. The subsequent probe selection/custody/Linux discovery batch is pushed separately and requires its own CI result.
