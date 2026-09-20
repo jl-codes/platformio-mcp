@@ -4246,29 +4246,29 @@ var require_polyfills = __commonJS({
         })(fs57.rename);
       }
       fs57.read = typeof fs57.read !== "function" ? fs57.read : (function(fs$read) {
-        function read(fd, buffer, offset, length, position, callback_) {
+        function read(fd, buffer, offset2, length, position, callback_) {
           var callback;
           if (callback_ && typeof callback_ === "function") {
             var eagCounter = 0;
             callback = function(er, _, __) {
               if (er && er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
-                return fs$read.call(fs57, fd, buffer, offset, length, position, callback);
+                return fs$read.call(fs57, fd, buffer, offset2, length, position, callback);
               }
               callback_.apply(this, arguments);
             };
           }
-          return fs$read.call(fs57, fd, buffer, offset, length, position, callback);
+          return fs$read.call(fs57, fd, buffer, offset2, length, position, callback);
         }
         if (Object.setPrototypeOf) Object.setPrototypeOf(read, fs$read);
         return read;
       })(fs57.read);
       fs57.readSync = typeof fs57.readSync !== "function" ? fs57.readSync : /* @__PURE__ */ (function(fs$readSync) {
-        return function(fd, buffer, offset, length, position) {
+        return function(fd, buffer, offset2, length, position) {
           var eagCounter = 0;
           while (true) {
             try {
-              return fs$readSync.call(fs57, fd, buffer, offset, length, position);
+              return fs$readSync.call(fs57, fd, buffer, offset2, length, position);
             } catch (er) {
               if (er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
@@ -8148,7 +8148,7 @@ var require_int = __commonJS({
     "use strict";
     var stringifyNumber = require_stringifyNumber();
     var intIdentify = (value2) => typeof value2 === "bigint" || Number.isInteger(value2);
-    var intResolve = (str, offset, radix, { intAsBigInt }) => intAsBigInt ? BigInt(str) : parseInt(str.substring(offset), radix);
+    var intResolve = (str, offset2, radix, { intAsBigInt }) => intAsBigInt ? BigInt(str) : parseInt(str.substring(offset2), radix);
     function intStringify(node, radix, prefix) {
       const { value: value2 } = node;
       if (intIdentify(value2) && value2 >= 0)
@@ -8591,11 +8591,11 @@ var require_int2 = __commonJS({
     "use strict";
     var stringifyNumber = require_stringifyNumber();
     var intIdentify = (value2) => typeof value2 === "bigint" || Number.isInteger(value2);
-    function intResolve(str, offset, radix, { intAsBigInt }) {
+    function intResolve(str, offset2, radix, { intAsBigInt }) {
       const sign = str[0];
       if (sign === "-" || sign === "+")
-        offset += 1;
-      str = str.substring(offset).replace(/_/g, "");
+        offset2 += 1;
+      str = str.substring(offset2).replace(/_/g, "");
       if (intAsBigInt) {
         switch (radix) {
           case 2:
@@ -9469,7 +9469,7 @@ ${pointer}
 var require_resolve_props = __commonJS({
   "node_modules/yaml/dist/compose/resolve-props.js"(exports) {
     "use strict";
-    function resolveProps(tokens, { flow, indicator, next, offset, onError, parentIndent, startOnNewline }) {
+    function resolveProps(tokens, { flow, indicator, next, offset: offset2, onError, parentIndent, startOnNewline }) {
       let spaceBefore = false;
       let atNewline = startOnNewline;
       let hasSpace = startOnNewline;
@@ -9576,7 +9576,7 @@ var require_resolve_props = __commonJS({
         }
       }
       const last = tokens[tokens.length - 1];
-      const end = last ? last.offset + last.source.length : offset;
+      const end = last ? last.offset + last.source.length : offset2;
       if (reqSpace && next && next.type !== "space" && next.type !== "newline" && next.type !== "comma" && (next.type !== "scalar" || next.source !== "")) {
         onError(next.offset, "MISSING_CHAR", "Tags and anchors must be separated from the next token by white space");
       }
@@ -9691,14 +9691,14 @@ var require_resolve_block_map = __commonJS({
       const map = new NodeClass(ctx.schema);
       if (ctx.atRoot)
         ctx.atRoot = false;
-      let offset = bm.offset;
+      let offset2 = bm.offset;
       let commentEnd = null;
       for (const collItem of bm.items) {
         const { start, key, sep, value: value2 } = collItem;
         const keyProps = resolveProps.resolveProps(start, {
           indicator: "explicit-key-ind",
           next: key ?? sep?.[0],
-          offset,
+          offset: offset2,
           onError,
           parentIndent: bm.indent,
           startOnNewline: true
@@ -9707,9 +9707,9 @@ var require_resolve_block_map = __commonJS({
         if (implicitKey) {
           if (key) {
             if (key.type === "block-seq")
-              onError(offset, "BLOCK_AS_IMPLICIT_KEY", "A block sequence may not be used as an implicit map key");
+              onError(offset2, "BLOCK_AS_IMPLICIT_KEY", "A block sequence may not be used as an implicit map key");
             else if ("indent" in key && key.indent !== bm.indent)
-              onError(offset, "BAD_INDENT", startColMsg);
+              onError(offset2, "BAD_INDENT", startColMsg);
           }
           if (!keyProps.anchor && !keyProps.tag && !sep) {
             commentEnd = keyProps.end;
@@ -9725,7 +9725,7 @@ var require_resolve_block_map = __commonJS({
             onError(key ?? start[start.length - 1], "MULTILINE_IMPLICIT_KEY", "Implicit keys need to be on a single line");
           }
         } else if (keyProps.found?.indent !== bm.indent) {
-          onError(offset, "BAD_INDENT", startColMsg);
+          onError(offset2, "BAD_INDENT", startColMsg);
         }
         ctx.atKey = true;
         const keyStart = keyProps.end;
@@ -9743,18 +9743,18 @@ var require_resolve_block_map = __commonJS({
           parentIndent: bm.indent,
           startOnNewline: !key || key.type === "block-scalar"
         });
-        offset = valueProps.end;
+        offset2 = valueProps.end;
         if (valueProps.found) {
           if (implicitKey) {
             if (value2?.type === "block-map" && !valueProps.hasNewline)
-              onError(offset, "BLOCK_AS_IMPLICIT_KEY", "Nested mappings are not allowed in compact mappings");
+              onError(offset2, "BLOCK_AS_IMPLICIT_KEY", "Nested mappings are not allowed in compact mappings");
             if (ctx.options.strict && keyProps.start < valueProps.found.offset - 1024)
               onError(keyNode.range, "KEY_OVER_1024_CHARS", "The : indicator must be at most 1024 chars after the start of an implicit block mapping key");
           }
-          const valueNode = value2 ? composeNode(ctx, value2, valueProps, onError) : composeEmptyNode(ctx, offset, sep, null, valueProps, onError);
+          const valueNode = value2 ? composeNode(ctx, value2, valueProps, onError) : composeEmptyNode(ctx, offset2, sep, null, valueProps, onError);
           if (ctx.schema.compat)
             utilFlowIndentCheck.flowIndentCheck(bm.indent, value2, onError);
-          offset = valueNode.range[2];
+          offset2 = valueNode.range[2];
           const pair = new Pair.Pair(keyNode, valueNode);
           if (ctx.options.keepSourceTokens)
             pair.srcToken = collItem;
@@ -9774,9 +9774,9 @@ var require_resolve_block_map = __commonJS({
           map.items.push(pair);
         }
       }
-      if (commentEnd && commentEnd < offset)
+      if (commentEnd && commentEnd < offset2)
         onError(commentEnd, "IMPOSSIBLE", "Map comment with trailing content");
-      map.range = [bm.offset, offset, commentEnd ?? offset];
+      map.range = [bm.offset, offset2, commentEnd ?? offset2];
       return map;
     }
     exports.resolveBlockMap = resolveBlockMap;
@@ -9797,13 +9797,13 @@ var require_resolve_block_seq = __commonJS({
         ctx.atRoot = false;
       if (ctx.atKey)
         ctx.atKey = false;
-      let offset = bs.offset;
+      let offset2 = bs.offset;
       let commentEnd = null;
       for (const { start, value: value2 } of bs.items) {
         const props = resolveProps.resolveProps(start, {
           indicator: "seq-item-ind",
           next: value2,
-          offset,
+          offset: offset2,
           onError,
           parentIndent: bs.indent,
           startOnNewline: true
@@ -9813,7 +9813,7 @@ var require_resolve_block_seq = __commonJS({
             if (value2?.type === "block-seq")
               onError(props.end, "BAD_INDENT", "All sequence items must start at the same column");
             else
-              onError(offset, "MISSING_CHAR", "Sequence item without - indicator");
+              onError(offset2, "MISSING_CHAR", "Sequence item without - indicator");
           } else {
             commentEnd = props.end;
             if (props.comment)
@@ -9824,10 +9824,10 @@ var require_resolve_block_seq = __commonJS({
         const node = value2 ? composeNode(ctx, value2, props, onError) : composeEmptyNode(ctx, props.end, start, null, props, onError);
         if (ctx.schema.compat)
           utilFlowIndentCheck.flowIndentCheck(bs.indent, value2, onError);
-        offset = node.range[2];
+        offset2 = node.range[2];
         seq.items.push(node);
       }
-      seq.range = [bs.offset, offset, commentEnd ?? offset];
+      seq.range = [bs.offset, offset2, commentEnd ?? offset2];
       return seq;
     }
     exports.resolveBlockSeq = resolveBlockSeq;
@@ -9838,7 +9838,7 @@ var require_resolve_block_seq = __commonJS({
 var require_resolve_end = __commonJS({
   "node_modules/yaml/dist/compose/resolve-end.js"(exports) {
     "use strict";
-    function resolveEnd(end, offset, reqSpace, onError) {
+    function resolveEnd(end, offset2, reqSpace, onError) {
       let comment = "";
       if (end) {
         let hasSpace = false;
@@ -9868,10 +9868,10 @@ var require_resolve_end = __commonJS({
             default:
               onError(token, "UNEXPECTED_TOKEN", `Unexpected ${type} at node end`);
           }
-          offset += source.length;
+          offset2 += source.length;
         }
       }
-      return { comment, offset };
+      return { comment, offset: offset2 };
     }
     exports.resolveEnd = resolveEnd;
   }
@@ -9902,7 +9902,7 @@ var require_resolve_flow_collection = __commonJS({
         ctx.atRoot = false;
       if (ctx.atKey)
         ctx.atKey = false;
-      let offset = fc.offset + fc.start.source.length;
+      let offset2 = fc.offset + fc.start.source.length;
       for (let i = 0; i < fc.items.length; ++i) {
         const collItem = fc.items[i];
         const { start, key, sep, value: value2 } = collItem;
@@ -9910,7 +9910,7 @@ var require_resolve_flow_collection = __commonJS({
           flow: fcName,
           indicator: "explicit-key-ind",
           next: key ?? sep?.[0],
-          offset,
+          offset: offset2,
           onError,
           parentIndent: fc.indent,
           startOnNewline: false
@@ -9927,7 +9927,7 @@ var require_resolve_flow_collection = __commonJS({
               else
                 coll.comment = props.comment;
             }
-            offset = props.end;
+            offset2 = props.end;
             continue;
           }
           if (!isMap && ctx.options.strict && utilContainsNewline.containsNewline(key))
@@ -9973,7 +9973,7 @@ var require_resolve_flow_collection = __commonJS({
         if (!isMap && !sep && !props.found) {
           const valueNode = value2 ? composeNode(ctx, value2, props, onError) : composeEmptyNode(ctx, props.end, sep, null, props, onError);
           coll.items.push(valueNode);
-          offset = valueNode.range[2];
+          offset2 = valueNode.range[2];
           if (isBlock(value2))
             onError(valueNode.range, "BLOCK_IN_FLOW", blockMsg);
         } else {
@@ -10038,18 +10038,18 @@ var require_resolve_flow_collection = __commonJS({
             map.range = [keyNode.range[0], endRange[1], endRange[2]];
             coll.items.push(map);
           }
-          offset = valueNode ? valueNode.range[2] : valueProps.end;
+          offset2 = valueNode ? valueNode.range[2] : valueProps.end;
         }
       }
       const expectedEnd = isMap ? "}" : "]";
       const [ce, ...ee] = fc.end;
-      let cePos = offset;
+      let cePos = offset2;
       if (ce?.source === expectedEnd)
         cePos = ce.offset + ce.source.length;
       else {
         const name2 = fcName[0].toUpperCase() + fcName.substring(1);
         const msg = atRoot ? `${name2} must end with a ${expectedEnd}` : `${name2} in block collection must be sufficiently indented and end with a ${expectedEnd}`;
-        onError(offset, atRoot ? "MISSING_CHAR" : "BAD_INDENT", msg);
+        onError(offset2, atRoot ? "MISSING_CHAR" : "BAD_INDENT", msg);
         if (ce && ce.source.length !== 1)
           ee.unshift(ce);
       }
@@ -10164,7 +10164,7 @@ var require_resolve_block_scalar = __commonJS({
         return { value: value3, type, comment: header.comment, range: [start, end2, end2] };
       }
       let trimIndent = scalar.indent + header.indent;
-      let offset = scalar.offset + header.length;
+      let offset2 = scalar.offset + header.length;
       let contentStart = 0;
       for (let i = 0; i < chompStart; ++i) {
         const [indent, content] = lines2[i];
@@ -10174,18 +10174,18 @@ var require_resolve_block_scalar = __commonJS({
         } else {
           if (indent.length < trimIndent) {
             const message = "Block scalars with more-indented leading empty lines must use an explicit indentation indicator";
-            onError(offset + indent.length, "MISSING_CHAR", message);
+            onError(offset2 + indent.length, "MISSING_CHAR", message);
           }
           if (header.indent === 0)
             trimIndent = indent.length;
           contentStart = i;
           if (trimIndent === 0 && !ctx.atRoot) {
             const message = "Block scalar values in collections must be indented";
-            onError(offset, "BAD_INDENT", message);
+            onError(offset2, "BAD_INDENT", message);
           }
           break;
         }
-        offset += indent.length + content.length + 1;
+        offset2 += indent.length + content.length + 1;
       }
       for (let i = lines2.length - 1; i >= chompStart; --i) {
         if (lines2[i][0].length > trimIndent)
@@ -10198,14 +10198,14 @@ var require_resolve_block_scalar = __commonJS({
         value2 += lines2[i][0].slice(trimIndent) + "\n";
       for (let i = contentStart; i < chompStart; ++i) {
         let [indent, content] = lines2[i];
-        offset += indent.length + content.length + 1;
+        offset2 += indent.length + content.length + 1;
         const crlf = content[content.length - 1] === "\r";
         if (crlf)
           content = content.slice(0, -1);
         if (content && indent.length < trimIndent) {
           const src = header.indent ? "explicit indentation indicator" : "first line";
           const message = `Block scalar lines must not be less indented than their ${src}`;
-          onError(offset - content.length - (crlf ? 2 : 1), "BAD_INDENT", message);
+          onError(offset2 - content.length - (crlf ? 2 : 1), "BAD_INDENT", message);
           indent = "";
         }
         if (type === Scalar.Scalar.BLOCK_LITERAL) {
@@ -10245,7 +10245,7 @@ var require_resolve_block_scalar = __commonJS({
       const end = start + header.length + scalar.source.length;
       return { value: value2, type, comment: header.comment, range: [start, end, end] };
     }
-    function parseBlockScalarHeader({ offset, props }, strict, onError) {
+    function parseBlockScalarHeader({ offset: offset2, props }, strict, onError) {
       if (props[0].type !== "block-scalar-header") {
         onError(props[0], "IMPOSSIBLE", "Block scalar header not found");
         return null;
@@ -10264,7 +10264,7 @@ var require_resolve_block_scalar = __commonJS({
           if (!indent && n)
             indent = n;
           else if (error2 === -1)
-            error2 = offset + i;
+            error2 = offset2 + i;
         }
       }
       if (error2 !== -1)
@@ -10326,10 +10326,10 @@ var require_resolve_flow_scalar = __commonJS({
     var Scalar = require_Scalar();
     var resolveEnd = require_resolve_end();
     function resolveFlowScalar(scalar, strict, onError) {
-      const { offset, type, source, end } = scalar;
+      const { offset: offset2, type, source, end } = scalar;
       let _type;
       let value2;
-      const _onError = (rel, code, msg) => onError(offset + rel, code, msg);
+      const _onError = (rel, code, msg) => onError(offset2 + rel, code, msg);
       switch (type) {
         case "scalar":
           _type = Scalar.Scalar.PLAIN;
@@ -10350,16 +10350,16 @@ var require_resolve_flow_scalar = __commonJS({
             value: "",
             type: null,
             comment: "",
-            range: [offset, offset + source.length, offset + source.length]
+            range: [offset2, offset2 + source.length, offset2 + source.length]
           };
       }
-      const valueEnd = offset + source.length;
+      const valueEnd = offset2 + source.length;
       const re = resolveEnd.resolveEnd(end, valueEnd, strict, onError);
       return {
         value: value2,
         type: _type,
         comment: re.comment,
-        range: [offset, valueEnd, re.offset]
+        range: [offset2, valueEnd, re.offset]
       };
     }
     function plainValue(source, onError) {
@@ -10436,9 +10436,9 @@ var require_resolve_flow_scalar = __commonJS({
         if (ch === "\r" && source[i + 1] === "\n")
           continue;
         if (ch === "\n") {
-          const { fold, offset } = foldNewline(source, i);
+          const { fold, offset: offset2 } = foldNewline(source, i);
           res += fold;
-          i = offset;
+          i = offset2;
         } else if (ch === "\\") {
           let next = source[++i];
           const cc = escapeCodes[next];
@@ -10476,20 +10476,20 @@ var require_resolve_flow_scalar = __commonJS({
         onError(source.length, "MISSING_CHAR", 'Missing closing "quote');
       return res;
     }
-    function foldNewline(source, offset) {
+    function foldNewline(source, offset2) {
       let fold = "";
-      let ch = source[offset + 1];
+      let ch = source[offset2 + 1];
       while (ch === " " || ch === "	" || ch === "\n" || ch === "\r") {
-        if (ch === "\r" && source[offset + 2] !== "\n")
+        if (ch === "\r" && source[offset2 + 2] !== "\n")
           break;
         if (ch === "\n")
           fold += "\n";
-        offset += 1;
-        ch = source[offset + 1];
+        offset2 += 1;
+        ch = source[offset2 + 1];
       }
       if (!fold)
         fold = " ";
-      return { fold, offset };
+      return { fold, offset: offset2 };
     }
     var escapeCodes = {
       "0": "\0",
@@ -10524,15 +10524,15 @@ var require_resolve_flow_scalar = __commonJS({
       "\\": "\\",
       "	": "	"
     };
-    function parseCharCode(source, offset, length, onError) {
-      const cc = source.substr(offset, length);
+    function parseCharCode(source, offset2, length, onError) {
+      const cc = source.substr(offset2, length);
       const ok = cc.length === length && /^[0-9a-fA-F]+$/.test(cc);
       const code = ok ? parseInt(cc, 16) : NaN;
       try {
         return String.fromCodePoint(code);
       } catch {
-        const raw = source.substr(offset - 2, length + 2);
-        onError(offset - 2, "BAD_DQ_ESCAPE", `Invalid escape sequence ${raw}`);
+        const raw = source.substr(offset2 - 2, length + 2);
+        onError(offset2 - 2, "BAD_DQ_ESCAPE", `Invalid escape sequence ${raw}`);
         return raw;
       }
     }
@@ -10625,7 +10625,7 @@ var require_compose_scalar = __commonJS({
 var require_util_empty_scalar_position = __commonJS({
   "node_modules/yaml/dist/compose/util-empty-scalar-position.js"(exports) {
     "use strict";
-    function emptyScalarPosition(offset, before, pos) {
+    function emptyScalarPosition(offset2, before, pos) {
       if (before) {
         pos ?? (pos = before.length);
         for (let i = pos - 1; i >= 0; --i) {
@@ -10634,18 +10634,18 @@ var require_util_empty_scalar_position = __commonJS({
             case "space":
             case "comment":
             case "newline":
-              offset -= st.source.length;
+              offset2 -= st.source.length;
               continue;
           }
           st = before[++i];
           while (st?.type === "space") {
-            offset += st.source.length;
+            offset2 += st.source.length;
             st = before[++i];
           }
           break;
         }
       }
-      return offset;
+      return offset2;
     }
     exports.emptyScalarPosition = emptyScalarPosition;
   }
@@ -10718,10 +10718,10 @@ var require_compose_node = __commonJS({
         node.srcToken = token;
       return node;
     }
-    function composeEmptyNode(ctx, offset, before, pos, { spaceBefore, comment, anchor, tag, end }, onError) {
+    function composeEmptyNode(ctx, offset2, before, pos, { spaceBefore, comment, anchor, tag, end }, onError) {
       const token = {
         type: "scalar",
-        offset: utilEmptyScalarPosition.emptyScalarPosition(offset, before, pos),
+        offset: utilEmptyScalarPosition.emptyScalarPosition(offset2, before, pos),
         indent: -1,
         source: ""
       };
@@ -10739,15 +10739,15 @@ var require_compose_node = __commonJS({
       }
       return node;
     }
-    function composeAlias({ options }, { offset, source, end }, onError) {
+    function composeAlias({ options }, { offset: offset2, source, end }, onError) {
       const alias = new Alias.Alias(source.substring(1));
       if (alias.source === "")
-        onError(offset, "BAD_ALIAS", "Alias cannot be an empty string");
+        onError(offset2, "BAD_ALIAS", "Alias cannot be an empty string");
       if (alias.source.endsWith(":"))
-        onError(offset + source.length - 1, "BAD_ALIAS", "Alias ending in : is ambiguous", true);
-      const valueEnd = offset + source.length;
+        onError(offset2 + source.length - 1, "BAD_ALIAS", "Alias ending in : is ambiguous", true);
+      const valueEnd = offset2 + source.length;
       const re = resolveEnd.resolveEnd(end, valueEnd, options.strict, onError);
-      alias.range = [offset, valueEnd, re.offset];
+      alias.range = [offset2, valueEnd, re.offset];
       if (re.comment)
         alias.comment = re.comment;
       return alias;
@@ -10765,7 +10765,7 @@ var require_compose_doc = __commonJS({
     var composeNode = require_compose_node();
     var resolveEnd = require_resolve_end();
     var resolveProps = require_resolve_props();
-    function composeDoc(options, directives, { offset, start, value: value2, end }, onError) {
+    function composeDoc(options, directives, { offset: offset2, start, value: value2, end }, onError) {
       const opts = Object.assign({ _directives: directives }, options);
       const doc = new Document.Document(void 0, opts);
       const ctx = {
@@ -10778,7 +10778,7 @@ var require_compose_doc = __commonJS({
       const props = resolveProps.resolveProps(start, {
         indicator: "doc-start",
         next: value2 ?? end?.[0],
-        offset,
+        offset: offset2,
         onError,
         parentIndent: 0,
         startOnNewline: true
@@ -10793,7 +10793,7 @@ var require_compose_doc = __commonJS({
       const re = resolveEnd.resolveEnd(end, contentEnd, false, onError);
       if (re.comment)
         doc.comment = re.comment;
-      doc.range = [offset, contentEnd, re.offset];
+      doc.range = [offset2, contentEnd, re.offset];
       return doc;
     }
     exports.composeDoc = composeDoc;
@@ -10816,8 +10816,8 @@ var require_composer = __commonJS({
         return [src, src + 1];
       if (Array.isArray(src))
         return src.length === 2 ? src : [src[0], src[1]];
-      const { offset, source } = src;
-      return [offset, offset + (typeof source === "string" ? source.length : 1)];
+      const { offset: offset2, source } = src;
+      return [offset2, offset2 + (typeof source === "string" ? source.length : 1)];
     }
     function parsePrelude(prelude) {
       let comment = "";
@@ -10926,9 +10926,9 @@ ${cb}` : comment;
           console.dir(token, { depth: null });
         switch (token.type) {
           case "directive":
-            this.directives.add(token.source, (offset, message, warning) => {
+            this.directives.add(token.source, (offset2, message, warning) => {
               const pos = getErrorPos(token);
-              pos[0] += offset;
+              pos[0] += offset2;
               this.onError(pos, "BAD_DIRECTIVE", message, warning);
             });
             this.prelude.push(token.source);
@@ -11019,11 +11019,11 @@ var require_cst_scalar = __commonJS({
     function resolveAsScalar(token, strict = true, onError) {
       if (token) {
         const _onError = (pos, code, message) => {
-          const offset = typeof pos === "number" ? pos : Array.isArray(pos) ? pos[0] : pos.offset;
+          const offset2 = typeof pos === "number" ? pos : Array.isArray(pos) ? pos[0] : pos.offset;
           if (onError)
-            onError(offset, code, message);
+            onError(offset2, code, message);
           else
-            throw new errors.YAMLParseError([offset, offset + 1], code, message);
+            throw new errors.YAMLParseError([offset2, offset2 + 1], code, message);
         };
         switch (token.type) {
           case "scalar":
@@ -11037,7 +11037,7 @@ var require_cst_scalar = __commonJS({
       return null;
     }
     function createScalarToken(value2, context) {
-      const { implicitKey = false, indent, inFlow = false, offset = -1, type = "PLAIN" } = context;
+      const { implicitKey = false, indent, inFlow = false, offset: offset2 = -1, type = "PLAIN" } = context;
       const source = stringifyString.stringifyString({ type, value: value2 }, {
         implicitKey,
         indent: indent > 0 ? " ".repeat(indent) : "",
@@ -11054,18 +11054,18 @@ var require_cst_scalar = __commonJS({
           const head = source.substring(0, he);
           const body = source.substring(he + 1) + "\n";
           const props = [
-            { type: "block-scalar-header", offset, indent, source: head }
+            { type: "block-scalar-header", offset: offset2, indent, source: head }
           ];
           if (!addEndtoBlockProps(props, end))
             props.push({ type: "newline", offset: -1, indent, source: "\n" });
-          return { type: "block-scalar", offset, indent, props, source: body };
+          return { type: "block-scalar", offset: offset2, indent, props, source: body };
         }
         case '"':
-          return { type: "double-quoted-scalar", offset, indent, source, end };
+          return { type: "double-quoted-scalar", offset: offset2, indent, source, end };
         case "'":
-          return { type: "single-quoted-scalar", offset, indent, source, end };
+          return { type: "single-quoted-scalar", offset: offset2, indent, source, end };
         default:
-          return { type: "scalar", offset, indent, source, end };
+          return { type: "scalar", offset: offset2, indent, source, end };
       }
     }
     function setScalarValue(token, value2, context = {}) {
@@ -11123,10 +11123,10 @@ var require_cst_scalar = __commonJS({
         header.source = head;
         token.source = body;
       } else {
-        const { offset } = token;
+        const { offset: offset2 } = token;
         const indent = "indent" in token ? token.indent : -1;
         const props = [
-          { type: "block-scalar-header", offset, indent, source: head }
+          { type: "block-scalar-header", offset: offset2, indent, source: head }
         ];
         if (!addEndtoBlockProps(props, "end" in token ? token.end : void 0))
           props.push({ type: "newline", offset: -1, indent, source: "\n" });
@@ -11171,8 +11171,8 @@ var require_cst_scalar = __commonJS({
         }
         case "block-map":
         case "block-seq": {
-          const offset = token.offset + source.length;
-          const nl = { type: "newline", offset, indent: token.indent, source: "\n" };
+          const offset2 = token.offset + source.length;
+          const nl = { type: "newline", offset: offset2, indent: token.indent, source: "\n" };
           delete token.items;
           Object.assign(token, { type, source, end: [nl] });
           break;
@@ -11486,25 +11486,25 @@ var require_lexer = __commonJS({
       charAt(n) {
         return this.buffer[this.pos + n];
       }
-      continueScalar(offset) {
-        let ch = this.buffer[offset];
+      continueScalar(offset2) {
+        let ch = this.buffer[offset2];
         if (this.indentNext > 0) {
           let indent = 0;
           while (ch === " ")
-            ch = this.buffer[++indent + offset];
+            ch = this.buffer[++indent + offset2];
           if (ch === "\r") {
-            const next = this.buffer[indent + offset + 1];
+            const next = this.buffer[indent + offset2 + 1];
             if (next === "\n" || !next && !this.atEnd)
-              return offset + indent + 1;
+              return offset2 + indent + 1;
           }
-          return ch === "\n" || indent >= this.indentNext || !ch && !this.atEnd ? offset + indent : -1;
+          return ch === "\n" || indent >= this.indentNext || !ch && !this.atEnd ? offset2 + indent : -1;
         }
         if (ch === "-" || ch === ".") {
-          const dt = this.buffer.substr(offset, 3);
-          if ((dt === "---" || dt === "...") && isEmpty(this.buffer[offset + 3]))
+          const dt = this.buffer.substr(offset2, 3);
+          if ((dt === "---" || dt === "...") && isEmpty(this.buffer[offset2 + 3]))
             return -1;
         }
-        return offset;
+        return offset2;
       }
       getLine() {
         let end = this.lineEndPos;
@@ -12014,23 +12014,23 @@ var require_line_counter = __commonJS({
     var LineCounter = class {
       constructor() {
         this.lineStarts = [];
-        this.addNewLine = (offset) => this.lineStarts.push(offset);
-        this.linePos = (offset) => {
+        this.addNewLine = (offset2) => this.lineStarts.push(offset2);
+        this.linePos = (offset2) => {
           let low = 0;
           let high = this.lineStarts.length;
           while (low < high) {
             const mid = low + high >> 1;
-            if (this.lineStarts[mid] < offset)
+            if (this.lineStarts[mid] < offset2)
               low = mid + 1;
             else
               high = mid;
           }
-          if (this.lineStarts[low] === offset)
+          if (this.lineStarts[low] === offset2)
             return { line: low + 1, col: 1 };
           if (low === 0)
-            return { line: 0, col: offset };
+            return { line: 0, col: offset2 };
           const start = this.lineStarts[low - 1];
-          return { line: low, col: offset - start + 1 };
+          return { line: low, col: offset2 - start + 1 };
         };
       }
     };
@@ -15666,7 +15666,7 @@ function resolveSerialEndpoint(port, options = {}) {
       deviceNumber: metadata.rdev
     };
   });
-  const snapshot2 = () => {
+  const snapshot = () => {
     if (platform2 === "win32") {
       const localPrefix = "\\\\.\\";
       const name2 = port.startsWith(localPrefix) ? port.slice(localPrefix.length) : port;
@@ -15743,7 +15743,7 @@ function resolveSerialEndpoint(port, options = {}) {
       presence: "character-device"
     };
   };
-  const expected = snapshot2();
+  const expected = snapshot();
   return Object.freeze({
     requestedPort: port,
     canonicalPort: expected.canonicalPort,
@@ -15755,7 +15755,7 @@ function resolveSerialEndpoint(port, options = {}) {
     presence: expected.presence,
     survivesReenumeration: false,
     revalidate() {
-      const current = snapshot2();
+      const current = snapshot();
       if (current.canonicalPort !== expected.canonicalPort || current.identity !== expected.identity || current.deviceNumber !== expected.deviceNumber)
         throw new PlatformIOError(
           "Serial endpoint changed after selection; resolve and authorize again.",
@@ -25111,11 +25111,11 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
     content: redactSecretsInText(stitchedLines.join("\n"))
   };
 }
-function encodeMonitorCursor(logPath, offset) {
+function encodeMonitorCursor(logPath, offset2) {
   const payload = {
     version: 1,
     logHash: crypto17.createHash("sha256").update(path52.resolve(logPath)).digest("hex"),
-    offset
+    offset: offset2
   };
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
 }
@@ -27203,19 +27203,19 @@ var require_utf32 = __commonJS({
       var src = Buffer4.from(str, "ucs2");
       var dst = Buffer4.alloc(src.length * 2);
       var write32 = this.isLE ? dst.writeUInt32LE : dst.writeUInt32BE;
-      var offset = 0;
+      var offset2 = 0;
       for (var i = 0; i < src.length; i += 2) {
         var code = src.readUInt16LE(i);
         var isHighSurrogate = code >= 55296 && code < 56320;
         var isLowSurrogate = code >= 56320 && code < 57344;
         if (this.highSurrogate) {
           if (isHighSurrogate || !isLowSurrogate) {
-            write32.call(dst, this.highSurrogate, offset);
-            offset += 4;
+            write32.call(dst, this.highSurrogate, offset2);
+            offset2 += 4;
           } else {
             var codepoint = (this.highSurrogate - 55296 << 10 | code - 56320) + 65536;
-            write32.call(dst, codepoint, offset);
-            offset += 4;
+            write32.call(dst, codepoint, offset2);
+            offset2 += 4;
             this.highSurrogate = 0;
             continue;
           }
@@ -27223,13 +27223,13 @@ var require_utf32 = __commonJS({
         if (isHighSurrogate) {
           this.highSurrogate = code;
         } else {
-          write32.call(dst, code, offset);
-          offset += 4;
+          write32.call(dst, code, offset2);
+          offset2 += 4;
           this.highSurrogate = 0;
         }
       }
-      if (offset < dst.length) {
-        dst = dst.slice(0, offset);
+      if (offset2 < dst.length) {
+        dst = dst.slice(0, offset2);
       }
       return dst;
     };
@@ -27258,7 +27258,7 @@ var require_utf32 = __commonJS({
       var i = 0;
       var codepoint = 0;
       var dst = Buffer4.alloc(src.length + 4);
-      var offset = 0;
+      var offset2 = 0;
       var isLE = this.isLE;
       var overflow = this.overflow;
       var badChar = this.badChar;
@@ -27273,7 +27273,7 @@ var require_utf32 = __commonJS({
             codepoint = overflow[i + 3] | overflow[i + 2] << 8 | overflow[i + 1] << 16 | overflow[i] << 24;
           }
           overflow.length = 0;
-          offset = _writeCodepoint(dst, offset, codepoint, badChar);
+          offset2 = _writeCodepoint(dst, offset2, codepoint, badChar);
         }
       }
       for (; i < src.length - 3; i += 4) {
@@ -27282,27 +27282,27 @@ var require_utf32 = __commonJS({
         } else {
           codepoint = src[i + 3] | src[i + 2] << 8 | src[i + 1] << 16 | src[i] << 24;
         }
-        offset = _writeCodepoint(dst, offset, codepoint, badChar);
+        offset2 = _writeCodepoint(dst, offset2, codepoint, badChar);
       }
       for (; i < src.length; i++) {
         overflow.push(src[i]);
       }
-      return dst.slice(0, offset).toString("ucs2");
+      return dst.slice(0, offset2).toString("ucs2");
     };
-    function _writeCodepoint(dst, offset, codepoint, badChar) {
+    function _writeCodepoint(dst, offset2, codepoint, badChar) {
       if (codepoint < 0 || codepoint > 1114111) {
         codepoint = badChar;
       }
       if (codepoint >= 65536) {
         codepoint -= 65536;
         var high = 55296 | codepoint >> 10;
-        dst[offset++] = high & 255;
-        dst[offset++] = high >> 8;
+        dst[offset2++] = high & 255;
+        dst[offset2++] = high >> 8;
         var codepoint = 56320 | codepoint & 1023;
       }
-      dst[offset++] = codepoint & 255;
-      dst[offset++] = codepoint >> 8;
-      return offset;
+      dst[offset2++] = codepoint & 255;
+      dst[offset2++] = codepoint >> 8;
+      return offset2;
     }
     Utf32Decoder.prototype.end = function() {
       this.overflow.length = 0;
@@ -42243,9 +42243,9 @@ var require_implementation = __commonJS({
       }
       return arr;
     };
-    var slicy = function slicy2(arrLike, offset) {
+    var slicy = function slicy2(arrLike, offset2) {
       var arr = [];
-      for (var i = offset || 0, j = 0; i < arrLike.length; i += 1, j += 1) {
+      for (var i = offset2 || 0, j = 0; i < arrLike.length; i += 1, j += 1) {
         arr[j] = arrLike[i];
       }
       return arr;
@@ -55923,7 +55923,7 @@ var require_router = __commonJS({
       }
     };
     Router.prototype.use = function use(handler) {
-      let offset = 0;
+      let offset2 = 0;
       let path58 = "/";
       if (typeof handler !== "function") {
         let arg = handler;
@@ -55931,11 +55931,11 @@ var require_router = __commonJS({
           arg = arg[0];
         }
         if (typeof arg !== "function") {
-          offset = 1;
+          offset2 = 1;
           path58 = handler;
         }
       }
-      const callbacks = flatten.call(slice.call(arguments, offset), Infinity);
+      const callbacks = flatten.call(slice.call(arguments, offset2), Infinity);
       if (callbacks.length === 0) {
         throw new TypeError("argument handler is required");
       }
@@ -56229,7 +56229,7 @@ var require_application = __commonJS({
       this.router.handle(req, res, done);
     };
     app.use = function use(fn) {
-      var offset = 0;
+      var offset2 = 0;
       var path58 = "/";
       if (typeof fn !== "function") {
         var arg = fn;
@@ -56237,11 +56237,11 @@ var require_application = __commonJS({
           arg = arg[0];
         }
         if (typeof arg !== "function") {
-          offset = 1;
+          offset2 = 1;
           path58 = fn;
         }
       }
-      var fns = flatten.call(slice.call(arguments, offset), Infinity);
+      var fns = flatten.call(slice.call(arguments, offset2), Infinity);
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
@@ -57304,9 +57304,9 @@ var require_request = __commonJS({
     defineGetter(req, "subdomains", function subdomains() {
       var hostname2 = this.hostname;
       if (!hostname2) return [];
-      var offset = this.app.get("subdomain offset");
+      var offset2 = this.app.get("subdomain offset");
       var subdomains2 = !isIP2(hostname2) ? hostname2.split(".").reverse() : [hostname2];
-      return subdomains2.slice(offset);
+      return subdomains2.slice(offset2);
     });
     defineGetter(req, "path", function path58() {
       return parse4(this).pathname;
@@ -57324,8 +57324,8 @@ var require_request = __commonJS({
     defineGetter(req, "hostname", function hostname2() {
       var host = this.host;
       if (!host) return;
-      var offset = host[0] === "[" ? host.indexOf("]") + 1 : 0;
-      var index = host.indexOf(":", offset);
+      var offset2 = host[0] === "[" ? host.indexOf("]") + 1 : 0;
+      var index = host.indexOf(":", offset2);
       return index !== -1 ? host.substring(0, index) : host;
     });
     defineGetter(req, "fresh", function() {
@@ -67486,7 +67486,7 @@ var require_send = __commonJS({
       var res = this.res;
       var req = this.req;
       var ranges = req.headers.range;
-      var offset = options.start || 0;
+      var offset2 = options.start || 0;
       if (res.headersSent) {
         this.headersAlreadySent();
         return;
@@ -67504,9 +67504,9 @@ var require_send = __commonJS({
           return;
         }
       }
-      len = Math.max(0, len - offset);
+      len = Math.max(0, len - offset2);
       if (options.end !== void 0) {
-        var bytes = options.end - offset + 1;
+        var bytes = options.end - offset2 + 1;
         if (len > bytes) len = bytes;
       }
       if (this._acceptRanges && BYTES_RANGE_REGEXP.test(ranges)) {
@@ -67528,15 +67528,15 @@ var require_send = __commonJS({
           debug("range %j", ranges);
           res.statusCode = 206;
           res.setHeader("Content-Range", contentRange("bytes", len, ranges[0]));
-          offset += ranges[0].start;
+          offset2 += ranges[0].start;
           len = ranges[0].end - ranges[0].start + 1;
         }
       }
       for (var prop in options) {
         opts[prop] = options[prop];
       }
-      opts.start = offset;
-      opts.end = Math.max(offset, offset + len - 1);
+      opts.start = offset2;
+      opts.end = Math.max(offset2, offset2 + len - 1);
       res.setHeader("Content-Length", len);
       if (req.method === "HEAD") {
         res.end();
@@ -78371,8 +78371,8 @@ var require_parser_v3 = __commonJS({
     }
     function arrayBufferToBuffer(data) {
       var length = data.byteLength || data.length;
-      var offset = data.byteOffset || 0;
-      return Buffer.from(data.buffer || data, offset, length);
+      var offset2 = data.byteOffset || 0;
+      return Buffer.from(data.buffer || data, offset2, length);
     }
     function encodePayloadAsBinary(packets, callback) {
       if (!packets.length) {
@@ -79651,20 +79651,20 @@ var require_buffer_util = __commonJS({
       if (list2.length === 0) return EMPTY_BUFFER;
       if (list2.length === 1) return list2[0];
       const target = Buffer.allocUnsafe(totalLength);
-      let offset = 0;
+      let offset2 = 0;
       for (let i = 0; i < list2.length; i++) {
         const buf = list2[i];
-        target.set(buf, offset);
-        offset += buf.length;
+        target.set(buf, offset2);
+        offset2 += buf.length;
       }
-      if (offset < totalLength) {
-        return new FastBuffer(target.buffer, target.byteOffset, offset);
+      if (offset2 < totalLength) {
+        return new FastBuffer(target.buffer, target.byteOffset, offset2);
       }
       return target;
     }
-    function _mask(source, mask, output, offset, length) {
+    function _mask(source, mask, output, offset2, length) {
       for (let i = 0; i < length; i++) {
-        output[offset + i] = source[i] ^ mask[i & 3];
+        output[offset2 + i] = source[i] ^ mask[i & 3];
       }
     }
     function _unmask(buffer, mask) {
@@ -79702,9 +79702,9 @@ var require_buffer_util = __commonJS({
     if (!process.env.WS_NO_BUFFER_UTIL) {
       try {
         const bufferUtil = __require("bufferutil");
-        module.exports.mask = function(source, mask, output, offset, length) {
-          if (length < 48) _mask(source, mask, output, offset, length);
-          else bufferUtil.mask(source, mask, output, offset, length);
+        module.exports.mask = function(source, mask, output, offset2, length) {
+          if (length < 48) _mask(source, mask, output, offset2, length);
+          else bufferUtil.mask(source, mask, output, offset2, length);
         };
         module.exports.unmask = function(buffer, mask) {
           if (buffer.length < 32) _unmask(buffer, mask);
@@ -80469,11 +80469,11 @@ var require_receiver = __commonJS({
         const dst = Buffer.allocUnsafe(n);
         do {
           const buf = this._buffers[0];
-          const offset = dst.length - n;
+          const offset2 = dst.length - n;
           if (n >= buf.length) {
-            dst.set(this._buffers.shift(), offset);
+            dst.set(this._buffers.shift(), offset2);
           } else {
-            dst.set(new Uint8Array(buf.buffer, buf.byteOffset, n), offset);
+            dst.set(new Uint8Array(buf.buffer, buf.byteOffset, n), offset2);
             this._buffers[0] = new FastBuffer(
               buf.buffer,
               buf.byteOffset + n,
@@ -81042,7 +81042,7 @@ var require_sender = __commonJS({
       static frame(data, options) {
         let mask;
         let merge2 = false;
-        let offset = 2;
+        let offset2 = 2;
         let skipMasking = false;
         if (options.mask) {
           mask = options.maskBuffer || maskBuffer;
@@ -81062,7 +81062,7 @@ var require_sender = __commonJS({
             mask[3] = randomPool[randomPoolPointer++];
           }
           skipMasking = (mask[0] | mask[1] | mask[2] | mask[3]) === 0;
-          offset = 6;
+          offset2 = 6;
         }
         let dataLength;
         if (typeof data === "string") {
@@ -81078,13 +81078,13 @@ var require_sender = __commonJS({
         }
         let payloadLength = dataLength;
         if (dataLength >= 65536) {
-          offset += 8;
+          offset2 += 8;
           payloadLength = 127;
         } else if (dataLength > 125) {
-          offset += 2;
+          offset2 += 2;
           payloadLength = 126;
         }
-        const target = Buffer.allocUnsafe(merge2 ? dataLength + offset : offset);
+        const target = Buffer.allocUnsafe(merge2 ? dataLength + offset2 : offset2);
         target[0] = options.fin ? options.opcode | 128 : options.opcode;
         if (options.rsv1) target[0] |= 64;
         target[1] = payloadLength;
@@ -81096,13 +81096,13 @@ var require_sender = __commonJS({
         }
         if (!options.mask) return [target, data];
         target[1] |= 128;
-        target[offset - 4] = mask[0];
-        target[offset - 3] = mask[1];
-        target[offset - 2] = mask[2];
-        target[offset - 1] = mask[3];
+        target[offset2 - 4] = mask[0];
+        target[offset2 - 3] = mask[1];
+        target[offset2 - 2] = mask[2];
+        target[offset2 - 1] = mask[3];
         if (skipMasking) return [target, data];
         if (merge2) {
-          applyMask(data, mask, target, offset, dataLength);
+          applyMask(data, mask, target, offset2, dataLength);
           return [target];
         }
         applyMask(data, mask, data, 0, dataLength);
@@ -84702,7 +84702,7 @@ var require_polling2 = __commonJS({
         this.dataReq = req;
         this.dataRes = res;
         let buffer;
-        let offset = 0;
+        let offset2 = 0;
         const headers = {
           // text/html is required instead of text/plain to avoid an
           // unwanted download dialog on certain user-agents (GH-43)
@@ -84724,7 +84724,7 @@ var require_polling2 = __commonJS({
           this.onError("data request connection closed prematurely");
         });
         res.onData((arrayBuffer, isLast) => {
-          const totalLength = offset + arrayBuffer.byteLength;
+          const totalLength = offset2 + arrayBuffer.byteLength;
           if (totalLength > expectedContentLength) {
             this.onError("content-length mismatch");
             res.close();
@@ -84737,7 +84737,7 @@ var require_polling2 = __commonJS({
             }
             buffer = Buffer.allocUnsafe(expectedContentLength);
           }
-          Buffer.from(arrayBuffer).copy(buffer, offset);
+          Buffer.from(arrayBuffer).copy(buffer, offset2);
           if (isLast) {
             if (totalLength != expectedContentLength) {
               this.onError("content-length mismatch");
@@ -84748,7 +84748,7 @@ var require_polling2 = __commonJS({
             onEnd(buffer);
             return;
           }
-          offset = totalLength;
+          offset2 = totalLength;
         });
       }
       /**
@@ -87841,14 +87841,14 @@ var require_namespace = __commonJS({
       }
       async _createSocket(client, auth) {
         const sessionId = auth.pid;
-        const offset = auth.offset;
+        const offset2 = auth.offset;
         if (
           // @ts-ignore
-          this.server.opts.connectionStateRecovery && typeof sessionId === "string" && typeof offset === "string"
+          this.server.opts.connectionStateRecovery && typeof sessionId === "string" && typeof offset2 === "string"
         ) {
           let session;
           try {
-            session = await this.adapter.restoreSession(sessionId, offset);
+            session = await this.adapter.restoreSession(sessionId, offset2);
           } catch (e) {
             debug("error while restoring session: %s", e);
           }
@@ -88512,7 +88512,7 @@ var require_in_memory_adapter = __commonJS({
        * @param pid
        * @param offset
        */
-      restoreSession(pid, offset) {
+      restoreSession(pid, offset2) {
         return null;
       }
     };
@@ -88546,7 +88546,7 @@ var require_in_memory_adapter = __commonJS({
         session.disconnectedAt = Date.now();
         this.sessions.set(session.pid, session);
       }
-      restoreSession(pid, offset) {
+      restoreSession(pid, offset2) {
         const session = this.sessions.get(pid);
         if (!session) {
           return null;
@@ -88556,7 +88556,7 @@ var require_in_memory_adapter = __commonJS({
           this.sessions.delete(pid);
           return null;
         }
-        const index = this.packets.findIndex((packet) => packet.id === offset);
+        const index = this.packets.findIndex((packet) => packet.id === offset2);
         if (index === -1) {
           return null;
         }
@@ -88666,7 +88666,7 @@ var require_cluster_adapter = __commonJS({
        * @param offset
        * @protected
        */
-      onMessage(message, offset) {
+      onMessage(message, offset2) {
         if (message.uid === this.uid) {
           return debug("[%s] ignore message from self", this.uid);
         }
@@ -88700,7 +88700,7 @@ var require_cluster_adapter = __commonJS({
             } else {
               const packet = message.data.packet;
               const opts = decodeOptions(message.data.opts);
-              this.addOffsetIfNecessary(packet, opts, offset);
+              this.addOffsetIfNecessary(packet, opts, offset2);
               super.broadcast(packet, opts);
             }
             break;
@@ -88830,14 +88830,14 @@ var require_cluster_adapter = __commonJS({
         const onlyLocal = (_a = opts.flags) === null || _a === void 0 ? void 0 : _a.local;
         if (!onlyLocal) {
           try {
-            const offset = await this.publishAndReturnOffset({
+            const offset2 = await this.publishAndReturnOffset({
               type: MessageType.BROADCAST,
               data: {
                 packet,
                 opts: encodeOptions(opts)
               }
             });
-            this.addOffsetIfNecessary(packet, opts, offset);
+            this.addOffsetIfNecessary(packet, opts, offset2);
           } catch (e) {
             debug("[%s] error while broadcasting message: %s", this.uid, e.message);
           }
@@ -88853,7 +88853,7 @@ var require_cluster_adapter = __commonJS({
        * @param offset
        * @private
        */
-      addOffsetIfNecessary(packet, opts, offset) {
+      addOffsetIfNecessary(packet, opts, offset2) {
         var _a;
         if (!this.nsp.server.opts.connectionStateRecovery) {
           return;
@@ -88862,7 +88862,7 @@ var require_cluster_adapter = __commonJS({
         const withoutAcknowledgement = packet.id === void 0;
         const notVolatile = ((_a = opts.flags) === null || _a === void 0 ? void 0 : _a.volatile) === void 0;
         if (isEventPacket && withoutAcknowledgement && notVolatile) {
-          packet.data.push(offset);
+          packet.data.push(offset2);
         }
       }
       broadcastWithAck(packet, opts, clientCountCallback, ack) {
@@ -89087,7 +89087,7 @@ var require_cluster_adapter = __commonJS({
           clearInterval(this.cleanupTimer);
         }
       }
-      onMessage(message, offset) {
+      onMessage(message, offset2) {
         if (message.uid === this.uid) {
           return debug("[%s] ignore message from self", this.uid);
         }
@@ -89106,7 +89106,7 @@ var require_cluster_adapter = __commonJS({
             this.removeNode(message.uid);
             break;
           default:
-            super.onMessage(message, offset);
+            super.onMessage(message, offset2);
         }
       }
       serverCount() {
@@ -89463,8 +89463,8 @@ var require_uws = __commonJS({
           const [ok, done] = res.tryEnd(arrayBufferChunk, size);
           if (!done && !ok) {
             readStream.pause();
-            res.onWritable((offset) => {
-              const [ok2, done2] = res.tryEnd(arrayBufferChunk.slice(offset - lastOffset), size);
+            res.onWritable((offset2) => {
+              const [ok2, done2] = res.tryEnd(arrayBufferChunk.slice(offset2 - lastOffset), size);
               if (!done2 && ok2) {
                 readStream.resume();
               }
@@ -91147,9 +91147,9 @@ var require_helpers = __commonJS({
     function spanAllZeroes(s) {
       return escapeHtml(s).replace(/(0+)/g, '<span class="zero">$1</span>');
     }
-    function spanAll(s, offset = 0) {
+    function spanAll(s, offset2 = 0) {
       const letters = s.split("");
-      return letters.map((n, i) => `<span class="digit value-${escapeHtml(n)} position-${i + offset}">${spanAllZeroes(n)}</span>`).join("");
+      return letters.map((n, i) => `<span class="digit value-${escapeHtml(n)} position-${i + offset2}">${spanAllZeroes(n)}</span>`).join("");
     }
     function spanLeadingZeroesSimple(group) {
       return escapeHtml(group).replace(/^(0+)/, '<span class="zero">$1</span>');
@@ -91158,13 +91158,13 @@ var require_helpers = __commonJS({
       const groups = address.split(":");
       return groups.map((g) => spanLeadingZeroesSimple(g)).join(":");
     }
-    function simpleGroup(addressString, offset = 0) {
+    function simpleGroup(addressString, offset2 = 0) {
       const groups = addressString.split(":");
       return groups.map((g, i) => {
         if (/group-v4/.test(g)) {
           return g;
         }
-        return `<span class="hover-group group-${i + offset}">${spanLeadingZeroesSimple(g)}</span>`;
+        return `<span class="hover-group group-${i + offset2}">${spanLeadingZeroesSimple(g)}</span>`;
       });
     }
   }
@@ -94740,18 +94740,18 @@ function parseEspPartitionCsv(text7, layout) {
       subtype = DATA_SUBTYPES[subtypeText];
     else subtype = parsePartitionNumber(subtypeText);
     const alignment = type === 0 ? 65536 : SECTOR;
-    const offset = offsetText ? parsePartitionNumber(offsetText) : Math.ceil(end / alignment) * alignment;
-    const size = sizeText.startsWith("-") ? parsePartitionNumber(sizeText.slice(1)) - offset : parsePartitionNumber(sizeText);
+    const offset2 = offsetText ? parsePartitionNumber(offsetText) : Math.ceil(end / alignment) * alignment;
+    const size = sizeText.startsWith("-") ? parsePartitionNumber(sizeText.slice(1)) - offset2 : parsePartitionNumber(sizeText);
     let flags = 0;
     for (const flag of flagText.split(":").filter(Boolean)) {
       if (flag === "encrypted") flags |= 1;
       else if (flag === "readonly") flags |= 2;
       else invalid("Unsupported partition flag.");
     }
-    parts.push({ name: name2, type, subtype, offset, size, flags });
+    parts.push({ name: name2, type, subtype, offset: offset2, size, flags });
     if (parts.length > 95)
       invalid("Partition table exceeds the 95-entry limit.");
-    end = offset + size;
+    end = offset2 + size;
   }
   validateEspPartitions(parts, layout);
   return parts;
@@ -95017,7 +95017,7 @@ function contained(root, target) {
   const relative = path15.relative(root, target);
   return relative !== "" && relative !== ".." && !relative.startsWith(".." + path15.sep) && !path15.isAbsolute(relative);
 }
-async function snapshot(root, requested, limit) {
+async function readPartitionArtifact(root, requested, limit) {
   const lexical = path15.resolve(root, requested);
   const canonical3 = await fs10.realpath(lexical);
   if (!contained(root, canonical3))
@@ -95063,7 +95063,7 @@ async function snapshot(root, requested, limit) {
 }
 async function inspectEspPartitionArtifacts(input) {
   const root = await fs10.realpath(input.workspaceDir);
-  const table = await snapshot(
+  const table = await readPartitionArtifact(
     root,
     input.tablePath,
     input.format === "csv" ? 65536 : 4096
@@ -95082,8 +95082,8 @@ async function inspectEspPartitionArtifacts(input) {
   const parts = input.format === "csv" ? parseEspPartitionCsv(text7, { tableOffset: input.layout.tableOffset }) : parseEspPartitionBinary(table.content, {
     tableOffset: input.layout.tableOffset
   });
-  const firmware = input.firmwarePath ? await snapshot(root, input.firmwarePath, 128 * 1024 * 1024) : null;
-  const observed = input.observedTablePath ? await snapshot(root, input.observedTablePath, 4096) : null;
+  const firmware = input.firmwarePath ? await readPartitionArtifact(root, input.firmwarePath, 128 * 1024 * 1024) : null;
+  const observed = input.observedTablePath ? await readPartitionArtifact(root, input.observedTablePath, 4096) : null;
   const comparison = observed ? compareEspPartitions(
     parts,
     parseEspPartitionBinary(observed.content, {
@@ -95104,17 +95104,75 @@ async function inspectEspPartitionArtifacts(input) {
   };
 }
 
+// src/core/esp-partition-location.ts
+init_errors2();
+function offset(value2) {
+  const parsed = typeof value2 === "string" ? parsePartitionNumber(value2) : value2;
+  if (typeof parsed !== "number" || !Number.isSafeInteger(parsed) || parsed < 0 || parsed > 4294963200 || parsed % 4096)
+    throw new PlatformIOError(
+      "Partition table offset must be an aligned flash address.",
+      "PARTITION_OFFSET_INVALID"
+    );
+  return parsed;
+}
+function partitionOffsetFromSdkconfig(text7) {
+  if (Buffer.byteLength(text7, "utf8") > 2 * 1024 * 1024)
+    throw new PlatformIOError(
+      "sdkconfig exceeds the inspection limit.",
+      "PARTITION_CONFIG_LIMIT"
+    );
+  const matches = text7.split(/\r?\n/).filter((line) => /^\s*CONFIG_PARTITION_TABLE_OFFSET\s*=/.test(line));
+  if (!matches.length) return null;
+  if (matches.length !== 1)
+    throw new PlatformIOError(
+      "Duplicate partition table offset in sdkconfig.",
+      "PARTITION_OFFSET_AMBIGUOUS"
+    );
+  const value2 = matches[0].slice(matches[0].indexOf("=") + 1).trim();
+  return {
+    source: "sdkconfig:CONFIG_PARTITION_TABLE_OFFSET",
+    offset: offset(value2)
+  };
+}
+function resolvePartitionOffset(evidence, configuredUploadOffset) {
+  const entries = evidence.map((entry) => ({
+    source: entry.source,
+    offset: offset(entry.offset)
+  }));
+  if (configuredUploadOffset !== void 0 && configuredUploadOffset !== null)
+    entries.push({
+      source: "board_upload.partition_table_offset",
+      offset: offset(configuredUploadOffset)
+    });
+  if (!entries.length)
+    throw new PlatformIOError(
+      "Partition table location is unknown; provide its resolved offset or build metadata.",
+      "PARTITION_OFFSET_REQUIRED"
+    );
+  if (new Set(entries.map((entry) => entry.offset)).size !== 1)
+    throw new PlatformIOError(
+      "Partition table generation and upload offsets disagree.",
+      "PARTITION_OFFSET_CONFLICT"
+    );
+  return { tableOffset: entries[0].offset, evidence: entries };
+}
+
 // src/tools/partition-table.ts
+init_errors2();
 var PartitionTableSchema = external_exports.object({
   projectDir: external_exports.string().min(1).max(32768),
   tablePath: external_exports.string().min(1).max(32768),
   format: external_exports.enum(["csv", "binary"]),
-  tableOffset: external_exports.number().int().min(0).max(4294963200),
+  tableOffset: external_exports.number().int().min(0).max(4294963200).optional(),
+  sdkconfigPath: external_exports.string().min(1).max(32768).optional(),
   flashSize: external_exports.number().int().positive().max(4294967296).optional(),
   firmwarePath: external_exports.string().min(1).max(32768).optional(),
   observedTablePath: external_exports.string().min(1).max(32768).optional(),
   approvalId: external_exports.string().max(256).optional()
-}).strict();
+}).strict().refine(
+  (value2) => value2.tableOffset !== void 0 || value2.sdkconfigPath !== void 0,
+  "Provide tableOffset or sdkconfigPath."
+);
 async function executePartitionTable(input, caller = {}, onAuthorized) {
   const params = PartitionTableSchema.parse(input);
   const projectDir = await fs11.realpath(params.projectDir);
@@ -95126,12 +95184,40 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
       const guard = createPolicyRevisionGuard(projectDir);
       await onAuthorized?.();
       guard();
+      const evidence = [];
+      if (params.tableOffset !== void 0)
+        evidence.push({
+          source: "explicit:tableOffset",
+          offset: params.tableOffset
+        });
+      const sdkconfig = params.sdkconfigPath ? await readPartitionArtifact(
+        projectDir,
+        params.sdkconfigPath,
+        2 * 1024 * 1024
+      ) : null;
+      if (sdkconfig) {
+        let text7;
+        try {
+          text7 = new TextDecoder("utf-8", { fatal: true }).decode(
+            sdkconfig.content
+          );
+        } catch {
+          throw new PlatformIOError(
+            "sdkconfig is not valid UTF-8.",
+            "PARTITION_CONFIG_INVALID"
+          );
+        }
+        const setting = partitionOffsetFromSdkconfig(text7);
+        if (setting) evidence.push(setting);
+      }
+      const location = resolvePartitionOffset(evidence);
+      guard();
       const result = await inspectEspPartitionArtifacts({
         workspaceDir: projectDir,
         tablePath: params.tablePath,
         format: params.format,
         layout: {
-          tableOffset: params.tableOffset,
+          tableOffset: location.tableOffset,
           flashSize: params.flashSize
         },
         firmwarePath: params.firmwarePath,
@@ -95141,6 +95227,8 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
       const mismatch = Boolean(result.comparison?.length);
       return {
         ...result,
+        offset_evidence: location.evidence,
+        sdkconfig_artifact: sdkconfig?.identity ?? null,
         ok: result.ok && !mismatch,
         summary: result.partitions.length + " partition(s) inspected from offline artifacts. " + (mismatch ? "The supplied comparison table differs. " : "") + result.error_count + " layout error(s), " + result.warning_count + " warning(s)."
       };
@@ -95206,7 +95294,7 @@ async function readElfIdentity(elfPath, expectedSha256) {
         "Truncated ELF64 header.",
         "ANALYSIS_ELF_INVALID"
       );
-    const u16 = (offset) => byteOrder === "little" ? header.readUInt16LE(offset) : header.readUInt16BE(offset);
+    const u16 = (offset2) => byteOrder === "little" ? header.readUInt16LE(offset2) : header.readUInt16BE(offset2);
     const version2 = byteOrder === "little" ? header.readUInt32LE(20) : header.readUInt32BE(20);
     const type = u16(16);
     if (version2 !== 1 || u16(bits === 32 ? 40 : 52) !== (bits === 32 ? 52 : 64) || ![2, 3].includes(type))
@@ -95269,8 +95357,8 @@ async function readElfIdentity(elfPath, expectedSha256) {
 }
 
 // src/core/analysis/elf-archive.ts
-async function retainElfSnapshot(snapshot2, expectedSha256, archiveRoot = path21.join(SERVER_DATA_DIR, "artifacts", "elf"), sourcePath = snapshot2) {
-  const identity = await readElfIdentity(snapshot2, expectedSha256);
+async function retainElfSnapshot(snapshot, expectedSha256, archiveRoot = path21.join(SERVER_DATA_DIR, "artifacts", "elf"), sourcePath = snapshot) {
+  const identity = await readElfIdentity(snapshot, expectedSha256);
   archiveRoot = await sourceArchiveRoot(sourcePath, archiveRoot);
   await fs18.mkdir(archiveRoot, { recursive: true, mode: 448 });
   const rootState = await fs18.lstat(archiveRoot);
@@ -95370,15 +95458,15 @@ async function readCommandOutput(filename) {
     if (!stat.isFile() || stat.size > 16 * 1024 * 1024)
       throw new PlatformIOError("Command output exceeds the report limit", "COMMAND_LOG_LIMIT");
     const buffer = Buffer.alloc(stat.size + 1);
-    let offset = 0;
-    while (offset < buffer.length) {
-      const read = await handle.read(buffer, offset, buffer.length - offset, offset);
+    let offset2 = 0;
+    while (offset2 < buffer.length) {
+      const read = await handle.read(buffer, offset2, buffer.length - offset2, offset2);
       if (!read.bytesRead) break;
-      offset += read.bytesRead;
+      offset2 += read.bytesRead;
     }
-    if (offset !== stat.size)
+    if (offset2 !== stat.size)
       throw new PlatformIOError("Command output changed during collection", "COMMAND_LOG_CHANGED");
-    return redactSecretsInText(buffer.subarray(0, offset).toString("utf8")).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+    return redactSecretsInText(buffer.subarray(0, offset2).toString("utf8")).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
   } finally {
     await handle.close();
   }
@@ -96104,16 +96192,16 @@ async function withElfSnapshot(elfPath, expectedSha256, analyze, sourcePath = el
   );
   try {
     await fs22.chmod(directory, 448);
-    const snapshot2 = path28.join(directory, "firmware.elf");
-    await fs22.copyFile(identity.path, snapshot2);
-    await readElfIdentity(snapshot2, identity.sha256);
+    const snapshot = path28.join(directory, "firmware.elf");
+    await fs22.copyFile(identity.path, snapshot);
+    await readElfIdentity(snapshot, identity.sha256);
     const archivePath = await retainElfSnapshot(
-      snapshot2,
+      snapshot,
       identity.sha256,
       void 0,
       sourcePath
     );
-    return await analyze(snapshot2, { ...identity, archivePath });
+    return await analyze(snapshot, { ...identity, archivePath });
   } finally {
     await fs22.rm(directory, { recursive: true, force: true });
   }
@@ -96143,7 +96231,7 @@ async function decodeFirmwareCrash(context, text7, includeAllHex = false) {
   return withElfSnapshot(
     context.elfPath,
     context.expectedElfSha256,
-    async (snapshot2, identity) => {
+    async (snapshot, identity) => {
       const addresses = [
         ...new Set(crash.addresses.map((frame) => frame.address))
       ];
@@ -96151,7 +96239,7 @@ async function decodeFirmwareCrash(context, text7, includeAllHex = false) {
       for (let index = 0; index < addresses.length; index += 128) {
         const result = await runAnalysisProcess(
           tools.addr2line,
-          ["-pfiaC", "-e", snapshot2, ...addresses.slice(index, index + 128)],
+          ["-pfiaC", "-e", snapshot, ...addresses.slice(index, index + 128)],
           executionOptions(context, deadline)
         );
         for (const [address, frame] of parseAddr2line(result.stdout))
@@ -96234,7 +96322,7 @@ async function reportFirmwareSize(context, top = 25, filter) {
   return withElfSnapshot(
     context.elfPath,
     context.expectedElfSha256,
-    async (snapshot2, identity) => {
+    async (snapshot, identity) => {
       const evidence = context.memoryEvidence;
       if (evidence && (evidence.environment !== context.environment || evidence.elfSha256 !== identity.sha256)) {
         throw new PlatformIOError(
@@ -96246,17 +96334,17 @@ async function reportFirmwareSize(context, top = 25, filter) {
       const memoryUnavailableReason = memory ? null : !evidence ? "not_collected" : evidence.exitCode !== 0 ? "size_check_failed" : "unsupported_or_incomplete_output";
       const sectionsOutput = await runAnalysisProcess(
         tools.size,
-        ["-A", snapshot2],
+        ["-A", snapshot],
         executionOptions(context, deadline)
       );
       const totalsOutput = await runAnalysisProcess(
         tools.size,
-        ["-B", snapshot2],
+        ["-B", snapshot],
         executionOptions(context, deadline)
       );
       const symbolsOutput = await runAnalysisProcess(
         tools.nm,
-        ["-S", "-C", "-l", "--size-sort", "--defined-only", snapshot2],
+        ["-S", "-C", "-l", "--size-sort", "--defined-only", snapshot],
         executionOptions(context, deadline)
       );
       const sections = parseSizeSections(sectionsOutput.stdout);
@@ -97830,8 +97918,8 @@ var DirectSerialTransport = class {
         return;
       }
       try {
-        for (let offset = 0; offset < bytes.length; offset += 65536)
-          this.onData(bytes.subarray(offset, offset + 65536));
+        for (let offset2 = 0; offset2 < bytes.length; offset2 += 65536)
+          this.onData(bytes.subarray(offset2, offset2 + 65536));
       } catch {
         this.fail(
           new PlatformIOError(
@@ -98277,13 +98365,13 @@ function descriptor(record2) {
   ).digest("hex");
 }
 function bindSerialDiscovery(endpoint, records, resolve) {
-  const inspect = (snapshot2) => {
-    if (!Array.isArray(snapshot2) || snapshot2.length > 1024)
+  const inspect = (snapshot) => {
+    if (!Array.isArray(snapshot) || snapshot.length > 1024)
       throw new PlatformIOError(
         "Invalid serial discovery snapshot.",
         "SERIAL_DISCOVERY_INVALID"
       );
-    const normalized = snapshot2.map((record2) => {
+    const normalized = snapshot.map((record2) => {
       if (!record2 || typeof record2 !== "object")
         throw new PlatformIOError(
           "Invalid serial discovery entry.",
@@ -98322,9 +98410,9 @@ function bindSerialDiscovery(endpoint, records, resolve) {
     endpointIdentity: endpoint.resource.identity,
     usbIdentity: expected === void 0 ? void 0 : `usb:${expected}`,
     identityBasis: expected === void 0 ? "endpoint-only" : "usb-descriptor",
-    revalidate(snapshot2) {
+    revalidate(snapshot) {
       endpoint.revalidate();
-      if (inspect(snapshot2) !== expected)
+      if (inspect(snapshot) !== expected)
         throw new PlatformIOError(
           "Serial discovery identity changed; select and authorize again.",
           "SERIAL_DEVICE_CHANGED"
@@ -98498,8 +98586,8 @@ var SerialSessionBuffer = class {
     const first = this.count ? this.ring[this.head].cursor : this.nextCursor;
     let cursor = Math.max(first, requested), bytes = 0;
     const lines2 = [], lineTruncatedBytes = [];
-    for (let offset = cursor - first; offset < this.count && lines2.length < limit; offset++) {
-      const row = this.ring[(this.head + offset) % this.capacity];
+    for (let offset2 = cursor - first; offset2 < this.count && lines2.length < limit; offset2++) {
+      const row = this.ring[(this.head + offset2) % this.capacity];
       if (bytes + row.bytes > byteLimit) break;
       lines2.push(row.text);
       lineTruncatedBytes.push(row.truncatedBytes);
@@ -98610,17 +98698,17 @@ var SerialSessionBuffer = class {
       const view = this.snapshot(options);
       const first = Math.max(options.cursor ?? 0, view.firstAvailableCursor);
       const rows = [];
-      for (let offset = first - view.firstAvailableCursor; offset < this.count; offset++) {
-        rows.push(this.ring[(this.head + offset) % this.capacity].text);
+      for (let offset2 = first - view.firstAvailableCursor; offset2 < this.count; offset2++) {
+        rows.push(this.ring[(this.head + offset2) % this.capacity].text);
       }
       let matchedLine = null;
       if (options.waitFor && !options.signal?.aborted) {
-        for (let offset = 0; offset < rows.length; ) {
-          const start = offset;
+        for (let offset2 = 0; offset2 < rows.length; ) {
+          const start = offset2;
           let bytes = 0;
           const batch = [];
-          while (offset < rows.length && bytes + Buffer.byteLength(rows[offset]) <= 1024 * 1024) {
-            const line = rows[offset++];
+          while (offset2 < rows.length && bytes + Buffer.byteLength(rows[offset2]) <= 1024 * 1024) {
+            const line = rows[offset2++];
             batch.push(line);
             bytes += Buffer.byteLength(line);
           }
@@ -116529,13 +116617,15 @@ var toolDefinitions = [
     description: "Inspect explicit offline ESP partition artifacts and firmware fit. Requires the resolved table offset; does not build or read a device.",
     inputSchema: {
       type: "object",
-      required: ["projectDir", "tablePath", "format", "tableOffset"],
+      required: ["projectDir", "tablePath", "format"],
+      anyOf: [{ required: ["tableOffset"] }, { required: ["sdkconfigPath"] }],
       additionalProperties: false,
       properties: {
         projectDir: { type: "string", minLength: 1, maxLength: 32768 },
         tablePath: { type: "string", minLength: 1, maxLength: 32768 },
         format: { type: "string", enum: ["csv", "binary"] },
         tableOffset: { type: "integer", minimum: 0, maximum: 4294963200 },
+        sdkconfigPath: { type: "string", minLength: 1, maxLength: 32768 },
         flashSize: { type: "integer", minimum: 1, maximum: 4294967296 },
         firmwarePath: { type: "string", minLength: 1, maxLength: 32768 },
         observedTablePath: { type: "string", minLength: 1, maxLength: 32768 },

@@ -62,3 +62,46 @@ it("rejects device-read arguments instead of silently ignoring them", async () =
     }),
   ).rejects.toThrow();
 });
+
+it("resolves custom offsets from authorized SDK configuration bytes", async () => {
+  fs.writeFileSync(path.join(root, "table.csv"), "app,app,factory,,1M,");
+  fs.writeFileSync(
+    path.join(root, "sdkconfig.custom"),
+    "CONFIG_PARTITION_TABLE_OFFSET=0x10000\n",
+  );
+  const result = await executePartitionTable({
+    projectDir: root,
+    tablePath: "table.csv",
+    format: "csv",
+    sdkconfigPath: "sdkconfig.custom",
+  });
+  expect(result.table_offset).toBe(0x10000);
+  expect(result.partitions[0].offset).toBe(0x20000);
+  expect(result.sdkconfig_artifact?.sha256).toMatch(/^[a-f0-9]{64}$/);
+});
+it("rejects conflicting explicit and configured offsets before reading the table", async () => {
+  fs.writeFileSync(
+    path.join(root, "sdkconfig"),
+    "CONFIG_PARTITION_TABLE_OFFSET=0x10000\n",
+  );
+  await expect(
+    executePartitionTable({
+      projectDir: root,
+      tablePath: "absent.csv",
+      format: "csv",
+      tableOffset: 0x8000,
+      sdkconfigPath: "sdkconfig",
+    }),
+  ).rejects.toMatchObject({ code: "PARTITION_OFFSET_CONFLICT" });
+});
+it("keeps missing SDK configuration evidence unknown", async () => {
+  fs.writeFileSync(path.join(root, "sdkconfig"), "CONFIG_OTHER=y\n");
+  await expect(
+    executePartitionTable({
+      projectDir: root,
+      tablePath: "absent.csv",
+      format: "csv",
+      sdkconfigPath: "sdkconfig",
+    }),
+  ).rejects.toMatchObject({ code: "PARTITION_OFFSET_REQUIRED" });
+});

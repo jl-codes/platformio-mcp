@@ -27,7 +27,11 @@ function contained(root: string, target: string): boolean {
 }
 
 /** Read one regular workspace artifact through a bounded handle, detecting replacement or mutation. */
-async function snapshot(root: string, requested: string, limit: number) {
+export async function readPartitionArtifact(
+  root: string,
+  requested: string,
+  limit: number,
+) {
   const lexical = path.resolve(root, requested);
   const canonical = await fs.realpath(lexical);
   if (!contained(root, canonical))
@@ -92,7 +96,7 @@ export async function inspectEspPartitionArtifacts(input: {
   observedTablePath?: string;
 }) {
   const root = await fs.realpath(input.workspaceDir);
-  const table = await snapshot(
+  const table = await readPartitionArtifact(
     root,
     input.tablePath,
     input.format === "csv" ? 65536 : 4096,
@@ -115,10 +119,10 @@ export async function inspectEspPartitionArtifacts(input: {
           tableOffset: input.layout.tableOffset,
         });
   const firmware = input.firmwarePath
-    ? await snapshot(root, input.firmwarePath, 128 * 1024 * 1024)
+    ? await readPartitionArtifact(root, input.firmwarePath, 128 * 1024 * 1024)
     : null;
   const observed = input.observedTablePath
-    ? await snapshot(root, input.observedTablePath, 4096)
+    ? await readPartitionArtifact(root, input.observedTablePath, 4096)
     : null;
   const comparison = observed
     ? compareEspPartitions(
