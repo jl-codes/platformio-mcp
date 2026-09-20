@@ -539,3 +539,34 @@ setInterval(()=>{},1000);
     }
   }, 30000);
 });
+
+it("reports lease ownership without exposing capabilities or recovering stale records", () => {
+  const root = directory();
+  let observation = running();
+  const store = new DeviceLeaseStore({ root, inspect: () => observation });
+  expect(store.status(resource)).toEqual({ status: "unclaimed", resource });
+  const lease = store.acquire(resource);
+  const recordFile = fs
+    .readdirSync(root)
+    .find((file) => file.endsWith(".json"))!;
+  const original = fs.readFileSync(path.join(root, recordFile), "utf8");
+  const state = store.status(resource);
+  expect(state).toMatchObject({ status: "owned", ownerPid: process.pid });
+  expect(Object.keys(state).sort()).toEqual([
+    "acquiredAt",
+    "ownerPid",
+    "resource",
+    "status",
+  ]);
+  expect(() => store.acquire(resource)).toThrow(
+    expect.objectContaining({ code: "DEVICE_BUSY" }),
+  );
+  observation = { status: "unknown" };
+  expect(store.status(resource).status).toBe("unknown");
+  observation = { status: "absent" };
+  expect(store.status(resource).status).toBe("stale");
+  expect(fs.readFileSync(path.join(root, recordFile), "utf8")).toBe(original);
+  observation = running();
+  store.release(lease);
+  expect(store.status(resource).status).toBe("unclaimed");
+});

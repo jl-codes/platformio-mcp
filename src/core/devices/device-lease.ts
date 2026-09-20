@@ -24,6 +24,13 @@ export interface DeviceLease {
   readonly resource: Readonly<DeviceResource>;
   readonly acquiredAt: string;
 }
+/** Advisory ownership snapshot; it never grants access or exposes the release/handoff nonce. */
+export interface DeviceLeaseStatus {
+  status: "unclaimed" | "owned" | "stale" | "unknown";
+  resource: Readonly<DeviceResource>;
+  ownerPid?: number;
+  acquiredAt?: string;
+}
 /** Internal IPC handoff ticket. The target process must adopt it before opening hardware. */
 export interface DeviceLeaseTransfer {
   readonly resource: Readonly<DeviceResource>;
@@ -110,6 +117,25 @@ export class DeviceLeaseStore {
   constructor(options: DeviceLeaseStoreOptions = {}) {
     this.root = path.resolve(options.root ?? stableDeviceLeaseRoot());
     this.inspect = options.inspect ?? inspectProcessIdentity;
+  }
+
+  /** Inspect persisted ownership without releasing or recovering it; acquisition must still be atomic. */
+  status(resource: DeviceResource): DeviceLeaseStatus {
+    const key = resourceKey(resource);
+    return this.withGate(key, () => {
+      const record = this.readRecord(key);
+      if (!record) return { status: "unclaimed", resource: { ...resource } };
+      const identity = compareProcessIdentity(
+        record.owner,
+        this.inspect(record.owner.pid),
+      );
+      return {
+        status: identity === "alive" ? "owned" : identity,
+        resource: { ...record.resource },
+        ownerPid: record.owner.pid,
+        acquiredAt: record.acquiredAt,
+      };
+    });
   }
 
   /** Acquire exclusively, recovering a previous lease only after its owner is proven stale. */
