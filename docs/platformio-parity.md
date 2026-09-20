@@ -17,3 +17,8 @@ Set structuredReport=true on the canonical run_tests tool to include validated t
 
 The canonical run_tests tool and dashboard command API also accept filter, ignore, withoutUploading, withoutBuilding, uploadPort and verbose. Skipping upload alone can still run tests and open hardware; use compileOnly to disable upload and execution. The dashboard launcher exposes suite inclusion/exclusion patterns and Build tests only. Stage controls cannot override build-only policy.
 
+
+### CLI access
+
+Use clean, check and test with --project-dir and optional --environment. Clean supports --full. Check supports --severity, --pattern, --tool, --skip-packages and --structured-report. Test supports --filter, --ignore, --compile-only, --without-uploading, --without-building, --upload-port, --verbose and --structured-report. All three support --background; structured test reports require foreground execution. Commands use the corresponding canonical permissions and shared executors. Reported execution failures set a nonzero CLI exit code.
+

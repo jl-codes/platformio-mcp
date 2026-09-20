@@ -127,3 +127,9 @@ it("rejects invalid dependency flags and honors concrete tool denial", () => {
   expect(run("deps-check").errorType).toBe("PolicyDenied");
   expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
 });
+
+
+it.each(["clean", "check", "test"])("routes %s CLI through canonical permission before execution", command => {
+  expect(run(command).errorType).toBe("PolicyDenied");
+  expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
+});

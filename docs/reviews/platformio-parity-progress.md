@@ -904,3 +904,8 @@ Confirmed test timeouts now retain bounded redacted output and return an explici
 
 Added optional suite filters, upload/build stage switches, explicit upload port and verbosity to canonical run_tests and its dashboard command API. Both ordinary and structured foreground calls pass options to the same test runner; existing omitted-option behavior is preserved. Dashboard launcher exposes include/exclude patterns and compile-only mode. TypeScript, eleven focused mocked execution/schema checks and frontend production build passed; plugin rebuilt. Per-device lease coordination and native/background report acceptance remain pending; no publication occurred.
 
+
+### CLI build-family coverage
+
+Added clean/check/test command registration, help, canonical operation mapping and validated option forwarding through shared locks/executors. Structured foreground reports and compile-only safeguards are available from CLI without enabling compatibility names. Failures reported by completed commands set exit code 1. Initial targeted checks exposed missing known-command registration; corrected it before final verification. TypeScript and three specifically selected CLI permission-denial checks passed (other cases intentionally not run); plugin rebuilt. No native PlatformIO or hardware commands were executed. Device custody and final-release acceptance remain pending.
+

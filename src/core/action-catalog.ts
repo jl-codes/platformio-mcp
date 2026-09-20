@@ -356,6 +356,12 @@ export function operationForCliCommand(command: string): string {
       return "list_boards";
     case "init":
       return "init_project";
+    case "clean":
+      return "clean_project";
+    case "check":
+      return "check_project";
+    case "test":
+      return "run_tests";
     case "build":
       return "build_project";
     case "flash":

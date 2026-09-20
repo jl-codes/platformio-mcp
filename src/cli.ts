@@ -31,6 +31,9 @@ import {
   AgentSafePinAuditParamsSchema,
   AgentValidateProjectParamsSchema,
   BuildProjectParamsSchema,
+  CleanProjectParamsSchema,
+  CheckProjectParamsSchema,
+  RunTestsParamsSchema,
   CheckTaskStatusParamsSchema,
   GetApprovalRequestParamsSchema,
   GetPolicyStatusParamsSchema,
@@ -46,6 +49,9 @@ import {
 import { listDevicesCore } from "./core/devices.js";
 import { listBoardsCore } from "./core/boards.js";
 import { initProjectCore } from "./core/project.js";
+import { cleanProject, checkProject, runTests } from "./tools/build.js";
+import { runTestsWithReport } from "./core/test-report-execution.js";
+import { hardwareLockManager } from "./utils/lock-manager.js";
 import { buildProjectCore } from "./core/build.js";
 import { uploadFirmwareCore } from "./core/flash.js";
 import {
@@ -98,6 +104,9 @@ COMMANDS:
   boards --filter <value>
   init --board <id> --project-dir <dir> [--framework <name>]
   build --project-dir <dir> [--environment <env>] [--jobs <count>] [--force-execution] [--background] [--verbose]
+  clean --project-dir <dir> [--environment <env>] [--full] [--background]
+  check --project-dir <dir> [--environment <env>] [--severity <low|medium|high>] [--pattern <glob>] [--tool <name>] [--skip-packages] [--structured-report] [--background]
+  test --project-dir <dir> [--environment <env>] [--filter <glob>] [--ignore <glob>] [--compile-only] [--without-uploading] [--without-building] [--upload-port <port>] [--verbose] [--structured-report] [--background]
   flash --project-dir <dir> [--port <port|auto>] [--environment <env>] [--background] [--start-monitor]
   monitor [--project-dir <dir>] [--port <port|auto>] [--environment <env>] [--timeout <seconds>] [--expect <text>] [--background]
   target-resolve --project-dir <dir> [--environment <env>] [--port <port>] [--binding-ttl <seconds>]
@@ -675,6 +684,32 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         return;
       }
 
+      case "clean": {
+        const params = CleanProjectParamsSchema.parse({ projectDir: asString(options["project-dir"]), environment: asString(options.environment), full: asBoolean(options.full), background: asBoolean(options.background) });
+        const result = await hardwareLockManager.withImplicitLock(() => cleanProject(params.projectDir, params.background, { environment: params.environment, full: params.full }));
+        printOutput(result, jsonMode);
+        if (result.success === false) process.exitCode = 1;
+        return;
+      }
+      case "check": {
+        const params = CheckProjectParamsSchema.parse({ projectDir: asString(options["project-dir"]), environment: asString(options.environment), severity: asString(options.severity), pattern: asString(options.pattern), tool: asString(options.tool), skipPackages: asBoolean(options["skip-packages"]), structuredReport: asBoolean(options["structured-report"]), background: asBoolean(options.background) });
+        const result = await hardwareLockManager.withImplicitLock(() => checkProject(params.projectDir, params.environment, params.background, { severity: params.severity, pattern: params.pattern, tool: params.tool, skipPackages: params.skipPackages, jsonOutput: params.structuredReport }));
+        printOutput(result, jsonMode);
+        if (result.success === false) process.exitCode = 1;
+        return;
+      }
+      case "test": {
+        const params = RunTestsParamsSchema.parse({ projectDir: asString(options["project-dir"]), environment: asString(options.environment), filter: asString(options.filter), ignore: asString(options.ignore), compileOnly: asBoolean(options["compile-only"]), withoutUploading: asBoolean(options["without-uploading"]), withoutBuilding: asBoolean(options["without-building"]), uploadPort: asString(options["upload-port"]), verbose: asBoolean(options.verbose), structuredReport: asBoolean(options["structured-report"]), background: asBoolean(options.background) });
+        if (params.structuredReport && params.background) throw new PlatformIOError("Structured test reports require foreground execution", "INVALID_ARGUMENT");
+        const selection = { filter: params.filter, ignore: params.ignore, withoutUploading: params.withoutUploading, withoutBuilding: params.withoutBuilding, uploadPort: params.uploadPort, verbose: params.verbose };
+        const result = await hardwareLockManager.withImplicitLock(() => params.structuredReport
+          ? runTestsWithReport(params.projectDir, params.environment, params.compileOnly, selection)
+          : runTests(params.projectDir, params.environment, params.background, params.compileOnly, selection));
+        printOutput(result, jsonMode);
+        if (result.success === false) process.exitCode = 1;
+        return;
+      }
+
       case "flash": {
         const params = UploadFirmwareParamsSchema.parse({
           projectDir: asString(options["project-dir"]),
@@ -1041,6 +1076,9 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       boards: "boards",
       init: "init",
       build: "build",
+      clean: "build",
+      check: "analysis",
+      test: "test",
       flash: "upload",
       monitor: "monitor",
       "target-resolve": "devices",
@@ -1102,6 +1140,9 @@ async function main() {
     "boards",
     "init",
     "build",
+    "clean",
+    "check",
+    "test",
     "flash",
     "monitor",
     "target-resolve",
