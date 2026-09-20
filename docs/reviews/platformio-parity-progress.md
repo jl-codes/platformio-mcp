@@ -958,3 +958,8 @@ Canonical decode_backtrace and its CLI now accept archivedElfSha256/--archived-e
 ### Compatibility archive selection
 
 The pio_decode_backtrace adapter now accepts archived_elf_sha256, maps it into the canonical request-bound analysis call, and returns elf_archive_path. Malformed hashes fail before configuration inspection or owned-session reads. TypeScript and four focused adapter checks passed. This is an additive extension; all pinned decoder parameters remain supported.
+
+### Debugger protocol foundation
+
+Added the bounded GDB/MI parser/framer required by PAR-06 through PAR-09, using the official GDB/MI output grammar. It preserves exact decimal command tokens, ordered duplicate fields, nested tuples/lists, console/target/log streams and asynchronous state notifications. UTF-8 pipe fragmentation and CR/LF boundaries are handled without treating prompts or async events as command completion. Per-record, nesting, node and chunk limits reject malformed or unbounded input. TypeScript and 14 focused protocol cases passed; no debugger/probe ran. Session command correlation, classified debugger commands, controlled initialization, probe custody, canonical/compatibility adapters and physical acceptance remain incomplete. Source: https://sourceware.org/gdb/current/onlinedocs/gdb.html/GDB_002fMI-Output-Syntax.html
+
