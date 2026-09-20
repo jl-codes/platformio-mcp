@@ -45,3 +45,13 @@ Unknown
 ```
 
 For upload failures, resolve the target binding again before retrying. Treat port drift as safe only when the stable device fingerprint still matches; stop on substitution or ambiguity.
+
+## Dependency audit
+
+Use `deps_check` with `projectDir` and an optional `environment` to inspect
+declarations and installed library manifests. `build` defaults to false. An
+explicit `build: true` requires separate build permission and returns LDF graph
+evidence. Inspect `inventoryComplete`, diagnostics, and graph status before
+claiming the audit is clean. Name collisions and leftover-library findings do
+not prove which library was linked. Scoped approvals are separate for the
+overall request, configuration, inventory and optional build stages.

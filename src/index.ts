@@ -10,6 +10,7 @@
  * - CallToolRequestSchema handler: Routes tool requests to their respective backend logic.
  */
 
+import { inspectDependencies } from "./tools/dependency-inspection.js";
 import { compatibilityErrorResult } from "./adapters/compatibility-error.js";
 import { withProjectCompatibility } from "./adapters/project-compat-registry.js";
 import { executeProjectCompatibility } from "./adapters/project-compat.js";
@@ -208,6 +209,28 @@ const automationKeyInputSchema = {
  * exposed by this server.
  */
 const toolDefinitions: ToolDefinition[] = [
+  {
+    name: "deps_check",
+    description:
+      "Audit declared and installed project dependencies, with optional separately authorized build and LDF graph evidence.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: { type: "string", minLength: 1, maxLength: 32768 },
+        environment: {
+          type: "string",
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,49}$",
+        },
+        build: { type: "boolean", default: false },
+        approvalId: { type: "string", maxLength: 256 },
+        configurationApprovalId: { type: "string", maxLength: 256 },
+        inventoryApprovalId: { type: "string", maxLength: 256 },
+        buildApprovalId: { type: "string", maxLength: 256 },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
   {
     name: "project_envs",
     description:
@@ -1537,6 +1560,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     if (
+      name === "deps_check" ||
       name === "decode_backtrace" ||
       name === "size_report" ||
       name.startsWith("pkg_") ||
@@ -1574,40 +1598,48 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         () =>
           registeredTool.handler(args, {
             dispatch: async (tool, parameters) =>
-              compatibilityTool
-                ? (projectCompatibility
-                    ? executeProjectCompatibility
-                    : executePackageCompatibility)(
-                    tool,
-                    parameters,
-                    { projectDir: compatibilityProjectDir, cwd: process.cwd() },
-                    caller,
-                    onAuthorized,
-                  )
-                : projectInspection
-                  ? executeProjectInspection(
-                      tool as ProjectInspectionAction,
+              tool === "deps_check"
+                ? inspectDependencies(parameters, caller, onAuthorized)
+                : compatibilityTool
+                  ? (projectCompatibility
+                      ? executeProjectCompatibility
+                      : executePackageCompatibility)(
+                      tool,
                       parameters,
+                      {
+                        projectDir: compatibilityProjectDir,
+                        cwd: process.cwd(),
+                      },
                       caller,
                       onAuthorized,
                     )
-                  : tool.startsWith("pkg_")
-                    ? executePackageAction(
-                        tool as PackageAction,
+                  : projectInspection
+                    ? executeProjectInspection(
+                        tool as ProjectInspectionAction,
                         parameters,
                         caller,
                         onAuthorized,
                       )
-                    : tool === "decode_backtrace"
-                      ? decodeBacktrace(parameters, caller, onAuthorized)
-                      : firmwareSizeReport(parameters, caller, onAuthorized),
+                    : tool.startsWith("pkg_")
+                      ? executePackageAction(
+                          tool as PackageAction,
+                          parameters,
+                          caller,
+                          onAuthorized,
+                        )
+                      : tool === "decode_backtrace"
+                        ? decodeBacktrace(parameters, caller, onAuthorized)
+                        : firmwareSizeReport(parameters, caller, onAuthorized),
           }),
       );
       const response = createToolResult({
         success: result.ok,
         status: result.ok ? "completed" : "failed",
         summary:
-          name.startsWith("pkg_") || compatibilityTool || projectInspection
+          name === "deps_check" ||
+          name.startsWith("pkg_") ||
+          compatibilityTool ||
+          projectInspection
             ? result.summary
             : name === "size_report"
               ? "Firmware size report completed."

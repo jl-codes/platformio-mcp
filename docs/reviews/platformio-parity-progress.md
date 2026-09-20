@@ -493,3 +493,10 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 
 - Optional dependency builds now parse bounded ASCII LDF trees, preserving nesting, versions and repeated names. Missing/partial graph evidence is distinct from process status; an isolated heading is unavailable, not a successful empty graph. RecursionError text is reported as an observation.
 - TypeScript compilation and six graph/service tests pass. Actual build-output acceptance, broader formatting variants, public tool integration and release gates remain open.
+
+### Canonical dependency MCP tool
+
+- Registered `deps_check` as the 54th canonical tool. Its request-level concrete policy check runs before configuration execution, with separate scoped configuration/inventory/build approvals preserved. Canonical MCP results use the existing envelope/activity path.
+- Updated plugin skill/coverage and runtime. Compatibility mode now has 63 tools (54 canonical plus nine aliases); the dependency alias and CLI remain pending.
+- TypeScript compilation passed. Initial registry suite found its explicit fixture missing the new name; corrected it. Focused MCP/service checks passed (7 tests), five other registry/plugin/authorization files passed (32 tests), and the final registry/service/serial-policy run passed 23 tests. Plugin and all three npm archive validations passed.
+- Full parity, dependency CLI/reference adapter and actual build-output acceptance remain incomplete. No release was published.

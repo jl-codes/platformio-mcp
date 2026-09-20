@@ -102,7 +102,7 @@ async function approval(promise: Promise<unknown>): Promise<string> {
   throw new Error("Expected an approval challenge");
 }
 it("keeps implemented internal actions separate from the advertised MCP registry", () => {
-  expect(Object.keys(MCP_ACTIONS)).toHaveLength(53);
+  expect(Object.keys(MCP_ACTIONS)).toHaveLength(54);
   expect(MCP_ACTIONS.serial_session_write).toBeUndefined();
   expect(policyNamesForOperation("serial_session_write")).toEqual([
     "serial_session_write",

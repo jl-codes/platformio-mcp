@@ -80,7 +80,7 @@ function preservesSchema(actual: any, baseline: any, location: string): void {
 describe("stdio MCP policy boundary", () => {
   it("keeps all 42 existing tool declarations available", async () => {
     const listed = await harness.client.listTools();
-    expect(listed.tools).toHaveLength(53);
+    expect(listed.tools).toHaveLength(54);
   });
   it("preserves every pinned upstream tool input contract", async () => {
     const baseline = JSON.parse(

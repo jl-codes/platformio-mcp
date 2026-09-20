@@ -61,3 +61,17 @@ it("does not report success for incomplete installed manifest evidence", async (
     ]),
   });
 });
+
+it("honors a concrete deps_check denial before configuration execution", async () => {
+  await fs.writeFile(
+    path.join(project, ".pio-mcp-policy.json"),
+    JSON.stringify({
+      profile: "read_only",
+      overrides: { deny: ["deps_check"] },
+    }),
+  );
+  await expect(
+    inspectDependencies({ projectDir: project }),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(platformioExecutor.execute).not.toHaveBeenCalled();
+});
