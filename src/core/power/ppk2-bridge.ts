@@ -146,6 +146,13 @@ def collect(request, factory, cancelled, emit):
               "outputOffWritten": off_written, "outputOffPhysicallyVerified": False,
               "powerMayBeOn": power_may_be_on, "measurementStopped": stopped, "serialClosed": serial_closed})
 
+def load_api():
+    from importlib.metadata import version
+    if version("ppk2-api") != "0.9.2" or version("pyserial") != "3.5":
+        raise RuntimeError("PPK2_API_INCOMPATIBLE")
+    from ppk2_api.ppk2_api import PPK2_API
+    return PPK2_API
+
 def main():
     def emit(message):
         sys.__stdout__.write(json.dumps(message, separators=(",", ":"), allow_nan=False) + "\n")
@@ -155,9 +162,12 @@ def main():
         if len(line) > 16384 or not line.endswith(b"\n"): raise ValueError("PPK2_REQUEST_INVALID")
         request = validate(json.loads(line))
         with contextlib.redirect_stdout(sys.stderr):
-            from ppk2_api.ppk2_api import PPK2_API
+            PPK2_API = load_api()
     except ImportError:
         emit({"event": "unavailable", "code": "PPK2_API_MISSING"})
+        return
+    except RuntimeError:
+        emit({"event": "unavailable", "code": "PPK2_API_INCOMPATIBLE"})
         return
     except Exception:
         emit({"event": "unavailable", "code": "PPK2_REQUEST_INVALID"})

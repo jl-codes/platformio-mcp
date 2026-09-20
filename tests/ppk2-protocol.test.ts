@@ -112,3 +112,15 @@ it("rejects oversized input and sample-before-start records", () => {
     send(new Ppk2Protocol(request), { event: "samples", currentMa: [1] }),
   ).toThrow();
 });
+it("reports incompatible dependencies as an unopened terminal outcome", () => {
+  const p = new Ppk2Protocol(request);
+  send(p, { event: "unavailable", code: "PPK2_API_INCOMPATIBLE" });
+  p.end();
+  expect(p.snapshot()).toMatchObject({
+    ended: true,
+    started: false,
+    cleanupReported: true,
+    unavailable: "PPK2_API_INCOMPATIBLE",
+    currentMa: [],
+  });
+});

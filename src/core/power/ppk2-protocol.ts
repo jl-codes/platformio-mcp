@@ -61,7 +61,11 @@ const eventSchema = z.discriminatedUnion("event", [
   z
     .object({
       event: z.literal("unavailable"),
-      code: z.enum(["PPK2_API_MISSING", "PPK2_REQUEST_INVALID"]),
+      code: z.enum([
+        "PPK2_API_MISSING",
+        "PPK2_API_INCOMPATIBLE",
+        "PPK2_REQUEST_INVALID",
+      ]),
     })
     .strict(),
   finishedSchema,
