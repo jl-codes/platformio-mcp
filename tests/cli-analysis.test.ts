@@ -184,3 +184,10 @@ it("routes power profiling through policy even with explicit CLI approval", () =
   expect(run("power-profile", "--port", "COM42", "--approve").errorType).toBe("PolicyDenied");
   expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
 }, 20000);
+
+it("routes OTA through configured policy even with explicit CLI approval", () => {
+  fs.writeFileSync(path.join(project, "platformio.ini"), "[env:fixture]\nplatform=native\n");
+  fs.writeFileSync(path.join(project, ".pio-mcp-policy.json"), JSON.stringify({ profile: "read_only", overrides: { deny: ["get_project_config"] } }));
+  expect(run("upload-ota", "--host", "192.0.2.8", "--approve").errorType).toBe("PolicyDenied");
+  expect(fs.existsSync(path.join(project, ".pio"))).toBe(false);
+}, 20000);

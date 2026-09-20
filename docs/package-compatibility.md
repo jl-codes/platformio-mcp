@@ -61,3 +61,16 @@ utilities report `reachable: null` and allow the separately authorized OTA opera
 to continue. A ping reply establishes neither OTA service availability nor firmware
 runtime health. The system utility is selected from fixed OS paths without a shell
 or PATH search; public requests cannot choose its command or arguments.
+
+### OTA from the CLI
+
+Use `pio-agent upload-ota --project-dir <dir> --host <address>` with the same
+configuration, build, image, network, upload, and host-command permissions as MCP.
+Optional flags include `--environment`, `--port`, `--filesystem`, `--build false`,
+`--verify-reachable false`, `--timeout`, `--image-path`, `--elf-path`, and
+`--expected-image-sha256`. For an explicit password, use `--auth-env <variable>`;
+the selected host environment variable supplies it without putting the password in
+process arguments. Without this flag, project configuration supplies authentication.
+The CLI supports the same seven scoped approval IDs using hyphenated flags and
+in-process interactive approvals (`--approve`, or prompts outside JSON mode).
+Approval never overrides policy denial. A failed result exits nonzero.

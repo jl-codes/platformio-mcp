@@ -1937,3 +1937,14 @@ setup that would omit future enabled aliases. Corrected stale 76-tool, ten-wheel
 seven-container, not-yet-run, and unfinished-collector claims. No authority markers,
 environments, publish flags, or release gates changed. This was a documentation-only
 correction against existing evidence; no smoke tests were run.
+
+### 2026-09-20: OTA CLI integration
+
+Added upload-ota with strict argument translation into the shared OTA adapter,
+canonical CLI policy mapping, help/routing, and in-process approval handling. Passwords
+can be read from an explicitly named host environment variable; plaintext --auth is
+rejected. All artifact, timeout, filesystem, build/reachability and scoped approval
+controls are forwarded through the same schema. Thirteen focused parser/policy-mapping
+checks and one real CLI denial case passed; the latter confirms --approve cannot
+bypass configured denial before PlatformIO/network execution. TypeScript and scoped
+lint passed; bundled plugin regenerated. No hardware or network probe was performed.

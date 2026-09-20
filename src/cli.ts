@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { parseOtaCli } from "./adapters/ota-cli.js";
+import { executeOtaCompatibility } from "./adapters/ota-compat.js";
 import { parsePowerProfileCli } from "./adapters/power-profile-cli.js";
 import { executePowerCompatibility } from "./adapters/power-compat.js";
 import { PowerMeterClient } from "./adapters/power-meter-client.js";
@@ -137,6 +139,7 @@ COMMANDS:
   project-metadata|list-targets --project-dir <dir> [--environment <env>]
   coredump --project-dir <dir> (--dump-path <file> | --port <port> --table-path <csv> --table-offset <bytes>) [--format <raw|base64>] [--analyze false | --elf-path <file>]
   partition-table --project-dir <dir> [--environment <env>] [--table-path <file>] [--format <csv|binary>] [--table-offset <bytes> | --sdkconfig-path <file>] [--flash-size <bytes>] [--firmware-path <file>] [--observed-table-path <file>]
+  upload-ota --project-dir <dir> --host <address> [--environment <env>] [--port <port>] [--filesystem] [--build false] [--verify-reachable false] [--timeout <seconds>] [--auth-env <variable>] [--approve]
   power-profile --project-dir <dir> [--source serial|ppk2] [--port <meter>] [--seconds <n>] [--baud <rate>] [--mode ampere|source --dut-port <port> --voltage-mv <mV> --current-limit-ma <mA>] [--approve]
   flash-verify --project-dir <dir> [--environment <env>] [--upload-port <port>] [--monitor-port <port>] [--baud <rate>] [--expect <regex>] [--fail-on <regex>] [--timeout <seconds>] [--settle <seconds>] [--stability-window <seconds>] [--max-lines <count>] [--stop-open-sessions] [--approve]
   run-target --project-dir <dir> --target <name> [--environment <env>] [--upload-port <port>]
@@ -447,6 +450,20 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         flashSize: numberOption("flash-size"), firmwarePath: asString(options["firmware-path"]),
         observedTablePath: asString(options["observed-table-path"]), approvalId: asString(options["approval-id"]),
       }, {workspaceDir: projectDirForPolicy, actor: "user"});
+      printOutput(result, jsonMode);
+      if (!result.ok) process.exitCode = 1;
+      return;
+    }
+    if (command === "upload-ota") {
+      const input = parseOtaCli(options, positionals, projectDirForPolicy);
+      const execute = () => executeOtaCompatibility(input, {}, {
+        workspaceDir: projectDirForPolicy, actor: "user",
+      });
+      const result = (approvalOpt === true || (!jsonMode && approvalOpt !== false))
+        ? await withInteractiveApprovals(
+            async (request) => approvalOpt === true || promptApproval(request.reason), execute,
+          )
+        : await execute();
       printOutput(result, jsonMode);
       if (!result.ok) process.exitCode = 1;
       return;
@@ -1222,6 +1239,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
       "run-target": "build",
       "flash-verify": "upload",
       "power-profile": "monitor",
+      "upload-ota": "upload",
 
       "pkg-search": "packages",
       "pkg-install": "packages",
@@ -1287,6 +1305,7 @@ async function main() {
     "run-target",
     "flash-verify",
     "power-profile",
+    "upload-ota",
     "deps-check",
     "project-envs",
     "project-metadata",
