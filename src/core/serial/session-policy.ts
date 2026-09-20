@@ -216,6 +216,53 @@ export class PolicySerialSessionService {
     return this.discoveryProject.run(canonical, () => this.discovery.list());
   }
 
+  /** Return only this caller's session metadata for one authorized canonical project. */
+  async listSessions(owner: SerialSessionOwner, projectDir: string) {
+    // Validate the unforgeable owner before consuming an approval or exposing metadata.
+    this.sessions.list(owner);
+    const context = this.context.getStore();
+    if (!context)
+      throw new PlatformIOError(
+        "Session listing requires a trusted request context.",
+        "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED",
+      );
+    if (!path.isAbsolute(projectDir))
+      throw new PlatformIOError(
+        "Serial project must be absolute.",
+        "SERIAL_PROJECT_INVALID",
+      );
+    const canonical = fs.realpathSync.native(projectDir);
+    if (!fs.statSync(canonical).isDirectory())
+      throw new PlatformIOError(
+        "Serial project must be a directory.",
+        "SERIAL_PROJECT_INVALID",
+      );
+    let check: (() => void) | undefined;
+    try {
+      check = createPolicyRevisionGuard(canonical);
+    } catch (error) {
+      if (!(error instanceof PolicyConfigError)) throw error;
+    }
+    return dispatchAuthorizedAction(
+      "serial_session_list",
+      { projectDir: canonical, approvalId: context.approvalId },
+      { ...context.caller, workspaceDir: canonical },
+      async () => {
+        if (!check)
+          throw new PlatformIOError(
+            "Policy changed during session listing.",
+            "POLICY_CHANGED",
+          );
+        check();
+        const sessions = this.sessions
+          .list(owner)
+          .filter((session) => session.projectDir === canonical);
+        check();
+        return sessions;
+      },
+    );
+  }
+
   /** Use the existing inspection action; a serial-open approval is never reused as an enumeration grant. */
   private async authorizeDiscovery(): Promise<() => void> {
     const context = this.context.getStore();

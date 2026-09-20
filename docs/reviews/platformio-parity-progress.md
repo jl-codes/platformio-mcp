@@ -715,3 +715,7 @@ Added opt-in pio_list_boards and pio_board_info through the canonical list_board
 ### Reference device presentation
 
 Implemented reference device rows, likely-board/noise hints, stable likely-first ordering and summary fields. Private claim records and inferred board IDs are excluded from the projection. TypeScript and two fixture-only checks pass; no devices were enumerated or opened. The full pio_list_devices alias is intentionally not advertised yet: its open_monitor_sessions field must come from caller-owned session listing, not a fabricated empty list or a global session dump. Public tool counts remain 54/66. This is a partial implementation step toward the complete alias, not completed device parity.
+
+### Authorized owned session listing
+
+Added internal serial_session_list mapped to get_monitor_status permission and PolicySerialSessionService.listSessions. It validates the owner capability before consuming approvals, requires trusted request context, resolves one canonical project, checks policy revision around disclosure and filters snapshots by both owner and project. Only metadata is returned. TypeScript passes; the two new targeted policy/isolation checks pass using mock transports (22 unrelated cases were not rerun). Rebuilt the plugin payload for the action catalog change. Public caller/session lifecycle wiring and complete pio_list_devices/monitor aliases remain outstanding; no physical hardware or broad smoke run occurred.

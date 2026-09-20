@@ -301,6 +301,7 @@ export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
     policyAction: "start_monitor",
     idempotent: false,
   },
+  serial_session_list: { ...READ, policyAction: "get_monitor_status" },
   serial_session_read: { ...READ, policyAction: "query_logs" },
   serial_session_write: {
     ...MCP_ACTIONS.upload_firmware,

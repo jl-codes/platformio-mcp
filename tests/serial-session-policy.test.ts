@@ -560,3 +560,38 @@ it("keeps the opening policy revision through one-shot read authorization", asyn
   });
   expect(f.ports.get("COM42")!.isOpen).toBe(false);
 });
+
+it("lists only owned sessions in the authorized project without returning serial text", async () => {
+  const f = fixture();
+  f.policy({ profile: "monitor_only" });
+  const started = await f.service.run({}, () =>
+    f.service.sessions.start(f.owner, f.request),
+  );
+  const outsider = f.service.sessions.createOwner();
+  expect(
+    await f.service.run({}, () =>
+      f.service.listSessions(outsider, f.projectDir),
+    ),
+  ).toEqual([]);
+  const listed = await f.service.run({}, () =>
+    f.service.listSessions(f.owner, f.projectDir),
+  );
+  expect(listed.map((item) => item.sessionId)).toEqual([started.sessionId]);
+  expect(listed[0]).not.toHaveProperty("text");
+  const other = path.join(root, "other-list-project");
+  fs.mkdirSync(other);
+  expect(
+    await f.service.run({}, () => f.service.listSessions(f.owner, other)),
+  ).toEqual([]);
+});
+it("requires listing context and honors a concrete session-list deny", async () => {
+  const f = fixture();
+  await expect(
+    f.service.listSessions(f.owner, f.projectDir),
+  ).rejects.toMatchObject({ code: "SERIAL_AUTHORIZATION_CONTEXT_REQUIRED" });
+  f.policy({ profile: "read_only", deny: ["serial_session_list"] });
+  await expect(
+    f.service.run({}, () => f.service.listSessions(f.owner, f.projectDir)),
+  ).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(f.transport).not.toHaveBeenCalled();
+});
