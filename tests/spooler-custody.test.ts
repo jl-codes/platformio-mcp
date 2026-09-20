@@ -211,3 +211,23 @@ it("closes local resources when confirmed-exit lease release fails", async () =>
   expect(mocks.close).toHaveBeenCalledOnce();
   expect(mocks.release).not.toHaveBeenCalled();
 });
+
+it("releases explicit endpoint custody without clearing a legacy port claim", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-target-custody-"));
+  roots.push(root);
+  mocks.spawn.mockResolvedValue({});
+  mocks.wait.mockResolvedValue(0);
+  mocks.register.mockResolvedValue(undefined);
+  mocks.unregister.mockResolvedValue(undefined);
+  mocks.update.mockResolvedValue(undefined);
+  mocks.prepare.mockReset();
+  mocks.finish.mockReset();
+  await executeWithSpooling("run", ["--target", "upload"], {
+    cwd: root,
+    devicePort: "COM99",
+  });
+  expect(mocks.acquire).toHaveBeenCalledWith("COM99");
+  expect(mocks.prepare).toHaveBeenCalledOnce();
+  expect(mocks.finish).toHaveBeenCalledOnce();
+  expect(mocks.release).not.toHaveBeenCalled();
+});

@@ -47,6 +47,7 @@ it("forwards explicit selection and observes completed failed output", async () 
   expect(
     await buildTarget(project, "uploadfs", "fixture", true, {
       uploadPort: "board.local",
+      serialPort: "COM99",
       timeoutMs: 1200000,
       onResult,
     }),
@@ -62,7 +63,7 @@ it("forwards explicit selection and observes completed failed output", async () 
       "board.local",
       "--verbose",
     ],
-    expect.objectContaining({ timeout: 1200000 }),
+    expect.objectContaining({ timeout: 1200000, devicePort: "COM99" }),
   );
   expect(onResult).toHaveBeenCalledExactlyOnceWith(completed);
 });

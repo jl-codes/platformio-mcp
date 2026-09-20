@@ -139,7 +139,7 @@ function ensureLatestLogPointer(logFile: string, latestLog: string): { mirrorLat
 export async function executeWithSpooling(
   command: string,
   args: string[],
-  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; onSuccess?: () => Promise<void>; rootCommandId?: string; artifactType?: "build" | "upload" | "monitor" | "test" | "debug" }
+  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; devicePort?: string; onSuccess?: () => Promise<void>; rootCommandId?: string; artifactType?: "build" | "upload" | "monitor" | "test" | "debug" }
 ): Promise<SpoolingResult> {
   const projectArea = options.projectDir ?? options.cwd;
 
@@ -157,8 +157,9 @@ export async function executeWithSpooling(
   let proc: Awaited<ReturnType<typeof platformioExecutor.spawn>>;
   let deviceCustody: ProcessDeviceCustody | undefined;
   try {
-    if (options.activePort) {
-      deviceCustody = acquireProcessDeviceCustody(options.activePort);
+    const custodyPort = options.devicePort ?? options.activePort;
+    if (custodyPort) {
+      deviceCustody = acquireProcessDeviceCustody(custodyPort);
       deviceCustody.prepareSpawn();
     }
     proc = await platformioExecutor.spawn(command, args, {

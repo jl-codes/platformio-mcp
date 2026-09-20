@@ -245,7 +245,7 @@ export function cleanCompatibilityResult(
   environment: string | undefined,
   duration: number,
   timedOut = false,
-  tool: "clean" | "build" = "clean",
+  tool: string = "clean",
 ) {
   const output = normalizeCleanOutput(result.output);
   const lines = output.split("\n");

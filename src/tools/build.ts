@@ -510,6 +510,7 @@ export async function cleanProject(
 
 /** Trusted controls for an already-authorized named target; this helper does not grant device access. */
 export interface TargetExecutionOptions {
+  serialPort?: string; // Host-resolved endpoint custody, separate from network upload destinations.
   uploadPort?: string; // Explicit serial or network destination, kept as one argv value.
   timeoutMs?: number; // Bounded execution deadline, defaulting to the existing ten minutes.
   onResult?: (result: SpoolingForegroundResult) => Promise<void>; // Preserve full-log collection.
@@ -566,6 +567,7 @@ export async function buildTarget(
       cwd: validatedPath,
       projectDir: validatedPath,
       timeout: execution.timeoutMs ?? 600000,
+      devicePort: execution.serialPort,
     });
 
     if ('status' in result) {
