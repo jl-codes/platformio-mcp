@@ -3,7 +3,17 @@
  * Physical target adapters supply an already resolved serial port; discovery remains separately authorized.
  */
 import { z } from "zod";
-import { dispatchAuthorizedTarget } from "../core/target-effects.js";
+import {
+  planAction,
+  dispatchAuthorizedAction,
+} from "../core/action-dispatcher.js";
+import { executeProjectInspection } from "./project-inspection.js";
+import { listDevicesCore } from "../core/devices.js";
+import { projectCompatibilityDevices } from "../adapters/device-compat.js";
+import {
+  classifyTargetEffects,
+  dispatchAuthorizedTarget,
+} from "../core/target-effects.js";
 import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
 import type { PolicyEvaluationContext } from "../core/policy/types.js";
 import { SerialClientContext } from "../adapters/serial-client.js";
@@ -35,6 +45,8 @@ export const RunTargetSchema = z
     upload_port: z.string().min(1).max(512).nullable().optional(),
     stop_open_sessions: z.boolean().default(false),
     approval_id: z.string().max(256).optional(),
+    config_approval_id: z.string().max(256).optional(),
+    selection_approval_id: z.string().max(256).optional(),
   })
   .strict();
 
@@ -51,12 +63,38 @@ export async function executeNamedTarget(
     request.project_dir,
     defaults,
   );
+  const effects = classifyTargetEffects(request.target);
+  const initialArgs = {
+    projectDir,
+    target: request.target,
+    environment: request.env ?? undefined,
+    uploadPort: request.upload_port ?? undefined,
+    stopOpenSessions: request.stop_open_sessions,
+  };
+  const plan = await planAction(effects.operation, initialArgs, {
+    ...caller,
+    workspaceDir: projectDir,
+  });
+  if (plan.status === "deny")
+    throw new PlatformIOError(plan.reason, "POLICY_DENIED");
+  let environment = request.env ?? undefined;
+  let uploadPort = request.upload_port ?? undefined;
+  if (effects.deviceAccess === "write" && !uploadPort) {
+    const selection = await resolveTargetSerialSelection(
+      projectDir,
+      environment,
+      request,
+      caller,
+    );
+    environment = selection.environment;
+    uploadPort = selection.port;
+  }
   return dispatchAuthorizedTarget(
     request.target,
     {
       projectDir,
-      environment: request.env ?? undefined,
-      uploadPort: request.upload_port ?? undefined,
+      environment,
+      uploadPort,
       stopOpenSessions: request.stop_open_sessions,
       approvalId: request.approval_id,
     },
@@ -65,14 +103,8 @@ export async function executeNamedTarget(
       const guard = createPolicyRevisionGuard(projectDir);
       await onAuthorized?.();
       guard();
-      // A guessed/default port would not be the resource bound to this request's grant.
-      if (effects.deviceAccess === "write" && !request.upload_port)
-        throw new PlatformIOError(
-          "Resolve an explicit upload port before executing a device target.",
-          "TARGET_PORT_REQUIRED",
-        );
-      const endpoint = request.upload_port
-        ? resolveSerialEndpoint(request.upload_port)
+      const endpoint = uploadPort
+        ? resolveSerialEndpoint(uploadPort)
         : undefined;
       const stopped: string[] = [];
       return hardwareLockManager.withImplicitLock(async () => {
@@ -128,20 +160,14 @@ export async function executeNamedTarget(
         };
         let timedOut = false;
         try {
-          await buildTarget(
-            projectDir,
-            request.target,
-            request.env ?? undefined,
-            false,
-            {
-              uploadPort: request.upload_port ?? undefined,
-              serialPort: endpoint?.canonicalPort,
-              timeoutMs: effects.deviceAccess === "write" ? 180000 : 1200000,
-              onResult: async (result) => {
-                completed = await collect(result.exitCode, result.fullLogPath);
-              },
+          await buildTarget(projectDir, request.target, environment, false, {
+            uploadPort,
+            serialPort: endpoint?.canonicalPort,
+            timeoutMs: effects.deviceAccess === "write" ? 180000 : 1200000,
+            onResult: async (result) => {
+              completed = await collect(result.exitCode, result.fullLogPath);
             },
-          );
+          });
         } catch (error) {
           if (
             error instanceof PlatformIOError &&
@@ -162,7 +188,7 @@ export async function executeNamedTarget(
         return {
           ...cleanCompatibilityResult(
             completed,
-            request.env ?? undefined,
+            environment,
             (performance.now() - started) / 1000,
             timedOut,
             "target-" + request.target,
@@ -174,4 +200,70 @@ export async function executeNamedTarget(
       });
     },
   );
+}
+
+/** Resolve omitted serial destinations with separate configuration/discovery permissions. */
+export async function resolveTargetSerialSelection(
+  projectDir: string,
+  environment: string | undefined,
+  grants: { config_approval_id?: string; selection_approval_id?: string },
+  caller: PolicyEvaluationContext,
+): Promise<{ environment: string; port: string }> {
+  const guard = createPolicyRevisionGuard(projectDir);
+  const report = await executeProjectInspection(
+    "project_envs",
+    {
+      projectDir,
+      approvalId: grants.config_approval_id,
+    },
+    caller,
+  );
+  guard();
+  if (!report.ok || !("defaultEnvironments" in report))
+    throw new PlatformIOError(
+      "Cannot resolve target environment.",
+      "TARGET_ENVIRONMENT_INVALID",
+    );
+  const selected =
+    environment ??
+    report.defaultEnvironments[0] ??
+    (report.envs.length === 1 ? report.envs[0].name : undefined);
+  const config = report.envs.find((entry) => entry.name === selected);
+  if (!config)
+    throw new PlatformIOError(
+      "Select one target environment explicitly.",
+      "TARGET_ENVIRONMENT_REQUIRED",
+    );
+  if (config.uploadPort) {
+    const port = z
+      .string()
+      .min(1)
+      .max(512)
+      .regex(/^[^\x00-\x1f\x7f]+$/)
+      .parse(config.uploadPort);
+    // Network/glob destinations need their own ownership adapter, not a fake serial lease.
+    resolveSerialEndpoint(port);
+    return { environment: config.name, port };
+  }
+  const port = await dispatchAuthorizedAction(
+    "list_devices",
+    {
+      projectDir,
+      approvalId: grants.selection_approval_id,
+    },
+    { ...caller, workspaceDir: projectDir },
+    async () => {
+      const candidates = projectCompatibilityDevices(
+        await listDevicesCore(),
+      ).likely_ports;
+      guard();
+      if (candidates.length !== 1)
+        throw new PlatformIOError(
+          "No unique target device; pass upload_port explicitly.",
+          "TARGET_PORT_SELECTION_REQUIRED",
+        );
+      return candidates[0];
+    },
+  );
+  return { environment: config.name, port };
 }
