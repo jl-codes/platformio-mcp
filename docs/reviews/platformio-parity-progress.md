@@ -579,3 +579,7 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 ### Owned memory capture integration correction
 
 Validated capture through the real session manager and byte-at-a-time mock transport, including rejection of another owner and retained reads after stopping. This exposed partial-line read starvation; collection now yields briefly when no completed lines arrive. Disconnected/error sessions, cancellation, and redaction truncation no longer claim complete collection; redaction flags accumulate across pages. No physical hardware was exercised. TypeScript checking and the 29 memory-capture/session-manager tests pass. Public memory tools and legacy ownership migration remain outstanding.
+
+### Reference heap-label coverage
+
+Adapted the pinned reference heap-label and trailer patterns, retaining the MIT attribution. Built-in parsing now covers minimum/free/allocated heap, largest allocation, PSRAM, ESP helper labels, and binary-scaled KiB/KB/MB. Overlapping labels are counted once and observations retain source order. Word-valued measurements remain unknown unless an explicit word size is supplied. TypeScript checking and 19 parser/report/capture tests pass. Stack variants, generic memory labels, exact custom-span precedence, and public tool wiring remain incomplete.

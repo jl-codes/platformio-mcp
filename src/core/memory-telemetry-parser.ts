@@ -121,14 +121,68 @@ export function parseMemoryTelemetry(
       if (/^[-= ]+$/.test(trimmed)) return;
       taskTable = false;
     }
-    const heap =
-      /\bFree\s+heap\s*:\s*(\d+)\b(?![.eE])(?:\s+min\s*:\s*(\d+)\b(?![.eE]))?(?:\s+largest\s*:\s*(\d+)\b(?![.eE]))?/i.exec(
-        text,
+    // Match specific labels first so a minimum-heap label is not also counted as free heap.
+    const heapMatches: Array<{ metric: string; match: RegExpExecArray }> = [];
+    const claimed: Array<[number, number]> = [];
+    const heapNumber = String.raw`\s*(?:[:=]|\bis\b)?\s*(\d+)\b(?![.eE])(?:\s*(KiB|KB|MB|bytes?|B|words?)\b)?`;
+    const heapPatterns: Array<[string, string, boolean]> = [
+      [
+        "min_free_heap",
+        String.raw`(?:min(?:imum)?[\s_.]*free[\s_]*(?:internal[\s_]*)?heap(?:[\s_]*size)?|free[\s_]*heap[\s_]*min(?:imum)?|lowest[\s_]*free[\s_]*heap|ESP\.getMinFreeHeap\(\)|esp_get_minimum_free_heap_size\(\)|minFreeHeap|min_free(?![\s_]*block))`,
+        false,
+      ],
+      [
+        "largest_free_block",
+        String.raw`(?:largest[\s_]*free[\s_]*block|largest[\s_]*(?:free[\s_]*)?(?:block|alloc(?:atable)?)|max(?:imum)?[\s_]*alloc(?:atable)?(?:[\s_]*heap|[\s_]*block|[\s_]*size)?|ESP\.getMaxAllocHeap\(\)|maxAllocHeap|biggest[\s_]*free[\s_]*block)`,
+        false,
+      ],
+      [
+        "psram_free",
+        String.raw`(?:free[\s_]*psram|psram[\s_]*free|ESP\.getFreePsram\(\)|freePsram|free_psram)`,
+        false,
+      ],
+      [
+        "allocated",
+        String.raw`(?:allocated(?:[\s_]*heap)?|heap[\s_]*used|used[\s_]*heap)`,
+        false,
+      ],
+      [
+        "free_heap",
+        String.raw`(?:free[\s_]*(?:internal[\s_]*|dram[\s_]*)?heap(?:[\s_]*size)?|heap[\s_]*free|ESP\.getFreeHeap\(\)|esp_get_free_heap_size\(\)|freeHeap|free_heap|\bheap)`,
+        false,
+      ],
+      ["min_free_heap", String.raw`\bmin`, true],
+      ["largest_free_block", String.raw`\blargest`, true],
+    ];
+    for (const [metric, label, trailer] of heapPatterns) {
+      if (trailer && heapMatches.length === 0) continue;
+      const regex = new RegExp(label + heapNumber, "gi");
+      for (const match of text.matchAll(regex)) {
+        const end = match.index + match[0].length;
+        if (claimed.some(([a, b]) => match.index < b && end > a)) continue;
+        claimed.push([match.index, end]);
+        heapMatches.push({ metric, match });
+      }
+    }
+    heapMatches.sort((a, b) => a.match.index - b.match.index);
+    for (const { metric, match } of heapMatches) {
+      const unit = match[2]?.toLowerCase();
+      const words = unit === "word" || unit === "words";
+      const scale = words
+        ? settings.stackWordBytes
+        : unit === "mb"
+          ? 1024 * 1024
+          : unit === "kb" || unit === "kib"
+            ? 1024
+            : 1;
+      add(
+        line,
+        metric,
+        match[1],
+        scale === undefined ? "unknown" : "bytes",
+        undefined,
+        scale ?? 1,
       );
-    if (heap) {
-      add(line, "free_heap", heap[1], "bytes");
-      if (heap[2]) add(line, "min_free_heap", heap[2], "bytes");
-      if (heap[3]) add(line, "largest_free_block", heap[3], "bytes");
       formats.add("arduino_heap");
     }
     const stack =

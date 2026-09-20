@@ -45,7 +45,9 @@ it("reads only aggregate ESP-IDF heap totals inside a recognized block", () => {
   expect(parsed.samples.map((sample) => sample.value)).toEqual([
     1000, 500, 900, 600,
   ]);
-  expect(parse(["free 1000 allocated 500"]).recognized).toBe(false);
+  expect(parse(["free 1000 allocated 500"]).samples).toMatchObject([
+    { metric: "allocated", value: 500 },
+  ]);
 });
 it("requires a task-table header and keeps unknown units explicit", () => {
   expect(parse(["loop R 1 128 2"]).recognized).toBe(false);
@@ -68,4 +70,27 @@ it("does not truncate decimal values into integer measurements", () => {
   expect(parse(["Free heap: 1.5", "loopTask: stack hwm 2.5"]).recognized).toBe(
     false,
   );
+});
+
+it("recognizes reference heap labels, units and overlapping minimum labels once", () => {
+  const result = parse([
+    "ESP.getFreeHeap() = 32 KiB; ESP.getMinFreeHeap() = 16 KB",
+    "free psram: 2 MB; heap used: 500 bytes; maximum allocatable block: 8 KiB",
+    "minimum free internal heap size is 1234",
+  ]);
+  expect(result.samples.map(({ metric, value }) => [metric, value])).toEqual([
+    ["free_heap", 32768],
+    ["min_free_heap", 16384],
+    ["psram_free", 2097152],
+    ["allocated", 500],
+    ["largest_free_block", 8192],
+    ["min_free_heap", 1234],
+  ]);
+  expect(parse(["free heap: 2 words"]).samples[0]).toMatchObject({
+    value: 2,
+    unit: "unknown",
+  });
+  expect(
+    parse(["free heap: 2 words"], { stackWordBytes: 4 }).samples[0],
+  ).toMatchObject({ value: 8, unit: "bytes" });
 });
