@@ -2,6 +2,7 @@
  * Reference serial-device presentation without opening ports or asserting hardware identity.
  * Provides projectCompatibilityDevices for authorized discovery adapters.
  */
+import { executeDecodeCompatibility } from "./decode-compat.js";
 import { inspectPortDiagnostics } from "../core/devices/port-diagnostics.js";
 import { executeMemoryCompatibility } from "./memory-compat.js";
 import {
@@ -69,6 +70,14 @@ export async function executeDeviceCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_decode_backtrace")
+    return executeDecodeCompatibility(
+      client,
+      input,
+      defaults,
+      caller,
+      onAuthorized,
+    );
   if (name === "pio_port_diagnose") {
     const params = z
       .object({
@@ -415,6 +424,31 @@ export function withDeviceCompatibility<TResult>(
       additionalProperties: false,
     },
     handler: (args, context) => context.dispatch("pio_port_diagnose", args),
+  });
+  const decodeSource = base.get("decode_backtrace");
+  if (!decodeSource || result.has("pio_decode_backtrace"))
+    throw new Error("Invalid decoder compatibility registry");
+  result.set("pio_decode_backtrace", {
+    ...decodeSource,
+    name: "pio_decode_backtrace",
+    description:
+      "Decode supplied crash text or an owned monitor session against a verified ELF snapshot. Build metadata collection and serial reads retain separate canonical permissions.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        project_dir: { type: ["string", "null"], maxLength: 32768 },
+        env: { type: ["string", "null"], maxLength: 50 },
+        text: { type: ["string", "null"], maxLength: 1048576 },
+        session_id: { type: ["string", "null"], maxLength: 256 },
+        include_all_hex: { type: "boolean", default: false },
+        approval_id: { type: "string", maxLength: 256 },
+        config_approval_id: { type: "string", maxLength: 256 },
+        read_approval_id: { type: "string", maxLength: 256 },
+        expected_elf_sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_decode_backtrace", args),
   });
   const startSource = base.get("start_monitor");
   if (!startSource || result.has("pio_monitor_start"))

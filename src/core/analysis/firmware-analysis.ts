@@ -93,6 +93,7 @@ export async function decodeFirmwareCrash(
       context.validatePolicy?.();
       return {
         ok: frames.some((frame) => frame.resolved),
+        addr2line: tools.addr2line,
         environment: context.environment,
         elf: identity,
         artifactIdentity: context.expectedElfSha256
