@@ -1,5 +1,6 @@
 /** Stable ELF snapshots prevent rebuilds from changing an in-progress analysis. */
 import fs from "node:fs/promises";
+import { retainElfSnapshot } from "./elf-archive.js";
 import os from "node:os";
 import path from "node:path";
 import { readElfIdentity, type ElfIdentity } from "./elf-identity.js";
@@ -19,7 +20,8 @@ export async function withElfSnapshot<T>(
     const snapshot = path.join(directory, "firmware.elf");
     await fs.copyFile(identity.path, snapshot);
     await readElfIdentity(snapshot, identity.sha256);
-    return await analyze(snapshot, identity);
+    const archivePath = await retainElfSnapshot(snapshot, identity.sha256);
+    return await analyze(snapshot, { ...identity, archivePath });
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }

@@ -944,3 +944,8 @@ Spooling operations with an active serial port now acquire the same canonical en
 
 Removed both first-device fallbacks after firmware/filesystem upload. Reconnect now requires exact VID:PID and nonempty SER tokens, rejects duplicate descriptors, and ignores transient location changes. This intentionally stops auto-monitoring devices lacking usable identity rather than silently attaching another board; explicit monitor selection remains available. TypeScript and 19 focused mocked discovery/upload checks passed. Plugin rebuilt. Full re-enumeration lease handoff and real device acceptance remain unproven.
 
+
+### Retained ELF provenance and current CI
+
+Analysis snapshots now publish a hash-verified content-addressed ELF copy and expose its archivePath in report identity. Concurrent publication reuses only a verified object; corrupted existing objects are never overwritten. Two new cases exercise rebuild retention, concurrent reuse and corruption rejection; 15 focused ELF/report checks passed and TypeScript passed. Complete CI run 35491602875 passed at source 3d70d44058c54a84a78ac4e87bb387000158e3e4, before this archive change. The connected MCP device inventory returned no serial devices; hardware-availability.json records this as availability evidence, not PR-runtime acceptance. Full upload-image/offset manifests and physical acceptance remain incomplete.
+

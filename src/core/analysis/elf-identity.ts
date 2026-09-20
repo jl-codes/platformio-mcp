@@ -6,6 +6,7 @@ import { PlatformIOError } from "../../utils/errors.js";
 /** Hash and target information for one exact ELF file. */
 export interface ElfIdentity {
   path: string;
+  archivePath?: string; // Retained hash-verified copy, when captured by an analysis report.
   sha256: string;
   size: number;
   bits: 32 | 64;

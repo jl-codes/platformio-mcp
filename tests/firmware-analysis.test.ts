@@ -1,6 +1,8 @@
 /** Report-engine fixtures verify orchestration; real toolchain/hardware acceptance remains separate. */
 import { readElfIdentity } from "../src/core/analysis/elf-identity.js";
 import fs from "node:fs";
+import * as elfArchive from "../src/core/analysis/elf-archive.js";
+const retainElf = elfArchive.retainElfSnapshot;
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +21,9 @@ let snapshots: string[];
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-analysis-report-"));
   snapshots = [];
+  vi.spyOn(elfArchive, "retainElfSnapshot").mockImplementation((file, hash) =>
+    retainElf(file, hash, path.join(root, "archive")),
+  );
   const bin = path.join(root, "toolchain", "bin");
   fs.mkdirSync(bin, { recursive: true });
   for (const name of ["gcc", "addr2line", "size", "nm"])
@@ -43,6 +48,7 @@ beforeEach(() => {
   vi.mocked(runAnalysisProcess).mockReset();
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const snapshot of snapshots) expect(fs.existsSync(snapshot)).toBe(false);
   fs.rmSync(root, { recursive: true, force: true });
 });

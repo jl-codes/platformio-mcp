@@ -1,0 +1,14 @@
+{
+  "devices": [],
+  "source": "connected platformio MCP server, list_devices",
+  "nextAction": "Provide identified serial boards and remaining required probe/power/OTA fixtures before physical acceptance.",
+  "workspaceCommit": "3d70d44058c54a84a78ac4e87bb387000158e3e4",
+  "serverRevision": "not established; this is availability evidence, not PR runtime acceptance",
+  "limitations": [
+    "Does not enumerate network OTA targets or all debug/power probes.",
+    "Does not prove hardware acceptance or that the PR runtime was exercised."
+  ],
+  "observedAt": "2026-09-20T05:26:12Z",
+  "outcome": "no serial devices reported",
+  "schemaVersion": 1
+}

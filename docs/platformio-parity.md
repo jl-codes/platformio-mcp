@@ -27,3 +27,8 @@ Use clean, check and test with --project-dir and optional --environment. Clean s
 
 Automatic monitoring follows only a unique exact USB VID:PID and SER identity from the uploaded board. A changed port or USB location can be followed, but matching only the device model, a serial-number prefix, or duplicated descriptors is insufficient. If the board has no usable serial metadata or cannot be uniquely rediscovered, upload success is retained and automatic monitoring is skipped with a diagnostic; select its monitor port explicitly. USB descriptors are discovery evidence, not cryptographic device authentication. The monitor no longer falls back to the first connected board.
 
+
+## Retained analysis binaries
+
+Crash and size reports include elf.archivePath, a hash-verified ELF copy retained under the server data directory in artifacts/elf. Later builds do not overwrite these copies, and a corrupt existing object is rejected rather than replaced. Private working snapshots are still removed after analysis. Retention is currently manual; archived ELF files may contain symbols and source paths and remain until explicitly removed. A retained ELF does not by itself prove which binary was flashed: flashedFirmwareVerified stays false until upload-manifest evidence establishes that relationship.
+

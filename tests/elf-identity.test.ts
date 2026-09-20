@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { retainElfSnapshot } from "../src/core/analysis/elf-archive.js";
 import { readElfIdentity } from "../src/core/analysis/elf-identity.js";
 let root: string;
 beforeEach(() => {
@@ -78,4 +79,46 @@ describe("ELF identity", () => {
       code: "ANALYSIS_ELF_INVALID",
     });
   });
+});
+
+it("retains distinct content across rebuilds and reuses a verified archived hash", async () => {
+  const file = path.join(root, "firmware.elf");
+  const archive = path.join(root, "archive");
+  const old = header(94);
+  fs.writeFileSync(file, old);
+  const first = await readElfIdentity(file);
+  const retained = await retainElfSnapshot(file, first.sha256, archive);
+  const again = await Promise.all(
+    Array.from({ length: 3 }, () =>
+      retainElfSnapshot(file, first.sha256, archive),
+    ),
+  );
+  expect(new Set(again)).toEqual(new Set([retained]));
+  const newer = header(94);
+  newer[100] = 42;
+  fs.writeFileSync(file, newer);
+  const second = await readElfIdentity(file);
+  const next = await retainElfSnapshot(file, second.sha256, archive);
+  fs.unlinkSync(file);
+  expect(fs.readFileSync(retained)).toEqual(old);
+  expect(fs.readFileSync(next)).toEqual(newer);
+  expect(fs.readdirSync(archive).sort()).toEqual(
+    [first.sha256 + ".elf", second.sha256 + ".elf"].sort(),
+  );
+});
+it("rejects corrupted archived content without overwriting it", async () => {
+  const file = path.join(root, "firmware.elf");
+  const archive = path.join(root, "archive");
+  fs.writeFileSync(file, header(94));
+  const identity = await readElfIdentity(file);
+  const retained = await retainElfSnapshot(file, identity.sha256, archive);
+  const corrupt = header(40);
+  fs.writeFileSync(retained, corrupt);
+  await expect(
+    retainElfSnapshot(file, identity.sha256, archive),
+  ).rejects.toMatchObject({
+    code: "ANALYSIS_ELF_MISMATCH",
+  });
+  expect(fs.readFileSync(retained)).toEqual(corrupt);
+  expect(fs.readdirSync(archive)).toEqual([identity.sha256 + ".elf"]);
 });
