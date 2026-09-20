@@ -2017,3 +2017,11 @@ Retained job outcomes/URLs and GitHub artifact IDs/digests in
  distribution-310-build-evidence.json. All publication inputs were false; publication
 jobs were skipped as intended. No registry-installed acceptance, physical hardware,
 protected publication or full parity acceptance is inferred from this success.
+
+### Dashboard analysis preview (2026-09-20)
+
+The command ledger now retains a redacted, bounded projection of decoded frames and largest symbols for both canonical and compatibility analysis tools. The existing command feed renders up to 20 rows as text, including unresolved-frame labels, selected ELF identity and interpretation limits. Full client responses remain unchanged. Raw crash input and unrelated fields are excluded from the projection.
+
+Validation: backend projection tests 3 passed; dashboard preview and existing command-feed tests 7 passed; TypeScript and the production dashboard build passed. Rebuilt the bundled plugin. No hardware execution or additional smoke suite was performed for this change.
+
+Both CI runs for 4a56bd1151b442a834460df9fa31f8a2820003b7 passed. Installer acceptance run 35530618249 passed all 17 cases; its downloaded manifest and evidence identify that exact PR revision, resolving the earlier synthetic merge revision mismatch. This is POL-05 evidence only, not full parity or deployment acceptance.

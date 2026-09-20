@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { projectAnalysisLedger } from "./adapters/analysis-ledger.js";
 import { withFlashVerificationTools } from "./adapters/flash-verification-registry.js";
 import { withOtaTools } from "./adapters/ota-registry.js";
 import { withPowerCompatibility } from "./adapters/power-compat-registry.js";
@@ -1856,6 +1857,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           mcpResponse: {
             success: result.ok,
             summary: response.structuredContent.summary,
+            ...projectAnalysisLedger(name, result),
           },
         },
         targetProjectDir,

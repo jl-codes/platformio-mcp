@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AnalysisPreview from './analysis-preview';
 import { Badge, Typography, Collapse, Button, Space, Switch, Tooltip, Tag, Divider, Segmented, Popconfirm, message, theme } from 'antd';
 import { 
   ExperimentOutlined, 
@@ -491,6 +492,7 @@ export default function CommandFeed({
                     </Text>
                   )}
                 </div>
+                <AnalysisPreview response={cmd.mcpResponse} />
                 <div style={{ marginBottom: 8, fontSize: 11, fontFamily: 'monospace' }}>
                   {cmd.mcpResponse ? (
                     (typeof cmd.mcpResponse === 'object' && (cmd.mcpResponse as any).truncated) 

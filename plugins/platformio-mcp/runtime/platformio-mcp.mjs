@@ -48,6 +48,36 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
+// src/core/policy/redact.ts
+function redactSecretsInText(text9) {
+  let redacted = text9;
+  for (const pattern of secretPatterns) {
+    redacted = redacted.replace(pattern, replacement);
+  }
+  return redacted;
+}
+var secretPatterns, replacement;
+var init_redact = __esm({
+  "src/core/policy/redact.ts"() {
+    "use strict";
+    secretPatterns = [
+      /OPENAI_API_KEY=[^\s]+/gi,
+      /GITHUB_TOKEN=[^\s]+/gi,
+      /SUPABASE_KEY=[^\s]+/gi,
+      /AWS_SECRET_ACCESS_KEY=[^\s]+/gi,
+      /(?:wifi|wi-fi|wlan)[_-]?(?:password|pass|psk)\s*[:=]\s*[^\s,;]+/gi,
+      /(?:api[_-]?key|client[_-]?secret|provisioning[_-]?(?:key|secret))\s*[:=]\s*[^\s,;]+/gi,
+      /authorization\s*:\s*bearer\s+[^\s]+/gi,
+      /bearer\s+[a-z0-9._~+/=-]{12,}/gi,
+      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
+      /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gi,
+      /password\s*=\s*[^\s]+/gi,
+      /token\s*=\s*[^\s]+/gi
+    ];
+    replacement = "[REDACTED_SECRET]";
+  }
+});
+
 // node_modules/graceful-fs/polyfills.js
 var require_polyfills = __commonJS({
   "node_modules/graceful-fs/polyfills.js"(exports, module) {
@@ -6698,14 +6728,14 @@ var require_foldFlowLines = __commonJS({
     var FOLD_FLOW = "flow";
     var FOLD_BLOCK = "block";
     var FOLD_QUOTED = "quoted";
-    function foldFlowLines(text8, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
+    function foldFlowLines(text9, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
       if (!lineWidth || lineWidth < 0)
-        return text8;
+        return text9;
       if (lineWidth < minContentWidth)
         minContentWidth = 0;
       const endStep = Math.max(1 + minContentWidth, 1 + lineWidth - indent.length);
-      if (text8.length <= endStep)
-        return text8;
+      if (text9.length <= endStep)
+        return text9;
       const folds = [];
       const escapedFolds = {};
       let end = lineWidth - indent.length;
@@ -6722,14 +6752,14 @@ var require_foldFlowLines = __commonJS({
       let escStart = -1;
       let escEnd = -1;
       if (mode === FOLD_BLOCK) {
-        i = consumeMoreIndentedLines(text8, i, indent.length);
+        i = consumeMoreIndentedLines(text9, i, indent.length);
         if (i !== -1)
           end = i + endStep;
       }
-      for (let ch; ch = text8[i += 1]; ) {
+      for (let ch; ch = text9[i += 1]; ) {
         if (mode === FOLD_QUOTED && ch === "\\") {
           escStart = i;
-          switch (text8[i + 1]) {
+          switch (text9[i + 1]) {
             case "x":
               i += 3;
               break;
@@ -6746,12 +6776,12 @@ var require_foldFlowLines = __commonJS({
         }
         if (ch === "\n") {
           if (mode === FOLD_BLOCK)
-            i = consumeMoreIndentedLines(text8, i, indent.length);
+            i = consumeMoreIndentedLines(text9, i, indent.length);
           end = i + indent.length + endStep;
           split = void 0;
         } else {
           if (ch === " " && prev && prev !== " " && prev !== "\n" && prev !== "	") {
-            const next = text8[i + 1];
+            const next = text9[i + 1];
             if (next && next !== " " && next !== "\n" && next !== "	")
               split = i;
           }
@@ -6763,12 +6793,12 @@ var require_foldFlowLines = __commonJS({
             } else if (mode === FOLD_QUOTED) {
               while (prev === " " || prev === "	") {
                 prev = ch;
-                ch = text8[i += 1];
+                ch = text9[i += 1];
                 overflow = true;
               }
               const j = i > escEnd + 1 ? i - 2 : escStart - 1;
               if (escapedFolds[j])
-                return text8;
+                return text9;
               folds.push(j);
               escapedFolds[j] = true;
               end = j + endStep;
@@ -6783,39 +6813,39 @@ var require_foldFlowLines = __commonJS({
       if (overflow && onOverflow)
         onOverflow();
       if (folds.length === 0)
-        return text8;
+        return text9;
       if (onFold)
         onFold();
-      let res = text8.slice(0, folds[0]);
+      let res = text9.slice(0, folds[0]);
       for (let i2 = 0; i2 < folds.length; ++i2) {
         const fold = folds[i2];
-        const end2 = folds[i2 + 1] || text8.length;
+        const end2 = folds[i2 + 1] || text9.length;
         if (fold === 0)
           res = `
-${indent}${text8.slice(0, end2)}`;
+${indent}${text9.slice(0, end2)}`;
         else {
           if (mode === FOLD_QUOTED && escapedFolds[fold])
-            res += `${text8[fold]}\\`;
+            res += `${text9[fold]}\\`;
           res += `
-${indent}${text8.slice(fold + 1, end2)}`;
+${indent}${text9.slice(fold + 1, end2)}`;
         }
       }
       return res;
     }
-    function consumeMoreIndentedLines(text8, i, indent) {
+    function consumeMoreIndentedLines(text9, i, indent) {
       let end = i;
       let start = i + 1;
-      let ch = text8[start];
+      let ch = text9[start];
       while (ch === " " || ch === "	") {
         if (i < start + indent) {
-          ch = text8[++i];
+          ch = text9[++i];
         } else {
           do {
-            ch = text8[++i];
+            ch = text9[++i];
           } while (ch && ch !== "\n");
           end = i;
           start = i + 1;
-          ch = text8[start];
+          ch = text9[start];
         }
       }
       return end;
@@ -13527,36 +13557,6 @@ var init_workspace_registry = __esm({
   }
 });
 
-// src/core/policy/redact.ts
-function redactSecretsInText(text8) {
-  let redacted = text8;
-  for (const pattern of secretPatterns) {
-    redacted = redacted.replace(pattern, replacement);
-  }
-  return redacted;
-}
-var secretPatterns, replacement;
-var init_redact = __esm({
-  "src/core/policy/redact.ts"() {
-    "use strict";
-    secretPatterns = [
-      /OPENAI_API_KEY=[^\s]+/gi,
-      /GITHUB_TOKEN=[^\s]+/gi,
-      /SUPABASE_KEY=[^\s]+/gi,
-      /AWS_SECRET_ACCESS_KEY=[^\s]+/gi,
-      /(?:wifi|wi-fi|wlan)[_-]?(?:password|pass|psk)\s*[:=]\s*[^\s,;]+/gi,
-      /(?:api[_-]?key|client[_-]?secret|provisioning[_-]?(?:key|secret))\s*[:=]\s*[^\s,;]+/gi,
-      /authorization\s*:\s*bearer\s+[^\s]+/gi,
-      /bearer\s+[a-z0-9._~+/=-]{12,}/gi,
-      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi,
-      /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gi,
-      /password\s*=\s*[^\s]+/gi,
-      /token\s*=\s*[^\s]+/gi
-    ];
-    replacement = "[REDACTED_SECRET]";
-  }
-});
-
 // src/api/events.ts
 import { EventEmitter } from "events";
 import fs4 from "node:fs";
@@ -14013,24 +14013,24 @@ var init_device_lease = __esm({
       status(resource) {
         const key = resourceKey(resource);
         return this.withGate(key, () => {
-          const record2 = this.readRecord(key);
-          if (!record2) return { status: "unclaimed", resource: { ...resource } };
-          if (record2.handoffPending)
+          const record3 = this.readRecord(key);
+          if (!record3) return { status: "unclaimed", resource: { ...resource } };
+          if (record3.handoffPending)
             return {
               status: "unknown",
-              resource: { ...record2.resource },
-              ownerPid: record2.owner.pid,
-              acquiredAt: record2.acquiredAt
+              resource: { ...record3.resource },
+              ownerPid: record3.owner.pid,
+              acquiredAt: record3.acquiredAt
             };
           const identity = compareProcessIdentity(
-            record2.owner,
-            this.inspect(record2.owner.pid)
+            record3.owner,
+            this.inspect(record3.owner.pid)
           );
           return {
             status: identity === "alive" ? "owned" : identity,
-            resource: { ...record2.resource },
-            ownerPid: record2.owner.pid,
-            acquiredAt: record2.acquiredAt
+            resource: { ...record3.resource },
+            ownerPid: record3.owner.pid,
+            acquiredAt: record3.acquiredAt
           };
         });
       }
@@ -14056,15 +14056,15 @@ var init_device_lease = __esm({
                 status === "alive" ? "DEVICE_BUSY" : "DEVICE_OWNER_UNKNOWN"
               );
           }
-          const record2 = {
+          const record3 = {
             version: 1,
             resource: { kind: resource.kind, identity: resource.identity },
             owner: { ...owner },
             nonce: randomUUID(),
             acquiredAt: (/* @__PURE__ */ new Date()).toISOString()
           };
-          this.writeRecord(key, record2);
-          return this.createHandle(record2);
+          this.writeRecord(key, record3);
+          return this.createHandle(record3);
         });
       }
       /** Persist uncertainty before launching a child, so a coordinator crash cannot expose its hardware. */
@@ -14190,12 +14190,12 @@ var init_device_lease = __esm({
           this.held.delete(lease);
         });
       }
-      createHandle(record2) {
+      createHandle(record3) {
         const lease = Object.freeze({
-          resource: Object.freeze({ ...record2.resource }),
-          acquiredAt: record2.acquiredAt
+          resource: Object.freeze({ ...record3.resource }),
+          acquiredAt: record3.acquiredAt
         });
-        this.held.set(lease, record2);
+        this.held.set(lease, record3);
         return lease;
       }
       requireHandle(lease) {
@@ -14286,10 +14286,10 @@ var init_device_lease = __esm({
             "DEVICE_LEASE_CORRUPT"
           );
         try {
-          const record2 = JSON.parse(fs12.readFileSync(file, "utf8"));
-          if (record2.version !== 1 || record2.handoffPending !== void 0 && record2.handoffPending !== true || resourceKey(record2.resource) !== key || !validProcessIdentity(record2.owner) || typeof record2.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(record2.nonce) || typeof record2.acquiredAt !== "string" || !Number.isFinite(Date.parse(record2.acquiredAt)))
+          const record3 = JSON.parse(fs12.readFileSync(file, "utf8"));
+          if (record3.version !== 1 || record3.handoffPending !== void 0 && record3.handoffPending !== true || resourceKey(record3.resource) !== key || !validProcessIdentity(record3.owner) || typeof record3.nonce !== "string" || !/^[a-f0-9-]{36}$/.test(record3.nonce) || typeof record3.acquiredAt !== "string" || !Number.isFinite(Date.parse(record3.acquiredAt)))
             throw new Error("Invalid lease schema");
-          return record2;
+          return record3;
         } catch {
           throw new PlatformIOError(
             "Invalid device lease record; ownership is not assumed stale.",
@@ -14297,12 +14297,12 @@ var init_device_lease = __esm({
           );
         }
       }
-      writeRecord(key, record2) {
-        const temporary = path17.join(this.root, `${key}.${record2.nonce}.tmp`);
+      writeRecord(key, record3) {
+        const temporary = path17.join(this.root, `${key}.${record3.nonce}.tmp`);
         let fd;
         try {
           fd = fs12.openSync(temporary, "wx", 384);
-          fs12.writeFileSync(fd, JSON.stringify(record2), "utf8");
+          fs12.writeFileSync(fd, JSON.stringify(record3), "utf8");
           fs12.fsyncSync(fd);
           fs12.closeSync(fd);
           fd = void 0;
@@ -14490,7 +14490,7 @@ function getRegistryFilePath(projectDir) {
   if (!fs14.existsSync(dir)) fs14.mkdirSync(dir, { recursive: true });
   return path20.join(dir, REGISTRY_FILE2);
 }
-async function registerCommand(record2, projectDir) {
+async function registerCommand(record3, projectDir) {
   const file = getRegistryFilePath(projectDir);
   if (!fs14.existsSync(file)) fs14.writeFileSync(file, "[]");
   try {
@@ -14501,17 +14501,17 @@ async function registerCommand(record2, projectDir) {
         history = JSON.parse(fs14.readFileSync(file, "utf8"));
       } catch {
       }
-      const existingIndex = history.findIndex((cmd) => cmd.id === record2.id);
+      const existingIndex = history.findIndex((cmd) => cmd.id === record3.id);
       if (existingIndex !== -1) {
         const existingCmd = history[existingIndex];
-        record2.tasks.forEach((newArt) => {
+        record3.tasks.forEach((newArt) => {
           if (!existingCmd.tasks.find((a) => a.taskId === newArt.taskId)) {
             existingCmd.tasks.push(newArt);
           }
         });
-        existingCmd.status = record2.status;
+        existingCmd.status = record3.status;
       } else {
-        history.push(record2);
+        history.push(record3);
         if (history.length > MAX_HISTORY_ITEMS) {
           history = history.slice(-MAX_HISTORY_ITEMS);
         }
@@ -15840,11 +15840,11 @@ async function executeWithSpooling(command, args, options) {
           if (stat.size > fileOffset) {
             const stream = fs20.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
             stream.on("data", (chunk) => {
-              const text8 = chunk.toString();
-              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text8);
+              const text9 = chunk.toString();
+              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text9);
               if (latestPointer.mirrorLatest) {
                 try {
-                  fs20.appendFileSync(latestLog, text8);
+                  fs20.appendFileSync(latestLog, text9);
                 } catch {
                 }
               }
@@ -17022,8 +17022,8 @@ async function getProjectContext(projectDir, includeBuildHistory) {
   let libDeps;
   if (hasPlatformioIni) {
     try {
-      const text8 = fs36.readFileSync(iniPath, "utf8");
-      const parsed = parsePlatformioIni(text8);
+      const text9 = fs36.readFileSync(iniPath, "utf8");
+      const parsed = parsePlatformioIni(text9);
       environments = parsed.environments;
       libDeps = parsed.libDeps;
     } catch {
@@ -21866,7 +21866,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text8, msg) => text8 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text9, msg) => text9 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -24764,9 +24764,9 @@ function emitNewLogBytes(port, daemon) {
     const buffer = Buffer.alloc(stat.size - start);
     fd = fs82.openSync(daemon.logFile, "r");
     fs82.readSync(fd, buffer, 0, buffer.length, start);
-    const text8 = buffer.toString();
-    if (text8.length > 0) {
-      portalEvents.emitSerialLog(port, text8, daemon.taskId);
+    const text9 = buffer.toString();
+    if (text9.length > 0) {
+      portalEvents.emitSerialLog(port, text9, daemon.taskId);
       daemon.lastActivityAt = (/* @__PURE__ */ new Date()).toISOString();
     }
     daemon.fileOffset = stat.size;
@@ -41324,8 +41324,8 @@ var require_text = __commonJS({
     var debug = require_src()("body-parser:text");
     var read = require_read();
     var { normalizeOptions, passthrough } = require_utils2();
-    module.exports = text8;
-    function text8(options) {
+    module.exports = text9;
+    function text9(options) {
       const normalizedOptions = normalizeOptions(options, "text/plain");
       return function textParser(req, res, next) {
         read(req, res, next, passthrough, debug, normalizedOptions);
@@ -55145,11 +55145,11 @@ var require_dist5 = __commonJS({
     exports.TokenData = TokenData;
     var PathError = class extends TypeError {
       constructor(message, originalPath) {
-        let text8 = message;
+        let text9 = message;
         if (originalPath)
-          text8 += `: ${originalPath}`;
-        text8 += `; visit https://git.new/pathToRegexpError for info`;
-        super(text8);
+          text9 += `: ${originalPath}`;
+        text9 += `; visit https://git.new/pathToRegexpError for info`;
+        super(text9);
         this.originalPath = originalPath;
       }
     };
@@ -90684,11 +90684,11 @@ var require_ipv4 = __commonJS({
        * @param {integer} integer - a number to convert
        * @returns {Address4}
        */
-      static fromInteger(integer2) {
-        if (!Number.isInteger(integer2) || integer2 < 0 || integer2 > 4294967295) {
+      static fromInteger(integer3) {
+        if (!Number.isInteger(integer3) || integer3 < 0 || integer3 > 4294967295) {
           throw new address_error_1.AddressError("IPv4 integer must be in the range 0 to 2**32 - 1");
         }
-        return _Address4.fromHex(integer2.toString(16).padStart(8, "0"));
+        return _Address4.fromHex(integer3.toString(16).padStart(8, "0"));
       }
       /**
        * Return an address from in-addr.arpa form
@@ -92653,6 +92653,40 @@ var require_ip_address = __commonJS({
   }
 });
 
+// src/adapters/analysis-ledger.ts
+init_redact();
+var record = (value2) => value2 && typeof value2 === "object" && !Array.isArray(value2) ? value2 : {};
+var text = (value2) => typeof value2 === "string" ? redactSecretsInText(value2).slice(0, 384) : null;
+var integer = (value2) => typeof value2 === "number" && Number.isSafeInteger(value2) && value2 >= 0 ? value2 : null;
+function projectAnalysisLedger(name2, input) {
+  const data = record(input);
+  const kind3 = ["decode_backtrace", "pio_decode_backtrace"].includes(name2) ? "frames" : ["size_report", "pio_size_report"].includes(name2) ? "symbols" : null;
+  if (!kind3) return {};
+  const source = kind3 === "frames" ? data.frames : data.topSymbols ?? data.top_symbols;
+  if (!Array.isArray(source)) return {};
+  const rows = source.slice(0, 20).map((value2) => {
+    const item = record(value2);
+    return {
+      address: text(item.address),
+      name: text(kind3 === "frames" ? item.function : item.name),
+      file: text(item.file),
+      line: integer(item.line),
+      ...kind3 === "frames" ? { resolved: item.resolved === true } : { size: integer(item.size) }
+    };
+  });
+  const hash = record(data.elf).sha256 ?? data.elf_sha256;
+  return {
+    analysis: {
+      kind: kind3,
+      rows,
+      total: source.length,
+      truncated: source.length > rows.length,
+      elfSha256: typeof hash === "string" && /^[a-f0-9]{64}$/i.test(hash) ? hash.toLowerCase() : null,
+      note: kind3 === "frames" ? "Decoded against the selected ELF; this does not verify the firmware running on the device." : "Largest reported symbols; symbol sizes are not partition usage or runtime heap measurements."
+    }
+  };
+}
+
 // src/core/action-catalog.ts
 var READ = {
   riskLevel: "low",
@@ -93163,8 +93197,8 @@ var PolicyConfigError = class extends PlatformIOError {
   }
   source;
 };
-function parsePolicyDocument(text8, source) {
-  if (Buffer.byteLength(text8, "utf8") > MAX_POLICY_BYTES) {
+function parsePolicyDocument(text9, source) {
+  if (Buffer.byteLength(text9, "utf8") > MAX_POLICY_BYTES) {
     throw new PolicyConfigError(source, "Policy exceeds the 64 KiB limit.");
   }
   const extension = path.extname(source).toLowerCase();
@@ -93175,8 +93209,8 @@ function parsePolicyDocument(text8, source) {
     );
   }
   try {
-    if (extension === ".json") JSON.parse(text8);
-    const document2 = (0, import_yaml.parseDocument)(text8, {
+    if (extension === ".json") JSON.parse(text9);
+    const document2 = (0, import_yaml.parseDocument)(text9, {
       version: "1.2",
       strict: true,
       uniqueKeys: true,
@@ -93277,10 +93311,10 @@ function approvalsFile() {
   return path3.join(resolvePolicyDirectory(), "approvals.json");
 }
 function readApprovals(file = approvalsFile()) {
-  let text8;
+  let text9;
   try {
     if (fs.statSync(file).size > 8 * 1024 * 1024) throw new Error("size limit");
-    text8 = fs.readFileSync(file, "utf8");
+    text9 = fs.readFileSync(file, "utf8");
   } catch (error2) {
     if (error2.code === "ENOENT") return [];
     throw new PlatformIOError(
@@ -93289,7 +93323,7 @@ function readApprovals(file = approvalsFile()) {
     );
   }
   try {
-    return external_exports.array(ApprovalRecordSchema).parse(JSON.parse(text8));
+    return external_exports.array(ApprovalRecordSchema).parse(JSON.parse(text9));
   } catch {
     throw new PlatformIOError(
       "Approval storage is malformed; operator repair is required.",
@@ -93344,19 +93378,19 @@ function claimPath(file, id) {
     crypto.createHash("sha256").update(id).digest("hex")
   );
 }
-function currentState(record2, file) {
-  if (fs.existsSync(claimPath(file, record2.id)))
-    return { ...record2, status: "consumed" };
-  if ((record2.status === "pending" || record2.status === "approved") && record2.expiresAt && Date.parse(record2.expiresAt) <= Date.now())
-    return { ...record2, status: "expired" };
-  return record2;
+function currentState(record3, file) {
+  if (fs.existsSync(claimPath(file, record3.id)))
+    return { ...record3, status: "consumed" };
+  if ((record3.status === "pending" || record3.status === "approved") && record3.expiresAt && Date.parse(record3.expiresAt) <= Date.now())
+    return { ...record3, status: "expired" };
+  return record3;
 }
 function listApprovalRequests(opts) {
   const file = approvalsFile();
   const records = readApprovals(file).map(
-    (record2) => currentState(record2, file)
+    (record3) => currentState(record3, file)
   );
-  return records.filter((record2) => !opts?.status || record2.status === opts.status).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, Math.max(0, opts?.limit ?? records.length));
+  return records.filter((record3) => !opts?.status || record3.status === opts.status).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, Math.max(0, opts?.limit ?? records.length));
 }
 function createApprovalRequest(input) {
   const minutes = input.expiresInMinutes ?? 30;
@@ -93365,7 +93399,7 @@ function createApprovalRequest(input) {
       "Approval lifetime must be between zero and 1440 minutes.",
       "APPROVAL_LIFETIME_INVALID"
     );
-  const record2 = ApprovalRecordSchema.parse({
+  const record3 = ApprovalRecordSchema.parse({
     id: `approval-${crypto.randomUUID()}`,
     action: input.action,
     riskLevel: input.riskLevel,
@@ -93378,23 +93412,23 @@ function createApprovalRequest(input) {
     metadata: input.metadata
   });
   return mutate((records) => {
-    records.push(record2);
-    return record2;
+    records.push(record3);
+    return record3;
   });
 }
 function transition(id, status) {
   return mutate((records, file) => {
-    const index = records.findIndex((record3) => record3.id === id);
+    const index = records.findIndex((record4) => record4.id === id);
     if (index < 0) return void 0;
-    const record2 = currentState(records[index], file);
-    if (record2.status !== "pending" && !(status === "denied" && record2.status === "approved")) {
-      if (record2.status === status) return record2;
+    const record3 = currentState(records[index], file);
+    if (record3.status !== "pending" && !(status === "denied" && record3.status === "approved")) {
+      if (record3.status === status) return record3;
       throw new PlatformIOError(
-        `Approval is ${record2.status} and cannot become ${status}.`,
+        `Approval is ${record3.status} and cannot become ${status}.`,
         "APPROVAL_TRANSITION_INVALID"
       );
     }
-    records[index] = { ...record2, status };
+    records[index] = { ...record3, status };
     return records[index];
   });
 }
@@ -93406,15 +93440,15 @@ function denyRequest(id) {
 }
 function getApproval(id) {
   const file = approvalsFile();
-  const record2 = readApprovals(file).find((item) => item.id === id);
-  return record2 ? currentState(record2, file) : void 0;
+  const record3 = readApprovals(file).find((item) => item.id === id);
+  return record3 ? currentState(record3, file) : void 0;
 }
 function consumeApproval(id, scopeDigest) {
   return mutate((records, file) => {
-    const index = records.findIndex((record3) => record3.id === id);
+    const index = records.findIndex((record4) => record4.id === id);
     if (index < 0) return void 0;
-    const record2 = currentState(records[index], file);
-    if (record2.status !== "approved" || !record2.expiresAt || record2.scopeDigest !== scopeDigest)
+    const record3 = currentState(records[index], file);
+    if (record3.status !== "approved" || !record3.expiresAt || record3.scopeDigest !== scopeDigest)
       return void 0;
     const claim = claimPath(file, id);
     fs.mkdirSync(path3.dirname(claim), { recursive: true, mode: 448 });
@@ -93431,7 +93465,7 @@ function consumeApproval(id, scopeDigest) {
       if (error2.code === "EEXIST") return void 0;
       throw error2;
     }
-    records[index] = { ...record2, status: "consumed", consumedAt };
+    records[index] = { ...record3, status: "consumed", consumedAt };
     return records[index];
   });
 }
@@ -93990,10 +94024,10 @@ function isProjectEnrolled(identity) {
     const stat = fs8.statSync(source);
     if (!stat.isFile() || stat.size > 4096)
       throw new Error("Invalid enrollment record");
-    const record2 = JSON.parse(fs8.readFileSync(source, "utf8"));
-    if (record2.version !== 1 || typeof record2.project !== "string" || !/^[a-f0-9]{64}$/.test(record2.digest))
+    const record3 = JSON.parse(fs8.readFileSync(source, "utf8"));
+    if (record3.version !== 1 || typeof record3.project !== "string" || !/^[a-f0-9]{64}$/.test(record3.digest))
       throw new Error("Invalid enrollment record");
-    return record2.project === identity.project && record2.digest === identity.digest;
+    return record3.project === identity.project && record3.digest === identity.digest;
   } catch (error2) {
     if (error2.code === "ENOENT") return false;
     throw new PolicyConfigError(
@@ -94216,12 +94250,12 @@ function readLayer(source, required2) {
     );
   }
 }
-function recordSource(sources, kind3, source, text8) {
+function recordSource(sources, kind3, source, text9) {
   sources.push({
     kind: kind3,
     source,
-    present: text8 !== void 0,
-    ...text8 === void 0 ? {} : { sha256: crypto5.createHash("sha256").update(text8).digest("hex") }
+    present: text9 !== void 0,
+    ...text9 === void 0 ? {} : { sha256: crypto5.createHash("sha256").update(text9).digest("hex") }
   });
 }
 function applyOperatorCeiling(policy, operator) {
@@ -94265,11 +94299,11 @@ function loadEffectivePolicyState(workspaceDir) {
       path12.resolve(workspaceDir),
       ".pio-mcp-policy.json"
     );
-    const text8 = readLayer(source2, false);
-    recordSource(sources, "project-profile", source2, text8);
-    if (text8 !== void 0) {
+    const text9 = readLayer(source2, false);
+    recordSource(sources, "project-profile", source2, text9);
+    if (text9 !== void 0) {
       const document2 = PolicyProfileConfigSchema.safeParse(
-        parsePolicyDocument(text8, source2)
+        parsePolicyDocument(text9, source2)
       );
       if (!document2.success)
         throw new PolicyConfigError(
@@ -94300,10 +94334,10 @@ function loadEffectivePolicyState(workspaceDir) {
       ".pio-mcp-workspace",
       "policy.yaml"
     );
-    const text8 = readLayer(source2, false);
-    recordSource(sources, "project-override", source2, text8);
-    if (text8 !== void 0) {
-      const document2 = parsePolicyDocument(text8, source2);
+    const text9 = readLayer(source2, false);
+    recordSource(sources, "project-override", source2, text9);
+    if (text9 !== void 0) {
+      const document2 = parsePolicyDocument(text9, source2);
       if ("profile" in document2)
         throw new PolicyConfigError(
           source2,
@@ -95982,8 +96016,8 @@ function unsigned(value2, maximum, label) {
     invalid("Invalid " + label + ".");
   return value2;
 }
-function parsePartitionNumber(text8) {
-  const match = /^(0x[0-9a-f]+|[0-9]+)([km])?$/i.exec(text8.trim());
+function parsePartitionNumber(text9) {
+  const match = /^(0x[0-9a-f]+|[0-9]+)([km])?$/i.exec(text9.trim());
   if (!match) invalid("Invalid partition number.");
   return unsigned(
     Number(match[1]) * (match[2]?.toLowerCase() === "k" ? 1024 : match[2] ? 1048576 : 1),
@@ -96036,13 +96070,13 @@ function validateEspPartitions(parts, layout) {
       invalid("Partition exceeds flash size.");
   }
 }
-function parseEspPartitionCsv(text8, layout) {
+function parseEspPartitionCsv(text9, layout) {
   validateLocation(layout);
-  if (Buffer.byteLength(text8, "utf8") > 65536)
+  if (Buffer.byteLength(text9, "utf8") > 65536)
     invalid("Partition CSV exceeds 64 KiB.");
   const parts = [];
   let end = layout.tableOffset + SECTOR;
-  for (const line of text8.replace(/^\uFEFF/, "").split(/\r?\n/)) {
+  for (const line of text9.replace(/^\uFEFF/, "").split(/\r?\n/)) {
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
     const fields = line.split(",").map((field3) => field3.trim());
     if (fields.length < 5 || fields.length > 6)
@@ -96085,24 +96119,24 @@ function parseEspPartitionBinary(input, layout) {
   const parts = [];
   let checksumSeen = false;
   for (let index = 0; index < Math.min(data.length, 3072); index += 32) {
-    const record2 = data.subarray(index, index + 32);
-    if (record2.every((byte) => byte === 255)) {
+    const record3 = data.subarray(index, index + 32);
+    if (record3.every((byte) => byte === 255)) {
       if (!data.subarray(index, Math.min(data.length, 3072)).every((byte) => byte === 255))
         invalid("Unexpected data after partition terminator.");
       validateEspPartitions(parts, layout);
       return parts;
     }
-    if (record2.readUInt16LE(0) === 60395) {
-      if (checksumSeen || !record2.subarray(2, 16).every((byte) => byte === 255))
+    if (record3.readUInt16LE(0) === 60395) {
+      if (checksumSeen || !record3.subarray(2, 16).every((byte) => byte === 255))
         invalid("Invalid partition checksum record.");
-      if (!createHash2("md5").update(data.subarray(0, index)).digest().equals(record2.subarray(16)))
+      if (!createHash2("md5").update(data.subarray(0, index)).digest().equals(record3.subarray(16)))
         invalid("Partition checksum mismatch.");
       checksumSeen = true;
       continue;
     }
-    if (checksumSeen || record2.readUInt16LE(0) !== 20650)
+    if (checksumSeen || record3.readUInt16LE(0) !== 20650)
       invalid("Invalid partition record magic or record order.");
-    const label = record2.subarray(12, 28);
+    const label = record3.subarray(12, 28);
     const zero = label.indexOf(0);
     let name2;
     try {
@@ -96114,11 +96148,11 @@ function parseEspPartitionBinary(input, layout) {
     }
     parts.push({
       name: name2,
-      type: record2[2],
-      subtype: record2[3],
-      offset: record2.readUInt32LE(4),
-      size: record2.readUInt32LE(8),
-      flags: record2.readUInt32LE(28)
+      type: record3[2],
+      subtype: record3[3],
+      offset: record3.readUInt32LE(4),
+      size: record3.readUInt32LE(8),
+      flags: record3.readUInt32LE(28)
     });
   }
   return invalid("Partition binary is missing its terminator.");
@@ -96389,10 +96423,10 @@ async function inspectEspPartitionArtifacts(input) {
     input.tablePath,
     input.format === "csv" ? 65536 : 4096
   );
-  let text8;
+  let text9;
   if (input.format === "csv") {
     try {
-      text8 = new TextDecoder("utf-8", { fatal: true }).decode(table.content);
+      text9 = new TextDecoder("utf-8", { fatal: true }).decode(table.content);
     } catch {
       throw new PlatformIOError(
         "Partition CSV is not valid UTF-8.",
@@ -96400,7 +96434,7 @@ async function inspectEspPartitionArtifacts(input) {
       );
     }
   }
-  const parts = input.format === "csv" ? parseEspPartitionCsv(text8, { tableOffset: input.layout.tableOffset }) : parseEspPartitionBinary(table.content, {
+  const parts = input.format === "csv" ? parseEspPartitionCsv(text9, { tableOffset: input.layout.tableOffset }) : parseEspPartitionBinary(table.content, {
     tableOffset: input.layout.tableOffset
   });
   const firmware = input.firmwarePath ? await readPartitionArtifact(root, input.firmwarePath, 128 * 1024 * 1024) : null;
@@ -97292,28 +97326,28 @@ async function retainUploadCapture(recordPath2, context, archiveRoot) {
   };
   const root = await fs32.realpath(selected.captureDirectory);
   const project = await fs32.realpath(selected.projectDir);
-  const record2 = await readUploadCaptureRecord(recordPath2, root);
-  if (await fs32.realpath(record2.projectDir) !== project || record2.environment !== selected.environment || record2.compiler !== selected.compiler)
+  const record3 = await readUploadCaptureRecord(recordPath2, root);
+  if (await fs32.realpath(record3.projectDir) !== project || record3.environment !== selected.environment || record3.compiler !== selected.compiler)
     throw new PlatformIOError(
       "Upload capture differs from the selected build context.",
       "UPLOAD_CAPTURE_CONTEXT_CHANGED"
     );
-  if (record2.elf.size > 256 * 1024 * 1024 || record2.images.some((image) => image.size > 64 * 1024 * 1024) || record2.images.reduce((sum, image) => sum + image.size, 0) > 128 * 1024 * 1024)
+  if (record3.elf.size > 256 * 1024 * 1024 || record3.images.some((image) => image.size > 64 * 1024 * 1024) || record3.images.reduce((sum, image) => sum + image.size, 0) > 128 * 1024 * 1024)
     throw new PlatformIOError(
       "Upload capture exceeds artifact limits.",
       "UPLOAD_CAPTURE_INVALID"
     );
-  await validateEspUploadCommand(record2.argv, selected.uploader);
+  await validateEspUploadCommand(record3.argv, selected.uploader);
   return captureEspUploadManifest(
     {
       projectDir: project,
       environment: selected.environment,
       toolchain: selected.toolchain,
-      buildSettingsSha256: record2.buildSettingsSha256,
-      elf: { path: record2.elf.path, sha256: record2.elf.sha256 },
-      images: record2.images.map(({ size: _size2, ...image }) => image)
+      buildSettingsSha256: record3.buildSettingsSha256,
+      elf: { path: record3.elf.path, sha256: record3.elf.sha256 },
+      images: record3.images.map(({ size: _size2, ...image }) => image)
     },
-    record2.argv,
+    record3.argv,
     archiveRoot,
     selected.trustedImageRoots
   );
@@ -97421,8 +97455,8 @@ async function discoverUploadInstallation(systemInfo, projectDir, compilerPath) 
     if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
     const root = await fs34.realpath(path40.join(packages, entry.name));
     if (!within(packages, root) || root === packages) continue;
-    const record2 = await registeredPackage(root);
-    if (record2) registered.push(record2);
+    const record3 = await registeredPackage(root);
+    if (record3) registered.push(record3);
   }
   const toolchain = registered.find(
     (item) => item.name.startsWith("toolchain-") && within(item.root, compiler)
@@ -97451,11 +97485,11 @@ async function captureRegisteredUpload(input, systemInfo, archiveRoot) {
   return withTargetUploadCapture(
     { ...selected, projectDir },
     async (recordPath2, captureDirectory) => {
-      const record2 = await readUploadCaptureRecord(
+      const record3 = await readUploadCaptureRecord(
         recordPath2,
         captureDirectory
       );
-      if (await fs35.realpath(record2.projectDir) !== projectDir || record2.environment !== selected.environment)
+      if (await fs35.realpath(record3.projectDir) !== projectDir || record3.environment !== selected.environment)
         throw new PlatformIOError(
           "Capture differs from the selected project or environment.",
           "UPLOAD_CAPTURE_CONTEXT_CHANGED"
@@ -97463,16 +97497,16 @@ async function captureRegisteredUpload(input, systemInfo, archiveRoot) {
       const installation = await discoverUploadInstallation(
         systemInfo,
         projectDir,
-        record2.compiler
+        record3.compiler
       );
-      const commandIndex = record2.argv.findIndex(
+      const commandIndex = record3.argv.findIndex(
         (arg) => arg === "write_flash" || arg === "write-flash"
       );
       const chips2 = [];
       for (let index = 2; index < commandIndex; index++) {
-        const arg = record2.argv[index];
+        const arg = record3.argv[index];
         if (arg === "--chip" || arg === "-c")
-          chips2.push(record2.argv[index + 1] ?? "");
+          chips2.push(record3.argv[index + 1] ?? "");
         else if (arg.startsWith("--chip=") || arg.startsWith("-c="))
           chips2.push(arg.slice(arg.indexOf("=") + 1));
       }
@@ -97528,24 +97562,24 @@ function parseDebugServerCommand(input, projectDir) {
   if (input === null) return null;
   if (!input || typeof input !== "object" || Array.isArray(input))
     return invalid4();
-  const record2 = input;
+  const record3 = input;
   const boundedString = (value2, maximum) => typeof value2 === "string" && Buffer.byteLength(value2) <= maximum && !/[\x00-\x1f\x7f]/.test(value2);
-  const cwd = record2.cwd == null ? projectDir : record2.cwd;
+  const cwd = record3.cwd == null ? projectDir : record3.cwd;
   if (!boundedString(cwd, 32768) || !path41.isAbsolute(cwd)) return invalid4();
-  if (!boundedString(record2.executable, 32768) || !record2.executable.trim() || /\.(?:cmd|bat|ps1|sh)$/i.test(record2.executable))
+  if (!boundedString(record3.executable, 32768) || !record3.executable.trim() || /\.(?:cmd|bat|ps1|sh)$/i.test(record3.executable))
     return invalid4();
-  if (!Array.isArray(record2.arguments) || record2.arguments.length > 256 || record2.arguments.some((argument2) => !boundedString(argument2, 32768)))
+  if (!Array.isArray(record3.arguments) || record3.arguments.length > 256 || record3.arguments.some((argument2) => !boundedString(argument2, 32768)))
     return invalid4();
-  const arguments_ = record2.arguments;
+  const arguments_ = record3.arguments;
   if (arguments_.reduce(
     (size, argument2) => size + Buffer.byteLength(argument2),
     0
   ) > 128 * 1024)
     return invalid4();
-  if (!path41.isAbsolute(record2.executable) && record2.cwd == null)
+  if (!path41.isAbsolute(record3.executable) && record3.cwd == null)
     return invalid4();
   return {
-    executable: path41.resolve(cwd, record2.executable),
+    executable: path41.resolve(cwd, record3.executable),
     cwd: path41.normalize(cwd),
     arguments: [...arguments_]
   };
@@ -98650,19 +98684,19 @@ async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, pr
       65536
     );
     const recordBytes = await readPartitionArtifact(root, ".piopm", 65536);
-    let manifest, record2;
+    let manifest, record3;
     try {
       manifest = JSON.parse(manifestBytes.content.toString("utf8"));
-      record2 = JSON.parse(recordBytes.content.toString("utf8"));
+      record3 = JSON.parse(recordBytes.content.toString("utf8"));
     } catch {
       throw new PlatformIOError(
         "Invalid framework package registration.",
         "PARTITION_FRAMEWORK_UNTRUSTED"
       );
     }
-    if (!manifest || !record2 || typeof manifest.name !== "string" || !["framework-arduinoespressif32", "framework-espidf"].includes(
+    if (!manifest || !record3 || typeof manifest.name !== "string" || !["framework-arduinoespressif32", "framework-espidf"].includes(
       manifest.name
-    ) || typeof manifest.version !== "string" || !manifest.version || record2.name !== manifest.name || record2.version !== manifest.version || record2.type !== "tool")
+    ) || typeof manifest.version !== "string" || !manifest.version || record3.name !== manifest.name || record3.version !== manifest.version || record3.type !== "tool")
       throw new PlatformIOError(
         "Framework registration does not match its manifest.",
         "PARTITION_FRAMEWORK_UNTRUSTED"
@@ -98697,13 +98731,13 @@ async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, pr
 // src/core/project-inspection.ts
 init_errors2();
 init_redact();
-var text = external_exports.string().max(65536);
+var text2 = external_exports.string().max(65536);
 var value = external_exports.union([
-  text,
+  text2,
   external_exports.number().finite(),
   external_exports.boolean(),
   external_exports.null(),
-  external_exports.array(text).max(1e4)
+  external_exports.array(text2).max(1e4)
 ]);
 var configSchema = external_exports.array(
   external_exports.tuple([
@@ -98713,28 +98747,28 @@ var configSchema = external_exports.array(
 ).max(512);
 var targetSchema = external_exports.object({
   name: external_exports.string().min(1).max(256),
-  title: text.nullish(),
-  description: text.nullish(),
-  group: text.nullish()
+  title: text2.nullish(),
+  description: text2.nullish(),
+  group: text2.nullish()
 });
 var metadataSchema = external_exports.record(
   external_exports.object({
     env_name: external_exports.string().optional(),
-    build_type: text.nullish(),
-    defines: external_exports.array(text).max(1e4).optional(),
+    build_type: text2.nullish(),
+    defines: external_exports.array(text2).max(1e4).optional(),
     includes: external_exports.object({
-      build: external_exports.array(text).max(1e4).optional(),
-      toolchain: external_exports.array(text).max(1e4).optional()
+      build: external_exports.array(text2).max(1e4).optional(),
+      toolchain: external_exports.array(text2).max(1e4).optional()
     }).passthrough().nullish(),
-    libsource_dirs: external_exports.array(text).max(4096).optional(),
-    cc_path: text.nullish(),
-    cxx_path: text.nullish(),
-    gdb_path: text.nullish(),
-    prog_path: text.nullish(),
-    svd_path: text.nullish(),
-    compiler_type: text.nullish(),
-    cc_flags: external_exports.array(text).max(1e4).optional(),
-    cxx_flags: external_exports.array(text).max(1e4).optional(),
+    libsource_dirs: external_exports.array(text2).max(4096).optional(),
+    cc_path: text2.nullish(),
+    cxx_path: text2.nullish(),
+    gdb_path: text2.nullish(),
+    prog_path: text2.nullish(),
+    svd_path: text2.nullish(),
+    compiler_type: text2.nullish(),
+    cc_flags: external_exports.array(text2).max(1e4).optional(),
+    cxx_flags: external_exports.array(text2).max(1e4).optional(),
     targets: external_exports.array(targetSchema).max(2048).optional(),
     extra: external_exports.unknown().optional()
   }).passthrough()
@@ -99262,11 +99296,11 @@ async function discoverInstalledDebugRoots(debuggerPath, systemInfo, projectDir,
     }
   };
   try {
-    const [manifest, record2] = await Promise.all([
+    const [manifest, record3] = await Promise.all([
       readRecord(path48.join(root, "package.json")),
       readRecord(path48.join(root, ".piopm"))
     ]);
-    if (typeof manifest.name !== "string" || !trust.package.test(manifest.name) || typeof manifest.version !== "string" || !manifest.version || record2.type !== "tool" || record2.name !== manifest.name || record2.version !== manifest.version)
+    if (typeof manifest.name !== "string" || !trust.package.test(manifest.name) || typeof manifest.version !== "string" || !manifest.version || record3.type !== "tool" || record3.name !== manifest.name || record3.version !== manifest.version)
       return invalid4(
         "Debugger package registration does not match its manifest."
       );
@@ -99478,11 +99512,11 @@ async function discoverAnalysisToolchainRoots(compilerPath, systemInfo, projectD
   if (!inside(packages, root) || !inside(root, compiler))
     return fail("Toolchain package escapes the host installation.");
   try {
-    const [manifest, record2] = await Promise.all([
+    const [manifest, record3] = await Promise.all([
       packageDocument(path49.join(root, "package.json")),
       packageDocument(path49.join(root, ".piopm"))
     ]);
-    if (typeof manifest.name !== "string" || !manifest.name.startsWith("toolchain-") || record2.type !== "tool" || record2.name !== manifest.name || typeof manifest.version !== "string" || record2.version !== manifest.version)
+    if (typeof manifest.name !== "string" || !manifest.name.startsWith("toolchain-") || record3.type !== "tool" || record3.name !== manifest.name || typeof manifest.version !== "string" || record3.version !== manifest.version)
       throw new Error("Unregistered compiler package");
   } catch {
     return fail(
@@ -99537,13 +99571,13 @@ init_errors2();
 init_errors2();
 var HEX = "0x[0-9a-fA-F]{6,16}";
 var MAX_ADDRESSES = 4096;
-function linesOf(text8) {
-  if (Buffer.byteLength(text8) > 1024 * 1024)
+function linesOf(text9) {
+  if (Buffer.byteLength(text9) > 1024 * 1024)
     throw new PlatformIOError(
       "Analysis text exceeds 1 MiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
-  const lines2 = text8.split(/\r?\n/);
+  const lines2 = text9.split(/\r?\n/);
   if (lines2.some((line) => line.length > 16384))
     throw new PlatformIOError(
       "Analysis line exceeds 16 KiB.",
@@ -99559,8 +99593,8 @@ function normalizeAddress(address) {
     );
   return `0x${BigInt(address).toString(16).padStart(8, "0")}`;
 }
-function extractCrash(text8, includeAllHex = false) {
-  const lines2 = linesOf(text8);
+function extractCrash(text9, includeAllHex = false) {
+  const lines2 = linesOf(text9);
   const evidence = {
     addresses: [],
     causes: [],
@@ -99568,7 +99602,7 @@ function extractCrash(text8, includeAllHex = false) {
     backtraceCorrupted: false
   };
   const seen = /* @__PURE__ */ new Set();
-  const riscvDump = /\b(?:MEPC|MTVAL|MCAUSE)\s*[:=]/i.test(text8);
+  const riscvDump = /\b(?:MEPC|MTVAL|MCAUSE)\s*[:=]/i.test(text9);
   let inBacktrace = false;
   let backtraceFrame = 0;
   const add = (raw, role, register = null, frame = null) => {
@@ -99637,8 +99671,8 @@ function extractCrash(text8, includeAllHex = false) {
 function parseAddr2line(output) {
   const frames = /* @__PURE__ */ new Map();
   let current;
-  const location = (text8) => {
-    const match = text8.match(
+  const location = (text9) => {
+    const match = text9.match(
       /^(.*?)\s+at\s+(.+):(\d+|\?)(?:\s+\(discriminator \d+\))?\s*$/
     );
     if (!match) return void 0;
@@ -99739,17 +99773,17 @@ function parseSizeTotals(output) {
   for (const line of lines(output)) {
     const match = line.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+/);
     if (!match) continue;
-    const [text8, data, bss, total] = match.slice(1).map(BigInt);
-    if (text8 + data + bss !== total)
+    const [text9, data, bss, total] = match.slice(1).map(BigInt);
+    if (text9 + data + bss !== total)
       throw new PlatformIOError(
         "Inconsistent GNU size totals.",
         "ANALYSIS_SIZE_INVALID"
       );
     rows.push({
-      text: exact(text8),
+      text: exact(text9),
       data: exact(data),
       bss: exact(bss),
-      flashEstimate: exact(text8 + data),
+      flashEstimate: exact(text9 + data),
       ramEstimate: exact(data + bss)
     });
   }
@@ -99928,9 +99962,9 @@ function executionOptions(context, deadline) {
     );
   return { cwd: context.projectDir, signal: context.signal, timeoutMs };
 }
-async function decodeFirmwareCrash(context, text8, includeAllHex = false) {
+async function decodeFirmwareCrash(context, text9, includeAllHex = false) {
   context.validatePolicy?.();
-  const crash = extractCrash(text8, includeAllHex);
+  const crash = extractCrash(text9, includeAllHex);
   if (!crash.addresses.length)
     return { ok: false, error: "no_addresses", ...crash, frames: [] };
   const deadline = Date.now() + 3e4;
@@ -100005,11 +100039,11 @@ async function filterSizeSymbols(symbols, pattern, deadline) {
     bytes = 0;
   };
   for (let index = 0; index < symbols.length; index++) {
-    for (const text8 of [symbols[index].name, symbols[index].file]) {
-      if (!text8) continue;
-      const length = Buffer.byteLength(text8);
+    for (const text9 of [symbols[index].name, symbols[index].file]) {
+      if (!text9) continue;
+      const length = Buffer.byteLength(text9);
       if (texts.length >= 4096 || bytes + length > 1024 * 1024) await flush();
-      texts.push(text8);
+      texts.push(text9);
       owners.push(index);
       bytes += length;
     }
@@ -100423,13 +100457,13 @@ async function executeDecodeCompatibility(client, input, defaults, caller, onAut
     archived_elf_sha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
     expected_elf_sha256: external_exports.string().regex(/^[a-fA-F0-9]{64}$/).optional()
   }).strict().parse(input);
-  const decode = async (text8, collection) => {
-    if (!text8.trim())
+  const decode = async (text9, collection) => {
+    if (!text9.trim())
       throw new PlatformIOError(
         "Pass crash text or an owned monitor session containing output.",
         "ANALYSIS_ARGUMENT_INVALID"
       );
-    const crash = extractCrash(text8, params.include_all_hex);
+    const crash = extractCrash(text9, params.include_all_hex);
     if (!crash.addresses.length)
       return {
         ok: false,
@@ -100464,7 +100498,7 @@ async function executeDecodeCompatibility(client, input, defaults, caller, onAut
       {
         projectDir,
         environment,
-        text: text8,
+        text: text9,
         includeAllHex: params.include_all_hex,
         approvalId: params.approval_id,
         expectedElfSha256: params.expected_elf_sha256,
@@ -101168,8 +101202,8 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
   };
   let heapSummaryUntil = -1, totalsPending = false, taskTable = false;
   lines2.forEach((raw, line) => {
-    const text8 = raw.replace(/\x1b\[[0-9;]*m/g, "");
-    const trimmed = text8.trim();
+    const text9 = raw.replace(/\x1b\[[0-9;]*m/g, "");
+    const trimmed = text9.trim();
     if (/heap summary for capabilities/i.test(trimmed)) {
       heapSummaryUntil = line + 128;
       totalsPending = false;
@@ -101260,7 +101294,7 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
     for (const [metric, label, trailer] of heapPatterns) {
       if (trailer && heapMatches.length === 0) continue;
       const regex = new RegExp(label + heapNumber, "gi");
-      for (const match of text8.matchAll(regex)) {
+      for (const match of text9.matchAll(regex)) {
         const end = match.index + match[0].length;
         if (claimed.some(([a, b]) => match.index < b && end > a)) continue;
         claimed.push([match.index, end]);
@@ -101288,7 +101322,7 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
       String.raw`^\s*(?<task>[\w.-]{1,128})\s*[:=]\s*` + stackNumber + String.raw`\s*(?:free|left|remaining)\b`
     ];
     for (const pattern of stackPatterns) {
-      for (const match of text8.matchAll(new RegExp(pattern, "gi"))) {
+      for (const match of text9.matchAll(new RegExp(pattern, "gi"))) {
         const end = match.index + match[0].length;
         if (claimed.some(([a, b]) => match.index < b && end > a)) continue;
         const groups = match.groups;
@@ -101313,7 +101347,7 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
         String.raw`(?<name>(?:[A-Za-z_][\w .-]{0,40}?)?(?:heap|stack|psram)[\w .-]{0,30}?)\s*[:=]\s*` + stackNumber,
         "gi"
       );
-      for (const match of text8.matchAll(generic)) {
+      for (const match of text9.matchAll(generic)) {
         const end = match.index + match[0].length;
         if (claimed.some(([a, b]) => match.index < b && end > a)) continue;
         const groups = match.groups;
@@ -101607,13 +101641,13 @@ async function captureSessionMemory(manager, owner, sessionId2, input = {}, sign
     droppedLines += last.droppedLines;
     let accepted = 0;
     for (let index = 0; index < last.lines.length; index++) {
-      const text8 = last.lines[index];
-      const size = Buffer.byteLength(text8);
+      const text9 = last.lines[index];
+      const size = Buffer.byteLength(text9);
       if (bytes + size > 1024 * 1024) {
         limitReached = true;
         break;
       }
-      lines2.push(text8);
+      lines2.push(text9);
       accepted++;
       bytes += size;
       truncatedBytes += last.lineTruncatedBytes[index] ?? 0;
@@ -101708,12 +101742,12 @@ import { performance as performance8 } from "node:perf_hooks";
 // src/core/devices/serial-discovery-binding.ts
 init_errors2();
 import { createHash as createHash9 } from "node:crypto";
-function descriptor(record2) {
+function descriptor(record3) {
   for (const field3 of [
-    record2.path,
-    record2.vendorId,
-    record2.productId,
-    record2.serialNumber
+    record3.path,
+    record3.vendorId,
+    record3.productId,
+    record3.serialNumber
   ]) {
     if (field3 !== void 0 && (typeof field3 !== "string" || field3.length > 512 || /[\x00-\x1f\x7f]/.test(field3)))
       throw new PlatformIOError(
@@ -101721,25 +101755,25 @@ function descriptor(record2) {
         "SERIAL_DISCOVERY_INVALID"
       );
   }
-  if (!record2.path)
+  if (!record3.path)
     throw new PlatformIOError(
       "Missing serial discovery path.",
       "SERIAL_DISCOVERY_INVALID"
     );
-  for (const id of [record2.vendorId, record2.productId]) {
+  for (const id of [record3.vendorId, record3.productId]) {
     if (id !== void 0 && !/^[0-9a-f]{4}$/i.test(id))
       throw new PlatformIOError(
         "Invalid USB identifier.",
         "SERIAL_DISCOVERY_INVALID"
       );
   }
-  if (!record2.vendorId || !record2.productId || !record2.serialNumber)
+  if (!record3.vendorId || !record3.productId || !record3.serialNumber)
     return void 0;
   return createHash9("sha256").update(
     JSON.stringify([
-      record2.vendorId.toLowerCase(),
-      record2.productId.toLowerCase(),
-      record2.serialNumber
+      record3.vendorId.toLowerCase(),
+      record3.productId.toLowerCase(),
+      record3.serialNumber
     ])
   ).digest("hex");
 }
@@ -101751,24 +101785,24 @@ function bindSerialDiscovery(endpoint, records, resolve, options = {}) {
         "Invalid serial discovery snapshot.",
         "SERIAL_DISCOVERY_INVALID"
       );
-    const normalized = snapshot.map((record2) => {
-      if (!record2 || typeof record2 !== "object")
+    const normalized = snapshot.map((record3) => {
+      if (!record3 || typeof record3 !== "object")
         throw new PlatformIOError(
           "Invalid serial discovery entry.",
           "SERIAL_DISCOVERY_INVALID"
         );
-      const usb2 = descriptor(record2);
-      return { endpoint: resolve(record2.path).resource.identity, usb: usb2 };
+      const usb2 = descriptor(record3);
+      return { endpoint: resolve(record3.path).resource.identity, usb: usb2 };
     });
     const matches = normalized.filter(
-      (record2) => record2.endpoint === endpoint.resource.identity
+      (record3) => record3.endpoint === endpoint.resource.identity
     );
     if (!matches.length)
       throw new PlatformIOError(
         "Selected serial endpoint is absent from discovery.",
         "SERIAL_DEVICE_UNAVAILABLE"
       );
-    const identities = new Set(matches.map((record2) => record2.usb));
+    const identities = new Set(matches.map((record3) => record3.usb));
     if (identities.size !== 1)
       throw new PlatformIOError(
         "Conflicting discovery metadata for the selected endpoint.",
@@ -101776,7 +101810,7 @@ function bindSerialDiscovery(endpoint, records, resolve, options = {}) {
       );
     const usb = matches[0].usb;
     if (usb && !allowShared && normalized.some(
-      (record2) => record2.usb === usb && record2.endpoint !== endpoint.resource.identity
+      (record3) => record3.usb === usb && record3.endpoint !== endpoint.resource.identity
     ))
       throw new PlatformIOError(
         "USB identity is shared by multiple endpoints.",
@@ -101784,7 +101818,7 @@ function bindSerialDiscovery(endpoint, records, resolve, options = {}) {
       );
     const interfaces = usb ? [
       ...new Set(
-        normalized.filter((record2) => record2.usb === usb).map((record2) => record2.endpoint)
+        normalized.filter((record3) => record3.usb === usb).map((record3) => record3.endpoint)
       )
     ].sort() : [];
     return { usb, topology: JSON.stringify(interfaces) };
@@ -102130,8 +102164,8 @@ var SerialSessionBuffer = class {
     }
   }
   /** Frame CRLF or bare CR/LF once, retaining only a whole-code-point prefix of long lines. */
-  acceptText(text8) {
-    for (const character of text8) {
+  acceptText(text9) {
+    for (const character of text9) {
       if (character === "\n" && this.previousCr) {
         this.previousCr = false;
         continue;
@@ -102161,12 +102195,12 @@ var SerialSessionBuffer = class {
         "Serial line cursor exhausted.",
         "SERIAL_BUFFER_COUNTER_LIMIT"
       );
-    const text8 = this.filterText(this.partial);
-    const bytes = Buffer.byteLength(text8);
+    const text9 = this.filterText(this.partial);
+    const bytes = Buffer.byteLength(text9);
     while (this.count && (this.count === this.capacity || this.storedBytes + bytes > this.byteCapacity))
       this.evict();
     this.ring[(this.head + this.count) % this.capacity] = {
-      text: text8,
+      text: text9,
       bytes,
       truncatedBytes: this.partialLost,
       cursor: this.nextCursor++
@@ -102179,9 +102213,9 @@ var SerialSessionBuffer = class {
     this.partialLost = 0;
   }
   /** Apply filtering before response/storage budgeting; never split a UTF-8 code point. */
-  filterText(text8) {
-    if (!this.redactor) return text8;
-    const filtered = this.redactor.preview(text8);
+  filterText(text9) {
+    if (!this.redactor) return text9;
+    const filtered = this.redactor.preview(text9);
     if (Buffer.byteLength(filtered) <= this.lineCapacity) return filtered;
     this.redactionClipped = true;
     let prefix = "", bytes = 0;
@@ -102670,7 +102704,7 @@ var NativeSerialDiscovery = class {
             "SERIAL_DISCOVERY_INVALID"
           );
         return Object.freeze(
-          parsed.data.map((record2) => Object.freeze(record2))
+          parsed.data.map((record3) => Object.freeze(record3))
         );
       } catch (error2) {
         if (error2 instanceof PlatformIOError) throw error2;
@@ -106422,7 +106456,7 @@ import fs52 from "node:fs/promises";
 init_serial_endpoint();
 function selectPpk2Port(records, resolve = resolveSerialEndpoint) {
   const candidates = records.filter(
-    (record2) => record2.vendorId?.toLowerCase() === "1915" && record2.productId?.toLowerCase() === "c00a"
+    (record3) => record3.vendorId?.toLowerCase() === "1915" && record3.productId?.toLowerCase() === "c00a"
   );
   if (candidates.length !== 1)
     throw new PlatformIOError(
@@ -106908,35 +106942,35 @@ var Ppk2Protocol = class {
       }
       const parsed = eventSchema.safeParse(value2);
       if (!parsed.success || this.finished || this.unavailable) this.invalid();
-      const record2 = parsed.data;
-      switch (record2.event) {
+      const record3 = parsed.data;
+      switch (record3.event) {
         case "started":
-          if (this.started || record2.mode !== this.request.mode) this.invalid();
+          if (this.started || record3.mode !== this.request.mode) this.invalid();
           this.started = true;
           break;
         case "samples":
-          if (!this.started || record2.currentMa.some(
+          if (!this.started || record3.currentMa.some(
             (value3) => Math.abs(value3) > this.request.currentLimitMa + 5e-7
           ))
             this.invalid();
-          this.samples.push(...record2.currentMa);
+          this.samples.push(...record3.currentMa);
           if (this.samples.length * 1e3 > Math.ceil(this.request.seconds * 1e5) + 1e5)
             this.invalid();
           break;
         case "unavailable":
           if (this.started || this.samples.length) this.invalid();
-          this.unavailable = record2.code;
+          this.unavailable = record3.code;
           break;
         case "finished":
-          if (record2.emittedWindows !== this.samples.length || record2.sampleCount !== (record2.emittedWindows + record2.unreportedWindows) * 1e3 + record2.partialWindowSamples || record2.sampleCount > Math.ceil(this.request.seconds * 1e5) + 1e5)
+          if (record3.emittedWindows !== this.samples.length || record3.sampleCount !== (record3.emittedWindows + record3.unreportedWindows) * 1e3 + record3.partialWindowSamples || record3.sampleCount > Math.ceil(this.request.seconds * 1e5) + 1e5)
             this.invalid();
-          if (!this.started && (record2.sampleCount || record2.outcome === "complete") || !record2.deviceTouched && (this.started || record2.powerMayBeOn))
+          if (!this.started && (record3.sampleCount || record3.outcome === "complete") || !record3.deviceTouched && (this.started || record3.powerMayBeOn))
             this.invalid();
-          if (record2.outcome === "complete" && record2.unreportedWindows)
+          if (record3.outcome === "complete" && record3.unreportedWindows)
             this.invalid();
-          if (this.request.mode === "source" && record2.outputOffWritten && record2.powerMayBeOn)
+          if (this.request.mode === "source" && record3.outputOffWritten && record3.powerMayBeOn)
             this.invalid();
-          this.finished = record2;
+          this.finished = record3;
           break;
       }
     }
@@ -108789,7 +108823,7 @@ function selectDebugProbe(records, selector = {}) {
       return invalid4();
     return value2.replace(/^0x/i, "").toLowerCase();
   };
-  const text8 = (value2) => {
+  const text9 = (value2) => {
     if (typeof value2 !== "string" || !value2.trim() || Buffer.byteLength(value2) > 256 || /[\x00-\x1f\x7f]/.test(value2))
       return invalid4();
     return value2;
@@ -108797,14 +108831,14 @@ function selectDebugProbe(records, selector = {}) {
   if (!Array.isArray(records) || records.length > 1024) return invalid4();
   const vendor = selector.vendorId === void 0 ? void 0 : hex2(selector.vendorId);
   const product = selector.productId === void 0 ? void 0 : hex2(selector.productId);
-  const serial = selector.serialNumber === void 0 ? void 0 : text8(selector.serialNumber);
+  const serial = selector.serialNumber === void 0 ? void 0 : text9(selector.serialNumber);
   const candidates = /* @__PURE__ */ new Map();
-  for (const record2 of records) {
+  for (const record3 of records) {
     const probe2 = {
-      vendorId: hex2(record2.vendorId),
-      productId: hex2(record2.productId),
-      serialNumber: text8(record2.serialNumber),
-      location: text8(record2.location)
+      vendorId: hex2(record3.vendorId),
+      productId: hex2(record3.productId),
+      serialNumber: text9(record3.serialNumber),
+      location: text9(record3.location)
     };
     if (vendor && probe2.vendorId !== vendor || product && probe2.productId !== product || serial && probe2.serialNumber !== serial)
       continue;
@@ -108917,9 +108951,9 @@ function bindOpenOcdProbe(command, selected, port) {
   for (let index = 0; index < normalized.arguments.length; index++) {
     const option = normalized.arguments[index];
     if (option.startsWith("-c") || option === "--command" || option.startsWith("--command=")) {
-      const text8 = option.startsWith("--command=") ? option.slice(10) : option.startsWith("-c") && option.length > 2 ? option.slice(2) : normalized.arguments[++index];
-      if (text8 === void 0 || /(?:^|[;\n])\s*(?:init|reset|halt|resume|program|flash|adapter\s+serial|ftdi_serial|hla_serial|cmsis_dap_serial|jlink\s+serial|st-link\s+serial)(?:\s|$)/i.test(
-        text8
+      const text9 = option.startsWith("--command=") ? option.slice(10) : option.startsWith("-c") && option.length > 2 ? option.slice(2) : normalized.arguments[++index];
+      if (text9 === void 0 || /(?:^|[;\n])\s*(?:init|reset|halt|resume|program|flash|adapter\s+serial|ftdi_serial|hla_serial|cmsis_dap_serial|jlink\s+serial|st-link\s+serial)(?:\s|$)/i.test(
+        text9
       ))
         throw new PlatformIOError(
           "Backend arguments initialize hardware early or contain a competing probe selector.",
@@ -109429,8 +109463,8 @@ function prepareDebugCommand(input) {
     invalid4();
   const command = input.trim();
   const make = (miCommand, effect, waitForStop = false) => Object.freeze({ miCommand, effect, waitForStop });
-  const consoleCommand = (text8, effect, waitForStop = false) => make(
-    "-interpreter-exec console " + JSON.stringify(text8),
+  const consoleCommand = (text9, effect, waitForStop = false) => make(
+    "-interpreter-exec console " + JSON.stringify(text9),
     effect,
     waitForStop
   );
@@ -109794,9 +109828,9 @@ function parseGdbMiRecord(line) {
       if (character !== "\\") {
         if (character.charCodeAt(0) < 32) return invalid4();
         const point = line.codePointAt(at - 1);
-        const text8 = String.fromCodePoint(point);
-        at += text8.length - 1;
-        bytes.push(...Buffer.from(text8));
+        const text9 = String.fromCodePoint(point);
+        at += text9.length - 1;
+        bytes.push(...Buffer.from(text9));
         continue;
       }
       const escape2 = line[at++];
@@ -109891,9 +109925,9 @@ function parseGdbMiRecord(line) {
   };
   if ("~@&".includes(line[0] ?? "") && line.length) {
     const channel = line[at++] === "~" ? "console" : line[0] === "@" ? "target" : "log";
-    const text8 = string3();
+    const text9 = string3();
     if (at !== line.length) invalid4();
-    return { kind: "stream", channel, text: text8 };
+    return { kind: "stream", channel, text: text9 };
   }
   const prefix = /^([0-9]*)([\^*+=])/.exec(line);
   if (!prefix) return { kind: "other", text: line };
@@ -109943,13 +109977,13 @@ var GdbMiFramer = class {
     this.pending = "";
     return records;
   }
-  frame(text8) {
+  frame(text9) {
     const records = [];
     let start = 0;
-    for (let index = 0; index < text8.length; index++) {
-      const current = text8[index];
+    for (let index = 0; index < text9.length; index++) {
+      const current = text9[index];
       if (current !== "\r" && current !== "\n") continue;
-      const part = this.pending + text8.slice(start, index);
+      const part = this.pending + text9.slice(start, index);
       this.pending = "";
       if (!(this.afterCr && current === "\n" && part === "")) {
         if (records.length >= 4096)
@@ -109962,8 +109996,8 @@ var GdbMiFramer = class {
       this.afterCr = current === "\r";
       start = index + 1;
     }
-    this.pending += text8.slice(start);
-    if (start < text8.length) this.afterCr = false;
+    this.pending += text9.slice(start);
+    if (start < text9.length) this.afterCr = false;
     if (Buffer.byteLength(this.pending) > MAX_LINE_BYTES)
       throw new PlatformIOError(
         "Incomplete GDB/MI record exceeds limits.",
@@ -110057,7 +110091,7 @@ var GdbMiSession = class {
       throw new PlatformIOError("Debugger process has exited.", "GDB_CLOSED");
     try {
       const records = this.framer.push(chunk);
-      for (const record2 of records) this.observe(record2);
+      for (const record3 of records) this.observe(record3);
       return records;
     } catch (error2) {
       this.fail(error2);
@@ -110071,26 +110105,26 @@ var GdbMiSession = class {
     this.exitCode = exitCode;
     if (!this.failure) {
       try {
-        for (const record2 of this.framer.finish()) this.observe(record2);
+        for (const record3 of this.framer.finish()) this.observe(record3);
       } catch (error2) {
         this.fail(error2);
       }
     }
     if (this.pending) this.complete(this.pending, false);
   }
-  observe(record2) {
-    if (record2.kind === "exec") {
-      if (record2.class === "running") this.running = true;
-      if (record2.class === "stopped") {
+  observe(record3) {
+    if (record3.kind === "exec") {
+      if (record3.class === "running") this.running = true;
+      if (record3.class === "stopped") {
         this.running = false;
-        this.lastStop = record2;
-        if (this.pending) this.pending.stopped = record2;
+        this.lastStop = record3;
+        if (this.pending) this.pending.stopped = record3;
       }
     }
     const pending = this.pending;
     if (!pending) return;
-    if (record2.kind === "stream" || record2.kind === "other") {
-      const bytes = Buffer.from(record2.text);
+    if (record3.kind === "stream" || record3.kind === "other") {
+      const bytes = Buffer.from(record3.text);
       const remaining = MAX_OUTPUT_BYTES - pending.bytes;
       if (remaining > 0 && pending.console.length < 4096) {
         const selected = bytes.subarray(0, remaining);
@@ -110099,9 +110133,9 @@ var GdbMiSession = class {
       } else pending.truncated = true;
       if (bytes.length > remaining) pending.truncated = true;
     }
-    if (record2.kind === "result" && record2.token === pending.token) {
-      pending.result = record2;
-      if (record2.class === "running" && !pending.stopped) this.running = true;
+    if (record3.kind === "result" && record3.token === pending.token) {
+      pending.result = record3;
+      if (record3.class === "running" && !pending.stopped) this.running = true;
     }
     if (pending.result && (!pending.waitForStop || pending.stopped || pending.result.class === "error" || pending.result.class === "exit"))
       this.complete(pending, false);
@@ -110985,14 +111019,14 @@ function parseWindowsUsbProbes(output) {
   if (!Array.isArray(records) || records.length > 1024) return invalid4();
   const devices = [];
   let unidentified = 0;
-  for (const record2 of records) {
-    if (!record2 || typeof record2 !== "object" || typeof record2.instanceId !== "string" || record2.instanceId.length > 1024)
+  for (const record3 of records) {
+    if (!record3 || typeof record3 !== "object" || typeof record3.instanceId !== "string" || record3.instanceId.length > 1024)
       return invalid4();
     const match = /^USB\\VID_([0-9A-F]{4})&PID_([0-9A-F]{4})\\([^\\]+)$/i.exec(
-      record2.instanceId
+      record3.instanceId
     );
     if (!match) continue;
-    if (!Number.isInteger(record2.capabilities) || !(record2.capabilities & 16) || typeof record2.location !== "string" || !record2.location) {
+    if (!Number.isInteger(record3.capabilities) || !(record3.capabilities & 16) || typeof record3.location !== "string" || !record3.location) {
       unidentified++;
       continue;
     }
@@ -111002,7 +111036,7 @@ function parseWindowsUsbProbes(output) {
           vendorId: match[1],
           productId: match[2],
           serialNumber: match[3],
-          location: record2.location
+          location: record3.location
         }
       ]).probe
     );
@@ -111060,19 +111094,19 @@ function parseMacosUsbProbes(output) {
     for (const item of items) {
       if (++nodes > 4096 || !item || typeof item !== "object" || Array.isArray(item))
         return invalid4();
-      const record2 = item;
-      if (record2.vendor_id !== void 0 || record2.product_id !== void 0) {
+      const record3 = item;
+      if (record3.vendor_id !== void 0 || record3.product_id !== void 0) {
         const hex2 = (value2) => {
           if (typeof value2 !== "string" || value2.length > 512) return invalid4();
           const match = /^0x([a-f0-9]{4})(?:\s.*)?$/i.exec(value2);
           return match?.[1] ?? invalid4();
         };
-        const vendorId = hex2(record2.vendor_id), productId = hex2(record2.product_id);
-        if (typeof record2.serial_num !== "string" || !record2.serial_num || typeof record2.location_id !== "string" || !record2.location_id)
+        const vendorId = hex2(record3.vendor_id), productId = hex2(record3.product_id);
+        if (typeof record3.serial_num !== "string" || !record3.serial_num || typeof record3.location_id !== "string" || !record3.location_id)
           unidentified++;
         else {
           const location = /^0x([a-f0-9]{1,16})(?:\s.*)?$/i.exec(
-            record2.location_id
+            record3.location_id
           );
           if (!location) return invalid4();
           devices.push(
@@ -111080,16 +111114,16 @@ function parseMacosUsbProbes(output) {
               {
                 vendorId,
                 productId,
-                serialNumber: record2.serial_num,
+                serialNumber: record3.serial_num,
                 location: "usb:" + location[1].toLowerCase()
               }
             ]).probe
           );
         }
       }
-      if (record2._items !== void 0) {
-        if (!Array.isArray(record2._items)) return invalid4();
-        visit(record2._items, depth + 1);
+      if (record3._items !== void 0) {
+        if (!Array.isArray(record3._items)) return invalid4();
+        visit(record3._items, depth + 1);
       }
     }
   };
@@ -111187,30 +111221,30 @@ var DebugListCompatibilitySchema = external_exports.object({}).strict();
 function field2(fields, name2) {
   return fields.find((entry) => entry.name === name2)?.value;
 }
-function text2(fields, name2) {
+function text3(fields, name2) {
   const value2 = field2(fields, name2);
   return typeof value2 === "string" ? value2 : null;
 }
-function normalizeDebuggerStop(record2) {
-  if (!record2) return null;
-  const value2 = field2(record2.fields, "frame");
+function normalizeDebuggerStop(record3) {
+  if (!record3) return null;
+  const value2 = field2(record3.fields, "frame");
   const fields = value2 && typeof value2 !== "string" && value2.kind === "tuple" ? value2.fields : [];
   return {
-    reason: text2(record2.fields, "reason"),
-    signal_name: text2(record2.fields, "signal-name"),
-    signal_meaning: text2(record2.fields, "signal-meaning"),
-    thread_id: text2(record2.fields, "thread-id"),
+    reason: text3(record3.fields, "reason"),
+    signal_name: text3(record3.fields, "signal-name"),
+    signal_meaning: text3(record3.fields, "signal-meaning"),
+    thread_id: text3(record3.fields, "thread-id"),
     frame: fields.length ? {
-      function: text2(fields, "func"),
-      address: text2(fields, "addr"),
-      file: text2(fields, "fullname") ?? text2(fields, "file"),
-      line: text2(fields, "line")
+      function: text3(fields, "func"),
+      address: text3(fields, "addr"),
+      file: text3(fields, "fullname") ?? text3(fields, "file"),
+      line: text3(fields, "line")
     } : null
   };
 }
 function formatDebuggerCommandResult(result) {
   const resultClass = result.result?.class ?? null;
-  const error2 = resultClass === "error" ? text2(result.result.fields, "msg") ?? "GDB command failed." : null;
+  const error2 = resultClass === "error" ? text3(result.result.fields, "msg") ?? "GDB command failed." : null;
   return {
     ok: error2 === null && !result.timedOut && !(result.closed && resultClass !== "exit"),
     result_class: resultClass,
@@ -112196,15 +112230,15 @@ async function runEspotaProcess(request) {
       { cleanupPending: false }
     );
   const redact = (buffers) => {
-    let text8 = Buffer.concat(buffers).toString("utf8");
+    let text9 = Buffer.concat(buffers).toString("utf8");
     if (request.auth)
       for (const secret of /* @__PURE__ */ new Set([
         request.auth,
         JSON.stringify(request.auth).slice(1, -1),
         encodeURIComponent(request.auth)
       ]))
-        text8 = text8.split(secret).join("[REDACTED]");
-    return text8;
+        text9 = text9.split(secret).join("[REDACTED]");
+    return text9;
   };
   return {
     exitCode,
@@ -112808,10 +112842,10 @@ async function prune(root, now) {
         "record.json",
         4096
       );
-      const record2 = JSON.parse(metadata.content.toString("utf8"));
-      if (!Number.isSafeInteger(record2.createdAt) || !Number.isSafeInteger(record2.expiresAt) || record2.expiresAt - record2.createdAt !== LIFETIME_MS)
+      const record3 = JSON.parse(metadata.content.toString("utf8"));
+      if (!Number.isSafeInteger(record3.createdAt) || !Number.isSafeInteger(record3.expiresAt) || record3.expiresAt - record3.createdAt !== LIFETIME_MS)
         throw new Error("Invalid retention interval");
-      expires = record2.expiresAt;
+      expires = record3.expiresAt;
     } catch (error2) {
       if (error2.code !== "ENOENT")
         throw new PlatformIOError(
@@ -113113,13 +113147,13 @@ function offset(value2) {
     );
   return parsed;
 }
-function partitionOffsetFromSdkconfig(text8) {
-  if (Buffer.byteLength(text8, "utf8") > 2 * 1024 * 1024)
+function partitionOffsetFromSdkconfig(text9) {
+  if (Buffer.byteLength(text9, "utf8") > 2 * 1024 * 1024)
     throw new PlatformIOError(
       "sdkconfig exceeds the inspection limit.",
       "PARTITION_CONFIG_LIMIT"
     );
-  const matches = text8.split(/\r?\n/).filter((line) => /^\s*CONFIG_PARTITION_TABLE_OFFSET\s*=/.test(line));
+  const matches = text9.split(/\r?\n/).filter((line) => /^\s*CONFIG_PARTITION_TABLE_OFFSET\s*=/.test(line));
   if (!matches.length) return null;
   if (matches.length !== 1)
     throw new PlatformIOError(
@@ -113146,16 +113180,16 @@ function partitionOffsetFromFlashImages(images, tablePath, normalizePath) {
         "Invalid flash image entry.",
         "PARTITION_METADATA_INVALID"
       );
-    const record2 = image;
-    if (typeof record2.path !== "string" || record2.path.length > 32768)
+    const record3 = image;
+    if (typeof record3.path !== "string" || record3.path.length > 32768)
       throw new PlatformIOError(
         "Invalid flash image path.",
         "PARTITION_METADATA_INVALID"
       );
-    if (normalizePath(record2.path) === target)
+    if (normalizePath(record3.path) === target)
       matches.push({
         source: "metadata:extra.flash_images",
-        offset: offset(record2.offset)
+        offset: offset(record3.offset)
       });
   }
   if (matches.length > 1)
@@ -113416,9 +113450,9 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
         }
       }
       if (sdkconfig) {
-        let text8;
+        let text9;
         try {
-          text8 = new TextDecoder("utf-8", { fatal: true }).decode(
+          text9 = new TextDecoder("utf-8", { fatal: true }).decode(
             sdkconfig.content
           );
         } catch {
@@ -113427,7 +113461,7 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
             "PARTITION_CONFIG_INVALID"
           );
         }
-        const setting = partitionOffsetFromSdkconfig(text8);
+        const setting = partitionOffsetFromSdkconfig(text9);
         if (setting) evidence.push(setting);
       }
       const location = resolvePartitionOffset(evidence, project?.uploadOffset);
@@ -113689,8 +113723,8 @@ function inspectRawEspCoredump(input, encrypted = false) {
     }
   };
 }
-function decodeEspCoredumpBase64(text8) {
-  if (Buffer.byteLength(text8, "utf8") > Math.ceil(MAX_DUMP_BYTES / 3) * 4 + 65536)
+function decodeEspCoredumpBase64(text9) {
+  if (Buffer.byteLength(text9, "utf8") > Math.ceil(MAX_DUMP_BYTES / 3) * 4 + 65536)
     throw new PlatformIOError(
       "Encoded core dump exceeds the input limit.",
       "COREDUMP_INPUT_LIMIT"
@@ -113709,12 +113743,12 @@ function decodeEspCoredumpBase64(text8) {
       );
     return decoded2;
   };
-  const compact = text8.replace(/[ \t\r\n]/g, "");
+  const compact = text9.replace(/[ \t\r\n]/g, "");
   let decoded;
   if (/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) {
     decoded = decodeChunk(compact);
   } else {
-    const lines2 = text8.split(/\r?\n/).map((line) => line.replace(/[ \t]/g, "")).filter(Boolean);
+    const lines2 = text9.split(/\r?\n/).map((line) => line.replace(/[ \t]/g, "")).filter(Boolean);
     if (lines2.length > 65536)
       throw new PlatformIOError(
         "Too many encoded core-dump lines.",
@@ -113953,16 +113987,16 @@ async function readEspCoredumpArtifact(input) {
     );
   let bytes = artifact.content;
   if (input.format === "base64") {
-    let text8;
+    let text9;
     try {
-      text8 = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      text9 = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     } catch {
       throw new PlatformIOError(
         "Encoded core dump is not valid UTF-8.",
         "COREDUMP_BASE64_INVALID"
       );
     }
-    bytes = decodeEspCoredumpBase64(text8);
+    bytes = decodeEspCoredumpBase64(text9);
   }
   return {
     ...inspectEspCoredumpContent(bytes, input.encrypted),
@@ -115020,41 +115054,41 @@ var PendingUploadStore = class {
   }
   async resumePending(resumeId, scope5, approvalId2, caller, executionContext) {
     this.prune();
-    const record2 = this.records.get(resumeId);
-    if (this.closed || !record2 || record2.state !== "pending" || record2.scope.projectDir !== scope5.projectDir || record2.scope.environment !== scope5.environment || record2.scope.uploadPort !== scope5.uploadPort || record2.scope.deviceBinding !== scope5.deviceBinding)
+    const record3 = this.records.get(resumeId);
+    if (this.closed || !record3 || record3.state !== "pending" || record3.scope.projectDir !== scope5.projectDir || record3.scope.environment !== scope5.environment || record3.scope.uploadPort !== scope5.uploadPort || record3.scope.deviceBinding !== scope5.deviceBinding)
       throw new PlatformIOError(
         "Pending upload is missing, busy or belongs to another destination.",
         "UPLOAD_RESUME_UNAVAILABLE"
       );
-    record2.guard();
-    record2.state = "authorizing";
+    record3.guard();
+    record3.state = "authorizing";
     try {
       return await dispatchAuthorizedAction(
         "upload_firmware",
         {
-          ...record2.scope,
+          ...record3.scope,
           purpose: "retained_upload",
           resumeId,
-          manifestSha256: record2.retained.sha256,
+          manifestSha256: record3.retained.sha256,
           approvalId: approvalId2
         },
-        { ...caller, workspaceDir: record2.scope.projectDir },
+        { ...caller, workspaceDir: record3.scope.projectDir },
         async () => {
-          if (this.closed || this.records.get(resumeId) !== record2 || record2.abort.signal.aborted || this.now() >= record2.expiresAt)
+          if (this.closed || this.records.get(resumeId) !== record3 || record3.abort.signal.aborted || this.now() >= record3.expiresAt)
             throw new PlatformIOError(
               "Pending upload expired or disconnected before execution.",
               "UPLOAD_RESUME_UNAVAILABLE"
             );
-          record2.guard();
-          record2.state = "executing";
-          await record2.retained.verify();
-          record2.guard();
-          if (record2.abort.signal.aborted)
+          record3.guard();
+          record3.state = "executing";
+          await record3.retained.verify();
+          record3.guard();
+          if (record3.abort.signal.aborted)
             throw new PlatformIOError(
               "Pending upload disconnected before execution.",
               "UPLOAD_RESUME_UNAVAILABLE"
             );
-          return record2.execute(record2.abort.signal, executionContext);
+          return record3.execute(record3.abort.signal, executionContext);
         }
       );
     } catch (error2) {
@@ -115062,7 +115096,7 @@ var PendingUploadStore = class {
       throw error2;
     } finally {
       const current = this.records.get(resumeId);
-      if (current === record2) {
+      if (current === record3) {
         if (current.state === "executing") this.records.delete(resumeId);
         else current.state = "pending";
       }
@@ -115075,7 +115109,7 @@ var PendingUploadStore = class {
   /** Disconnect invalidates pending IDs and cancels executing callbacks through their owned signal. */
   async close() {
     this.closed = true;
-    for (const record2 of this.records.values()) record2.abort.abort();
+    for (const record3 of this.records.values()) record3.abort.abort();
     this.records.clear();
     await Promise.allSettled([...this.inFlight]);
     for (const owner of this.cleanupOwners) {
@@ -115084,9 +115118,9 @@ var PendingUploadStore = class {
     }
   }
   prune() {
-    for (const [id, record2] of this.records) {
-      if (record2.state !== "executing" && this.now() >= record2.expiresAt) {
-        record2.abort.abort();
+    for (const [id, record3] of this.records) {
+      if (record3.state !== "executing" && this.now() >= record3.expiresAt) {
+        record3.abort.abort();
         this.records.delete(id);
       }
     }
@@ -115272,8 +115306,8 @@ function parseDependencyDeclaration(input) {
     constrained: !!match[3]?.trim()
   };
 }
-function parseDependencyManifest(text8, format) {
-  if (Buffer.byteLength(text8) > 1024 * 1024)
+function parseDependencyManifest(text9, format) {
+  if (Buffer.byteLength(text9) > 1024 * 1024)
     throw new PlatformIOError(
       "Library manifest exceeds 1 MiB.",
       "DEPENDENCY_MANIFEST_LIMIT"
@@ -115290,7 +115324,7 @@ function parseDependencyManifest(text8, format) {
         name: nameSchema.nullish(),
         version: external_exports.union([external_exports.string().max(512), external_exports.number().finite()]).nullish(),
         dependencies: external_exports.unknown().optional()
-      }).parse(JSON.parse(text8));
+      }).parse(JSON.parse(text9));
       rawName = data.name;
       rawVersion = data.version;
       if (Array.isArray(data.dependencies)) {
@@ -115308,7 +115342,7 @@ function parseDependencyManifest(text8, format) {
         throw new Error("Invalid dependencies");
     } else {
       const fields = /* @__PURE__ */ new Map();
-      for (const line of text8.split(/\r?\n/)) {
+      for (const line of text9.split(/\r?\n/)) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith("#")) continue;
         const at = line.indexOf("=");
@@ -115859,15 +115893,15 @@ function dependencyGraphFields(evidence) {
 
 // src/adapters/dependency-compat.ts
 init_errors2();
-var text3 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
+var text4 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var schema4 = external_exports.object({
-  project_dir: text3.nullable().optional(),
-  env: text3.nullable().optional(),
+  project_dir: text4.nullable().optional(),
+  env: text4.nullable().optional(),
   build: external_exports.boolean().default(false),
-  approval_id: text3.optional(),
-  configuration_approval_id: text3.optional(),
-  inventory_approval_id: text3.optional(),
-  build_approval_id: text3.optional()
+  approval_id: text4.optional(),
+  configuration_approval_id: text4.optional(),
+  inventory_approval_id: text4.optional(),
+  build_approval_id: text4.optional()
 }).strict();
 async function executeDependencyCompatibility(name2, input, defaults = {}, caller = {}, onAuthorized) {
   if (name2 !== "pio_deps_check")
@@ -115972,8 +116006,8 @@ var decisionSchema = external_exports.object({
   timestamp: external_exports.string().max(128)
 });
 function compatibilityErrorResult(error2) {
-  const record2 = error2 && typeof error2 === "object" ? error2 : {};
-  const code = error2 instanceof external_exports.ZodError ? "COMPAT_ARGUMENT_INVALID" : typeof record2.code === "string" && /^[A-Z0-9_]{1,128}$/.test(record2.code) ? record2.code : "INTERNAL_ERROR";
+  const record3 = error2 && typeof error2 === "object" ? error2 : {};
+  const code = error2 instanceof external_exports.ZodError ? "COMPAT_ARGUMENT_INVALID" : typeof record3.code === "string" && /^[A-Z0-9_]{1,128}$/.test(record3.code) ? record3.code : "INTERNAL_ERROR";
   const names = {
     POLICY_DENIED: "policy_denied",
     APPROVAL_REQUIRED: "approval_required",
@@ -115983,7 +116017,7 @@ function compatibilityErrorResult(error2) {
     COMPAT_ARGUMENT_INVALID: "ValueError",
     COMPAT_PROJECT_INVALID: "ValueError"
   };
-  const context = record2.context && typeof record2.context === "object" ? record2.context : {};
+  const context = record3.context && typeof record3.context === "object" ? record3.context : {};
   const parsed = decisionSchema.safeParse(context.policyDecision);
   const policyDecision = parsed.success ? {
     ...parsed.data,
@@ -116010,7 +116044,7 @@ function compatibilityErrorResult(error2) {
     ok: false,
     error: names[code] ?? code,
     summary: redactSecretsInText(
-      error2 instanceof external_exports.ZodError ? "Compatibility arguments do not match the tool schema." : typeof record2.message === "string" ? record2.message : "Compatibility operation failed."
+      error2 instanceof external_exports.ZodError ? "Compatibility arguments do not match the tool schema." : typeof record3.message === "string" ? record3.message : "Compatibility operation failed."
     ).slice(0, 8192),
     log_path: null,
     ...resume?.success ? {
@@ -116035,15 +116069,15 @@ function compatibilityErrorResult(error2) {
 // src/adapters/board-compat.ts
 init_zod();
 init_errors2();
-var text4 = external_exports.string().max(4096);
+var text5 = external_exports.string().max(4096);
 var listSchema = external_exports.object({
-  query: text4,
-  platform: text4.nullable().optional(),
-  framework: text4.nullable().optional(),
+  query: text5,
+  platform: text5.nullable().optional(),
+  framework: text5.nullable().optional(),
   limit: external_exports.number().int().min(-1e4).max(1e4).default(30),
-  approval_id: text4.optional()
+  approval_id: text5.optional()
 }).strict();
-var infoSchema = external_exports.object({ board_id: text4.min(1), approval_id: text4.optional() }).strict();
+var infoSchema = external_exports.object({ board_id: text5.min(1), approval_id: text5.optional() }).strict();
 function compactCompatibilityBoard(board) {
   const rounded2 = (value2, divisor) => {
     if (!value2) return null;
@@ -116491,16 +116525,16 @@ init_errors2();
 // src/core/analysis/test-report.ts
 init_zod();
 init_errors2();
-var text5 = external_exports.string().max(65536).nullable().optional();
+var text6 = external_exports.string().max(65536).nullable().optional();
 var count = external_exports.number().int().nonnegative().max(1e6);
 var duration = external_exports.number().finite().nonnegative();
 var testCase = external_exports.object({
-  name: text5,
+  name: text6,
   status: external_exports.enum(["PASSED", "FAILED", "ERRORED", "SKIPPED", "WARNED"]),
-  message: text5,
-  exception: text5,
+  message: text6,
+  exception: text6,
   source: external_exports.object({
-    file: text5,
+    file: text6,
     line: external_exports.number().int().nonnegative().nullable().optional()
   }).nullable().optional()
 });
@@ -116512,8 +116546,8 @@ var reportSchema2 = external_exports.object({
   duration,
   test_suites: external_exports.array(
     external_exports.object({
-      env_name: text5,
-      test_name: text5,
+      env_name: text6,
+      test_name: text6,
       status: external_exports.string().min(1).max(64),
       duration: duration.default(0),
       test_cases: external_exports.array(testCase).max(1e5)
@@ -116643,15 +116677,15 @@ async function runTestsWithReport(projectDir, environment, compileOnly, options 
 // src/adapters/test-compat.ts
 init_errors2();
 async function executeTestCompatibility(input, defaults = {}, caller = {}, onAuthorized) {
-  const text8 = external_exports.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/);
+  const text9 = external_exports.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/);
   const params = external_exports.object({
     project_dir: external_exports.string().max(32768).nullable().optional(),
     env: external_exports.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).nullable().optional(),
-    filter: text8.nullable().optional(),
-    ignore: text8.nullable().optional(),
+    filter: text9.nullable().optional(),
+    ignore: text9.nullable().optional(),
     without_uploading: external_exports.boolean().default(false),
     without_building: external_exports.boolean().default(false),
-    upload_port: text8.nullable().optional(),
+    upload_port: text9.nullable().optional(),
     verbose: external_exports.boolean().default(false),
     approval_id: external_exports.string().max(256).optional()
   }).strict().parse(input);
@@ -116909,15 +116943,15 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
 init_zod();
 import path94 from "node:path";
 init_errors2();
-var text6 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
+var text7 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var scope2 = {
-  project_dir: text6.nullable().optional(),
-  approval_id: text6.optional()
+  project_dir: text7.nullable().optional(),
+  approval_id: text7.optional()
 };
 var schemas = {
   pio_project_envs: external_exports.object(scope2).strict(),
-  pio_list_targets: external_exports.object({ ...scope2, env: text6.nullable().optional() }).strict(),
-  pio_project_metadata: external_exports.object({ ...scope2, env: text6.nullable().optional() }).strict()
+  pio_list_targets: external_exports.object({ ...scope2, env: text7.nullable().optional() }).strict(),
+  pio_project_metadata: external_exports.object({ ...scope2, env: text7.nullable().optional() }).strict()
 };
 async function mapProjectCompatibilityRequest(name2, input, defaults = {}) {
   if (!Object.hasOwn(schemas, name2))
@@ -117157,9 +117191,9 @@ function invalid3() {
     "PACKAGE_CONFIG_CONFLICT"
   );
 }
-function parse(text8) {
-  if (Buffer.byteLength(text8) > 1024 * 1024) invalid3();
-  const lines2 = text8.split(/\r?\n/);
+function parse(text9) {
+  if (Buffer.byteLength(text9) > 1024 * 1024) invalid3();
+  const lines2 = text9.split(/\r?\n/);
   const sections = /* @__PURE__ */ new Map();
   let section;
   let entry;
@@ -117194,7 +117228,7 @@ function parse(text8) {
   for (const section2 of sections.values())
     for (const entry2 of section2.entries.values())
       entry2.value = entry2.value.trim();
-  return { lines: lines2, sections, newline: text8.includes("\r\n") ? "\r\n" : "\n" };
+  return { lines: lines2, sections, newline: text9.includes("\r\n") ? "\r\n" : "\n" };
 }
 function mergePackageConfiguration(before, after, options) {
   const original = parse(before), updated = parse(after);
@@ -117366,9 +117400,9 @@ var mutationSchema = external_exports.object({
     "Package specification cannot be an option"
   )
 }).strict();
-function safeOutput(text8) {
+function safeOutput(text9) {
   return redactSecretsInText(
-    text8.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1[REDACTED]@")
+    text9.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1[REDACTED]@")
   );
 }
 async function readConfiguration(projectDir) {
@@ -117557,7 +117591,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
           after = merged;
         }
       }
-      const digest = (text8) => text8 === null ? null : crypto15.createHash("sha256").update(text8).digest("hex");
+      const digest = (text9) => text9 === null ? null : crypto15.createHash("sha256").update(text9).digest("hex");
       validatePolicy();
       const detail = action === "pkg_search" ? parsePackageSearch(safeOutput(result.stdout)) : action === "pkg_list" ? parsePackageList(safeOutput(result.stdout)) : void 0;
       const parsedOk = !detail || detail.parseStatus === "complete";
@@ -117590,28 +117624,28 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
 }
 
 // src/adapters/package-compat.ts
-var text7 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
+var text8 = external_exports.string().max(4096).refine((value2) => !/[\x00-\x1f\x7f]/.test(value2));
 var scope4 = {
-  project_dir: text7.nullable().optional(),
-  env: text7.nullable().optional(),
-  approval_id: text7.optional()
+  project_dir: text8.nullable().optional(),
+  env: text8.nullable().optional(),
+  approval_id: text8.optional()
 };
 var kind2 = external_exports.enum(["library", "platform", "tool"]).default("library");
 var schemas2 = {
   pio_pkg_search: external_exports.object({
-    query: text7,
+    query: text8,
     type: kind2,
     page: external_exports.number().int().min(1).max(1e5).default(1),
-    approval_id: text7.optional()
+    approval_id: text8.optional()
   }).strict(),
   pio_pkg_install: external_exports.object({
     ...scope4,
-    spec: text7.refine((value2) => value2.length > 0),
+    spec: text8.refine((value2) => value2.length > 0),
     type: kind2
   }).strict(),
   pio_pkg_uninstall: external_exports.object({
     ...scope4,
-    spec: text7.refine((value2) => value2.length > 0),
+    spec: text8.refine((value2) => value2.length > 0),
     type: kind2
   }).strict(),
   pio_pkg_list: external_exports.object(scope4).strict(),
@@ -118462,7 +118496,7 @@ var string = (params) => {
   const regex = params ? `[\\s\\S]{${params?.minimum ?? 0},${params?.maximum ?? ""}}` : `[\\s\\S]*`;
   return new RegExp(`^${regex}$`);
 };
-var integer = /^\d+$/;
+var integer2 = /^\d+$/;
 var number2 = /^-?\d+(?:\.\d+)?/i;
 var boolean = /true|false/i;
 var _null = /null/i;
@@ -118571,7 +118605,7 @@ var $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat"
     bag.minimum = minimum;
     bag.maximum = maximum;
     if (isInt)
-      bag.pattern = integer;
+      bag.pattern = integer2;
   });
   inst._zod.check = (payload) => {
     const input = payload.value;
@@ -121245,7 +121279,7 @@ var ZodRecord2 = /* @__PURE__ */ $constructor("ZodRecord", (inst, def) => {
   inst.keyType = def.keyType;
   inst.valueType = def.valueType;
 });
-function record(keyType, valueType, params) {
+function record2(keyType, valueType, params) {
   return new ZodRecord2({
     type: "record",
     keyType,
@@ -121715,7 +121749,7 @@ var ImplementationSchema = BaseMetadataSchema.extend({
 });
 var FormElicitationCapabilitySchema = intersection(object2({
   applyDefaults: boolean2().optional()
-}), record(string2(), unknown()));
+}), record2(string2(), unknown()));
 var ElicitationCapabilitySchema = preprocess((value2) => {
   if (value2 && typeof value2 === "object" && !Array.isArray(value2)) {
     if (Object.keys(value2).length === 0) {
@@ -121726,7 +121760,7 @@ var ElicitationCapabilitySchema = preprocess((value2) => {
 }, intersection(object2({
   form: FormElicitationCapabilitySchema.optional(),
   url: AssertObjectSchema.optional()
-}), record(string2(), unknown()).optional()));
+}), record2(string2(), unknown()).optional()));
 var ClientTasksCapabilitySchema = looseObject({
   /**
    * Present if the client supports listing tasks.
@@ -121779,7 +121813,7 @@ var ClientCapabilitiesSchema = object2({
   /**
    * Experimental, non-standard capabilities that the client supports.
    */
-  experimental: record(string2(), AssertObjectSchema).optional(),
+  experimental: record2(string2(), AssertObjectSchema).optional(),
   /**
    * Present if the client supports sampling from an LLM.
    */
@@ -121814,7 +121848,7 @@ var ClientCapabilitiesSchema = object2({
   /**
    * Extensions that the client supports. Keys are extension identifiers (vendor-prefix/extension-name).
    */
-  extensions: record(string2(), AssertObjectSchema).optional()
+  extensions: record2(string2(), AssertObjectSchema).optional()
 });
 var InitializeRequestParamsSchema = BaseRequestParamsSchema.extend({
   /**
@@ -121832,7 +121866,7 @@ var ServerCapabilitiesSchema = object2({
   /**
    * Experimental, non-standard capabilities that the server supports.
    */
-  experimental: record(string2(), AssertObjectSchema).optional(),
+  experimental: record2(string2(), AssertObjectSchema).optional(),
   /**
    * Present if the server supports sending log messages to the client.
    */
@@ -121879,7 +121913,7 @@ var ServerCapabilitiesSchema = object2({
   /**
    * Extensions that the server supports. Keys are extension identifiers (vendor-prefix/extension-name).
    */
-  extensions: record(string2(), AssertObjectSchema).optional()
+  extensions: record2(string2(), AssertObjectSchema).optional()
 });
 var InitializeResultSchema = ResultSchema.extend({
   /**
@@ -122017,7 +122051,7 @@ var ResourceContentsSchema = object2({
    * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
    * for notes on _meta usage.
    */
-  _meta: record(string2(), unknown()).optional()
+  _meta: record2(string2(), unknown()).optional()
 });
 var TextResourceContentsSchema = ResourceContentsSchema.extend({
   /**
@@ -122211,7 +122245,7 @@ var GetPromptRequestParamsSchema = BaseRequestParamsSchema.extend({
   /**
    * Arguments to use for templating the prompt.
    */
-  arguments: record(string2(), string2()).optional()
+  arguments: record2(string2(), string2()).optional()
 });
 var GetPromptRequestSchema = RequestSchema.extend({
   method: literal("prompts/get"),
@@ -122231,7 +122265,7 @@ var TextContentSchema = object2({
    * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
    * for notes on _meta usage.
    */
-  _meta: record(string2(), unknown()).optional()
+  _meta: record2(string2(), unknown()).optional()
 });
 var ImageContentSchema = object2({
   type: literal("image"),
@@ -122251,7 +122285,7 @@ var ImageContentSchema = object2({
    * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
    * for notes on _meta usage.
    */
-  _meta: record(string2(), unknown()).optional()
+  _meta: record2(string2(), unknown()).optional()
 });
 var AudioContentSchema = object2({
   type: literal("audio"),
@@ -122271,7 +122305,7 @@ var AudioContentSchema = object2({
    * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
    * for notes on _meta usage.
    */
-  _meta: record(string2(), unknown()).optional()
+  _meta: record2(string2(), unknown()).optional()
 });
 var ToolUseContentSchema = object2({
   type: literal("tool_use"),
@@ -122289,12 +122323,12 @@ var ToolUseContentSchema = object2({
    * Arguments to pass to the tool.
    * Must conform to the tool's inputSchema.
    */
-  input: record(string2(), unknown()),
+  input: record2(string2(), unknown()),
   /**
    * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
    * for notes on _meta usage.
    */
-  _meta: record(string2(), unknown()).optional()
+  _meta: record2(string2(), unknown()).optional()
 });
 var EmbeddedResourceSchema = object2({
   type: literal("resource"),
@@ -122307,7 +122341,7 @@ var EmbeddedResourceSchema = object2({
    * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
    * for notes on _meta usage.
    */
-  _meta: record(string2(), unknown()).optional()
+  _meta: record2(string2(), unknown()).optional()
 });
 var ResourceLinkSchema = ResourceSchema.extend({
   type: literal("resource_link")
@@ -122397,7 +122431,7 @@ var ToolSchema = object2({
    */
   inputSchema: object2({
     type: literal("object"),
-    properties: record(string2(), AssertObjectSchema).optional(),
+    properties: record2(string2(), AssertObjectSchema).optional(),
     required: array(string2()).optional()
   }).catchall(unknown()),
   /**
@@ -122407,7 +122441,7 @@ var ToolSchema = object2({
    */
   outputSchema: object2({
     type: literal("object"),
-    properties: record(string2(), AssertObjectSchema).optional(),
+    properties: record2(string2(), AssertObjectSchema).optional(),
     required: array(string2()).optional()
   }).catchall(unknown()).optional(),
   /**
@@ -122422,7 +122456,7 @@ var ToolSchema = object2({
    * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
    * for notes on _meta usage.
    */
-  _meta: record(string2(), unknown()).optional()
+  _meta: record2(string2(), unknown()).optional()
 });
 var ListToolsRequestSchema = PaginatedRequestSchema.extend({
   method: literal("tools/list")
@@ -122443,7 +122477,7 @@ var CallToolResultSchema = ResultSchema.extend({
    *
    * If the Tool defines an outputSchema, this field MUST be present in the result, and contain a JSON object that matches the schema.
    */
-  structuredContent: record(string2(), unknown()).optional(),
+  structuredContent: record2(string2(), unknown()).optional(),
   /**
    * Whether the tool call ended in an error.
    *
@@ -122471,7 +122505,7 @@ var CallToolRequestParamsSchema = TaskAugmentedRequestParamsSchema.extend({
   /**
    * Arguments to pass to the tool.
    */
-  arguments: record(string2(), unknown()).optional()
+  arguments: record2(string2(), unknown()).optional()
 });
 var CallToolRequestSchema = RequestSchema.extend({
   method: literal("tools/call"),
@@ -122573,7 +122607,7 @@ var ToolResultContentSchema = object2({
    * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
    * for notes on _meta usage.
    */
-  _meta: record(string2(), unknown()).optional()
+  _meta: record2(string2(), unknown()).optional()
 });
 var SamplingContentSchema = discriminatedUnion("type", [TextContentSchema, ImageContentSchema, AudioContentSchema]);
 var SamplingMessageContentBlockSchema = discriminatedUnion("type", [
@@ -122590,7 +122624,7 @@ var SamplingMessageSchema = object2({
    * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
    * for notes on _meta usage.
    */
-  _meta: record(string2(), unknown()).optional()
+  _meta: record2(string2(), unknown()).optional()
 });
 var CreateMessageRequestParamsSchema = TaskAugmentedRequestParamsSchema.extend({
   messages: array(SamplingMessageSchema),
@@ -122778,7 +122812,7 @@ var ElicitRequestFormParamsSchema = TaskAugmentedRequestParamsSchema.extend({
    */
   requestedSchema: object2({
     type: literal("object"),
-    properties: record(string2(), PrimitiveSchemaDefinitionSchema),
+    properties: record2(string2(), PrimitiveSchemaDefinitionSchema),
     required: array(string2()).optional()
   })
 });
@@ -122830,7 +122864,7 @@ var ElicitResultSchema = ResultSchema.extend({
    * Per MCP spec, content is "typically omitted" for decline/cancel actions.
    * We normalize null to undefined for leniency while maintaining type compatibility.
    */
-  content: preprocess((val) => val === null ? void 0 : val, record(string2(), union([string2(), number3(), boolean2(), array(string2())])).optional())
+  content: preprocess((val) => val === null ? void 0 : val, record2(string2(), union([string2(), number3(), boolean2(), array(string2())])).optional())
 });
 var ResourceTemplateReferenceSchema = object2({
   type: literal("ref/resource"),
@@ -122865,7 +122899,7 @@ var CompleteRequestParamsSchema = BaseRequestParamsSchema.extend({
     /**
      * Previously-resolved variables in a URI template or prompt.
      */
-    arguments: record(string2(), string2()).optional()
+    arguments: record2(string2(), string2()).optional()
   }).optional()
 });
 var CompleteRequestSchema = RequestSchema.extend({
@@ -122901,7 +122935,7 @@ var RootSchema = object2({
    * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
    * for notes on _meta usage.
    */
-  _meta: record(string2(), unknown()).optional()
+  _meta: record2(string2(), unknown()).optional()
 });
 var ListRootsRequestSchema = RequestSchema.extend({
   method: literal("roots/list"),
@@ -128623,25 +128657,25 @@ function collectPinUsages(projectDir) {
   const defineRegex = /^\s*#define\s+([A-Za-z_][A-Za-z0-9_]*)\s+(\d{1,2})\b/gm;
   const callRegex = /\b(pinMode|digitalWrite|analogWrite|analogRead)\s*\(\s*([A-Za-z_][A-Za-z0-9_]*|\d{1,2})/g;
   for (const absPath of srcFiles) {
-    let text8 = "";
+    let text9 = "";
     try {
-      text8 = fs90.readFileSync(absPath, "utf8");
+      text9 = fs90.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
     defineRegex.lastIndex = 0;
-    for (const match of text8.matchAll(defineRegex)) {
+    for (const match of text9.matchAll(defineRegex)) {
       macroMap.set(match[1], Number.parseInt(match[2], 10));
     }
   }
   for (const absPath of srcFiles) {
-    let text8 = "";
+    let text9 = "";
     try {
-      text8 = fs90.readFileSync(absPath, "utf8");
+      text9 = fs90.readFileSync(absPath, "utf8");
     } catch {
       continue;
     }
-    const lines2 = text8.split(/\r?\n/);
+    const lines2 = text9.split(/\r?\n/);
     for (const line of lines2) {
       callRegex.lastIndex = 0;
       for (const match of line.matchAll(callRegex)) {
@@ -129261,17 +129295,17 @@ function ensureStructuredToolResult(toolName, response) {
   if (response.structuredContent) {
     return response;
   }
-  const text8 = response.content?.find(
+  const text9 = response.content?.find(
     (item) => item.type === "text" && typeof item.text === "string"
   )?.text;
-  let data = text8;
+  let data = text9;
   try {
-    data = text8 ? JSON.parse(text8) : void 0;
+    data = text9 ? JSON.parse(text9) : void 0;
   } catch {
   }
-  const record2 = typeof data === "object" && data !== null ? data : void 0;
-  const success = typeof record2?.success === "boolean" ? record2.success : response.isError !== true;
-  const rawStatus = record2?.status;
+  const record3 = typeof data === "object" && data !== null ? data : void 0;
+  const success = typeof record3?.success === "boolean" ? record3.success : response.isError !== true;
+  const rawStatus = record3?.status;
   const statusValues = [
     "completed",
     "running",
@@ -129281,7 +129315,7 @@ function ensureStructuredToolResult(toolName, response) {
     "unavailable"
   ];
   const status = statusValues.includes(rawStatus) ? rawStatus : success ? "completed" : "failed";
-  const summary = typeof record2?.summary === "string" ? record2.summary : typeof record2?.message === "string" ? record2.message : `${toolName} ${success ? "completed" : "failed"}.`;
+  const summary = typeof record3?.summary === "string" ? record3.summary : typeof record3?.message === "string" ? record3.message : `${toolName} ${success ? "completed" : "failed"}.`;
   return {
     ...response,
     structuredContent: {
@@ -130817,7 +130851,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           status: result.ok ? "success" : "error",
           mcpResponse: {
             success: result.ok,
-            summary: response2.structuredContent.summary
+            summary: response2.structuredContent.summary,
+            ...projectAnalysisLedger(name2, result)
           }
         },
         targetProjectDir
