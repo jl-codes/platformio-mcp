@@ -1269,3 +1269,9 @@ Connected trusted physical-probe discovery to DeviceLeaseStore. Selection acquir
 Added bounded physical USB discovery from Linux sysfs vendor/product/serial attributes, excluding interface entries and reporting serial-less devices as unidentified. Disappearing devices are omitted; invalid/oversized identities fail. Four kernel-shaped filesystem cases, TypeScript and lint passed on Windows; real Linux host discovery and connected-probe acceptance remain unverified. Windows/macOS enumerators and public discovery authorization are still required.
 
 CI runs 35502231269 and 35502233612 both completed successfully on b17f2acb, including all three host unit/plugin jobs, dependency audit, dashboard and CLI checks. The subsequent probe selection/custody/Linux discovery batch is pushed separately and requires its own CI result.
+
+### Windows Plug and Play USB inventory
+
+Added a fixed, bounded Windows PnP metadata collector and parser. Only physical USB instance records with CM_DEVCAP_UNIQUEID and location metadata become serial-based identities; generated IDs and missing location data are counted as unidentified. Six parser cases, TypeScript and lint passed. A real metadata-only invocation on this Windows host returned windows_pnp, identified=5 and unidentified=3; this does not mean five debug probes were identified or prove hardware operation.
+
+Unique-ID capability basis: https://devblogs.microsoft.com/windows-music-dev/the-importance-of-including-a-unique-iserialnumber-in-your-usb-midi-devices/ . Public permission-gated discovery, backend-specific probe matching and macOS enumeration remain incomplete.
