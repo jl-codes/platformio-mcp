@@ -150,3 +150,49 @@ it("does not silently choose among multiple default environments", async () => {
     executePartitionTable({ projectDir: root }),
   ).rejects.toMatchObject({ code: "PARTITION_ENVIRONMENT_REQUIRED" });
 });
+
+it("reports the actual metadata-selected binary source", async () => {
+  const table = path.join(root, "partitions.bin");
+  const bytes = Buffer.alloc(96, 255);
+  bytes.writeUInt16LE(0x50aa, 0);
+  bytes[2] = 0;
+  bytes[3] = 0;
+  bytes.writeUInt32LE(0x20000, 4);
+  bytes.writeUInt32LE(0x100000, 8);
+  bytes.fill(0, 12, 32);
+  bytes.write("app", 12, "utf8");
+  fs.writeFileSync(table, bytes);
+  vi.mocked(executeProjectInspection)
+    .mockResolvedValueOnce({
+      ok: true,
+      defaultEnvironments: ["custom"],
+      envs: [
+        {
+          name: "custom",
+          partitionTable: null,
+          partitionTableUploadOffset: null,
+          flashSize: null,
+          board: null,
+          mcu: null,
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>)
+    .mockResolvedValueOnce({
+      ok: true,
+      envs: {
+        custom: {
+          extra: { flash_images: [{ path: table, offset: "0x10000" }] },
+        },
+      },
+    } as unknown as Awaited<ReturnType<typeof executeProjectInspection>>);
+  const result = await executePartitionTable({
+    projectDir: root,
+    buildMetadata: true,
+  });
+  expect(result).toMatchObject({
+    ok: true,
+    table_source: "metadata:extra.flash_images",
+    table_offset: 0x10000,
+  });
+  expect(result.artifacts.table.path).toBe(fs.realpathSync.native(table));
+});

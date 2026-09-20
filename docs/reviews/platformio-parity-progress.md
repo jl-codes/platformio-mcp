@@ -1051,3 +1051,7 @@ Public partition inspection now resolves configured environment CSV paths, uploa
 ### Authorized build-derived partition identity
 
 Added opt-in buildMetadata resolution through project_metadata, preserving its build permission before Core execution. Matches selected environment flash-image evidence, rejects ambiguous binaries and combines metadata offsets with configuration/explicit evidence. MCP safety annotations now reflect optional project script execution. Eleven focused metadata/workflow tests and TypeScript passed. CI run 35496158937 for prior commit 52f26758 remained live at inspection; this change is saved locally to avoid cancelling it. Metadata generation does not certify binary freshness; device reads and full reference acceptance remain pending.
+
+### Partition CI and provenance fixes
+
+CI run 35496158937 completed with a stale 55-tool assertion in mcp-authorization.test.ts (current inventory is 56); corrected it without weakening pinned legacy contract validation. Corrected metadata-selected binary provenance to metadata:extra.flash_images and added a complete executor regression. Eighteen focused MCP/partition cases and TypeScript passed. Both prior CI runs are terminal, so the saved metadata change and fixes can now be pushed together.

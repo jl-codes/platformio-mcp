@@ -95672,7 +95672,7 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
       return {
         ...result,
         environment: project?.environment ?? null,
-        table_source: params.tablePath ? "explicit:tablePath" : project.tableSource,
+        table_source: params.tablePath ? "explicit:tablePath" : build ? "metadata:extra.flash_images" : project.tableSource,
         board: project?.board ?? null,
         mcu: project?.mcu ?? null,
         offset_evidence: location.evidence,
