@@ -201,7 +201,11 @@ export class DebugProcess {
     command: string,
     caller: PolicyEvaluationContext,
     timeoutMs = 30000,
-    grants: { approvalId?: string; sessionId?: string } = {},
+    grants: {
+      approvalId?: string;
+      sessionId?: string;
+      targetApprovalId?: string;
+    } = {},
   ) {
     return dispatchDebuggerCommand(
       command,

@@ -3,7 +3,7 @@
  * Inspection also requires trusted startup with auto-loading and inferior calls disabled.
  */
 import { PlatformIOError } from "../../utils/errors.js";
-import { dispatchAuthorizedAction } from "../action-dispatcher.js";
+import { dispatchAuthorizedAction, planAction } from "../action-dispatcher.js";
 import type { PolicyEvaluationContext } from "../policy/types.js";
 
 /** Prepared transport command and its minimum permission category. */
@@ -150,13 +150,16 @@ export function prepareDebugCommand(
     ].includes(command)
   )
     return consoleCommand(command, "target");
-  if (/^(?:shell|python|source) .+/.test(command))
+  if (
+    command === "pio_reset_run_target" ||
+    /^(?:shell|python|source) .+/.test(command)
+  )
     return consoleCommand(command, "host-code");
   return invalid();
 }
 
 /** Bind debugger text and generated MI to canonical inspection, write or host-code authorization. */
-export function dispatchDebuggerCommand<T>(
+export async function dispatchDebuggerCommand<T>(
   command: string,
   args: Record<string, unknown>,
   caller: PolicyEvaluationContext,
@@ -169,6 +172,39 @@ export function dispatchDebuggerCommand<T>(
       : prepared.effect === "target"
         ? "debugger_mutate"
         : "debugger_host_code";
+  if (command.trim() === "pio_reset_run_target") {
+    const { targetApprovalId, ...hostScope } = args;
+    const hostArgs = {
+      ...hostScope,
+      command: command.trim(),
+      miCommand: prepared.miCommand,
+    };
+    const targetArgs = {
+      projectDir: args.projectDir,
+      sessionId: args.sessionId,
+      purpose: "debugger_reset_run_stop",
+      approvalId: targetApprovalId,
+    };
+    for (const [action, scope] of [
+      ["debugger_host_code", hostArgs],
+      ["debugger_mutate", targetArgs],
+    ] as const) {
+      const plan = await planAction(action, scope, caller);
+      if (plan.status !== "ready")
+        throw new PlatformIOError(
+          plan.reason,
+          plan.status === "requires_approval"
+            ? "APPROVAL_REQUIRED"
+            : "POLICY_DENIED",
+          { policyDecision: plan },
+        );
+    }
+    return dispatchAuthorizedAction("debugger_mutate", targetArgs, caller, () =>
+      dispatchAuthorizedAction("debugger_host_code", hostArgs, caller, () =>
+        send(prepared),
+      ),
+    );
+  }
   return dispatchAuthorizedAction(
     operation,
     { ...args, command: command.trim(), miCommand: prepared.miCommand },

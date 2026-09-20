@@ -1,4 +1,5 @@
 /** Per-connection debugger ownership, bounded startup capacity and retryable probe cleanup. */
+import { resetRunDebuggerTarget } from "./debug-reset-run.js";
 import { DebugStartupFailure } from "./debug-start-failure.js";
 import { randomUUID } from "node:crypto";
 import { PlatformIOError } from "../../utils/errors.js";
@@ -221,6 +222,44 @@ export class DebugClientSessions {
             "DEBUG_DETACH_FAILED",
             { sessionId: id, cleanupPending: true, targetStateUncertain: true },
           );
+        await entry.process.cleanupProcess();
+        this.sessions.delete(id);
+      })
+      .finally(() => this.stopping.delete(id));
+    this.stopping.set(id, pending);
+    return pending;
+  }
+
+  /** Run Core's configured reset/run hook before releasing the owned GDB/backend processes. */
+  resetRunAndStop(
+    id: string,
+    caller: PolicyEvaluationContext,
+    timeoutMs = 30000,
+    grants: { hostApprovalId?: string; targetApprovalId?: string } = {},
+  ): Promise<void> {
+    if (this.closed)
+      throw new PlatformIOError(
+        "Debugger client disconnected.",
+        "DEBUG_CLIENT_CLOSED",
+      );
+    if (this.stopping.has(id))
+      throw new PlatformIOError(
+        "Debugger cleanup is in progress.",
+        "DEBUG_SESSION_CLOSING",
+      );
+    const entry = this.lookup(id);
+    const pending = Promise.resolve()
+      .then(async () => {
+        if (this.closed)
+          throw new PlatformIOError(
+            "Debugger client disconnected.",
+            "DEBUG_CLIENT_CLOSED",
+          );
+        await resetRunDebuggerTarget(
+          entry.process,
+          { ...grants, projectDir: entry.projectDir, sessionId: id, timeoutMs },
+          caller,
+        );
         await entry.process.cleanupProcess();
         this.sessions.delete(id);
       })
