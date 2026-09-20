@@ -216,7 +216,8 @@
       "publishIntent": false,
       "packagePath": "packages/flashagent",
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Functional alias prepared; public metadata returned 404, but publisher authority and naming eligibility remain unverified."
+      "reason": "Existing npm flash-agent@1.0.38 creates a punctuation-insensitive naming collision. A missing exact-name lookup does not prove eligibility; publication remains disabled pending registry resolution.",
+      "namingEligibilityVerified": false
     },
     {
       "registry": "pypi",
@@ -272,23 +273,25 @@
     {
       "registry": "npm",
       "name": "flash-agent",
-      "role": "watch",
+      "role": "excluded_third_party",
       "publishIntent": false,
-      "reason": "Same punctuation-insensitive moniker family as flashagent; registry eligibility must be resolved as a family, not inferred from 404 responses."
+      "reason": "Public npm metadata reports existing version 1.0.38 maintained by chenpingaodian; project publication control is not established. Do not overwrite."
     },
     {
       "registry": "npm",
       "name": "flash.agent",
       "role": "watch",
       "publishIntent": false,
-      "reason": "Same punctuation-insensitive moniker family as flashagent; registry eligibility must be resolved as a family, not inferred from 404 responses."
+      "reason": "Existing npm flash-agent@1.0.38 creates a punctuation-insensitive naming collision. A missing exact-name lookup does not prove eligibility; publication remains disabled pending registry resolution.",
+      "namingEligibilityVerified": false
     },
     {
       "registry": "npm",
       "name": "flash_agent",
       "role": "watch",
       "publishIntent": false,
-      "reason": "Same punctuation-insensitive moniker family as flashagent; registry eligibility must be resolved as a family, not inferred from 404 responses."
+      "reason": "Existing npm flash-agent@1.0.38 creates a punctuation-insensitive naming collision. A missing exact-name lookup does not prove eligibility; publication remains disabled pending registry resolution.",
+      "namingEligibilityVerified": false
     },
     {
       "registry": "npm",

@@ -786,3 +786,7 @@ TypeScript passed and the plugin rebuilt before interruption. Two focused adapte
 ### Expanded alias families
 
 Added functional `@forkbomb/flashagent` npm and `flash-agent` Python candidates; tracked flash-agent/flash.agent/flash_agent npm collision candidates and scoped platformiomcp/pioagent variants. Extended the GHCR inventory to ten names and generalized container target resolution to retain all seven explicit targets while including additional validated names under the same owner. All candidates remain publication-disabled until authority/eligibility evidence exists. npm version alignment and four release-identity checks passed; Python publisher selection still excludes new unverified candidates. No alias was published.
+
+### Expanded registry observations
+
+Refreshed the cached public namespace report for the expanded inventory. npm `flash-agent` exists at 1.0.38 with maintainer `chenpingaodian` and no repository link in the returned metadata. Marked that name excluded from project publication; recorded the punctuation-family collision against unscoped `flashagent`, `flash.agent` and `flash_agent`. Missing exact-name lookups cannot establish registrability. The scoped flashagent candidate remains subject to independent scope-control verification. PyPI `flash-agent` returned 404, separately from npm; no claim of availability or ownership follows. No package was installed or published.
