@@ -543,3 +543,8 @@ Namespace coverage is finite. Python package-name normalization makes the compet
 - Added bounded parsing for Arduino-style free/min/largest heap lines and named task stack high-water marks. Stack units remain unknown unless explicitly supplied; word counts require a specified word size before conversion to bytes.
 - TypeScript compilation and seven parser/statistics tests passed, covering paired heap fields, unit uncertainty/overrides, unknown logs and input/value bounds.
 - ESP-IDF blocks, FreeRTOS task tables, additional print variants, custom bounded patterns, serial collection and public integrations remain open. This is not full memory-watch parity.
+
+### ESP-IDF and FreeRTOS telemetry formats
+
+- Inspected pinned reference parsers.py via GitHub contents API without executing it. Added ESP-IDF aggregate heap blocks and FreeRTOS header-gated task rows, retaining explicit stack units. Heap state expires after 128 lines and skips per-region metrics. Decimal/scientific numeric prefixes are not truncated into integers.
+- TypeScript compilation and ten telemetry tests passed. Remaining print variants, bounded custom patterns, report aggregation and serial/public integration remain open.

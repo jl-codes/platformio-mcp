@@ -34,3 +34,38 @@ it("returns unrecognized for ordinary logs and enforces numeric and byte bounds"
   );
   expect(() => parse(["x".repeat(16385)])).toThrow("limits");
 });
+
+it("reads only aggregate ESP-IDF heap totals inside a recognized block", () => {
+  const parsed = parse([
+    "Heap summary for capabilities 0x00000004:",
+    "at 0x3ffae6e0 len 6400 free 100 allocated 10 min_free 80 largest_free_block 90",
+    "Totals:",
+    "free 1000 allocated 500 min_free 900 largest_free_block 600",
+  ]);
+  expect(parsed.samples.map((sample) => sample.value)).toEqual([
+    1000, 500, 900, 600,
+  ]);
+  expect(parse(["free 1000 allocated 500"]).recognized).toBe(false);
+});
+it("requires a task-table header and keeps unknown units explicit", () => {
+  expect(parse(["loop R 1 128 2"]).recognized).toBe(false);
+  const parsed = parse(
+    [
+      "Name State Prio Stack Num",
+      "loop R 1 128 2",
+      "idle B 0 256 3",
+      "",
+      "stray R 1 10 4",
+    ],
+    { stackUnit: "words", stackWordBytes: 4 },
+  );
+  expect(parsed.samples.map((sample) => [sample.task, sample.value])).toEqual([
+    ["loop", 512],
+    ["idle", 1024],
+  ]);
+});
+it("does not truncate decimal values into integer measurements", () => {
+  expect(parse(["Free heap: 1.5", "loopTask: stack hwm 2.5"]).recognized).toBe(
+    false,
+  );
+});

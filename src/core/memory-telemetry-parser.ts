@@ -54,10 +54,75 @@ export function parseMemoryTelemetry(
       );
     samples.push({ line, metric, value, unit, ...(task ? { task } : {}) });
   };
+  let heapSummaryUntil = -1,
+    totalsPending = false,
+    taskTable = false;
   lines.forEach((raw, line) => {
     const text = raw.replace(/\x1b\[[0-9;]*m/g, "");
+    const trimmed = text.trim();
+    if (/heap summary for capabilities/i.test(trimmed)) {
+      heapSummaryUntil = line + 128;
+      totalsPending = false;
+      return;
+    }
+    if (line <= heapSummaryUntil) {
+      if (/^Totals\s*:/i.test(trimmed)) totalsPending = true;
+      const totals =
+        /\bfree\s+(\d+)\s+allocated\s+(\d+)(?:\s+min_free\s+(\d+))?(?:\s+largest_free_block\s+(\d+))?\s*$/i.exec(
+          trimmed,
+        );
+      if (totals && totalsPending) {
+        add(line, "free_heap", totals[1], "bytes");
+        add(line, "allocated", totals[2], "bytes");
+        if (totals[3]) add(line, "min_free_heap", totals[3], "bytes");
+        if (totals[4]) add(line, "largest_free_block", totals[4], "bytes");
+        formats.add("esp_idf_heap_info");
+        heapSummaryUntil = -1;
+        totalsPending = false;
+        return;
+      }
+      if (
+        /^(?:Totals\s*:|at 0x|largest_free_block\b|alloc_blocks\b)/i.test(
+          trimmed,
+        ) ||
+        totals ||
+        !trimmed
+      )
+        return;
+      heapSummaryUntil = -1;
+      totalsPending = false;
+    }
+    if (
+      /^Name\s+State\s+Prio(?:rity)?\s+Stack\s+(?:Num|#|Task\s+Number)\s*$/i.test(
+        trimmed,
+      )
+    ) {
+      taskTable = true;
+      return;
+    }
+    if (taskTable) {
+      const row = /^(\S{1,128})\s+[XRBSD]\s+\d+\s+(\d+)\s+\d+\s*$/.exec(
+        trimmed,
+      );
+      if (row) {
+        const known =
+          settings.stackUnit === "bytes" || settings.stackUnit === "words";
+        add(
+          line,
+          "stack_free",
+          row[2],
+          known ? "bytes" : "unknown",
+          row[1],
+          settings.stackUnit === "words" ? settings.stackWordBytes : 1,
+        );
+        formats.add("freertos_task_table");
+        return;
+      }
+      if (/^[-= ]+$/.test(trimmed)) return;
+      taskTable = false;
+    }
     const heap =
-      /\bFree\s+heap\s*:\s*(\d+)\b(?:\s+min\s*:\s*(\d+)\b)?(?:\s+largest\s*:\s*(\d+)\b)?/i.exec(
+      /\bFree\s+heap\s*:\s*(\d+)\b(?![.eE])(?:\s+min\s*:\s*(\d+)\b(?![.eE]))?(?:\s+largest\s*:\s*(\d+)\b(?![.eE]))?/i.exec(
         text,
       );
     if (heap) {
@@ -67,7 +132,7 @@ export function parseMemoryTelemetry(
       formats.add("arduino_heap");
     }
     const stack =
-      /(?:^|\s)([A-Za-z0-9_.-]{1,128}):\s*stack\s+hwm\s*[:=]?\s*(\d+)\b(?:\s*(bytes|words)\b)?/i.exec(
+      /(?:^|\s)([A-Za-z0-9_.-]{1,128}):\s*stack\s+hwm\s*[:=]?\s*(\d+)\b(?![.eE])(?:\s*(bytes|words)\b)?/i.exec(
         text,
       );
     if (stack) {
