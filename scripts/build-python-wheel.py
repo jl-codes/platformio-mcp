@@ -10,9 +10,15 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
+_source_spec = importlib.util.spec_from_file_location("python_release_source", ROOT / "scripts/python-release-source.py")
+_source_module = importlib.util.module_from_spec(_source_spec)
+_source_spec.loader.exec_module(_source_module)
+source_identity = _source_module.source_identity
 
-def build_wheel(host, destination):
+
+def build_wheel(host, destination, allow_dirty=False):
     """Use a fresh staging directory and produce one platform-specific wheel without publishing."""
+    identity = source_identity(ROOT, allow_dirty)
     destination = Path(destination).resolve()
     if destination.exists():
         raise ValueError("Wheel staging destination must be new")
@@ -38,9 +44,12 @@ def build_wheel(host, destination):
             with item.open("rb") as stream:
                 digest = hashlib.file_digest(stream, "sha256").hexdigest()
             inventory.append({"path":item.relative_to(payload).as_posix(),"bytes":item.stat().st_size,"sha256":digest})
-    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    (payload / "payload.json").write_text(json.dumps({"schemaVersion":1,"host":host,"wheelTag":target["wheelTag"],"version":package["version"],"sourceCommit":commit,"nodeVersion":support["nodeVersion"],"minimums":support["minimums"],"files":inventory},indent=2)+"\n")
+    if source_identity(ROOT, allow_dirty) != identity:
+        raise ValueError("Source changed during wheel assembly")
+    (payload / "payload.json").write_text(json.dumps({"schemaVersion":1,"host":host,"wheelTag":target["wheelTag"],"version":package["version"],**identity,"nodeVersion":support["nodeVersion"],"minimums":support["minimums"],"files":inventory},indent=2)+"\n")
     subprocess.run([sys.executable,"-m","build","--wheel","--no-isolation",str(destination)],check=True)
+    if source_identity(ROOT, allow_dirty) != identity:
+        raise ValueError("Source changed during wheel build")
     return destination / "dist"
 
 
@@ -48,5 +57,6 @@ if __name__ == "__main__":
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("host")
     parser.add_argument("destination")
+    parser.add_argument("--allow-dirty", action="store_true")
     args=parser.parse_args()
-    print(build_wheel(args.host,args.destination))
+    print(build_wheel(args.host,args.destination,args.allow_dirty))

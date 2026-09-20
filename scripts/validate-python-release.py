@@ -43,6 +43,8 @@ def validate(directory):
                     raise ValueError("Wheel payload source/runtime identity mismatch")
                 if payload.get("minimums") != support["minimums"]:
                     raise ValueError("Wheel OS requirements differ from the support manifest")
+                if payload.get("sourceDirty") is not False:
+                    raise ValueError("Development wheel cannot be released")
                 inventory=payload["files"]
                 paths={item["path"] for item in inventory}
                 packed={name[len(prefix):] for name in names if name.startswith(prefix) and name!=prefix+"payload.json"}
@@ -60,6 +62,9 @@ def validate(directory):
                 if any(name.endswith('/entry_points.txt') for name in names):
                     raise ValueError("Alias must not overwrite canonical command files")
                 module=identity.replace('-','_')+'_alias/__main__.py'
+                source=json.loads(archive.read(identity.replace("-", "_")+"_alias/source.json"))
+                if source.get("sourceCommit") != commit or source.get("sourceDirty") is not False:
+                    raise ValueError("Alias source identity is not the clean release commit")
                 if module not in names:
                     raise ValueError("Functional alias module missing")
         identities.append({"name":identity,"version":version,"file":filename,"host":host if canonical else "any","sha256":hashlib.sha256(wheel.read_bytes()).hexdigest()})
