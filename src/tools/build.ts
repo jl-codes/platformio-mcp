@@ -9,6 +9,7 @@
  * - listTargets: Discovers valid compilation targets.
  */
 
+import type { ProcessDeviceCustody } from "../core/devices/process-device-custody.js";
 import { summarizeCheckOutput } from "../core/analysis/check-report.js";
 import { readCommandOutput } from "../utils/command-log.js";
 import { loadEffectivePolicyState } from "../core/policy/load-policy.js";
@@ -510,6 +511,8 @@ export async function cleanProject(
 
 /** Trusted controls for an already-authorized named target; this helper does not grant device access. */
 export interface TargetExecutionOptions {
+  deviceCustody?: ProcessDeviceCustody; // Trusted retained upload-to-monitor ownership, never public arguments.
+  cancellation?: AbortSignal; // Owned workflow stop request; closure still must be confirmed.
   serialPort?: string; // Host-resolved endpoint custody, separate from network upload destinations.
   uploadPort?: string; // Explicit serial or network destination, kept as one argv value.
   timeoutMs?: number; // Bounded execution deadline, defaulting to the existing ten minutes.
@@ -568,6 +571,8 @@ export async function buildTarget(
       projectDir: validatedPath,
       timeout: execution.timeoutMs ?? 600000,
       devicePort: execution.serialPort,
+      deviceCustody: execution.deviceCustody,
+      cancellation: execution.cancellation,
     });
 
     if ('status' in result) {

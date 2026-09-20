@@ -1,5 +1,9 @@
 /** Reference firmware upload delegates to the shared authorized target and owned-session workflow. */
-import { RunTargetSchema, executeNamedTarget } from "../tools/run-target.js";
+import {
+  RunTargetSchema,
+  executeNamedTarget,
+  type ReservedUploadCustody,
+} from "../tools/run-target.js";
 import type { SerialClientContext } from "./serial-client.js";
 import type { CompatibilityProjectDefaults } from "./compatibility-project.js";
 import type { PolicyEvaluationContext } from "../core/policy/types.js";
@@ -13,6 +17,7 @@ export function executeUploadCompatibility(
   defaults: CompatibilityProjectDefaults = {},
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
+  reservedUpload?: ReservedUploadCustody,
 ) {
   const params = UploadCompatibilitySchema.parse(input);
   return executeNamedTarget(
@@ -21,5 +26,6 @@ export function executeUploadCompatibility(
     defaults,
     caller,
     onAuthorized,
+    reservedUpload,
   );
 }

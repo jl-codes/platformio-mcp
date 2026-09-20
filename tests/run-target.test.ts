@@ -370,3 +370,90 @@ it("upload compatibility obeys the same upload permission before session cleanup
   expect(client.run).not.toHaveBeenCalled();
   expect(buildTarget).not.toHaveBeenCalled();
 });
+
+it.each(["valid", "other-owner", "other-port", "already-open"])(
+  "validates retained upload reservation: %s",
+  async (kind) => {
+    fs.writeFileSync(
+      path.join(project, ".pio-mcp-policy.json"),
+      JSON.stringify({
+        profile: "lab_runner",
+        overrides: { audit_all_agent_actions: false },
+      }),
+    );
+    const reserved = {
+      sessionId: "pending-monitor",
+      path: "COM9",
+      projectDir: project,
+      state: kind === "already-open" ? "open" : "authorizing",
+      cleanupPending: true,
+    };
+    const stop = vi.fn();
+    const client = {
+      run: async (
+        _context: unknown,
+        execute: (service: unknown, owner: unknown) => Promise<unknown>,
+      ) =>
+        execute(
+          {
+            sessions: {
+              list: () => (kind === "other-owner" ? [] : [reserved]),
+              stop,
+            },
+          },
+          {},
+        ),
+    } as unknown as SerialClientContext;
+    const custody = { prepareSpawn: vi.fn(), releaseAfterExit: vi.fn() };
+    const signal = new AbortController().signal;
+    const retained = {
+      custody,
+      signal,
+      sessionId: reserved.sessionId,
+      path: kind === "other-port" ? "COM10" : "COM9",
+    };
+    const request = { project_dir: project, upload_port: "COM9" };
+    const decision = await executeUploadCompatibility(
+      request,
+      client,
+      {},
+      {},
+      undefined,
+      retained,
+    ).catch((error) => error);
+    expect(decision.code).toBe("APPROVAL_REQUIRED");
+    expect(buildTarget).not.toHaveBeenCalled();
+    const approvalId = decision.context.policyDecision.approvalId;
+    approveRequest(approvalId);
+    const operation = executeUploadCompatibility(
+      { ...request, approval_id: approvalId },
+      client,
+      {},
+      {},
+      undefined,
+      retained,
+    );
+    if (kind === "valid") {
+      await expect(operation).resolves.toMatchObject({
+        ok: true,
+        stopped_sessions: [],
+      });
+      expect(buildTarget).toHaveBeenCalledWith(
+        expect.any(String),
+        "upload",
+        undefined,
+        false,
+        expect.objectContaining({
+          deviceCustody: custody,
+          cancellation: signal,
+        }),
+      );
+    } else {
+      await expect(operation).rejects.toMatchObject({
+        code: "UPLOAD_CUSTODY_MISMATCH",
+      });
+      expect(buildTarget).not.toHaveBeenCalled();
+    }
+    expect(stop).not.toHaveBeenCalled();
+  },
+);

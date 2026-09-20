@@ -2,6 +2,7 @@
  * Execute named PlatformIO targets with effect-based policy and caller-owned monitor cleanup.
  * Physical target adapters supply an already resolved serial port; discovery remains separately authorized.
  */
+import type { ProcessDeviceCustody } from "../core/devices/process-device-custody.js";
 import { z } from "zod";
 import { inspectPortDiagnostics } from "../core/devices/port-diagnostics.js";
 import {
@@ -51,6 +52,14 @@ export const RunTargetSchema = z
   })
   .strict();
 
+/** Host-only custody from the same connection's unopened monitor; never constructed from MCP JSON. */
+export interface ReservedUploadCustody {
+  sessionId: string;
+  path: string;
+  custody: ProcessDeviceCustody;
+  signal: AbortSignal;
+}
+
 /** Authorize before stopping monitors or spawning, and preserve cleanup uncertainty on failure. */
 export async function executeNamedTarget(
   input: unknown,
@@ -58,6 +67,7 @@ export async function executeNamedTarget(
   defaults: CompatibilityProjectDefaults = {},
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
+  reservedUpload?: ReservedUploadCustody,
 ) {
   const request = RunTargetSchema.parse(input);
   const projectDir = await resolveCompatibilityProject(
@@ -107,12 +117,46 @@ export async function executeNamedTarget(
       const endpoint = uploadPort
         ? resolveSerialEndpoint(uploadPort)
         : undefined;
+      if (
+        reservedUpload &&
+        (request.target !== "upload" ||
+          !endpoint ||
+          resolveSerialEndpoint(reservedUpload.path).resource.identity !==
+            endpoint.resource.identity)
+      )
+        throw new PlatformIOError(
+          "Retained upload custody does not match the selected target.",
+          "UPLOAD_CUSTODY_MISMATCH",
+        );
       const stopped: string[] = [];
       return hardwareLockManager.withImplicitLock(async () => {
         guard();
         if (effects.deviceAccess !== "none") {
           await client.run({ caller }, async (service, owner) => {
-            const held = service.sessions.list(owner).filter((session) => {
+            const sessions = service.sessions.list(owner);
+            if (reservedUpload) {
+              const reserved = sessions.find(
+                (session) => session.sessionId === reservedUpload.sessionId,
+              );
+              if (
+                !reserved ||
+                reserved.projectDir !== projectDir ||
+                reserved.state !== "authorizing" ||
+                !reserved.cleanupPending ||
+                resolveSerialEndpoint(reserved.path).resource.identity !==
+                  endpoint!.resource.identity
+              )
+                throw new PlatformIOError(
+                  "Upload reservation is not an owned pending monitor.",
+                  "UPLOAD_CUSTODY_MISMATCH",
+                );
+            }
+            const held = sessions.filter((session) => {
+              if (
+                reservedUpload &&
+                session.sessionId === reservedUpload.sessionId
+              )
+                return false;
               if (
                 ["stopped", "disconnected", "error"].includes(session.state) &&
                 !session.cleanupPending
@@ -164,6 +208,12 @@ export async function executeNamedTarget(
           await buildTarget(projectDir, request.target, environment, false, {
             uploadPort,
             serialPort: endpoint?.canonicalPort,
+            ...(reservedUpload
+              ? {
+                  deviceCustody: reservedUpload.custody,
+                  cancellation: reservedUpload.signal,
+                }
+              : {}),
             timeoutMs: effects.deviceAccess === "write" ? 180000 : 1200000,
             onResult: async (result) => {
               completed = await collect(result.exitCode, result.fullLogPath);

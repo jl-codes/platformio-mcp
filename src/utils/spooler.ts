@@ -139,7 +139,7 @@ function ensureLatestLogPointer(logFile: string, latestLog: string): { mirrorLat
 export async function executeWithSpooling(
   command: string,
   args: string[],
-  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; devicePort?: string; onSuccess?: () => Promise<void>; rootCommandId?: string; artifactType?: "build" | "upload" | "monitor" | "test" | "debug" }
+  options: { cwd: string; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; devicePort?: string; deviceCustody?: ProcessDeviceCustody; cancellation?: AbortSignal; onSuccess?: () => Promise<void>; rootCommandId?: string; artifactType?: "build" | "upload" | "monitor" | "test" | "debug" }
 ): Promise<SpoolingResult> {
   const projectArea = options.projectDir ?? options.cwd;
 
@@ -158,10 +158,14 @@ export async function executeWithSpooling(
   let deviceCustody: ProcessDeviceCustody | undefined;
   try {
     const custodyPort = options.devicePort ?? options.activePort;
-    if (custodyPort) {
+    deviceCustody = options.deviceCustody;
+    if (!deviceCustody && custodyPort)
       deviceCustody = acquireProcessDeviceCustody(custodyPort);
-      await deviceCustody.prepareSpawn();
-    }
+    if (options.cancellation?.aborted)
+      throw new PlatformIOError("Command cancelled before spawn.", "PROCESS_CANCELLED");
+    await deviceCustody?.prepareSpawn();
+    if (options.cancellation?.aborted)
+      throw new PlatformIOError("Command cancelled before spawn.", "PROCESS_CANCELLED");
     proc = await platformioExecutor.spawn(command, args, {
       cwd: options.cwd,
       stdio: ["ignore", outFd, outFd],
@@ -181,7 +185,12 @@ export async function executeWithSpooling(
   // Observe exit/error before registry I/O yields; startup failures use the same bounded waiter.
   const timeoutMs = options.timeout ?? (options.background ? 3600000 : 600000);
   const startupCancellation = new AbortController();
+  const cancelFromCaller = () => startupCancellation.abort();
+  options.cancellation?.addEventListener("abort", cancelFromCaller, { once: true });
+  if (options.cancellation?.aborted) cancelFromCaller();
   const completion = waitForOwnedProcess(proc, timeoutMs, 1000, startupCancellation.signal);
+  const removeCancellation = () => options.cancellation?.removeEventListener("abort", cancelFromCaller);
+  void completion.then(removeCancellation, removeCancellation);
   void completion.catch(() => {}); // The result is consumed after registration or in its failure path.
 
   const ctx = mcpContext.getStore();

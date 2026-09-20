@@ -231,3 +231,83 @@ it("releases explicit endpoint custody without clearing a legacy port claim", as
   expect(mocks.finish).toHaveBeenCalledOnce();
   expect(mocks.release).not.toHaveBeenCalled();
 });
+
+it.each([false, true])(
+  "uses borrowed workflow custody and retains it on uncertain completion=%s",
+  async (cleanupPending) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-borrowed-upload-"));
+    roots.push(root);
+    const custody = { prepareSpawn: vi.fn(), releaseAfterExit: vi.fn() };
+    mocks.wait.mockRejectedValueOnce(
+      new PlatformIOError("cancelled", "PROCESS_CANCELLED", { cleanupPending }),
+    );
+    await expect(
+      executeWithSpooling("run", ["--target", "upload"], {
+        cwd: root,
+        devicePort: "COM99",
+        deviceCustody: custody,
+      }),
+    ).rejects.toMatchObject({
+      code: "PROCESS_CANCELLED",
+      context: { cleanupPending },
+    });
+    expect(mocks.acquire).not.toHaveBeenCalled();
+    expect(custody.prepareSpawn).toHaveBeenCalledOnce();
+    expect(custody.releaseAfterExit).toHaveBeenCalledTimes(
+      cleanupPending ? 0 : 1,
+    );
+    expect(mocks.finish).not.toHaveBeenCalled();
+  },
+);
+
+it("returns borrowed custody without spawning when cancelled during preparation", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-cancel-upload-"));
+  roots.push(root);
+  const abort = new AbortController();
+  const custody = {
+    prepareSpawn: vi.fn(() => abort.abort()),
+    releaseAfterExit: vi.fn(),
+  };
+  await expect(
+    executeWithSpooling("run", [], {
+      cwd: root,
+      deviceCustody: custody,
+      cancellation: abort.signal,
+    }),
+  ).rejects.toMatchObject({ context: { cleanupPending: false } });
+  expect(mocks.spawn).not.toHaveBeenCalled();
+  expect(custody.releaseAfterExit).toHaveBeenCalledOnce();
+});
+
+it("forwards workflow cancellation to the owned child waiter and removes its listener", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-stop-upload-"));
+  roots.push(root);
+  const abort = new AbortController();
+  const remove = vi.spyOn(abort.signal, "removeEventListener");
+  const custody = { prepareSpawn: vi.fn(), releaseAfterExit: vi.fn() };
+  mocks.wait.mockImplementationOnce(
+    (_proc, _timeout, _grace, signal: AbortSignal) =>
+      new Promise((_resolve, reject) => {
+        signal.addEventListener(
+          "abort",
+          () =>
+            reject(
+              new PlatformIOError("stopped", "PROCESS_CANCELLED", {
+                cleanupPending: false,
+              }),
+            ),
+          { once: true },
+        );
+        abort.abort();
+      }),
+  );
+  await expect(
+    executeWithSpooling("run", [], {
+      cwd: root,
+      deviceCustody: custody,
+      cancellation: abort.signal,
+    }),
+  ).rejects.toMatchObject({ code: "PROCESS_CANCELLED" });
+  expect(custody.releaseAfterExit).toHaveBeenCalledOnce();
+  expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+});

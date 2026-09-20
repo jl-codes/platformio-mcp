@@ -16976,10 +16976,14 @@ async function executeWithSpooling(command, args, options) {
   let deviceCustody;
   try {
     const custodyPort = options.devicePort ?? options.activePort;
-    if (custodyPort) {
+    deviceCustody = options.deviceCustody;
+    if (!deviceCustody && custodyPort)
       deviceCustody = acquireProcessDeviceCustody(custodyPort);
-      await deviceCustody.prepareSpawn();
-    }
+    if (options.cancellation?.aborted)
+      throw new PlatformIOError("Command cancelled before spawn.", "PROCESS_CANCELLED");
+    await deviceCustody?.prepareSpawn();
+    if (options.cancellation?.aborted)
+      throw new PlatformIOError("Command cancelled before spawn.", "PROCESS_CANCELLED");
     proc = await platformioExecutor.spawn(command, args, {
       cwd: options.cwd,
       stdio: ["ignore", outFd, outFd],
@@ -17000,7 +17004,12 @@ async function executeWithSpooling(command, args, options) {
   }
   const timeoutMs = options.timeout ?? (options.background ? 36e5 : 6e5);
   const startupCancellation = new AbortController();
+  const cancelFromCaller = () => startupCancellation.abort();
+  options.cancellation?.addEventListener("abort", cancelFromCaller, { once: true });
+  if (options.cancellation?.aborted) cancelFromCaller();
   const completion = waitForOwnedProcess(proc, timeoutMs, 1e3, startupCancellation.signal);
+  const removeCancellation = () => options.cancellation?.removeEventListener("abort", cancelFromCaller);
+  void completion.then(removeCancellation, removeCancellation);
   void completion.catch(() => {
   });
   const ctx = mcpContext.getStore();
@@ -109572,7 +109581,9 @@ async function buildTarget(projectDir, target, environment, verbose, execution =
       cwd: validatedPath,
       projectDir: validatedPath,
       timeout: execution.timeoutMs ?? 6e5,
-      devicePort: execution.serialPort
+      devicePort: execution.serialPort,
+      deviceCustody: execution.deviceCustody,
+      cancellation: execution.cancellation
     });
     if ("status" in result) {
       return result;
@@ -110420,7 +110431,7 @@ var RunTargetSchema = external_exports.object({
   config_approval_id: external_exports.string().max(256).optional(),
   selection_approval_id: external_exports.string().max(256).optional()
 }).strict();
-async function executeNamedTarget(input, client, defaults = {}, caller = {}, onAuthorized) {
+async function executeNamedTarget(input, client, defaults = {}, caller = {}, onAuthorized, reservedUpload) {
   const request = RunTargetSchema.parse(input);
   const projectDir = await resolveCompatibilityProject(
     request.project_dir,
@@ -110467,12 +110478,30 @@ async function executeNamedTarget(input, client, defaults = {}, caller = {}, onA
       await onAuthorized?.();
       guard();
       const endpoint = uploadPort ? resolveSerialEndpoint(uploadPort) : void 0;
+      if (reservedUpload && (request.target !== "upload" || !endpoint || resolveSerialEndpoint(reservedUpload.path).resource.identity !== endpoint.resource.identity))
+        throw new PlatformIOError(
+          "Retained upload custody does not match the selected target.",
+          "UPLOAD_CUSTODY_MISMATCH"
+        );
       const stopped = [];
       return hardwareLockManager.withImplicitLock(async () => {
         guard();
         if (effects2.deviceAccess !== "none") {
           await client.run({ caller }, async (service, owner) => {
-            const held = service.sessions.list(owner).filter((session2) => {
+            const sessions = service.sessions.list(owner);
+            if (reservedUpload) {
+              const reserved = sessions.find(
+                (session2) => session2.sessionId === reservedUpload.sessionId
+              );
+              if (!reserved || reserved.projectDir !== projectDir || reserved.state !== "authorizing" || !reserved.cleanupPending || resolveSerialEndpoint(reserved.path).resource.identity !== endpoint.resource.identity)
+                throw new PlatformIOError(
+                  "Upload reservation is not an owned pending monitor.",
+                  "UPLOAD_CUSTODY_MISMATCH"
+                );
+            }
+            const held = sessions.filter((session2) => {
+              if (reservedUpload && session2.sessionId === reservedUpload.sessionId)
+                return false;
               if (["stopped", "disconnected", "error"].includes(session2.state) && !session2.cleanupPending)
                 return false;
               if (!endpoint) return session2.projectDir === projectDir;
@@ -110516,6 +110545,10 @@ async function executeNamedTarget(input, client, defaults = {}, caller = {}, onA
           await buildTarget(projectDir, request.target, environment, false, {
             uploadPort,
             serialPort: endpoint?.canonicalPort,
+            ...reservedUpload ? {
+              deviceCustody: reservedUpload.custody,
+              cancellation: reservedUpload.signal
+            } : {},
             timeoutMs: effects2.deviceAccess === "write" ? 18e4 : 12e5,
             onResult: async (result) => {
               completed = await collect(result.exitCode, result.fullLogPath);
@@ -110673,14 +110706,15 @@ async function diagnoseTargetPortFailure(port, code, projectDir, caller) {
 
 // src/adapters/upload-compat.ts
 var UploadCompatibilitySchema = RunTargetSchema.omit({ target: true });
-function executeUploadCompatibility(input, client, defaults = {}, caller = {}, onAuthorized) {
+function executeUploadCompatibility(input, client, defaults = {}, caller = {}, onAuthorized, reservedUpload) {
   const params = UploadCompatibilitySchema.parse(input);
   return executeNamedTarget(
     { ...params, target: "upload" },
     client,
     defaults,
     caller,
-    onAuthorized
+    onAuthorized,
+    reservedUpload
   );
 }
 
