@@ -37,3 +37,9 @@ To decode an earlier retained build, pass archivedElfSha256 to decode_backtrace 
 
 
 The optional compatibility extension archived_elf_sha256 provides the same retained-build selection through pio_decode_backtrace. Its result includes elf_archive_path. Canonical project/configuration, analysis and owned-session permissions still apply.
+
+### Named target execution
+
+The canonical run_target MCP tool accepts projectDir, target, environment, uploadPort and stopOpenSessions. With compatibility enabled, pio_run_target accepts the reference spellings project_dir, env, upload_port and stop_open_sessions. Both use the same executor and effect-specific permission categories; custom target names require privileged host-code permission. A concrete run_target or pio_run_target denial also applies to their internal effect operations.
+
+Serial targets resolve a configured upload port or one unambiguous likely board, coordinate caller-owned monitor cleanup, and retain endpoint custody until process cleanup. This implementation still lacks network/probe destination integration, complete uploaded-artifact binding and full physical acceptance. It does not establish complete PAR-35 parity.

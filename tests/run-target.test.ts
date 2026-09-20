@@ -226,3 +226,13 @@ it.each([
     if (stopOpen) expect(stop).toHaveBeenCalledWith(owner, "owned");
   },
 );
+
+it("honors a public run_target denial before executing an allowed build category", async () => {
+  fs.writeFileSync(path.join(project, ".pio-mcp-policy.json"), JSON.stringify({
+    profile: "build_only", deny: ["run_target"],
+    overrides: { audit_all_agent_actions: false },
+  }));
+  await expect(executeNamedTarget({ target: "buildfs", project_dir: project },
+    {} as SerialClientContext)).rejects.toMatchObject({ code: "POLICY_DENIED" });
+  expect(buildTarget).not.toHaveBeenCalled();
+});

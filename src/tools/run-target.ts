@@ -267,3 +267,41 @@ export async function resolveTargetSerialSelection(
   );
   return { environment: config.name, port };
 }
+
+/** Map the canonical tool spelling to the same executor used by the compatibility tool. */
+export function executeRunTargetAction(
+  input: unknown,
+  client: SerialClientContext,
+  caller: PolicyEvaluationContext = {},
+  onAuthorized?: () => Promise<void>,
+) {
+  const params = z
+    .object({
+      target: RunTargetSchema.shape.target,
+      projectDir: z.string().min(1).max(32768),
+      environment: RunTargetSchema.shape.env,
+      uploadPort: RunTargetSchema.shape.upload_port,
+      stopOpenSessions: z.boolean().default(false),
+      approvalId: z.string().max(256).optional(),
+      configApprovalId: z.string().max(256).optional(),
+      selectionApprovalId: z.string().max(256).optional(),
+    })
+    .strict()
+    .parse(input);
+  return executeNamedTarget(
+    {
+      target: params.target,
+      project_dir: params.projectDir,
+      env: params.environment,
+      upload_port: params.uploadPort,
+      stop_open_sessions: params.stopOpenSessions,
+      approval_id: params.approvalId,
+      config_approval_id: params.configApprovalId,
+      selection_approval_id: params.selectionApprovalId,
+    },
+    client,
+    {},
+    caller,
+    onAuthorized,
+  );
+}

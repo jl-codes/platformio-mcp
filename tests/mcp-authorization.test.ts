@@ -109,7 +109,7 @@ describe("schema compatibility comparator", () => {
 describe("stdio MCP policy boundary", () => {
   it("keeps all 42 existing tool declarations available", async () => {
     const listed = await harness.client.listTools();
-    expect(listed.tools).toHaveLength(54);
+    expect(listed.tools).toHaveLength(55);
   });
   it("preserves every pinned upstream tool input contract", async () => {
     const baseline = JSON.parse(
@@ -216,4 +216,16 @@ it("marks configuration as inspection and denies metadata/target scripts through
     expect(response.isError).toBe(true);
     expect(JSON.stringify(response)).toContain("POLICY_DENIED");
   }
+});
+
+it("routes named targets through effect policy before execution", async () => {
+  fs.writeFileSync(path.join(project, "platformio.ini"), "[env:native]\nplatform=native\n");
+  const listed = await harness.client.listTools();
+  expect(listed.tools.find((tool) => tool.name === "run_target")?.annotations)
+    .toMatchObject({ readOnlyHint: false, destructiveHint: true });
+  const response = await harness.client.callTool({
+    name: "run_target", arguments: { projectDir: project, target: "buildfs" },
+  });
+  expect(response.isError).toBe(true);
+  expect(JSON.stringify(response)).toContain("POLICY_DENIED");
 });

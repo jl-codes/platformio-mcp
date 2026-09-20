@@ -25,6 +25,10 @@ const READ: ActionSafetyMetadata = {
 
 /** Existing callable MCP actions; additions require matching registered handlers. */
 export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  run_target: {
+    policyAction: "run_shell_command", riskLevel: "critical",
+    readOnly: false, destructive: true, idempotent: false, openWorld: true,
+  },
   deps_check: {
     ...READ,
     policyAction: "get_project_config",
@@ -445,6 +449,8 @@ export function policyNamesForOperation(name: string): string[] {
   let current = name;
   while (!names.includes(current)) {
     names.push(current);
+    if (current === name && Object.hasOwn(INTERNAL_ACTIONS, name) && name.startsWith("target_"))
+      names.push("run_target", "pio_run_target");
     const parent = Object.hasOwn(MCP_ACTIONS, current)
       ? MCP_ACTIONS[current].policyAction
       : Object.hasOwn(INTERNAL_ACTIONS, current)

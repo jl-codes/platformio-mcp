@@ -1003,3 +1003,7 @@ The target service now preflights effect policy, resolves omitted serial destina
 ### Scoped target cleanup acceptance
 
 Extended workflow regression coverage through the real policy/approval service with isolated operator storage outside each test project. An approved filesystem target refuses a held monitor by default; stop_open_sessions closes only the supplied owner capability's session; cleanupPending prevents buildTarget; confirmed closure forwards the same selected port into argv and endpoint custody. Twelve focused workflow checks passed. This is synthetic transport acceptance, not physical-device or public-MCP parity.
+
+### Public named-target routes
+
+Registered run_target and optional pio_run_target using the same executor. Canonical inputs map to the reference spelling without a second implementation. Target effect policy chains now honor public-name denials as well as effect/category denials. Thirty-six workflow/effect checks and one focused real-stdio named-target denial check passed; no PlatformIO operation executed. Canonical inventory is 55 tools, with 29 optional aliases (84 total). The attempted alias test-name filter matched no cases, so it supplies no additional validation evidence. Public exposure does not close PAR-35: network/probe targets, artifact binding, diagnostic presentation and native/hardware acceptance remain required.

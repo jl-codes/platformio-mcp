@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { executeNamedTarget, executeRunTargetAction } from "./tools/run-target.js";
 import { registerShutdownTask } from "./utils/shutdown-coordinator.js";
 import {
   executeDeviceCompatibility,
@@ -291,6 +292,22 @@ const toolDefinitions: ToolDefinition[] = [
       },
       required: ["projectDir"],
       additionalProperties: false,
+    },
+  },
+  {
+    name: "run_target",
+    description: "Run a named PlatformIO target with effect-based permissions. Serial upload targets coordinate owned monitors and endpoint custody; network/probe destinations require their dedicated workflow.",
+    inputSchema: {
+      type: "object", required: ["projectDir", "target"], additionalProperties: false,
+      properties: {
+        projectDir: { type: "string", minLength: 1, maxLength: 32768 },
+        target: { type: "string", minLength: 1, maxLength: 4096 },
+        environment: { type: ["string", "null"] },
+        uploadPort: { type: ["string", "null"] },
+        stopOpenSessions: { type: "boolean", default: false },
+        approvalId: { type: "string" }, configApprovalId: { type: "string" },
+        selectionApprovalId: { type: "string" },
+      },
     },
   },
   {
@@ -1619,6 +1636,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const compatibilityTool =
     packageCompatibility ||
     projectCompatibility ||
+    name === "pio_run_target" ||
     dependencyCompatibility ||
     boardCompatibility ||
     deviceCompatibility;
@@ -1637,6 +1655,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     if (
+      name === "run_target" ||
       name === "deps_check" ||
       name === "decode_backtrace" ||
       name === "size_report" ||
@@ -1675,7 +1694,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         () =>
           registeredTool.handler(args, {
             dispatch: async (tool, parameters) =>
-              tool === "deps_check"
+              tool === "run_target"
+                ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized)
+                : tool === "pio_run_target"
+                  ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
+                : tool === "deps_check"
                 ? inspectDependencies(parameters, caller, onAuthorized)
                 : compatibilityTool
                   ? (deviceCompatibility
@@ -1719,6 +1742,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         success: result.ok,
         status: result.ok ? "completed" : "failed",
         summary:
+          name === "run_target" ||
           name === "deps_check" ||
           name.startsWith("pkg_") ||
           compatibilityTool ||

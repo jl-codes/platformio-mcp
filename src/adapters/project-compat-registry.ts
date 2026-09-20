@@ -167,5 +167,30 @@ export function withProjectCompatibility<TResult>(
     },
     handler: (args, context) => context.dispatch("pio_test", args),
   });
+  const target = base.get("run_target");
+  if (!target || result.has("pio_run_target"))
+    throw new Error("Invalid named target compatibility registry");
+  result.set("pio_run_target", {
+    ...target,
+    name: "pio_run_target",
+    description:
+      "Run a named target through the canonical effect permissions and caller-owned serial lifecycle.",
+    inputSchema: {
+      type: "object",
+      required: ["target"],
+      additionalProperties: false,
+      properties: {
+        target: { type: "string" },
+        project_dir: { type: ["string", "null"], default: null },
+        env: { type: ["string", "null"], default: null },
+        upload_port: { type: ["string", "null"], default: null },
+        stop_open_sessions: { type: "boolean", default: false },
+        approval_id: { type: "string" },
+        config_approval_id: { type: "string" },
+        selection_approval_id: { type: "string" },
+      },
+    },
+    handler: (args, context) => context.dispatch("pio_run_target", args),
+  });
   return result;
 }
