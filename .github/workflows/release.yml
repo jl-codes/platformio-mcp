@@ -21,6 +21,12 @@ on:
         default: false
         type: boolean
 
+      publish_ghcr:
+        description: Publish validated native images under all seven verified GHCR aliases
+        required: true
+        default: false
+        type: boolean
+
       acceptance_run_id:
         description: Completed same-commit acceptance run containing platformio-parity-acceptance evidence (required for publication)
         required: false
@@ -170,7 +176,7 @@ jobs:
           package-manager-cache: false
 
       - name: Verify release tag matches package version
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_npm || inputs.publish_pypi || inputs.publish_mcp_registry
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_npm || inputs.publish_pypi || inputs.publish_mcp_registry || inputs.publish_ghcr
         run: |
           expected_ref="refs/tags/v$(node -p "require('./package.json').version")"
           if [ "$GITHUB_REF" != "$expected_ref" ]; then
@@ -179,7 +185,7 @@ jobs:
           fi
 
       - name: Require complete final-revision acceptance before publication
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_npm || inputs.publish_pypi || inputs.publish_mcp_registry
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_npm || inputs.publish_pypi || inputs.publish_mcp_registry || inputs.publish_ghcr
         env:
           GH_TOKEN: ${{ github.token }}
           ACCEPTANCE_RUN: ${{ inputs.acceptance_run_id }}
@@ -205,6 +211,8 @@ jobs:
           npm --prefix web audit --audit-level=low
           npm run test:ci:unit
           npm run test:namespaces
+          python3 tests/test-container-release.py
+          python3 tests/test-container-publication.py
           npm run registry:validate
           npm --prefix web run test -- --run
           npm run test:e2e:ci
@@ -377,4 +385,44 @@ jobs:
         with:
           name: mcp-registry-publication
           path: release-artifacts/mcp-publication-*.json
+          if-no-files-found: warn
+
+  publish_container:
+    name: Publish all seven verified container aliases
+    needs: build_release
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_ghcr
+    runs-on: ubuntu-24.04
+    environment: ghcr
+    concurrency:
+      group: platformio-ghcr-publication
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download this run's validated native archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p container-release-artifacts
+          gh run download "$GITHUB_RUN_ID" --name platformio-container-amd64 --dir container-release-artifacts
+          gh run download "$GITHUB_RUN_ID" --name platformio-container-arm64 --dir container-release-artifacts
+      - name: Authenticate and publish identical version indexes
+        env:
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_PUBLISHERS_VERIFIED: ${{ vars.GHCR_PUBLISHERS_VERIFIED }}
+          DOCKER_CONFIG: ${{ runner.temp }}/platformio-docker-auth
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io >/dev/null 2>&1' EXIT
+          python3 scripts/publish-container-release.py container-release-artifacts --output container-publication/evidence.json
+      - name: Retain container publication accounting
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ghcr-publication
+          path: container-publication/evidence.json
           if-no-files-found: warn

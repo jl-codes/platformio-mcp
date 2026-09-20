@@ -1,4 +1,4 @@
-"""Bind native container archives and all four alias targets to the exact release source."""
+"""Bind native container archives and all seven alias targets to the exact release source."""
 import argparse
 import hashlib
 import json
@@ -7,7 +7,7 @@ import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-ALIASES = ("platformio-mcp", "platformio.mcp", "pio-mcp", "pio-agent")
+ALIASES = ("platformio-mcp", "platformio.mcp", "pio-mcp", "pio-agent", "platformiomcp", "pioagent", "flashagent")
 
 
 def digest_file(filename):
@@ -48,7 +48,7 @@ def validate(directory, loaded=False):
     names = [entry["name"] for entry in inventory["entries"] if entry["registry"] == "ghcr"]
     expected_names = [f"ghcr.io/jl-codes/{alias}" for alias in ALIASES]
     if len(names) != len(expected_names) or set(names) != set(expected_names):
-        raise ValueError("All four requested container aliases must be accounted for")
+        raise ValueError("All seven requested container aliases must be accounted for")
     artifacts = []
     for arch in ("amd64", "arm64"):
         archive = directory / f"pio-agent-{arch}.tar"

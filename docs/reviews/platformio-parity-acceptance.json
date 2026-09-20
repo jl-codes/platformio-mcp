@@ -1445,6 +1445,19 @@
       "artifacts": [],
       "expectedAssertion": "ESP32/ESP8266 firmware/filesystem OTA and real PPK2 measurement/source safety",
       "nextAction": "Complete implementation and attach final-revision hardware evidence."
+    },
+    {
+      "requirementId": "NS-CONTAINER",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Native Linux amd64/arm64 container execution, policy configuration, MCP lifecycle and non-root device access with exact release image identity",
+      "nextAction": "Collect same-commit native acceptance on both Linux architectures before container publication."
     }
   ]
 }

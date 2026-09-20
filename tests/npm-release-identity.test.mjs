@@ -36,7 +36,7 @@ test("namespace inventory preserves existing names and keeps unverified candidat
  const released=npmReleasePackages(root);
  assert.deepEqual(released.map(item=>item.name).sort(),["pio-agent","pio-mcp","platformio-mcp"]);
  const candidates=npmReleasePackages(root,{includeCandidates:true}).filter(item=>!item.publishIntent);
- assert.equal(candidates.length,4);
+ assert.equal(candidates.length,5);
  assert.ok(candidates.some(item=>item.name==="@forkbomb/platformio.mcp"));
- assert.ok(candidates.every(item=>item.filename.startsWith("forkbomb-") && item.version===released[0].version));
+ assert.ok(candidates.every(item=>(item.filename.startsWith("forkbomb-") || item.name==="flashagent") && item.version===released[0].version));
 });

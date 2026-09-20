@@ -204,6 +204,63 @@
       "publishIntent": false,
       "source": "https://github.com/jl-codes/platformio-mcp",
       "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+    },
+    {
+      "registry": "npm",
+      "name": "flashagent",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "packagePath": "packages/flashagent",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Functional alias prepared; public metadata returned 404, but publisher authority and naming eligibility remain unverified."
+    },
+    {
+      "registry": "pypi",
+      "name": "platformiomcp",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Explicit requested alias; metadata returned 404. Functional wheel packaging, publisher authority and eligibility remain pending."
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/platformiomcp",
+      "role": "candidate_container",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
+    },
+    {
+      "registry": "pypi",
+      "name": "pioagent",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Explicit requested alias; metadata returned 404. Functional wheel packaging, publisher authority and eligibility remain pending."
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/pioagent",
+      "role": "candidate_container",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
+    },
+    {
+      "registry": "pypi",
+      "name": "flashagent",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Explicit requested alias; metadata returned 404. Functional wheel packaging, publisher authority and eligibility remain pending."
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/flashagent",
+      "role": "candidate_container",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
     }
   ],
   "unsupportedChannels": [
@@ -214,5 +271,14 @@
     "winget",
     "Chocolatey",
     "domains"
+  ],
+  "requestedAliases": [
+    "platformio-mcp",
+    "pio-mcp",
+    "platformio.mcp",
+    "pio-agent",
+    "platformiomcp",
+    "pioagent",
+    "flashagent"
   ]
 }
