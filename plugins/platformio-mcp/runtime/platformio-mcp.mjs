@@ -94003,6 +94003,38 @@ function projectCompatibilityDevices(devices) {
   };
 }
 async function executeDeviceCompatibility(client, name2, input, defaults = {}, caller = {}, onAuthorized) {
+  if (name2 === "pio_monitor_stop") {
+    const params2 = external_exports.object({ session_id: external_exports.string().min(1).max(256) }).strict().parse(input);
+    return client.run({ caller }, async (service, owner) => {
+      const session = await service.sessions.stop(owner, params2.session_id);
+      const info = projectCompatibilitySession(session);
+      return {
+        ok: !session.cleanupPending,
+        summary: session.cleanupPending ? `Session ${params2.session_id} closure is unconfirmed; device ownership is retained.` : `session ${params2.session_id} on ${info.port} closed after ${info.uptime_s}s and ${info.bytes_received} bytes.`,
+        ...info
+      };
+    });
+  }
+  if (name2 === "pio_monitor_list") {
+    const params2 = external_exports.object({ approval_id: external_exports.string().max(256).optional() }).strict().parse(input);
+    const projectDir2 = await fs13.realpath(
+      path18.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd())
+    );
+    return client.run(
+      { caller, approvalId: params2.approval_id },
+      async (service, owner) => {
+        const sessions = (await service.listSessions(owner, projectDir2)).map(
+          projectCompatibilitySession
+        );
+        await onAuthorized?.();
+        return {
+          ok: true,
+          summary: `${sessions.length} open session(s).`,
+          sessions
+        };
+      }
+    );
+  }
   if (name2 !== "pio_list_devices")
     throw new PlatformIOError(
       "Unknown device compatibility tool.",
@@ -94030,22 +94062,7 @@ async function executeDeviceCompatibility(client, name2, input, defaults = {}, c
         guard();
         return {
           ...projectCompatibilityDevices(devices),
-          open_monitor_sessions: sessions.map((session) => ({
-            session_id: session.sessionId,
-            port: session.path,
-            baud: session.baudRate,
-            lines_buffered: session.linesBuffered,
-            next_cursor: session.nextCursor,
-            bytes_received: session.bytesReceived,
-            uptime_s: Math.round(
-              Math.max(0, Date.now() - Date.parse(session.startedAt)) / 100
-            ) / 10,
-            closed: ["stopped", "disconnected", "error"].includes(
-              session.state
-            ),
-            error: session.cleanupError ?? (session.state === "error" ? "SERIAL_TRANSPORT_ERROR" : null),
-            cleanup_pending: session.cleanupPending
-          }))
+          open_monitor_sessions: sessions.map(projectCompatibilitySession)
         };
       }
     )
@@ -94070,7 +94087,43 @@ function withDeviceCompatibility(base2) {
     },
     handler: (args, context) => context.dispatch("pio_list_devices", args)
   });
+  for (const [name2, canonical3] of [
+    ["pio_monitor_list", "get_monitor_status"],
+    ["pio_monitor_stop", "stop_monitor"]
+  ]) {
+    const source2 = base2.get(canonical3);
+    if (!source2 || result.has(name2))
+      throw new Error("Invalid monitor compatibility registry");
+    result.set(name2, {
+      ...source2,
+      name: name2,
+      description: name2 === "pio_monitor_list" ? "List this connection's authorized monitor sessions." : "Close an owned monitor session, retaining device ownership until closure is confirmed.",
+      inputSchema: {
+        type: "object",
+        properties: name2 === "pio_monitor_list" ? { approval_id: { type: "string" } } : { session_id: { type: "string" } },
+        ...name2 === "pio_monitor_stop" ? { required: ["session_id"] } : {},
+        additionalProperties: false
+      },
+      handler: (args, context) => context.dispatch(name2, args)
+    });
+  }
   return result;
+}
+function projectCompatibilitySession(session) {
+  return {
+    session_id: session.sessionId,
+    port: session.path,
+    baud: session.baudRate,
+    lines_buffered: session.linesBuffered,
+    next_cursor: session.nextCursor,
+    bytes_received: session.bytesReceived,
+    uptime_s: Math.round(
+      Math.max(0, Date.now() - Date.parse(session.startedAt)) / 100
+    ) / 10,
+    closed: !session.cleanupPending && ["stopped", "disconnected", "error"].includes(session.state),
+    error: session.cleanupError ?? (session.state === "error" ? "SERIAL_TRANSPORT_ERROR" : null),
+    cleanup_pending: session.cleanupPending
+  };
 }
 
 // src/core/serial/memory-capture.ts
@@ -114041,7 +114094,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_list_targets"
   ].includes(name2);
   const dependencyCompatibility = name2 === "pio_deps_check";
-  const deviceCompatibility = name2 === "pio_list_devices";
+  const deviceCompatibility = ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop"].includes(name2);
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name2
   );

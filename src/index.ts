@@ -1577,7 +1577,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     "pio_list_targets",
   ].includes(name);
   const dependencyCompatibility = name === "pio_deps_check";
-  const deviceCompatibility = name === "pio_list_devices";
+  const deviceCompatibility = ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop"].includes(name);
   const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
     name,
   );

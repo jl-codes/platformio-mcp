@@ -13,6 +13,7 @@ import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../core/policy/revision-guard.js";
 import { listDevicesCore } from "../core/devices.js";
 import { PlatformIOError } from "../utils/errors.js";
+import type { SerialSessionInfo } from "../core/serial/session-manager.js";
 import type { SerialDevice } from "../types.js";
 
 // Hint patterns adapted from the pinned reference devices.py; these are not identity checks.
@@ -61,6 +62,46 @@ export async function executeDeviceCompatibility(
   caller: PolicyEvaluationContext = {},
   onAuthorized?: () => Promise<void>,
 ) {
+  if (name === "pio_monitor_stop") {
+    const params = z
+      .object({ session_id: z.string().min(1).max(256) })
+      .strict()
+      .parse(input);
+    return client.run({ caller }, async (service, owner) => {
+      const session = await service.sessions.stop(owner, params.session_id);
+      const info = projectCompatibilitySession(session);
+      return {
+        ok: !session.cleanupPending,
+        summary: session.cleanupPending
+          ? `Session ${params.session_id} closure is unconfirmed; device ownership is retained.`
+          : `session ${params.session_id} on ${info.port} closed after ${info.uptime_s}s and ${info.bytes_received} bytes.`,
+        ...info,
+      };
+    });
+  }
+  if (name === "pio_monitor_list") {
+    const params = z
+      .object({ approval_id: z.string().max(256).optional() })
+      .strict()
+      .parse(input);
+    const projectDir = await fs.realpath(
+      path.resolve(defaults.projectDir ?? defaults.cwd ?? process.cwd()),
+    );
+    return client.run(
+      { caller, approvalId: params.approval_id },
+      async (service, owner) => {
+        const sessions = (await service.listSessions(owner, projectDir)).map(
+          projectCompatibilitySession,
+        );
+        await onAuthorized?.();
+        return {
+          ok: true,
+          summary: `${sessions.length} open session(s).`,
+          sessions,
+        };
+      },
+    );
+  }
   if (name !== "pio_list_devices")
     throw new PlatformIOError(
       "Unknown device compatibility tool.",
@@ -92,25 +133,7 @@ export async function executeDeviceCompatibility(
           guard();
           return {
             ...projectCompatibilityDevices(devices),
-            open_monitor_sessions: sessions.map((session) => ({
-              session_id: session.sessionId,
-              port: session.path,
-              baud: session.baudRate,
-              lines_buffered: session.linesBuffered,
-              next_cursor: session.nextCursor,
-              bytes_received: session.bytesReceived,
-              uptime_s:
-                Math.round(
-                  Math.max(0, Date.now() - Date.parse(session.startedAt)) / 100,
-                ) / 10,
-              closed: ["stopped", "disconnected", "error"].includes(
-                session.state,
-              ),
-              error:
-                session.cleanupError ??
-                (session.state === "error" ? "SERIAL_TRANSPORT_ERROR" : null),
-              cleanup_pending: session.cleanupPending,
-            })),
+            open_monitor_sessions: sessions.map(projectCompatibilitySession),
           };
         },
       ),
@@ -140,5 +163,54 @@ export function withDeviceCompatibility<TResult>(
     },
     handler: (args, context) => context.dispatch("pio_list_devices", args),
   });
+  for (const [name, canonical] of [
+    ["pio_monitor_list", "get_monitor_status"],
+    ["pio_monitor_stop", "stop_monitor"],
+  ] as const) {
+    const source = base.get(canonical);
+    if (!source || result.has(name))
+      throw new Error("Invalid monitor compatibility registry");
+    result.set(name, {
+      ...source,
+      name,
+      description:
+        name === "pio_monitor_list"
+          ? "List this connection's authorized monitor sessions."
+          : "Close an owned monitor session, retaining device ownership until closure is confirmed.",
+      inputSchema: {
+        type: "object",
+        properties:
+          name === "pio_monitor_list"
+            ? { approval_id: { type: "string" } }
+            : { session_id: { type: "string" } },
+        ...(name === "pio_monitor_stop" ? { required: ["session_id"] } : {}),
+        additionalProperties: false,
+      },
+      handler: (args, context) => context.dispatch(name, args),
+    });
+  }
   return result;
+}
+
+/** Present bounded owned-session metadata without disclosing serial content. */
+export function projectCompatibilitySession(session: SerialSessionInfo) {
+  return {
+    session_id: session.sessionId,
+    port: session.path,
+    baud: session.baudRate,
+    lines_buffered: session.linesBuffered,
+    next_cursor: session.nextCursor,
+    bytes_received: session.bytesReceived,
+    uptime_s:
+      Math.round(
+        Math.max(0, Date.now() - Date.parse(session.startedAt)) / 100,
+      ) / 10,
+    closed:
+      !session.cleanupPending &&
+      ["stopped", "disconnected", "error"].includes(session.state),
+    error:
+      session.cleanupError ??
+      (session.state === "error" ? "SERIAL_TRANSPORT_ERROR" : null),
+    cleanup_pending: session.cleanupPending,
+  };
 }

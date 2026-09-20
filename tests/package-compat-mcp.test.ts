@@ -52,12 +52,18 @@ it.each([
       );
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(enabled ? 67 : 54);
+      expect(tools).toHaveLength(enabled ? 69 : 54);
       expect(tools.some((tool) => tool.name === "pkg_install")).toBe(true);
       expect(tools.some((tool) => tool.name === "pio_pkg_install")).toBe(
         enabled,
       );
-      for (const name of ["pio_list_boards", "pio_board_info", "pio_list_devices"]) {
+      for (const name of [
+        "pio_list_boards",
+        "pio_board_info",
+        "pio_list_devices",
+        "pio_monitor_list",
+        "pio_monitor_stop",
+      ]) {
         expect(tools.some((tool) => tool.name === name)).toBe(enabled);
       }
       if (enabled) {
