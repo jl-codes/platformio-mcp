@@ -25,6 +25,7 @@ const READ: ActionSafetyMetadata = {
 
 /** Existing callable MCP actions; additions require matching registered handlers. */
 export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  coredump: { ...READ, policyAction: "get_project_config", riskLevel: "critical", readOnly: false, destructive: true, idempotent: false, openWorld: true },
   partition_table: { ...READ, policyAction: "get_project_config", riskLevel: "high", readOnly: false, destructive: true, idempotent: false, openWorld: true },
   run_target: {
     policyAction: "run_shell_command", riskLevel: "critical",

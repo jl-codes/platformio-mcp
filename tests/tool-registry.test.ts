@@ -7,6 +7,7 @@ import {
 } from "../src/mcp/tool-registry.js";
 
 const TOOL_NAMES = [
+  "coredump",
   "partition_table",
   "run_target",
   "deps_check",
@@ -79,7 +80,7 @@ describe("MCP tool registry", () => {
   it("assigns one complete contract and fixed-name handler to every tool", async () => {
     const registry = createToolRegistry<string>(definitions());
     const listed = listRegisteredTools(registry);
-    expect(listed).toHaveLength(56);
+    expect(listed).toHaveLength(57);
     expect(
       listed.every(
         (tool) =>

@@ -42,6 +42,7 @@ export const CoredumpSchema = z
 export async function executeCoredump(
   input: unknown,
   caller: PolicyEvaluationContext = {},
+  onAuthorized?: () => Promise<void>,
 ) {
   const request = CoredumpSchema.parse(input);
   const projectDir = await fs.realpath(request.projectDir);
@@ -70,6 +71,7 @@ export async function executeCoredump(
     context,
     async () => {
       const validatePolicy = createPolicyRevisionGuard(projectDir);
+    await onAuthorized?.();
       validatePolicy();
       const selection = { ...request, workspaceDir: projectDir };
       if (!request.analyze) {

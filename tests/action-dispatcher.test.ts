@@ -76,7 +76,7 @@ describe("shared action authorization", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
   it("uses the same permission identity for equivalent CLI and MCP entrypoints", () => {
-    expect(Object.keys(MCP_ACTIONS)).toHaveLength(56);
+    expect(Object.keys(MCP_ACTIONS)).toHaveLength(57);
     for (const [cli, operation] of [
       ["task-status", "check_task_status"],
       ["dashboard", "get_dashboard_url"],

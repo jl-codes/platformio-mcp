@@ -1137,3 +1137,8 @@ Added trusted-root debugger resolution and a fixed fail-fast command file disabl
 
 Added explicit server-environment Python/GDB selection, rejecting project-owned Python and reusing trusted debugger root validation. Added strict offline requests with separate artifact-read and critical host-execution preflights before grant consumption. Read-only inspection returns identities, never raw dump bytes. Three host-selection and three real policy cases passed after correcting the test enrollment store to sit outside its project; lint and TypeScript passed. The handler remains internal pending MCP/CLI registration; device acquisition and reference adapter remain unfinished.
 
+
+### Public offline core-dump registration
+
+Registered coredump in MCP and CLI with strict artifact arguments, staged permissions and host-only executable configuration. Added conservative action annotations, plugin coverage and usage instructions; rebuilt the plugin runtime. Canonical inventory is 57 and compatibility-enabled inventory is 89. Twenty-two focused policy/registry/manifest checks passed; TypeScript and targeted lint passed (existing index any warnings remain). Device acquisition and the reference pio_coredump adapter remain unfinished.
+

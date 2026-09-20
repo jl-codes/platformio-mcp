@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { executeCoredump } from "./tools/coredump.js";
 import { executePartitionCompatibility } from "./adapters/partition-compat.js";
 import { executePartitionTable } from "./tools/partition-table.js";
 import { executeSystemCompatibility } from "./adapters/system-compat.js";
@@ -298,6 +299,7 @@ const toolDefinitions: ToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  { name: "coredump", description: "Inspect an explicit offline ESP core dump, optionally producing a backtrace/register report against an explicit ELF. Analysis requires separately authorized host tools; no live device access.", inputSchema: {"type": "object", "required": ["projectDir", "dumpPath"], "additionalProperties": false, "properties": {"projectDir": {"type": "string", "minLength": 1, "maxLength": 32768}, "dumpPath": {"type": "string", "minLength": 1, "maxLength": 32768}, "elfPath": {"type": "string", "minLength": 1, "maxLength": 32768}, "expectedInputSha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}, "expectedElfSha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}, "approvalId": {"type": "string", "maxLength": 256}, "commandApprovalId": {"type": "string", "maxLength": 256}, "format": {"type": "string", "enum": ["raw", "base64"], "default": "raw"}, "analyze": {"type": "boolean", "default": true}, "encrypted": {"type": "boolean", "default": false}}} },
   {
     name: "partition_table",
     description: "Inspect ESP partition artifacts and firmware fit. Optional buildMetadata requires build permission and can execute project scripts. Optional readDevice resets/reads an explicitly selected serial device with separate permissions.",
@@ -1690,6 +1692,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     if (
+      name === "coredump" ||
       name === "partition_table" ||
       name === "run_target" ||
       name === "deps_check" ||
@@ -1730,7 +1733,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         () =>
           registeredTool.handler(args, {
             dispatch: async (tool, parameters) =>
-              tool === "partition_table"
+              tool === "coredump"
+                ? executeCoredump(parameters, caller, onAuthorized)
+                : tool === "partition_table"
                 ? executePartitionTable(parameters, caller, onAuthorized)
                 : tool === "run_target"
                 ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized)
@@ -1786,6 +1791,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         success: result.ok,
         status: result.ok ? "completed" : "failed",
         summary:
+          name === "coredump" ? "Offline core-dump inspection completed." :
           name === "partition_table" ||
       name === "run_target" ||
           name === "deps_check" ||
