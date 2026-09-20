@@ -6,6 +6,22 @@ import {
   DebugClientSessions,
   type OwnedDebugProcess,
 } from "../src/core/debug/debug-client-sessions.js";
+import type { GdbMiCommandResult } from "../src/core/debug/gdb-mi-session.js";
+function detachResult(
+  overrides: Partial<GdbMiCommandResult> = {},
+): GdbMiCommandResult {
+  return {
+    token: "1",
+    result: { kind: "result", token: "1", class: "done", fields: [] },
+    console: [],
+    truncated: false,
+    timedOut: false,
+    running: false,
+    closed: false,
+    exitCode: null,
+    ...overrides,
+  };
+}
 function processFixture() {
   return {
     command: vi.fn<OwnedDebugProcess["command"]>(),
@@ -183,4 +199,65 @@ it("expires stale startup approval identities", async () => {
   } finally {
     now.mockRestore();
   }
+});
+
+it("authorizes detach with the owned ID before process cleanup", async () => {
+  const owner = new DebugClientSessions(),
+    process = processFixture();
+  const id = await owner.start("project", "env", async () => process);
+  process.command.mockResolvedValue(detachResult());
+  await owner.detachAndStop(id, {}, 1200, "detach-grant");
+  expect(process.command).toHaveBeenCalledWith("detach", {}, 1200, {
+    sessionId: id,
+    approvalId: "detach-grant",
+  });
+  expect(process.cleanupProcess).toHaveBeenCalledOnce();
+  expect(owner.list()).toEqual([]);
+});
+
+it("retains a denied detach and permits independent process-only cleanup", async () => {
+  const owner = new DebugClientSessions(),
+    process = processFixture();
+  const id = await owner.start("project", "env", async () => process);
+  process.command.mockRejectedValue(
+    new PlatformIOError("Denied", "POLICY_DENIED"),
+  );
+  await expect(owner.detachAndStop(id, {})).rejects.toMatchObject({
+    code: "POLICY_DENIED",
+  });
+  expect(process.cleanupProcess).not.toHaveBeenCalled();
+  expect(owner.list()).toHaveLength(1);
+  await owner.stop(id);
+  expect(owner.list()).toEqual([]);
+});
+
+it.each([
+  detachResult({ timedOut: true }),
+  detachResult({ closed: true }),
+  detachResult({ result: { kind: "result", class: "error", fields: [] } }),
+])("retains unconfirmed detach results %j", async (result) => {
+  const owner = new DebugClientSessions(),
+    process = processFixture();
+  const id = await owner.start("project", "env", async () => process);
+  process.command.mockResolvedValue(result);
+  await expect(owner.detachAndStop(id, {})).rejects.toMatchObject({
+    code: "DEBUG_DETACH_FAILED",
+  });
+  expect(process.cleanupProcess).not.toHaveBeenCalled();
+  await owner.close();
+});
+
+it("disconnect cancels queued detach and still cleans its process", async () => {
+  const owner = new DebugClientSessions(),
+    process = processFixture();
+  const id = await owner.start("project", "env", async () => process);
+  const pending = owner.detachAndStop(id, {});
+  const rejected = expect(pending).rejects.toMatchObject({
+    code: "DEBUG_CLIENT_CLOSED",
+  });
+  const closing = owner.close();
+  await rejected;
+  expect(await closing).toEqual({ cleanupPending: false, failed: 0 });
+  expect(process.command).not.toHaveBeenCalled();
+  expect(process.cleanupProcess).toHaveBeenCalledOnce();
 });

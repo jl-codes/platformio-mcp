@@ -175,11 +175,67 @@ export class DebugClientSessions {
     return pending;
   }
 
+  /** Authorize target detach before cleanup; failed or denied detach leaves a recoverable session. */
+  detachAndStop(
+    id: string,
+    caller: PolicyEvaluationContext,
+    timeoutMs = 30000,
+    approvalId?: string,
+  ): Promise<void> {
+    if (this.closed)
+      throw new PlatformIOError(
+        "Debugger client disconnected.",
+        "DEBUG_CLIENT_CLOSED",
+      );
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600000)
+      throw new PlatformIOError(
+        "Invalid debugger detach timeout.",
+        "DEBUG_ARGUMENT_INVALID",
+      );
+    // Do not silently turn an already running process-only stop into a successful detach.
+    if (this.stopping.has(id))
+      throw new PlatformIOError(
+        "Debugger cleanup is in progress.",
+        "DEBUG_SESSION_CLOSING",
+      );
+    const entry = this.lookup(id);
+    const pending = Promise.resolve()
+      .then(async () => {
+        if (this.closed)
+          throw new PlatformIOError(
+            "Debugger client disconnected.",
+            "DEBUG_CLIENT_CLOSED",
+          );
+        const result = await entry.process.command(
+          "detach",
+          caller,
+          timeoutMs,
+          {
+            sessionId: id,
+            approvalId,
+          },
+        );
+        if (result.timedOut || result.closed || result.result?.class !== "done")
+          throw new PlatformIOError(
+            "Debugger did not confirm target detach; session retained for recovery.",
+            "DEBUG_DETACH_FAILED",
+            { sessionId: id, cleanupPending: true, targetStateUncertain: true },
+          );
+        await entry.process.cleanupProcess();
+        this.sessions.delete(id);
+      })
+      .finally(() => this.stopping.delete(id));
+    this.stopping.set(id, pending);
+    return pending;
+  }
+
   /** Refuse new work, await in-flight starts and retain failures for later cleanup retries. */
   async close() {
     this.closed = true;
     this.approvalReservations.clear();
     await Promise.allSettled([...this.starting]);
+    // A denied/failed detach must not prevent independent disconnect cleanup.
+    await Promise.allSettled([...this.stopping.values()]);
     const results = await Promise.allSettled(
       [...this.sessions.keys()].map((id) => this.stop(id)),
     );
