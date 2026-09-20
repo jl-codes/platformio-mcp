@@ -924,3 +924,8 @@ Completion tracking is attached immediately after child creation, before asynchr
 
 The existing buildTarget engine now accepts explicit uploadPort, bounded timeoutMs and completed-log observation without changing existing call defaults or result behavior. Invalid target/control inputs fail before execution. PlatformIOError codes and cleanupPending context survive target failure, allowing callers to retain uncertain hardware custody. TypeScript and nine mocked target-execution checks passed; plugin runtime rebuilt. PAR-35 remains incomplete: public canonical/compatibility routing, effect-based authorization, owned-session handling and shared physical-device leases must be integrated before exposure. No hardware target was executed.
 
+
+### Named-target effect authorization
+
+Added the planned target-effects service: exact known targets map to build, cleanup, firmware upload, filesystem upload or erase permissions; unknown/composed names require privileged host-code permission. The shared dispatcher binds the actual target into request arguments and respects concrete/category denials. Restricted read_only/build_only/monitor_only profiles now explicitly deny erase_flash and run_shell_command instead of permitting an approval escalation. TypeScript and 35 focused target/profile/engine checks passed; plugin runtime rebuilt. This authorization service is internal; PAR-35 public routing and physical custody/artifact/session integration remain incomplete.
+

@@ -73,6 +73,8 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
     deny: Array.from(
       new Set([
         ...defaultPolicy.deny,
+        "erase_flash",
+        "run_shell_command",
         "build_project",
         "check_project",
         "run_tests",
@@ -92,6 +94,8 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
     deny: Array.from(
       new Set([
         ...defaultPolicy.deny,
+        "erase_flash",
+        "run_shell_command",
         "upload_firmware",
         "upload_filesystem",
         "reset_server_state",
@@ -106,6 +110,8 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
     deny: Array.from(
       new Set([
         ...defaultPolicy.deny,
+        "erase_flash",
+        "run_shell_command",
         "build_project",
         "check_project",
         "run_tests",

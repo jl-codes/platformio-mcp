@@ -92434,6 +92434,21 @@ var MCP_ACTIONS = {
   }
 };
 var INTERNAL_ACTIONS = {
+  target_build: { ...MCP_ACTIONS.build_project, policyAction: "build_project" },
+  target_cleanup: { ...MCP_ACTIONS.clean_project, policyAction: "clean_project" },
+  target_upload: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
+  target_upload_filesystem: { ...MCP_ACTIONS.upload_filesystem, policyAction: "upload_filesystem" },
+  target_erase: {
+    ...MCP_ACTIONS.upload_firmware,
+    policyAction: "erase_flash",
+    riskLevel: "critical"
+  },
+  target_custom: {
+    ...MCP_ACTIONS.upload_firmware,
+    policyAction: "run_shell_command",
+    riskLevel: "critical",
+    openWorld: true
+  },
   dependency_inventory: { ...READ, policyAction: "get_project_config" },
   dependency_build: {
     ...MCP_ACTIONS.build_project,
@@ -92824,6 +92839,8 @@ var policyProfiles = {
     deny: Array.from(
       /* @__PURE__ */ new Set([
         ...defaultPolicy.deny,
+        "erase_flash",
+        "run_shell_command",
         "build_project",
         "check_project",
         "run_tests",
@@ -92843,6 +92860,8 @@ var policyProfiles = {
     deny: Array.from(
       /* @__PURE__ */ new Set([
         ...defaultPolicy.deny,
+        "erase_flash",
+        "run_shell_command",
         "upload_firmware",
         "upload_filesystem",
         "reset_server_state",
@@ -92857,6 +92876,8 @@ var policyProfiles = {
     deny: Array.from(
       /* @__PURE__ */ new Set([
         ...defaultPolicy.deny,
+        "erase_flash",
+        "run_shell_command",
         "build_project",
         "check_project",
         "run_tests",

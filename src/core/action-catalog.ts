@@ -290,6 +290,18 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
 
 /** Implemented internal service actions; these are not advertised as MCP tools. */
 export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  target_build: { ...MCP_ACTIONS.build_project, policyAction: "build_project" },
+  target_cleanup: { ...MCP_ACTIONS.clean_project, policyAction: "clean_project" },
+  target_upload: { ...MCP_ACTIONS.upload_firmware, policyAction: "upload_firmware" },
+  target_upload_filesystem: { ...MCP_ACTIONS.upload_filesystem, policyAction: "upload_filesystem" },
+  target_erase: {
+    ...MCP_ACTIONS.upload_firmware, policyAction: "erase_flash", riskLevel: "critical",
+  },
+  target_custom: {
+    ...MCP_ACTIONS.upload_firmware, policyAction: "run_shell_command", riskLevel: "critical",
+    openWorld: true,
+  },
+
   dependency_inventory: { ...READ, policyAction: "get_project_config" },
   dependency_build: {
     ...MCP_ACTIONS.build_project,
