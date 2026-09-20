@@ -740,3 +740,7 @@ Added opt-in `pio_port_diagnose` (75 compatibility-visible tools; 54 canonical u
 Validation: TypeScript no-emit check passed; four focused port-diagnostics checks passed on Windows (holder parsing, output bound, invalid endpoint, Windows endpoint forms). No broad runtime smoke test was repeated.
 
 `distribution/README.md` now records all four user-requested aliases across each suitable channel and requires explicit published/equivalent/blocked accounting. This is release scope, not evidence of publication or ownership.
+
+### Container archive publication identity
+
+The release job now downloads both same-run native container archives, verifies archive hashes and same-commit context metadata, loads each archive, and inspects the declared immutable image ID. The verifier requires Linux amd64/arm64, exact source/version/revision/license labels, the non-root runtime contract, and all four requested GHCR targets. It records a release identity for the later publisher; it does not publish or claim anonymous availability. Four focused metadata rejection checks passed locally. Docker load and the complete release job remain unexecuted locally because the Docker daemon is unavailable. GHCR publishing and public-access verification remain pending.

@@ -242,6 +242,15 @@ jobs:
           gh run download "$GITHUB_RUN_ID" --pattern 'python-host-*' --dir release-artifacts/python-host-evidence
           tar -czf release-artifacts/python-host-evidence.tar.gz -C release-artifacts python-host-evidence
 
+      - name: Bind both native container archives to this release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p container-release-artifacts
+          gh run download "$GITHUB_RUN_ID" --name platformio-container-amd64 --dir container-release-artifacts
+          gh run download "$GITHUB_RUN_ID" --name platformio-container-arm64 --dir container-release-artifacts
+          python3 scripts/validate-container-release.py container-release-artifacts --load --output release-artifacts/container-release-identity.json
+
       - name: Verify npm release identities before publication
         if: inputs.publish_npm
         run: node scripts/npm-release-identity.mjs
