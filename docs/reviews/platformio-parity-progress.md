@@ -1117,3 +1117,8 @@ Added a fixed Python program using esp-coredump==1.10.0 FileLoader only, with fi
 
 Added owner-only temporary directories before any sensitive writes: POSIX mode/owner checks and protected Windows ACLs granting only the current SID. Windows verification exposed an inherited PowerShell module-loading failure; the helper now uses .NET ACL APIs directly. The real Windows permissions/failure-cleanup regression, lint and TypeScript passed. Callers must terminate all consumers before returning. Converter integration, host matrix verification and sensitive retention policy remain incomplete.
 
+
+### Private bounded core conversion integration
+
+Connected the pinned converter program to owner-only staging, isolated Python invocation, a 60-second deadline, 64 KiB output bound, structured known errors and workspace-contained core ELF validation. Raw input hashes are rechecked before staging; files are removed after the consumer returns or fails. Nine focused process/orchestration cases passed; lint and TypeScript passed. Process tests use real Node children and conversion orchestration substitutes the optional converter; actual esp-coredump and debugger acceptance remain outstanding. CI 35498314271 and 35498312360 passed at 3513e535.
+

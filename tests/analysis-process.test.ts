@@ -68,3 +68,16 @@ describe("analysis subprocess bounds", () => {
     ).rejects.toMatchObject({ code: "ANALYSIS_LIMIT_INVALID" });
   });
 });
+it("accepts only explicitly selected protocol exit codes", async () => {
+  const result = await runAnalysisProcess(
+    process.execPath,
+    ["-e", "process.stdout.write('{}'); process.exit(2)"],
+    { allowedExitCodes: [2] },
+  );
+  expect(result).toEqual({ stdout: "{}", stderr: "", exitCode: 2 });
+  await expect(
+    runAnalysisProcess(process.execPath, ["-e", "process.exit(3)"], {
+      allowedExitCodes: [2],
+    }),
+  ).rejects.toMatchObject({ code: "ANALYSIS_TOOL_FAILED" });
+});

@@ -9,11 +9,13 @@ export interface AnalysisProcessOptions {
   timeoutMs?: number;
   maxOutputBytes?: number;
   signal?: AbortSignal;
+  allowedExitCodes?: readonly number[]; // Internal protocols may return structured errors on a known status.
 }
 /** Captured UTF-8 output; failed or truncated output is never reported as a successful analysis. */
 export interface AnalysisProcessResult {
   stdout: string;
   stderr: string;
+  exitCode?: number;
 }
 
 /**
@@ -56,6 +58,15 @@ export async function runAnalysisProcess(
       "Analysis argument list is invalid or too large.",
       "ANALYSIS_ARGUMENT_INVALID",
     );
+  if (
+    options.allowedExitCodes?.some(
+      (code) => !Number.isInteger(code) || code < 0 || code > 255,
+    )
+  )
+    throw new PlatformIOError(
+      "Invalid allowed exit code.",
+      "ANALYSIS_LIMIT_INVALID",
+    );
   if (options.signal?.aborted)
     throw new PlatformIOError("Analysis was cancelled.", "ANALYSIS_CANCELLED");
   return new Promise((resolve, reject) => {
@@ -79,6 +90,15 @@ export async function runAnalysisProcess(
           return;
         }
         const code = error.code as string | number | undefined;
+        if (
+          typeof code === "number" &&
+          !error.killed &&
+          !options.signal?.aborted &&
+          options.allowedExitCodes?.includes(code)
+        ) {
+          resolve({ stdout, stderr, exitCode: code });
+          return;
+        }
         const failure =
           options.signal?.aborted || error.name === "AbortError"
             ? "ANALYSIS_CANCELLED"
