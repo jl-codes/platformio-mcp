@@ -46,6 +46,58 @@ describe("target resolution", () => {
     ]);
   });
 
+  it("resolves board and framework inherited via extends", () => {
+    const parsed = parseTargetEnvironments(
+      [
+        "[env:base_env]",
+        "board = um_nanos3",
+        "framework = arduino, espidf",
+        "",
+        "[env:derived_env]",
+        "extends = env:base_env",
+        "build_flags = -D WITH_BLE",
+      ].join("\n"),
+    );
+    expect(parsed.environments).toEqual([
+      { name: "base_env", board: "um_nanos3", framework: "arduino, espidf" },
+      { name: "derived_env", board: "um_nanos3", framework: "arduino, espidf" },
+    ]);
+  });
+
+  it("resolves extends through multiple levels", () => {
+    const parsed = parseTargetEnvironments(
+      [
+        "[env:grandparent]",
+        "board = esp32dev",
+        "framework = arduino",
+        "",
+        "[env:parent]",
+        "extends = env:grandparent",
+        "",
+        "[env:child]",
+        "extends = env:parent",
+      ].join("\n"),
+    );
+    const child = parsed.environments.find((e) => e.name === "child");
+    expect(child?.board).toBe("esp32dev");
+    expect(child?.framework).toBe("arduino");
+  });
+
+  it("does not override a directly declared board with extends", () => {
+    const parsed = parseTargetEnvironments(
+      [
+        "[env:base]",
+        "board = esp32dev",
+        "",
+        "[env:override]",
+        "extends = env:base",
+        "board = esp32s3",
+      ].join("\n"),
+    );
+    const override = parsed.environments.find((e) => e.name === "override");
+    expect(override?.board).toBe("esp32s3");
+  });
+
   it("returns ambiguity instead of choosing among multiple environments", async () => {
     const projectDir = createProject(
       "[env:first]\nboard = esp32dev\n[env:second]\nboard = esp32dev\n",
