@@ -5,6 +5,48 @@ All notable changes to **platformio-mcp** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - Unreleased
+
+### Added
+
+- Optional `platformio-mcp-python` compatibility mode registers all 40 pinned
+  reference tool names alongside 72 normal-mode tools. Registration is not a
+  declaration of completed behavioral or physical acceptance.
+- Connection-owned serial sessions, bounded capture, memory telemetry and port
+  diagnosis without compatibility mode, preserving legacy monitor tools.
+- Retained-artifact flash verification with connection-local approval/resume;
+  ESP firmware/filesystem OTA with pinned destinations, bounded optional ICMP
+  checks, and a shared `upload-ota` CLI command.
+- Classified debugger operations, ELF/partition/core-dump inspection, and serial
+  or PPK2 power profiling with explicit device and electrical authorization.
+- Functional candidate packaging across npm, Python and GHCR, including all seven
+  requested scoped npm name families. Candidates remain unpublished until their
+  authority, naming eligibility and release gates are satisfied.
+- Source-bound acceptance evidence collection and installer evidence production.
+
+### Changed
+
+- Resolve server policy and host configuration provenance without treating
+  `config.toml` settings as blanket server authorization. Preserve existing Codex
+  comments, restrictions, custom launchers and policy selectors during installation.
+- Pin every npm wrapper to the exact canonical release version and keep package
+  eligibility, publisher control, publication and installed verification separate.
+
+### Fixed
+
+- Advertise retained flash resume and approval fields in MCP schemas.
+- Expose owned serial, retained flash and OTA capabilities in normal mode.
+- Return bounded schema-validation errors instead of internal errors for invalid
+  compatibility arguments; redact OTA credentials from build diagnostics.
+
+### Release status
+
+3.1.0 is prepared but not published. Native wheel installation on five hosts and
+amd64/arm64 container builds passed on the recorded pre-release source. Full parity,
+required physical acceptance, publisher setup and registry-installed verification
+remain incomplete. See [distribution readiness](docs/DISTRIBUTION_READINESS.md)
+and the [compatibility guide](docs/package-compatibility.md) for current limits.
+
 ## [3.0.0] - 2026-09-08
 
 ### Added

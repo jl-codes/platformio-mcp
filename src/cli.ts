@@ -1,6 +1,36 @@
 #!/usr/bin/env node
+import { parseSerialObservationCli } from "./adapters/serial-observation-cli.js";
+import { executeDeviceCompatibility } from "./adapters/device-compat.js";
+import { parseDebugRunCli, executeDebugRunCli } from "./adapters/debug-run-cli.js";
+import { parseOtaCli } from "./adapters/ota-cli.js";
+import { executeOtaCompatibility } from "./adapters/ota-compat.js";
+import { parsePowerProfileCli } from "./adapters/power-profile-cli.js";
+import { executePowerCompatibility } from "./adapters/power-compat.js";
+import { PowerMeterClient } from "./adapters/power-meter-client.js";
+import { withInteractiveApprovals } from "./core/policy/interactive-approvals.js";
+import { parseFlashVerificationCli } from "./adapters/flash-verification-cli.js";
+import { executeFlashVerificationCompatibility } from "./adapters/flash-verification-compat.js";
+import { executeCoredump } from "./tools/coredump.js";
+import { executePartitionTable } from "./tools/partition-table.js";
 
+import { executeRunTargetAction } from "./tools/run-target.js";
+import { SerialClientContext } from "./adapters/serial-client.js";
+import { readRuntimeVersion } from "./utils/runtime-version.js";
+import { inspectDependencies } from "./tools/dependency-inspection.js";
+import { parseCompatibilityLaunch } from "./adapters/compatibility-mode.js";
+import {
+  executeProjectInspection,
+  type ProjectInspectionAction,
+} from "./tools/project-inspection.js";
+import { executePackageAction, type PackageAction } from "./tools/packages.js";
+import { decodeBacktrace, firmwareSizeReport } from "./tools/analysis.js";
+import { operationForCliCommand } from "./core/action-catalog.js";
+import {
+  enrollProjectPolicy,
+  revokeProjectPolicy,
+} from "./core/policy/project-enrollment.js";
 import fs from "node:fs";
+import { configurePolicyFileFromArgs } from "./core/policy/policy-sources.js";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { stdin as input, stdout as output } from "node:process";
@@ -16,6 +46,9 @@ import {
   AgentSafePinAuditParamsSchema,
   AgentValidateProjectParamsSchema,
   BuildProjectParamsSchema,
+  CleanProjectParamsSchema,
+  CheckProjectParamsSchema,
+  RunTestsParamsSchema,
   CheckTaskStatusParamsSchema,
   GetApprovalRequestParamsSchema,
   GetPolicyStatusParamsSchema,
@@ -31,6 +64,9 @@ import {
 import { listDevicesCore } from "./core/devices.js";
 import { listBoardsCore } from "./core/boards.js";
 import { initProjectCore } from "./core/project.js";
+import { cleanProject, checkProject, runTests } from "./tools/build.js";
+import { runTestsWithReport } from "./core/test-report-execution.js";
+import { hardwareLockManager } from "./utils/lock-manager.js";
 import { buildProjectCore } from "./core/build.js";
 import { uploadFirmwareCore } from "./core/flash.js";
 import {
@@ -43,8 +79,9 @@ import {
 } from "./core/tasks.js";
 import { resolveTarget } from "./core/target-resolution.js";
 import { getDashboardStatusCore } from "./core/dashboard.js";
+import { getOperatorDashboardStatus } from "./api/server.js";
 import { toCliStructuredError } from "./core/cli-diagnostics.js";
-import { evaluatePolicy } from "./core/policy/evaluate-policy.js";
+import { authorizeAction, dispatchAuthorizedAction } from "./core/action-dispatcher.js";
 import { getPolicyStatus } from "./core/policy/status.js";
 import {
   approveRequest,
@@ -82,7 +119,10 @@ COMMANDS:
   devices
   boards --filter <value>
   init --board <id> --project-dir <dir> [--framework <name>]
-  build --project-dir <dir> [--environment <env>] [--background] [--verbose]
+  build --project-dir <dir> [--environment <env>] [--jobs <count>] [--force-execution] [--background] [--verbose]
+  clean --project-dir <dir> [--environment <env>] [--full] [--background]
+  check --project-dir <dir> [--environment <env>] [--severity <low|medium|high>] [--pattern <glob>] [--tool <name>] [--skip-packages] [--structured-report] [--background]
+  test --project-dir <dir> [--environment <env>] [--filter <glob>] [--ignore <glob>] [--compile-only] [--without-uploading] [--without-building] [--upload-port <port>] [--verbose] [--structured-report] [--background]
   flash --project-dir <dir> [--port <port|auto>] [--environment <env>] [--background] [--start-monitor]
   monitor [--project-dir <dir>] [--port <port|auto>] [--environment <env>] [--timeout <seconds>] [--expect <text>] [--background]
   target-resolve --project-dir <dir> [--environment <env>] [--port <port>] [--binding-ttl <seconds>]
@@ -96,17 +136,41 @@ COMMANDS:
   agent-flash-monitor-verify --project-dir <dir> [--environment <env>] [--port <port|auto>] [--expect-all <csv>] [--reject-patterns <csv>] [--timeout <seconds>] [--stability-window <seconds>] [--auto-build <true|false>]
   agent-last-report --project-dir <dir>
   agent-board-report --project-dir <dir> --board <id>
+  decode-backtrace --project-dir <dir> --environment <env> <--text <value>|--text-file <path>> [--include-all-hex]
+  size-report --project-dir <dir> --environment <env> [--top <n>] [--filter <regex>]
+  deps-check --project-dir <dir> [--environment <env>] [--build]
+  project-envs --project-dir <dir>
+  project-metadata|list-targets --project-dir <dir> [--environment <env>]
+  coredump --project-dir <dir> (--dump-path <file> | --port <port> --table-path <csv> --table-offset <bytes>) [--format <raw|base64>] [--analyze false | --elf-path <file>]
+  partition-table --project-dir <dir> [--environment <env>] [--table-path <file>] [--format <csv|binary>] [--table-offset <bytes> | --sdkconfig-path <file>] [--flash-size <bytes>] [--firmware-path <file>] [--observed-table-path <file>]
+  port-diagnose --project-dir <dir> [--port <port>] [--environment <env>] [--approve]
+  monitor-capture --project-dir <dir> [--port <port>] [--baud <rate>] [--seconds <n>] [--until <regex>] [--max-lines <n>] [--approve]
+  memory-watch --project-dir <dir> [--port <port>] [--baud <rate>] [--seconds <n>] [--pattern <regex>] [--stack-unit bytes|words] [--stack-word-bytes <n>] [--approve]
+  debug-run --project-dir <dir> --commands <JSON-array> [--environment <env>] [--load false] [--timeout <seconds>] [--command-timeout <seconds>] [--probe-serial <id>] [--process-only] [--approve]
+  upload-ota --project-dir <dir> --host <address> [--environment <env>] [--port <port>] [--filesystem] [--build false] [--verify-reachable false] [--timeout <seconds>] [--auth-env <variable>] [--approve]
+  power-profile --project-dir <dir> [--source serial|ppk2] [--port <meter>] [--seconds <n>] [--baud <rate>] [--mode ampere|source --dut-port <port> --voltage-mv <mV> --current-limit-ma <mA>] [--approve]
+  flash-verify --project-dir <dir> [--environment <env>] [--upload-port <port>] [--monitor-port <port>] [--baud <rate>] [--expect <regex>] [--fail-on <regex>] [--timeout <seconds>] [--settle <seconds>] [--stability-window <seconds>] [--max-lines <count>] [--stop-open-sessions] [--approve]
+  run-target --project-dir <dir> --target <name> [--environment <env>] [--upload-port <port>]
+  pkg-search --query <query> [--kind library|platform|tool] [--page <n>]
+  pkg-install --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
+  pkg-uninstall --project-dir <dir> --spec <package> [--kind library|platform|tool] [--environment <env>]
+  pkg-list|pkg-outdated|pkg-update --project-dir <dir> [--environment <env>]
   policy-status [--project-dir <dir>]
-  approvals [--status <pending|approved|denied|expired>] [--limit <n>]
+  policy-enroll --project-dir <dir>
+  policy-revoke --project-dir <dir>
+  approvals [--status <pending|approved|denied|expired|consumed>] [--limit <n>]
   approval-status <approval-id> [--project-dir <dir>]
   pending-approvals [--project-dir <dir>] [--limit <n>]
   approve <approval-id>
   deny <approval-id>
-  dashboard
+  dashboard [--operator]
   install --<cline|claude|vscode|antigravity|codex|codex-plugin>
   plugin validate [--require-runtime]
 
 GLOBAL FLAGS:
+  --policy-file <path>  Explicit operator policy (or PIO_MCP_POLICY_FILE)
+  --compat platformio-mcp-python  Enable additional MCP compatibility tools
+                                 (or PIO_MCP_COMPAT=platformio-mcp-python)
   --json
   --approve
   --help
@@ -213,63 +277,6 @@ function printOutput(data: unknown, jsonMode: boolean) {
   printHuman(data);
 }
 
-function actionForCommand(command: string): string {
-  switch (command) {
-    case "devices":
-      return "list_devices";
-    case "boards":
-      return "list_boards";
-    case "init":
-      return "init_project";
-    case "build":
-      return "build_project";
-    case "flash":
-      return "upload_firmware";
-    case "monitor":
-      return "start_monitor";
-    case "target-resolve":
-      return "agent_resolve_target";
-    case "monitor-status":
-      return "get_monitor_status";
-    case "monitor-health":
-      return "agent_monitor_health";
-    case "task-status":
-      return "check_task_status";
-    case "task-history":
-      return "list_task_history";
-    case "agent-validate":
-      return "agent_validate_project";
-    case "agent-build-diagnose":
-      return "agent_build_diagnose";
-    case "agent-safe-pin-audit":
-      return "agent_safe_pin_audit";
-    case "agent-flash-monitor-verify":
-      return "upload_firmware";
-    case "agent-last-report":
-      return "agent_get_last_report";
-    case "agent-board-report":
-      return "agent_generate_board_report";
-    case "policy-status":
-      return "get_policy_status";
-    case "dashboard":
-      return "get_dashboard_url";
-    case "plugin":
-      return "get_policy_status";
-    case "install":
-      return "run_shell_command";
-    case "approval-status":
-      return "get_approval_request";
-    case "pending-approvals":
-      return "list_pending_approvals";
-    case "approvals":
-    case "approve":
-    case "deny":
-      return "query_logs";
-    default:
-      return command;
-  }
-}
-
 async function promptApproval(reason: string): Promise<boolean> {
   const rl = createInterface({ input, output });
   try {
@@ -284,15 +291,7 @@ async function promptApproval(reason: string): Promise<boolean> {
 }
 
 function readVersion(): string {
-  try {
-    const currentDir = path.dirname(fileURLToPath(import.meta.url));
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(currentDir, "..", "package.json"), "utf8"),
-    ) as { version?: string };
-    return pkg.version ?? "unknown";
-  } catch {
-    return "unknown";
-  }
+  return readRuntimeVersion(import.meta.url);
 }
 
 async function runInstallSubcommand(rawArgs: string[]) {
@@ -341,10 +340,48 @@ async function runPluginSubcommand(rawArgs: string[]) {
   });
 }
 
+/** Reads at most 1 MiB of regular crash-log input without trusting a prior file-size check. */
+function readCrashTextFile(file: string): string {
+  const descriptor = fs.openSync(file, "r");
+  try {
+    if (!fs.fstatSync(descriptor).isFile())
+      throw new PlatformIOError(
+        "Crash input must be a regular file.",
+        "ANALYSIS_INPUT_INVALID",
+      );
+    const buffer = Buffer.alloc(1024 * 1024 + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const count = fs.readSync(
+        descriptor,
+        buffer,
+        length,
+        buffer.length - length,
+        null,
+      );
+      if (!count) break;
+      length += count;
+    }
+    if (length > 1024 * 1024)
+      throw new PlatformIOError(
+        "Crash text exceeds 1 MiB.",
+        "ANALYSIS_INPUT_LIMIT",
+      );
+    return buffer.subarray(0, length).toString("utf8");
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
 async function runCliCommand(command: string, rawArgs: string[]) {
   const { options, positionals } = parseArgs(rawArgs);
   const jsonMode = Boolean(options.json);
-  const actionName = actionForCommand(command);
+  const actionName = operationForCliCommand(command);
+  const projectInspection = [
+    "project-envs",
+    "project-metadata",
+    "list-targets",
+  ].includes(command);
   const projectDirForPolicy = asString(options["project-dir"]);
   const approvalOpt = asBoolean(options.approve);
   let policyArgs: Record<string, unknown> = {
@@ -352,14 +389,412 @@ async function runCliCommand(command: string, rawArgs: string[]) {
     projectDir: projectDirForPolicy,
   };
 
-  if (approvalOpt === true) {
-    policyArgs = { ...policyArgs, __approved: true };
-  }
-
   try {
-    let decision = await evaluatePolicy(actionName, policyArgs, {
+    if (command === "coredump") {
+      const allowed = new Set(["retain-dump", "out-path", "export-approval-id", "json", "project-dir", "dump-path", "format", "analyze", "elf-path", "expected-input-sha256", "expected-elf-sha256", "encrypted", "approval-id", "command-approval-id", "port", "partition-name", "table-path", "table-format", "table-offset", "sdkconfig-path", "environment", "flash-size", "build-metadata", "table-approval-id", "config-approval-id", "metadata-approval-id", "system-approval-id", "board-approval-id", "read-approval-id", "read-command-approval-id"]);
+      if (positionals.length || Object.keys(options).some((key) => !allowed.has(key)))
+        throw new PlatformIOError("Unknown core-dump option or positional argument.", "COREDUMP_INPUT_INVALID");
+      for (const key of ["analyze", "encrypted", "build-metadata", "retain-dump"])
+        if (options[key] !== undefined && ![true, false, "true", "false"].includes(options[key]))
+          throw new PlatformIOError("Expected true or false for --" + key, "COREDUMP_INPUT_INVALID");
+      const port = asString(options.port);
+      const deviceOptions = ["partition-name", "table-path", "table-format", "table-offset", "sdkconfig-path", "environment", "flash-size", "build-metadata", "table-approval-id", "config-approval-id", "metadata-approval-id", "system-approval-id", "board-approval-id", "read-approval-id", "read-command-approval-id"];
+      if (!port && deviceOptions.some((key) => options[key] !== undefined))
+        throw new PlatformIOError("Device/table options require --port.", "COREDUMP_INPUT_INVALID");
+      const integerOption = (key: string) => {
+        const value = asString(options[key]);
+        if (value === undefined) return undefined;
+        if (!/^(?:0x[0-9a-f]+|[0-9]+)$/i.test(value))
+          throw new PlatformIOError("Expected integer bytes for --" + key, "COREDUMP_INPUT_INVALID");
+        return Number(value);
+      };
+      const device = port ? {
+        port, partitionName: asString(options["partition-name"]),
+        approvalId: asString(options["read-approval-id"]), commandApprovalId: asString(options["read-command-approval-id"]),
+        table: {
+          projectDir: projectDirForPolicy, tablePath: asString(options["table-path"]),
+          format: asString(options["table-format"]), tableOffset: integerOption("table-offset"),
+          sdkconfigPath: asString(options["sdkconfig-path"]), environment: asString(options.environment),
+          flashSize: integerOption("flash-size"), buildMetadata: asBoolean(options["build-metadata"]) ?? false,
+          approvalId: asString(options["table-approval-id"]), configApprovalId: asString(options["config-approval-id"]),
+          metadataApprovalId: asString(options["metadata-approval-id"]), systemApprovalId: asString(options["system-approval-id"]), boardApprovalId: asString(options["board-approval-id"]),
+        },
+      } : undefined;
+      const result = await executeCoredump({
+        device, retainDump: asBoolean(options["retain-dump"]) ?? false, outPath: asString(options["out-path"]), exportApprovalId: asString(options["export-approval-id"]),
+        projectDir: projectDirForPolicy, dumpPath: asString(options["dump-path"]),
+        format: asString(options.format), analyze: asBoolean(options.analyze) ?? true,
+        elfPath: asString(options["elf-path"]), encrypted: asBoolean(options.encrypted) ?? false,
+        expectedInputSha256: asString(options["expected-input-sha256"]), expectedElfSha256: asString(options["expected-elf-sha256"]),
+        approvalId: asString(options["approval-id"]), commandApprovalId: asString(options["command-approval-id"]),
+      }, { workspaceDir: projectDirForPolicy, actor: "user" });
+      printOutput(result, jsonMode);
+      if (!result.ok) process.exitCode = 1;
+      return;
+    }
+    if (command === "partition-table") {
+      const allowed = new Set(["json", "project-dir", "table-path", "format", "table-offset", "sdkconfig-path", "read-device", "port", "read-approval-id", "command-approval-id", "build-metadata", "metadata-approval-id", "system-approval-id", "board-approval-id", "environment", "config-approval-id", "flash-size", "firmware-path", "observed-table-path", "approval-id"]);
+      if (positionals.length || Object.keys(options).some((key) => !allowed.has(key)))
+        throw new PlatformIOError("Unknown partition inspection argument.", "PARTITION_INPUT_INVALID");
+      if (options["read-device"] !== undefined && ![true, false, "true", "false"].includes(options["read-device"]))
+        throw new PlatformIOError("--read-device must be true or false.", "PARTITION_INPUT_INVALID");
+      if (options["build-metadata"] !== undefined && ![true, false, "true", "false"].includes(options["build-metadata"]))
+        throw new PlatformIOError("--build-metadata must be true or false.", "PARTITION_INPUT_INVALID");
+      const numberOption = (key: string) => {
+        const value = asString(options[key]);
+        if (value === undefined) return undefined;
+        if (!/^(?:0x[0-9a-f]+|[0-9]+)$/i.test(value))
+          throw new PlatformIOError("Expected integer bytes for --" + key, "PARTITION_INPUT_INVALID");
+        return Number(value);
+      };
+      const result = await executePartitionTable({
+        projectDir: projectDirForPolicy, tablePath: asString(options["table-path"]),
+        format: asString(options.format), tableOffset: numberOption("table-offset"),
+        sdkconfigPath: asString(options["sdkconfig-path"]),
+        readDevice: asBoolean(options["read-device"]) ?? false, port: asString(options.port),
+        readApprovalId: asString(options["read-approval-id"]), commandApprovalId: asString(options["command-approval-id"]),
+        buildMetadata: asBoolean(options["build-metadata"]) ?? false, metadataApprovalId: asString(options["metadata-approval-id"]), systemApprovalId: asString(options["system-approval-id"]), boardApprovalId: asString(options["board-approval-id"]),
+        environment: asString(options.environment), configApprovalId: asString(options["config-approval-id"]),
+        flashSize: numberOption("flash-size"), firmwarePath: asString(options["firmware-path"]),
+        observedTablePath: asString(options["observed-table-path"]), approvalId: asString(options["approval-id"]),
+      }, {workspaceDir: projectDirForPolicy, actor: "user"});
+      printOutput(result, jsonMode);
+      if (!result.ok) process.exitCode = 1;
+      return;
+    }
+    if (command === "monitor-capture" || command === "memory-watch" || command === "port-diagnose") {
+      const input = parseSerialObservationCli(command, options, positionals, projectDirForPolicy);
+      const client = new SerialClientContext();
+      const operation = command === "monitor-capture" ? "monitor_capture" : command === "memory-watch" ? "memory_watch" : "port_diagnose";
+      const caller = { workspaceDir: projectDirForPolicy, actor: "user" as const };
+      try {
+        const execute = () => dispatchAuthorizedAction(operation, input, caller, () => executeDeviceCompatibility(client, "pio_" + operation, input, {}, caller));
+        const result = (approvalOpt === true || (!jsonMode && approvalOpt !== false))
+          ? await withInteractiveApprovals(async request => approvalOpt === true || promptApproval(request.reason), execute)
+          : await execute();
+        printOutput(result, jsonMode);
+        if (!(result as { ok?: boolean }).ok) process.exitCode = 1;
+      } finally {
+        const sessions = await client.close();
+        if (sessions.some(session => session.cleanupPending)) throw new PlatformIOError("Serial cleanup remains pending.", "SERIAL_CLI_CLEANUP_PENDING");
+      }
+      return;
+    }
+    if (command === "debug-run") {
+      const input = parseDebugRunCli(options, positionals, projectDirForPolicy);
+      const execute = () => executeDebugRunCli(input, { workspaceDir: projectDirForPolicy, actor: "user" });
+      const result = (approvalOpt === true || (!jsonMode && approvalOpt !== false))
+        ? await withInteractiveApprovals(async (request) => approvalOpt === true || promptApproval(request.reason), execute)
+        : await execute();
+      printOutput(result, jsonMode);
+      if (!result.ok) process.exitCode = 1;
+      return;
+    }
+    if (command === "upload-ota") {
+      const input = parseOtaCli(options, positionals, projectDirForPolicy);
+      const execute = () => executeOtaCompatibility(input, {}, {
+        workspaceDir: projectDirForPolicy, actor: "user",
+      });
+      const result = (approvalOpt === true || (!jsonMode && approvalOpt !== false))
+        ? await withInteractiveApprovals(
+            async (request) => approvalOpt === true || promptApproval(request.reason), execute,
+          )
+        : await execute();
+      printOutput(result, jsonMode);
+      if (!result.ok) process.exitCode = 1;
+      return;
+    }
+    if (command === "power-profile") {
+      const input = parsePowerProfileCli(options, positionals, projectDirForPolicy);
+      const serial = new SerialClientContext();
+      const meter = new PowerMeterClient();
+      try {
+        const execute = () => executePowerCompatibility(serial, meter, input, {}, {
+          workspaceDir: projectDirForPolicy, actor: "user",
+        }, "power_profile");
+        const result = (approvalOpt === true || (!jsonMode && approvalOpt !== false))
+          ? await withInteractiveApprovals(
+              async (request) => approvalOpt === true || promptApproval(request.reason), execute,
+            )
+          : await execute();
+        printOutput(result, jsonMode);
+        if (!result.ok) process.exitCode = 1;
+      } finally {
+        const closed = await Promise.allSettled([meter.close(), serial.close()]);
+        const failure = closed.find((entry) => entry.status === "rejected");
+        if (failure?.status === "rejected") throw failure.reason;
+      }
+      return;
+    }
+    if (command === "flash-verify") {
+      const input = parseFlashVerificationCli(options, positionals, projectDirForPolicy);
+      const client = new SerialClientContext();
+      try {
+        const execute = () => executeFlashVerificationCompatibility(input, client, {}, {
+          workspaceDir: projectDirForPolicy, actor: "user",
+        });
+        const result = (approvalOpt === true || (!jsonMode && approvalOpt !== false))
+          ? await withInteractiveApprovals(
+              async (request) => approvalOpt === true || promptApproval(request.reason),
+              execute,
+            )
+          : await execute();
+        printOutput(result, jsonMode);
+        if (!result.ok) process.exitCode = 1;
+      } finally {
+        await client.close();
+      }
+      return;
+    }
+    if (command === "run-target") {
+      const allowed = new Set([
+        "json", "project-dir", "target", "environment", "upload-port",
+        "stop-open-sessions", "approval-id", "config-approval-id", "selection-approval-id",
+      ]);
+      if (positionals.length || Object.keys(options).some((key) => !allowed.has(key)))
+        throw new PlatformIOError("Unknown named-target option or positional argument.", "TARGET_INPUT_INVALID");
+      if (options["stop-open-sessions"] !== undefined &&
+          ![true, false, "true", "false"].includes(options["stop-open-sessions"]))
+        throw new PlatformIOError("--stop-open-sessions must be true or false.", "TARGET_INPUT_INVALID");
+      const client = new SerialClientContext();
+      try {
+        const result = await executeRunTargetAction({
+          projectDir: projectDirForPolicy, target: asString(options.target),
+          environment: asString(options.environment), uploadPort: asString(options["upload-port"]),
+          stopOpenSessions: asBoolean(options["stop-open-sessions"]) ?? false,
+          approvalId: asString(options["approval-id"]),
+          configApprovalId: asString(options["config-approval-id"]),
+          selectionApprovalId: asString(options["selection-approval-id"]),
+        }, client, { workspaceDir: projectDirForPolicy, actor: "user" });
+        printOutput(result, jsonMode);
+        if (!result.ok) process.exitCode = 1;
+      } finally {
+        await client.close();
+      }
+      return;
+    }
+    // Operator administration stays local to the CLI, including recovery from invalid policy.
+    // This is not proof of human identity against a process with the same OS-user authority.
+    if (command === "policy-enroll" || command === "policy-revoke") {
+      const project = asString(options["project-dir"]);
+      if (!project) throw new Error(`${command} requires --project-dir`);
+      const result =
+        command === "policy-enroll"
+          ? enrollProjectPolicy(project)
+          : (revokeProjectPolicy(project), { revoked: true });
+      printOutput(result, jsonMode);
+      return;
+    }
+    if (
+      command === "deps-check" ||
+      command === "decode-backtrace" ||
+      command === "size-report" ||
+      command.startsWith("pkg-") ||
+      projectInspection
+    ) {
+      const scope = {
+        projectDir: projectDirForPolicy,
+        environment: asString(options.environment),
+        approvalId: asString(options["approval-id"]),
+        expectedElfSha256: asString(options["expected-elf-sha256"]),
+      };
+      let parameters: Record<string, unknown>;
+      if (command === "deps-check") {
+        const allowed = new Set([
+          "json",
+          "project-dir",
+          "environment",
+          "build",
+          "approval-id",
+          "configuration-approval-id",
+          "inventory-approval-id",
+          "build-approval-id",
+        ]);
+        if (
+          positionals.length ||
+          Object.keys(options).some((key) => !allowed.has(key))
+        )
+          throw new PlatformIOError(
+            "Unknown dependency inspection option or positional argument.",
+            "DEPENDENCY_INPUT_INVALID",
+          );
+        if (
+          options.build !== undefined &&
+          ![true, false, "true", "false"].includes(options.build)
+        )
+          throw new PlatformIOError(
+            "--build must be true or false.",
+            "DEPENDENCY_INPUT_INVALID",
+          );
+        parameters = {
+          projectDir: scope.projectDir,
+          environment: scope.environment,
+          build: asBoolean(options.build) ?? false,
+          approvalId: scope.approvalId,
+          configurationApprovalId: asString(
+            options["configuration-approval-id"],
+          ),
+          inventoryApprovalId: asString(options["inventory-approval-id"]),
+          buildApprovalId: asString(options["build-approval-id"]),
+        };
+      } else if (projectInspection) {
+        const allowed = new Set([
+          "json",
+          "approve",
+          "approval-id",
+          "project-dir",
+          ...(command === "project-envs" ? [] : ["environment"]),
+        ]);
+        if (
+          positionals.length ||
+          Object.keys(options).some((key) => !allowed.has(key))
+        )
+          throw new PlatformIOError(
+            "Unknown project inspection option or positional argument.",
+            "PROJECT_INPUT_INVALID",
+          );
+        parameters = {
+          projectDir: scope.projectDir,
+          approvalId: scope.approvalId,
+          ...(command === "project-envs"
+            ? {}
+            : { environment: scope.environment }),
+        };
+      } else if (command.startsWith("pkg-")) {
+        const allowed = new Set([
+          "json",
+          "approve",
+          "approval-id",
+          "project-dir",
+          "environment",
+          ...(command === "pkg-search"
+            ? ["query", "kind", "page"]
+            : command === "pkg-install" || command === "pkg-uninstall"
+              ? ["spec", "kind"]
+              : []),
+        ]);
+        if (
+          positionals.length ||
+          Object.keys(options).some((key) => !allowed.has(key))
+        )
+          throw new PlatformIOError(
+            "Unknown package option or positional argument.",
+            "PACKAGE_INPUT_INVALID",
+          );
+        const project = asString(options["project-dir"]);
+        if (command !== "pkg-search" && !project)
+          throw new PlatformIOError(
+            "Package commands require --project-dir.",
+            "PACKAGE_INPUT_INVALID",
+          );
+        parameters =
+          command === "pkg-search"
+            ? {
+                query: asString(options.query),
+                kind: asString(options.kind),
+                page:
+                  options.page === undefined
+                    ? undefined
+                    : typeof options.page === "string"
+                      ? Number(options.page)
+                      : NaN,
+                approvalId: scope.approvalId,
+              }
+            : {
+                projectDir: project,
+                environment: scope.environment,
+                approvalId: scope.approvalId,
+                ...(command === "pkg-install" || command === "pkg-uninstall"
+                  ? {
+                      spec: asString(options.spec),
+                      kind: asString(options.kind),
+                    }
+                  : {}),
+              };
+      } else if (command === "decode-backtrace") {
+        const text = asString(options.text),
+          file = asString(options["text-file"]);
+        if ((text === undefined) === (file === undefined))
+          throw new PlatformIOError(
+            "Provide exactly one of --text or --text-file.",
+            "ANALYSIS_INPUT_INVALID",
+          );
+        parameters = {
+          ...scope,
+          text: file !== undefined ? readCrashTextFile(file) : text,
+          includeAllHex: asBoolean(options["include-all-hex"]),
+          archivedElfSha256: asString(options["archived-elf-sha256"]),
+        };
+      } else
+        parameters = {
+          ...scope,
+          top:
+            options.top === undefined
+              ? undefined
+              : typeof options.top === "string"
+                ? Number(options.top)
+                : NaN,
+          filter: asString(options.filter),
+        };
+      const run = (args: Record<string, unknown>) =>
+        command === "deps-check"
+          ? inspectDependencies(args, {
+              actor: "user",
+              actorClass: "interactive",
+            })
+          : projectInspection
+            ? executeProjectInspection(
+                command.replaceAll("-", "_") as ProjectInspectionAction,
+                args,
+                { actor: "user", actorClass: "interactive" },
+              )
+            : command.startsWith("pkg-")
+              ? executePackageAction(
+                  command.replace("pkg-", "pkg_") as PackageAction,
+                  args,
+                  {
+                    actor: "user",
+                    actorClass: "interactive",
+                    workspaceDir: projectDirForPolicy,
+                  },
+                )
+              : (command === "decode-backtrace"
+                  ? decodeBacktrace
+                  : firmwareSizeReport)(args, {
+                  actor: "user",
+                  actorClass: "interactive",
+                });
+      let result;
+      try {
+        result = await run(parameters);
+      } catch (error) {
+        if (
+          command === "deps-check" ||
+          !(error instanceof PlatformIOError) ||
+          error.code !== "APPROVAL_REQUIRED" ||
+          (jsonMode && approvalOpt !== true)
+        )
+          throw error;
+        const decision = error.context?.policyDecision as
+          | { reason: string; approvalId?: string }
+          | undefined;
+        if (!decision?.approvalId) throw error;
+        if (approvalOpt !== true && !(await promptApproval(decision.reason)))
+          throw new PlatformIOError(
+            "Action cancelled by user.",
+            "APPROVAL_DENIED",
+          );
+        if (!approveRequest(decision.approvalId)) throw error;
+        result = await run({ ...parameters, approvalId: decision.approvalId });
+      }
+      printOutput(result, jsonMode);
+      if (!result.ok) process.exitCode = 1;
+      return;
+    }
+    let decision = await authorizeAction(actionName, policyArgs, {
       workspaceDir: projectDirForPolicy,
       actor: "user",
+      operationName: operationForCliCommand(command),
     });
 
     if (decision.status === "deny") {
@@ -393,14 +828,20 @@ async function runCliCommand(command: string, rawArgs: string[]) {
         }
       }
 
+      if (!decision.approvalId || !approveRequest(decision.approvalId)) {
+        throw new PlatformIOError(
+          "Approval request is no longer available.",
+          "APPROVAL_REQUIRED",
+        );
+      }
       policyArgs = {
         ...policyArgs,
-        __approved: true,
         approvalId: decision.approvalId,
       };
-      decision = await evaluatePolicy(actionName, policyArgs, {
+      decision = await authorizeAction(actionName, policyArgs, {
         workspaceDir: projectDirForPolicy,
         actor: "user",
+        operationName: operationForCliCommand(command),
       });
       if (decision.status !== "allow") {
         const policyError = new PlatformIOError(
@@ -444,10 +885,38 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           projectDir: asString(options["project-dir"]),
           environment: asString(options.environment),
           verbose: asBoolean(options.verbose),
+          jobs: asNumber(options.jobs),
+          forceExecution: asBoolean(options["force-execution"]),
           background: asBoolean(options.background),
         });
         const result = await buildProjectCore(params);
         printOutput(result, jsonMode);
+        return;
+      }
+
+      case "clean": {
+        const params = CleanProjectParamsSchema.parse({ projectDir: asString(options["project-dir"]), environment: asString(options.environment), full: asBoolean(options.full), background: asBoolean(options.background) });
+        const result = await hardwareLockManager.withImplicitLock(() => cleanProject(params.projectDir, params.background, { environment: params.environment, full: params.full }));
+        printOutput(result, jsonMode);
+        if (result.success === false) process.exitCode = 1;
+        return;
+      }
+      case "check": {
+        const params = CheckProjectParamsSchema.parse({ projectDir: asString(options["project-dir"]), environment: asString(options.environment), severity: asString(options.severity), pattern: asString(options.pattern), tool: asString(options.tool), skipPackages: asBoolean(options["skip-packages"]), structuredReport: asBoolean(options["structured-report"]), background: asBoolean(options.background) });
+        const result = await hardwareLockManager.withImplicitLock(() => checkProject(params.projectDir, params.environment, params.background, { severity: params.severity, pattern: params.pattern, tool: params.tool, skipPackages: params.skipPackages, jsonOutput: params.structuredReport }));
+        printOutput(result, jsonMode);
+        if (result.success === false) process.exitCode = 1;
+        return;
+      }
+      case "test": {
+        const params = RunTestsParamsSchema.parse({ projectDir: asString(options["project-dir"]), environment: asString(options.environment), filter: asString(options.filter), ignore: asString(options.ignore), compileOnly: asBoolean(options["compile-only"]), withoutUploading: asBoolean(options["without-uploading"]), withoutBuilding: asBoolean(options["without-building"]), uploadPort: asString(options["upload-port"]), verbose: asBoolean(options.verbose), structuredReport: asBoolean(options["structured-report"]), background: asBoolean(options.background) });
+        if (params.structuredReport && params.background) throw new PlatformIOError("Structured test reports require foreground execution", "INVALID_ARGUMENT");
+        const selection = { filter: params.filter, ignore: params.ignore, withoutUploading: params.withoutUploading, withoutBuilding: params.withoutBuilding, uploadPort: params.uploadPort, verbose: params.verbose };
+        const result = await hardwareLockManager.withImplicitLock(() => params.structuredReport
+          ? runTestsWithReport(params.projectDir, params.environment, params.compileOnly, selection)
+          : runTests(params.projectDir, params.environment, params.background, params.compileOnly, selection));
+        printOutput(result, jsonMode);
+        if (result.success === false) process.exitCode = 1;
         return;
       }
 
@@ -698,7 +1167,9 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           open: true,
           projectDir: asString(options["project-dir"]),
         });
-        const result = await getDashboardStatusCore(params);
+        const result = asBoolean(options.operator)
+          ? await getOperatorDashboardStatus(params.open, params.projectDir)
+          : await getDashboardStatusCore(params);
         printOutput(result, jsonMode);
         return;
       }
@@ -709,6 +1180,7 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           | "approved"
           | "denied"
           | "expired"
+          | "consumed"
           | undefined;
         const limit = asNumber(options.limit);
         const result = listApprovalRequests({ status, limit });
@@ -799,10 +1271,31 @@ async function runCliCommand(command: string, rawArgs: string[]) {
     }
   } catch (error) {
     const stageMap: Record<string, string> = {
+      "project-envs": "inspection",
+      "project-metadata": "inspection",
+      "list-targets": "inspection",
+      "run-target": "build",
+      "flash-verify": "upload",
+      "power-profile": "monitor",
+      "debug-run": "debugger",
+      "upload-ota": "upload",
+
+      "pkg-search": "packages",
+      "pkg-install": "packages",
+      "pkg-uninstall": "packages",
+      "pkg-list": "packages",
+      "pkg-outdated": "packages",
+      "pkg-update": "packages",
+
+      "decode-backtrace": "analysis",
+      "size-report": "analysis",
       devices: "devices",
       boards: "boards",
       init: "init",
       build: "build",
+      clean: "build",
+      check: "analysis",
+      test: "test",
       flash: "upload",
       monitor: "monitor",
       "target-resolve": "devices",
@@ -841,13 +1334,42 @@ async function runCliCommand(command: string, rawArgs: string[]) {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
+  const args = configurePolicyFileFromArgs(
+    parseCompatibilityLaunch(process.argv.slice(2)).args,
+  );
   const command = args[0];
   const knownCommands = new Set([
+    "coredump",
+    "partition-table",
+    "run-target",
+    "flash-verify",
+    "power-profile",
+    "debug-run",
+    "monitor-capture",
+    "port-diagnose",
+    "memory-watch",
+    "upload-ota",
+    "deps-check",
+    "project-envs",
+    "project-metadata",
+    "list-targets",
+
+    "pkg-search",
+    "pkg-install",
+    "pkg-uninstall",
+    "pkg-list",
+    "pkg-outdated",
+    "pkg-update",
+
+    "decode-backtrace",
+    "size-report",
     "devices",
     "boards",
     "init",
     "build",
+    "clean",
+    "check",
+    "test",
     "flash",
     "monitor",
     "target-resolve",
@@ -862,6 +1384,8 @@ async function main() {
     "agent-last-report",
     "agent-board-report",
     "policy-status",
+    "policy-enroll",
+    "policy-revoke",
     "approvals",
     "approval-status",
     "pending-approvals",

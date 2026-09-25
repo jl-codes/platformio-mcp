@@ -1,0 +1,10 @@
+{
+  "observedAt": "2026-09-20T17:48:29.150190+00:00",
+  "repository": "stlink-org/stlink",
+  "revision": "a7bfb83000567f775b3780dac24ae6f02e449327",
+  "path": "src/st-util/gdb-server.c",
+  "sha256": "6ffa0423fefaf5ddb136d22ec153c3b1fbcb2dd5970d3002bd6126f4dba77e0b",
+  "finding": "st-util binds INADDR_ANY; current owned local backend requires loopback-only listener isolation.",
+  "hardwareExecuted": false,
+  "sourceUrl": "https://github.com/stlink-org/stlink/blob/a7bfb83000567f775b3780dac24ae6f02e449327/src/st-util/gdb-server.c"
+}

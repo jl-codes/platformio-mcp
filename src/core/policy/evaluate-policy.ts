@@ -1,12 +1,14 @@
+/** Enforce category and concrete-operation policy with one-use request-bound approvals. */
+import {
+  interactiveApprovalId,
+  requestInteractiveApproval,
+} from "./interactive-approvals.js";
+import { policyNamesForOperation } from "../action-catalog.js";
 import path from "node:path";
+import { actionRiskLevels, deniedActionPatterns } from "./default-policy.js";
 import {
-  actionRiskLevels,
-  defaultPolicy,
-  deniedActionPatterns,
-} from "./default-policy.js";
-import {
-  approveRequest,
   createApprovalRequest,
+  consumeApproval,
   getApproval,
 } from "./approvals.js";
 import { appendAuditEvent } from "./audit-log.js";
@@ -15,7 +17,12 @@ import {
   validateAutomationScope,
   type AutomationScopeInput,
 } from "./automation-policy.js";
-import { loadEffectivePolicyState } from "./load-policy.js";
+import {
+  loadEffectivePolicyState,
+  type EffectivePolicyState,
+} from "./load-policy.js";
+import { approvalScopeDigest } from "./approval-scope.js";
+import { PolicyConfigError } from "./policy-schema.js";
 import type {
   PolicyDecision,
   PolicyEvaluationContext,
@@ -44,45 +51,6 @@ function isPathBoundaryUnsafe(projectDir: string): boolean {
   return resolved === root;
 }
 
-function approvalMatchesScope(
-  action: string,
-  args: Record<string, unknown>,
-  request: NonNullable<ReturnType<typeof getApproval>>,
-): boolean {
-  if (normalizeActionName(request.action) !== action) return false;
-  const metadata = request.metadata ?? {};
-  const approvedArgs =
-    typeof metadata.args === "object" && metadata.args !== null
-      ? (metadata.args as Record<string, unknown>)
-      : {};
-
-  for (const key of ["projectDir", "environment", "port"] as const) {
-    const approved = approvedArgs[key];
-    if (typeof approved !== "string") continue;
-    const current = args[key];
-    if (typeof current !== "string") return false;
-    const matches =
-      key === "projectDir"
-        ? path.resolve(approved) === path.resolve(current)
-        : approved === current;
-    if (!matches) return false;
-  }
-
-  const approvedBinding = approvedArgs.targetBinding;
-  if (typeof approvedBinding === "object" && approvedBinding !== null) {
-    const currentBinding = args.targetBinding;
-    if (
-      typeof currentBinding !== "object" ||
-      currentBinding === null ||
-      (approvedBinding as Record<string, unknown>).digest !==
-        (currentBinding as Record<string, unknown>).digest
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
 function decision(
   status: PolicyDecision["status"],
   reason: string,
@@ -100,14 +68,61 @@ function decision(
   };
 }
 
+/** Authorize execution, consuming any matching one-use grant and scheduled write reservation. */
 export async function evaluatePolicy(
   actionName: string,
   args: Record<string, unknown>,
   context: PolicyEvaluationContext = {},
 ): Promise<PolicyDecision> {
+  return evaluatePolicyInternal(actionName, args, context, false);
+}
+
+/** Planning evidence is deliberately not an execution authorization. */
+export type PolicyPlan = Omit<PolicyDecision, "status"> & {
+  status: "ready" | "deny" | "requires_approval";
+};
+
+/** Check policy and create missing challenges without consuming grants or reserving hardware writes. */
+export async function planPolicy(
+  actionName: string,
+  args: Record<string, unknown>,
+  context: PolicyEvaluationContext = {},
+): Promise<PolicyPlan> {
+  const result = await evaluatePolicyInternal(actionName, args, context, true);
+  return {
+    ...result,
+    status: result.status === "allow" ? "ready" : result.status,
+  };
+}
+
+async function evaluatePolicyInternal(
+  actionName: string,
+  args: Record<string, unknown>,
+  context: PolicyEvaluationContext,
+  planning: boolean,
+  interactiveRetry = true,
+): Promise<PolicyDecision> {
   const action = normalizeActionName(actionName);
   const riskLevel = riskForAction(action);
-  const effectivePolicy = loadEffectivePolicyState(context.workspaceDir);
+  const operationNames = policyNamesForOperation(
+    context.operationName ?? action,
+  );
+  // Ignore a caller-provided unrelated name; only the catalog establishes mapped authority.
+  const permissionNames =
+    operationNames.at(-1) === action ? operationNames : [action];
+  let effectivePolicy: EffectivePolicyState;
+  try {
+    effectivePolicy = loadEffectivePolicyState(context.workspaceDir);
+  } catch (error) {
+    if (!(error instanceof PolicyConfigError)) throw error;
+    // Only the diagnostic endpoint can bypass invalid configuration; no execution occurs.
+    return decision(
+      action === "get_policy_status" ? "allow" : "deny",
+      error.message,
+      action,
+      riskLevel,
+    );
+  }
   const policy = effectivePolicy.policy;
   const auditContext = {
     workspaceDir: context.workspaceDir,
@@ -163,7 +178,7 @@ export async function evaluatePolicy(
           ? error.message
           : "Unattended automation scope was denied.";
       const denied = decision("deny", reason, action, riskLevel);
-      if (policy.audit_all_agent_actions) {
+      if (!planning && policy.audit_all_agent_actions) {
         appendAuditEvent({
           action,
           status: "denied",
@@ -179,7 +194,8 @@ export async function evaluatePolicy(
   const reserveScheduledWrite = async (): Promise<
     PolicyDecision | undefined
   > => {
-    if (!scheduledScopeInput || !scheduledWriteOperation) return undefined;
+    if (planning || !scheduledScopeInput || !scheduledWriteOperation)
+      return undefined;
     try {
       await reserveAutomationWriteBudget(scheduledScopeInput);
       return undefined;
@@ -189,7 +205,7 @@ export async function evaluatePolicy(
           ? error.message
           : "Unattended hardware-write budget was denied.";
       const denied = decision("deny", reason, action, riskLevel);
-      if (policy.audit_all_agent_actions) {
+      if (!planning && policy.audit_all_agent_actions) {
         appendAuditEvent({
           action,
           status: "denied",
@@ -204,7 +220,7 @@ export async function evaluatePolicy(
 
   // Hard deny known dangerous command aliases/patterns.
   if (
-    policy.deny.includes(action) ||
+    permissionNames.some((name) => policy.deny.includes(name)) ||
     deniedActionPatterns.some((p) => p.test(action))
   ) {
     const denied = decision(
@@ -213,7 +229,7 @@ export async function evaluatePolicy(
       action,
       riskLevel,
     );
-    if (policy.audit_all_agent_actions) {
+    if (!planning && policy.audit_all_agent_actions) {
       appendAuditEvent({
         action,
         status: "denied",
@@ -236,7 +252,7 @@ export async function evaluatePolicy(
       action,
       riskLevel,
     );
-    if (policy.audit_all_agent_actions) {
+    if (!planning && policy.audit_all_agent_actions) {
       appendAuditEvent({
         action,
         status: "denied",
@@ -260,7 +276,7 @@ export async function evaluatePolicy(
         action,
         riskLevel,
       );
-      if (policy.audit_all_agent_actions) {
+      if (!planning && policy.audit_all_agent_actions) {
         appendAuditEvent({
           action,
           status: "denied",
@@ -273,20 +289,44 @@ export async function evaluatePolicy(
     }
   }
 
-  if (policy.approval_required.includes(action)) {
-    const explicitApprovalId =
-      typeof args.approvalId === "string" ? args.approvalId : undefined;
-    const explicitApproved =
+  if (permissionNames.some((name) => policy.approval_required.includes(name))) {
+    const scopeDigest = approvalScopeDigest(
+      action,
+      args,
+      effectivePolicy.digest,
+      context,
+    );
+    const scopeMetadata = {
+      args: {
+        projectDir: args.projectDir,
+        environment: args.environment,
+        port: args.port,
+      },
+      policyDigest: effectivePolicy.digest,
+      scopeVersion: 1,
+      operationName: context.operationName ?? action,
+    };
+    const interactive =
       context.actor === "user" &&
-      (args.approved === true || args.__approved === true);
+      (context.actorClass === undefined ||
+        context.actorClass === "interactive");
+    const explicitApprovalId =
+      typeof args.approvalId === "string"
+        ? args.approvalId
+        : interactive
+          ? interactiveApprovalId(scopeDigest)
+          : undefined;
 
     if (explicitApprovalId) {
-      const request = getApproval(explicitApprovalId);
-      if (
-        request &&
-        request.status === "approved" &&
-        approvalMatchesScope(action, args, request)
-      ) {
+      const candidate = planning ? getApproval(explicitApprovalId) : undefined;
+      const request = planning
+        ? candidate?.status === "approved" &&
+          candidate.expiresAt &&
+          candidate.scopeDigest === scopeDigest
+          ? candidate
+          : undefined
+        : consumeApproval(explicitApprovalId, scopeDigest);
+      if (request) {
         const reservationDenied = await reserveScheduledWrite();
         if (reservationDenied) return reservationDenied;
         const allowed = decision(
@@ -296,7 +336,7 @@ export async function evaluatePolicy(
           riskLevel,
           explicitApprovalId,
         );
-        if (policy.audit_all_agent_actions) {
+        if (!planning && policy.audit_all_agent_actions) {
           appendAuditEvent({
             action,
             status: "approved",
@@ -310,45 +350,26 @@ export async function evaluatePolicy(
       }
     }
 
-    if (explicitApproved) {
-      const reservationDenied = await reserveScheduledWrite();
-      if (reservationDenied) return reservationDenied;
-      const approved = createApprovalRequest({
-        action,
-        riskLevel,
-        reason: `Action '${action}' explicitly approved by caller.`,
-        requestedBy: context.actor ?? "user",
-        metadata: { source: "inline-approved-flag" },
-      });
-      approveRequest(approved.id);
-      const allowed = decision(
-        "allow",
-        `Action '${action}' allowed by explicit caller approval.`,
-        action,
-        riskLevel,
-        approved.id,
-      );
-      if (policy.audit_all_agent_actions) {
-        appendAuditEvent({
-          action,
-          status: "approved",
-          reason: allowed.reason,
-          riskLevel,
-          ...auditContext,
-          approvalId: approved.id,
-        });
-      }
-      return allowed;
-    }
-
     const approval = createApprovalRequest({
       action,
       riskLevel,
-      reason: `Action '${action}' requires explicit approval by policy.`,
+      reason: `Operation '${context.operationName ?? action}' requires explicit approval by policy.`,
       requestedBy: context.actor ?? "agent",
-      metadata: { args },
+      scopeDigest,
+      metadata: scopeMetadata,
       expiresInMinutes: 30,
     });
+    if (interactive && interactiveRetry) {
+      const approvedId = await requestInteractiveApproval(approval);
+      if (approvedId)
+        return evaluatePolicyInternal(
+          actionName,
+          { ...args, approvalId: approvedId },
+          context,
+          planning,
+          false,
+        );
+    }
     const needsApproval = decision(
       "requires_approval",
       `${action} requires explicit approval by policy.`,
@@ -356,7 +377,7 @@ export async function evaluatePolicy(
       riskLevel,
       approval.id,
     );
-    if (policy.audit_all_agent_actions) {
+    if (!planning && policy.audit_all_agent_actions) {
       appendAuditEvent({
         action,
         status: "requires_approval",
@@ -369,9 +390,8 @@ export async function evaluatePolicy(
     return needsApproval;
   }
 
-  const allowList =
-    policy.allow.length > 0 ? policy.allow : defaultPolicy.allow;
-  const isAllowed = allowList.includes(action);
+  const allowList = policy.allow;
+  const isAllowed = permissionNames.some((name) => allowList.includes(name));
   const result = isAllowed
     ? decision(
         "allow",
@@ -391,7 +411,7 @@ export async function evaluatePolicy(
     if (reservationDenied) return reservationDenied;
   }
 
-  if (policy.audit_all_agent_actions) {
+  if (!planning && policy.audit_all_agent_actions) {
     appendAuditEvent({
       action,
       status: result.status === "allow" ? "allowed" : "denied",

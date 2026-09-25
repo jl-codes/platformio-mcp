@@ -1,184 +1,238 @@
+/**
+ * Validated, provenance-aware policy resolution.
+ *
+ * Provides:
+ * - loadEffectivePolicyState: Resolves layers and preserves operator restrictions.
+ * - loadEffectivePolicy: Returns the resolved policy for existing callers.
+ */
+import { policyNamesForOperation } from "../action-catalog.js";
+import {
+  projectEnrollmentIdentity,
+  isProjectEnrolled,
+  type ProjectPolicyDocuments,
+} from "./project-enrollment.js";
 import fs from "node:fs";
 import path from "node:path";
-import type {
-  PolicyConfig,
-  PolicyProfileConfig,
-  PolicyProfileName,
-} from "./types.js";
+import crypto from "node:crypto";
+import type { PolicyConfig, PolicyProfileName } from "./types.js";
 import { resolvePolicyProfile } from "./profiles.js";
-import { SERVER_DATA_DIR, ensureDir } from "../../utils/paths.js";
+import {
+  parsePolicyDocument,
+  PolicyConfigError,
+  PolicyProfileConfigSchema,
+} from "./policy-schema.js";
+import { resolvePolicyDirectory, resolvePolicyFile } from "./policy-sources.js";
 
-function parseBoolean(value: string): boolean {
-  return ["true", "1", "yes", "on"].includes(value.trim().toLowerCase());
+/** A configured layer, including missing optional sources. */
+export interface PolicySource {
+  kind: "builtin" | "project-profile" | "operator" | "project-override";
+  source: string;
+  present: boolean;
+  sha256?: string;
 }
 
-function parseSimpleYamlPolicy(yamlText: string): Partial<PolicyConfig> {
-  const out: Partial<PolicyConfig> = {};
-  const lines = yamlText.split(/\r?\n/);
-  let currentListKey: keyof PolicyConfig | undefined;
-
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-
-    if (line.startsWith("- ")) {
-      if (!currentListKey) continue;
-      const item = line.slice(2).trim();
-      if (!item) continue;
-      const existing = (out[currentListKey] as string[] | undefined) ?? [];
-      (out as Record<string, unknown>)[currentListKey] = [...existing, item];
-      continue;
-    }
-
-    currentListKey = undefined;
-    const sepIdx = line.indexOf(":");
-    if (sepIdx === -1) continue;
-    const key = line.slice(0, sepIdx).trim() as keyof PolicyConfig;
-    const value = line.slice(sepIdx + 1).trim();
-
-    if (key === "approval_required" || key === "allow" || key === "deny") {
-      if (value.startsWith("[") && value.endsWith("]")) {
-        const parsed = value
-          .slice(1, -1)
-          .split(",")
-          .map((x) => x.trim())
-          .filter((x) => x.length > 0);
-        (out as Record<string, unknown>)[key] = parsed;
-      } else {
-        (out as Record<string, unknown>)[key] = [];
-        currentListKey = key;
-      }
-      continue;
-    }
-
-    if (
-      key === "require_workspace_boundary" ||
-      key === "require_device_lock_for_upload" ||
-      key === "redact_secrets_from_logs" ||
-      key === "audit_all_agent_actions"
-    ) {
-      (out as Record<string, unknown>)[key] = parseBoolean(value);
-    }
-  }
-
-  return out;
-}
-
-function mergePolicy(
-  base: PolicyConfig,
-  override: Partial<PolicyConfig>,
-): PolicyConfig {
-  return {
-    approval_required: override.approval_required ?? base.approval_required,
-    allow: override.allow ?? base.allow,
-    deny: override.deny ?? base.deny,
-    require_workspace_boundary:
-      override.require_workspace_boundary ?? base.require_workspace_boundary,
-    require_device_lock_for_upload:
-      override.require_device_lock_for_upload ?? base.require_device_lock_for_upload,
-    redact_secrets_from_logs:
-      override.redact_secrets_from_logs ?? base.redact_secrets_from_logs,
-    audit_all_agent_actions:
-      override.audit_all_agent_actions ?? base.audit_all_agent_actions,
-  };
-}
-
-function loadPolicyFile(policyPath: string): Partial<PolicyConfig> {
-  if (!fs.existsSync(policyPath)) return {};
-  const text = fs.readFileSync(policyPath, "utf8");
-  try {
-    return JSON.parse(text) as Partial<PolicyConfig>;
-  } catch {
-    return parseSimpleYamlPolicy(text);
-  }
-}
-
-function isPolicyProfileName(value: string): value is PolicyProfileName {
-  return (
-    value === "read_only" ||
-    value === "build_only" ||
-    value === "monitor_only" ||
-    value === "flash_requires_approval" ||
-    value === "lab_runner" ||
-    value === "lab_admin"
-  );
-}
-
-function loadProfileConfig(
-  workspaceDir?: string,
-): { profile: PolicyProfileName; source: string; overrides?: Partial<PolicyConfig> } {
-  const fallbackProfile: PolicyProfileName = "flash_requires_approval";
-  if (!workspaceDir) {
-    return {
-      profile: fallbackProfile,
-      source: "built-in:flash_requires_approval",
-    };
-  }
-
-  const profilePath = path.join(workspaceDir, ".pio-mcp-policy.json");
-  if (!fs.existsSync(profilePath)) {
-    return {
-      profile: fallbackProfile,
-      source: "built-in:flash_requires_approval",
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(
-      fs.readFileSync(profilePath, "utf8"),
-    ) as PolicyProfileConfig;
-
-    if (!parsed || typeof parsed.profile !== "string" || !isPolicyProfileName(parsed.profile)) {
-      return {
-        profile: fallbackProfile,
-        source: `invalid-profile:${profilePath}`,
-      };
-    }
-
-    return {
-      profile: parsed.profile,
-      source: profilePath,
-      overrides: parsed.overrides,
-    };
-  } catch {
-    return {
-      profile: fallbackProfile,
-      source: `invalid-profile:${profilePath}`,
-    };
-  }
-}
-
+/** Complete policy resolution and provenance used by execution and diagnostics. */
 export interface EffectivePolicyState {
   profile: PolicyProfileName;
   source: string;
   policy: PolicyConfig;
+  sources: PolicySource[];
+  digest: string;
+  projectEnrollment?: { enrolled: boolean; digest: string };
 }
 
-export function loadEffectivePolicyState(workspaceDir?: string): EffectivePolicyState {
-  ensureDir(SERVER_DATA_DIR);
-  const globalPath = path.join(SERVER_DATA_DIR, "policy.yaml");
-  const localPath = workspaceDir
-    ? path.join(workspaceDir, ".pio-mcp-workspace", "policy.yaml")
-    : undefined;
+/** Applies only fields present in an already-validated override. */
+function mergePolicy(
+  base: PolicyConfig,
+  override: Partial<PolicyConfig>,
+): PolicyConfig {
+  return { ...base, ...override };
+}
 
-  const profileConfig = loadProfileConfig(workspaceDir);
-  const basePolicy = resolvePolicyProfile({
-    profile: profileConfig.profile,
-    overrides: profileConfig.overrides,
+/** Reads once, distinguishing a missing optional file from other I/O failures. */
+function readLayer(source: string, required: boolean): string | undefined {
+  try {
+    const stat = fs.statSync(source);
+    if (!stat.isFile() || stat.size > 64 * 1024) {
+      throw new PolicyConfigError(
+        source,
+        "Expected a regular policy file no larger than 64 KiB.",
+      );
+    }
+    return fs.readFileSync(source, "utf8");
+  } catch (error) {
+    if (error instanceof PolicyConfigError) throw error;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT" && !required)
+      return undefined;
+    throw new PolicyConfigError(
+      source,
+      required
+        ? "The selected policy file is missing or unreadable."
+        : "The configured policy file is unreadable.",
+    );
+  }
+}
+
+/** Adds policy-file content identity without storing its contents in diagnostic output. */
+function recordSource(
+  sources: PolicySource[],
+  kind: PolicySource["kind"],
+  source: string,
+  text: string | undefined,
+) {
+  sources.push({
+    kind,
+    source,
+    present: text !== undefined,
+    ...(text === undefined
+      ? {}
+      : { sha256: crypto.createHash("sha256").update(text).digest("hex") }),
   });
-  const globalOverride = loadPolicyFile(globalPath);
-  const localOverride = localPath ? loadPolicyFile(localPath) : {};
+}
 
-  const withGlobal = mergePolicy(basePolicy, globalOverride);
-  const policy = mergePolicy(withGlobal, localOverride);
-
+/**
+ * Restores operator restrictions after project overrides.
+ * Explicit operator allow lists are ceilings, including an explicitly empty list.
+ */
+function applyOperatorCeiling(
+  policy: PolicyConfig,
+  operator: Partial<PolicyConfig>,
+): PolicyConfig {
+  const union = (left: string[], right: string[] = []) => [
+    ...new Set([...left, ...right]),
+  ];
+  const approvalRequired = union(
+    policy.approval_required,
+    operator.approval_required,
+  );
+  const operatorActions =
+    operator.allow === undefined
+      ? undefined
+      : new Set([...operator.allow, ...(operator.approval_required ?? [])]);
+  const permitted = (action: string) =>
+    operatorActions === undefined ||
+    policyNamesForOperation(action).some((name) => operatorActions.has(name));
   return {
-    profile: profileConfig.profile,
-    source: profileConfig.source,
-    policy,
+    ...policy,
+    allow: policy.allow.filter(permitted),
+    approval_required: approvalRequired.filter(permitted),
+    deny: union(policy.deny, operator.deny),
+    require_workspace_boundary:
+      operator.require_workspace_boundary === true ||
+      policy.require_workspace_boundary,
+    require_device_lock_for_upload:
+      operator.require_device_lock_for_upload === true ||
+      policy.require_device_lock_for_upload,
+    redact_secrets_from_logs:
+      operator.redact_secrets_from_logs === true ||
+      policy.redact_secrets_from_logs,
+    audit_all_agent_actions:
+      operator.audit_all_agent_actions === true ||
+      policy.audit_all_agent_actions,
   };
 }
 
+/**
+ * Resolves the project profile, operator policy and project overrides in legacy order.
+ * Invalid sources throw; only absent optional sources use the built-in default.
+ * @param workspaceDir - Explicit project scope, if any.
+ * @returns Effective policy, source provenance and digest.
+ */
+export function loadEffectivePolicyState(
+  workspaceDir?: string,
+): EffectivePolicyState {
+  let profile: PolicyProfileName = "flash_requires_approval";
+  const sources: PolicySource[] = [
+    {
+      kind: "builtin",
+      source: "built-in:flash_requires_approval",
+      present: true,
+    },
+  ];
+  const builtIn = resolvePolicyProfile({ profile });
+  const projectDocuments: ProjectPolicyDocuments = {
+    profile: null,
+    override: null,
+  };
+  let policy = builtIn;
+  if (workspaceDir) {
+    const source = path.join(
+      path.resolve(workspaceDir),
+      ".pio-mcp-policy.json",
+    );
+    const text = readLayer(source, false);
+    recordSource(sources, "project-profile", source, text);
+    if (text !== undefined) {
+      const document = PolicyProfileConfigSchema.safeParse(
+        parsePolicyDocument(text, source),
+      );
+      if (!document.success)
+        throw new PolicyConfigError(
+          source,
+          "Project profile requires a valid profile name.",
+        );
+      projectDocuments.profile = document.data;
+      profile = document.data.profile;
+      policy = resolvePolicyProfile(document.data);
+    }
+  }
+  const explicit = resolvePolicyFile();
+  const operatorPath =
+    explicit ?? path.join(resolvePolicyDirectory(), "policy.yaml");
+  const operatorText = readLayer(operatorPath, explicit !== undefined);
+  recordSource(sources, "operator", operatorPath, operatorText);
+  let operator: Partial<PolicyConfig> = {};
+  if (operatorText !== undefined) {
+    const document = parsePolicyDocument(operatorText, operatorPath);
+    if ("profile" in document) {
+      profile = document.profile;
+      operator = resolvePolicyProfile(document);
+    } else operator = document;
+    policy = mergePolicy(policy, operator);
+  }
+  if (workspaceDir) {
+    const source = path.join(
+      path.resolve(workspaceDir),
+      ".pio-mcp-workspace",
+      "policy.yaml",
+    );
+    const text = readLayer(source, false);
+    recordSource(sources, "project-override", source, text);
+    if (text !== undefined) {
+      const document = parsePolicyDocument(text, source);
+      if ("profile" in document)
+        throw new PolicyConfigError(
+          source,
+          "Select a project profile in .pio-mcp-policy.json; this file contains overrides only.",
+        );
+      projectDocuments.override = document;
+      policy = mergePolicy(policy, document);
+    }
+  }
+  let projectEnrollment: EffectivePolicyState["projectEnrollment"];
+  if (
+    workspaceDir &&
+    (projectDocuments.profile !== null || projectDocuments.override !== null)
+  ) {
+    const identity = projectEnrollmentIdentity(workspaceDir, projectDocuments);
+    const enrolled = isProjectEnrolled(identity);
+    projectEnrollment = { enrolled, digest: identity.digest };
+    if (!enrolled) {
+      // Project documents may restrict the operator baseline immediately, never expand it.
+      const baseline = mergePolicy(builtIn, operator);
+      policy = applyOperatorCeiling(policy, baseline);
+    }
+  }
+  policy = applyOperatorCeiling(policy, operator);
+  const source = sources.filter((item) => item.present).at(-1)!.source;
+  const digest = crypto
+    .createHash("sha256")
+    .update(JSON.stringify({ profile, policy, sources, projectEnrollment }))
+    .digest("hex");
+  return { profile, source, policy, sources, digest, projectEnrollment };
+}
+
+/** Returns the same validated policy used by the provenance-aware API. */
 export function loadEffectivePolicy(workspaceDir?: string): PolicyConfig {
   return loadEffectivePolicyState(workspaceDir).policy;
 }

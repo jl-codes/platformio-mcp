@@ -1,3 +1,4 @@
+import { dashboardActionFetch } from "../lib/dashboard-action";
 import React, { useState } from 'react';
 import { Layout, Menu, Drawer, Button, Space, Badge, Dropdown, Switch, Typography, Modal, message, theme } from 'antd';
 import { CodeOutlined, InfoCircleOutlined, UsbOutlined, PoweroffOutlined, FolderOpenOutlined, ApiOutlined, LinkOutlined, UpOutlined, DownOutlined, HomeOutlined } from '@ant-design/icons';
@@ -65,7 +66,7 @@ export default function WorkspaceCockpit({
       cancelText: 'Cancel',
       onOk: async () => {
         try {
-          const res = await fetch(`${apiBase}/api/server/reset`, {
+          const res = await dashboardActionFetch(`${apiBase}/api/server/reset`, {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
@@ -175,17 +176,17 @@ export default function WorkspaceCockpit({
               } else if (e.key === 'reset-server') {
                 handleResetServer();
               } else if (e.key === 'pio-home') {
-                fetch(`${apiBase}/api/commands/pio_home`, {
+                dashboardActionFetch(`${apiBase}/api/commands/pio_home`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`
                   },
                   body: JSON.stringify({ projectDir: activeWorkspace })
-                }).catch(err => console.error("Failed to start PIO Home", err));
-                setTimeout(() => {
-                  window.open('http://127.0.0.1:8008/', '_blank');
-                }, 1000);
+                }).then(response => {
+                  if (!response.ok) throw new Error('PIO Home was not authorized or could not start.');
+                  setTimeout(() => window.open('http://127.0.0.1:8008/', '_blank'), 1000);
+                }).catch(err => message.error(err.message));
               } else {
                 setActiveMenu(e.key);
               }

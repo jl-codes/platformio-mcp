@@ -1,0 +1,17 @@
+{
+  "sconsVersion": "4.8.1",
+  "status": 86,
+  "laterActionsExecuted": [],
+  "originalUploaderExecuted": false,
+  "captured": true,
+  "scriptSha256": "d1309dfbf423515c0cf5229f0d6dc602608e961d7390e078522d7bc87ca85aa6",
+  "observedAt": "2026-09-20T16:28:04.129391+00:00",
+  "host": "Windows x64",
+  "sourceBase": "b7f27838",
+  "implementationSha256": "804277dca5d85bceeeceba5f1db33f18b7893711da9938acb3de6c2bc0a62694",
+  "scope": "Real SCons lazy/list-action engine with synthetic input files; no PlatformIO build, uploader or hardware execution",
+  "limits": [
+    "Capture hook not yet wired to public upload execution",
+    "Command-line parsing, trusted toolchain identity, manifest authorization and retained-input spawning remain required"
+  ]
+}

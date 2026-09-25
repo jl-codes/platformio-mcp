@@ -12,6 +12,10 @@ import type {
   PolicyProfileName,
 } from "./types.js";
 import { defaultPolicy } from "./default-policy.js";
+import {
+  PolicyProfileConfigSchema,
+  PolicyConfigError,
+} from "./policy-schema.js";
 
 const READ_ONLY_ALLOW = [
   "list_devices",
@@ -69,6 +73,8 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
     deny: Array.from(
       new Set([
         ...defaultPolicy.deny,
+        "erase_flash",
+        "run_shell_command",
         "build_project",
         "check_project",
         "run_tests",
@@ -88,6 +94,8 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
     deny: Array.from(
       new Set([
         ...defaultPolicy.deny,
+        "erase_flash",
+        "run_shell_command",
         "upload_firmware",
         "upload_filesystem",
         "reset_server_state",
@@ -102,6 +110,8 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
     deny: Array.from(
       new Set([
         ...defaultPolicy.deny,
+        "erase_flash",
+        "run_shell_command",
         "build_project",
         "check_project",
         "run_tests",
@@ -186,8 +196,13 @@ export const policyProfiles: Record<PolicyProfileName, PolicyConfig> = {
 export function resolvePolicyProfile(
   config: PolicyProfileConfig,
 ): PolicyConfig {
-  const base =
-    policyProfiles[config.profile] ?? policyProfiles.flash_requires_approval;
+  const parsed = PolicyProfileConfigSchema.safeParse(config);
+  if (!parsed.success)
+    throw new PolicyConfigError(
+      "profile",
+      "Unknown profile or invalid overrides.",
+    );
+  const base = policyProfiles[parsed.data.profile];
   if (!config.overrides) return base;
   return {
     approval_required:

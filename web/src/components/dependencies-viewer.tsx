@@ -1,3 +1,4 @@
+import { dashboardActionFetch } from "../lib/dashboard-action";
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Typography, Spin, Empty, List, Tag, Space, theme } from 'antd';
 import { CodeSandboxOutlined, ExportOutlined } from '@ant-design/icons';
@@ -49,7 +50,7 @@ export default function DependenciesViewer({
     if (!activeWorkspace) return;
     setLoadingPioHome(true);
     try {
-      await fetch(`${apiBase}/api/commands/pio_home`, {
+      const response = await dashboardActionFetch(`${apiBase}/api/commands/pio_home`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -57,6 +58,7 @@ export default function DependenciesViewer({
         },
         body: JSON.stringify({ projectDir: activeWorkspace })
       });
+      if (!response.ok) throw new Error('PIO Home was not authorized or could not start.');
       setTimeout(() => {
         window.open('http://127.0.0.1:8008/', '_blank');
       }, 1000);

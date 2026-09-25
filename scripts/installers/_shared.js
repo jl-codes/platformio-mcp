@@ -1,7 +1,7 @@
 /**
  * Shared utilities for PlatformIO MCP installers.
  *
- * Provides the canonical MCP server config block (npx-based, cross-platform)
+ * Provides the canonical MCP server config block for npm and Python installations
  * and idempotent JSON config merging with backup/recovery for malformed files.
  */
 import fs from "node:fs";
@@ -10,7 +10,8 @@ import os from "node:os";
 
 /**
  * Returns the standard MCP server config block for platformio-mcp.
- * Uses `npx -y platformio-mcp` so users always get the latest published version.
+ * Python-launched installers retain their interpreter and bundled engine.
+ * npm installations use the existing npx launch behavior.
  *
  * On Windows, npm shims live as `npx.cmd`; some hosts (Claude Desktop on Windows)
  * cannot resolve a bare `npx` without the extension, so we explicitly emit the
@@ -19,6 +20,16 @@ import os from "node:os";
  * @returns {{ command: string, args: string[] }}
  */
 export function mcpServerConfigBlock() {
+  const python = process.env.PIO_MCP_PYTHON_EXECUTABLE;
+  if (python !== undefined) {
+    if (!path.isAbsolute(python) || !fs.statSync(python).isFile()) {
+      throw new Error("Python launcher interpreter must be an existing absolute file path");
+    }
+    return {
+      command: python,
+      args: ["-m", "pio_agent_launcher", "--open-dashboard-on-start"],
+    };
+  }
   const command = process.platform === "win32" ? "npx.cmd" : "npx";
   return {
     command,

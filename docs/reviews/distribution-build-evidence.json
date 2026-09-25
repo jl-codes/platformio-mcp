@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "ef52feb65e89cc1dab063ebfa79f57b1e9acdc28",
+  "workflowRun": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379",
+  "outcome": "pass",
+  "scope": "Non-publishing distribution validation. Final revision, physical hardware, protected publication gates and public registry acceptance are not established.",
+  "jobs": [
+    {
+      "name": "Build complete Python wheel set",
+      "conclusion": "success",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106091354437"
+    },
+    {
+      "name": "Install Python wheels (darwin-x64)",
+      "conclusion": "success",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106091605256"
+    },
+    {
+      "name": "Install Python wheels (darwin-arm64)",
+      "conclusion": "success",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106091605259"
+    },
+    {
+      "name": "Install Python wheels (win32-x64)",
+      "conclusion": "success",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106091605265"
+    },
+    {
+      "name": "Install Python wheels (linux-arm64)",
+      "conclusion": "success",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106091605288"
+    },
+    {
+      "name": "Install Python wheels (linux-x64)",
+      "conclusion": "success",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106091605291"
+    },
+    {
+      "name": "Build native container (amd64)",
+      "conclusion": "success",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106091744602"
+    },
+    {
+      "name": "Build native container (arm64)",
+      "conclusion": "success",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106091744615"
+    },
+    {
+      "name": "Build release artifacts",
+      "conclusion": "success",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106091877223"
+    },
+    {
+      "name": "Publish every verified container alias",
+      "conclusion": "skipped",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106092452546"
+    },
+    {
+      "name": "Publish verified Python distributions",
+      "conclusion": "skipped",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106092452930"
+    },
+    {
+      "name": "Publish verified MCP Registry descriptor",
+      "conclusion": "skipped",
+      "url": "https://github.com/jl-codes/platformio-mcp/actions/runs/35515777379/job/106092452947"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 10607140695,
+      "name": "platformio-python-release",
+      "size_in_bytes": 269514817,
+      "digest": "sha256:c99b9e96bbc7b0fd13b042d04269a8e62ec6b26eb973e3fae54ac5f7dfed7f87",
+      "expired": false
+    },
+    {
+      "id": 10607100762,
+      "name": "python-host-win32-x64",
+      "size_in_bytes": 1866,
+      "digest": "sha256:0bbe16fbd686b3f0979047f1537f939f72fc9422db6b3daefdde9801217300c7",
+      "expired": false
+    },
+    {
+      "id": 10606778259,
+      "name": "platformio-mcp-release",
+      "size_in_bytes": 282040348,
+      "digest": "sha256:07c1300ea1de7249853ba6422c2897092ffaae7dc747feefaa5873eeb551a44d",
+      "expired": false
+    },
+    {
+      "id": 10606703004,
+      "name": "python-host-linux-x64",
+      "size_in_bytes": 1868,
+      "digest": "sha256:3234c82a7c97f671d9ca767432f6045ad79004b5de6cc9c364c877aa2be9635f",
+      "expired": false
+    },
+    {
+      "id": 10606613324,
+      "name": "platformio-container-arm64",
+      "size_in_bytes": 350240705,
+      "digest": "sha256:370d739f6d167c7ef273ad4c1990097ba0fa75c424ce1ad8fbcaf7d3a389a6e0",
+      "expired": false
+    },
+    {
+      "id": 10606538318,
+      "name": "python-host-darwin-x64",
+      "size_in_bytes": 1857,
+      "digest": "sha256:2cf6ac080205e8d965dde837a73adbb9ae625937f76a3db0b737a5599b185610",
+      "expired": false
+    },
+    {
+      "id": 10606418567,
+      "name": "python-host-darwin-arm64",
+      "size_in_bytes": 1857,
+      "digest": "sha256:6e33e9f974789656e28160fd30e0cbde4f1ec4cf5fb3b13c34321b0047e6d485",
+      "expired": false
+    },
+    {
+      "id": 10606368689,
+      "name": "platformio-container-amd64",
+      "size_in_bytes": 326489536,
+      "digest": "sha256:5671602cea571df91ca918a090dcfa2e4084564a6ad1c53177fe6ecec418903b",
+      "expired": false
+    },
+    {
+      "id": 10606328743,
+      "name": "python-host-linux-arm64",
+      "size_in_bytes": 1874,
+      "digest": "sha256:fb226f4d80bb98f2c24a02da20eff1ed6c353980aef7ceedc848ac8a8e03d489",
+      "expired": false
+    }
+  ]
+}

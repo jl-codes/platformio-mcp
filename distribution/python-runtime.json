@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "nodeVersion": "24.15.0",
+  "pythonRequires": ">=3.11",
+  "checksumSource": "https://nodejs.org/dist/v24.15.0/SHASUMS256.txt",
+  "platformSource": "https://github.com/nodejs/node/blob/v24.15.0/BUILDING.md",
+  "minimums": {
+    "windows": "10",
+    "macos": "13.5",
+    "glibc": "2.28",
+    "linuxKernel": "4.18",
+    "libstdcxx": "GLIBCXX_3.4.25"
+  },
+  "targets": {
+    "win32-x64": {
+      "archive": "node-v24.15.0-win-x64.zip",
+      "sha256": "cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62",
+      "wheelTag": "win_amd64",
+      "acceptance": "pending"
+    },
+    "darwin-arm64": {
+      "archive": "node-v24.15.0-darwin-arm64.tar.gz",
+      "sha256": "372331b969779ab5d15b949884fc6eaf88d5afe87bde8ba881d6400b9100ffc4",
+      "wheelTag": "macosx_14_0_arm64",
+      "acceptance": "pending"
+    },
+    "darwin-x64": {
+      "archive": "node-v24.15.0-darwin-x64.tar.gz",
+      "sha256": "ffd5ee293467927f3ee731a553eb88fd1f48cf74eebc2d74a6babe4af228673b",
+      "wheelTag": "macosx_14_0_x86_64",
+      "acceptance": "pending"
+    },
+    "linux-arm64": {
+      "archive": "node-v24.15.0-linux-arm64.tar.xz",
+      "sha256": "f3d5a797b5d210ce8e2cb265544c8e482eaedcb8aa409a8b46da7e8595d0dda0",
+      "wheelTag": "manylinux_2_28_aarch64",
+      "acceptance": "pending"
+    },
+    "linux-x64": {
+      "archive": "node-v24.15.0-linux-x64.tar.xz",
+      "sha256": "472655581fb851559730c48763e0c9d3bc25975c59d518003fc0849d3e4ba0f6",
+      "wheelTag": "manylinux_2_28_x86_64",
+      "acceptance": "pending"
+    }
+  }
+}

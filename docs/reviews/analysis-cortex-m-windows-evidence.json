@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-25T19:23:26.944Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.15.0"
+  },
+  "environment": "analysis-cortex-m",
+  "board": "nucleo_f401re",
+  "platform": "ststm32@19.4.0",
+  "sourceSha256": "2b668484e59183795ca8e6c7179cde5af4dd8c81f901902b715b7219d801e2d7",
+  "elf": {
+    "sha256": "ce8a897e1f9450f4aba96814e7a4444c4fec85f63ab8824a165d46814475050f",
+    "architecture": "arm",
+    "bytes": 76556
+  },
+  "utilityVersion": "GNU nm (GNU Tools for Arm Embedded Processors 7-2017-q4-major) 2.29.51.20171128",
+  "checks": {
+    "knownFunction": true,
+    "sourceLine": 9,
+    "unresolvedFrame": true,
+    "expectedHash": true,
+    "wrongHashRejected": true,
+    "symbolAttribution": true,
+    "filteredSymbols": true,
+    "inlineFrames": 0
+  },
+  "totals": {
+    "text": 672,
+    "data": 8,
+    "bss": 1568,
+    "flashEstimate": 680,
+    "ramEstimate": 1576
+  },
+  "symbolCount": 75,
+  "physicalDeviceTest": false
+}

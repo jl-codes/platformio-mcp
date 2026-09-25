@@ -1,0 +1,40 @@
+{
+  "observedAt": "2026-09-20T11:57:39.462Z",
+  "platform": "win32",
+  "physicalDeviceContacted": false,
+  "supervisorSha256": "e2adfb763e8abf88e41ef0fd424be9a7d3231c6f69989d709945a26e6d002bcc",
+  "results": [
+    {
+      "mode": "stop",
+      "cleanupConfirmed": true,
+      "rootExited": true,
+      "descendantExited": true
+    },
+    {
+      "mode": "owner_eof",
+      "cleanupConfirmed": true,
+      "rootExited": true,
+      "descendantExited": true
+    },
+    {
+      "mode": "natural",
+      "cleanupConfirmed": true,
+      "rootExited": true,
+      "descendantExited": true
+    },
+    {
+      "mode": "node_owner",
+      "cleanupConfirmed": true,
+      "rootExited": true,
+      "descendantExited": true
+    },
+    {
+      "mode": "interactive_node_owner",
+      "inputEchoed": true,
+      "outputCannotForgeControl": true,
+      "cleanupConfirmed": true,
+      "rootExited": true,
+      "descendantExited": true
+    }
+  ]
+}

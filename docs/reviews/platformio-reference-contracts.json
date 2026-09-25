@@ -1,0 +1,3297 @@
+{
+  "schemaVersion": 1,
+  "referenceSha": "a7b31021982f20b5406eaf80732899f8e75bd464",
+  "method": "Hash-verified AST analysis; no reference code imported or executed.",
+  "limitations": [
+    "Literal return keys are branch evidence, not complete output schemas.",
+    "Delegated results and runtime failures require behavioral fixtures.",
+    "Unknown compatibility parameters are rejected intentionally; this is stricter than permissive argument handling."
+  ],
+  "tools": [
+    {
+      "requirementId": "PAR-01",
+      "referenceTool": "pio_board_info",
+      "canonicalAction": "get_board_info",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/project.py#L70",
+      "sourceSha256": "3dc0e791d8890159d0df4de963ab2d3f11bb0ce2398ba54dbd9ec627e8237dc1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "board_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "board_id"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_compact_board",
+          "line": 30,
+          "literalKeys": [
+            "id",
+            "name",
+            "platform",
+            "mcu",
+            "cpu_mhz",
+            "ram_kb",
+            "flash_kb",
+            "frameworks",
+            "vendor"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "KeyError",
+        "next",
+        "round",
+        "run_json",
+        "sorted"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-02",
+      "referenceTool": "pio_build",
+      "canonicalAction": "build_project",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/build.py#L96",
+      "sourceSha256": "faf067ef3aad4aef8ec87d39c54f53355bb526842dbfde66d317ba7f8eb3bdf9",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "verbose": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_run",
+          "line": 41,
+          "literalKeys": [
+            "ok",
+            "status",
+            "summary",
+            "environments",
+            "errors",
+            "warnings",
+            "error_count",
+            "warning_count",
+            "memory",
+            "duration_s",
+            "exit_code",
+            "log_path",
+            "output_tail",
+            "port_error"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "check_policy",
+        "classify_port_error",
+        "len",
+        "parse_build_result",
+        "parse_diagnostics",
+        "parse_memory",
+        "resolve_project_dir",
+        "run_pio",
+        "str",
+        "tail"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-03",
+      "referenceTool": "pio_check",
+      "canonicalAction": "check_project",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/quality.py#L91",
+      "sourceSha256": "903323cdce824d042c6f10628725d1effc2091e2a02c02e55bf624549664c9ad",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "severity": {
+            "type": "string",
+            "default": "medium"
+          },
+          "pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "skip_packages": {
+            "type": "boolean",
+            "default": true
+          },
+          "tool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_check",
+          "line": 113,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "output_tail",
+            "log_path"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_check",
+          "line": 122,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "log_path"
+          ],
+          "hasExpansion": true
+        }
+      ],
+      "externalDependencies": [
+        "ValueError",
+        "check_policy",
+        "resolve_project_dir",
+        "run_pio",
+        "str",
+        "summarize_check_report",
+        "tail"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-04",
+      "referenceTool": "pio_clean",
+      "canonicalAction": "clean_project",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/build.py#L119",
+      "sourceSha256": "faf067ef3aad4aef8ec87d39c54f53355bb526842dbfde66d317ba7f8eb3bdf9",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "full": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_run",
+          "line": 41,
+          "literalKeys": [
+            "ok",
+            "status",
+            "summary",
+            "environments",
+            "errors",
+            "warnings",
+            "error_count",
+            "warning_count",
+            "memory",
+            "duration_s",
+            "exit_code",
+            "log_path",
+            "output_tail",
+            "port_error"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "check_policy",
+        "classify_port_error",
+        "len",
+        "parse_build_result",
+        "parse_diagnostics",
+        "parse_memory",
+        "resolve_project_dir",
+        "run_pio",
+        "str",
+        "tail"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-05",
+      "referenceTool": "pio_coredump",
+      "canonicalAction": "coredump",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/flash.py#L251",
+      "sourceSha256": "8f7e311fa19836eecddf094504c9187bdd93d2ede4550fa0e6c02d4d4a6e3d9f",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "out_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "analyze": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_board",
+          "line": 42,
+          "literalKeys": [],
+          "hasExpansion": false
+        },
+        {
+          "function": "_board",
+          "line": 46,
+          "literalKeys": [
+            "id"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "_run_analyzer",
+          "line": 220,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "command"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "_run_analyzer",
+          "line": 222,
+          "literalKeys": [
+            "ok",
+            "exit_code",
+            "command",
+            "output"
+          ],
+          "hasExpansion": true
+        },
+        {
+          "function": "parse_coredump_report",
+          "line": 247,
+          "literalKeys": [
+            "crashed_task",
+            "reason",
+            "backtrace",
+            "registers"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_coredump",
+          "line": 276,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary"
+          ],
+          "hasExpansion": true
+        },
+        {
+          "function": "pio_coredump",
+          "line": 295,
+          "literalKeys": [
+            "ok",
+            "summary"
+          ],
+          "hasExpansion": true
+        },
+        {
+          "function": "pio_coredump",
+          "line": 297,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "analysis"
+          ],
+          "hasExpansion": true
+        },
+        {
+          "function": "pio_coredump",
+          "line": 299,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "analysis",
+            "install_hint"
+          ],
+          "hasExpansion": true
+        },
+        {
+          "function": "pio_coredump",
+          "line": 306,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "analysis"
+          ],
+          "hasExpansion": true
+        }
+      ],
+      "externalDependencies": [
+        "FileNotFoundError",
+        "KeyError",
+        "Path",
+        "RuntimeError",
+        "ValueError",
+        "_all_boards",
+        "_pick_port",
+        "bool",
+        "default_envs",
+        "env_setting",
+        "len",
+        "load_toolchain",
+        "log_dir",
+        "next",
+        "parse_partition_csv",
+        "project_config",
+        "project_metadata",
+        "resolve_project_dir",
+        "run_pio",
+        "sorted",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-06",
+      "referenceTool": "pio_debug_cmd",
+      "canonicalAction": "debug_cmd",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/debug.py#L79",
+      "sourceSha256": "cf03d1baf0a611f5eae48131853b496db98ff184c4cf9647fc408735918d8991",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "timeout_s": {
+            "type": "number",
+            "default": 30
+          }
+        },
+        "required": [
+          "session_id",
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_debug_cmd",
+          "line": 96,
+          "literalKeys": [
+            "ok",
+            "summary"
+          ],
+          "hasExpansion": true
+        }
+      ],
+      "externalDependencies": [
+        "len",
+        "min",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-07",
+      "referenceTool": "pio_debug_list",
+      "canonicalAction": "debug_list",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/debug.py#L106",
+      "sourceSha256": "cf03d1baf0a611f5eae48131853b496db98ff184c4cf9647fc408735918d8991",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_debug_list",
+          "line": 108,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "sessions"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "len"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-08",
+      "referenceTool": "pio_debug_start",
+      "canonicalAction": "debug_start",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/debug.py#L44",
+      "sourceSha256": "cf03d1baf0a611f5eae48131853b496db98ff184c4cf9647fc408735918d8991",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "load": {
+            "type": "boolean",
+            "default": true
+          },
+          "timeout_s": {
+            "type": "number",
+            "default": 90
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_debug_start",
+          "line": 53,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "env",
+            "debug_tool",
+            "output_tail"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_debug_start",
+          "line": 67,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "load",
+            "command",
+            "init_script",
+            "stopped"
+          ],
+          "hasExpansion": true
+        }
+      ],
+      "externalDependencies": [
+        "check_policy",
+        "default_envs",
+        "env_names",
+        "env_setting",
+        "min",
+        "project_config",
+        "resolve_project_dir",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-09",
+      "referenceTool": "pio_debug_stop",
+      "canonicalAction": "debug_stop",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/debug.py#L100",
+      "sourceSha256": "cf03d1baf0a611f5eae48131853b496db98ff184c4cf9647fc408735918d8991",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_debug_stop",
+          "line": 102,
+          "literalKeys": [
+            "ok",
+            "summary"
+          ],
+          "hasExpansion": true
+        }
+      ],
+      "externalDependencies": [],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-10",
+      "referenceTool": "pio_decode_backtrace",
+      "canonicalAction": "decode_backtrace",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/analysis.py#L106",
+      "sourceSha256": "dbccfbebfabfca839b909d0f6237ad7df2ae06facd15cf188927b317b2f6e2d6",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "include_all_hex": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_decode",
+          "line": 66,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "causes",
+            "reset_reasons"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "_decode",
+          "line": 92,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "causes",
+            "reset_reasons",
+            "backtrace_corrupted",
+            "frames",
+            "elf_path",
+            "env",
+            "addr2line"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "ValueError",
+        "bool",
+        "extract_crash",
+        "len",
+        "load_toolchain",
+        "require_elf",
+        "str",
+        "symbolize"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-11",
+      "referenceTool": "pio_deps_check",
+      "canonicalAction": "deps_check",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/deps.py#L195",
+      "sourceSha256": "50dd80d4b6793db0e42c45086fd393c3db7fb0811c4c8634d91c73ea887a3ab9",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "build": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_deps_check",
+          "line": 226,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "env",
+            "declared",
+            "installed",
+            "graph",
+            "build",
+            "issues",
+            "issue_count",
+            "counts"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "read_library_manifest",
+          "line": 41,
+          "literalKeys": [
+            "name",
+            "version",
+            "dependencies",
+            "manifest"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "read_library_manifest",
+          "line": 44,
+          "literalKeys": [
+            "manifest"
+          ],
+          "hasExpansion": true
+        }
+      ],
+      "externalDependencies": [
+        "Path",
+        "ValueError",
+        "any",
+        "bool",
+        "default_envs",
+        "env_setting",
+        "has_recursion_error",
+        "isinstance",
+        "len",
+        "library_json_dependencies",
+        "parse_dependency_graph",
+        "parse_lib_spec",
+        "parse_library_properties",
+        "project_config",
+        "resolve_project_dir",
+        "run_pio",
+        "set",
+        "sorted",
+        "str",
+        "sum",
+        "tail",
+        "tuple",
+        "visit"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-12",
+      "referenceTool": "pio_flash_and_verify",
+      "canonicalAction": "agent_flash_monitor_verify",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/analysis.py#L178",
+      "sourceSha256": "dbccfbebfabfca839b909d0f6237ad7df2ae06facd15cf188927b317b2f6e2d6",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "expect": {
+            "type": "string",
+            "default": "setup done|ready|started|Booting|loop"
+          },
+          "fail_on": {
+            "type": "string",
+            "default": "Guru Meditation|panic'ed|abort\\(\\) was called|assert failed|HardFault|Hard Fault|BusFault|UsageFault|MemManage|stack overflow|Task watchdog|Brownout|CORRUPT HEAP|Backtrace:|rst:0x[0-9a-f]+ \\((?:SW_CPU_RESET|TG\\dWDT_SYS_RESET|RTCWDT_RTC_RESET|PANIC)"
+          },
+          "timeout_s": {
+            "type": "number",
+            "default": 30
+          },
+          "upload_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "monitor_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "baud": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "stop_open_sessions": {
+            "type": "boolean",
+            "default": false
+          },
+          "max_lines": {
+            "type": "integer",
+            "default": 500
+          },
+          "settle_s": {
+            "type": "number",
+            "default": 1.5
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_decode",
+          "line": 66,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "causes",
+            "reset_reasons"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "_decode",
+          "line": 92,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "causes",
+            "reset_reasons",
+            "backtrace_corrupted",
+            "frames",
+            "elf_path",
+            "env",
+            "addr2line"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "RuntimeError",
+        "_pick_port",
+        "bool",
+        "check_policy",
+        "extract_crash",
+        "len",
+        "list",
+        "load_toolchain",
+        "min",
+        "pio_upload",
+        "require_elf",
+        "resolve_project_dir",
+        "round",
+        "str",
+        "symbolize",
+        "type"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-13",
+      "referenceTool": "pio_list_boards",
+      "canonicalAction": "list_boards",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/project.py#L44",
+      "sourceSha256": "3dc0e791d8890159d0df4de963ab2d3f11bb0ce2398ba54dbd9ec627e8237dc1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "limit": {
+            "type": "integer",
+            "default": 30
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_compact_board",
+          "line": 30,
+          "literalKeys": [
+            "id",
+            "name",
+            "platform",
+            "mcu",
+            "cpu_mhz",
+            "ram_kb",
+            "flash_kb",
+            "frameworks",
+            "vendor"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_list_boards",
+          "line": 61,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "total_matches",
+            "boards"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "ValueError",
+        "len",
+        "round",
+        "run_json",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-14",
+      "referenceTool": "pio_list_devices",
+      "canonicalAction": "list_devices",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/devices.py#L37",
+      "sourceSha256": "91cadd7174428b4c0dd22ca40e807adfe8c520eb945a77253a2ca9e6134e5532",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_list_devices",
+          "line": 41,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "devices",
+            "likely_ports",
+            "open_monitor_sessions"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "bool",
+        "len",
+        "run_json"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-15",
+      "referenceTool": "pio_list_targets",
+      "canonicalAction": "list_targets",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/build.py#L125",
+      "sourceSha256": "faf067ef3aad4aef8ec87d39c54f53355bb526842dbfde66d317ba7f8eb3bdf9",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_list_targets",
+          "line": 132,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "log_path"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_list_targets",
+          "line": 134,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "targets"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "len",
+        "parse_targets",
+        "resolve_project_dir",
+        "run_pio",
+        "sorted",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-16",
+      "referenceTool": "pio_memory_watch",
+      "canonicalAction": "memory_watch",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/runtime.py#L142",
+      "sourceSha256": "2142a74a143b6cbf6ffbc9f19dab18c776b0e5df65b8ec3b3778c17d22202045",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "baud": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "seconds": {
+            "type": "number",
+            "default": 15
+          },
+          "pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "stack_warn_bytes": {
+            "type": "integer",
+            "default": 512
+          },
+          "max_lines": {
+            "type": "integer",
+            "default": 5000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_metric_stats",
+          "line": 55,
+          "literalKeys": [
+            "metric",
+            "samples",
+            "first",
+            "last",
+            "min",
+            "max",
+            "change",
+            "bytes_per_sample",
+            "bytes_per_second",
+            "verdict",
+            "leak_suspected"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "analyze_memory",
+          "line": 85,
+          "literalKeys": [
+            "recognized",
+            "formats",
+            "sample_count",
+            "metrics",
+            "stacks",
+            "fragmentation",
+            "samples"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "_pick_port",
+        "abs",
+        "int",
+        "len",
+        "list",
+        "max",
+        "min",
+        "parse_memory_telemetry",
+        "range",
+        "round",
+        "sum",
+        "zip"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-17",
+      "referenceTool": "pio_monitor_capture",
+      "canonicalAction": "capture_monitor",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/devices.py#L199",
+      "sourceSha256": "91cadd7174428b4c0dd22ca40e807adfe8c520eb945a77253a2ca9e6134e5532",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "baud": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "seconds": {
+            "type": "number",
+            "default": 5
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "max_lines": {
+            "type": "integer",
+            "default": 500
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_monitor_capture",
+          "line": 213,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "port",
+            "baud",
+            "lines",
+            "matched",
+            "partial_line",
+            "error"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "RuntimeError",
+        "bool",
+        "default_envs",
+        "env_setting",
+        "int",
+        "len",
+        "min",
+        "project_config",
+        "run_json"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-18",
+      "referenceTool": "pio_monitor_list",
+      "canonicalAction": "list_monitors",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/devices.py#L193",
+      "sourceSha256": "91cadd7174428b4c0dd22ca40e807adfe8c520eb945a77253a2ca9e6134e5532",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_monitor_list",
+          "line": 195,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "sessions"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "len"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-19",
+      "referenceTool": "pio_monitor_read",
+      "canonicalAction": "read_monitor",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/devices.py#L162",
+      "sourceSha256": "91cadd7174428b4c0dd22ca40e807adfe8c520eb945a77253a2ca9e6134e5532",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "integer",
+            "default": 0
+          },
+          "max_lines": {
+            "type": "integer",
+            "default": 200
+          },
+          "wait_for": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "timeout_s": {
+            "type": "number",
+            "default": 10
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [],
+      "externalDependencies": [
+        "len",
+        "min",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-20",
+      "referenceTool": "pio_monitor_start",
+      "canonicalAction": "start_monitor",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/devices.py#L153",
+      "sourceSha256": "91cadd7174428b4c0dd22ca40e807adfe8c520eb945a77253a2ca9e6134e5532",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "baud": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "max_lines": {
+            "type": "integer",
+            "default": 5000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_monitor_start",
+          "line": 158,
+          "literalKeys": [
+            "ok",
+            "summary"
+          ],
+          "hasExpansion": true
+        }
+      ],
+      "externalDependencies": [
+        "RuntimeError",
+        "bool",
+        "default_envs",
+        "env_setting",
+        "int",
+        "len",
+        "project_config",
+        "run_json"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-21",
+      "referenceTool": "pio_monitor_stop",
+      "canonicalAction": "stop_monitor",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/devices.py#L187",
+      "sourceSha256": "91cadd7174428b4c0dd22ca40e807adfe8c520eb945a77253a2ca9e6134e5532",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_monitor_stop",
+          "line": 189,
+          "literalKeys": [
+            "ok",
+            "summary"
+          ],
+          "hasExpansion": true
+        }
+      ],
+      "externalDependencies": [],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-22",
+      "referenceTool": "pio_monitor_write",
+      "canonicalAction": "write_monitor",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/devices.py#L179",
+      "sourceSha256": "91cadd7174428b4c0dd22ca40e807adfe8c520eb945a77253a2ca9e6134e5532",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "newline": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "session_id",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_monitor_write",
+          "line": 183,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "session_id",
+            "bytes"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "check_policy"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-23",
+      "referenceTool": "pio_partition_table",
+      "canonicalAction": "partition_table",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/flash.py#L123",
+      "sourceSha256": "8f7e311fa19836eecddf094504c9187bdd93d2ede4550fa0e6c02d4d4a6e3d9f",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "read_device": {
+            "type": "boolean",
+            "default": false
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_board",
+          "line": 42,
+          "literalKeys": [],
+          "hasExpansion": false
+        },
+        {
+          "function": "_board",
+          "line": 46,
+          "literalKeys": [
+            "id"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_partition_table",
+          "line": 178,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "env",
+            "csv_path",
+            "csv_source",
+            "board",
+            "mcu",
+            "flash_size",
+            "flash_size_source",
+            "table_end",
+            "firmware_bin",
+            "firmware_size",
+            "partitions",
+            "issues",
+            "error_count",
+            "warning_count",
+            "device"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "FileNotFoundError",
+        "Path",
+        "RuntimeError",
+        "ValueError",
+        "_all_boards",
+        "_pick_port",
+        "check_partitions",
+        "default_envs",
+        "diff_partitions",
+        "env_setting",
+        "int",
+        "len",
+        "max",
+        "next",
+        "parse_number",
+        "parse_partition_bin",
+        "parse_partition_csv",
+        "project_config",
+        "project_metadata",
+        "resolve_project_dir",
+        "run_pio",
+        "sorted",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-24",
+      "referenceTool": "pio_pkg_install",
+      "canonicalAction": "pkg_install",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/packages.py#L33",
+      "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spec": {
+            "type": "string"
+          },
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "type": {
+            "type": "string",
+            "default": "library"
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_pkg_install",
+          "line": 43,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "output_tail",
+            "log_path"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_pkg_install",
+          "line": 44,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "output_tail",
+            "log_path"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "ValueError",
+        "check_policy",
+        "resolve_project_dir",
+        "run_pio",
+        "str",
+        "tail"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-25",
+      "referenceTool": "pio_pkg_list",
+      "canonicalAction": "pkg_list",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/packages.py#L59",
+      "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_pkg_list",
+          "line": 66,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "packages",
+            "output_tail",
+            "log_path"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "len",
+        "parse_pkg_list",
+        "resolve_project_dir",
+        "run_pio",
+        "str",
+        "tail"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-26",
+      "referenceTool": "pio_pkg_outdated",
+      "canonicalAction": "pkg_outdated",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/packages.py#L70",
+      "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_pkg_outdated",
+          "line": 76,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "output",
+            "log_path"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "resolve_project_dir",
+        "run_pio",
+        "str",
+        "tail"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-27",
+      "referenceTool": "pio_pkg_search",
+      "canonicalAction": "pkg_search",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/packages.py#L15",
+      "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "default": "library"
+          },
+          "page": {
+            "type": "integer",
+            "default": 1
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_pkg_search",
+          "line": 21,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "log_path"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_pkg_search",
+          "line": 24,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "install_hint"
+          ],
+          "hasExpansion": true
+        }
+      ],
+      "externalDependencies": [
+        "ValueError",
+        "parse_pkg_search",
+        "run_pio",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-28",
+      "referenceTool": "pio_pkg_uninstall",
+      "canonicalAction": "pkg_uninstall",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/packages.py#L48",
+      "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spec": {
+            "type": "string"
+          },
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "type": {
+            "type": "string",
+            "default": "library"
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_pkg_uninstall",
+          "line": 55,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "output_tail",
+            "log_path"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "check_policy",
+        "resolve_project_dir",
+        "run_pio",
+        "str",
+        "tail"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-29",
+      "referenceTool": "pio_pkg_update",
+      "canonicalAction": "pkg_update",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/packages.py#L80",
+      "sourceSha256": "44c03af8ca78e72b898d3ba97d8738130ef8ed0507dd8b4cbcead0627b5a15e1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_pkg_update",
+          "line": 87,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "output_tail",
+            "log_path"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "check_policy",
+        "resolve_project_dir",
+        "run_pio",
+        "str",
+        "tail"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-30",
+      "referenceTool": "pio_port_diagnose",
+      "canonicalAction": "port_diagnose",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/devices.py#L146",
+      "sourceSha256": "91cadd7174428b4c0dd22ca40e807adfe8c520eb945a77253a2ca9e6134e5532",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_port_diagnose",
+          "line": 149,
+          "literalKeys": [
+            "ok",
+            "summary"
+          ],
+          "hasExpansion": true
+        }
+      ],
+      "externalDependencies": [
+        "RuntimeError",
+        "bool",
+        "default_envs",
+        "env_setting",
+        "int",
+        "len",
+        "project_config",
+        "run_json",
+        "set",
+        "sorted",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-31",
+      "referenceTool": "pio_power_profile",
+      "canonicalAction": "power_profile",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/power.py#L328",
+      "sourceSha256": "c3857d12bae612bb83ac33e4ad0ca1875b14108aa7b5f04ed45371b40aa13231",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "default": "serial"
+          },
+          "seconds": {
+            "type": "number",
+            "default": 10
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "baud": {
+            "type": "integer",
+            "default": 115200
+          },
+          "pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "voltage_mv": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "trigger_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "buckets": {
+            "type": "integer",
+            "default": 20
+          },
+          "sleep_threshold_ma": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_wait_for_trigger",
+          "line": 324,
+          "literalKeys": [
+            "trigger_line",
+            "trigger_offset_s"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "analyze",
+          "line": 230,
+          "literalKeys": [
+            "sample_count",
+            "duration_s",
+            "voltage_mv",
+            "threshold_ma",
+            "threshold_source",
+            "timeline",
+            "battery_1000mah_hours"
+          ],
+          "hasExpansion": true
+        },
+        {
+          "function": "current_stats",
+          "line": 146,
+          "literalKeys": [
+            "average_ma",
+            "min_ma",
+            "max_ma",
+            "p95_ma"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "energy",
+          "line": 215,
+          "literalKeys": [
+            "charge_uah",
+            "energy_mwh"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_power_profile",
+          "line": 361,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_power_profile",
+          "line": 366,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "port",
+            "unparsed_lines"
+          ],
+          "hasExpansion": true
+        },
+        {
+          "function": "pio_power_profile",
+          "line": 370,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "source",
+            "port",
+            "seconds",
+            "unparsed_lines"
+          ],
+          "hasExpansion": true
+        },
+        {
+          "function": "sleep_active_split",
+          "line": 189,
+          "literalKeys": [
+            "sleep_fraction",
+            "sleep_avg_ma",
+            "active_avg_ma"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "Ppk2Source",
+        "RuntimeError",
+        "ValueError",
+        "enumerate",
+        "float",
+        "int",
+        "len",
+        "max",
+        "min",
+        "range",
+        "round",
+        "sleep",
+        "sorted",
+        "str",
+        "sum",
+        "zip"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-32",
+      "referenceTool": "pio_project_envs",
+      "canonicalAction": "project_envs",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/project.py#L115",
+      "sourceSha256": "3dc0e791d8890159d0df4de963ab2d3f11bb0ce2398ba54dbd9ec627e8237dc1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_project_envs",
+          "line": 136,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "project_dir",
+            "default_envs",
+            "platformio_section",
+            "envs",
+            "platformio_ini_path"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "default_envs",
+        "env_names",
+        "env_setting",
+        "len",
+        "project_config",
+        "resolve_project_dir",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-33",
+      "referenceTool": "pio_project_init",
+      "canonicalAction": "init_project",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/project.py#L91",
+      "sourceSha256": "3dc0e791d8890159d0df4de963ab2d3f11bb0ce2398ba54dbd9ec627e8237dc1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "type": "string"
+          },
+          "board": {
+            "type": "string"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "project_options": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "project_dir",
+          "board"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_project_init",
+          "line": 102,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "output",
+            "log_path"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_project_init",
+          "line": 104,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "project_dir",
+            "platformio_ini",
+            "layout",
+            "log_path"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "Path",
+        "check_policy",
+        "run_pio",
+        "sorted",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-34",
+      "referenceTool": "pio_project_metadata",
+      "canonicalAction": "project_metadata",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/project.py#L148",
+      "sourceSha256": "3dc0e791d8890159d0df4de963ab2d3f11bb0ce2398ba54dbd9ec627e8237dc1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_project_metadata",
+          "line": 168,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "project_dir",
+            "envs"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "len",
+        "resolve_project_dir",
+        "run_json",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-35",
+      "referenceTool": "pio_run_target",
+      "canonicalAction": "run_target",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/build.py#L138",
+      "sourceSha256": "faf067ef3aad4aef8ec87d39c54f53355bb526842dbfde66d317ba7f8eb3bdf9",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "upload_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "stop_open_sessions": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_run",
+          "line": 41,
+          "literalKeys": [
+            "ok",
+            "status",
+            "summary",
+            "environments",
+            "errors",
+            "warnings",
+            "error_count",
+            "warning_count",
+            "memory",
+            "duration_s",
+            "exit_code",
+            "log_path",
+            "output_tail",
+            "port_error"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "RuntimeError",
+        "_pick_port",
+        "check_policy",
+        "classify_port_error",
+        "diagnose_port",
+        "len",
+        "parse_build_result",
+        "parse_diagnostics",
+        "parse_memory",
+        "resolve_project_dir",
+        "run_pio",
+        "str",
+        "tail"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-36",
+      "referenceTool": "pio_size_report",
+      "canonicalAction": "size_report",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/analysis.py#L117",
+      "sourceSha256": "dbccfbebfabfca839b909d0f6237ad7df2ae06facd15cf188927b317b2f6e2d6",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "top": {
+            "type": "integer",
+            "default": 25
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_board_limits",
+          "line": 43,
+          "literalKeys": [],
+          "hasExpansion": false
+        },
+        {
+          "function": "_board_limits",
+          "line": 47,
+          "literalKeys": [
+            "board",
+            "flash_bytes",
+            "ram_bytes",
+            "mcu"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "_board_limits",
+          "line": 50,
+          "literalKeys": [
+            "board"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_size_report",
+          "line": 156,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "env",
+            "elf_path",
+            "board",
+            "totals",
+            "memory",
+            "memory_source",
+            "memory_log_path",
+            "flash_percent",
+            "ram_percent",
+            "region_totals",
+            "sections",
+            "top_symbols",
+            "symbol_count",
+            "top_files",
+            "filter"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "FileNotFoundError",
+        "_all_boards",
+        "default_envs",
+        "env_setting",
+        "group_by_file",
+        "len",
+        "load_toolchain",
+        "parse_memory",
+        "parse_nm",
+        "parse_size_sections",
+        "parse_size_totals",
+        "project_config",
+        "require_elf",
+        "resolve_project_dir",
+        "round",
+        "run_pio",
+        "run_tool",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-37",
+      "referenceTool": "pio_system_info",
+      "canonicalAction": "system_info",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/system.py#L13",
+      "sourceSha256": "bc70430f72c1bc8a0a61b1af2549f94b6771044e0fa9a802ca5ced80aa3c8e1e",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_system_info",
+          "line": 16,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "server_version",
+            "policy"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_system_info",
+          "line": 24,
+          "literalKeys": [
+            "ok",
+            "summary",
+            "server_version",
+            "policy",
+            "pio_command",
+            "core_version",
+            "python",
+            "system",
+            "core_dir",
+            "installed_platforms",
+            "installed_tools",
+            "obsolete_core_warning",
+            "log_dir",
+            "open_monitor_sessions"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "find_pio",
+        "log_dir",
+        "policy",
+        "run_json",
+        "run_pio",
+        "str"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-38",
+      "referenceTool": "pio_test",
+      "canonicalAction": "run_tests",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/quality.py#L26",
+      "sourceSha256": "903323cdce824d042c6f10628725d1effc2091e2a02c02e55bf624549664c9ad",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "ignore": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "without_uploading": {
+            "type": "boolean",
+            "default": false
+          },
+          "without_building": {
+            "type": "boolean",
+            "default": false
+          },
+          "upload_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "verbose": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "pio_test",
+          "line": 77,
+          "literalKeys": [
+            "ok",
+            "status",
+            "summary",
+            "build_errors",
+            "output_tail",
+            "log_path"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_test",
+          "line": 87,
+          "literalKeys": [
+            "ok",
+            "status",
+            "summary",
+            "build_errors",
+            "exit_code",
+            "log_path",
+            "output_tail"
+          ],
+          "hasExpansion": true
+        }
+      ],
+      "externalDependencies": [
+        "PolicyError",
+        "check_policy",
+        "default_envs",
+        "env_setting",
+        "len",
+        "open",
+        "parse_diagnostics",
+        "policy",
+        "project_config",
+        "resolve_project_dir",
+        "run_pio",
+        "str",
+        "summarize_test_report",
+        "tail"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-39",
+      "referenceTool": "pio_upload",
+      "canonicalAction": "upload_firmware",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/build.py#L107",
+      "sourceSha256": "faf067ef3aad4aef8ec87d39c54f53355bb526842dbfde66d317ba7f8eb3bdf9",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "upload_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "stop_open_sessions": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "_run",
+          "line": 41,
+          "literalKeys": [
+            "ok",
+            "status",
+            "summary",
+            "environments",
+            "errors",
+            "warnings",
+            "error_count",
+            "warning_count",
+            "memory",
+            "duration_s",
+            "exit_code",
+            "log_path",
+            "output_tail",
+            "port_error"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "RuntimeError",
+        "_pick_port",
+        "check_policy",
+        "classify_port_error",
+        "diagnose_port",
+        "len",
+        "parse_build_result",
+        "parse_diagnostics",
+        "parse_memory",
+        "resolve_project_dir",
+        "run_pio",
+        "str",
+        "tail"
+      ],
+      "behavioralAcceptance": "not_run"
+    },
+    {
+      "requirementId": "PAR-40",
+      "referenceTool": "pio_upload_ota",
+      "canonicalAction": "upload_ota",
+      "sourceUrl": "https://github.com/powerdragonfire/platformio.mcp/blob/a7b31021982f20b5406eaf80732899f8e75bd464/src/platformio_mcp/tools/ota.py#L121",
+      "sourceSha256": "685112ac74b86ed054ad33c00c93e67fcd25aba7280c7cf114b2634a8016e607",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "project_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "auth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "filesystem": {
+            "type": "boolean",
+            "default": false
+          },
+          "build": {
+            "type": "boolean",
+            "default": true
+          },
+          "timeout_s": {
+            "type": "number",
+            "default": 180
+          },
+          "verify_reachable": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "host"
+        ],
+        "additionalProperties": false
+      },
+      "returnEvidence": [
+        {
+          "function": "parse_espota",
+          "line": 52,
+          "literalKeys": [
+            "success",
+            "progress_percent",
+            "error",
+            "hint",
+            "auto_switched"
+          ],
+          "hasExpansion": false
+        },
+        {
+          "function": "pio_upload_ota",
+          "line": 154,
+          "literalKeys": [
+            "ok",
+            "error",
+            "summary",
+            "host",
+            "ip",
+            "port",
+            "env"
+          ],
+          "hasExpansion": false
+        }
+      ],
+      "externalDependencies": [
+        "FileNotFoundError",
+        "Path",
+        "PioResult",
+        "RuntimeError",
+        "ValueError",
+        "any",
+        "bool",
+        "check_policy",
+        "clean_output",
+        "default_envs",
+        "enumerate",
+        "env_setting",
+        "int",
+        "isinstance",
+        "list",
+        "max",
+        "parse_build_result",
+        "parse_diagnostics",
+        "parse_memory",
+        "project_config",
+        "resolve_project_dir",
+        "round",
+        "run_pio",
+        "sorted",
+        "str",
+        "tail",
+        "write_log"
+      ],
+      "behavioralAcceptance": "not_run"
+    }
+  ]
+}

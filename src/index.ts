@@ -1,4 +1,32 @@
 #!/usr/bin/env node
+import { projectAnalysisLedger } from "./adapters/analysis-ledger.js";
+import { withFlashVerificationTools } from "./adapters/flash-verification-registry.js";
+import { withOtaTools } from "./adapters/ota-registry.js";
+import { withPowerCompatibility } from "./adapters/power-compat-registry.js";
+import { executePowerCompatibility } from "./adapters/power-compat.js";
+import { PowerMeterClient } from "./adapters/power-meter-client.js";
+import { DebugCompatibilityClient } from "./adapters/debug-compat.js";
+import { executeDebugTool, isDebugToolName } from "./adapters/debug-tool-dispatch.js";
+import { withDebugCompatibility } from "./adapters/debug-compat-registry.js";
+import { executeOtaCompatibility } from "./adapters/ota-compat.js";
+import { executeFlashVerificationCompatibility } from "./adapters/flash-verification-compat.js";
+import { startCoredumpRetentionCleanup } from "./core/analysis/esp-coredump-retention.js";
+import { executeCoredump } from "./tools/coredump.js";
+import { executeCoredumpCompatibility } from "./adapters/coredump-compat.js";
+import { executePartitionCompatibility } from "./adapters/partition-compat.js";
+import { executePartitionTable } from "./tools/partition-table.js";
+import { executeSystemCompatibility } from "./adapters/system-compat.js";
+import { executeUploadCompatibility } from "./adapters/upload-compat.js";
+import { executeNamedTarget, executeRunTargetAction } from "./tools/run-target.js";
+import { registerShutdownTask, requestProcessShutdown } from "./utils/shutdown-coordinator.js";
+import {
+  executeDeviceCompatibility,
+  withDeviceCompatibility,
+  withOwnedSerialTools,
+  OWNED_SERIAL_TOOLS,
+} from "./adapters/device-compat.js";
+import { SerialClientContext } from "./adapters/serial-client.js";
+import { readRuntimeVersion } from "./utils/runtime-version.js";
 
 /**
  * PlatformIO MCP Server Entry Point
@@ -10,6 +38,21 @@
  * - CallToolRequestSchema handler: Routes tool requests to their respective backend logic.
  */
 
+import {
+  executeDependencyCompatibility,
+  withDependencyCompatibility,
+} from "./adapters/dependency-compat.js";
+import { inspectDependencies } from "./tools/dependency-inspection.js";
+import { compatibilityErrorResult } from "./adapters/compatibility-error.js";
+import {
+  executeBoardCompatibility,
+  withBoardCompatibility,
+} from "./adapters/board-compat.js";
+import { withProjectCompatibility } from "./adapters/project-compat-registry.js";
+import { executeProjectCompatibility } from "./adapters/project-compat.js";
+import { parseCompatibilityLaunch } from "./adapters/compatibility-mode.js";
+import { withPackageCompatibility } from "./adapters/package-compat-registry.js";
+import { executePackageCompatibility } from "./adapters/package-compat.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -66,12 +109,19 @@ import { mcpContext } from "./utils/mcp-context.js";
 import { addWorkspace } from "./utils/workspace-registry.js";
 
 // Import tool functions from feature modules
+import {
+  executeProjectInspection,
+  type ProjectInspectionAction,
+} from "./tools/project-inspection.js";
+import { executePackageAction, type PackageAction } from "./tools/packages.js";
+import { decodeBacktrace, firmwareSizeReport } from "./tools/analysis.js";
 import { getBoardInfo } from "./tools/boards.js";
 import {
   getProjectConfig,
   getSystemInfo,
   getProjectContext,
 } from "./tools/projects.js";
+import { runTestsWithReport } from "./core/test-report-execution.js";
 import { cleanProject, checkProject, runTests } from "./tools/build.js";
 import { uploadFilesystem } from "./tools/upload.js";
 import {
@@ -111,17 +161,18 @@ import {
   agentMonitorHealth,
 } from "./tools/agent.js";
 import { checkPlatformIOInstalled } from "./platformio.js";
-import { formatPlatformIOError } from "./utils/errors.js";
+import { formatPlatformIOError, PlatformIOError } from "./utils/errors.js";
 import { hardwareLockManager } from "./utils/lock-manager.js";
 import { killAllTrackedProcesses } from "./utils/process-manager.js";
 import { GLOBAL_LOCKS_DIR } from "./utils/paths.js";
 import fs from "node:fs";
+import { configurePolicyFileFromArgs } from "./core/policy/policy-sources.js";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { logDiagnostic as logDiag } from "./utils/logger.js";
 import { portalEvents } from "./api/events.js";
 import crypto from "node:crypto";
-import { evaluatePolicy } from "./core/policy/evaluate-policy.js";
+import { authorizeAction } from "./core/action-dispatcher.js";
 import { getPolicyStatus } from "./core/policy/status.js";
 import { resolveTarget, resolveWriteTarget } from "./core/target-resolution.js";
 import {
@@ -146,7 +197,7 @@ import {
 const server = new Server(
   {
     name: "platformio-mcp-server",
-    version: "1.0.0",
+    version: readRuntimeVersion(import.meta.url),
   },
   {
     capabilities: {
@@ -195,6 +246,401 @@ const automationKeyInputSchema = {
  * exposed by this server.
  */
 const toolDefinitions: ToolDefinition[] = [
+  {
+    name: "deps_check",
+    description:
+      "Audit declared and installed project dependencies, with optional separately authorized build and LDF graph evidence.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: { type: "string", minLength: 1, maxLength: 32768 },
+        environment: {
+          type: "string",
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,49}$",
+        },
+        build: { type: "boolean", default: false },
+        approvalId: { type: "string", maxLength: 256 },
+        configurationApprovalId: { type: "string", maxLength: 256 },
+        inventoryApprovalId: { type: "string", maxLength: 256 },
+        buildApprovalId: { type: "string", maxLength: 256 },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "project_envs",
+    description:
+      "List resolved project environments, inherited board/framework/port settings and configured defaults without running build scripts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: {
+          type: "string",
+          minLength: 1,
+          maxLength: 32768,
+        },
+        approvalId: {
+          type: "string",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "project_metadata",
+    description:
+      "Generate bounded build metadata for selected or all environments. Requires build permission; may execute project scripts or install dependencies.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: {
+          type: "string",
+          minLength: 1,
+          maxLength: 32768,
+        },
+        approvalId: {
+          type: "string",
+        },
+        environment: {
+          type: "string",
+          minLength: 1,
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
+  { name: "coredump", description: "Inspect an ESP core dump from a file or explicitly authorized device partition read, optionally analyzing it against an explicit ELF. Device reads can reset hardware and require separate device and host-command grants.", inputSchema: {"type": "object", "required": ["projectDir"], "additionalProperties": false, "properties": {"projectDir": {"type": "string", "minLength": 1, "maxLength": 32768}, "dumpPath": {"type": "string", "minLength": 1, "maxLength": 32768}, "elfPath": {"type": "string", "minLength": 1, "maxLength": 32768}, "expectedInputSha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}, "expectedElfSha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}, "approvalId": {"type": "string", "maxLength": 256}, "commandApprovalId": {"type": "string", "maxLength": 256}, "format": {"type": "string", "enum": ["raw", "base64"], "default": "raw"}, "analyze": {"type": "boolean", "default": true}, "encrypted": {"type": "boolean", "default": false}, "device": {"type": "object", "required": ["port", "table"], "additionalProperties": false, "properties": {"port": {"type": "string", "minLength": 1, "maxLength": 512}, "partitionName": {"type": "string", "minLength": 1, "maxLength": 16}, "table": {"type": "object", "required": ["projectDir"], "additionalProperties": false, "properties": {"projectDir": {"type": "string", "minLength": 1}, "tablePath": {"type": "string", "minLength": 1}, "format": {"type": "string", "enum": ["csv", "binary"], "default": "csv"}, "tableOffset": {"type": "integer", "minimum": 0, "maximum": 4294963200}, "environment": {"type": "string"}, "sdkconfigPath": {"type": "string"}, "flashSize": {"type": "integer", "minimum": 1, "maximum": 4294967296}, "buildMetadata": {"type": "boolean", "default": false}, "approvalId": {"type": "string", "maxLength": 256}, "configApprovalId": {"type": "string", "maxLength": 256}, "metadataApprovalId": {"type": "string", "maxLength": 256}, "systemApprovalId": {"type": "string", "maxLength": 256}, "boardApprovalId": {"type": "string", "maxLength": 256}}}, "approvalId": {"type": "string", "maxLength": 256}, "commandApprovalId": {"type": "string", "maxLength": 256}}}, "outPath": {"type": "string", "minLength": 1, "maxLength": 32768}, "exportApprovalId": {"type": "string", "maxLength": 256}, "retainDump": {"type": "boolean", "default": false, "description": "Save the device partition in private managed storage with 24-hour expiry; requires export permission."}}, "oneOf": [{"required": ["dumpPath"], "not": {"required": ["device"]}}, {"required": ["device"], "not": {"required": ["dumpPath"]}}]} },
+  {
+    name: "partition_table",
+    description: "Inspect ESP partition artifacts and firmware fit. Optional buildMetadata requires build permission and can execute project scripts. Optional readDevice resets/reads an explicitly selected serial device with separate permissions.",
+    inputSchema: {
+      type: "object", required: ["projectDir"], additionalProperties: false,
+      properties: {
+        projectDir: { type: "string", minLength: 1, maxLength: 32768 },
+        tablePath: { type: "string", minLength: 1, maxLength: 32768 },
+        environment: { type: "string", maxLength: 50, pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$" },
+        configApprovalId: { type: "string", maxLength: 256 },
+        format: { type: "string", enum: ["csv", "binary"], default: "csv" },
+        tableOffset: { type: "integer", minimum: 0, maximum: 4294963200 },
+        sdkconfigPath: { type: "string", minLength: 1, maxLength: 32768 },
+        readDevice: { type: "boolean", default: false, description: "Read the partition sector from an explicit serial port; may reset hardware and requires separate device and host-command permissions." },
+        port: { type: "string", minLength: 1, maxLength: 512 },
+        readApprovalId: { type: "string", maxLength: 256 },
+        commandApprovalId: { type: "string", maxLength: 256 },
+        buildMetadata: { type: "boolean", default: false, description: "Generate build metadata under build permission; may execute project scripts." },
+        metadataApprovalId: { type: "string", maxLength: 256 },
+        systemApprovalId: { type: "string", maxLength: 256 },
+        boardApprovalId: { type: "string", maxLength: 256 },
+        flashSize: { type: "integer", minimum: 1, maximum: 4294967296 },
+        firmwarePath: { type: "string", minLength: 1, maxLength: 32768 },
+        observedTablePath: { type: "string", minLength: 1, maxLength: 32768 },
+        approvalId: { type: "string", maxLength: 256 },
+      },
+    },
+  },
+  {
+    name: "run_target",
+    description: "Run a named PlatformIO target with effect-based permissions. Serial upload targets coordinate owned monitors and endpoint custody; network/probe destinations require their dedicated workflow.",
+    inputSchema: {
+      type: "object", required: ["projectDir", "target"], additionalProperties: false,
+      properties: {
+        projectDir: { type: "string", minLength: 1, maxLength: 32768 },
+        target: { type: "string", minLength: 1, maxLength: 4096 },
+        environment: { type: ["string", "null"] },
+        uploadPort: { type: ["string", "null"] },
+        stopOpenSessions: { type: "boolean", default: false },
+        approvalId: { type: "string" }, configApprovalId: { type: "string" },
+        selectionApprovalId: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_targets",
+    description:
+      "List structured target metadata for selected or all environments. Requires build permission; does not execute the listed targets.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: {
+          type: "string",
+          minLength: 1,
+          maxLength: 32768,
+        },
+        approvalId: {
+          type: "string",
+        },
+        environment: {
+          type: "string",
+          minLength: 1,
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pkg_search",
+    description:
+      "Search PlatformIO library, platform or tool registry packages by type and page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        query: {
+          type: "string",
+          minLength: 1,
+          maxLength: 4096,
+        },
+        kind: {
+          type: "string",
+          enum: ["library", "platform", "tool"],
+          default: "library",
+        },
+        page: {
+          type: "integer",
+          minimum: 1,
+          maximum: 100000,
+          default: 1,
+        },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pkg_install",
+    description:
+      "Install a library, platform or tool in a project and save dependencies through PlatformIO.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        projectDir: {
+          type: "string",
+          minLength: 1,
+        },
+        environment: {
+          type: "string",
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+        spec: {
+          type: "string",
+          minLength: 1,
+          maxLength: 4096,
+        },
+        kind: {
+          type: "string",
+          enum: ["library", "platform", "tool"],
+          default: "library",
+        },
+      },
+      required: ["projectDir", "spec"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pkg_uninstall",
+    description:
+      "Remove a library, platform or tool from a project and its declared dependencies.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        projectDir: {
+          type: "string",
+          minLength: 1,
+        },
+        environment: {
+          type: "string",
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+        spec: {
+          type: "string",
+          minLength: 1,
+          maxLength: 4096,
+        },
+        kind: {
+          type: "string",
+          enum: ["library", "platform", "tool"],
+          default: "library",
+        },
+      },
+      required: ["projectDir", "spec"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pkg_list",
+    description:
+      "List project packages and environments. Requires build permission because PlatformIO loads platform code.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        projectDir: {
+          type: "string",
+          minLength: 1,
+        },
+        environment: {
+          type: "string",
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pkg_outdated",
+    description:
+      "Report outdated project packages. Requires build permission because PlatformIO loads platform code.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        projectDir: {
+          type: "string",
+          minLength: 1,
+        },
+        environment: {
+          type: "string",
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pkg_update",
+    description:
+      "Update project dependencies within declared version constraints, with retained output and configuration change hashes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        approvalId: {
+          type: "string",
+        },
+        projectDir: {
+          type: "string",
+          minLength: 1,
+        },
+        environment: {
+          type: "string",
+          maxLength: 50,
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$",
+        },
+      },
+      required: ["projectDir"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "decode_backtrace",
+    description:
+      "Decode crash addresses against the selected current or retained ELF. Requires build permission for metadata; does not prove flashed-device identity.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: {
+          type: "string",
+          description: "Explicit PlatformIO project directory.",
+        },
+        environment: {
+          type: "string",
+          minLength: 1,
+          maxLength: 50,
+          description:
+            "Explicit build environment; metadata collection can execute project scripts.",
+        },
+        approvalId: {
+          type: "string",
+        },
+        archivedElfSha256: {
+          type: "string",
+          pattern: "^[a-fA-F0-9]{64}$",
+          description: "Retained ELF hash from this environment source path, for an earlier build.",
+        },
+        expectedElfSha256: {
+          type: "string",
+          pattern: "^[a-fA-F0-9]{64}$",
+        },
+        text: {
+          type: "string",
+          minLength: 1,
+          description: "Crash output, at most 1 MiB UTF-8.",
+        },
+        includeAllHex: {
+          type: "boolean",
+        },
+      },
+      required: ["projectDir", "environment", "text"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "size_report",
+    description:
+      "Report GNU symbols and PlatformIO memory accounting for one environment. Metadata and size checks require build permission and may execute project scripts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: {
+          type: "string",
+          description: "Explicit PlatformIO project directory.",
+        },
+        environment: {
+          type: "string",
+          minLength: 1,
+          maxLength: 50,
+          description:
+            "Explicit build environment; metadata collection can execute project scripts.",
+        },
+        approvalId: {
+          type: "string",
+        },
+        expectedElfSha256: {
+          type: "string",
+          pattern: "^[a-fA-F0-9]{64}$",
+        },
+        top: {
+          type: "integer",
+          minimum: 1,
+          maximum: 1000,
+          default: 25,
+        },
+        filter: {
+          type: "string",
+          maxLength: 4096,
+          description:
+            "Case-insensitive bounded regex applied to symbol names or source paths.",
+        },
+      },
+      required: ["projectDir", "environment"],
+      additionalProperties: false,
+    },
+  },
   {
     name: "list_boards",
     description:
@@ -269,6 +715,8 @@ const toolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        jobs: { type: "integer", minimum: 1, maximum: 1024, description: "Optional parallel build jobs" },
+        forceExecution: { type: "boolean", description: "Run a fresh build even when inputs match the cache" },
         projectDir: {
           type: "string",
           description:
@@ -303,6 +751,8 @@ const toolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        environment: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,50}$", description: "Optional environment to clean" },
+        full: { type: "boolean", description: "Also remove downloaded build dependencies using fullclean" },
         projectDir: {
           type: "string",
           description:
@@ -1070,6 +1520,11 @@ const toolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        severity: { type: "string", enum: ["low", "medium", "high"], description: "Minimum defect severity" },
+        pattern: { type: "string", minLength: 1, maxLength: 4096, description: "Source file pattern" },
+        skipPackages: { type: "boolean", description: "Exclude dependency source files" },
+        tool: { type: "string", minLength: 1, maxLength: 4096, description: "Configured analysis tool" },
+        structuredReport: { type: "boolean", description: "Request JSON analysis and return structured defects for foreground calls" },
         projectDir: {
           type: "string",
           description:
@@ -1093,6 +1548,13 @@ const toolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
+        filter: { type: "string", minLength: 1, maxLength: 4096, description: "Include matching test suites" },
+        ignore: { type: "string", minLength: 1, maxLength: 4096, description: "Exclude matching test suites" },
+        withoutUploading: { type: "boolean", description: "Skip upload; test execution may still access hardware" },
+        withoutBuilding: { type: "boolean", description: "Use existing test artifacts; incompatible with compile-only" },
+        uploadPort: { type: "string", minLength: 1, maxLength: 512, description: "Explicit test upload port" },
+        verbose: { type: "boolean", description: "Verbose test output" },
+        structuredReport: { type: "boolean", description: "Include per-case results for foreground runs; cannot be combined with background" },
         projectDir: {
           type: "string",
           description:
@@ -1101,6 +1563,11 @@ const toolDefinitions: ToolDefinition[] = [
         environment: {
           type: "string",
           description: "Specific environment to test",
+        },
+        compileOnly: {
+          type: "boolean",
+          description:
+            "Compile tests without uploading or executing them. Enforced by build_only policy.",
         },
         background: {
           type: "boolean",
@@ -1160,7 +1627,46 @@ const toolDefinitions: ToolDefinition[] = [
   },
 ];
 
-const toolRegistry = createToolRegistry<any>(toolDefinitions);
+// stdio serves one trusted client connection; owner capabilities never come from tool arguments.
+const serialClient = new SerialClientContext();
+const debugClient = new DebugCompatibilityClient();
+const powerClient = new PowerMeterClient();
+registerShutdownTask(() => powerClient.close());
+registerShutdownTask(async () => {
+  if ((await debugClient.close()).cleanupPending) {
+    await logDiag("Debugger shutdown cleanup remains pending; probe ownership is retained.");
+    throw new Error("Debugger shutdown closure unconfirmed");
+  }
+});
+registerShutdownTask(async () => {
+  const sessions = await serialClient.close();
+  if (sessions.some(session => session.cleanupPending)) {
+    await logDiag("Serial shutdown cleanup remains pending; device ownership is retained.");
+    throw new Error("Serial shutdown closure unconfirmed");
+  }
+});
+server.onclose = () => {
+  void powerClient.close().catch(() => logDiag("Power disconnect cleanup remains pending; device custody is retained."));
+  void debugClient.close().then((state) => {
+    if (state.cleanupPending) void logDiag("Debugger disconnect cleanup remains pending; probe ownership is retained.");
+  }).catch(() => logDiag("Debugger disconnect cleanup failed; probe ownership is retained."));
+  void serialClient
+    .close()
+    .then((sessions) => {
+      if (sessions.some((session) => session.cleanupPending))
+        logDiag(
+          "Serial disconnect cleanup remains pending; device ownership is retained.",
+        );
+    })
+    .catch(() =>
+      logDiag(
+        "Serial disconnect cleanup failed; device ownership is retained.",
+      ),
+    );
+};
+
+let toolRegistry = createToolRegistry<any>(toolDefinitions);
+let compatibilityProjectDir: string | undefined;
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools: listRegisteredTools(toolRegistry) };
@@ -1173,58 +1679,217 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name } = request.params;
+  const packageCompatibility = name.startsWith("pio_pkg_");
+  const projectCompatibility = [
+    "pio_test",
+    "pio_check",
+    "pio_build",
+    "pio_clean",
+    "pio_project_init",
+    "pio_project_envs",
+    "pio_project_metadata",
+    "pio_list_targets",
+  ].includes(name);
+  const dependencyCompatibility = name === "pio_deps_check";
+  const deviceCompatibility = Object.hasOwn(OWNED_SERIAL_TOOLS, name) || ["pio_list_devices", "pio_monitor_list", "pio_monitor_stop", "pio_monitor_write", "pio_monitor_read", "pio_monitor_start", "pio_monitor_capture", "pio_memory_watch", "pio_port_diagnose", "pio_decode_backtrace", "pio_size_report"].includes(name);
+  const boardCompatibility = ["pio_list_boards", "pio_board_info"].includes(
+    name,
+  );
+  const debugCompatibility = isDebugToolName(name);
+  const compatibilityTool =
+    name === "power_profile" || name === "pio_power_profile" ||
+    debugCompatibility ||
+    packageCompatibility ||
+    projectCompatibility ||
+    name === "pio_run_target" ||
+    name === "pio_upload" ||
+    name === "flash_verification" || name === "pio_flash_and_verify" ||
+    name === "upload_ota" || name === "pio_upload_ota" ||
+    name === "pio_partition_table" ||
+    name === "pio_coredump" ||
+    name === "pio_system_info" ||
+    dependencyCompatibility ||
+    boardCompatibility ||
+    deviceCompatibility;
+  const projectInspection = [
+    "project_envs",
+    "project_metadata",
+    "list_targets",
+  ].includes(name);
   const args: any = request.params.arguments || {};
   const registeredTool = getRegisteredTool(toolRegistry, name);
-  if (args.projectDir) {
-    portalEvents.emitWorkspaceState(args.projectDir);
-  }
-
   const activityId = crypto.randomUUID();
-  portalEvents.emitActivity(name, args, "running", activityId);
-
-  // Group global commands into the currently active workspace UI if missing
-  const targetProjectDir =
-    args.projectDir || portalEvents.getLastKnownWorkspace();
-
-  // Expose the MCP tool initiation to the Web UI ledger
-  await registerCommand(
-    {
-      id: activityId,
-      commandDesc: `MCP Tool: ${name}`,
-      timestamp: Date.now(),
-      status: "running",
-      tasks: [],
-      mcpRequest: args,
-      mcpToolName: name,
-    },
-    targetProjectDir,
-  );
-
-  logDiag(
-    `[Command Execution] Tool invoked: '${name}' with arguments: ${JSON.stringify(args)}`,
-    targetProjectDir,
-  );
+  const targetProjectDir = compatibilityTool
+    ? args.project_dir || compatibilityProjectDir || process.cwd()
+    : args.projectDir || portalEvents.getLastKnownWorkspace();
+  let commandRegistered = false;
 
   try {
-    const policyDecision = await evaluatePolicy(
-      registeredTool.policyAction,
-      args,
-      {
+    if (
+      name === "coredump" ||
+      name === "partition_table" ||
+      name === "run_target" ||
+      name === "deps_check" ||
+      name === "decode_backtrace" ||
+      name === "size_report" ||
+      name.startsWith("pkg_") ||
+      compatibilityTool ||
+      projectInspection
+    ) {
+      const safeRequest = {
+        projectDir: compatibilityTool ? args.project_dir : args.projectDir,
+        environment: compatibilityTool ? args.env : args.environment,
+      };
+      const caller = {
         workspaceDir: targetProjectDir,
-        devicePort: typeof args.port === "string" ? args.port : undefined,
+        actor: "agent" as const,
         taskId: activityId,
-        actor: "agent",
-        actorClass: args.automationKey ? "scheduled" : "interactive",
-        automationKey:
-          typeof args.automationKey === "string"
-            ? args.automationKey
-            : undefined,
-        targetBindingDigest:
-          typeof args.targetBinding?.digest === "string"
-            ? args.targetBinding.digest
-            : undefined,
-      },
-    );
+        actorClass: "interactive" as const,
+      };
+      const onAuthorized = async () => {
+        await registerCommand(
+          {
+            id: activityId,
+            commandDesc: `MCP Tool: ${name}`,
+            timestamp: Date.now(),
+            status: "running",
+            tasks: [],
+            mcpToolName: name,
+            mcpRequest: safeRequest,
+          },
+          targetProjectDir,
+        );
+        commandRegistered = true;
+        portalEvents.emitActivity(name, safeRequest, "running", activityId);
+      };
+      const result = await mcpContext.run(
+        { activityId, targetProjectDir },
+        () =>
+          registeredTool.handler(args, {
+            dispatch: async (tool, parameters) =>
+              tool === "power_profile" || tool === "pio_power_profile"
+                ? executePowerCompatibility(serialClient, powerClient, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, tool)
+                : isDebugToolName(tool)
+                ? executeDebugTool(debugClient, tool, parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller)
+                : tool === "coredump"
+                ? executeCoredump(parameters, caller, onAuthorized)
+                : tool === "partition_table"
+                ? executePartitionTable(parameters, caller, onAuthorized)
+                : tool === "run_target"
+                ? executeRunTargetAction(parameters, serialClient, caller, onAuthorized)
+                : tool === "pio_coredump"
+                  ? executeCoredumpCompatibility(parameters, {projectDir:compatibilityProjectDir,cwd:process.cwd()},caller,onAuthorized)
+                : tool === "pio_partition_table"
+                  ? executePartitionCompatibility(parameters, {projectDir:compatibilityProjectDir,cwd:process.cwd()},caller,onAuthorized)
+                : tool === "pio_system_info"
+                  ? executeSystemCompatibility(parameters, serialClient, readRuntimeVersion(import.meta.url), { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
+                : tool === "upload_ota" || tool === "pio_upload_ota"
+                  ? executeOtaCompatibility(parameters, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
+                : tool === "flash_verification" || tool === "pio_flash_and_verify"
+                  ? executeFlashVerificationCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
+                : tool === "pio_upload"
+                  ? executeUploadCompatibility(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
+                : tool === "pio_run_target"
+                  ? executeNamedTarget(parameters, serialClient, { projectDir: compatibilityProjectDir, cwd: process.cwd() }, caller, onAuthorized)
+                : tool === "deps_check"
+                ? inspectDependencies(parameters, caller, onAuthorized)
+                : compatibilityTool
+                  ? (deviceCompatibility
+                      ? executeDeviceCompatibility.bind(null, serialClient)
+                      : boardCompatibility
+                        ? executeBoardCompatibility
+                        : dependencyCompatibility
+                          ? executeDependencyCompatibility
+                          : projectCompatibility
+                            ? executeProjectCompatibility
+                            : executePackageCompatibility)(
+                      tool,
+                      parameters,
+                      {
+                        projectDir: compatibilityProjectDir,
+                        cwd: process.cwd(),
+                      },
+                      caller,
+                      onAuthorized,
+                    )
+                  : projectInspection
+                    ? executeProjectInspection(
+                        tool as ProjectInspectionAction,
+                        parameters,
+                        caller,
+                        onAuthorized,
+                      )
+                    : tool.startsWith("pkg_")
+                      ? executePackageAction(
+                          tool as PackageAction,
+                          parameters,
+                          caller,
+                          onAuthorized,
+                        )
+                      : tool === "decode_backtrace"
+                        ? decodeBacktrace(parameters, caller, onAuthorized)
+                        : firmwareSizeReport(parameters, caller, onAuthorized),
+          }),
+      );
+      const response = createToolResult({
+        success: result.ok,
+        status: result.ok ? "completed" : "failed",
+        summary:
+          name === "coredump" ? (result.ok ? "Core-dump inspection completed." : "No recorded core dump is present.") :
+          name === "partition_table" ||
+      name === "run_target" ||
+          name === "deps_check" ||
+          name.startsWith("pkg_") ||
+          compatibilityTool ||
+          projectInspection
+            ? result.summary
+            : name === "size_report"
+              ? "Firmware size report completed."
+              : result.ok
+                ? "Crash addresses decoded against the selected ELF."
+                : "No crash addresses resolved against the selected ELF.",
+        data: result,
+      });
+      await updateCommandStatus(
+        activityId,
+        {
+          status: result.ok ? "success" : "error",
+          mcpResponse: {
+            success: result.ok,
+            summary: response.structuredContent.summary,
+            ...projectAnalysisLedger(name, result),
+          },
+        },
+        targetProjectDir,
+      );
+      portalEvents.emitActivity(
+        name,
+        safeRequest,
+        result.ok ? "success" : "error",
+        activityId,
+      );
+      if (compatibilityTool)
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          structuredContent: result,
+          ...(!result.ok ? { isError: true } : {}),
+        };
+      return { ...response, ...(!result.ok ? { isError: true } : {}) };
+    }
+    const policyDecision = await authorizeAction(name, args, {
+      workspaceDir: targetProjectDir,
+      devicePort: typeof args.port === "string" ? args.port : undefined,
+      taskId: activityId,
+      actor: "agent",
+      operationName: name,
+      actorClass: args.automationKey ? "scheduled" : "interactive",
+      automationKey:
+        typeof args.automationKey === "string" ? args.automationKey : undefined,
+      targetBindingDigest:
+        typeof args.targetBinding?.digest === "string"
+          ? args.targetBinding.digest
+          : undefined,
+    });
 
     if (policyDecision.status !== "allow") {
       const policyResponse = {
@@ -1233,9 +1898,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
       const response = createToolErrorResult(policyDecision.reason, {
         status:
-          policyDecision.status === "requires_approval"
-            ? "blocked"
-            : "failed",
+          policyDecision.status === "requires_approval" ? "blocked" : "failed",
         data: policyResponse,
         policyDecision,
         nextSteps:
@@ -1246,18 +1909,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             : undefined,
       });
 
-      await updateCommandStatus(
-        activityId,
-        {
-          status: "success",
-          mcpResponse: policyResponse as any,
-        },
-        targetProjectDir,
-      );
-
-      portalEvents.emitActivity(name, args, "success", activityId);
       return response;
     }
+
+    if (args.projectDir) portalEvents.emitWorkspaceState(args.projectDir);
+    portalEvents.emitActivity(name, args, "running", activityId);
+    // Expose the MCP tool initiation to the Web UI ledger
+    await registerCommand(
+      {
+        id: activityId,
+        commandDesc: `MCP Tool: ${name}`,
+        timestamp: Date.now(),
+        status: "running",
+        tasks: [],
+        mcpRequest: args,
+        mcpToolName: name,
+      },
+      targetProjectDir,
+    );
+
+    logDiag(
+      `[Command Execution] Tool invoked: '${name}' with arguments: ${JSON.stringify(args)}`,
+      targetProjectDir,
+    );
+
+    commandRegistered = true;
 
     const legacyResponse = await mcpContext.run(
       { activityId, targetProjectDir },
@@ -1324,6 +2000,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   projectDir: params.projectDir,
                   environment: params.environment,
                   verbose: params.verbose,
+                  jobs: params.jobs,
+                  forceExecution: params.forceExecution,
                   background: params.background,
                   sessionId: params.sessionId,
                 });
@@ -1342,7 +2020,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 const params = CleanProjectParamsSchema.parse(args);
 
                 const executeTask = () =>
-                  cleanProject(params.projectDir, params.background);
+                  cleanProject(params.projectDir, params.background, { environment: params.environment, full: params.full });
                 const result = params.sessionId
                   ? (hardwareLockManager.requireLock(params.sessionId),
                     await executeTask())
@@ -1901,6 +2579,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   params.projectDir,
                   params.environment,
                   params.background,
+                  { severity: params.severity, pattern: params.pattern, skipPackages: params.skipPackages, tool: params.tool, jsonOutput: params.structuredReport },
                 );
                 return {
                   content: [
@@ -1911,11 +2590,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
               case "run_tests": {
                 const params = RunTestsParamsSchema.parse(args);
-                const executeTask = () =>
+                if (params.structuredReport && params.background)
+                  throw new PlatformIOError("Structured test reports require foreground execution", "INVALID_ARGUMENT");
+                const options = { filter: params.filter, ignore: params.ignore, withoutUploading: params.withoutUploading,
+                  withoutBuilding: params.withoutBuilding, uploadPort: params.uploadPort, verbose: params.verbose };
+                const executeTask = () => params.structuredReport
+                  ? runTestsWithReport(params.projectDir, params.environment, params.compileOnly, options)
+                  :
                   runTests(
                     params.projectDir,
                     params.environment,
                     params.background,
+                    params.compileOnly,
+                    options,
                   );
                 const result = params.sessionId
                   ? (hardwareLockManager.requireLock(params.sessionId),
@@ -2003,19 +2690,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     return response;
   } catch (error: any) {
-    await updateCommandStatus(
-      activityId,
-      {
-        status: "error",
-        mcpResponse: { error: error.message },
-      },
-      targetProjectDir,
-    );
+    if (commandRegistered)
+      await updateCommandStatus(
+        activityId,
+        {
+          status: "error",
+          mcpResponse: { error: error.message },
+        },
+        targetProjectDir,
+      );
 
-    portalEvents.emitActivity(name, args, "error", activityId);
+    if (commandRegistered)
+      portalEvents.emitActivity(
+        name,
+        name === "decode_backtrace" ||
+          name === "size_report" ||
+          name.startsWith("pkg_") ||
+          compatibilityTool ||
+          projectInspection
+          ? {
+              projectDir: compatibilityTool
+                ? args.project_dir
+                : args.projectDir,
+              environment: compatibilityTool ? args.env : args.environment,
+            }
+          : args,
+        "error",
+        activityId,
+      );
 
+    if (compatibilityTool) return compatibilityErrorResult(error);
     const errorMessage = formatPlatformIOError(error);
-    return createToolErrorResult(errorMessage);
+    return createToolErrorResult(errorMessage, {
+      status: error.code === "APPROVAL_REQUIRED" ? "blocked" : "failed",
+      data: { code: error.code },
+      policyDecision: error.context?.policyDecision,
+    });
   }
 });
 
@@ -2058,7 +2768,20 @@ async function main() {
   // Dispatches BEFORE the MCP server boots. The default behavior (no subcommand)
   // is preserved: start the MCP stdio server for AI agents.
   // ---------------------------------------------------------------------------
-  const cliArgs = process.argv.slice(2);
+  const compatibility = parseCompatibilityLaunch(process.argv.slice(2));
+  const cliArgs = configurePolicyFileFromArgs(compatibility.args);
+  toolRegistry = withOwnedSerialTools(toolRegistry);
+  toolRegistry = withFlashVerificationTools(withOtaTools(withDebugCompatibility(withPowerCompatibility(toolRegistry, "power_profile"), true)));
+  if (compatibility.mode) {
+    compatibilityProjectDir = process.env.PLATFORMIO_MCP_PROJECT_DIR;
+    toolRegistry = withPowerCompatibility(withDebugCompatibility(withDependencyCompatibility(
+      withDeviceCompatibility(
+        withBoardCompatibility(
+          withProjectCompatibility(withPackageCompatibility(toolRegistry)),
+        ),
+      ),
+    )));
+  }
   const subcommand = cliArgs.find((a) => !a.startsWith("--"));
 
   if (cliArgs.includes("--help") || subcommand === "help") {
@@ -2067,14 +2790,7 @@ async function main() {
   }
 
   if (cliArgs.includes("--version") || subcommand === "version") {
-    let version = "unknown";
-    try {
-      const currentDir = path.dirname(new URL(import.meta.url).pathname);
-      const pkg = JSON.parse(
-        fs.readFileSync(path.join(currentDir, "..", "package.json"), "utf8"),
-      );
-      version = pkg.version;
-    } catch {}
+    const version = readRuntimeVersion(import.meta.url);
     console.log(version);
     process.exit(0);
   }
@@ -2127,6 +2843,11 @@ async function main() {
   // Fall through to default MCP stdio server boot
   // ---------------------------------------------------------------------------
 
+  const stopRetentionCleanup = await startCoredumpRetentionCleanup((code) => {
+    void logDiag("Core-dump retention cleanup requires attention: " + code);
+  });
+  registerShutdownTask(stopRetentionCleanup);
+
   // Check if PlatformIO is installed
   let isInstalled = false;
   try {
@@ -2145,6 +2866,8 @@ async function main() {
     );
   }
 
+  // The SDK transport does not forward client EOF; finish owned cleanup before forced termination.
+  process.stdin.once("end", requestProcessShutdown);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
@@ -2184,19 +2907,10 @@ async function main() {
       .trim();
   } catch {}
 
-  let version = "1.0.0";
-  try {
-    const currentDir = path.dirname(new URL(import.meta.url).pathname);
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(currentDir, "../package.json"), "utf8"),
-    );
-    version = pkg.version;
-  } catch {}
+  const version = readRuntimeVersion(import.meta.url);
 
   logDiag("\n\n=======================================================");
-  logDiag(
-    `🚀 PIO Agent v${version} (Build: ${gitHash}) running on stdio`,
-  );
+  logDiag(`🚀 PIO Agent v${version} (Build: ${gitHash}) running on stdio`);
   logDiag("🚀 Server supports 1000+ boards across 30+ platforms");
   logDiag("=======================================================\n");
 }

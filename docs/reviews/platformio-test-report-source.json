@@ -1,0 +1,24 @@
+{
+  "repository": "https://github.com/platformio/platformio-core",
+  "commit": "67b2759be207178c0b0bd51fc408b17ea25a8135",
+  "observations": [
+    "TestStatus includes PASSED, FAILED, SKIPPED, WARNED and ERRORED.",
+    "Aggregate testcase_nums counts all cases, including WARNED; no aggregate warned count is emitted.",
+    "JSON source locations use file and line; exceptions serialize to strings."
+  ],
+  "schemaVersion": 1,
+  "validation": "Read-only source inspection; not native runtime acceptance.",
+  "version": "6.1.16",
+  "files": [
+    {
+      "path": "platformio/test/result.py",
+      "url": "https://github.com/platformio/platformio-core/blob/67b2759be207178c0b0bd51fc408b17ea25a8135/platformio/test/result.py",
+      "gitBlobSha": "2de59b519fe4dbe68acb505f90f69d13a2af3d5b"
+    },
+    {
+      "path": "platformio/test/reports/json.py",
+      "url": "https://github.com/platformio/platformio-core/blob/67b2759be207178c0b0bd51fc408b17ea25a8135/platformio/test/reports/json.py",
+      "gitBlobSha": "8d834b384c84ae7299cd7b4609a56ff16d6ffdf0"
+    }
+  ]
+}

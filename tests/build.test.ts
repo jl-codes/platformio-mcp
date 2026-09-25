@@ -3,7 +3,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { buildProject } from '../src/tools/build.js';
 
-vi.mock('../src/platformio.js', () => {
+vi.mock('../src/platformio.js', async () => {
+  const {EventEmitter} = await import('node:events');
   return {
     platformioExecutor: {
       spawn: vi.fn().mockImplementation((command, args, options) => {
@@ -13,14 +14,9 @@ vi.mock('../src/platformio.js', () => {
             'Compiling project...\nRAM: used 1234 bytes\nFlash: used 5678 bytes\nEnvironment: default\n[SUCCESS]\n'
           );
         }
-        return {
-          pid: 9999,
-          on: vi.fn().mockImplementation((event, callback) => {
-            if (event === 'close') {
-              setTimeout(() => callback(0), 10);
-            }
-          }),
-        };
+        const proc = Object.assign(new EventEmitter(), {pid: 9999, exitCode: null as number | null, signalCode: null, kill: vi.fn()});
+        setTimeout(() => {proc.exitCode = 0; proc.emit('exit', 0); proc.emit('close', 0);}, 10);
+        return proc;
       }),
       execute: vi.fn()
     }

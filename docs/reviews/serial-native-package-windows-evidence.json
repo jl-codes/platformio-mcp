@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "artifact": "platformio-mcp-3.0.0.tgz",
+  "sha256": "74c6ac41ccc437e10981a09dccaf0801a4ad03101d3456aa7ee78ceeac97c4ab",
+  "platform": "win32",
+  "arch": "x64",
+  "nativeLoad": "passed",
+  "deviceEnumeration": false,
+  "deviceOpened": false,
+  "source": "npm pack --ignore-scripts; isolated archive extraction",
+  "note": "Unpublished development artifact, not release acceptance."
+}

@@ -81,6 +81,7 @@ export async function uploadFilesystem(
 
     const uploadArgs: string[] = ["run", "--target", "uploadfs"];
     if (environment) uploadArgs.push("--environment", environment);
+    uploadArgs.push("--upload-port", activePort);
 
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Filesystem Upload");
@@ -115,25 +116,9 @@ export async function uploadFilesystem(
               }
             }
 
-            let device = null;
-            for (let i = 0; i < 20; i++) {
-              await new Promise((resolve) => setTimeout(resolve, 500));
-              device = await getFirstDevice();
-              if (device) break;
-            }
-            if (device) {
-              await startMonitor(
-                device.port,
-                undefined,
-                validatedPath,
-                environment,
-                rootCommandId,
-              );
-            } else {
-              console.error(
-                `[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`,
-              );
-            }
+            console.error(
+              "[Spooler Diagnostic] Auto-monitor skipped: the uploaded device could not be uniquely identified. Select its port explicitly.",
+            );
           }
         : undefined,
     });
@@ -158,13 +143,7 @@ export async function uploadFilesystem(
       diagnostic,
     };
   } catch (error) {
-    if (error instanceof PlatformIOError) {
-      throw new UploadError(`Filesystem upload failed: ${error.message}`, {
-        projectDir,
-        port,
-        environment,
-      });
-    }
+    if (error instanceof PlatformIOError) throw error;
     throw new UploadError(`Failed to upload filesystem: ${error}`, {
       projectDir,
       port,
@@ -228,6 +207,7 @@ export async function uploadFirmware(
 
     const uploadArgs: string[] = ["run", "--target", "upload"];
     if (environment) uploadArgs.push("--environment", environment);
+    uploadArgs.push("--upload-port", activePort);
 
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Firmware Upload");
@@ -262,25 +242,9 @@ export async function uploadFirmware(
               }
             }
 
-            let device = null;
-            for (let i = 0; i < 20; i++) {
-              await new Promise((resolve) => setTimeout(resolve, 500));
-              device = await getFirstDevice();
-              if (device) break;
-            }
-            if (device) {
-              await startMonitor(
-                device.port,
-                undefined,
-                validatedPath,
-                environment,
-                rootCommandId,
-              );
-            } else {
-              console.error(
-                `[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`,
-              );
-            }
+            console.error(
+              "[Spooler Diagnostic] Auto-monitor skipped: the uploaded device could not be uniquely identified. Select its port explicitly.",
+            );
           }
         : undefined,
     });
@@ -305,13 +269,7 @@ export async function uploadFirmware(
       diagnostic,
     };
   } catch (error) {
-    if (error instanceof PlatformIOError) {
-      throw new UploadError(`Upload failed: ${error.message}`, {
-        projectDir,
-        port,
-        environment,
-      });
-    }
+    if (error instanceof PlatformIOError) throw error;
     throw new UploadError(`Failed to upload firmware: ${error}`, {
       projectDir,
       port,

@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+src/pio_agent_launcher/payload/
+dist/
+build/
+*.egg-info/

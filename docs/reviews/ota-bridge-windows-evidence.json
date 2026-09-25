@@ -1,0 +1,10 @@
+{
+  "observedAt": "2026-09-20T10:33:26.279Z",
+  "platform": "win32",
+  "python": "3.14",
+  "physicalDeviceContacted": false,
+  "assertion": "private credential redaction, INFO completion marker, UDP endpoint filter, TCP peer filter, confirmed cleanup",
+  "outcome": "pass",
+  "sourceSha256": "92e946b73209a81e8bca4b8b98a61799a841fc69a8818e5c4f80e6284b26c57b",
+  "fixtureSha256": "553560dbaafa95f013e95b952e842774ca2d760b3b813863eed991d900ff7d3b"
+}

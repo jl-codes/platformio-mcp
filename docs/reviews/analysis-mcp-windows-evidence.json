@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-19T20:38:26.059Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.15.0"
+  },
+  "transport": "MCP stdio",
+  "environment": "analysis-esp32s3",
+  "toolCount": 44,
+  "elfSha256": "acde361f81f50a4a47a7676ba724da5983feb1122c9c027db6080dcefb291f1f",
+  "checks": {
+    "liveMetadata": true,
+    "registeredToolchain": true,
+    "liveSizeCheck": true,
+    "filteredSymbol": true,
+    "decodedKnownSource": true
+  },
+  "memory": {
+    "ram": {
+      "usedBytes": 18040,
+      "totalBytes": 327680,
+      "percent": 5.5
+    },
+    "flash": {
+      "usedBytes": 233161,
+      "totalBytes": 3342336,
+      "percent": 7
+    }
+  },
+  "gnuTotals": {
+    "text": 177153,
+    "data": 56264,
+    "bss": 170717,
+    "flashEstimate": 233417,
+    "ramEstimate": 226981
+  },
+  "sourceLine": 6,
+  "physicalDeviceTest": false
+}

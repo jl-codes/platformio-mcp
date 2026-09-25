@@ -1,0 +1,473 @@
+{
+  "schemaVersion": 1,
+  "canonicalSource": "https://github.com/jl-codes/platformio-mcp",
+  "operatorRole": "repository maintainer; release operator identity must be verified at publication",
+  "maxLookups": 100,
+  "entries": [
+    {
+      "registry": "npm",
+      "name": "platformio-mcp",
+      "role": "canonical",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": true,
+      "packagePath": ".",
+      "publicationControlVerified": true
+    },
+    {
+      "registry": "npm",
+      "name": "pio-agent",
+      "role": "functional_alias",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": true,
+      "packagePath": "packages/pio-agent",
+      "publicationControlVerified": true
+    },
+    {
+      "registry": "npm",
+      "name": "pio-mcp",
+      "role": "functional_alias",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": true,
+      "packagePath": "packages/pio-mcp",
+      "publicationControlVerified": true
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/platformio-mcp",
+      "role": "functional_alias",
+      "publishIntent": true,
+      "packagePath": "packages/scoped-platformio-mcp",
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "npm",
+      "name": "platformio.mcp",
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "2026-09-25 authenticated npm publish returned E403: Package name too similar to existing package platformio-mcp; try renaming your package to '@forkbomb/platformio.mcp' and publishing with 'npm publish --access=public' instead. Scoped functional alias is published. No unscoped retry without a registry eligibility change; maintainer may request npm Support review, with no exception or ownership transfer assumed.",
+      "namingEligibilityVerified": false
+    },
+    {
+      "registry": "npm",
+      "name": "platformio_mcp",
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+    },
+    {
+      "registry": "npm",
+      "name": "platformiomcp",
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "2026-09-25 authenticated npm publish returned E403: Package name too similar to existing package platformio-mcp; try renaming your package to '@forkbomb/platformiomcp' and publishing with 'npm publish --access=public' instead. Scoped functional alias is published. No unscoped retry without a registry eligibility change; maintainer may request npm Support review, with no exception or ownership transfer assumed.",
+      "namingEligibilityVerified": false
+    },
+    {
+      "registry": "npm",
+      "name": "pio.agent",
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+    },
+    {
+      "registry": "npm",
+      "name": "pio_agent",
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+    },
+    {
+      "registry": "npm",
+      "name": "pioagent",
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "2026-09-25 authenticated npm publish returned E403: Package name too similar to existing package pio-agent; try renaming your package to '@forkbomb/pioagent' and publishing with 'npm publish --access=public' instead. Scoped functional alias is published. No unscoped retry without a registry eligibility change; maintainer may request npm Support review, with no exception or ownership transfer assumed.",
+      "namingEligibilityVerified": false
+    },
+    {
+      "registry": "npm",
+      "name": "pio.mcp",
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+    },
+    {
+      "registry": "npm",
+      "name": "pio_mcp",
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+    },
+    {
+      "registry": "npm",
+      "name": "piomcp",
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+    },
+    {
+      "registry": "pypi",
+      "name": "pio-agent-platformio",
+      "role": "candidate_canonical",
+      "publishIntent": true
+    },
+    {
+      "registry": "pypi",
+      "name": "pio-agent",
+      "role": "candidate_alias",
+      "publishIntent": true,
+      "packagePath": "packages/python-aliases/pio-agent",
+      "source": "https://github.com/jl-codes/platformio-mcp"
+    },
+    {
+      "registry": "pypi",
+      "name": "pio-mcp",
+      "role": "candidate_alias",
+      "publishIntent": true,
+      "packagePath": "packages/python-aliases/pio-mcp",
+      "source": "https://github.com/jl-codes/platformio-mcp"
+    },
+    {
+      "registry": "pypi",
+      "name": "platformio.mcp",
+      "role": "excluded_third_party",
+      "publishIntent": false,
+      "equivalentNames": [
+        "platformio-mcp",
+        "platformio_mcp"
+      ]
+    },
+    {
+      "registry": "mcp",
+      "name": "io.github.jl-codes/platformio-mcp",
+      "role": "planned",
+      "publishIntent": true
+    },
+    {
+      "registry": "plugin",
+      "name": "platformio-mcp",
+      "role": "existing",
+      "publishIntent": true
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/platformio-mcp",
+      "role": "canonical",
+      "publishIntent": true
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/platformio.mcp",
+      "role": "functional_alias",
+      "publishIntent": true,
+      "packagePath": "packages/scoped-platformio.mcp",
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/pio-mcp",
+      "role": "functional_alias",
+      "publishIntent": true,
+      "packagePath": "packages/scoped-pio-mcp",
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/pio-agent",
+      "role": "functional_alias",
+      "publishIntent": true,
+      "packagePath": "packages/scoped-pio-agent",
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/platformio-mcp",
+      "role": "candidate_container",
+      "publishIntent": true,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/platformio.mcp",
+      "role": "candidate_container",
+      "publishIntent": true,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/pio-mcp",
+      "role": "candidate_container",
+      "publishIntent": true,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/pio-agent",
+      "role": "candidate_container",
+      "publishIntent": true,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "npm",
+      "name": "flashagent",
+      "role": "blocked_naming_rule",
+      "publishIntent": false,
+      "packagePath": "packages/flashagent",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "2026-09-25 authenticated npm publish returned E403: Package name too similar to existing package flash-agent; try renaming your package to '@forkbomb/flashagent' and publishing with 'npm publish --access=public' instead. Scoped functional alias is published. No unscoped retry without a registry eligibility change; maintainer may request npm Support review, with no exception or ownership transfer assumed.",
+      "namingEligibilityVerified": false
+    },
+    {
+      "registry": "pypi",
+      "name": "platformiomcp",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified.",
+      "packagePath": "packages/python-aliases/platformiomcp"
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/platformiomcp",
+      "role": "candidate_container",
+      "publishIntent": true,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "pypi",
+      "name": "pioagent",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified.",
+      "packagePath": "packages/python-aliases/pioagent"
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/pioagent",
+      "role": "candidate_container",
+      "publishIntent": true,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "pypi",
+      "name": "flashagent",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified.",
+      "packagePath": "packages/python-aliases/flashagent"
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/flashagent",
+      "role": "candidate_container",
+      "publishIntent": true,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "npm",
+      "name": "flash-agent",
+      "role": "excluded_third_party",
+      "publishIntent": false,
+      "reason": "Public npm metadata reports existing version 1.0.38 maintained by chenpingaodian; project publication control is not established. Do not overwrite."
+    },
+    {
+      "registry": "npm",
+      "name": "flash.agent",
+      "role": "watch",
+      "publishIntent": false,
+      "reason": "Existing npm flash-agent@1.0.38 creates a punctuation-insensitive naming collision. A missing exact-name lookup does not prove eligibility; publication remains disabled pending registry resolution.",
+      "namingEligibilityVerified": false
+    },
+    {
+      "registry": "npm",
+      "name": "flash_agent",
+      "role": "watch",
+      "publishIntent": false,
+      "reason": "Existing npm flash-agent@1.0.38 creates a punctuation-insensitive naming collision. A missing exact-name lookup does not prove eligibility; publication remains disabled pending registry resolution.",
+      "namingEligibilityVerified": false
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/flashagent",
+      "role": "functional_alias",
+      "publishIntent": true,
+      "packagePath": "packages/scoped-flashagent",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "pypi",
+      "name": "flash-agent",
+      "role": "candidate_alias",
+      "publishIntent": false,
+      "packagePath": "packages/python-aliases/flash-agent",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "equivalentNames": [
+        "flash.agent",
+        "flash_agent"
+      ],
+      "reason": "Distinct normalized name from flashagent; functional wrapper prepared, authority and eligibility unverified."
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/platformiomcp",
+      "role": "functional_alias",
+      "publishIntent": true,
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
+      "publicationControlVerified": true,
+      "packagePath": "packages/scoped-platformiomcp",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "npm",
+      "name": "@forkbomb/pioagent",
+      "role": "functional_alias",
+      "publishIntent": true,
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
+      "publicationControlVerified": true,
+      "packagePath": "packages/scoped-pioagent",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/flash-agent",
+      "role": "candidate_container",
+      "publishIntent": true,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/flash.agent",
+      "role": "candidate_container",
+      "publishIntent": true,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "ghcr",
+      "name": "ghcr.io/jl-codes/flash_agent",
+      "role": "candidate_container",
+      "publishIntent": true,
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/pio-mcp",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/platformio.mcp",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/pio-agent",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/platformiomcp",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/pioagent",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+    },
+    {
+      "registry": "github",
+      "name": "jl-codes/flashagent",
+      "role": "official_landing",
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "publishIntent": false,
+      "publicationControlVerified": true,
+      "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+    }
+  ],
+  "unsupportedChannels": [
+    "Docker Hub",
+    "VS Code Marketplace",
+    "Open VSX",
+    "Homebrew",
+    "winget",
+    "Chocolatey",
+    "domains"
+  ],
+  "requestedAliases": [
+    "platformio-mcp",
+    "pio-mcp",
+    "platformio.mcp",
+    "pio-agent",
+    "platformiomcp",
+    "pioagent",
+    "flashagent"
+  ]
+}

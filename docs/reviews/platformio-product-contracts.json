@@ -1,0 +1,1162 @@
+{
+  "schemaVersion": 1,
+  "repository": "jl-codes/platformio-mcp",
+  "revision": "40e12ccb8e85fcaf33b46c50b6d832665728e773",
+  "sourceSha256": "130dd6a4781801686c08ac3cb8eef71f63d74936855280384381f143503acc6b",
+  "method": "Static TypeScript literal parsing; server code not executed",
+  "tools": [
+    {
+      "name": "list_boards",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "description": "Optional filter by platform (e.g., \"espressif32\"), framework (e.g., \"arduino\"), or MCU name"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_board_info",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "description": "Board ID (e.g., \"esp32dev\", \"uno\", \"nucleo_f401re\")"
+          }
+        },
+        "required": [
+          "boardId"
+        ]
+      }
+    },
+    {
+      "name": "list_devices",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "init_project",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "string",
+            "description": "Board ID for the project"
+          },
+          "framework": {
+            "type": "string",
+            "description": "Optional framework (e.g., \"arduino\", \"espidf\", \"mbed\")"
+          },
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "platformOptions": {
+            "type": "object",
+            "description": "Optional platform-specific configuration options"
+          }
+        },
+        "required": [
+          "board",
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "build_project",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "environment": {
+            "type": "string",
+            "description": "Optional specific environment to build from platformio.ini"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Agent session ID for pipeline lock validation"
+          },
+          "verbose": {
+            "type": "boolean",
+            "description": "If true, returns the complete verbose build log in the result instead of truncating it on success"
+          },
+          "background": {
+            "type": "boolean",
+            "description": "If true, dispatches the compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "clean_project",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Agent session ID for pipeline lock validation"
+          },
+          "background": {
+            "type": "boolean",
+            "description": "If true, dispatches the long-running execution to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "upload_filesystem",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "port": {
+            "type": "string",
+            "description": "Optional upload port (auto-detected if not specified)"
+          },
+          "environment": {
+            "type": "string",
+            "description": "Optional specific environment from platformio.ini"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Agent session ID for pipeline lock validation"
+          },
+          "verbose": {
+            "type": "boolean",
+            "description": "If true, returns the complete verbose upload log in the result instead of truncating it"
+          },
+          "background": {
+            "type": "boolean",
+            "description": "If true, dispatches the compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
+          },
+          "start_monitor": {
+            "type": "boolean",
+            "description": "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."
+          },
+          "targetBinding": {
+            "type": "object",
+            "description": "Short-lived exact target binding returned by agent_resolve_target.",
+            "properties": {
+              "digest": {
+                "type": "string",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              "projectDir": {
+                "type": "string"
+              },
+              "environment": {
+                "type": "string"
+              },
+              "board": {
+                "type": "string"
+              },
+              "port": {
+                "type": "string"
+              },
+              "deviceFingerprint": {
+                "type": "string",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "digest",
+              "projectDir",
+              "environment",
+              "board",
+              "port",
+              "deviceFingerprint",
+              "createdAt",
+              "expiresAt"
+            ]
+          },
+          "automationKey": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$",
+            "description": "Stable scheduled-run key. Supplying this activates unattended automation policy."
+          },
+          "maxRunDurationSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 900,
+            "description": "Required finite execution budget for an unattended write."
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "upload_firmware",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "port": {
+            "type": "string",
+            "description": "Optional upload port (auto-detected if not specified)"
+          },
+          "environment": {
+            "type": "string",
+            "description": "Optional specific environment from platformio.ini"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Agent session ID for pipeline lock validation"
+          },
+          "verbose": {
+            "type": "boolean",
+            "description": "If true, returns the complete verbose upload log in the result instead of truncating it"
+          },
+          "background": {
+            "type": "boolean",
+            "description": "If true, dispatches the compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently."
+          },
+          "start_monitor": {
+            "type": "boolean",
+            "description": "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration."
+          },
+          "targetBinding": {
+            "type": "object",
+            "description": "Short-lived exact target binding returned by agent_resolve_target.",
+            "properties": {
+              "digest": {
+                "type": "string",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              "projectDir": {
+                "type": "string"
+              },
+              "environment": {
+                "type": "string"
+              },
+              "board": {
+                "type": "string"
+              },
+              "port": {
+                "type": "string"
+              },
+              "deviceFingerprint": {
+                "type": "string",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "digest",
+              "projectDir",
+              "environment",
+              "board",
+              "port",
+              "deviceFingerprint",
+              "createdAt",
+              "expiresAt"
+            ]
+          },
+          "automationKey": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$",
+            "description": "Stable scheduled-run key. Supplying this activates unattended automation policy."
+          },
+          "maxRunDurationSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 900,
+            "description": "Required finite execution budget for an unattended write."
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "acquire_lock",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Your active Session ID"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for locking"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "release_lock",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Your active Session ID"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "get_lock_status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "search_libraries",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query (library name, keyword, or description)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Maximum number of results (default: 20)"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "install_library",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library": {
+            "type": "string",
+            "description": "Library name or ID to install"
+          },
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "version": {
+            "type": "string",
+            "description": "Optional specific version (e.g., \"1.0.0\", \"^2.1.0\")"
+          },
+          "global": {
+            "type": "boolean",
+            "description": "If true, performs the operation globally. Defaults to false."
+          }
+        },
+        "required": [
+          "library"
+        ]
+      }
+    },
+    {
+      "name": "list_installed_libraries",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "global": {
+            "type": "boolean",
+            "description": "If true, performs the operation globally. Defaults to false."
+          }
+        }
+      }
+    },
+    {
+      "name": "start_monitor",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string",
+            "description": "Optional COM path. Falls back to default."
+          },
+          "baudRate": {
+            "type": "number",
+            "description": "Optional baud rate. Defaults to 115200."
+          },
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "environment": {
+            "type": "string",
+            "description": "Optional PlatformIO environment context."
+          }
+        }
+      }
+    },
+    {
+      "name": "stop_monitor",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string",
+            "description": "COM port to stop listening on."
+          },
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          }
+        },
+        "required": [
+          "port"
+        ]
+      }
+    },
+    {
+      "name": "query_logs",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "number",
+            "description": "Fetch this many tail lines from the end of the log (default: 100)"
+          },
+          "searchPattern": {
+            "type": "string",
+            "description": "Optional Regex pattern to filter the spool for specific keywords."
+          },
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "port": {
+            "type": "string",
+            "description": "Specific COM port to query logs for."
+          }
+        }
+      }
+    },
+    {
+      "name": "reset_server_state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          }
+        }
+      }
+    },
+    {
+      "name": "check_task_status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "Optional task ID to check status."
+          },
+          "logPath": {
+            "type": "string",
+            "description": "Optional relative log path to check."
+          },
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          }
+        }
+      }
+    },
+    {
+      "name": "get_dashboard_url",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean",
+            "description": "If true, automatically opens the authenticated GUI link natively in the system's browser."
+          }
+        }
+      }
+    },
+    {
+      "name": "get_project_context",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "includeBuildHistory": {
+            "type": "boolean",
+            "description": "If true, include the most recent build/upload status summary from the workspace log directory."
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "get_project_config",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "agent_validate_project",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory."
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "agent_build_diagnose",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory."
+          },
+          "environment": {
+            "type": "string",
+            "description": "Optional specific environment from platformio.ini."
+          },
+          "verbose": {
+            "type": "boolean",
+            "description": "If true, preserves verbose build output."
+          },
+          "background": {
+            "type": "boolean",
+            "description": "If true, dispatches build to background and returns a pending diagnostic status."
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "agent_safe_pin_audit",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory."
+          },
+          "boardId": {
+            "type": "string",
+            "description": "Target PlatformIO board ID."
+          }
+        },
+        "required": [
+          "projectDir",
+          "boardId"
+        ]
+      }
+    },
+    {
+      "name": "agent_flash_monitor_verify",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory."
+          },
+          "environment": {
+            "type": "string",
+            "description": "Optional specific environment from platformio.ini."
+          },
+          "port": {
+            "type": "string",
+            "description": "Optional upload port."
+          },
+          "targetBinding": {
+            "type": "object",
+            "description": "Short-lived exact target binding returned by agent_resolve_target.",
+            "properties": {
+              "digest": {
+                "type": "string",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              "projectDir": {
+                "type": "string"
+              },
+              "environment": {
+                "type": "string"
+              },
+              "board": {
+                "type": "string"
+              },
+              "port": {
+                "type": "string"
+              },
+              "deviceFingerprint": {
+                "type": "string",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "digest",
+              "projectDir",
+              "environment",
+              "board",
+              "port",
+              "deviceFingerprint",
+              "createdAt",
+              "expiresAt"
+            ]
+          },
+          "automationKey": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$",
+            "description": "Stable scheduled-run key. Supplying this activates unattended automation policy."
+          },
+          "maxRunDurationSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 900,
+            "description": "Required finite execution budget for an unattended write."
+          },
+          "expect_all": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Serial markers expected to appear."
+          },
+          "reject_patterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Serial patterns that must not appear."
+          },
+          "timeoutSeconds": {
+            "type": "number",
+            "description": "Verification window in seconds (default 45)."
+          },
+          "stabilityWindowSeconds": {
+            "type": "number",
+            "description": "Required quiet window in seconds (default 10)."
+          },
+          "autoBuild": {
+            "type": "boolean",
+            "description": "If true, builds before flashing when firmware artifact is missing."
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "agent_get_last_report",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory."
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "agent_generate_board_report",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory."
+          },
+          "boardId": {
+            "type": "string",
+            "description": "Target PlatformIO board ID."
+          }
+        },
+        "required": [
+          "projectDir",
+          "boardId"
+        ]
+      }
+    },
+    {
+      "name": "get_policy_status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Optional project directory to resolve local policy profile context."
+          }
+        }
+      }
+    },
+    {
+      "name": "agent_resolve_target",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Exact PlatformIO project directory."
+          },
+          "environment": {
+            "type": "string",
+            "description": "Optional declared PlatformIO environment."
+          },
+          "port": {
+            "type": "string",
+            "description": "Optional exact attached serial port."
+          },
+          "bindingTtlSeconds": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 900
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "get_monitor_status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Optional exact PlatformIO project directory."
+          },
+          "port": {
+            "type": "string",
+            "description": "Optional exact serial port."
+          }
+        }
+      }
+    },
+    {
+      "name": "capture_serial_window",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string"
+          },
+          "port": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "baudRate": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000000
+          },
+          "durationSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "maxBytes": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 65536
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "targetBinding": {
+            "type": "object",
+            "description": "Short-lived exact target binding returned by agent_resolve_target.",
+            "properties": {
+              "digest": {
+                "type": "string",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              "projectDir": {
+                "type": "string"
+              },
+              "environment": {
+                "type": "string"
+              },
+              "board": {
+                "type": "string"
+              },
+              "port": {
+                "type": "string"
+              },
+              "deviceFingerprint": {
+                "type": "string",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "digest",
+              "projectDir",
+              "environment",
+              "board",
+              "port",
+              "deviceFingerprint",
+              "createdAt",
+              "expiresAt"
+            ]
+          },
+          "automationKey": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$",
+            "description": "Stable scheduled-run key. Supplying this activates unattended automation policy."
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "agent_monitor_health",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "port": {
+            "type": "string"
+          },
+          "baudRate": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000000
+          },
+          "captureDurationSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "maxBytes": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 65536
+          },
+          "expectedMarkers": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          "rejectedPatterns": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          "automationKey": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "failureThreshold": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "cancel_task",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "projectDir": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      }
+    },
+    {
+      "name": "list_task_history",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "inactive",
+              "running",
+              "success",
+              "error",
+              "terminated"
+            ]
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "get_approval_request",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "approvalId": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "projectDir": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "approvalId"
+        ]
+      }
+    },
+    {
+      "name": "list_pending_approvals",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      }
+    },
+    {
+      "name": "system_info",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "check_project",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "environment": {
+            "type": "string",
+            "description": "Specific environment to check"
+          },
+          "background": {
+            "type": "boolean",
+            "description": "Run slow analysis in background"
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "run_tests",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "environment": {
+            "type": "string",
+            "description": "Specific environment to test"
+          },
+          "background": {
+            "type": "boolean",
+            "description": "Run testing in background"
+          }
+        },
+        "required": [
+          "projectDir"
+        ]
+      }
+    },
+    {
+      "name": "uninstall_library",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library": {
+            "type": "string",
+            "description": "Library name or ID to uninstall"
+          },
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "global": {
+            "type": "boolean",
+            "description": "If true, performs the operation globally. Defaults to false."
+          }
+        },
+        "required": [
+          "library"
+        ]
+      }
+    },
+    {
+      "name": "update_library",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library": {
+            "type": "string",
+            "description": "Library name or ID to update"
+          },
+          "projectDir": {
+            "type": "string",
+            "description": "Path to the PlatformIO project directory. Agents SHOULD ALWAYS explicitly provide this to ensure operations execute in the correct workspace, unless explicitly instructed otherwise."
+          },
+          "global": {
+            "type": "boolean",
+            "description": "If true, performs the operation globally. Defaults to false."
+          }
+        },
+        "required": [
+          "library"
+        ]
+      }
+    }
+  ]
+}
