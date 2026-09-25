@@ -195,33 +195,41 @@
       "registry": "ghcr",
       "name": "ghcr.io/jl-codes/platformio-mcp",
       "role": "candidate_container",
-      "publishIntent": false,
+      "publishIntent": true,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "ghcr",
       "name": "ghcr.io/jl-codes/platformio.mcp",
       "role": "candidate_container",
-      "publishIntent": false,
+      "publishIntent": true,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "ghcr",
       "name": "ghcr.io/jl-codes/pio-mcp",
       "role": "candidate_container",
-      "publishIntent": false,
+      "publishIntent": true,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "ghcr",
       "name": "ghcr.io/jl-codes/pio-agent",
       "role": "candidate_container",
-      "publishIntent": false,
+      "publishIntent": true,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "npm",
@@ -246,9 +254,11 @@
       "registry": "ghcr",
       "name": "ghcr.io/jl-codes/platformiomcp",
       "role": "candidate_container",
-      "publishIntent": false,
+      "publishIntent": true,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "pypi",
@@ -263,9 +273,11 @@
       "registry": "ghcr",
       "name": "ghcr.io/jl-codes/pioagent",
       "role": "candidate_container",
-      "publishIntent": false,
+      "publishIntent": true,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "pypi",
@@ -280,9 +292,11 @@
       "registry": "ghcr",
       "name": "ghcr.io/jl-codes/flashagent",
       "role": "candidate_container",
-      "publishIntent": false,
+      "publishIntent": true,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "npm",
@@ -357,25 +371,31 @@
       "registry": "ghcr",
       "name": "ghcr.io/jl-codes/flash-agent",
       "role": "candidate_container",
-      "publishIntent": false,
+      "publishIntent": true,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Additional same-image alias candidate; eligibility, authority and public digest verification remain pending."
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "ghcr",
       "name": "ghcr.io/jl-codes/flash.agent",
       "role": "candidate_container",
-      "publishIntent": false,
+      "publishIntent": true,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Additional same-image alias candidate; eligibility, authority and public digest verification remain pending."
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "ghcr",
       "name": "ghcr.io/jl-codes/flash_agent",
       "role": "candidate_container",
-      "publishIntent": false,
+      "publishIntent": true,
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Additional same-image alias candidate; eligibility, authority and public digest verification remain pending."
+      "reason": "User explicitly approved this personal-namespace target. Authenticated jl-codes account and repository-admin control verified; account container inventory is empty. Protected repository workflow uses packages:write. Native release gates, actual publication and anonymous digest verification remain pending.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "github",

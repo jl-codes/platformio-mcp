@@ -54,4 +54,13 @@ def publishers(root=ROOT):
 
 
 if __name__ == "__main__":
-    print(",".join(publishers()))
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--alias-matrix", action="store_true")
+    args = parser.parse_args()
+    selected = publishers()
+    if args.alias_matrix:
+        print(json.dumps({"include": [{"project": name, "environment": "pypi-" + name}
+                                      for name in selected[1:]]}))
+    else:
+        print(",".join(selected))

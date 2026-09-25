@@ -59,8 +59,10 @@ def assess(metadata, name, version, expected):
     return {filename: "identical" if filename in published else "unpublished" for filename in wanted}
 
 
-def release(directory, stage=None, verify=None):
+def release(directory, stage=None, verify=None, project=None):
     """Validate local wheels, compare public registry identity and stage only absent files."""
+    if project is not None and project not in PROJECTS:
+        raise ValueError("Unknown Python publication project")
     spec = importlib.util.spec_from_file_location("validate_python_release", ROOT / "scripts/validate-python-release.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -80,7 +82,7 @@ def release(directory, stage=None, verify=None):
         for item in expected:
             state = states[item["file"]]
             observations.append({**item, "state": state})
-            if stage and state == "unpublished":
+            if stage and state == "unpublished" and project in (None, name):
                 group = "canonical" if name == PROJECTS[0] else "aliases"
                 destination = stage / group / item["file"]
                 destination.parent.mkdir(exist_ok=True)
@@ -102,5 +104,6 @@ if __name__ == "__main__":
     parser.add_argument("directory", type=Path)
     parser.add_argument("--stage", type=Path)
     parser.add_argument("--verify", choices=["all", *PROJECTS])
+    parser.add_argument("--project", choices=PROJECTS)
     args = parser.parse_args()
-    release(args.directory, args.stage, args.verify)
+    release(args.directory, args.stage, args.verify, args.project)

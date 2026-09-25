@@ -288,11 +288,13 @@ jobs:
           fi
 
   publish_python:
-    name: Publish verified Python distributions
+    name: Publish verified canonical Python distribution
     needs: build_release
     if: github.event_name == 'workflow_dispatch' && inputs.publish_pypi
     runs-on: ubuntu-latest
     environment: pypi
+    outputs:
+      alias_matrix: ${{ steps.publishers.outputs.alias_matrix }}
     permissions:
       contents: read
       actions: read
@@ -303,17 +305,19 @@ jobs:
         with:
           python-version: '3.11'
       - name: Require recorded publisher configuration
+        id: publishers
         env:
           PUBLISHERS_VERIFIED: ${{ vars.PYPI_PUBLISHERS_VERIFIED }}
         run: |
-          test "$PUBLISHERS_VERIFIED" = "$(python scripts/python-release-packages.py)" || { echo 'Configure and verify all selected PyPI trusted publishers and the protected pypi environment first.' >&2; exit 1; }
+          test "$PUBLISHERS_VERIFIED" = "$(python scripts/python-release-packages.py)" || { echo 'Configure and verify all selected PyPI trusted publishers and the protected per-project environments first.' >&2; exit 1; }
+          echo "alias_matrix=$(python scripts/python-release-packages.py --alias-matrix)" >> "$GITHUB_OUTPUT"
       - name: Download immutable validated wheel set
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh run download "$GITHUB_RUN_ID" --name platformio-python-release --dir python-release-artifacts
       - name: Check registry identities and stage absent artifacts
         id: preflight
-        run: python scripts/pypi-release-identity.py python-release-artifacts --stage pypi-staging
+        run: python scripts/pypi-release-identity.py python-release-artifacts --stage pypi-staging --project pio-agent-platformio
       - name: Publish canonical wheels with attestations
         if: steps.preflight.outputs.canonical == 'true'
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
@@ -322,19 +326,59 @@ jobs:
           attestations: true
       - name: Verify canonical files before publishing aliases
         run: python scripts/pypi-release-identity.py python-release-artifacts --verify pio-agent-platformio
-      - name: Publish functional aliases with attestations
+      - name: Retain publication preflight
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pypi-publication-preflight-canonical
+          path: pypi-staging/preflight.json
+          if-no-files-found: warn
+
+  publish_python_aliases:
+    name: Publish verified Python alias (${{ matrix.project }})
+    needs: publish_python
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_pypi
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.publish_python.outputs.alias_matrix) }}
+    environment: ${{ matrix.environment }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - name: Download immutable validated wheel set
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --name platformio-python-release --dir python-release-artifacts
+      - name: Verify canonical identity and stage only this alias
+        id: preflight
+        env:
+          PYPI_PROJECT: ${{ matrix.project }}
+          PUBLISHERS_VERIFIED: ${{ vars.PYPI_PUBLISHERS_VERIFIED }}
+        run: |
+          test "$PUBLISHERS_VERIFIED" = "$(python scripts/python-release-packages.py)" || { echo 'Publisher configuration differs from the selected release.' >&2; exit 1; }
+          python scripts/pypi-release-identity.py python-release-artifacts --verify pio-agent-platformio --stage pypi-staging --project "$PYPI_PROJECT"
+      - name: Publish functional alias with attestations
         if: steps.preflight.outputs.aliases == 'true'
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
         with:
           packages-dir: pypi-staging/aliases/
           attestations: true
-      - name: Verify all published file identities
-        run: python scripts/pypi-release-identity.py python-release-artifacts --verify all
+      - name: Verify published alias identity
+        env:
+          PYPI_PROJECT: ${{ matrix.project }}
+        run: python scripts/pypi-release-identity.py python-release-artifacts --verify "$PYPI_PROJECT"
       - name: Retain publication preflight
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: pypi-publication-preflight
+          name: pypi-publication-preflight-${{ matrix.project }}
           path: pypi-staging/preflight.json
           if-no-files-found: warn
 
