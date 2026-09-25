@@ -162,7 +162,7 @@ export async function findDeviceByHwid(
  * Essential for macOS where ESP32-S3 boards physically drop off the bus and re-enumerate
  * with incremented port suffixes after a firmware flash.
  *
- * @param hwid - The exact hardware identifier (e.g., '303A:1001') to poll for.
+ * @param hwid - USB VID:PID and nonempty SER tokens from the previously selected device.
  * @param timeoutMs - Maximum duration in milliseconds to wait before giving up.
  * @returns The newly assigned physical port path (e.g., '/dev/cu.usbmodem102') or null on timeout.
  */
@@ -171,15 +171,22 @@ export async function waitForDeviceByHwid(
   timeoutMs: number = 5000,
   logCallback?: (msg: string) => void,
 ): Promise<string | null> {
-  if (!hwid) return null;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000)
+    throw new PlatformIOError("Invalid device discovery timeout.", "DEVICE_DISCOVERY_INVALID");
 
+  // A VID:PID identifies a model, not one board. Require an exact serial token too.
+  const identity = (value: string): string | undefined => {
+    if (typeof value !== "string" || value.length > 4096) return undefined;
+    const tokens = value.trim().split(/\s+/);
+    const usb = tokens.filter(token => /^VID:PID=[0-9a-f]{4}:[0-9a-f]{4}$/i.test(token));
+    const serial = tokens.filter(token => /^SER=\S+$/.test(token));
+    if (usb.length !== 1 || serial.length !== 1) return undefined;
+    return JSON.stringify([usb[0].toUpperCase(), serial[0]]);
+  };
+  const expected = identity(hwid);
+  if (!expected) return null;
   const pollIntervalMs = 500;
   const maxAttempts = Math.ceil(timeoutMs / pollIntervalMs);
-
-  // Extract rigid hardware attributes (VID:PID and Serial), ignoring transient macOS 'LOCATION=' strings
-  const strictTokens = hwid
-    .split(" ")
-    .filter((t) => t.includes("VID:PID") || t.includes("SER"));
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const devices = await listDevices();
@@ -193,12 +200,10 @@ export async function waitForDeviceByHwid(
       );
     }
 
-    const matchedDevice = devices.find((device) => {
-      if (strictTokens.length > 0) {
-        return strictTokens.every((token) => device.hwid.includes(token));
-      }
-      return device.hwid === hwid;
-    });
+    const matches = devices.filter(device => identity(device.hwid) === expected);
+    // Duplicate serial descriptors are ambiguous; never choose by enumeration order.
+    if (matches.length > 1) return null;
+    const matchedDevice = matches[0];
 
     if (matchedDevice && matchedDevice.port) {
       if (attempt > 1 || logCallback) {
@@ -210,10 +215,11 @@ export async function waitForDeviceByHwid(
     }
 
     // Non-blocking wait before next poll
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    if (attempt < maxAttempts)
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
 
-  const timeoutMsg = `[Device Discovery] Timeout (${timeoutMs}ms) waiting for stable signature: ${strictTokens.join(" ")}`;
+  const timeoutMsg = `[Device Discovery] Timeout (${timeoutMs}ms) waiting for stable signature: ${expected}`;
   console.error(timeoutMsg);
   if (logCallback) logCallback(timeoutMsg + "\n");
 

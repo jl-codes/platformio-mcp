@@ -22,7 +22,7 @@ import {
 import { UploadError, PlatformIOError } from "../utils/errors.js";
 import { parseStderrErrors } from "../utils/errors.js";
 import { stopMonitor } from "./monitor.js";
-import { portSemaphoreManager, ClaimError } from "../utils/semaphore.js";
+import { portSemaphoreManager } from "../utils/semaphore.js";
 import { redactSecretsInText } from "../core/policy/redact.js";
 import { diagnoseUploadLog } from "../core/diagnostics/upload-diagnostics.js";
 
@@ -81,77 +81,47 @@ export async function uploadFilesystem(
 
     const uploadArgs: string[] = ["run", "--target", "uploadfs"];
     if (environment) uploadArgs.push("--environment", environment);
+    uploadArgs.push("--upload-port", activePort);
 
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Filesystem Upload");
 
-    // The spooler releases this claim on normal completion (foreground exit
-    // or the background task's own .then). It does NOT if the spawn fails or
-    // waitForProcessEnd times out -- those reject before that code runs -- so
-    // under the long-lived MCP server the claim outlived the upload and, with
-    // a live owner PID, wedged the port until `port release --force`.
-    let uploadResult: Awaited<ReturnType<typeof executeWithSpooling>>;
-    try {
-      uploadResult = await executeWithSpooling("run", uploadArgs.slice(1), {
-        cwd: validatedPath,
-        projectDir: validatedPath,
-        timeout: maxRunDurationSeconds
-          ? maxRunDurationSeconds * 1000
-          : background
-            ? 3600000
-            : 600000,
-        background,
-        activePort,
-        rootCommandId,
-        artifactType: "upload",
-        onSuccess: startMonitorAfter
-          ? async () => {
-              if (hwid) {
-                const newPort = await waitForDeviceByHwid(hwid, 10000, (msg) =>
-                  console.error(msg.trim()),
-                );
-                if (newPort) {
-                  await startMonitor(
-                    newPort,
-                    undefined,
-                    validatedPath,
-                    environment,
-                    rootCommandId,
-                  );
-                  return;
-                }
-              }
-
-              let device = null;
-              for (let i = 0; i < 20; i++) {
-                await new Promise((resolve) => setTimeout(resolve, 500));
-                device = await getFirstDevice();
-                if (device) break;
-              }
-              if (device) {
+    const uploadResult = await executeWithSpooling("run", uploadArgs.slice(1), {
+      cwd: validatedPath,
+      projectDir: validatedPath,
+      timeout: maxRunDurationSeconds
+        ? maxRunDurationSeconds * 1000
+        : background
+          ? 3600000
+          : 600000,
+      background,
+      activePort,
+      rootCommandId,
+      artifactType: "upload",
+      onSuccess: startMonitorAfter
+        ? async () => {
+            if (hwid) {
+              const newPort = await waitForDeviceByHwid(hwid, 10000, (msg) =>
+                console.error(msg.trim()),
+              );
+              if (newPort) {
                 await startMonitor(
-                  device.port,
+                  newPort,
                   undefined,
                   validatedPath,
                   environment,
                   rootCommandId,
                 );
-              } else {
-                console.error(
-                  `[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`,
-                );
+                return;
               }
             }
-          : undefined,
-      });
-    } catch (spoolError) {
-      try {
-        portSemaphoreManager.releasePort(activePort);
-      } catch {
-        // Best-effort; the original error is the one to surface.
-      }
-      throw spoolError;
-    }
+
+            console.error(
+              "[Spooler Diagnostic] Auto-monitor skipped: the uploaded device could not be uniquely identified. Select its port explicitly.",
+            );
+          }
+        : undefined,
+    });
 
     if ("status" in uploadResult) {
       return uploadResult as unknown as UploadResult;
@@ -173,18 +143,7 @@ export async function uploadFilesystem(
       diagnostic,
     };
   } catch (error) {
-    // Claim failures are not upload failures. Rethrow on the ClaimError base,
-    // not on PortBusyError alone: CLAIM_IO_ERROR (a full disk, a read-only
-    // claim directory) and CLAIM_ACCESS_DENIED must keep their codes too, or
-    // an agent sees "Upload failed: ..." with nothing actionable.
-    if (error instanceof ClaimError) throw error;
-    if (error instanceof PlatformIOError) {
-      throw new UploadError(`Filesystem upload failed: ${error.message}`, {
-        projectDir,
-        port,
-        environment,
-      });
-    }
+    if (error instanceof PlatformIOError) throw error;
     throw new UploadError(`Failed to upload filesystem: ${error}`, {
       projectDir,
       port,
@@ -248,77 +207,47 @@ export async function uploadFirmware(
 
     const uploadArgs: string[] = ["run", "--target", "upload"];
     if (environment) uploadArgs.push("--environment", environment);
+    uploadArgs.push("--upload-port", activePort);
 
     await stopMonitor(activePort, projectDir);
     portSemaphoreManager.claimPort(activePort, "Firmware Upload");
 
-    // The spooler releases this claim on normal completion (foreground exit
-    // or the background task's own .then). It does NOT if the spawn fails or
-    // waitForProcessEnd times out -- those reject before that code runs -- so
-    // under the long-lived MCP server the claim outlived the upload and, with
-    // a live owner PID, wedged the port until `port release --force`.
-    let uploadResult: Awaited<ReturnType<typeof executeWithSpooling>>;
-    try {
-      uploadResult = await executeWithSpooling("run", uploadArgs.slice(1), {
-        cwd: validatedPath,
-        projectDir: validatedPath,
-        timeout: maxRunDurationSeconds
-          ? maxRunDurationSeconds * 1000
-          : background
-            ? 3600000
-            : 600000,
-        background,
-        activePort,
-        rootCommandId,
-        artifactType: "upload",
-        onSuccess: startMonitorAfter
-          ? async () => {
-              if (hwid) {
-                const newPort = await waitForDeviceByHwid(hwid, 10000, (msg) =>
-                  console.error(msg.trim()),
-                );
-                if (newPort) {
-                  await startMonitor(
-                    newPort,
-                    undefined,
-                    validatedPath,
-                    environment,
-                    rootCommandId,
-                  );
-                  return;
-                }
-              }
-
-              let device = null;
-              for (let i = 0; i < 20; i++) {
-                await new Promise((resolve) => setTimeout(resolve, 500));
-                device = await getFirstDevice();
-                if (device) break;
-              }
-              if (device) {
+    const uploadResult = await executeWithSpooling("run", uploadArgs.slice(1), {
+      cwd: validatedPath,
+      projectDir: validatedPath,
+      timeout: maxRunDurationSeconds
+        ? maxRunDurationSeconds * 1000
+        : background
+          ? 3600000
+          : 600000,
+      background,
+      activePort,
+      rootCommandId,
+      artifactType: "upload",
+      onSuccess: startMonitorAfter
+        ? async () => {
+            if (hwid) {
+              const newPort = await waitForDeviceByHwid(hwid, 10000, (msg) =>
+                console.error(msg.trim()),
+              );
+              if (newPort) {
                 await startMonitor(
-                  device.port,
+                  newPort,
                   undefined,
                   validatedPath,
                   environment,
                   rootCommandId,
                 );
-              } else {
-                console.error(
-                  `[Spooler Diagnostic] Auto-monitor failed: Device did not re-enumerate within 10 seconds.`,
-                );
+                return;
               }
             }
-          : undefined,
-      });
-    } catch (spoolError) {
-      try {
-        portSemaphoreManager.releasePort(activePort);
-      } catch {
-        // Best-effort; the original error is the one to surface.
-      }
-      throw spoolError;
-    }
+
+            console.error(
+              "[Spooler Diagnostic] Auto-monitor skipped: the uploaded device could not be uniquely identified. Select its port explicitly.",
+            );
+          }
+        : undefined,
+    });
 
     if ("status" in uploadResult) {
       return uploadResult as unknown as UploadResult;
@@ -340,18 +269,7 @@ export async function uploadFirmware(
       diagnostic,
     };
   } catch (error) {
-    // Claim failures are not upload failures. Rethrow on the ClaimError base,
-    // not on PortBusyError alone: CLAIM_IO_ERROR (a full disk, a read-only
-    // claim directory) and CLAIM_ACCESS_DENIED must keep their codes too, or
-    // an agent sees "Upload failed: ..." with nothing actionable.
-    if (error instanceof ClaimError) throw error;
-    if (error instanceof PlatformIOError) {
-      throw new UploadError(`Upload failed: ${error.message}`, {
-        projectDir,
-        port,
-        environment,
-      });
-    }
+    if (error instanceof PlatformIOError) throw error;
     throw new UploadError(`Failed to upload firmware: ${error}`, {
       projectDir,
       port,

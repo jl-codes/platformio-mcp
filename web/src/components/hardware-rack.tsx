@@ -1,3 +1,4 @@
+import { dashboardActionFetch } from "../lib/dashboard-action";
 import React, { useState } from 'react';
 import { Card, Button, Badge, Tooltip, Typography, Tag, Space, Divider, message, theme } from 'antd';
 import { 
@@ -46,7 +47,7 @@ export default function HardwareRack({ hardware, activeWorkspace, apiBase, token
     
     setLoadingMap(prev => ({ ...prev, [port]: true }));
     try {
-      const res = await fetch(`${apiBase}${endpoint}`, {
+      const res = await dashboardActionFetch(`${apiBase}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/modelcontextprotocol/registry",
+  "commit": "d1dcaf3fb36338d45ccdba98b5b8aea915e7d50d",
+  "path": "internal/validators/schemas/2025-12-11.json",
+  "sha256": "2e1e2dc758185bfc91023df4e5ace0e1c1bdb7b7b3d6614bb9ac6b9e9a9c2f68",
+  "licenseFile": "MCP-REGISTRY-LICENSE"
+}

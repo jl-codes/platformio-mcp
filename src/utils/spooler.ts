@@ -8,20 +8,18 @@
  * - executeWithSpooling: Spawns child processes mapped to disk limits.
  */
 import fs from "node:fs";
+import { acquireProcessDeviceCustody, type ProcessDeviceCustody } from "../core/devices/process-device-custody.js";
+import { waitForOwnedProcess } from "./owned-process-wait.js";
 
 import path from "node:path";
 import { platformioExecutor } from "../platformio.js";
-import {
-  registerBuildPid,
-  unregisterBuildPid,
-  isBuildActive,
-} from "./process-manager.js";
+import { registerBuildPid, unregisterBuildPid, isBuildActive } from "./process-manager.js";
 import { portSemaphoreManager } from "./semaphore.js";
 import { tailFileBounded } from "./tail.js";
 import { registerCommand, updateTaskStatus } from "./command-registry.js";
 import crypto from "node:crypto";
 import { mcpContext } from "./mcp-context.js";
-import { parseStderrErrors } from "./errors.js";
+import { PlatformIOError, parseStderrErrors } from "./errors.js";
 
 import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
 
@@ -73,10 +71,7 @@ export interface BuildStreamRotation {
  * @param projectDir - Associated workspace to scope clearance into.
  * @returns The structured paths indicating where the new logs are actively spooling.
  */
-export function rotateSpoolerStreams(
-  verb: string,
-  projectDir?: string,
-): BuildStreamRotation {
+export function rotateSpoolerStreams(verb: string, projectDir?: string): BuildStreamRotation {
   const targetDir = getLogDir(verb, projectDir);
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
@@ -106,58 +101,23 @@ export interface SpoolingForegroundResult {
   fullLogPath: string; // The absolute path referencing the complete log file
 }
 
-export type SpoolingResult =
-  | SpoolingBackgroundResult
-  | SpoolingForegroundResult;
+export type SpoolingResult = SpoolingBackgroundResult | SpoolingForegroundResult;
 
-function tryTerminateProcess(pid?: number) {
-  if (!pid) return;
+/**
+ * Releasing a port claim is best-effort bookkeeping and must never turn a
+ * completed (or already-failed) task into a claim error. releasePort is
+ * owner-checked and can throw on an unreadable claim directory.
+ */
+function releaseClaimBestEffort(port?: string) {
+  if (!port) return;
   try {
-    process.kill(pid, "SIGTERM");
-    setTimeout(() => {
-      try {
-        process.kill(pid, 0);
-        process.kill(pid, "SIGKILL");
-      } catch {}
-    }, 1000);
-  } catch {}
+    portSemaphoreManager.releasePort(port);
+  } catch {
+    // Best-effort; the task outcome is what the caller must see.
+  }
 }
 
-function waitForProcessEnd(proc: any, timeoutMs: number): Promise<number> {
-  return new Promise<number>((resolve, reject) => {
-    let settled = false;
-
-    const onDone = (code?: number | null) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(code ?? 1);
-    };
-
-    const onError = (err: Error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(err);
-    };
-
-    const timer = setTimeout(() => {
-      if (settled) return;
-      tryTerminateProcess(proc?.pid);
-      settled = true;
-      reject(new Error(`Command timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    proc.on("error", onError);
-    proc.on("exit", onDone);
-    proc.on("close", onDone);
-  });
-}
-
-function ensureLatestLogPointer(
-  logFile: string,
-  latestLog: string,
-): { mirrorLatest: boolean } {
+function ensureLatestLogPointer(logFile: string, latestLog: string): { mirrorLatest: boolean } {
   try {
     if (fs.existsSync(latestLog)) fs.unlinkSync(latestLog);
   } catch {}
@@ -180,8 +140,9 @@ function ensureLatestLogPointer(
   return { mirrorLatest: false };
 }
 
+
 /**
- * Wraps child process invocation forcing its runtime payload exclusively through
+ * Wraps child process invocation forcing its runtime payload exclusively through 
  * an active offline disk file context instead of active NodeJS stream memory.
  *
  * @param command - Core executing binary token.
@@ -192,16 +153,7 @@ function ensureLatestLogPointer(
 export async function executeWithSpooling(
   command: string,
   args: string[],
-  options: {
-    cwd: string;
-    projectDir?: string;
-    timeout?: number;
-    background?: boolean;
-    activePort?: string;
-    onSuccess?: () => Promise<void>;
-    rootCommandId?: string;
-    artifactType?: "build" | "upload" | "monitor" | "test" | "debug";
-  },
+  options: { cwd: string; environment?: NodeJS.ProcessEnv; projectDir?: string; timeout?: number; background?: boolean; activePort?: string; devicePort?: string; deviceCustody?: ProcessDeviceCustody; cancellation?: AbortSignal; onSuccess?: () => Promise<void>; rootCommandId?: string; artifactType?: "build" | "upload" | "monitor" | "test" | "debug" }
 ): Promise<SpoolingResult> {
   const projectArea = options.projectDir ?? options.cwd;
 
@@ -216,45 +168,92 @@ export async function executeWithSpooling(
   const outFd = fs.openSync(logFile, "a");
 
   // 3. Spawning
-  const proc = await platformioExecutor.spawn(command, args, {
-    cwd: options.cwd,
-    stdio: ["ignore", outFd, outFd],
-    detached: false,
-  });
+  let proc: Awaited<ReturnType<typeof platformioExecutor.spawn>>;
+  let deviceCustody: ProcessDeviceCustody | undefined;
+  try {
+    const custodyPort = options.devicePort ?? options.activePort;
+    deviceCustody = options.deviceCustody;
+    if (!deviceCustody && custodyPort)
+      deviceCustody = acquireProcessDeviceCustody(custodyPort);
+    if (options.cancellation?.aborted)
+      throw new PlatformIOError("Command cancelled before spawn.", "PROCESS_CANCELLED");
+    await deviceCustody?.prepareSpawn();
+    if (options.cancellation?.aborted)
+      throw new PlatformIOError("Command cancelled before spawn.", "PROCESS_CANCELLED");
+    proc = await platformioExecutor.spawn(command, args, {
+      cwd: options.cwd,
+      env: options.environment,
+      stdio: ["ignore", outFd, outFd],
+      detached: false,
+    });
+  } catch (error) {
+    try { fs.closeSync(outFd); } catch {}
+    deviceCustody?.releaseAfterExit();
+    releaseClaimBestEffort(options.activePort);
+    throw new PlatformIOError(
+      error instanceof Error ? error.message : "Process could not be started.",
+      "PROCESS_START_FAILED",
+      { cleanupPending: false, fullLogPath: logFile },
+    );
+  }
+
+  // Observe exit/error before registry I/O yields; startup failures use the same bounded waiter.
+  const timeoutMs = options.timeout ?? (options.background ? 3600000 : 600000);
+  const startupCancellation = new AbortController();
+  const cancelFromCaller = () => startupCancellation.abort();
+  options.cancellation?.addEventListener("abort", cancelFromCaller, { once: true });
+  if (options.cancellation?.aborted) cancelFromCaller();
+  const completion = waitForOwnedProcess(proc, timeoutMs, 1000, startupCancellation.signal);
+  const removeCancellation = () => options.cancellation?.removeEventListener("abort", cancelFromCaller);
+  void completion.then(removeCancellation, removeCancellation);
+  void completion.catch(() => {}); // The result is consumed after registration or in its failure path.
 
   const ctx = mcpContext.getStore();
-  const commandId =
-    options.rootCommandId || ctx?.activityId || crypto.randomUUID();
+  const commandId = options.rootCommandId || ctx?.activityId || crypto.randomUUID();
   const taskId = crypto.randomUUID();
   const artType = options.artifactType || "build";
   const targetProjectArea = projectArea || ctx?.targetProjectDir;
 
-  if (proc.pid) {
-    logDiag(
-      `[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`,
-      targetProjectArea,
-    );
-    await registerBuildPid(proc.pid, targetProjectArea);
-    await registerCommand(
-      {
+  try {
+    if (proc.pid) {
+      logDiag(`[Spooler] Spawning task command: \`${command} ${args.join(" ")}\` with Build ID/PID: ${proc.pid}`, targetProjectArea);
+      await registerBuildPid(proc.pid, targetProjectArea);
+      await registerCommand({
         id: commandId,
         commandDesc: `PIO Task: ${command} ${args.join(" ")}`,
         timestamp: Date.now(),
         status: "running",
-        tasks: [
-          {
-            taskId: taskId,
-            type: artType,
-            status: "running",
-            logPaths: [logFile],
-            pid: proc.pid,
-            commandDesc: `pio ${command} ${args.join(" ")}`,
-          },
-        ],
-      },
-      targetProjectArea,
-    ).catch((e) =>
-      logDiag(`[Spooler] Registry fail: ${e.message}`, targetProjectArea),
+        tasks: [{
+          taskId: taskId,
+          type: artType,
+          status: "running",
+          logPaths: [logFile],
+          pid: proc.pid,
+          commandDesc: `pio ${command} ${args.join(" ")}`
+        }]
+      }, targetProjectArea).catch(e => logDiag(`[Spooler] Registry fail: ${e.message}`, targetProjectArea));
+    }
+  } catch (error) {
+    startupCancellation.abort();
+    let cleanupPending = false;
+    try { await completion; }
+    catch (terminationError) {
+      cleanupPending = !(terminationError instanceof PlatformIOError) ||
+        terminationError.context?.cleanupPending !== false;
+    }
+    try {
+      if (!cleanupPending) {
+        deviceCustody?.releaseAfterExit();
+        await unregisterBuildPid(targetProjectArea).catch(() => {});
+        releaseClaimBestEffort(options.activePort);
+      }
+    } finally {
+      try { fs.closeSync(outFd); } catch {}
+    }
+    throw new PlatformIOError(
+      error instanceof Error ? error.message : "Process registration failed.",
+      "PROCESS_REGISTRATION_FAILED",
+      { cleanupPending, fullLogPath: logFile, pid: proc.pid },
     );
   }
 
@@ -267,21 +266,14 @@ export async function executeWithSpooling(
 
   try {
     watcher = fs.watch(logFile, (eventType) => {
-      if (eventType === "change") {
+      if (eventType === 'change') {
         try {
           const stat = fs.statSync(logFile);
           if (stat.size > fileOffset) {
-            const stream = fs.createReadStream(logFile, {
-              start: fileOffset,
-              end: stat.size - 1,
-            });
-            stream.on("data", (chunk) => {
+            const stream = fs.createReadStream(logFile, { start: fileOffset, end: stat.size - 1 });
+            stream.on('data', (chunk) => {
               const text = chunk.toString();
-              portalEvents.emitTaskLog(
-                targetProjectArea || "global",
-                taskId,
-                text,
-              );
+              portalEvents.emitTaskLog(targetProjectArea || "global", taskId, text);
               if (latestPointer.mirrorLatest) {
                 try {
                   fs.appendFileSync(latestLog, text);
@@ -293,26 +285,46 @@ export async function executeWithSpooling(
         } catch {}
       }
     });
-    watcher.unref();
     watcher.on("error", () => {
       // Swallow watcher errors (common on CI/Windows) so they don't crash test runtime.
     });
+    // A one-shot CLI must exit once its result is printed; an active
+    // FSEvents/inotify handle would keep the event loop alive after the task
+    // has finished. closeOutput() still closes it explicitly on completion.
+    watcher.unref();
   } catch {}
 
+  // Close local resources even when persistent registry/lease cleanup fails.
+  const closeOutput = () => {
+    try { fs.closeSync(outFd); } catch {}
+    if (watcher) {
+      let fd: number | undefined;
+      try {
+        const size = fs.statSync(logFile).size;
+        if (size > fileOffset) {
+          const start = Math.max(fileOffset, size - 512 * 1024);
+          const buffer = Buffer.alloc(size - start);
+          fd = fs.openSync(logFile, "r");
+          const bytes = fs.readSync(fd, buffer, 0, buffer.length, start);
+          portalEvents.emitTaskLog(targetProjectArea || "global", taskId, buffer.subarray(0, bytes).toString());
+        }
+      } catch {}
+      finally {
+        if (fd !== undefined) { try { fs.closeSync(fd); } catch {} }
+        try { watcher.close(); } catch {}
+      }
+    }
+  };
+
   // 4. Wait for termination
-  const timeoutMs = options.timeout ?? (options.background ? 3600000 : 600000);
-
   if (options.background) {
-    const p = waitForProcessEnd(proc, timeoutMs);
+    const p = completion;
 
-    p.catch((e) => {
+    let cleanupPending = false;
+    p.catch(e => {
+      cleanupPending = e?.context?.cleanupPending !== false;
       console.error(`[Background Task Error]: ${e.message}`);
-      updateTaskStatus(
-        commandId,
-        taskId,
-        { status: "error", error: e.message },
-        targetProjectArea,
-      ).catch(() => {});
+      updateTaskStatus(commandId, taskId, { status: "error", error: e.message }, targetProjectArea).catch(() => {});
       return 1;
     }).then(async (code) => {
       let errorMessage = undefined;
@@ -323,71 +335,56 @@ export async function executeWithSpooling(
           if (errors && errors.length > 0) errorMessage = errors[0];
         } catch {}
       }
-
-      await updateTaskStatus(
-        commandId,
-        taskId,
-        {
-          status: code === 0 ? "success" : "error",
-          exitCode: code,
-          ...(errorMessage ? { error: errorMessage } : {}),
-        },
-        targetProjectArea,
-      ).catch(() => {});
-      await unregisterBuildPid(targetProjectArea);
-      if (options.activePort) {
-        try {
-          portSemaphoreManager.releasePort(options.activePort);
-        } catch {
-          // Releasing a claim is best-effort and must never fail a completed task.
-        }
-      }
+      
+      await updateTaskStatus(commandId, taskId, { 
+        status: code === 0 ? "success" : "error",
+        exitCode: code,
+        ...(errorMessage ? { error: errorMessage } : {})
+      }, targetProjectArea).catch(() => {});
       try {
-        fs.closeSync(outFd);
-      } catch {}
-      if (watcher) {
-        // ARCHITECTURAL EXCEPTION: While synchronous fs calls are broadly banned to prevent
-        // event loop blocking, fs.statSync and fs.readSync are mathematically required here
-        // at the exact nanosecond of process termination. Using asynchronous promises yields
-        // to the event loop, causing the FSEvents watcher to close before the OS can flush
-        // the final chunk event, permanently dropping the trailing output lines from the UI.
-        try {
-          const stat = fs.statSync(logFile);
-          if (stat.size > fileOffset) {
-            const buffer = Buffer.alloc(stat.size - fileOffset);
-            const fd = fs.openSync(logFile, "r");
-            fs.readSync(fd, buffer, 0, buffer.length, fileOffset);
-            fs.closeSync(fd);
-            portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
-            fileOffset = stat.size;
-          }
-        } catch {}
-        try {
-          watcher.close();
-        } catch {}
+        if (!cleanupPending) {
+          deviceCustody?.releaseAfterExit();
+          await unregisterBuildPid(targetProjectArea);
+          releaseClaimBestEffort(options.activePort);
+        }
+      } finally {
+        closeOutput();
       }
 
       if (code === 0 && options.onSuccess) {
         try {
           await options.onSuccess();
         } catch (e: any) {
-          console.error(
-            `[Spooler Diagnostic] Background onSuccess hook failed: ${e.message}`,
-          );
+          console.error(`[Spooler Diagnostic] Background onSuccess hook failed: ${e.message}`);
         }
       }
+    }).catch(async (error) => {
+      console.error("[Background Task Cleanup Error]:", error instanceof Error ? error.message : "Cleanup failed.");
+      await updateTaskStatus(commandId, taskId, { status: "error", error: error instanceof Error ? error.message : "Cleanup failed." }, targetProjectArea).catch(() => {});
     });
 
-    return {
-      status: "running",
-      message: "Task dispatched to background.",
-      pid: proc.pid,
-      taskId: commandId,
-      logPaths: [logFile],
-    };
+    return { status: "running", message: "Task dispatched to background.", pid: proc.pid, taskId: commandId, logPaths: [logFile] };
   }
-
-  const exitCode = await waitForProcessEnd(proc, timeoutMs);
+  
+  let exitCode: number;
+  try {
+    exitCode = await completion;
+  } catch (error) {
+    const cleanupPending = !(error instanceof PlatformIOError) || error.context?.cleanupPending !== false;
+    await updateTaskStatus(commandId, taskId, {status: "error", error: error instanceof Error ? error.message : "Process failed."}, projectArea).catch(() => {});
+    try {
+      if (!cleanupPending) {
+        deviceCustody?.releaseAfterExit();
+        await unregisterBuildPid(projectArea);
+        releaseClaimBestEffort(options.activePort);
+      }
+    } finally {
+      closeOutput();
+    }
+    if (error instanceof PlatformIOError)
+      throw new PlatformIOError(error.message, error.code, { ...error.context, cleanupPending, fullLogPath: logFile });
+    throw error;
+  }
 
   let errorMessage = undefined;
   if (exitCode !== 0) {
@@ -398,49 +395,19 @@ export async function executeWithSpooling(
     } catch {}
   }
 
-  await updateTaskStatus(
-    commandId,
-    taskId,
-    {
-      status: exitCode === 0 ? "success" : "error",
-      exitCode,
-      ...(errorMessage ? { error: errorMessage } : {}),
-    },
-    projectArea,
-  ).catch(() => {});
+  await updateTaskStatus(commandId, taskId, { 
+    status: exitCode === 0 ? "success" : "error",
+    exitCode,
+    ...(errorMessage ? { error: errorMessage } : {})
+  }, projectArea).catch(() => {});
 
   // Cleanup
-  await unregisterBuildPid(projectArea);
-  if (options.activePort) {
-    try {
-      portSemaphoreManager.releasePort(options.activePort);
-    } catch {
-      // Releasing a claim is best-effort and must never fail a completed task.
-    }
-  }
   try {
-    fs.closeSync(outFd);
-  } catch {}
-  if (watcher) {
-    // ARCHITECTURAL EXCEPTION: While synchronous fs calls are broadly banned to prevent
-    // event loop blocking, fs.statSync and fs.readSync are mathematically required here
-    // at the exact nanosecond of process termination. Using asynchronous promises yields
-    // to the event loop, causing the FSEvents watcher to close before the OS can flush
-    // the final chunk event, permanently dropping the trailing output lines from the UI.
-    try {
-      const stat = fs.statSync(logFile);
-      if (stat.size > fileOffset) {
-        const buffer = Buffer.alloc(stat.size - fileOffset);
-        const fd = fs.openSync(logFile, "r");
-        fs.readSync(fd, buffer, 0, buffer.length, fileOffset);
-        fs.closeSync(fd);
-        portalEvents.emitTaskLog(projectArea, taskId, buffer.toString());
-        fileOffset = stat.size;
-      }
-    } catch {}
-    try {
-      watcher.close();
-    } catch {}
+    deviceCustody?.releaseAfterExit();
+    await unregisterBuildPid(projectArea);
+    releaseClaimBestEffort(options.activePort);
+  } finally {
+    closeOutput();
   }
 
   if (exitCode === 0 && options.onSuccess) {
@@ -466,53 +433,45 @@ export async function executeWithSpooling(
 /**
  * Spools a large JSON dataset to disk if it exceeds a specified string length.
  * Prevents MCP context window blowouts.
- *
+ * 
  * @param toolName - The name of the tool generating the data (used for the cache file name).
  * @param data - The raw JSON object/array payload.
  * @param targetDir - The target workspace directory to save the cache file.
  * @param threshold - The character count threshold above which the data should be spooled (default: 2000).
  * @returns Either the original data or a string message pointing to the file path.
  */
-export function spoolLargeDataset(
-  toolName: string,
-  data: any,
-  targetDir?: string,
-  threshold = 2000,
-): string | any {
+export function spoolLargeDataset(toolName: string, data: any, targetDir?: string, threshold = 2000): string | any {
   const stringified = JSON.stringify(data, null, 2);
-
+  
   if (stringified.length > threshold) {
     // Determine the cache directory using standard getLogDir with toolName as verb
     const cacheDir = getLogDir(toolName, targetDir);
-
+    
     // Ensure the directory exists
     if (!fs.existsSync(cacheDir)) {
       fs.mkdirSync(cacheDir, { recursive: true });
     }
-
+    
     // Rotate logs to prevent infinite spools accumulating
     rotateLogs(cacheDir, `${toolName}-`, 30);
-
+    
     // Define the cache file path
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const shortHash = crypto.randomBytes(4).toString("hex");
-    const cacheFile = path.join(
-      cacheDir,
-      `${toolName}-${timestamp}-${shortHash}.json`,
-    );
+    const cacheFile = path.join(cacheDir, `${toolName}-${timestamp}-${shortHash}.json`);
     const latestFile = path.join(cacheDir, `latest-${toolName}.json`);
-
+    
     // Write the raw JSON data to disk
     fs.writeFileSync(cacheFile, stringified, "utf-8");
-
+    
     // Update the latest symlink
     try {
       if (fs.existsSync(latestFile)) fs.unlinkSync(latestFile);
       fs.symlinkSync(cacheFile, latestFile);
     } catch {}
-
+    
     return `Payload too large for context window. Full dataset successfully spooled to disk at ${cacheFile}. Please use your grep_search or view_file tools to query this file.`;
   }
-
+  
   return data;
 }

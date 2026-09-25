@@ -1,0 +1,240 @@
+/** Public acquisition exports preserve empty raw partitions without returning memory bytes. */
+import fs from "node:fs";
+import { createHash } from "node:crypto";
+import os from "node:os";
+import path from "node:path";
+import { beforeEach, afterEach, expect, it, vi } from "vitest";
+vi.mock("../src/tools/coredump-device.js", () => ({
+  acquireProjectCoredump: vi.fn(),
+}));
+import { acquireProjectCoredump } from "../src/tools/coredump-device.js";
+vi.mock("../src/core/analysis/esp-coredump-tools.js", () => ({
+  resolveEspCoredumpTools: vi.fn(),
+}));
+import { resolveEspCoredumpTools } from "../src/core/analysis/esp-coredump-tools.js";
+import { PlatformIOError } from "../src/utils/errors.js";
+import { approveRequest, getApproval } from "../src/core/policy/approvals.js";
+import { executeCoredump } from "../src/tools/coredump.js";
+let root: string, state: string;
+beforeEach(() => {
+  vi.clearAllMocks();
+  root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-core-export-policy-"));
+  state = fs.mkdtempSync(path.join(os.tmpdir(), "pio-core-export-state-"));
+  vi.stubEnv("PIO_MCP_DATA_DIR", state);
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.rmSync(state, { recursive: true, force: true });
+});
+function request() {
+  return {
+    projectDir: root,
+    analyze: false,
+    outPath: "crash.bin",
+    device: {
+      port: "port",
+      table: {
+        projectDir: root,
+        tablePath: "partitions.csv",
+        tableOffset: 0x8000,
+      },
+    },
+  };
+}
+it.each([false, true])(
+  "preflights saving before device acquisition (managed=%s)",
+  async (managed) => {
+    fs.writeFileSync(
+      path.join(root, ".pio-mcp-policy.json"),
+      JSON.stringify({
+        profile: "read_only",
+        overrides: { audit_all_agent_actions: false },
+      }),
+    );
+    await expect(
+      executeCoredump({
+        ...request(),
+        outPath: managed ? undefined : "crash.bin",
+        retainDump: managed,
+      }),
+    ).rejects.toMatchObject({
+      code: "POLICY_DENIED",
+    });
+    expect(acquireProjectCoredump).not.toHaveBeenCalled();
+    expect(fs.existsSync(path.join(root, "crash.bin"))).toBe(false);
+  },
+);
+it.each([false, true])(
+  "checks erased input identity before export (mismatch=%s)",
+  async (mismatch) => {
+    const policy = path.join(state, "operator.json");
+    vi.stubEnv("PIO_MCP_POLICY_FILE", policy);
+    fs.writeFileSync(
+      policy,
+      JSON.stringify({
+        profile: "lab_admin",
+        overrides: {
+          allow: ["run_shell_command", "get_project_config"],
+          deny: [],
+          approval_required: [],
+          audit_all_agent_actions: false,
+        },
+      }),
+    );
+    const bytes = Buffer.alloc(4096, 255);
+    vi.mocked(acquireProjectCoredump).mockResolvedValueOnce({
+      present: false,
+      bytes,
+      source: {
+        port: "port",
+        offset: 0x310000,
+        length: 4096,
+        sha256: "fixture",
+        logPath: "log",
+        partition: "crash",
+      },
+      layout: {
+        table: { path: "table", size: 1, sha256: "fixture" },
+        table_offset: 0x8000,
+        environment: null,
+        table_source: "explicit",
+        evidence: "offline_layout",
+      },
+    });
+    const selected = {
+      ...request(),
+      expectedInputSha256: mismatch
+        ? "0".repeat(64)
+        : createHash("sha256").update(bytes).digest("hex"),
+    };
+    if (mismatch) {
+      await expect(executeCoredump(selected)).rejects.toMatchObject({
+        code: "COREDUMP_IDENTITY_MISMATCH",
+      });
+      expect(fs.existsSync(path.join(root, "crash.bin"))).toBe(false);
+      return;
+    }
+    const result = await executeCoredump(selected);
+    expect(result).toMatchObject({
+      ok: false,
+      error: "no_coredump",
+      dump_export: { size: 4096, retention: "user_managed" },
+    });
+    expect(result).not.toHaveProperty("bytes");
+    expect(fs.readFileSync(path.join(root, "crash.bin"))).toEqual(bytes);
+  },
+  20000,
+);
+
+it.each([
+  ["COREDUMP_TOOLS_UNCONFIGURED", true, true],
+  ["COREDUMP_TOOLS_INVALID", true, false],
+  ["COREDUMP_TOOLS_UNCONFIGURED", false, false],
+] as const)(
+  "only saved captures tolerate an unconfigured analyzer (%s, save=%s)",
+  async (code, save, succeeds) => {
+    const policy = path.join(state, "operator.json");
+    vi.stubEnv("PIO_MCP_POLICY_FILE", policy);
+    fs.writeFileSync(
+      policy,
+      JSON.stringify({
+        profile: "lab_admin",
+        overrides: {
+          allow: ["run_shell_command", "get_project_config"],
+          deny: [],
+          approval_required: [],
+          audit_all_agent_actions: false,
+        },
+      }),
+    );
+    const bytes = Buffer.from(
+      "2400000003000000010000000400000000000000020000006669787475726521168fe1cf",
+      "hex",
+    );
+    vi.mocked(acquireProjectCoredump).mockResolvedValueOnce({
+      present: true,
+      bytes,
+      source: {
+        port: "port",
+        offset: 0x310000,
+        length: bytes.length,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        logPath: "log",
+        partition: "crash",
+      },
+      layout: {
+        table: { path: "table", size: 1, sha256: "fixture" },
+        table_offset: 0x8000,
+        environment: null,
+        table_source: "explicit",
+        evidence: "offline_layout",
+      },
+    } as Awaited<ReturnType<typeof acquireProjectCoredump>>);
+    vi.mocked(resolveEspCoredumpTools).mockRejectedValueOnce(
+      new PlatformIOError("Unavailable fixture tool", code),
+    );
+    const selected = {
+      ...request(),
+      analyze: true,
+      elfPath: "firmware.elf",
+      outPath: save ? "crash.bin" : undefined,
+    };
+    if (succeeds) {
+      const result = await executeCoredump(selected);
+      expect(result).toMatchObject({
+        ok: true,
+        analyzed: false,
+        analysis_unavailable: "COREDUMP_TOOLS_UNCONFIGURED",
+        dump_export: { size: bytes.length },
+      });
+      expect(result).not.toHaveProperty("bytes");
+    } else {
+      await expect(executeCoredump(selected)).rejects.toMatchObject({ code });
+    }
+    expect(acquireProjectCoredump).toHaveBeenCalledTimes(1);
+    if (save)
+      expect(fs.readFileSync(path.join(root, "crash.bin"))).toEqual(bytes);
+  },
+  20000,
+);
+
+it("preserves an approved analysis grant while device acquisition requests its own approval", async () => {
+  const policy = path.join(state, "operator.json");
+  vi.stubEnv("PIO_MCP_POLICY_FILE", policy);
+  fs.writeFileSync(
+    policy,
+    JSON.stringify({
+      profile: "lab_admin",
+      overrides: {
+        allow: ["get_project_config", "run_shell_command"],
+        deny: [],
+        approval_required: ["run_shell_command"],
+        audit_all_agent_actions: false,
+      },
+    }),
+  );
+  const input = {
+    ...request(),
+    outPath: undefined,
+    analyze: true,
+    elfPath: "firmware.elf",
+  };
+  const error = (await executeCoredump(input).catch(
+    (value: unknown) => value,
+  )) as PlatformIOError;
+  expect(error.code).toBe("APPROVAL_REQUIRED");
+  const approvalId = (error.context?.policyDecision as { approvalId: string })
+    .approvalId;
+  approveRequest(approvalId);
+  const nested = new PlatformIOError(
+    "Read approval required",
+    "APPROVAL_REQUIRED",
+  );
+  vi.mocked(acquireProjectCoredump).mockRejectedValueOnce(nested);
+  await expect(
+    executeCoredump({ ...input, commandApprovalId: approvalId }),
+  ).rejects.toBe(nested);
+  expect(getApproval(approvalId)?.status).toBe("approved");
+  expect(resolveEspCoredumpTools).not.toHaveBeenCalled();
+});

@@ -43,11 +43,14 @@ describeMcp("PlatformIO MCP Server E2E Integration", () => {
     // and reset_server_state behind an approval these tests never grant — so
     // they failed with `requires explicit approval by policy` rather than for
     // any reason to do with the tools they exist to exercise. `lab_admin`
-    // permits all four outright. The gate itself is covered separately, below.
-    await fs.writeFile(
-      path.join(tempProjectDir, ".pio-mcp-policy.json"),
-      JSON.stringify({ profile: "lab_admin" }, null, 2),
-    );
+    // permits all four outright. It has to be the OPERATOR policy: a
+    // project-local `.pio-mcp-policy.json` can only restrict the operator
+    // baseline unless the project is enrolled (docs/policy-sources.md), and
+    // `approved: true` in tool arguments grants nothing. The harness forwards
+    // process.env to the server, so select the file the way an operator would.
+    const operatorPolicy = path.join(tempProjectDir, "operator-policy.yaml");
+    await fs.writeFile(operatorPolicy, "profile: lab_admin\n");
+    process.env.PIO_MCP_POLICY_FILE = operatorPolicy;
 
     harness = new MCPTestHarness();
     console.log(
@@ -57,6 +60,7 @@ describeMcp("PlatformIO MCP Server E2E Integration", () => {
   }, 10000);
 
   afterAll(async () => {
+    delete process.env.PIO_MCP_POLICY_FILE;
     await harness.disconnect();
     try {
       if (tempProjectDir) {
@@ -347,16 +351,24 @@ describeMcp("PlatformIO MCP Server E2E Integration", () => {
   }, 10000);
 
   it("still gates a hardware write behind approval under the default profile", async () => {
-    // The suite runs under `lab_admin` so the tool tests exercise tools rather
-    // than policy. That silently removed the signal the old failing assertions
-    // were providing -- that a hardware write IS gated -- so assert it directly
-    // against a workspace with no policy file, which falls back to
-    // `flash_requires_approval`.
+    // The suite runs under an operator `lab_admin` policy so the tool tests
+    // exercise tools rather than policy. That silently removed the signal the
+    // old failing assertions were providing -- that a hardware write IS gated
+    // -- so assert it directly against a workspace whose project override
+    // requires approval for upload_firmware. An operator profile selection
+    // wins over a project PROFILE selection, but a typed project override may
+    // always tighten the operator baseline without enrollment (see
+    // docs/policy-sources.md), which is exactly this case.
     const gatedDir = await fs.mkdtemp(path.join(os.tmpdir(), "pio-mcp-gated-"));
     try {
       await fs.writeFile(
         path.join(gatedDir, "platformio.ini"),
         "[env:native]\nplatform = native\n",
+      );
+      await fs.mkdir(path.join(gatedDir, ".pio-mcp-workspace"));
+      await fs.writeFile(
+        path.join(gatedDir, ".pio-mcp-workspace", "policy.yaml"),
+        "approval_required: [upload_firmware]\n",
       );
 
       const result = (await harness.client.callTool({

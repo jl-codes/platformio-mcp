@@ -1,0 +1,597 @@
+{
+  "schemaVersion": 1,
+  "referenceSha": "a7b31021982f20b5406eaf80732899f8e75bd464",
+  "legacyRevision": "40e12ccb8e85fcaf33b46c50b6d832665728e773",
+  "requirements": [
+    {
+      "id": "PAR-01",
+      "kind": "contract",
+      "assertion": "pio_board_info parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-02",
+      "kind": "contract",
+      "assertion": "pio_build parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-03",
+      "kind": "contract",
+      "assertion": "pio_check parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-04",
+      "kind": "contract",
+      "assertion": "pio_clean parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-05",
+      "kind": "contract",
+      "assertion": "pio_coredump parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-06",
+      "kind": "contract",
+      "assertion": "pio_debug_cmd parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-07",
+      "kind": "contract",
+      "assertion": "pio_debug_list parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-08",
+      "kind": "contract",
+      "assertion": "pio_debug_start parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-09",
+      "kind": "contract",
+      "assertion": "pio_debug_stop parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-10",
+      "kind": "contract",
+      "assertion": "pio_decode_backtrace parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-11",
+      "kind": "contract",
+      "assertion": "pio_deps_check parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-12",
+      "kind": "contract",
+      "assertion": "pio_flash_and_verify parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-13",
+      "kind": "contract",
+      "assertion": "pio_list_boards parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-14",
+      "kind": "contract",
+      "assertion": "pio_list_devices parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-15",
+      "kind": "contract",
+      "assertion": "pio_list_targets parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-16",
+      "kind": "contract",
+      "assertion": "pio_memory_watch parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-17",
+      "kind": "contract",
+      "assertion": "pio_monitor_capture parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-18",
+      "kind": "contract",
+      "assertion": "pio_monitor_list parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-19",
+      "kind": "contract",
+      "assertion": "pio_monitor_read parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-20",
+      "kind": "contract",
+      "assertion": "pio_monitor_start parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-21",
+      "kind": "contract",
+      "assertion": "pio_monitor_stop parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-22",
+      "kind": "contract",
+      "assertion": "pio_monitor_write parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-23",
+      "kind": "contract",
+      "assertion": "pio_partition_table parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-24",
+      "kind": "contract",
+      "assertion": "pio_pkg_install parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-25",
+      "kind": "contract",
+      "assertion": "pio_pkg_list parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-26",
+      "kind": "contract",
+      "assertion": "pio_pkg_outdated parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-27",
+      "kind": "contract",
+      "assertion": "pio_pkg_search parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-28",
+      "kind": "contract",
+      "assertion": "pio_pkg_uninstall parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-29",
+      "kind": "contract",
+      "assertion": "pio_pkg_update parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-30",
+      "kind": "contract",
+      "assertion": "pio_port_diagnose parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-31",
+      "kind": "contract",
+      "assertion": "pio_power_profile parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-32",
+      "kind": "contract",
+      "assertion": "pio_project_envs parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-33",
+      "kind": "contract",
+      "assertion": "pio_project_init parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-34",
+      "kind": "contract",
+      "assertion": "pio_project_metadata parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-35",
+      "kind": "contract",
+      "assertion": "pio_run_target parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-36",
+      "kind": "contract",
+      "assertion": "pio_size_report parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-37",
+      "kind": "contract",
+      "assertion": "pio_system_info parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-38",
+      "kind": "contract",
+      "assertion": "pio_test parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-39",
+      "kind": "contract",
+      "assertion": "pio_upload parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "PAR-40",
+      "kind": "contract",
+      "assertion": "pio_upload_ota parameter/default/result/error parity in both modes"
+    },
+    {
+      "id": "LEG-01",
+      "kind": "contract",
+      "assertion": "list_boards frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-02",
+      "kind": "contract",
+      "assertion": "get_board_info frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-03",
+      "kind": "contract",
+      "assertion": "list_devices frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-04",
+      "kind": "contract",
+      "assertion": "init_project frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-05",
+      "kind": "contract",
+      "assertion": "build_project frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-06",
+      "kind": "contract",
+      "assertion": "clean_project frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-07",
+      "kind": "contract",
+      "assertion": "upload_filesystem frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-08",
+      "kind": "contract",
+      "assertion": "upload_firmware frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-09",
+      "kind": "contract",
+      "assertion": "acquire_lock frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-10",
+      "kind": "contract",
+      "assertion": "release_lock frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-11",
+      "kind": "contract",
+      "assertion": "get_lock_status frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-12",
+      "kind": "contract",
+      "assertion": "search_libraries frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-13",
+      "kind": "contract",
+      "assertion": "install_library frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-14",
+      "kind": "contract",
+      "assertion": "list_installed_libraries frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-15",
+      "kind": "contract",
+      "assertion": "start_monitor frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-16",
+      "kind": "contract",
+      "assertion": "stop_monitor frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-17",
+      "kind": "contract",
+      "assertion": "query_logs frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-18",
+      "kind": "contract",
+      "assertion": "reset_server_state frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-19",
+      "kind": "contract",
+      "assertion": "check_task_status frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-20",
+      "kind": "contract",
+      "assertion": "get_dashboard_url frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-21",
+      "kind": "contract",
+      "assertion": "get_project_context frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-22",
+      "kind": "contract",
+      "assertion": "get_project_config frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-23",
+      "kind": "contract",
+      "assertion": "agent_validate_project frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-24",
+      "kind": "contract",
+      "assertion": "agent_build_diagnose frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-25",
+      "kind": "contract",
+      "assertion": "agent_safe_pin_audit frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-26",
+      "kind": "contract",
+      "assertion": "agent_flash_monitor_verify frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-27",
+      "kind": "contract",
+      "assertion": "agent_get_last_report frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-28",
+      "kind": "contract",
+      "assertion": "agent_generate_board_report frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-29",
+      "kind": "contract",
+      "assertion": "get_policy_status frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-30",
+      "kind": "contract",
+      "assertion": "agent_resolve_target frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-31",
+      "kind": "contract",
+      "assertion": "get_monitor_status frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-32",
+      "kind": "contract",
+      "assertion": "capture_serial_window frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-33",
+      "kind": "contract",
+      "assertion": "agent_monitor_health frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-34",
+      "kind": "contract",
+      "assertion": "cancel_task frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-35",
+      "kind": "contract",
+      "assertion": "list_task_history frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-36",
+      "kind": "contract",
+      "assertion": "get_approval_request frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-37",
+      "kind": "contract",
+      "assertion": "list_pending_approvals frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-38",
+      "kind": "contract",
+      "assertion": "system_info frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-39",
+      "kind": "contract",
+      "assertion": "check_project frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-40",
+      "kind": "contract",
+      "assertion": "run_tests frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-41",
+      "kind": "contract",
+      "assertion": "uninstall_library frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "LEG-42",
+      "kind": "contract",
+      "assertion": "update_library frozen public schema/default/behavior retention"
+    },
+    {
+      "id": "POL-01",
+      "kind": "integration",
+      "assertion": "Permission source precedence, invalid configuration, enrollment, provenance and profile ceilings"
+    },
+    {
+      "id": "POL-02",
+      "kind": "integration",
+      "assertion": "Approval integrity, replay/forgery/mismatch rejection, atomic consumption and composite effects"
+    },
+    {
+      "id": "POL-03",
+      "kind": "integration",
+      "assertion": "Queued policy revision and changed artifact/device rejection"
+    },
+    {
+      "id": "POL-04",
+      "kind": "host",
+      "assertion": "Actual isolated host standalone/plugin visibility and disabled mutation/alias enforcement"
+    },
+    {
+      "id": "POL-05",
+      "kind": "integration",
+      "assertion": "Host installation comments, restrictions, custom CODEX_HOME and atomic rollback"
+    },
+    {
+      "id": "LEG-CLI",
+      "kind": "integration",
+      "assertion": "CLI/API schemas, defaults and workflows"
+    },
+    {
+      "id": "LEG-UI",
+      "kind": "integration",
+      "assertion": "Dashboard authentication/events and runtime visibility"
+    },
+    {
+      "id": "LEG-STATE",
+      "kind": "integration",
+      "assertion": "Locks, caches, tasks, redaction and process ownership"
+    },
+    {
+      "id": "LEG-PLUGIN",
+      "kind": "integration",
+      "assertion": "Plugin, automation and installation paths"
+    },
+    {
+      "id": "PAR-ELF",
+      "kind": "integration",
+      "assertion": "Real Xtensa/Cortex-M ELF fixtures, corrupt/stripped/inline/mismatch/tool-failure cases"
+    },
+    {
+      "id": "PAR-SERIAL",
+      "kind": "integration",
+      "assertion": "Serial fault injection and cross-process ownership, overflow, UTF-8, regex, writes and cleanup"
+    },
+    {
+      "id": "PAR-WORKFLOW",
+      "kind": "integration",
+      "assertion": "Healthy/early-marker/panic/missing-marker/upload-failure/cancellation workflows"
+    },
+    {
+      "id": "PAR-QUALITY",
+      "kind": "integration",
+      "assertion": "Real native PlatformIO CLI package/test/static-analysis fixtures"
+    },
+    {
+      "id": "PAR-BACKENDS",
+      "kind": "integration",
+      "assertion": "GDB/MI, OTA failures, partitions/coredump and power/telemetry semantics"
+    },
+    {
+      "id": "NS-01",
+      "kind": "integration",
+      "assertion": "Registry normalization, exact-version aliases, collisions, inventory and provenance controls"
+    },
+    {
+      "id": "NS-02",
+      "kind": "integration",
+      "assertion": "npm canonical and both aliases installation/update/uninstall"
+    },
+    {
+      "id": "NS-03",
+      "kind": "integration",
+      "assertion": "Plugin packaged installation/update/uninstall"
+    },
+    {
+      "id": "NS-HOST-win32-x64",
+      "kind": "host",
+      "assertion": "win32-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "releaseAssertion": "win32-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "deferredCertification": "Minimum-OS certification"
+    },
+    {
+      "id": "NS-HOST-darwin-arm64",
+      "kind": "host",
+      "assertion": "darwin-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "releaseAssertion": "darwin-arm64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "deferredCertification": "Minimum-OS certification"
+    },
+    {
+      "id": "NS-HOST-darwin-x64",
+      "kind": "host",
+      "assertion": "darwin-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "releaseAssertion": "darwin-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "deferredCertification": "Minimum-OS certification"
+    },
+    {
+      "id": "NS-HOST-linux-arm64",
+      "kind": "host",
+      "assertion": "linux-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "releaseAssertion": "linux-arm64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "deferredCertification": "Minimum-OS certification"
+    },
+    {
+      "id": "NS-HOST-linux-x64",
+      "kind": "host",
+      "assertion": "linux-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "releaseAssertion": "linux-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "deferredCertification": "Minimum-OS certification"
+    },
+    {
+      "id": "PAR-HW-01",
+      "kind": "hardware",
+      "assertion": "ESP32 healthy/crashing firmware decode and reflash recovery"
+    },
+    {
+      "id": "PAR-HW-02",
+      "kind": "hardware",
+      "assertion": "Cortex-M physical fault-register PC/LR capture against flashed ELF",
+      "releaseGate": "deferred",
+      "deferredCertification": "Physical Cortex-M acceptance"
+    },
+    {
+      "id": "PAR-HW-03",
+      "kind": "hardware",
+      "assertion": "Serial echo, disconnect/reconnect, competing clients and legacy filter monitor"
+    },
+    {
+      "id": "PAR-HW-04",
+      "kind": "hardware",
+      "assertion": "Legacy firmware/filesystem upload, assertions and dashboard retention"
+    },
+    {
+      "id": "PAR-HW-05",
+      "kind": "hardware",
+      "assertion": "Restored designated firmware with sanitized artifacts and no leaked processes/locks"
+    },
+    {
+      "id": "PAR-HW-06",
+      "kind": "hardware",
+      "assertion": "Physical debug probe, real ESP32 coredump and custom partition verification"
+    },
+    {
+      "id": "PAR-HW-07",
+      "kind": "hardware",
+      "assertion": "ESP32/ESP8266 firmware/filesystem OTA and real PPK2 measurement/source safety",
+      "releaseAssertion": "ESP32 firmware/filesystem OTA including independent runtime/filesystem verification and controlled failed transfer",
+      "deferredCertification": "ESP8266 OTA and PPK2 hardware acceptance"
+    },
+    {
+      "id": "NS-CONTAINER",
+      "kind": "host",
+      "assertion": "Native Linux amd64/arm64 container execution, policy configuration, MCP lifecycle and non-root device access with exact release image identity",
+      "releaseAssertion": "Native Linux amd64/arm64 container execution, policy configuration and MCP lifecycle with exact release image identity",
+      "deferredCertification": "Container device-passthrough acceptance"
+    }
+  ],
+  "releaseScope": {
+    "decisionId": "maintainer-2026-09-25-release-3.1.0",
+    "version": "3.1.0",
+    "authority": "Explicit maintainer instruction in the release task on 2026-09-25",
+    "status": "deferred_by_maintainer_not_passed",
+    "deferredCertifications": [
+      "Physical Cortex-M acceptance",
+      "ESP8266 OTA acceptance",
+      "PPK2 hardware acceptance",
+      "Minimum-OS certification",
+      "Container device-passthrough acceptance"
+    ],
+    "retainedGates": "Correctness, authorization, device ownership and cleanup, credential protection, package integrity, and installation of published artifacts remain required. PPK2 source mode must not be enabled by default."
+  }
+}

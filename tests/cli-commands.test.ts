@@ -383,9 +383,11 @@ describe("dashboard command", () => {
 
 describe("CLI policy gate", () => {
   it("maps every registered command to an action the default policy permits", async () => {
-    const { COMMANDS, actionForCommand } = await import("../src/cli.js");
-    const { evaluatePolicy } =
-      await import("../src/core/policy/evaluate-policy.js");
+    const { COMMANDS } = await import("../src/cli.js");
+    const { operationForCliCommand } =
+      await import("../src/core/action-catalog.js");
+    const { authorizeAction } =
+      await import("../src/core/action-dispatcher.js");
 
     // This is the gap that let `task-status` ship mapped to an action the
     // default policy denies, breaking every --background workflow the skills
@@ -393,13 +395,17 @@ describe("CLI policy gate", () => {
     // hand and never reach runCliCommand, so nothing else exercises this.
     const denied: string[] = [];
     for (const command of Object.keys(COMMANDS)) {
-      const action = actionForCommand(command, []);
-      const decision = await evaluatePolicy(
+      const action = operationForCliCommand(command, []);
+      // authorizeAction is what runCliCommand calls; it also throws
+      // UNKNOWN_ACTION for an operation missing from the action catalog,
+      // which is the other way a new CLI command can ship unusable.
+      const decision = await authorizeAction(
         action,
         { projectDir: process.cwd() },
         {
           workspaceDir: process.cwd(),
           actor: "user",
+          operationName: action,
         },
       );
       // "approval_required" is a legitimate outcome; a flat denial is not.

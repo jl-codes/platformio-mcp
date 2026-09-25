@@ -1,8 +1,12 @@
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { getSystemInfo } from "../../tools/projects.js";
-import { findRunningPortal, startPortalServer } from "../../api/server.js";
-import { asBoolean, parseNumberOption } from "../args.js";
+import {
+  findRunningPortal,
+  issueDashboardLaunchUrl,
+  startPortalServer,
+} from "../../api/server.js";
+import { asBoolean, asString, parseNumberOption } from "../args.js";
 import { PlatformIOError } from "../../utils/errors.js";
 import type { CommandHandler } from "./types.js";
 
@@ -20,6 +24,17 @@ export const systemInfo: CommandHandler = async () => getSystemInfo();
  * whether one is already running, and must get a side-effect-free answer.
  */
 export const dashboard: CommandHandler = async (ctx) => {
+  // Browser sessions are minted from single-use launch tickets that live in
+  // the serving process, so an operator session can only be issued by the
+  // process that binds the listener: --operator is a serve-mode option.
+  const operator = asBoolean(ctx.options.operator) ?? false;
+  if (operator && !asBoolean(ctx.options.serve)) {
+    throw new PlatformIOError(
+      "--operator enrolls the browser that opens the dashboard THIS process serves; use `pio-agent dashboard --serve --operator`.",
+      "INVALID_ARGUMENT",
+      { argument: "operator" },
+    );
+  }
   if (!asBoolean(ctx.options.serve)) {
     // Cross-process: a one-shot CLI cannot see another process's
     // activePortalStatus, so reading that alone always answered "offline" and
@@ -53,6 +68,22 @@ export const dashboard: CommandHandler = async (ctx) => {
     const addr = httpServer.address();
     const bound = addr && typeof addr === "object" ? addr.port : port;
     console.error(`[pio-agent] Dashboard running at http://localhost:${bound}`);
+    // The launch ticket is single-use and expires in a minute; it is what
+    // turns a browser tab into an authenticated (optionally operator) session.
+    try {
+      const launchUrl = issueDashboardLaunchUrl(
+        asString(ctx.options["project-dir"]),
+        operator,
+      );
+      console.error(
+        `[pio-agent] Open ${launchUrl}` +
+          (operator ? " (operator session)" : ""),
+      );
+    } catch (error) {
+      console.error(
+        `[pio-agent] Could not issue a launch URL: ${(error as Error).message}`,
+      );
+    }
     console.error("[pio-agent] Press Ctrl+C to stop.");
   });
 

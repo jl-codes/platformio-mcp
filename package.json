@@ -1,6 +1,7 @@
 {
   "name": "platformio-mcp",
-  "version": "3.0.0",
+  "mcpName": "io.github.jl-codes/platformio-mcp",
+  "version": "3.1.0",
   "description": "PIO Agent: a PlatformIO MCP server and visual control plane for AI-assisted embedded development across 1000+ boards.",
   "type": "module",
   "main": "build/index.js",
@@ -20,9 +21,12 @@
     "plugins/platformio-mcp/tool-coverage.json",
     "web/dist",
     "scripts/installers",
+    "scripts/setup-ppk2.py",
     "scripts/validate-codex-plugin.mjs",
+    "scripts/serial-runtime-contract.mjs",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "scripts": {
     "build:ui": "cd web && npm ci && npm run build",
@@ -39,12 +43,24 @@
     "plugin:build": "npm run plugin:sync && npm run build:ui && tsc && node scripts/build-codex-plugin.mjs",
     "plugin:validate": "node scripts/validate-codex-plugin.mjs --require-runtime",
     "plugin:test": "vitest run tests/codex-plugin-manifest.test.ts tests/codex-plugin-launcher.test.ts tests/codex-plugin-skills.test.ts",
+    "test:namespaces": "node --test --test-reporter=tap tests/config-acceptance-producer.test.mjs tests/parity-evidence-download.test.mjs tests/parity-acceptance-collector.test.mjs tests/namespace-audit.test.mjs tests/npm-release-identity.test.mjs tests/mcp-registry-identity.test.mjs tests/github-release-assets.test.mjs",
+    "registry:validate": "node scripts/validate-mcp-registry.mjs",
+    "namespace:audit": "node scripts/audit-namespaces.mjs docs/reviews/platformio-namespace-observations.json",
     "package:validate": "node scripts/validate-npm-package.mjs",
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "smoke-test": "node -e \"require('fs').accessSync('build/index.js'); require('fs').accessSync('build/cli.js'); require('fs').accessSync('web/dist/index.html'); require('fs').accessSync('scripts/installers/index.js'); require('fs').accessSync('scripts/validate-codex-plugin.mjs')\"",
-    "prepublishOnly": "npm run build && npm run plugin:build && npm run plugin:validate && npm run plugin:test && npm run smoke-test && npm run package:validate"
+    "prepublishOnly": "npm run build && npm run plugin:build && npm run plugin:validate && npm run plugin:test && npm run smoke-test && npm run package:validate",
+    "test:python-runtime": "node --test tests/python-runtime.test.mjs",
+    "test:parity:acceptance": "node scripts/validate-parity-acceptance.mjs",
+    "package:aliases": "node scripts/pack-npm-alias-candidates.mjs",
+    "package:release": "node scripts/pack-npm-release.mjs",
+    "package:container": "python scripts/prepare-container-context.py",
+    "aliases:sync": "node scripts/sync-npm-aliases.mjs",
+    "aliases:check": "node scripts/sync-npm-aliases.mjs --check",
+    "namespace:coverage": "node scripts/namespace-coverage.mjs docs/reviews/platformio-namespace-coverage.json",
+    "accept:npm": "node scripts/accept-npm-release.mjs"
   },
   "keywords": [
     "mcp",
@@ -67,7 +83,7 @@
   "author": "PIO Agent Contributors",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -77,7 +93,9 @@
     "open": "^10.2.0",
     "proper-lockfile": "^4.1.2",
     "socket.io": "^4.8.0",
+    "toml-eslint-parser": "0.10.0",
     "tree-kill": "^1.2.2",
+    "yaml": "2.9.1",
     "zod": "^3.22.0"
   },
   "devDependencies": {
@@ -88,6 +106,7 @@
     "@types/proper-lockfile": "^4.1.4",
     "@types/supertest": "^7.2.0",
     "@vitest/ui": "^4.0.0",
+    "ajv": "8.18.0",
     "esbuild": "^0.28.2",
     "eslint": "^9.0.0",
     "prettier": "^3.1.0",
@@ -105,5 +124,8 @@
   "bugs": {
     "url": "https://github.com/jl-codes/platformio-mcp/issues"
   },
-  "homepage": "https://github.com/jl-codes/platformio-mcp#readme"
+  "homepage": "https://github.com/jl-codes/platformio-mcp#readme",
+  "optionalDependencies": {
+    "serialport": "13.0.0"
+  }
 }

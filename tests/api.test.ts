@@ -9,21 +9,20 @@ import path from "node:path";
 import os from "node:os";
 
 // Mock platformio hardware runner to avoid hanging threads
-vi.mock("../src/platformio.js", () => ({
-  platformioExecutor: {
-    spawn: vi.fn(() => ({
-      pid: 12345,
-      on: vi.fn((event, callback) => {
-        if (event === "close") {
-          setTimeout(() => callback(0), 10);
-        }
+vi.mock("../src/platformio.js", async () => {
+  const {EventEmitter} = await import("node:events");
+  return {
+    platformioExecutor: {
+      spawn: vi.fn(() => {
+        const proc = Object.assign(new EventEmitter(), {pid: 12345, exitCode: null as number | null, signalCode: null, unref: vi.fn(), kill: vi.fn()});
+        setTimeout(() => {proc.exitCode = 0; proc.emit("exit", 0); proc.emit("close", 0);}, 10);
+        return proc;
       }),
-      unref: vi.fn(),
-    })),
-    executeWithJsonOutput: vi.fn(() => Promise.resolve([])),
-  },
-  checkPlatformIOInstalled: vi.fn(() => Promise.resolve(true)),
-}));
+      executeWithJsonOutput: vi.fn(() => Promise.resolve([])),
+    },
+    checkPlatformIOInstalled: vi.fn(() => Promise.resolve(true)),
+  };
+});
 
 describe("Portal API Security & Telemetry Tailing", () => {
   let app: any;
@@ -35,6 +34,7 @@ describe("Portal API Security & Telemetry Tailing", () => {
     // Ephemeral port assignment
     process.env.PORTAL_PORT = "0";
 
+    vi.stubEnv("PIO_MCP_APPROVAL_TOKEN", "operator-test-capability-0123456789abcdef");
     const portal = startPortalServer();
     app = portal.app;
     server = portal.httpServer;
@@ -51,6 +51,55 @@ describe("Portal API Security & Telemetry Tailing", () => {
   afterAll(async () => {
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
+    });
+  });
+
+  describe("Server policy enforcement", () => {
+    it("blocks a denied build before reaching the PlatformIO executor", async () => {
+      const projectDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "pio-api-denied-"),
+      );
+      try {
+        fs.writeFileSync(
+          path.join(projectDir, ".pio-mcp-policy.json"),
+          '{"profile":"read_only"}',
+        );
+        const { platformioExecutor } = await import("../src/platformio.js");
+        const before = vi.mocked(platformioExecutor.spawn).mock.calls.length;
+        const response = await request(server)
+          .post("/api/commands/build")
+          .set("Authorization", `Bearer ${authToken}`)
+          .send({ projectDir });
+        expect(response.status).toBe(403);
+        expect(response.body.policyDecision.status).toBe("deny");
+        expect(vi.mocked(platformioExecutor.spawn).mock.calls.length).toBe(
+          before,
+        );
+      } finally {
+        fs.rmSync(projectDir, { recursive: true, force: true });
+      }
+    });
+
+    it("requires approval for dashboard uploads even with an inline approved flag", async () => {
+      const projectDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "pio-api-approval-"),
+      );
+      try {
+        const { platformioExecutor } = await import("../src/platformio.js");
+        const before = vi.mocked(platformioExecutor.spawn).mock.calls.length;
+        const response = await request(server)
+          .post("/api/commands/upload_firmware")
+          .set("Authorization", `Bearer ${authToken}`)
+          .send({ projectDir, approved: true });
+        expect(response.status).toBe(409);
+        expect(response.body.policyDecision.status).toBe("requires_approval");
+        expect(response.body.policyDecision.approvalId).toBeDefined();
+        expect(vi.mocked(platformioExecutor.spawn).mock.calls.length).toBe(
+          before,
+        );
+      } finally {
+        fs.rmSync(projectDir, { recursive: true, force: true });
+      }
     });
   });
 
@@ -207,6 +256,43 @@ describe("Portal API Security & Telemetry Tailing", () => {
   });
 
   describe("Safety Approval APIs", () => {
+    it("rejects approval mutations without the browser click origin and session", async () => {
+      const {getDashboardStatus} = await import("../src/api/server.js");
+      const {createApprovalRequest, getApproval} = await import("../src/core/policy/approvals.js");
+      const pending = createApprovalRequest({action:"upload_firmware",riskLevel:"high",reason:"attack path",requestedBy:"agent"});
+      const status = await getDashboardStatus(false);
+      expect(JSON.stringify(status)).not.toContain("operator-test-capability");
+      const launched = await request(server).get(new URL(status.launchUrl).pathname + new URL(status.launchUrl).search);
+      const cookie = launched.headers["set-cookie"];
+      for (const action of ["approve", "deny"]) {
+        const endpoint = `/api/safety/approvals/${pending.id}/${action}`;
+        expect((await request(server).post(endpoint).set("Cookie",cookie)).status).toBe(403);
+        const launch = new URL(status.launchUrl);
+        expect((await request(server).post(endpoint).set("Cookie",cookie).set("Host",launch.host).set("Origin",launch.origin).set("X-Pio-Dashboard-Approval","1")).status).toBe(403);
+        expect((await request(server).post(endpoint).set("Authorization",`Bearer ${authToken}`)).status).toBe(403);
+      }
+      expect(getApproval(pending.id)?.status).toBe("pending");
+    });
+
+    it("accepts a same-origin dashboard approval click without a second capability", async () => {
+      const {getOperatorDashboardStatus} = await import("../src/api/server.js");
+      const {createApprovalRequest, getApproval} = await import("../src/core/policy/approvals.js");
+      const status = await getOperatorDashboardStatus(false);
+      const launch = new URL(status.launchUrl);
+      const launched = await request(server).get(launch.pathname + launch.search);
+      const cookie = launched.headers["set-cookie"];
+      for (const action of ["approve", "deny"]) {
+        const pending = createApprovalRequest({action:"upload_firmware",riskLevel:"high",reason:"dashboard click",requestedBy:"agent"});
+        const endpoint = `/api/safety/approvals/${pending.id}/${action}`;
+        const send = () => request(server).post(endpoint).set("Host", launch.host).set("X-Pio-Dashboard-Approval", "1");
+        expect((await send().set("Origin", launch.origin).set("Authorization", `Bearer ${authToken}`)).status).toBe(403);
+        expect((await send().set("Cookie", cookie).set("Origin", "http://localhost:1")).status).toBe(403);
+        expect(getApproval(pending.id)?.status).toBe("pending");
+        expect((await send().set("Cookie", cookie).set("Origin", launch.origin)).status).toBe(200);
+        expect(getApproval(pending.id)?.status).toBe(action === "approve" ? "approved" : "denied");
+      }
+    });
+
     it("lists approvals and supports approve/deny actions", async () => {
       const { createApprovalRequest } =
         await import("../src/core/policy/approvals.js");
@@ -241,17 +327,31 @@ describe("Portal API Security & Telemetry Tailing", () => {
         .post(
           `/api/safety/approvals/${encodeURIComponent(approvalA.id)}/approve`,
         )
-        .set("Authorization", `Bearer ${authToken}`);
+        .set("Authorization", `Bearer ${authToken}`)
+        .set("X-Pio-Approval-Token", "operator-test-capability-0123456789abcdef");
       expect(approveRes.status).toBe(200);
       expect(approveRes.body.success).toBe(true);
       expect(approveRes.body.approval.status).toBe("approved");
 
       const denyRes = await request(server)
         .post(`/api/safety/approvals/${encodeURIComponent(approvalB.id)}/deny`)
-        .set("Authorization", `Bearer ${authToken}`);
+        .set("Authorization", `Bearer ${authToken}`)
+        .set("X-Pio-Approval-Token", "operator-test-capability-0123456789abcdef");
       expect(denyRes.status).toBe(200);
       expect(denyRes.body.success).toBe(true);
       expect(denyRes.body.approval.status).toBe("denied");
+    });
+
+    it("reports terminal approval transitions as conflicts without changing state", async () => {
+      const {createApprovalRequest, denyRequest, getApproval} = await import("../src/core/policy/approvals.js");
+      const approval = createApprovalRequest({action:"upload_firmware", riskLevel:"high", reason:"terminal-state test", requestedBy:"agent"});
+      denyRequest(approval.id);
+      const response = await request(server).post(`/api/safety/approvals/${approval.id}/approve`)
+        .set("Authorization", `Bearer ${authToken}`)
+        .set("X-Pio-Approval-Token", "operator-test-capability-0123456789abcdef");
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe("APPROVAL_TRANSITION_INVALID");
+      expect(getApproval(approval.id)?.status).toBe("denied");
     });
 
     it("reports plugin control state and preserves write budgets during cursor resets", async () => {

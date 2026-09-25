@@ -16,7 +16,10 @@
  * - /api/spooler/*: Manage background serial telemetry listeners
  * - /api/logs: Retrieve full background task log streams
  */
+import { registerShutdownTask } from "../utils/shutdown-coordinator.js";
 import express from "express";
+import { dispatchAuthorizedAction } from "../core/action-dispatcher.js";
+import { PlatformIOError } from "../utils/errors.js";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
@@ -121,10 +124,12 @@ const DASHBOARD_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 type LaunchTicket = {
   expiresAt: number;
   projectDir?: string;
+  operator: boolean;
 };
 
 const launchTickets = new Map<string, LaunchTicket>();
-const dashboardSessions = new Map<string, number>();
+const dashboardSessions = new Map<string, { expiresAt: number; operator: boolean }>();
+const OPERATOR_LAUNCH = Symbol("operator-dashboard-launch");
 
 /**
  * Global singleton tracking the health, bound port, and session payload
@@ -198,13 +203,14 @@ function parseCookies(header?: string): Record<string, string> {
  * @param cookieHeader - Request Cookie header.
  * @returns True when a non-expired session cookie is present.
  */
-function hasValidDashboardSession(cookieHeader?: string): boolean {
+function hasValidDashboardSession(cookieHeader?: string, requireOperator = false): boolean {
   const now = Date.now();
-  for (const [sessionId, expiresAt] of dashboardSessions) {
-    if (expiresAt <= now) dashboardSessions.delete(sessionId);
+  for (const [sessionId, session] of dashboardSessions) {
+    if (session.expiresAt <= now) dashboardSessions.delete(sessionId);
   }
   const sessionId = parseCookies(cookieHeader)[DASHBOARD_SESSION_COOKIE];
-  return Boolean(sessionId && (dashboardSessions.get(sessionId) ?? 0) > now);
+  const session = sessionId ? dashboardSessions.get(sessionId) : undefined;
+  return Boolean(session && session.expiresAt > now && (!requireOperator || session.operator));
 }
 
 /**
@@ -213,7 +219,7 @@ function hasValidDashboardSession(cookieHeader?: string): boolean {
  * @param projectDir - Optional project selected after authentication.
  * @returns Raw ticket and expiry for immediate browser launch.
  */
-function issueLaunchTicket(projectDir?: string): {
+function issueLaunchTicket(projectDir?: string, operator = false): {
   ticket: string;
   expiresAt: string;
 } {
@@ -223,8 +229,28 @@ function issueLaunchTicket(projectDir?: string): {
   }
   const ticket = crypto.randomBytes(32).toString("base64url");
   const expiresAt = now + LAUNCH_TICKET_TTL_MS;
-  launchTickets.set(ticket, { expiresAt, projectDir });
+  launchTickets.set(ticket, { expiresAt, projectDir, operator });
   return { ticket, expiresAt: new Date(expiresAt).toISOString() };
+}
+
+/**
+ * Launch URL for a portal THIS process is serving.
+ *
+ * Tickets are in-memory, single-use and short-lived, so only the process that
+ * bound the listener can mint one: `pio-agent dashboard --serve` prints it
+ * once the server is listening. Operator enrollment stays a local-CLI act
+ * (see getOperatorDashboardStatus); MCP and HTTP callers never reach this.
+ */
+export function issueDashboardLaunchUrl(
+  projectDir?: string,
+  operator = false,
+): string {
+  if (!activePortalStatus.running) {
+    throw new Error("The dashboard is not running in this process.");
+  }
+  const baseUrl = `http://${formatUrlHost(activePortalStatus.host)}:${activePortalStatus.port}`;
+  const launch = issueLaunchTicket(projectDir, operator);
+  return `${baseUrl}/auth/launch?ticket=${encodeURIComponent(launch.ticket)}`;
 }
 
 function parseDeviceLocks() {
@@ -293,6 +319,7 @@ function diagnoseByTaskType(
 export async function getDashboardStatus(
   autoOpen: boolean = false,
   projectDir?: string,
+  authority?: typeof OPERATOR_LAUNCH,
 ) {
   if (
     process.argv.includes("--disable-dashboard") ||
@@ -325,7 +352,7 @@ export async function getDashboardStatus(
   }
 
   const baseUrl = `http://${formatUrlHost(activePortalStatus.host)}:${activePortalStatus.port}`;
-  const launch = issueLaunchTicket(projectDir);
+  const launch = issueLaunchTicket(projectDir, authority === OPERATOR_LAUNCH);
   const launchUrl = `${baseUrl}/auth/launch?ticket=${encodeURIComponent(launch.ticket)}`;
 
   if (autoOpen) {
@@ -354,6 +381,11 @@ export async function getDashboardStatus(
     token: "[REDACTED_DEPRECATED]",
     deprecatedAuthenticationFields: ["url", "secureLink", "token"],
   };
+}
+
+/** Issue operator browser enrollment only through the trusted local CLI, never MCP or HTTP. */
+export function getOperatorDashboardStatus(autoOpen = false, projectDir?: string) {
+  return getDashboardStatus(autoOpen, projectDir, OPERATOR_LAUNCH);
 }
 
 /**
@@ -458,6 +490,28 @@ export function findRunningPortal(): PortalState | null {
 }
 
 export function startPortalServer(defaultPort = 8080) {
+  // Optional capability for non-browser operators; never exposed to dashboard clients.
+  const approvalCapability = process.env.PIO_MCP_APPROVAL_TOKEN;
+  if (approvalCapability !== undefined && (approvalCapability.length < 32 || approvalCapability.length > 256)) {
+    throw new Error("PIO_MCP_APPROVAL_TOKEN must contain 32 to 256 characters.");
+  }
+  const requireApprovalAuthority = (req: express.Request, res: express.Response): boolean => {
+    // Browser approval uses the existing session and an exact-origin click request.
+    const dashboardOrigin = `${req.protocol}://${req.get("host")}`;
+    if (
+      hasValidDashboardSession(req.headers.cookie, true) &&
+      req.headers.origin === dashboardOrigin &&
+      req.headers["x-pio-dashboard-approval"] === "1"
+    ) return true;
+    const supplied = req.headers["x-pio-approval-token"];
+    const expected = approvalCapability ? Buffer.from(approvalCapability) : undefined;
+    const candidate = typeof supplied === "string" ? Buffer.from(supplied) : undefined;
+    if (!expected || !candidate || expected.length !== candidate.length || !crypto.timingSafeEqual(expected, candidate)) {
+      res.status(403).json({code:"OPERATOR_APPROVAL_REQUIRED", error:"Enroll this browser with the local dashboard --operator command, or use the local approve/deny CLI."});
+      return false;
+    }
+    return true;
+  };
   const app = express();
   const httpServer = createServer(app);
   const portalHost = resolvePortalHost();
@@ -514,7 +568,7 @@ export function startPortalServer(defaultPort = 8080) {
       return;
     }
     const sessionId = crypto.randomBytes(32).toString("base64url");
-    dashboardSessions.set(sessionId, Date.now() + DASHBOARD_SESSION_TTL_MS);
+    dashboardSessions.set(sessionId, { expiresAt: Date.now() + DASHBOARD_SESSION_TTL_MS, operator: launch.operator });
     res.cookie(DASHBOARD_SESSION_COOKIE, sessionId, {
       httpOnly: true,
       sameSite: "strict",
@@ -791,6 +845,7 @@ export function startPortalServer(defaultPort = 8080) {
         | "approved"
         | "denied"
         | "expired"
+        | "consumed"
         | undefined;
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
       const approvals = listApprovalRequests({ status, limit });
@@ -806,6 +861,7 @@ export function startPortalServer(defaultPort = 8080) {
    * Route: POST /api/safety/approvals/:id/approve
    */
   app.post("/api/safety/approvals/:id/approve", async (req, res) => {
+    if (!requireApprovalAuthority(req, res)) return;
     try {
       const { id } = req.params;
       const existing = getApproval(id);
@@ -814,10 +870,14 @@ export function startPortalServer(defaultPort = 8080) {
         return;
       }
       const approved = approveRequest(id);
+      if (!approved) {
+        res.status(404).json({code:"APPROVAL_NOT_FOUND", error:"Approval no longer exists."});
+        return;
+      }
       appendAuditEvent({
         action: "dashboard_approve_request",
         status: "approved",
-        reason: `Approval ${id} was approved by an interactive dashboard user.`,
+        reason: `Approval ${id} was approved through an authenticated approval request.`,
         riskLevel: existing.riskLevel,
         approvalId: id,
         actorClass: "interactive",
@@ -828,6 +888,10 @@ export function startPortalServer(defaultPort = 8080) {
       });
       res.json({ success: true, approval: approved });
     } catch (e: any) {
+      if (e?.code === "APPROVAL_TRANSITION_INVALID") {
+        res.status(409).json({code:e.code, error:e.message});
+        return;
+      }
       res.status(500).json({ error: e.message });
     }
   });
@@ -838,6 +902,7 @@ export function startPortalServer(defaultPort = 8080) {
    * Route: POST /api/safety/approvals/:id/deny
    */
   app.post("/api/safety/approvals/:id/deny", async (req, res) => {
+    if (!requireApprovalAuthority(req, res)) return;
     try {
       const { id } = req.params;
       const existing = getApproval(id);
@@ -846,10 +911,14 @@ export function startPortalServer(defaultPort = 8080) {
         return;
       }
       const denied = denyRequest(id);
+      if (!denied) {
+        res.status(404).json({code:"APPROVAL_NOT_FOUND", error:"Approval no longer exists."});
+        return;
+      }
       appendAuditEvent({
         action: "dashboard_deny_request",
         status: "denied",
-        reason: `Approval ${id} was denied by an interactive dashboard user.`,
+        reason: `Approval ${id} was denied through an authenticated approval request.`,
         riskLevel: existing.riskLevel,
         approvalId: id,
         actorClass: "interactive",
@@ -860,6 +929,10 @@ export function startPortalServer(defaultPort = 8080) {
       });
       res.json({ success: true, approval: denied });
     } catch (e: any) {
+      if (e?.code === "APPROVAL_TRANSITION_INVALID") {
+        res.status(409).json({code:e.code, error:e.message});
+        return;
+      }
       res.status(500).json({ error: e.message });
     }
   });
@@ -982,24 +1055,51 @@ export function startPortalServer(defaultPort = 8080) {
     }
 
     const activityId = crypto.randomUUID();
+    let registered = false;
     try {
-      await registerCommand(
+      const result = await dispatchAuthorizedAction(
+        toolName,
+        requestPayload,
         {
-          id: activityId,
-          commandDesc: `Dashboard Action`,
-          timestamp: Date.now(),
-          status: "running",
-          tasks: [],
-          mcpRequest: requestPayload,
-          mcpToolName: toolName,
-          source: "dashboard",
+          workspaceDir: projectDir,
+          devicePort:
+            typeof requestPayload.port === "string"
+              ? requestPayload.port
+              : undefined,
+          actor: "user",
+          actorClass: requestPayload.automationKey
+            ? "scheduled"
+            : "interactive",
+          automationKey:
+            typeof requestPayload.automationKey === "string"
+              ? requestPayload.automationKey
+              : undefined,
+          targetBindingDigest:
+            typeof requestPayload.targetBinding?.digest === "string"
+              ? requestPayload.targetBinding.digest
+              : undefined,
         },
-        projectDir,
-      );
+        async () => {
+          await registerCommand(
+            {
+              id: activityId,
+              commandDesc: `Dashboard Action`,
+              timestamp: Date.now(),
+              status: "running",
+              tasks: [],
+              mcpRequest: requestPayload,
+              mcpToolName: toolName,
+              source: "dashboard",
+            },
+            projectDir,
+          );
 
-      const result = await mcpContext.run(
-        { activityId, targetProjectDir: projectDir },
-        action,
+          registered = true;
+          return mcpContext.run(
+            { activityId, targetProjectDir: projectDir },
+            action,
+          );
+        },
       );
 
       let storedResponse = result;
@@ -1028,14 +1128,24 @@ export function startPortalServer(defaultPort = 8080) {
 
       res.json(result);
     } catch (e: any) {
-      await updateCommandStatus(
-        activityId,
-        {
-          status: "error",
-          mcpResponse: { error: e.message },
-        },
-        projectDir,
-      );
+      if (
+        e instanceof PlatformIOError &&
+        (e.code === "APPROVAL_REQUIRED" || e.code === "POLICY_DENIED")
+      ) {
+        res
+          .status(e.code === "APPROVAL_REQUIRED" ? 409 : 403)
+          .json({ success: false, error: e.message, ...e.context });
+        return;
+      }
+      if (registered)
+        await updateCommandStatus(
+          activityId,
+          {
+            status: "error",
+            mcpResponse: { error: e.message },
+          },
+          projectDir,
+        );
       res.status(500).json({ error: e.message });
     }
   }
@@ -1056,8 +1166,8 @@ export function startPortalServer(defaultPort = 8080) {
       req.body.projectDir,
       req.body,
       async () => {
-        const { projectDir, environment, verbose } = req.body;
-        return await buildProject(projectDir, environment, verbose, true);
+        const { projectDir, environment, verbose, jobs, forceExecution } = req.body;
+        return await buildProject(projectDir, environment, verbose, true, { jobs, forceExecution });
       },
       res,
     );
@@ -1203,8 +1313,8 @@ export function startPortalServer(defaultPort = 8080) {
       req.body.projectDir,
       req.body,
       async () => {
-        const { projectDir } = req.body;
-        return await cleanProject(projectDir, true);
+        const { projectDir, environment, full } = req.body;
+        return await cleanProject(projectDir, true, { environment, full });
       },
       res,
     );
@@ -1288,8 +1398,8 @@ export function startPortalServer(defaultPort = 8080) {
       req.body.projectDir,
       req.body,
       async () => {
-        const { projectDir, environment } = req.body;
-        return await runTests(projectDir, environment, true);
+        const { projectDir, environment, compileOnly, filter, ignore, withoutUploading, withoutBuilding, uploadPort, verbose } = req.body;
+        return await runTests(projectDir, environment, true, compileOnly, { filter, ignore, withoutUploading, withoutBuilding, uploadPort, verbose });
       },
       res,
     );
@@ -1310,8 +1420,8 @@ export function startPortalServer(defaultPort = 8080) {
       req.body.projectDir,
       req.body,
       async () => {
-        const { projectDir, environment } = req.body;
-        return await checkProject(projectDir, environment, true);
+        const { projectDir, environment, severity, pattern, skipPackages, tool } = req.body;
+        return await checkProject(projectDir, environment, true, { severity, pattern, skipPackages, tool });
       },
       res,
     );
@@ -1829,8 +1939,7 @@ export function startPortalServer(defaultPort = 8080) {
     if (closed) return;
     closed = true;
     clearInterval(hardwarePollTimer);
-    process.off("SIGINT", cleanup);
-    process.off("SIGTERM", cleanup);
+    unregisterShutdown();
     await new Promise<void>((resolve) => {
       io.close(() => resolve());
     });
@@ -1844,12 +1953,7 @@ export function startPortalServer(defaultPort = 8080) {
     activePortalStatus.browserOpened = false;
     clearPortalState();
   };
-  const cleanup = () => {
-    void close().finally(() => process.exit(0));
-  };
-
-  process.on("SIGINT", cleanup);
-  process.on("SIGTERM", cleanup);
+  const unregisterShutdown = registerShutdownTask(close);
 
   return { app, httpServer, io, authToken: PORTAL_AUTH_TOKEN, close };
 }

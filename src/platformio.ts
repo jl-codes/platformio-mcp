@@ -20,6 +20,7 @@ import { fileURLToPath } from "url";
 import { z } from "zod";
 import crypto from "node:crypto";
 import { registerCommand, updateTaskStatus } from "./utils/command-registry.js";
+import { PIO_MONITOR_BRIDGE } from "./utils/pio-monitor-bridge.js";
 import { mcpContext } from "./utils/mcp-context.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,6 +49,7 @@ export async function execPioCommand(
     cwd?: string;
     timeout?: number;
     parseJson?: boolean;
+    env?: NodeJS.ProcessEnv;
     onOutput?: (chunk: string) => void;
   } = {},
 ): Promise<CommandResult> {
@@ -62,6 +64,7 @@ export async function execPioCommand(
         args,
         {
           cwd: options.cwd,
+          env: options.env,
           timeout,
           maxBuffer: 10 * 1024 * 1024,
         },
@@ -233,6 +236,7 @@ export class PlatformIOExecutor {
     options?: {
       cwd?: string;
       timeout?: number;
+      env?: NodeJS.ProcessEnv;
       onOutput?: (c: string) => void;
     },
   ): Promise<CommandResult> {
@@ -370,23 +374,27 @@ export class PlatformIOExecutor {
       ...options.env,
     };
 
-    // If a fake TTY is requested (macOS/Linux), wrap with our Python PTY bridge
-    if (options.useFakeTty && process.platform !== "win32") {
+    // Preserve PlatformIO filters with a POSIX PTY or Windows headless console.
+    if (options.useFakeTty) {
       const absolutePio = resolvePioPath();
-      const proxyScriptPath = path.join(
-        __dirname,
-        "..",
-        "src",
-        "utils",
-        "mcp_pio_proxy.py",
-      );
-
       pioBinary = "python3";
-      pioArgs = [proxyScriptPath, absolutePio, command, ...args];
+      if (process.platform === "win32") {
+        const info = await this.execute("system", ["info", "--json-output"], {
+          cwd: options.cwd, env, timeout: 15000,
+        });
+        const python = JSON.parse(info.stdout)?.python_exe?.value;
+        if (typeof python !== "string" || !path.isAbsolute(python) || /[\x00-\x1f\x7f]/.test(python) || /\.(?:cmd|bat|ps1|sh)$/i.test(python)) {
+          throw new PlatformIOError("PlatformIO did not report a native Python interpreter.", "MONITOR_PYTHON_UNAVAILABLE");
+        }
+        pioBinary = python;
+      }
+      pioArgs = ["-c", PIO_MONITOR_BRIDGE, absolutePio, command, ...args];
     }
 
     // Log the actual command being spawned for diagnostics
-    const fullCmd = `${pioBinary} ${pioArgs.join(" ")}`;
+    const fullCmd = options.useFakeTty
+      ? `${pioBinary} <monitor-bridge> ${command} ${args.join(" ")}`
+      : `${pioBinary} ${pioArgs.join(" ")}`;
     try {
       const logDir = path.join(__dirname, "..", "logs");
       if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });

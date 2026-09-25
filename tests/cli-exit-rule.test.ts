@@ -8,7 +8,7 @@ import { COMMANDS, OPERATION_COMMANDS, runCliCommand } from "../src/cli.js";
  * "exit code" test did, using target-resolve, proving nothing about the rule.
  */
 describe("runCliCommand exit-code rule", () => {
-  // runCliCommand evaluates policy BEFORE dispatch, and actionForCommand maps
+  // runCliCommand evaluates policy BEFORE dispatch, and operationForCliCommand maps
   // an unknown command to its own name, so the fake keys must themselves be
   // actions the default policy allows. Neither is a real CLI key (the CLI
   // spells them with hyphens), so nothing real is shadowed.

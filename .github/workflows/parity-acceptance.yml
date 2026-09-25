@@ -1,0 +1,34 @@
+name: Assemble parity acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      evidence_run_ids:
+        description: Successful same-commit runs with disjoint platformio-parity-evidence packets
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+      - name: Download and validate complete final-revision evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVIDENCE_RUN_IDS: ${{ inputs.evidence_run_ids }}
+        run: node scripts/download-parity-evidence.mjs acceptance-packet
+      - name: Retain release acceptance packet
+        uses: actions/upload-artifact@v7
+        with:
+          name: platformio-parity-acceptance
+          path: acceptance-packet
+          if-no-files-found: error

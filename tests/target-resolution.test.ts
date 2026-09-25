@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fingerprintDevice,
   parseTargetEnvironments,
@@ -10,6 +10,9 @@ import {
   verifyTargetBinding,
 } from "../src/core/target-resolution.js";
 import type { SerialDevice } from "../src/types.js";
+
+vi.mock("../src/tools/projects.js", () => ({ getProjectConfig: vi.fn() }));
+import { getProjectConfig } from "../src/tools/projects.js";
 
 const createdDirectories: string[] = [];
 
@@ -98,4 +101,24 @@ describe("target resolution", () => {
       resolveWriteTarget({ projectDir }),
     ).rejects.toMatchObject({ code: "AMBIGUOUS_TARGET" });
   });
+});
+
+
+it("binds the inherited board from Core's computed configuration", async () => {
+  const projectDir = createProject("[env:base]\nboard = esp32-s3-devkitc-1\n[env:native]\nextends = env:base\n");
+  vi.mocked(getProjectConfig).mockResolvedValueOnce([
+    ["platformio", [["default_envs", ["native"]]]],
+    ["env:base", [["board", "esp32-s3-devkitc-1"]]],
+    ["env:native", [["board", "esp32-s3-devkitc-1"], ["framework", ["arduino"]]]],
+  ]);
+  const result = await resolveTarget({ projectDir, environment: "native", port: "COM7" }, [device("COM7", "esp32-s3-devkitc-1")]);
+  expect(result.success).toBe(true);
+  expect(result.binding?.board).toBe("esp32-s3-devkitc-1");
+  expect(getProjectConfig).toHaveBeenCalledWith(projectDir);
+});
+
+it("does not fall back to raw target metadata when computed configuration fails", async () => {
+  const projectDir = createProject("[env:base]\nboard = esp32dev\n[env:native]\nextends = env:base\nboard = esp32dev\n");
+  vi.mocked(getProjectConfig).mockRejectedValueOnce(new Error("invalid inheritance"));
+  await expect(resolveTarget({ projectDir, environment: "native" }, [device("COM7")])).rejects.toThrow("invalid inheritance");
 });

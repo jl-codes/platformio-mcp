@@ -1,3 +1,4 @@
+import { enrollProjectPolicy } from "../src/core/policy/project-enrollment.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,7 +9,9 @@ import { getPolicyStatus } from "../src/core/policy/status.js";
 const createdDirs: string[] = [];
 
 function makeTempWorkspace(profile: object): string {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pio-policy-profile-"));
+  const workspace = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pio-policy-profile-"),
+  );
   createdDirs.push(workspace);
   fs.writeFileSync(
     path.join(workspace, ".pio-mcp-policy.json"),
@@ -73,6 +76,7 @@ describe("Policy Profiles", () => {
       overrides: { audit_all_agent_actions: false },
     });
 
+    enrollProjectPolicy(workspace);
     const uploadDecision = await evaluatePolicy(
       "upload_firmware",
       { projectDir: workspace },

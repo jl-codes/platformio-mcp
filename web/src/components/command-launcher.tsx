@@ -1,5 +1,7 @@
+/** Launch authorized dashboard commands with action-specific project and execution options. */
+import { dashboardActionFetch } from "../lib/dashboard-action";
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Switch, Button, message } from 'antd';
+import { Modal, Form, Select, Switch, Input, InputNumber, message } from 'antd';
 import { CodeOutlined } from '@ant-design/icons';
 
 /**
@@ -83,11 +85,24 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
       const payload: any = { projectDir: activeWorkspace };
 
       if (values.environment) payload.environment = values.environment;
-      if (values.port) payload.port = values.port;
-      if (values.verbose !== undefined) payload.verbose = values.verbose;
-      if (values.start_monitor !== undefined) payload.start_monitor = values.start_monitor;
+      if (["upload_firmware", "upload_filesystem"].includes(values.action) && values.port) payload.port = values.port;
+      if (["build_project", "upload_firmware"].includes(values.action) && values.verbose !== undefined) payload.verbose = values.verbose;
+      if (values.action === "upload_firmware" && values.start_monitor !== undefined) payload.start_monitor = values.start_monitor;
+      if (values.action === "build_project" && values.jobs != null) payload.jobs = values.jobs;
+      if (values.action === "clean" && values.full !== undefined) payload.full = values.full;
+      if (values.action === "run_tests") {
+        if (values.filter) payload.filter = values.filter;
+        if (values.ignore) payload.ignore = values.ignore;
+        if (values.compileOnly !== undefined) payload.compileOnly = values.compileOnly;
+      }
+      if (values.action === "check_project") {
+        if (values.severity) payload.severity = values.severity;
+        if (values.pattern) payload.pattern = values.pattern;
+        if (values.tool) payload.tool = values.tool;
+        if (values.skipPackages !== undefined) payload.skipPackages = values.skipPackages;
+      }
 
-      const res = await fetch(`${apiBase}${endpoint}`, {
+      const res = await dashboardActionFetch(`${apiBase}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,7 +124,7 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
     }
   };
 
-  const hasEnv = ['build_project', 'upload_firmware', 'upload_filesystem', 'run_tests', 'check_project'].includes(action);
+  const hasEnv = ['build_project', 'upload_firmware', 'upload_filesystem', 'run_tests', 'check_project', 'clean'].includes(action);
   const hasPort = ['upload_firmware', 'upload_filesystem'].includes(action);
   const hasVerbose = ['build_project', 'upload_firmware'].includes(action);
   const hasStartMonitor = ['upload_firmware'].includes(action);
@@ -149,6 +164,53 @@ export default function CommandLauncher({ isOpen, onClose, activeWorkspace, hard
               {environments.map(e => <Select.Option key={e} value={e}>{e}</Select.Option>)}
             </Select>
           </Form.Item>
+        )}
+
+        {action === 'build_project' && (
+          <Form.Item name="jobs" label="Parallel build jobs" rules={[{ type: 'integer', min: 1, max: 1024 }]} extra="Leave empty to use PlatformIO's default.">
+            <InputNumber min={1} max={1024} step={1} placeholder="Default" style={{ width: '100%' }} />
+          </Form.Item>
+        )}
+
+        {action === 'clean' && (
+          <Form.Item name="full" label="Also remove downloaded dependencies" valuePropName="checked" preserve={false} extra="The next build may need to download dependencies again.">
+            <Switch />
+          </Form.Item>
+        )}
+
+        {action === 'run_tests' && (
+          <>
+            <Form.Item name="filter" label="Include test suites" rules={[{ max: 4096, pattern: /^[^\x00-\x1f\x7f]*$/, message: 'Use a test pattern without control characters.' }]}>
+              <Input placeholder="For example, test_math*" maxLength={4096} />
+            </Form.Item>
+            <Form.Item name="ignore" label="Exclude test suites" rules={[{ max: 4096, pattern: /^[^\x00-\x1f\x7f]*$/, message: 'Use a test pattern without control characters.' }]}>
+              <Input placeholder="For example, test_slow*" maxLength={4096} />
+            </Form.Item>
+            <Form.Item name="compileOnly" label="Build tests only" valuePropName="checked" extra="Builds test firmware without uploading or running tests. Build-only policy always enforces this.">
+              <Switch />
+            </Form.Item>
+          </>
+        )}
+
+        {action === 'check_project' && (
+          <>
+            <Form.Item name="severity" label="Minimum severity">
+              <Select allowClear placeholder="Project default" options={[
+                { value: 'low', label: 'Low and above' },
+                { value: 'medium', label: 'Medium and above' },
+                { value: 'high', label: 'High only' },
+              ]} />
+            </Form.Item>
+            <Form.Item name="pattern" label="Source file pattern" rules={[{ max: 4096, pattern: /^[^\x00-\x1f\x7f]*$/, message: 'Use a file pattern without control characters.' }]}>
+              <Input placeholder="For example, src/*.cpp" maxLength={4096} />
+            </Form.Item>
+            <Form.Item name="tool" label="Analysis tool" rules={[{ max: 4096, pattern: /^[^\x00-\x1f\x7f]*$/, message: 'Use a tool name without control characters.' }]} extra="Leave empty to use the tools configured for this project.">
+              <Input placeholder="For example, cppcheck" maxLength={4096} />
+            </Form.Item>
+            <Form.Item name="skipPackages" label="Exclude dependency source files" valuePropName="checked">
+              <Switch />
+            </Form.Item>
+          </>
         )}
 
         {hasPort && (

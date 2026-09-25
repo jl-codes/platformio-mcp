@@ -29,6 +29,7 @@ export const approvals: CommandHandler = async (ctx) => {
     | "approved"
     | "denied"
     | "expired"
+    | "consumed"
     | undefined;
   const limit = asNumber(ctx.options.limit);
   return listApprovalRequests({ status, limit });

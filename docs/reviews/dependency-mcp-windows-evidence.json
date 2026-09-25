@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-20T00:09:51.219Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.15.0"
+  },
+  "transport": "MCP stdio",
+  "toolCount": 64,
+  "checks": {
+    "canonicalBuildSucceeded": true,
+    "compatibilityInspectionSucceeded": true,
+    "inventoryTiming": "before_build"
+  },
+  "graphStatus": "complete",
+  "graph": [],
+  "inventoryComplete": true,
+  "counts": {
+    "error": 0,
+    "warning": 0,
+    "info": 0
+  },
+  "build": {
+    "ok": true,
+    "exitCode": 0,
+    "durationSeconds": 2.5235195000000004,
+    "outputTail": "Processing analysis-esp32s3 (platform: espressif32@7.0.1; board: esp32-s3-devkitc-1; framework: arduino)\n--------------------------------------------------------------------------------\nVerbose mode can be enabled via `-v, --verbose` option\nCONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32-s3-devkitc-1.html\nPLATFORM: Espressif 32 (7.0.1) > Espressif ESP32-S3-DevKitC-1-N8 (8 MB QD, No PSRAM)\nHARDWARE: ESP32S3 240MHz, 320KB RAM, 8MB Flash\nDEBUG: Current (esp-builtin) On-board (esp-builtin) External (cmsis-dap, esp-bridge, esp-prog, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)\nPACKAGES: \n - framework-arduinoespressif32 @ 3.20017.241212+sha.dcc1105b \n - tool-esptoolpy @ 2.41100.0 (4.11.0) \n - toolchain-riscv32-esp @ 8.4.0+2021r2-patch5 \n - toolchain-xtensa-esp32s3 @ 8.4.0+2021r2-patch5\nLDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf\nLDF Modes: Finder ~ chain, Compatibility ~ soft\nFound 33 compatible libraries\nScanning dependencies...\nNo dependencies\nBuilding in debug mode\nRetrieving maximum program size .pio\\build\\analysis-esp32s3\\firmware.elf\nChecking size .pio\\build\\analysis-esp32s3\\firmware.elf\nAdvanced Memory Usage is available via \"PlatformIO Home > Project Inspect\"\nRAM:   [=         ]   5.5% (used 18040 bytes from 327680 bytes)\nFlash: [=         ]   7.0% (used 233161 bytes from 3342336 bytes)\n========================= [SUCCESS] Took 1.87 seconds =========================\n\n",
+    "logPath": null
+  },
+  "physicalDeviceTest": false
+}

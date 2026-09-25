@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!wheels/
+!wheels/*.whl
+!requirements.txt
+!build-requirements.txt

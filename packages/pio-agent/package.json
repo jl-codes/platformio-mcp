@@ -1,6 +1,6 @@
 {
   "name": "pio-agent",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Product-name npm alias for PIO Agent, powered by the canonical platformio-mcp package.",
   "type": "module",
   "bin": {
@@ -11,10 +11,10 @@
     "README.md"
   ],
   "dependencies": {
-    "platformio-mcp": "^3.0.0"
+    "platformio-mcp": "3.1.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "keywords": [
     "mcp",

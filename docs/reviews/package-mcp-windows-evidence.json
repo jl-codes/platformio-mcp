@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-19T21:03:21.214Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.15.0"
+  },
+  "transport": "MCP stdio",
+  "toolCount": 50,
+  "isolatedPlatformioCore": true,
+  "checks": {
+    "installedAllThreeKinds": true,
+    "commentsAndUntouchedEnvironmentPreserved": true,
+    "listParsed": 3,
+    "outdatedAndUpdate": true,
+    "uninstallPersisted": true,
+    "registrySearch": {
+      "total": 409,
+      "page": 1,
+      "returned": 10
+    }
+  },
+  "physicalDeviceTest": false
+}

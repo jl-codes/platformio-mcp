@@ -121,11 +121,16 @@ export class HardwareLockManager {
     // Claiming atomically: acquireLock is synchronous and throws if already locked.
     // This removes the time-of-check to time-of-use (TOCTOU) race condition.
     this.acquireLock(implicitSessionId, "Implicit Tool Execution");
+    let cleanupPending = false;
     try {
       const result = await action();
       return result;
+    } catch (error) {
+      cleanupPending = error instanceof PlatformIOError && error.context?.cleanupPending === true;
+      throw error;
     } finally {
-      this.releaseLock(implicitSessionId);
+      // An unconfirmed child may still own hardware; explicit recovery must resolve that custody.
+      if (!cleanupPending) this.releaseLock(implicitSessionId);
     }
   }
 }

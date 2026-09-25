@@ -1,0 +1,13 @@
+{
+  "sourceCommit": "bfc64bed98b5591226b87afa03eef8cf89d7a55d",
+  "observedAt": "2026-09-20T19:58:18.007282+00:00",
+  "method": "MCP initialize and tools/list against src/index.ts with platformio-mcp-python compatibility; compared pinned input properties and declared defaults.",
+  "referenceSha": "a7b31021982f20b5406eaf80732899f8e75bd464",
+  "referenceToolCount": 40,
+  "liveToolCount": 112,
+  "missingTools": [],
+  "missingParameters": [],
+  "nonNullDefaultDifferences": [],
+  "remainingAnnotationDifferences": "Some optional fields omit the reference default:null annotation.",
+  "scope": "Advertised parameter presence/default audit only. No calls to project, build, serial, probe or power tools. Does not establish response/error parity or release acceptance."
+}

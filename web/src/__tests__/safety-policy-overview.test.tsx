@@ -24,7 +24,7 @@ describe('SafetyPolicyOverview', () => {
     vi.clearAllMocks();
   });
 
-  it('separates lab-runner preauthorization and preserves write budgets when resetting monitor state', async () => {
+  it('reports unenrolled lab-runner authority and preserves write budgets when resetting monitor state', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({ success: true }),
@@ -42,6 +42,7 @@ describe('SafetyPolicyOverview', () => {
           projectDir: '/demo/project',
           policy: {
             profile: 'lab_runner',
+            projectEnrollment: {enrolled:false, digest:'fixture'},
             source: 'project',
             approvalRequiredOperations: [],
             deniedOperations: [],
@@ -65,7 +66,9 @@ describe('SafetyPolicyOverview', () => {
       />,
     );
 
-    expect(screen.getByText('LAB-RUNNER PREAUTHORIZED')).toBeInTheDocument();
+    expect(screen.queryByText('LAB-RUNNER PREAUTHORIZED')).not.toBeInTheDocument();
+    expect(screen.getByText(/not enrolled; operator baseline applies/)).toBeInTheDocument();
+    expect(screen.getByText(/Host permissions are enforced externally/)).toBeInTheDocument();
     expect(screen.getByText('nightly-hil')).toBeInTheDocument();
     expect(screen.getByText(/1 protected hardware writes/i)).toBeInTheDocument();
 

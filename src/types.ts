@@ -47,6 +47,11 @@ export interface BoardInfo {
   fcpu?: number; // Optional CPU frequency in Hz
   rom?: number; // Optional ROM size in bytes
   frameworks?: string[]; // List of supported software frameworks (e.g., 'arduino', 'espidf')
+  connectivity?: string[]; // Catalog connectivity hints, not confirmed device identity
+  debug?: {
+    tools?: Record<string, { default?: boolean; [key: string]: unknown }>;
+    [key: string]: unknown;
+  } | null; // Catalog debugger metadata
   vendor?: string; // Board manufacturer or vendor
   url?: string; // URL to the board's documentation or landing page
 }
@@ -67,6 +72,16 @@ export const BoardInfoSchema = z.object({
   frameworks: z.array(z.string()).optional(),
   vendor: z.string().optional(),
   url: z.string().optional(),
+  connectivity: z.array(z.string()).optional(),
+  debug: z
+    .object({
+      tools: z
+        .record(z.object({ default: z.boolean().optional() }).passthrough())
+        .optional(),
+    })
+    .passthrough()
+    .nullable()
+    .optional(),
 });
 
 /**
@@ -171,6 +186,9 @@ export interface BuildResult {
   taskId?: string; // UUID mapping to the background invocation
   logPaths?: string[]; // Array of associated trailing paths
   rawLogPath?: string; // Full path to the captured raw log when available
+  testReport?: ReturnType<typeof import("./core/analysis/test-report.js").summarizeTestOutput>; // Validated foreground test case report.
+  testReportError?: string; // Explicit missing/invalid report instead of a false passing result.
+  analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Structured diagnostic summary for agent-safe recovery flows
 }
 
@@ -219,6 +237,9 @@ export interface UploadResult {
   taskId?: string; // UUID mapping to the background invocation
   logPaths?: string[]; // Array of associated trailing paths
   rawLogPath?: string; // Full path to the captured raw log when available
+  testReport?: ReturnType<typeof import("./core/analysis/test-report.js").summarizeTestOutput>; // Validated foreground test case report.
+  testReportError?: string; // Explicit missing/invalid report instead of a false passing result.
+  analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Structured diagnostic summary for agent-safe recovery flows
 }
 
@@ -426,6 +447,8 @@ export const SystemInfoParamsSchema = z.object({});
 
 // Build project parameters
 export const BuildProjectParamsSchema = z.object({
+  jobs: z.number().int().min(1).max(1024).optional().describe("Parallel build jobs"),
+  forceExecution: z.boolean().optional().describe("Run the build even when cached inputs match"),
   projectDir: z
     .string()
     .min(1)
@@ -454,6 +477,8 @@ export const BuildProjectParamsSchema = z.object({
 
 // Clean project parameters
 export const CleanProjectParamsSchema = z.object({
+  environment: z.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).optional().describe("Environment to clean"),
+  full: z.boolean().optional().describe("Also remove downloaded build dependencies with fullclean"),
   projectDir: z
     .string()
     .min(1)
@@ -472,6 +497,11 @@ export const CleanProjectParamsSchema = z.object({
 
 // Check project parameters
 export const CheckProjectParamsSchema = z.object({
+  severity: z.enum(["low", "medium", "high"]).optional(),
+  pattern: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  skipPackages: z.boolean().optional(),
+  tool: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  structuredReport: z.boolean().optional(),
   projectDir: z
     .string()
     .min(1)
@@ -490,6 +520,13 @@ export const CheckProjectParamsSchema = z.object({
 
 // Run tests parameters
 export const RunTestsParamsSchema = z.object({
+  filter: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  ignore: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  withoutUploading: z.boolean().optional(),
+  withoutBuilding: z.boolean().optional(),
+  uploadPort: z.string().min(1).max(512).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  verbose: z.boolean().optional(),
+  structuredReport: z.boolean().optional().describe("Collect per-case results for a foreground test run"),
   projectDir: z
     .string()
     .min(1)
@@ -502,6 +539,12 @@ export const RunTestsParamsSchema = z.object({
     .string()
     .optional()
     .describe("Specific environment to test (from platformio.ini)"),
+  compileOnly: z
+    .boolean()
+    .optional()
+    .describe(
+      "Build tests without uploading or executing them. Always enforced by the build_only profile.",
+    ),
   background: z
     .boolean()
     .optional()
@@ -975,6 +1018,9 @@ export interface AgentFlashMonitorVerifyResult {
   unmatchedExpectations: string[]; // Expected runtime markers not observed
   rejectedPatterns: string[]; // Rejected runtime patterns that appeared
   detectedRuntimeErrors: string[]; // Built-in runtime failures detected
+  testReport?: ReturnType<typeof import("./core/analysis/test-report.js").summarizeTestOutput>; // Validated foreground test case report.
+  testReportError?: string; // Explicit missing/invalid report instead of a false passing result.
+  analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Upload-stage diagnostic payload when relevant
   recommendedNextAction: string; // Single recommended next step
   rawMonitorLogPath?: string; // Path to monitor log consumed for verification
@@ -1029,6 +1075,28 @@ export interface AgentGetLastReportResult {
  * Effective policy status payload returned by `get_policy_status`.
  */
 export interface PolicyStatusResult {
+  serverPolicy: {
+    enforcement: "platformio-mcp";
+    valid: boolean;
+    digest?: string;
+  };
+  hostPolicy: {
+    enforcement: "external";
+    effectivePermissions: "unknown";
+    message: string;
+  };
+
+  projectEnrollment?: { enrolled: boolean; digest: string }; // Exact project policy enrollment state
+
+  valid: boolean; // False means execution is blocked by invalid configuration
+  error?: { code: string; message: string }; // Safe repair diagnostic
+  digest?: string; // Identity of the effective policy and contributing files
+  sources: Array<{
+    kind: "builtin" | "project-profile" | "operator" | "project-override";
+    source: string;
+    present: boolean;
+    sha256?: string;
+  }>; // Ordered policy provenance, including absent optional files
   profile: string; // Active policy profile
   source: string; // Policy source path or descriptor
   allowedOperations: string[]; // Actions explicitly allowed

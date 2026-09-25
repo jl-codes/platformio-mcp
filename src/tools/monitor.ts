@@ -8,6 +8,7 @@
  * - queryLogs: Pulls historical/grep'd records from the spool buffer safely.
  */
 
+import { matchBoundedLines } from "../core/bounded-pattern.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -160,11 +161,6 @@ export async function stopMonitor(port: string, projectDir?: string) {
         daemon.watcher.close();
       } catch {}
     }
-    delete activeDaemons[port];
-    portalEvents.emitSpoolerStates(getSpoolerStates());
-    try {
-      portSemaphoreManager.releasePort(port);
-    } catch {}
   }
 
   logDiag(
@@ -194,28 +190,37 @@ export async function stopMonitor(port: string, projectDir?: string) {
     );
   }
 
-  const killResult = await killPioMonitorByPort(port, projectDir);
+  // killPioMonitorByPort verifies the process IDENTITY before and after the
+  // kill and returns true only on a confirmed exit; it throws when the
+  // identity is unavailable or changed. Either non-true outcome means the kill
+  // is not proven, which below falls back to a non-force release.
+  let proven = false;
+  try {
+    proven = await killPioMonitorByPort(port, projectDir);
+  } catch (error) {
+    logDiag(
+      `[Spooler Diagnostic] Monitor kill not proven for ${port}: ${(error as Error).message}`,
+      projectDir,
+    );
+  }
+  delete activeDaemons[port];
+  portalEvents.emitSpoolerStates(getSpoolerStates());
   logDiag(`[Spooler Diagnostic] killPioMonitorByPort completed.`, projectDir);
 
-  // A monitor claim now carries `monitor_pid` -- the detached child that
-  // actually holds the UART -- so isClaimStale can answer definitively and a
-  // plain non-force release is enough: it clears the claim exactly when that
-  // child is gone. This is strictly better than the old force path, which
-  // relied on `proven` from killing a PID found in this host's own
-  // pidsFile/command-history and therefore said nothing about a claim
+  // A monitor claim carries `monitor_pid` -- the detached child that actually
+  // holds the UART -- so isClaimStale can answer definitively and a plain
+  // non-force release is enough: it clears the claim exactly when that child
+  // is gone. `force` remains only as a fallback for claims with no
+  // monitor_pid (written before the field existed, or by a host that does
+  // not set it); there the rule is a proven kill AND the same host, because a
+  // kill proven from THIS host's pidsFile says nothing about a claim
   // published by a different host on shared storage.
-  //
-  // `force` remains only as a fallback for claims with no monitor_pid: those
-  // written before this field existed, or by a host that does not set it.
-  // There the old rule still applies -- proven kill AND same host.
   try {
     const survivingClaim = portSemaphoreManager.getClaim(port);
     const hasMonitorPid = typeof survivingClaim?.monitor_pid === "number";
     portSemaphoreManager.releasePort(port, {
       force:
-        !hasMonitorPid &&
-        killResult.proven &&
-        survivingClaim?.hostname === os.hostname(),
+        !hasMonitorPid && proven && survivingClaim?.hostname === os.hostname(),
       expectedType: "monitor",
     });
   } catch {
@@ -231,7 +236,8 @@ async function spawnPioMonitor(
   const daemon = activeDaemons[targetPort];
   if (!daemon) return;
 
-  const monitorArgs = ["--port", targetPort, "--quiet", "--raw"];
+  // Preserve project filters: --raw bypasses PlatformIO transformations.
+  const monitorArgs = ["--port", targetPort];
 
   if (daemon.environment) {
     monitorArgs.push("--environment", daemon.environment);
@@ -246,40 +252,24 @@ async function spawnPioMonitor(
 
   // Instead of node managing the streams via stdout.on, we pass the file descriptor directly to the OS.
   const outFd = fs.openSync(daemon.logFile, "a");
-  const proc = await platformioExecutor.spawn(
-    "device",
-    ["monitor", ...monitorArgs],
-    {
-      detached: true,
-      useFakeTty: true,
-      stdio: ["ignore", outFd, outFd],
-    },
-  );
+  let proc;
+  try {
+    proc = await platformioExecutor.spawn(
+      "device",
+      ["monitor", ...monitorArgs],
+      {
+        cwd: projectDir,
+        detached: true,
+        useFakeTty: true,
+        env: { PYTHONUNBUFFERED: "1" },
+        stdio: ["ignore", outFd, outFd],
+      },
+    );
+  } finally {
+    fs.closeSync(outFd);
+  }
 
   if (proc.pid) {
-    // The claim was taken before this child existed and records the LAUNCHER's
-    // pid. Under the CLI that process exits seconds from now while this child
-    // keeps the UART, so without this the claim would read stale and the next
-    // claimer would flash a port this monitor still holds.
-    const attached = portSemaphoreManager.attachMonitorPid(
-      targetPort,
-      proc.pid,
-    );
-    if (!attached) {
-      // Failing here is NOT benign. The comment this replaces claimed it
-      // "degrades to the old launcher-PID behaviour", but under the CLI the
-      // launcher is already exiting, so the claim immediately reads stale and
-      // the next claimer flashes a port this monitor still holds. Surface it
-      // loudly rather than leaving a monitor running behind an unusable claim.
-      logDiag(
-        `[Spooler] WARNING: could not record monitor PID ${proc.pid} on the ` +
-          `claim for ${targetPort}. The claim may read stale while this ` +
-          `monitor still holds the port. Stop it with ` +
-          `\`pio-agent monitor-stop --port ${targetPort}\`.`,
-        projectDir,
-      );
-    }
-
     // Record PID to workspace tracker
     const cliDesc = `pio device monitor ${monitorArgs.join(" ")}`;
     await registerPioMonitorPid(
@@ -291,6 +281,27 @@ async function spawnPioMonitor(
       daemon.taskId,
       cliDesc,
     );
+    // The claim was taken before this child existed and records the LAUNCHER's
+    // pid. Under the CLI that process exits seconds from now while this child
+    // keeps the UART, so without this the claim would read stale and the next
+    // claimer would flash a port this monitor still holds.
+    const attached = portSemaphoreManager.attachMonitorPid(
+      targetPort,
+      proc.pid,
+    );
+    if (!attached) {
+      // Not benign: under the CLI the launcher is already exiting, so the
+      // claim immediately reads stale and the next claimer flashes a port this
+      // monitor still holds. Say so rather than leaving a monitor running
+      // behind an unusable claim.
+      logDiag(
+        `[Spooler] WARNING: could not record monitor PID ${proc.pid} on the ` +
+          `claim for ${targetPort}. The claim may read stale while this ` +
+          `monitor still holds the port. Stop it with ` +
+          `\`pio-agent monitor-stop --port ${targetPort}\`.`,
+        projectDir,
+      );
+    }
   }
 
   // Symlink or copy to 'latest-monitor.log' for easy querying
@@ -413,10 +424,10 @@ export async function rehydrateMonitors(): Promise<void> {
                   } catch {}
                 }
               });
-              daemon.watcher.unref();
               daemon.watcher.on("error", () => {
                 // Ignore watcher errors on constrained environments.
               });
+              daemon.watcher.unref();
               startWindowsPollingFallback(port, daemon);
               rehydrationCount++;
               logDiag(
@@ -528,10 +539,13 @@ export async function startMonitor(
         } catch {}
       }
     });
-    daemon.watcher.unref();
     daemon.watcher.on("error", () => {
       // Ignore watcher errors on constrained environments.
     });
+    // A one-shot CLI must exit once it has printed the monitor's start result;
+    // the detached child keeps the UART, and this watcher only feeds the
+    // dashboard. Long-lived hosts hold their own references.
+    daemon.watcher.unref();
   } catch {
     logDiag(`[Spooler] Failed to attach fs.watch to ${logFile}`, projectDir);
   }
@@ -613,12 +627,20 @@ export async function queryLogs(
 
   if (searchPattern) {
     try {
-      const regex = new RegExp(searchPattern, "i");
-      stitchedLines = stitchedLines.filter((line) => regex.test(line));
-    } catch {
+      const indices = await matchBoundedLines(stitchedLines, searchPattern, {
+        mode: "regex",
+        ignoreCase: true,
+      });
+      stitchedLines = indices.map((index) => stitchedLines[index]);
+    } catch (error) {
       return {
         success: false,
-        content: `Invalid regex search pattern provided: ${searchPattern}`,
+        code:
+          error instanceof PlatformIOError
+            ? error.code
+            : "PATTERN_WORKER_FAILED",
+        content:
+          error instanceof Error ? error.message : "Pattern matching failed.",
       };
     }
   }
@@ -736,7 +758,8 @@ export function getMonitorStatus(
       const trackedPid = trackedPids[activePort];
       const stale =
         !fs.existsSync(daemon.logFile) ||
-        (trackedPid !== undefined && !isPidAlive(trackedPid));
+        trackedPid === undefined ||
+        !isPidAlive(trackedPid);
       return {
         state: stale ? "stale" : "active",
         port: activePort,

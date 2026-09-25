@@ -1,0 +1,3729 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": null,
+  "note": "Template only. Supply final-revision evidence in an external acceptance packet; historical fixtures do not establish completed acceptance.",
+  "entries": [
+    {
+      "requirementId": "PAR-01",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_board_info parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/board-compat.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-02",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_build parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/clean-compat.test.ts",
+        "tests/build.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-03",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_check parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/clean-compat.test.ts",
+        "tests/check-report.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-04",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_clean parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/clean-compat.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-05",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_coredump parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/coredump-compat.test.ts",
+        "tests/coredump-policy.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-06",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_debug_cmd parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/debug-command.test.ts",
+        "tests/debug-session-compat.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-07",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_debug_list parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/debug-session-compat.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-08",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_debug_start parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/debug-startup.test.ts",
+        "tests/debug-local-startup.test.ts",
+        "tests/debug-session-compat.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-09",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_debug_stop parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/debug-reset-run.test.ts",
+        "tests/debug-session-compat.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-10",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_decode_backtrace parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/decode-compat.test.ts",
+        "tests/crash-parser.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-11",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_deps_check parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/dependency-inspection.test.ts",
+        "tests/dependency-audit.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-12",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_flash_and_verify parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/flash-verification.test.ts",
+        "tests/flash-verification-compat.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-13",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_list_boards parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/board-compat.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-14",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_list_devices parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/device-compat.test.ts",
+        "tests/native-serial-discovery.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-15",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_list_targets parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/project-compat.test.ts",
+        "tests/project-inspection.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-16",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_memory_watch parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/memory-compat.test.ts",
+        "tests/memory-capture.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-17",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_monitor_capture parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/device-compat.test.ts",
+        "tests/serial-session-manager.test.ts",
+        "tests/compatibility-mode.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-18",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_monitor_list parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/owned-serial-registry.test.ts",
+        "tests/device-compat.test.ts",
+        "tests/compatibility-mode.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-19",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_monitor_read parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/device-compat.test.ts",
+        "tests/serial-session-buffer.test.ts",
+        "tests/compatibility-mode.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-20",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_monitor_start parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/device-compat.test.ts",
+        "tests/serial-session-policy.test.ts",
+        "tests/compatibility-mode.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-21",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_monitor_stop parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/device-compat.test.ts",
+        "tests/serial-session-manager.test.ts",
+        "tests/compatibility-mode.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-22",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_monitor_write parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/device-compat.test.ts",
+        "tests/serial-client.test.ts",
+        "tests/compatibility-mode.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-23",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_partition_table parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/partition-compat.test.ts",
+        "tests/partition-device-report.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-24",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_pkg_install parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/package-compat.test.ts",
+        "tests/package-compat-mcp.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-25",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_pkg_list parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/package-compat.test.ts",
+        "tests/package-compat-mcp.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-26",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_pkg_outdated parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/package-compat.test.ts",
+        "tests/package-compat-mcp.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-27",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_pkg_search parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/package-compat.test.ts",
+        "tests/package-compat-mcp.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-28",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_pkg_uninstall parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/package-compat.test.ts",
+        "tests/package-compat-mcp.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-29",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_pkg_update parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/package-compat.test.ts",
+        "tests/package-compat-mcp.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-30",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_port_diagnose parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/port-diagnostics.test.ts",
+        "tests/device-compat.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-31",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_power_profile parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/power-compat-policy.test.ts",
+        "tests/power-meter-client.test.ts",
+        "tests/power-serial-compat.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-32",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_project_envs parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/project-compat.test.ts",
+        "tests/project-context.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-33",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_project_init parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/init-compat.test.ts",
+        "tests/project-init-options.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-34",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_project_metadata parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/project-compat.test.ts",
+        "tests/project-inspection.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-35",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_run_target parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/run-target.test.ts",
+        "tests/target-execution.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-36",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_size_report parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/size-compat.test.ts",
+        "tests/size-parser.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-37",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_system_info parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/system-compat.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-38",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_test parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/test-compat.test.ts",
+        "tests/test-report-execution.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-39",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_upload parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/clean-compat.test.ts",
+        "tests/upload.test.ts",
+        "tests/retained-upload-execution.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-40",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "pio_upload_ota parameter/default/result/error parity in both modes",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/ota-options-compat.test.ts",
+        "tests/ota-upload.test.ts",
+        "tests/ota-transfer.test.ts",
+        "tests/compatibility-mode.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-01",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "list_boards frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/board-compat.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-02",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "get_board_info frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/board-compat.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-03",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "list_devices frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/native-serial-discovery.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-04",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "init_project frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/project-init-options.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-05",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "build_project frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/build.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-06",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "clean_project frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/build.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-07",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "upload_filesystem frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/upload.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-08",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "upload_firmware frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/upload.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-09",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "acquire_lock frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/lock-manager.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-10",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "release_lock frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/lock-manager.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-11",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "get_lock_status frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/lock-manager.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-12",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "search_libraries frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/packages.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-13",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "install_library frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/packages.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-14",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "list_installed_libraries frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/packages.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-15",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "start_monitor frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/monitor.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-16",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "stop_monitor frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/monitor.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-17",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "query_logs frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/monitor.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-18",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "reset_server_state frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/task-control.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-19",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "check_task_status frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/task-control.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-20",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "get_dashboard_url frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/dashboard-open.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-21",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "get_project_context frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/project-context.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-22",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "get_project_config frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/project-context.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-23",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "agent_validate_project frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/agent-workflows.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-24",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "agent_build_diagnose frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/agent-workflows.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-25",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "agent_safe_pin_audit frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/pin-audit.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-26",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "agent_flash_monitor_verify frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/agent-workflows.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-27",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "agent_get_last_report frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/agent-workflows.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-28",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "agent_generate_board_report frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/agent-workflows.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-29",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "get_policy_status frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/policy-sources.test.ts",
+        "tests/policy-engine.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-30",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "agent_resolve_target frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/target-resolution.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-31",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "get_monitor_status frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/monitor.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-32",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "capture_serial_window frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/monitor.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-33",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "agent_monitor_health frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/monitor.test.ts",
+        "tests/mcp-authorization.test.ts",
+        "tests/monitor-launch.test.ts",
+        "tests/monitor-termination.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-34",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "cancel_task frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/task-control.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-35",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "list_task_history frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/task-control.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-36",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "get_approval_request frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/approval-integrity.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-37",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "list_pending_approvals frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/approval-integrity.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-38",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "system_info frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/system-compat.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-39",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "check_project frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/build.test.ts",
+        "tests/check-report.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-40",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "run_tests frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/test-report-execution.test.ts",
+        "tests/test-execution-mode.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-41",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "uninstall_library frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/packages.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-42",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "update_library frozen public schema/default/behavior retention",
+      "nextAction": "Complete implementation and attach final-revision contract evidence.",
+      "testFiles": [
+        "tests/packages.test.ts",
+        "tests/mcp-authorization.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "POL-01",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Permission source precedence, invalid configuration, enrollment, provenance and profile ceilings",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/policy-config.test.ts",
+        "tests/policy-sources.test.ts",
+        "tests/project-enrollment.test.ts",
+        "tests/policy-profile.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "POL-02",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Approval integrity, replay/forgery/mismatch rejection, atomic consumption and composite effects",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/approval-integrity.test.ts",
+        "tests/action-dispatcher.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "POL-03",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Queued policy revision and changed artifact/device rejection",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/policy-engine.test.ts",
+        "tests/spooler-custody.test.ts",
+        "tests/retained-upload-execution.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "POL-04",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Actual isolated host standalone/plugin visibility and disabled mutation/alias enforcement",
+      "nextAction": "Complete implementation and attach final-revision host evidence.",
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "POL-05",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Host installation comments, restrictions, custom CODEX_HOME and atomic rollback",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/codex-config-installer.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-CLI",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "CLI/API schemas, defaults and workflows",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/cli-agent-smoke.test.ts",
+        "tests/serial-observation-cli.test.ts",
+        "tests/shutdown-coordinator.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-UI",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Dashboard authentication/events and runtime visibility",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/api.test.ts",
+        "tests/dashboard-open.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-STATE",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Locks, caches, tasks, redaction and process ownership",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/lock-manager.test.ts",
+        "tests/build-cache.test.ts",
+        "tests/process-manager.test.ts",
+        "tests/serial-redaction.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "LEG-PLUGIN",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Plugin, automation and installation paths",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/codex-plugin-manifest.test.ts",
+        "tests/codex-plugin-launcher.test.ts",
+        "tests/monitoring-automation.test.ts",
+        "tests/shutdown-coordinator.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-ELF",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Real Xtensa/Cortex-M ELF fixtures, corrupt/stripped/inline/mismatch/tool-failure cases",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/firmware-analysis.test.ts",
+        "tests/elf-identity.test.ts",
+        "tests/crash-parser.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-SERIAL",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Serial fault injection and cross-process ownership, overflow, UTF-8, regex, writes and cleanup",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/serial-session-manager.test.ts",
+        "tests/serial-session-buffer.test.ts",
+        "tests/serial-transport.test.ts",
+        "tests/device-lease.test.ts",
+        "tests/device-reenumeration.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-WORKFLOW",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Healthy/early-marker/panic/missing-marker/upload-failure/cancellation workflows",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/flash-verification.test.ts",
+        "tests/runtime-assertions.test.ts",
+        "tests/verification-capture.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-QUALITY",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Real native PlatformIO CLI package/test/static-analysis fixtures",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/test-report-execution.test.ts",
+        "tests/check-report.test.ts",
+        "tests/package-compat-mcp.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-BACKENDS",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "GDB/MI, OTA failures, partitions/coredump and power/telemetry semantics",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "testFiles": [
+        "tests/gdb-mi-session.test.ts",
+        "tests/ota-transfer.test.ts",
+        "tests/esp-coredump-analysis.test.ts",
+        "tests/partition-device-report.test.ts",
+        "tests/ppk2-protocol.test.ts",
+        "tests/ppk2-process.test.ts"
+      ],
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "NS-01",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Registry normalization, exact-version aliases, collisions, inventory and provenance controls",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "NS-02",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "npm canonical and both aliases installation/update/uninstall",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
+    },
+    {
+      "requirementId": "NS-03",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Plugin packaged installation/update/uninstall",
+      "nextAction": "Complete implementation and attach final-revision integration evidence.",
+      "verificationStage": "software-and-retained-evidence",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
+    },
+    {
+      "requirementId": "NS-HOST-win32-x64",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "win32-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Minimum-OS certification",
+      "originalExpectedAssertion": "win32-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
+    },
+    {
+      "requirementId": "NS-HOST-darwin-arm64",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "darwin-arm64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Minimum-OS certification",
+      "originalExpectedAssertion": "darwin-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
+    },
+    {
+      "requirementId": "NS-HOST-darwin-x64",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "darwin-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Minimum-OS certification",
+      "originalExpectedAssertion": "darwin-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
+    },
+    {
+      "requirementId": "NS-HOST-linux-arm64",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "linux-arm64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Minimum-OS certification",
+      "originalExpectedAssertion": "linux-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
+    },
+    {
+      "requirementId": "NS-HOST-linux-x64",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "linux-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Minimum-OS certification",
+      "originalExpectedAssertion": "linux-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
+    },
+    {
+      "requirementId": "PAR-HW-01",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "ESP32 healthy/crashing firmware decode and reflash recovery",
+      "nextAction": "Complete implementation and attach final-revision hardware evidence.",
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-HW-02",
+      "implementationStatus": "not_verified",
+      "outcome": "deferred",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Cortex-M physical fault-register PC/LR capture against flashed ELF",
+      "nextAction": "Maintainer-deferred certification; preserve the original physical procedure for a later certification run.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Physical Cortex-M acceptance",
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-HW-03",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Serial echo, disconnect/reconnect, competing clients and legacy filter monitor",
+      "nextAction": "Complete implementation and attach final-revision hardware evidence.",
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-HW-04",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Legacy firmware/filesystem upload, assertions and dashboard retention",
+      "nextAction": "Complete implementation and attach final-revision hardware evidence.",
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-HW-05",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Restored designated firmware with sanitized artifacts and no leaked processes/locks",
+      "nextAction": "Complete implementation and attach final-revision hardware evidence.",
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-HW-06",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Physical debug probe, real ESP32 coredump and custom partition verification",
+      "nextAction": "Complete implementation and attach final-revision hardware evidence.",
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "PAR-HW-07",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "ESP32 firmware/filesystem OTA including independent runtime/filesystem verification and controlled failed transfer",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "ESP8266 OTA and PPK2 hardware acceptance",
+      "originalExpectedAssertion": "ESP32/ESP8266 firmware/filesystem OTA and real PPK2 measurement/source safety",
+      "verificationStage": "software-and-retained-evidence"
+    },
+    {
+      "requirementId": "NS-CONTAINER",
+      "implementationStatus": "not_verified",
+      "outcome": "blocked",
+      "procedure": null,
+      "environment": null,
+      "executor": null,
+      "timestamp": null,
+      "evidence": null,
+      "artifacts": [],
+      "expectedAssertion": "Native Linux amd64/arm64 container execution, policy configuration and MCP lifecycle with exact release image identity",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Container device-passthrough acceptance",
+      "originalExpectedAssertion": "Native Linux amd64/arm64 container execution, policy configuration, MCP lifecycle and non-root device access with exact release image identity",
+      "verificationStage": "distribution"
+    }
+  ],
+  "releaseScopeDecision": "maintainer-2026-09-25-release-3.1.0",
+  "hostObservations": {
+    "scope": "Actual isolated host visibility and disabled mutation/alias enforcement; no model turn or physical operation. Working-tree declaration change recorded explicitly.",
+    "declarationSha256": "0f6e760467b054327ae378e3737d16f963dccb5d3b07b10dd03d0ac6e79a3723",
+    "reports": [
+      {
+        "version": "codex-cli 0.155.0-alpha.16.4",
+        "sourceCommit": "1d8c8af52ece0eb13dfb4550d02f29964b5afced",
+        "timestamp": "2026-09-25T19:15:06.048Z",
+        "mode": "standalone",
+        "server": "platformio",
+        "visible": 110,
+        "disabledAbsent": true,
+        "blocked": [
+          {
+            "tool": "build_project",
+            "error": "Error: {\"code\":-32603,\"message\":\"tool 'build_project' is disabled for MCP server 'platformio'\"}"
+          },
+          {
+            "tool": "pio_build",
+            "error": "Error: {\"code\":-32603,\"message\":\"tool 'pio_build' is disabled for MCP server 'platformio'\"}"
+          }
+        ]
+      },
+      {
+        "version": "codex-cli 0.155.0-alpha.16.4",
+        "sourceCommit": "1d8c8af52ece0eb13dfb4550d02f29964b5afced",
+        "timestamp": "2026-09-25T19:18:10.346Z",
+        "mode": "plugin",
+        "server": "platformio",
+        "visible": 110,
+        "disabledAbsent": true,
+        "blocked": [
+          {
+            "tool": "build_project",
+            "error": "Error: {\"code\":-32603,\"message\":\"tool 'build_project' is disabled for MCP server 'platformio'\"}"
+          },
+          {
+            "tool": "pio_build",
+            "error": "Error: {\"code\":-32603,\"message\":\"tool 'pio_build' is disabled for MCP server 'platformio'\"}"
+          }
+        ]
+      }
+    ]
+  },
+  "retainedRuntimeTree": "c18dd1bf44cde2ea9d3fa78e483161d569f5b49a",
+  "retainedRuntimeBaseline": "0e31ab704cec59280400935f6b5dedbba4f856e5",
+  "retainedBoardObservations": {
+    "sourceTranscriptSha256": "2c3a2d3d98ffcf04b4a1ca16593d4c73e7e65da6c340b4f24379558357a30ca0",
+    "executionRecord": "platformio-parity-progress.md#2026-09-25--completed-same-board-ota-and-restored-native-fixture",
+    "scope": "Selected original observations; historical execution identities/dates remain in the progress record. This is not a fresh hardware run. Local full transcript remains retained.",
+    "observations": [
+      {
+        "sourceLine": 6,
+        "tool": "serial_session_write",
+        "result": {
+          "ok": true,
+          "summary": "sent 25 byte(s) to COM5.",
+          "bytes": 25
+        }
+      },
+      {
+        "sourceLine": 7,
+        "tool": "serial_session_read",
+        "result": {
+          "ok": true,
+          "summary": "pattern matched; 90 new line(s). Next cursor 122. 31 older line(s) fell out of the buffer.",
+          "lines": [
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_ECHO:PIO_PARITY_ECHO_20260925"
+          ],
+          "cursor": 122,
+          "dropped_before_cursor": 31,
+          "more_available": true,
+          "matched": true,
+          "matched_line": 121,
+          "partial_line": "",
+          "closed": false,
+          "error": null,
+          "redaction_applied": true,
+          "truncated_bytes": 0
+        }
+      },
+      {
+        "sourceLine": 9,
+        "tool": "serial_session_write",
+        "result": {
+          "ok": true,
+          "summary": "sent 6 byte(s) to COM5.",
+          "bytes": 6
+        }
+      },
+      {
+        "sourceLine": 10,
+        "tool": "serial_session_read",
+        "result": {
+          "ok": true,
+          "summary": "pattern matched; 73 new line(s). Next cursor 195.",
+          "lines": [
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_READY_BEFORE_CRASH",
+            "",
+            "abort() was called at PC 0x42001759 on core 1",
+            "",
+            "",
+            "Backtrace: 0x4037705a:0x3fcebd90 0x4037a395:0x3fcebdb0 0x4037fa8d:0x3fcebdd0 0x42001759:0x3fcebe50 0x420017e5:0x3fcebe70 0x42003561:0x3fcebe90",
+            "",
+            "",
+            "",
+            "",
+            "ELF file SHA256: 6073f2aa7277aaaa",
+            "",
+            "Rebooting...",
+            "ESP-ROM:esp32s3-20210327",
+            "Build:Mar 27 2021",
+            "rst:0xc (RTC_SW_CPU_RST),boot:0x8 (SPI_FAST_FLASH_BOOT)",
+            "Saved PC:0x42022096",
+            "SPIWP:0xee",
+            "mode:DIO, clock div:1",
+            "load:0x3fce3808,len:0x4bc",
+            "load:0x403c9700,len:0xbd8",
+            "load:0x403cc700,len:0x2a0c",
+            "entry 0x403c98d0",
+            "PIO_HIL_READY"
+          ],
+          "cursor": 195,
+          "dropped_before_cursor": 0,
+          "more_available": false,
+          "matched": true,
+          "matched_line": 194,
+          "partial_line": "",
+          "closed": false,
+          "error": null,
+          "redaction_applied": true,
+          "truncated_bytes": 0
+        }
+      },
+      {
+        "sourceLine": 11,
+        "tool": "serial_session_read",
+        "result": {
+          "ok": true,
+          "summary": "pattern matched; 1 new line(s). Next cursor 196.",
+          "lines": [
+            "PIO_HIL_HEALTHY"
+          ],
+          "cursor": 196,
+          "dropped_before_cursor": 0,
+          "more_available": true,
+          "matched": true,
+          "matched_line": 195,
+          "partial_line": "",
+          "closed": false,
+          "error": null,
+          "redaction_applied": true,
+          "truncated_bytes": 0
+        }
+      },
+      {
+        "sourceLine": 37,
+        "tool": "coredump",
+        "result": {
+          "success": true,
+          "status": "completed",
+          "summary": "Core-dump inspection completed.",
+          "data": {
+            "ok": true,
+            "crashed_task": null,
+            "reason": null,
+            "backtrace": [
+              "#0  0x4037705d in panic_abort (details=0x3fcebdfa \"abort() was called at PC 0x42001759 on core 1\") at /home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_system/panic.c:408",
+              "#1  0x4037a398 in esp_system_abort (details=0x3fcebdfa \"abort() was called at PC 0x42001759 on core 1\") at /home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_system/esp_system.c:137",
+              "#2  0x4037fa90 in abort () at /home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/newlib/abort.c:46",
+              "#3  0x4200175c in parity_fixture_crash () at src/main.cpp:17",
+              "#4  0x420017e8 in loop () at src/main.cpp:32",
+              "#5  0x42003564 in loopTask (pvParameters=<optimized out>) at C:/Users/proto/.platformio/packages/framework-arduinoespressif32/cores/esp32/main.cpp:50"
+            ],
+            "registers": {
+              "pc": "0x4037705d          0x4037705d <panic_abort+21>",
+              "lbeg": "0x40056f5c          1074098012",
+              "lend": "0x40056f72          1074098034",
+              "lcount": "0x0                 0",
+              "sar": "0xa                 10",
+              "ps": "0x60820             395296",
+              "threadptr": "<unavailable>",
+              "br": "<unavailable>",
+              "scompare1": "<unavailable>",
+              "acclo": "<unavailable>",
+              "acchi": "<unavailable>",
+              "m0": "<unavailable>",
+              "m1": "<unavailable>",
+              "m2": "<unavailable>",
+              "m3": "<unavailable>",
+              "fcr": "<unavailable>",
+              "fsr": "<unavailable>",
+              "pwrctl": "<unavailable>",
+              "pwrstat": "<unavailable>",
+              "eristat": "<unavailable>",
+              "cs_itctrl": "<unavailable>",
+              "cs_claimset": "<unavailable>",
+              "cs_claimclr": "<unavailable>",
+              "cs_lockaccess": "<unavailable>",
+              "cs_lockstatus": "<unavailable>",
+              "cs_authstatus": "<unavailable>",
+              "fault_info": "<unavailable>",
+              "trax_id": "<unavailable>",
+              "trax_control": "<unavailable>",
+              "trax_status": "<unavailable>",
+              "trax_data": "<unavailable>",
+              "trax_address": "<unavailable>",
+              "trax_pctrigger": "<unavailable>",
+              "trax_pcmatch": "<unavailable>",
+              "trax_delay": "<unavailable>",
+              "trax_memstart": "<unavailable>",
+              "trax_memend": "<unavailable>",
+              "pmg": "<unavailable>",
+              "pmpc": "<unavailable>",
+              "pm0": "<unavailable>",
+              "pm1": "<unavailable>",
+              "pmctrl0": "<unavailable>",
+              "pmctrl1": "<unavailable>",
+              "pmstat0": "<unavailable>",
+              "pmstat1": "<unavailable>",
+              "ocdid": "<unavailable>",
+              "ocd_dcrclr": "<unavailable>",
+              "ocd_dcrset": "<unavailable>",
+              "ocd_dsr": "<unavailable>",
+              "a0": "0x8037a398          -2143837288",
+              "a1": "0x3fcebd90          1070513552",
+              "a2": "0x3fcebdfa          1070513658",
+              "a3": "0x3fcebe27          1070513703",
+              "a4": "0xa                 10",
+              "a5": "0x3fcf4b90          1070549904",
+              "a6": "0x60023             393251",
+              "a7": "0x3                 3",
+              "a8": "0x0                 0",
+              "a9": "0x1                 1",
+              "a10": "0x3fcebdde          1070513630",
+              "a11": "0x3fcebdde          1070513630",
+              "a12": "0xa                 10",
+              "a13": "0x3fcf4b60          1070549856",
+              "a14": "0x1                 1",
+              "a15": "0x3fcea000          1070505984"
+            },
+            "truncated": false,
+            "dump": {
+              "source": {
+                "path": null,
+                "size": 65536,
+                "sha256": "feb53ad7ad54a1d27877989736dd5e9e8d4c2d0e10f6144df1be875da041b0c5",
+                "format": "raw"
+              },
+              "identity": {
+                "sha256": "80e6619e99336ec06094cba53d61f441d244451cc8750860743e6a5b3613ecbf",
+                "input_sha256": "feb53ad7ad54a1d27877989736dd5e9e8d4c2d0e10f6144df1be875da041b0c5",
+                "length": 10404,
+                "input_length": 65536,
+                "trailing_bytes": 55132,
+                "version": 590080,
+                "chip": "esp32s3",
+                "payload_format": "elf",
+                "checksum": "crc32",
+                "task_count": 0,
+                "tcb_size": 0,
+                "segment_count": 0,
+                "chip_revision": null
+              }
+            },
+            "elf": {
+              "path": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\.pio\\build\\hil-esp32s3\\firmware.elf",
+              "sha256": "6073f2aa7277aaaa183b9bc466a80c8305cdc3ef2ab1ad02dfa953c8fb24d2ad",
+              "size": 7575180,
+              "bits": 32,
+              "byteOrder": "little",
+              "machine": 94,
+              "architecture": "xtensa",
+              "type": "executable",
+              "archivePath": "C:\\Users\\proto\\.platformio-mcp\\artifacts\\elf\\e8524ba98c28f0f56fced44ba0c4e36e51ed25e17e12735bd2fa6ecd9f4fc237\\6073f2aa7277aaaa183b9bc466a80c8305cdc3ef2ab1ad02dfa953c8fb24d2ad.elf"
+            },
+            "firmware_correspondence": {
+              "status": "prefix_matched",
+              "hashBits": 64
+            },
+            "core_sha256": "33beef098e37e847aa6b9bbeb8c45199f2aede6621d8238896a565d89f943cf8",
+            "debugger": "C:\\Users\\proto\\.platformio\\packages\\toolchain-xtensa-esp32s3\\bin\\xtensa-esp32s3-elf-gdb.exe",
+            "stderr_present": true,
+            "analyzed": true,
+            "acquisition": {
+              "offset": 8323072,
+              "length": 65536,
+              "sha256": "feb53ad7ad54a1d27877989736dd5e9e8d4c2d0e10f6144df1be875da041b0c5",
+              "partition": "coredump"
+            },
+            "layout": {
+              "table": {
+                "path": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\.pio\\build\\hil-esp32s3\\partitions.bin",
+                "size": 3072,
+                "sha256": "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c"
+              },
+              "table_offset": 32768,
+              "environment": null,
+              "table_source": "explicit:tablePath",
+              "evidence": "offline_layout"
+            },
+            "dump_export": null
+          },
+          "observedAt": "2026-09-25T14:07:11.356Z"
+        }
+      },
+      {
+        "sourceLine": 83,
+        "tool": "debug_start",
+        "result": {
+          "project_dir": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3",
+          "env": "hil-esp32s3",
+          "debug_tool": "esp-builtin",
+          "uptime_s": 9.680935500000022,
+          "running": false,
+          "closed": false,
+          "failed": false,
+          "error": null,
+          "pid": 29536,
+          "cleanupPending": true,
+          "stderr": "C:\\Users\\proto\\.platformio\\packages\\toolchain-xtensa-esp32s3\\bin\\xtensa-esp32s3-elf-gdb.exe: warning: Couldn't determine a path for the index cache directory.\r\n",
+          "command": [
+            "C:\\Users\\proto\\.platformio\\packages\\toolchain-xtensa-esp32s3\\bin\\xtensa-esp32s3-elf-gdb.exe",
+            "-nx",
+            "--quiet",
+            "--interpreter=mi2",
+            "-iex",
+            "set auto-load off",
+            "-iex",
+            "set may-call-functions off"
+          ],
+          "gdb_version": "GNU gdb (crosstool-NG esp-2021r2-patch5) 9.2.90.20200913-git",
+          "exit_code": null,
+          "last_stop": {
+            "reason": null,
+            "signal_name": null,
+            "signal_meaning": null,
+            "thread_id": "1",
+            "frame": {
+              "function": "esp_pm_impl_waiti",
+              "address": "0x42022096",
+              "file": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/hal/esp32s3/include/hal/cpu_ll.h",
+              "line": 182,
+              "args": []
+            }
+          },
+          "stopped": {
+            "reason": null,
+            "signal_name": null,
+            "signal_meaning": null,
+            "thread_id": "1",
+            "frame": {
+              "function": "esp_pm_impl_waiti",
+              "address": "0x42022096",
+              "file": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/hal/esp32s3/include/hal/cpu_ll.h",
+              "line": 182,
+              "args": []
+            }
+          },
+          "stop_count": 1,
+          "records_buffered": 58,
+          "ok": true,
+          "load": false,
+          "summary": "Debugger initialized using the retained PlatformIO script; reported target state reflects the latest observed event."
+        }
+      },
+      {
+        "sourceLine": 85,
+        "tool": "debug_cmd",
+        "result": {
+          "ok": true,
+          "result_class": "done",
+          "result_fields": [
+            {
+              "name": "stack",
+              "value": {
+                "kind": "results",
+                "fields": [
+                  {
+                    "name": "frame",
+                    "value": {
+                      "kind": "tuple",
+                      "fields": [
+                        {
+                          "name": "level",
+                          "value": "0"
+                        },
+                        {
+                          "name": "addr",
+                          "value": "0x40000400"
+                        },
+                        {
+                          "name": "func",
+                          "value": "??"
+                        },
+                        {
+                          "name": "arch",
+                          "value": "xtensa"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "stack": [
+              {
+                "frame": {
+                  "level": "0",
+                  "addr": "0x40000400",
+                  "func": "??",
+                  "arch": "xtensa"
+                }
+              }
+            ]
+          },
+          "console": [],
+          "log": [],
+          "target_output": [],
+          "other_output": [],
+          "records": [
+            {
+              "kind": "result",
+              "class": "done",
+              "payload": {
+                "stack": [
+                  {
+                    "frame": {
+                      "level": "0",
+                      "addr": "0x40000400",
+                      "func": "??",
+                      "arch": "xtensa"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "duration_s": 0.009509299999976064,
+          "note": null,
+          "error": null,
+          "stopped": null,
+          "running": false,
+          "timed_out": false,
+          "closed": false,
+          "exit_code": null,
+          "truncated": false,
+          "summary": "Debugger result: done.",
+          "command": "bt"
+        }
+      },
+      {
+        "sourceLine": 89,
+        "tool": "debug_cmd",
+        "result": {
+          "ok": true,
+          "result_class": "running",
+          "result_fields": [],
+          "result": {},
+          "console": [],
+          "log": [],
+          "target_output": [],
+          "other_output": [],
+          "records": [
+            {
+              "kind": "result",
+              "class": "running"
+            },
+            {
+              "kind": "exec",
+              "class": "running",
+              "payload": {
+                "thread-id": "all"
+              }
+            },
+            {
+              "kind": "prompt"
+            },
+            {
+              "kind": "exec",
+              "class": "stopped",
+              "payload": {
+                "reason": "end-stepping-range",
+                "frame": {
+                  "addr": "0x40000454",
+                  "func": "??",
+                  "args": [],
+                  "arch": "xtensa"
+                },
+                "thread-id": "1",
+                "stopped-threads": "all"
+              }
+            }
+          ],
+          "duration_s": 0.12055239999998593,
+          "note": null,
+          "error": null,
+          "stopped": {
+            "reason": "end-stepping-range",
+            "signal_name": null,
+            "signal_meaning": null,
+            "thread_id": "1",
+            "frame": {
+              "function": "??",
+              "address": "0x40000454",
+              "file": null,
+              "line": null,
+              "args": []
+            }
+          },
+          "running": false,
+          "timed_out": false,
+          "closed": false,
+          "exit_code": null,
+          "truncated": false,
+          "summary": "Debugger result: running.",
+          "command": "stepi"
+        }
+      },
+      {
+        "sourceLine": 93,
+        "tool": "debug_cmd",
+        "result": {
+          "ok": true,
+          "result_class": "running",
+          "result_fields": [],
+          "result": {},
+          "console": [
+            "[New Thread 1070550628]",
+            "[New Thread 1070549228]",
+            "[New Thread 1070536748]",
+            "[New Thread 1070542032]",
+            "[New Thread 1070535048]",
+            "[Switching to Thread 1070547828]",
+            "",
+            "Thread 1 \"main\" hit Temporary breakpoint 1, app_main () at C:/Users/proto/.platformio/packages/framework-arduinoespressif32/cores/esp32/main.cpp:56",
+            "56\t{"
+          ],
+          "log": [],
+          "target_output": [
+            "[esp32s3.cpu0] Target halted, PC=0x42003578, debug_reason=00000001",
+            "Set GDB target to 'esp32s3.cpu0'",
+            "[esp32s3.cpu1] Debug controller was reset.",
+            "[esp32s3.cpu1] Core was reset.",
+            "[esp32s3.cpu1] Target halted, PC=0x42022096, debug_reason=00000000"
+          ],
+          "other_output": [],
+          "records": [
+            {
+              "kind": "result",
+              "class": "running"
+            },
+            {
+              "kind": "exec",
+              "class": "running",
+              "payload": {
+                "thread-id": "all"
+              }
+            },
+            {
+              "kind": "prompt"
+            },
+            {
+              "kind": "target",
+              "text": "[esp32s3.cpu0] Target halted, PC=0x42003578, debug_reason=00000001\n"
+            },
+            {
+              "kind": "target",
+              "text": "Set GDB target to 'esp32s3.cpu0'\n"
+            },
+            {
+              "kind": "target",
+              "text": "[esp32s3.cpu1] Debug controller was reset.\n"
+            },
+            {
+              "kind": "target",
+              "text": "[esp32s3.cpu1] Core was reset.\n"
+            },
+            {
+              "kind": "target",
+              "text": "[esp32s3.cpu1] Target halted, PC=0x42022096, debug_reason=00000000\n"
+            },
+            {
+              "kind": "notify",
+              "class": "breakpoint-modified",
+              "payload": {
+                "bkpt": {
+                  "number": "1",
+                  "type": "hw breakpoint",
+                  "disp": "del",
+                  "enabled": "y",
+                  "addr": "0x42003578",
+                  "func": "app_main()",
+                  "file": "C:/Users/proto/.platformio/packages/framework-arduinoespressif32/cores/esp32/main.cpp",
+                  "fullname": "C:\\Users\\proto\\.platformio\\packages\\framework-arduinoespressif32\\cores\\esp32\\main.cpp",
+                  "line": "56",
+                  "thread-groups": [
+                    "i1"
+                  ],
+                  "times": "1",
+                  "original-location": "app_main"
+                }
+              }
+            },
+            {
+              "kind": "notify",
+              "class": "thread-created",
+              "payload": {
+                "id": "2",
+                "group-id": "i1"
+              }
+            },
+            {
+              "kind": "console",
+              "text": "[New Thread 1070550628]\n"
+            },
+            {
+              "kind": "notify",
+              "class": "thread-created",
+              "payload": {
+                "id": "3",
+                "group-id": "i1"
+              }
+            },
+            {
+              "kind": "console",
+              "text": "[New Thread 1070549228]\n"
+            },
+            {
+              "kind": "notify",
+              "class": "thread-created",
+              "payload": {
+                "id": "4",
+                "group-id": "i1"
+              }
+            },
+            {
+              "kind": "console",
+              "text": "[New Thread 1070536748]\n"
+            },
+            {
+              "kind": "notify",
+              "class": "thread-created",
+              "payload": {
+                "id": "5",
+                "group-id": "i1"
+              }
+            },
+            {
+              "kind": "console",
+              "text": "[New Thread 1070542032]\n"
+            },
+            {
+              "kind": "notify",
+              "class": "thread-created",
+              "payload": {
+                "id": "6",
+                "group-id": "i1"
+              }
+            },
+            {
+              "kind": "console",
+              "text": "[New Thread 1070535048]\n"
+            },
+            {
+              "kind": "console",
+              "text": "[Switching to Thread 1070547828]\n"
+            },
+            {
+              "kind": "console",
+              "text": "\n"
+            },
+            {
+              "kind": "console",
+              "text": "Thread 1 \"main\" hit Temporary breakpoint 1, app_main () at C:/Users/proto/.platformio/packages/framework-arduinoespressif32/cores/esp32/main.cpp:56\n"
+            },
+            {
+              "kind": "console",
+              "text": "56\t{\n"
+            },
+            {
+              "kind": "exec",
+              "class": "stopped",
+              "payload": {
+                "reason": "breakpoint-hit",
+                "disp": "del",
+                "bkptno": "1",
+                "frame": {
+                  "addr": "0x42003578",
+                  "func": "app_main",
+                  "args": [],
+                  "file": "C:/Users/proto/.platformio/packages/framework-arduinoespressif32/cores/esp32/main.cpp",
+                  "fullname": "C:\\Users\\proto\\.platformio\\packages\\framework-arduinoespressif32\\cores\\esp32\\main.cpp",
+                  "line": "56",
+                  "arch": "xtensa"
+                },
+                "thread-id": "1",
+                "stopped-threads": "all"
+              }
+            }
+          ],
+          "duration_s": 0.22647879999992437,
+          "note": null,
+          "error": null,
+          "stopped": {
+            "reason": "breakpoint-hit",
+            "signal_name": null,
+            "signal_meaning": null,
+            "thread_id": "1",
+            "bkptno": "1",
+            "disp": "del",
+            "frame": {
+              "function": "app_main",
+              "address": "0x42003578",
+              "file": "C:\\Users\\proto\\.platformio\\packages\\framework-arduinoespressif32\\cores\\esp32\\main.cpp",
+              "line": 56,
+              "args": []
+            }
+          },
+          "running": false,
+          "timed_out": false,
+          "closed": false,
+          "exit_code": null,
+          "truncated": false,
+          "summary": "Debugger result: running.",
+          "command": "continue"
+        }
+      },
+      {
+        "sourceLine": 108,
+        "tool": "debug_start",
+        "result": {
+          "project_dir": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3",
+          "env": "hil-esp32s3",
+          "debug_tool": "esp-builtin",
+          "uptime_s": 11.31854879999999,
+          "running": false,
+          "closed": false,
+          "failed": false,
+          "error": null,
+          "pid": 32852,
+          "cleanupPending": true,
+          "stderr": "C:\\Users\\proto\\.platformio\\packages\\toolchain-xtensa-esp32s3\\bin\\xtensa-esp32s3-elf-gdb.exe: warning: Couldn't determine a path for the index cache directory.\r\n",
+          "command": [
+            "C:\\Users\\proto\\.platformio\\packages\\toolchain-xtensa-esp32s3\\bin\\xtensa-esp32s3-elf-gdb.exe",
+            "-nx",
+            "--quiet",
+            "--interpreter=mi2",
+            "-iex",
+            "set auto-load off",
+            "-iex",
+            "set may-call-functions off"
+          ],
+          "gdb_version": "GNU gdb (crosstool-NG esp-2021r2-patch5) 9.2.90.20200913-git",
+          "exit_code": null,
+          "last_stop": {
+            "reason": null,
+            "signal_name": null,
+            "signal_meaning": null,
+            "thread_id": "1",
+            "frame": {
+              "function": "app_main",
+              "address": "0x42003578",
+              "file": "C:\\Users\\proto\\.platformio\\packages\\framework-arduinoespressif32\\cores\\esp32\\main.cpp",
+              "line": 56,
+              "args": []
+            }
+          },
+          "stopped": {
+            "reason": null,
+            "signal_name": null,
+            "signal_meaning": null,
+            "thread_id": "1",
+            "frame": {
+              "function": "app_main",
+              "address": "0x42003578",
+              "file": "C:\\Users\\proto\\.platformio\\packages\\framework-arduinoespressif32\\cores\\esp32\\main.cpp",
+              "line": 56,
+              "args": []
+            }
+          },
+          "stop_count": 1,
+          "records_buffered": 58,
+          "ok": true,
+          "load": false,
+          "summary": "Debugger initialized using the retained PlatformIO script; reported target state reflects the latest observed event."
+        }
+      },
+      {
+        "sourceLine": 128,
+        "tool": "flash_verification",
+        "result": {
+          "ok": true,
+          "verdict": "pass",
+          "matched_line": "PIO_HIL_HEALTHY",
+          "expect": "PIO_HIL_HEALTHY",
+          "fail_on": "Guru Meditation|panic'ed|abort\\(\\) was called|assert failed|HardFault|Hard Fault|BusFault|UsageFault|MemManage|stack overflow|Task watchdog|Brownout|CORRUPT HEAP|Backtrace:|rst:0x[0-9a-f]+ \\((?:SW_CPU_RESET|TG\\dWDT_SYS_RESET|RTCWDT_RTC_RESET|PANIC)",
+          "lines": [
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY",
+            "PIO_HIL_HEALTHY"
+          ],
+          "line_count": 15,
+          "verify_s": 25.42653539999999,
+          "port_error": null,
+          "dropped_lines": 0,
+          "truncated_bytes": 0,
+          "evidence_complete": true,
+          "retained_lines": 15,
+          "runtime_failures": [],
+          "redactionApplied": true,
+          "redactionOutputMayBeTruncated": false,
+          "cleanupPending": false,
+          "baud": 115200,
+          "upload": {
+            "ok": true,
+            "status": "success",
+            "summary": "target-upload success for env hil-esp32s3-native in 8.11s.",
+            "environments": [],
+            "errors": [],
+            "warnings": [],
+            "error_count": 0,
+            "warning_count": 0,
+            "memory": {},
+            "duration_s": 8.11,
+            "exit_code": 0,
+            "port_error": null,
+            "stopped_sessions": []
+          },
+          "upload_s": 8.107614299999957,
+          "firmware_identity": "embedded_hash_match",
+          "upload_manifest": {
+            "schemaVersion": 1,
+            "projectDir": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3",
+            "environment": "hil-esp32s3-native",
+            "toolchain": {
+              "id": "toolchain-xtensa-esp32s3",
+              "version": "8.4.0+2021r2-patch5"
+            },
+            "buildSettingsSha256": "a2d8cd49490087bc99b685695a97b509efdde6b23f1066e622cb5e8d7628dc62",
+            "uploadCommandSha256": "994c474835cec718afce17c3badc84a43e8d071f092ba618b551f3e9d494c6c1",
+            "elf": {
+              "sourcePath": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\.pio\\build\\hil-esp32s3-native\\firmware.elf",
+              "archivePath": "C:\\Users\\proto\\.platformio-mcp\\artifacts\\elf\\734a830867a13aba43ed46bf4f8960aea875c761456b1e5f1999e042a3c5f1c8\\29f15c4809965d38772b96cda405c8e4788d7f938dddd749dd4cdc875b69b0f8.elf",
+              "sha256": "29f15c4809965d38772b96cda405c8e4788d7f938dddd749dd4cdc875b69b0f8",
+              "size": 8086848
+            },
+            "images": [
+              {
+                "sourcePath": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\.pio\\build\\hil-esp32s3-native\\bootloader.bin",
+                "archivePath": "C:\\Users\\proto\\.platformio-mcp\\artifacts\\upload\\images\\14d2032117adbec1c0256d7cf7b217b919cec313b329b4ade6e09f534a767630\\1776e4dd896a69d0a5c2e79957b0e2a88aa4129b1381d6478683515a1f6af343.bin",
+                "sha256": "1776e4dd896a69d0a5c2e79957b0e2a88aa4129b1381d6478683515a1f6af343",
+                "size": 15104,
+                "offset": 0,
+                "role": "data"
+              },
+              {
+                "sourcePath": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\.pio\\build\\hil-esp32s3-native\\partitions.bin",
+                "archivePath": "C:\\Users\\proto\\.platformio-mcp\\artifacts\\upload\\images\\3e143ea6af48adb65cd5d57a951c0bc7f6fd4374afb54bc9b7e495a30b5a8147\\0e9c3868da97ff3f97c2178f643458ed45d27a17565eaf7d633b4a8d9540d02d.bin",
+                "sha256": "0e9c3868da97ff3f97c2178f643458ed45d27a17565eaf7d633b4a8d9540d02d",
+                "size": 3072,
+                "offset": 32768,
+                "role": "data"
+              },
+              {
+                "sourcePath": "C:\\Users\\proto\\.platformio\\packages\\framework-arduinoespressif32\\tools\\partitions\\boot_app0.bin",
+                "archivePath": "C:\\Users\\proto\\.platformio-mcp\\artifacts\\upload\\images\\145dcf289b58bc7ff7461fe120367bf2336145016f7c68270bd6e8e897ce023b\\f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0.bin",
+                "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0",
+                "size": 8192,
+                "offset": 57344,
+                "role": "data"
+              },
+              {
+                "sourcePath": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\.pio\\build\\hil-esp32s3-native\\firmware.bin",
+                "archivePath": "C:\\Users\\proto\\.platformio-mcp\\artifacts\\upload\\images\\793ecf2e3cf01296c0e2e2e02e448f08fed617d5332bf068967e9eafc757e290\\99327f62da7421140192de4e3ffcb4dd7140e9d54cdb319bd41fd717a58e73b3.bin",
+                "sha256": "99327f62da7421140192de4e3ffcb4dd7140e9d54cdb319bd41fd717a58e73b3",
+                "size": 261520,
+                "offset": 65536,
+                "role": "application"
+              }
+            ],
+            "elfCorrespondence": "embedded_hash_match"
+          },
+          "upload_manifest_sha256": "2af9f7ab39245948c31aa2d629ff072b262427d64fffa5ee06b14e78a012d399",
+          "summary": "Upload succeeded and fresh boot output passed verification."
+        }
+      },
+      {
+        "sourceLine": 131,
+        "tool": "partition_table",
+        "result": {
+          "success": true,
+          "status": "completed",
+          "summary": "6 partition(s) inspected from offline artifacts. 0 layout error(s), 0 warning(s).",
+          "data": {
+            "ok": true,
+            "table_offset": 32768,
+            "table_end": 8388608,
+            "flash_size": 8388608,
+            "firmware_size": 261520,
+            "partitions": [
+              {
+                "name": "nvs",
+                "type": "data",
+                "subtype": "nvs",
+                "offset": 36864,
+                "size": 20480,
+                "flags": [],
+                "unknown_flags": 0,
+                "offset_hex": "0x9000",
+                "size_hex": "0x5000",
+                "end_hex": "0xe000"
+              },
+              {
+                "name": "otadata",
+                "type": "data",
+                "subtype": "ota",
+                "offset": 57344,
+                "size": 8192,
+                "flags": [],
+                "unknown_flags": 0,
+                "offset_hex": "0xe000",
+                "size_hex": "0x2000",
+                "end_hex": "0x10000"
+              },
+              {
+                "name": "app0",
+                "type": "app",
+                "subtype": "ota_0",
+                "offset": 65536,
+                "size": 3276800,
+                "flags": [],
+                "unknown_flags": 0,
+                "offset_hex": "0x10000",
+                "size_hex": "0x320000",
+                "end_hex": "0x330000"
+              },
+              {
+                "name": "app1",
+                "type": "app",
+                "subtype": "ota_1",
+                "offset": 3342336,
+                "size": 3276800,
+                "flags": [],
+                "unknown_flags": 0,
+                "offset_hex": "0x330000",
+                "size_hex": "0x320000",
+                "end_hex": "0x650000"
+              },
+              {
+                "name": "spiffs",
+                "type": "data",
+                "subtype": "spiffs",
+                "offset": 6619136,
+                "size": 1703936,
+                "flags": [],
+                "unknown_flags": 0,
+                "offset_hex": "0x650000",
+                "size_hex": "0x1a0000",
+                "end_hex": "0x7f0000"
+              },
+              {
+                "name": "coredump",
+                "type": "data",
+                "subtype": "coredump",
+                "offset": 8323072,
+                "size": 65536,
+                "flags": [],
+                "unknown_flags": 0,
+                "offset_hex": "0x7f0000",
+                "size_hex": "0x10000",
+                "end_hex": "0x800000"
+              }
+            ],
+            "application_fit": [
+              {
+                "name": "app0",
+                "size": 3276800,
+                "firmware_size": 261520,
+                "fits": true,
+                "used_percent": 8
+              },
+              {
+                "name": "app1",
+                "size": 3276800,
+                "firmware_size": 261520,
+                "fits": true,
+                "used_percent": 8
+              }
+            ],
+            "issues": [
+              {
+                "severity": "info",
+                "code": "app_fits",
+                "message": "Firmware fits all declared application partitions.",
+                "fix": ""
+              }
+            ],
+            "error_count": 0,
+            "warning_count": 0,
+            "evidence": "offline_layout",
+            "artifacts": {
+              "table": {
+                "path": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\partitions-hil.csv",
+                "size": 363,
+                "sha256": "cf6e9809bc004a7eb6cae9a71b89dcf75be502b629a82c545c58c60f78e57588"
+              },
+              "firmware": {
+                "path": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\.pio\\build\\hil-esp32s3-native\\firmware.bin",
+                "size": 261520,
+                "sha256": "99327f62da7421140192de4e3ffcb4dd7140e9d54cdb319bd41fd717a58e73b3"
+              },
+              "observed_table": null
+            },
+            "comparison": null,
+            "comparison_source": null,
+            "device": {
+              "erased": false,
+              "partitions": [
+                {
+                  "name": "nvs",
+                  "type": "data",
+                  "subtype": "nvs",
+                  "offset": 36864,
+                  "size": 20480,
+                  "flags": [],
+                  "unknown_flags": 0,
+                  "offset_hex": "0x9000",
+                  "size_hex": "0x5000",
+                  "end_hex": "0xe000"
+                },
+                {
+                  "name": "otadata",
+                  "type": "data",
+                  "subtype": "ota",
+                  "offset": 57344,
+                  "size": 8192,
+                  "flags": [],
+                  "unknown_flags": 0,
+                  "offset_hex": "0xe000",
+                  "size_hex": "0x2000",
+                  "end_hex": "0x10000"
+                },
+                {
+                  "name": "app0",
+                  "type": "app",
+                  "subtype": "ota_0",
+                  "offset": 65536,
+                  "size": 3276800,
+                  "flags": [],
+                  "unknown_flags": 0,
+                  "offset_hex": "0x10000",
+                  "size_hex": "0x320000",
+                  "end_hex": "0x330000"
+                },
+                {
+                  "name": "app1",
+                  "type": "app",
+                  "subtype": "ota_1",
+                  "offset": 3342336,
+                  "size": 3276800,
+                  "flags": [],
+                  "unknown_flags": 0,
+                  "offset_hex": "0x330000",
+                  "size_hex": "0x320000",
+                  "end_hex": "0x650000"
+                },
+                {
+                  "name": "spiffs",
+                  "type": "data",
+                  "subtype": "spiffs",
+                  "offset": 6619136,
+                  "size": 1703936,
+                  "flags": [],
+                  "unknown_flags": 0,
+                  "offset_hex": "0x650000",
+                  "size_hex": "0x1a0000",
+                  "end_hex": "0x7f0000"
+                },
+                {
+                  "name": "coredump",
+                  "type": "data",
+                  "subtype": "coredump",
+                  "offset": 8323072,
+                  "size": 65536,
+                  "flags": [],
+                  "unknown_flags": 0,
+                  "offset_hex": "0x7f0000",
+                  "size_hex": "0x10000",
+                  "end_hex": "0x800000"
+                }
+              ],
+              "diff": [],
+              "sha256": "b26bcdf85613532c35861806dc3bdfabbbd105b7fd7d22d52f39fc1701ca4f6f",
+              "offset": 32768
+            },
+            "environment": "hil-esp32s3-native",
+            "table_source": "explicit:tablePath",
+            "framework_package": null,
+            "board": "esp32-s3-devkitc-1",
+            "mcu": "ESP32S3",
+            "flash_size_source": "explicit:flashSize",
+            "board_lookup": {
+              "status": "catalogue",
+              "flashSize": 8388608,
+              "mcu": "ESP32S3"
+            },
+            "offset_evidence": [
+              {
+                "source": "explicit:tableOffset",
+                "offset": 32768
+              }
+            ],
+            "sdkconfig_artifact": null,
+            "summary": "6 partition(s) inspected from offline artifacts. 0 layout error(s), 0 warning(s)."
+          },
+          "observedAt": "2026-09-25T16:10:34.331Z"
+        }
+      },
+      {
+        "sourceLine": 158,
+        "tool": "upload_ota",
+        "result": {
+          "ok": true,
+          "error": null,
+          "hint": "Observe the device separately to verify runtime health.",
+          "progress_percent": 100,
+          "auto_switched": false,
+          "runtime_verified": false,
+          "summary": "OTA image transfer completed; runtime health requires separate observation.",
+          "env": "hil-esp32s3-ota",
+          "platform_family": "espressif32",
+          "filesystem": false,
+          "upload_path": "espota_direct",
+          "firmware_path": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\.pio-mcp-workspace\\ota-private\\firmware-updated.bin",
+          "firmware_bytes": 784256,
+          "firmware_sha256": "2dfc609366ca382f4bd85aff642336763bae95e43e8f0a8a74f05250b9f9f973",
+          "firmware_archive_path": "C:\\Users\\proto\\.platformio-mcp\\artifacts\\ota\\5cabbcd2bbceb67fe3e1a76c2ef700b49123b566914395b471f75c9dc9d12134\\2dfc609366ca382f4bd85aff642336763bae95e43e8f0a8a74f05250b9f9f973.bin",
+          "elf_correspondence": "identity_unverified",
+          "elf": null,
+          "embedded_elf_sha256": "828acec0267bd3dfbb5899b7baaf3b6db13bb5b60719dcf533289cbd1d782280",
+          "reachable": null,
+          "reachability_status": "not_requested",
+          "duration_s": 24.424503800000007,
+          "exit_code": 0,
+          "memory": {},
+          "errors": [],
+          "build": null
+        }
+      },
+      {
+        "sourceLine": 163,
+        "tool": "serial_session_read",
+        "result": {
+          "ok": true,
+          "summary": "pattern matched; 1 new line(s). Next cursor 1.",
+          "lines": [
+            "PIO_HIL_OTA_ID mac=14:C1:9F:DC:20:4C ip=[private-board-ip] port=3232 firmware=ota-updated-20260925"
+          ],
+          "cursor": 1,
+          "dropped_before_cursor": 0,
+          "more_available": false,
+          "matched": true,
+          "matched_line": 0,
+          "partial_line": "",
+          "closed": false,
+          "error": null,
+          "redaction_applied": true,
+          "truncated_bytes": 0
+        }
+      },
+      {
+        "sourceLine": 167,
+        "tool": "upload_ota",
+        "result": {
+          "ok": true,
+          "error": null,
+          "hint": "Observe the device separately to verify runtime health.",
+          "progress_percent": 100,
+          "auto_switched": false,
+          "runtime_verified": false,
+          "summary": "OTA image transfer completed; runtime health requires separate observation.",
+          "env": "hil-esp32s3-ota",
+          "platform_family": "espressif32",
+          "filesystem": true,
+          "upload_path": "espota_direct",
+          "firmware_path": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\.pio\\build\\hil-esp32s3-ota\\spiffs.bin",
+          "firmware_bytes": 1703936,
+          "firmware_sha256": "9f982e4c1de1d4cac097ab2a31ce5dfa87f716febab570a41e4d321d94938b6e",
+          "firmware_archive_path": "C:\\Users\\proto\\.platformio-mcp\\artifacts\\ota\\0b0b45fc0831667405eba2566b77f7890678e386f6bd223384e43dfa131b15f8\\9f982e4c1de1d4cac097ab2a31ce5dfa87f716febab570a41e4d321d94938b6e.bin",
+          "elf_correspondence": "identity_unverified",
+          "elf": null,
+          "embedded_elf_sha256": null,
+          "reachable": null,
+          "reachability_status": "not_requested",
+          "duration_s": 53.72907789999997,
+          "exit_code": 0,
+          "memory": {},
+          "errors": [],
+          "build": null
+        }
+      },
+      {
+        "sourceLine": 172,
+        "tool": "serial_session_read",
+        "result": {
+          "ok": true,
+          "summary": "pattern matched; 2 new line(s). Next cursor 2.",
+          "lines": [
+            "PIO_HIL_OTA_ID mac=14:C1:9F:DC:20:4C ip=[private-board-ip] port=3232 firmware=ota-updated-20260925",
+            "PIO_HIL_FS:PIO_HIL_FILESYSTEM_20260925"
+          ],
+          "cursor": 2,
+          "dropped_before_cursor": 0,
+          "more_available": true,
+          "matched": true,
+          "matched_line": 1,
+          "partial_line": "",
+          "closed": false,
+          "error": null,
+          "redaction_applied": true,
+          "truncated_bytes": 0
+        }
+      },
+      {
+        "sourceLine": 176,
+        "tool": "check_task_status",
+        "result": {
+          "success": true,
+          "status": "completed",
+          "summary": "check_task_status completed.",
+          "data": {
+            "status": "success",
+            "targetStatus": "success",
+            "taskId": "bfec080b-a20e-430f-9224-0c298aa4126e",
+            "diagnostic": {
+              "success": true,
+              "stage": "build",
+              "severity": "info",
+              "summary": "build completed successfully.",
+              "evidence": [],
+              "recommendedAction": "Proceed to the next workflow step.",
+              "safeToAutoRetry": true,
+              "rawLogPath": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\.pio-mcp-workspace\\logs\\upload\\upload-2026-09-25T17-13-19-713Z-93eece21.log",
+              "taskId": "bfec080b-a20e-430f-9224-0c298aa4126e",
+              "timestamp": "2026-09-25T17:14:02.308Z"
+            }
+          },
+          "observedAt": "2026-09-25T17:14:02.308Z"
+        }
+      },
+      {
+        "sourceLine": 180,
+        "tool": "serial_session_read",
+        "result": {
+          "ok": true,
+          "summary": "pattern matched; 1 new line(s). Next cursor 1.",
+          "lines": [
+            "PIO_HIL_ECHO:OTA_ID"
+          ],
+          "cursor": 1,
+          "dropped_before_cursor": 0,
+          "more_available": false,
+          "matched": true,
+          "matched_line": 0,
+          "partial_line": "",
+          "closed": false,
+          "error": null,
+          "redaction_applied": true,
+          "truncated_bytes": 0
+        }
+      },
+      {
+        "sourceLine": 184,
+        "tool": "check_task_status",
+        "result": {
+          "success": true,
+          "status": "completed",
+          "summary": "check_task_status completed.",
+          "data": {
+            "status": "success",
+            "targetStatus": "success",
+            "taskId": "bc2554fa-c70c-49e8-aa69-81a265b9754f",
+            "diagnostic": {
+              "success": true,
+              "stage": "build",
+              "severity": "info",
+              "summary": "build completed successfully.",
+              "evidence": [],
+              "recommendedAction": "Proceed to the next workflow step.",
+              "safeToAutoRetry": true,
+              "rawLogPath": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\tests\\fixtures\\hardware\\esp32s3\\.pio-mcp-workspace\\logs\\upload\\upload-2026-09-25T17-17-30-035Z-7c53d3c0.log",
+              "taskId": "bc2554fa-c70c-49e8-aa69-81a265b9754f",
+              "timestamp": "2026-09-25T17:18:02.708Z"
+            }
+          },
+          "observedAt": "2026-09-25T17:18:02.708Z"
+        }
+      }
+    ]
+  },
+  "retainedSerialCustody": {
+    "serial-competing-owner-result.json": {
+      "ok": false,
+      "error": "DEVICE_BUSY",
+      "summary": "Physical resource is already owned.",
+      "status": "failed",
+      "details": {
+        "code": "DEVICE_BUSY"
+      }
+    },
+    "serial-reopen-result.json": {
+      "ok": true,
+      "summary": "Monitoring COM5 at 115200 baud in session 8c1f0633-8b37-46e5-81de-3c531f978280. Read with serial_session_read(session_id='8c1f0633-8b37-46e5-81de-3c531f978280', cursor=0). Stop before flashing.",
+      "baud": 115200,
+      "lines_buffered": 0,
+      "next_cursor": 0,
+      "bytes_received": 0,
+      "uptime_s": 0.2,
+      "closed": false,
+      "error": null,
+      "cleanup_pending": true
+    },
+    "esp32s3-crash-verdict.json": {
+      "matchedExpectations": [
+        "PIO_HIL_READY_BEFORE_CRASH"
+      ],
+      "unmatchedExpectations": [],
+      "rejectedPatterns": [],
+      "runtimeFailures": [
+        "PanicTrace"
+      ],
+      "stabilityAchieved": true
+    }
+  },
+  "retainedLegacyMonitor": {
+    "timestamp": "2026-09-25T19:52:23.025Z",
+    "boardIdentity": "USB VID:PID=303A:1001 SER=14:C1:9F:DC:20:4C",
+    "procedure": "Current-source MCP start_monitor, maintainer reset, query_logs, stop_monitor and inactive status; configured time filter",
+    "observations": [
+      {
+        "success": true,
+        "status": "completed",
+        "summary": "query_logs completed.",
+        "data": {
+          "success": true,
+          "content": "--- Quit: Ctrl+C | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H\r\nDisconnected (ClearCommError failed (PermissionError(13, 'The device does not recognize the command.', None, 22)))\r\nReconnecting to COM7 \t Connected!\r\n12:51:56.735 > PIO_HIL_READY\r\r\n12:51:56.736 > PIO_HIL_HEALTHY\r\r\n12:51:56.736 > PIO_HIL_HEALTHY\r\r\n12:51:56.736 > PIO_HIL_HEALTHY\r\r\n12:51:57.735 > PIO_HIL_HEALTHY\r\r\n12:51:58.735 > PIO_HIL_HEALTHY\r\r\n12:51:59.735 > PIO_HIL_HEALTHY\r\r\n12:52:00.735 > PIO_HIL_HEALTHY\r\r\n12:52:01.735 > PIO_HIL_HEALTHY\r\r\n12:52:02.735 > PIO_HIL_HEALTHY\r\r\n12:52:03.735 > PIO_HIL_HEALTHY\r\r\n12:52:04.735 > PIO_HIL_HEALTHY\r\r\n12:52:05.735 > PIO_HIL_HEALTHY\r\r\n12:52:06.735 > PIO_HIL_HEALTHY\r\r\n12:52:07.735 > PIO_HIL_HEALTHY\r\r\n12:52:08.735 > PIO_HIL_HEALTHY\r\r\n"
+        },
+        "observedAt": "2026-09-25T19:52:23.025Z"
+      },
+      {
+        "success": true,
+        "status": "completed",
+        "summary": "Stopped monitor on COM7",
+        "data": {
+          "success": true,
+          "message": "Stopped monitor on COM7"
+        },
+        "observedAt": "2026-09-25T19:52:37.841Z"
+      },
+      {
+        "success": true,
+        "status": "completed",
+        "summary": "Retrieved monitor status for COM7.",
+        "data": {
+          "state": "inactive",
+          "port": "COM7",
+          "projectDir": "C:/Users/proto/.codex/worktrees/platformio-parity/platformio-mcp/tests/fixtures/hardware/esp32s3"
+        },
+        "observedAt": "2026-09-25T19:52:54.761Z"
+      }
+    ],
+    "scope": "Windows headless PlatformIO filter path; no firmware replacement or repeated OTA/crash test",
+    "bridgeSourceSha256": "068e2ca0afff40c2d3d9c070f93876eabaab1402d95d7001f9f87c7c9c2ac66b",
+    "finalBridgeNote": "Live capture used the ConsoleBase reader/filter path; final embedded packaging and alive-aware writer disconnect changes are covered by monitor-launch.test.ts."
+  },
+  "pluginLifecycle": {
+    "timestamp": "2026-09-25T20:01:47.795Z",
+    "host": "Windows Codex CLI isolated CODEX_HOME",
+    "scope": "Existing 3.1.0 candidate refreshed to final package snapshot through native plugin add, then removed; prior host initialize/disabled-tool evidence retained separately",
+    "beforeInventorySha256": "2d8bde6f76dcf2898f326d8fc8b81f12d8ccd797106967aa953206811c735fa3",
+    "inventorySha256": "7ae295c3ccb51ca8e3b7d857f85b49af19f3014792d8ce64f937554b9af72938",
+    "updated": true,
+    "removed": true,
+    "added": {
+      "pluginId": "platformio-mcp@platformio-mcp",
+      "name": "platformio-mcp",
+      "marketplaceName": "platformio-mcp",
+      "version": "3.1.0",
+      "installedPath": "C:\\Users\\proto\\.codex\\worktrees\\platformio-parity\\platformio-mcp\\.platformio-mcp\\isolated-host-acceptance\\plugin-final\\plugins\\cache\\platformio-mcp\\platformio-mcp\\3.1.0",
+      "authPolicy": "ON_INSTALL"
+    },
+    "removeResult": {
+      "pluginId": "platformio-mcp@platformio-mcp",
+      "name": "platformio-mcp",
+      "marketplaceName": "platformio-mcp"
+    },
+    "inventorySourceCommit": "dd284779daa9e92e80f55ba101192a0ed8419e13",
+    "unchangedInstallMetadata": {
+      "plugins/platformio-mcp/.mcp.json": "0f6e760467b054327ae378e3737d16f963dccb5d3b07b10dd03d0ac6e79a3723",
+      "plugins/platformio-mcp/.codex-plugin/plugin.json": "639f66cf5c471d35dbe0b0b4b28b0446d89f5f1542404f56c96bae5ee5a42dc8",
+      "plugins/platformio-mcp/scripts/launch-platformio-mcp.mjs": "5a976440627de5c639072428f9f0dd90b5d2d948b72895d824188e1b86dfb950"
+    }
+  },
+  "retainedApplicability": {
+    "explanation": "Original board, real ELF/package and isolated host observations retain original dates and source context. Direct serial, debug, flash, OTA, policy and analysis implementations are unchanged from the runtime baseline. Only legacy monitor launch/filter/status changed: timestamped same-board capture and cleanup plus focused launch/disconnect regressions cover it. Historical observations are not final-revision executions. The later shutdown fix drains queued stdout/stderr only after existing device cleanup; the same cleanup deadline and ownership rules remain. Shutdown regression and final native installation checks cover the affected output path.",
+    "changedSources": {
+      "src/platformio.ts": "cc84011461971b9d7abc79c80d82edbb50791c005f7cfe6f0bf20c299297fd9f",
+      "src/tools/monitor.ts": "e7d08d538f1c656fd44f3e74afb8c6ea98a296522994be90cf3d3847adbba136",
+      "src/utils/mcp_pio_proxy.py": null,
+      "src/utils/pio-monitor-bridge.ts": "cb3f5034190a4c7bdd265fecb7004e13b23708e9723c7f0136c2ea30e857c452",
+      "src/utils/shutdown-coordinator.ts": "947fede453dc3254e103dd417266f6112af2d0400727ea6f151227238d7f1042"
+    }
+  },
+  "npmInstallationObservation": {
+    "sourceContext": "Local working-tree final runtime before batch commit; artifact digests identify the installed payload. Release workflow repeats this mandatory gate on its exact commit.",
+    "result": {
+      "schemaVersion": 1,
+      "sourceCommit": "0e31ab704cec59280400935f6b5dedbba4f856e5",
+      "timestamp": "2026-09-25T20:02:30.144Z",
+      "outcome": "pass",
+      "host": {
+        "platform": "win32",
+        "arch": "x64"
+      },
+      "upgradedFrom": "3.0.0",
+      "version": "3.1.0",
+      "artifacts": [
+        {
+          "name": "platformio-mcp",
+          "version": "3.1.0",
+          "filename": "platformio-mcp-3.1.0.tgz",
+          "sha256": "63c2914ce839244928bde799500e462a77dbf8895cb61bc2ed3c1b2084292368"
+        },
+        {
+          "name": "@forkbomb/flashagent",
+          "version": "3.1.0",
+          "filename": "forkbomb-flashagent-3.1.0.tgz",
+          "sha256": "f33e78c9d02d0001aa54069bb7c6f75be3c4cbf2dcf8fd64178aa1c4c925508a"
+        },
+        {
+          "name": "@forkbomb/pio-agent",
+          "version": "3.1.0",
+          "filename": "forkbomb-pio-agent-3.1.0.tgz",
+          "sha256": "86b15606bc95ae9ec24e4ca1438208f62c6c81d9544ffd878f0e10b88fcf90a1"
+        },
+        {
+          "name": "@forkbomb/pio-mcp",
+          "version": "3.1.0",
+          "filename": "forkbomb-pio-mcp-3.1.0.tgz",
+          "sha256": "ef613cbb7de2307f0eba377818aa036d1a43ee7042056b001a992be693d90486"
+        },
+        {
+          "name": "@forkbomb/pioagent",
+          "version": "3.1.0",
+          "filename": "forkbomb-pioagent-3.1.0.tgz",
+          "sha256": "23e7a2da8786600241796b40aa0c8ffeb498d5c6f227a883965bb23b5b16a7b3"
+        },
+        {
+          "name": "@forkbomb/platformio-mcp",
+          "version": "3.1.0",
+          "filename": "forkbomb-platformio-mcp-3.1.0.tgz",
+          "sha256": "6a0b04d26363f1b860f5cd9acc8918273bba5304344d7a3177b38bd5e177fc33"
+        },
+        {
+          "name": "@forkbomb/platformio.mcp",
+          "version": "3.1.0",
+          "filename": "forkbomb-platformio.mcp-3.1.0.tgz",
+          "sha256": "4973678cd33314bd6cf74b01608fefb862fc16e05550b944ed66060913309f4a"
+        },
+        {
+          "name": "@forkbomb/platformiomcp",
+          "version": "3.1.0",
+          "filename": "forkbomb-platformiomcp-3.1.0.tgz",
+          "sha256": "aa005a9ce39a1cf0273d0c3fc6acc633e45666d5e867725a89c32dc29c89b1b1"
+        },
+        {
+          "name": "pio-agent",
+          "version": "3.1.0",
+          "filename": "pio-agent-3.1.0.tgz",
+          "sha256": "ae6b232d14aca53acba78845128ba5ba1ac7fba3b1ad46e1952e19d485e1ac86"
+        },
+        {
+          "name": "pio-mcp",
+          "version": "3.1.0",
+          "filename": "pio-mcp-3.1.0.tgz",
+          "sha256": "b28c5fdd59474b8cbc17cb1962ab50a289e36d171725a60c6982aae6014594d7"
+        }
+      ],
+      "aliasUninstallPreservesCanonical": true,
+      "canonicalUninstalled": true,
+      "scope": "Exact packed artifacts, not public-registry installation"
+    }
+  }
+}

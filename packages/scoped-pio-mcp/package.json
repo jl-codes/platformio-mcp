@@ -1,0 +1,30 @@
+{
+  "name": "@forkbomb/pio-mcp",
+  "version": "3.1.0",
+  "description": "Functional npm alias for the canonical platformio-mcp CLI and MCP server.",
+  "type": "module",
+  "bin": {
+    "pio-mcp": "bin.js"
+  },
+  "files": [
+    "bin.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "platformio-mcp": "3.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jl-codes/platformio-mcp.git",
+    "directory": "packages/scoped-pio-mcp"
+  },
+  "homepage": "https://github.com/jl-codes/platformio-mcp#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}

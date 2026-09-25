@@ -13,6 +13,8 @@ import type { SerialDevice } from "../types.js";
 import { PlatformIOError } from "../utils/errors.js";
 import { validateProjectPath } from "../utils/validation.js";
 import { listDevicesCore } from "./devices.js";
+import { getProjectConfig } from "../tools/projects.js";
+import { parseProjectEnvironments } from "./project-inspection.js";
 
 const MAX_BINDING_TTL_SECONDS = 900;
 
@@ -186,7 +188,24 @@ export async function resolveTarget(
     };
   }
 
-  const parsed = parseTargetEnvironments(fs.readFileSync(iniPath, "utf8"));
+  const iniText = fs.readFileSync(iniPath, "utf8");
+  let parsed = parseTargetEnvironments(iniText);
+  // Core owns inheritance/interpolation semantics; never guess a write target from raw overrides.
+  if (/^\s*(?:extends|extra_configs)\s*=|^\s*\[env\]\s*$|\$\{/mu.test(iniText)) {
+    const report = parseProjectEnvironments(JSON.stringify(await getProjectConfig(projectDir)));
+    parsed = {
+      defaults: report.defaultEnvironments,
+      environments: report.envs.map((env) => {
+        if (env.board !== null && typeof env.board !== "string")
+          throw new PlatformIOError("Computed board is not a string.", "INVALID_TARGET_CONFIG");
+        return {
+          name: env.name,
+          ...(env.board ? { board: env.board } : {}),
+          ...(typeof env.framework === "string" ? { framework: env.framework } : {}),
+        };
+      }),
+    };
+  }
   let selectedEnvironment: TargetEnvironment | undefined;
   if (input.environment) {
     selectedEnvironment = parsed.environments.find(

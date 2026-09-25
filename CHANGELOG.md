@@ -5,19 +5,51 @@ All notable changes to **platformio-mcp** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.1.0] - Unreleased
 
-### Changed
+### Added
 
 - **The CLI is the primary interface.** `pio-agent` (also `platformio-mcp`) is a
   complete standalone adapter; nothing starts a long-lived process unless asked.
   MCP is unchanged and fully supported, now behind an explicit `pio-agent serve`.
   Bare invocation still starts the MCP server but prints a deprecation warning
-  on stderr; the installers now generate the `serve` form and no longer pass
-  `--open-dashboard-on-start`.
+  on stderr; the installers generate the `serve` form.
+- Skills retargeted from MCP tool names to CLI commands. `pio-manager` is the
+  gateway skill: Tier 1 is the `pio-agent` CLI, MCP is Tier 2 only when a
+  server is already running, and it documents the stdout/stderr/exit-code
+  contract (three outcomes, not two) and the `PortBusy` / `DeviceBusy`
+  distinction. The dashboard skill never starts the dashboard itself; it tells
+  the user to run `pio-agent dashboard --serve`. README and the LLM
+  installation guide lead with the CLI; MCP is documented as optional.
+- CLI commands closing the gap with the MCP tools: `lib`, `project`, `logs`,
+  `board-info`, `system-info`, `monitor-stop`, `task-cancel`, `upload-fs`,
+  `lock status`, `port release --port <p> [--force]` (the claim errors point
+  users at the last two for recovery), plus `serve` and `dashboard --serve`.
+- `install_library` / `lib install` accept PlatformIO's canonical `owner/name`
+  identifier (`bblanchon/ArduinoJson`), and `validateSerialPort` accepts
+  `/dev/serial/by-id/...`, `/dev/serial/by-path/...` and `/dev/ttyAMA0`.
+- Optional `platformio-mcp-python` compatibility mode registers all 40 pinned
+  reference tool names alongside 72 normal-mode tools. Registration is not a
+  declaration of completed behavioral or physical acceptance.
+- Connection-owned serial sessions, bounded capture, memory telemetry and port
+  diagnosis without compatibility mode, preserving legacy monitor tools.
+- Retained-artifact flash verification with connection-local approval/resume;
+  ESP firmware/filesystem OTA with pinned destinations, bounded optional ICMP
+  checks, and a shared `upload-ota` CLI command.
+- Classified debugger operations, ELF/partition/core-dump inspection, and serial
+  or PPK2 power profiling with explicit device and electrical authorization.
+- Functional candidate packaging across npm, Python and GHCR, including all seven
+  requested scoped npm name families. Candidates remain unpublished until their
+  authority, naming eligibility and release gates are satisfied.
+- Source-bound acceptance evidence collection and installer evidence production.
+
+### Changed
+
 - **`pio-agent dashboard` no longer boots the dashboard on demand.** It reports
-  whether one is running in any process and the URL; `pio-agent dashboard
-  --serve` starts it. Scripts that relied on the auto-boot must pass `--serve`.
+  whether one is running in any process and its URL; `pio-agent dashboard
+  --serve` starts it and prints the single-use launch URL (`--operator` mints
+  an operator session for that browser). Scripts that relied on the auto-boot
+  must pass `--serve`.
 - `--background` on the CLI now genuinely returns immediately: the command
   re-executes itself detached with a preassigned task id, and
   `task-status <id>` reads the result. Previously it printed `running` and then
@@ -29,22 +61,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   --version 1.2.3` installs that version instead of printing the CLI version.
   `--help` works after any command. An unknown leading flag is an error rather
   than starting the MCP server.
-
-### Added
-
-- Skills retargeted from MCP tool names to CLI commands. `pio-manager` is the
-  gateway skill: Tier 1 is the `pio-agent` CLI, MCP is Tier 2 only when a
-  server is already running, and it documents the stdout/stderr/exit-code
-  contract (three outcomes, not two) and the `PortBusy` / `DeviceBusy`
-  distinction. The dashboard skill never starts the dashboard itself; it tells
-  the user to run `pio-agent dashboard --serve`. README and the LLM
-  installation guide lead with the CLI; MCP is documented as optional.
-- 17 CLI commands closing the gap with the MCP tools: `lib`, `project`, `logs`,
-  `board-info`, `clean`, `test`, `system-info`, `monitor-stop`, `task-cancel`,
-  `upload-fs`, plus `serve` and `dashboard --serve`.
-- `install_library` / `lib install` accept PlatformIO's canonical `owner/name`
-  identifier (`bblanchon/ArduinoJson`), and `validateSerialPort` accepts
-  `/dev/serial/by-id/...`, `/dev/serial/by-path/...` and `/dev/ttyAMA0`.
+- **Diagnostics: the log-matcher `errorType: "PortBusy"` is renamed
+  `"DeviceBusy"`** (the OS reporting the device busy, often transient, still
+  `safeToAutoRetry: true`). `"PortBusy"` now means another pio-agent process
+  holds a claim on the port and is `safeToAutoRetry: false`. This `diagnostic`
+  object ships inside MCP `upload_firmware` / `upload_filesystem` results, so
+  consumers matching the old string must update.
+- Resolve server policy and host configuration provenance without treating
+  `config.toml` settings as blanket server authorization. Preserve existing Codex
+  comments, restrictions, custom launchers and policy selectors during installation.
+- Pin every npm wrapper to the exact canonical release version and keep package
+  eligibility, publisher control, publication and installed verification separate.
 
 ### Fixed
 
@@ -58,27 +85,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`PIO_MONITOR_CLAIM_TTL_MS`) -- so a live monitor is never reclaimed by a
   flash-sized timer, yet a recycled PID cannot wedge a port forever.
 - `stopMonitor` force-cleared a claim on a kill it never verified; it now
-  requires proof the monitor is gone, and says on stderr whose monitor it is
-  stopping when that monitor belongs to another session.
+  requires the identity-verified kill to succeed, and says on stderr whose
+  monitor it is stopping when that monitor belongs to another session.
 - `pio-agent monitor` printed its result and then never exited (an un-unref'd
   log watcher; on Windows, also the polling fallback).
 - On Windows, a claim for `COM1`-`COM9` would have been written to the serial
   device itself (reserved DOS device names); those filenames are now prefixed.
-- Upload claims leaked when the spooler timed out or failed to spawn, wedging
-  the port under the long-lived MCP server.
 - `reset_server_state` skipped `.reclaim` breakers and `.tmp.` files, so it
   reported "all locks cleared" while leaving a wedged port behind.
+- Advertise retained flash resume and approval fields in MCP schemas.
+- Expose owned serial, retained flash and OTA capabilities in normal mode.
+- Return bounded schema-validation errors instead of internal errors for invalid
+  compatibility arguments; redact OTA credentials from build diagnostics.
 
-### Changed
+### Release status
 
-- **Diagnostics: the log-matcher `errorType: "PortBusy"` is renamed
-  `"DeviceBusy"`** (the OS reporting the device busy, often transient, still
-  `safeToAutoRetry: true`). `"PortBusy"` now means another pio-agent process
-  holds a claim on the port and is `safeToAutoRetry: false`. This `diagnostic`
-  object ships inside MCP `upload_firmware` / `upload_filesystem` results, so
-  consumers matching the old string must update.
-- `pio-agent lock status` and `pio-agent port release --port <p> [--force]`
-  are added, since the claim errors point users at them for recovery.
+3.1.0 is prepared but not published. Native wheel installation on five hosts and
+amd64/arm64 container builds passed on the recorded pre-release source. Full parity,
+required physical acceptance, publisher setup and registry-installed verification
+remain incomplete. See [distribution readiness](docs/DISTRIBUTION_READINESS.md)
+and the [compatibility guide](docs/package-compatibility.md) for current limits.
 
 ## [3.0.0] - 2026-09-08
 

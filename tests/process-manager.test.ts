@@ -5,6 +5,9 @@ import path from 'node:path';
 import * as child_process from 'node:child_process';
 import os from 'node:os';
 
+// Fixture PIDs must never reach the host process tree, including during cleanup.
+vi.mock('tree-kill', () => ({ default: vi.fn((_pid, _signal, callback) => callback?.()) }));
+
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof child_process>();
   return {
@@ -27,10 +30,11 @@ describe('Process Manager (Atomic Locking & Staleness)', () => {
   });
 
   afterEach(async () => {
-    process.kill = originalKill;
     try {
       await killAllTrackedProcesses(testProjectDir);
-    } catch {}
+    } finally {
+      process.kill = originalKill;
+    }
     if (fs.existsSync(testProjectDir)) {
       fs.rmSync(testProjectDir, { recursive: true, force: true });
     }

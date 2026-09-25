@@ -131,26 +131,32 @@ describe("CLI agent workflow smoke tests", () => {
     });
   });
 
-  it("exposes read-only target, monitor, task, and approval state from CLI", async () => {
+  it("exposes read-only target state from CLI", async () => {
     const target = (await runCli(
       ["target-resolve", "--project-dir", tempProjectDir, "--json"],
       repoRoot,
     )) as { success: boolean; status: string };
     expect(target).toMatchObject({ success: false, status: "invalid_config" });
+  });
 
+  it("exposes read-only monitor state from CLI", async () => {
     const monitor = (await runCli(
       ["monitor-status", "--project-dir", tempProjectDir, "--json"],
       repoRoot,
     )) as { monitors: unknown[] };
     expect(monitor.monitors).toEqual([]);
+  });
 
+  it("exposes read-only task history from CLI", async () => {
     const history = (await runCli(
       ["task-history", "--project-dir", tempProjectDir, "--json"],
       repoRoot,
     )) as { tasks: unknown[]; observedAt: string };
     expect(history.tasks).toEqual([]);
     expect(new Date(history.observedAt).toString()).not.toBe("Invalid Date");
+  });
 
+  it("exposes read-only approval state from CLI", async () => {
     const approvals = (await runCli(
       ["pending-approvals", "--project-dir", tempProjectDir, "--json"],
       repoRoot,

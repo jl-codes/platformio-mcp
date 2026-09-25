@@ -1,3 +1,4 @@
+import { PlatformIOError } from "../src/utils/errors.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { HardwareLockManager, QueueEnforcementError } from "../src/utils/lock-manager.js";
 
@@ -62,4 +63,18 @@ describe("HardwareLockManager", () => {
     
     lockManager.releaseLock("re-entrant-session");
   });
+});
+
+
+it("retains implicit custody until explicit recovery when termination is unconfirmed", async () => {
+  const manager = HardwareLockManager.getInstance();
+  const previous = manager.getLockStatus().sessionId;
+  if (previous) manager.releaseLock(previous);
+  const error = new PlatformIOError("unconfirmed", "PROCESS_CLEANUP_PENDING", { cleanupPending: true });
+  await expect(manager.withImplicitLock(async () => { throw error; })).rejects.toBe(error);
+  const held = manager.getLockStatus();
+  try {
+    expect(held.isLocked).toBe(true);
+    await expect(manager.withImplicitLock(async () => {})).rejects.toBeInstanceOf(QueueEnforcementError);
+  } finally { if (held.sessionId) manager.releaseLock(held.sessionId); }
 });

@@ -1,0 +1,1166 @@
+{
+  "schemaVersion": 1,
+  "canonicalSource": "https://github.com/jl-codes/platformio-mcp",
+  "requestedAliases": [
+    "platformio-mcp",
+    "pio-mcp",
+    "platformio.mcp",
+    "pio-agent",
+    "platformiomcp",
+    "pioagent",
+    "flashagent"
+  ],
+  "rows": [
+    {
+      "alias": "platformio-mcp",
+      "channel": "npm",
+      "entries": [
+        {
+          "name": "platformio-mcp",
+          "role": "canonical",
+          "packagePath": ".",
+          "publishIntent": true,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "observed_project_link",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": "3.0.0",
+          "observedAt": "2026-09-20T03:52:45.662Z",
+          "reason": null
+        }
+      ],
+      "disposition": "published_metadata_observed_authority_verified",
+      "scopedAlternatives": [
+        {
+          "name": "@forkbomb/platformio-mcp",
+          "role": "candidate_alias",
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
+        }
+      ]
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "pypi",
+      "entries": [
+        {
+          "name": "platformio.mcp",
+          "role": "excluded_third_party",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "third_party",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": "0.2.0",
+          "observedAt": "2026-09-20T03:52:48.395Z",
+          "reason": null
+        }
+      ],
+      "disposition": "excluded_third_party",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "ghcr",
+      "entries": [
+        {
+          "name": "ghcr.io/jl-codes/platformio-mcp",
+          "role": "candidate_container",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:48.773Z",
+          "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "mcp",
+      "entries": [
+        {
+          "name": "io.github.jl-codes/platformio-mcp",
+          "role": "planned",
+          "packagePath": null,
+          "publishIntent": true,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:48.508Z",
+          "reason": null
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "plugin",
+      "entries": [
+        {
+          "name": "platformio-mcp",
+          "role": "existing",
+          "packagePath": null,
+          "publishIntent": true,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:48.508Z",
+          "reason": null
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/platformio-mcp",
+          "role": "canonical",
+          "packagePath": null,
+          "publishIntent": true,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:48.508Z",
+          "reason": null
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "Docker Hub",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "VS Code Marketplace",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "Open VSX",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "Homebrew",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "winget",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "Chocolatey",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio-mcp",
+      "channel": "domains",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "npm",
+      "entries": [
+        {
+          "name": "pio-mcp",
+          "role": "functional_alias",
+          "packagePath": "packages/pio-mcp",
+          "publishIntent": true,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "observed_project_link",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": "3.0.0",
+          "observedAt": "2026-09-20T03:52:46.090Z",
+          "reason": null
+        }
+      ],
+      "disposition": "published_metadata_observed_authority_verified",
+      "scopedAlternatives": [
+        {
+          "name": "@forkbomb/pio-mcp",
+          "role": "candidate_alias",
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
+        }
+      ]
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "pypi",
+      "entries": [
+        {
+          "name": "pio-mcp",
+          "role": "candidate_alias",
+          "packagePath": "packages/python-aliases/pio-mcp",
+          "publishIntent": true,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:48.199Z",
+          "reason": null
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "ghcr",
+      "entries": [
+        {
+          "name": "ghcr.io/jl-codes/pio-mcp",
+          "role": "candidate_container",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:48.773Z",
+          "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "mcp",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "plugin",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/pio-mcp",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715067,
+          "landingReadmeBlobSha": "fc63b1099ac0581c64f8f69e20ce6a8610e10327",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "Docker Hub",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "VS Code Marketplace",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "Open VSX",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "Homebrew",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "winget",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "Chocolatey",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-mcp",
+      "channel": "domains",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "npm",
+      "entries": [
+        {
+          "name": "platformio.mcp",
+          "role": "blocked_naming_rule",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:46.280Z",
+          "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+        }
+      ],
+      "disposition": "blocked_naming_rule",
+      "scopedAlternatives": [
+        {
+          "name": "@forkbomb/platformio.mcp",
+          "role": "candidate_alias",
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
+        }
+      ]
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "pypi",
+      "entries": [
+        {
+          "name": "platformio.mcp",
+          "role": "excluded_third_party",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "third_party",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": "0.2.0",
+          "observedAt": "2026-09-20T03:52:48.395Z",
+          "reason": null
+        }
+      ],
+      "disposition": "excluded_third_party",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "ghcr",
+      "entries": [
+        {
+          "name": "ghcr.io/jl-codes/platformio.mcp",
+          "role": "candidate_container",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:48.773Z",
+          "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "mcp",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "plugin",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/platformio.mcp",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715115,
+          "landingReadmeBlobSha": "980dfdb41f6f473f7f99c832bd8b4e8fb7f2f9e1",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "Docker Hub",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "VS Code Marketplace",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "Open VSX",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "Homebrew",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "winget",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "Chocolatey",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformio.mcp",
+      "channel": "domains",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "npm",
+      "entries": [
+        {
+          "name": "pio-agent",
+          "role": "functional_alias",
+          "packagePath": "packages/pio-agent",
+          "publishIntent": true,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "observed_project_link",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": "3.0.0",
+          "observedAt": "2026-09-20T03:52:45.974Z",
+          "reason": null
+        }
+      ],
+      "disposition": "published_metadata_observed_authority_verified",
+      "scopedAlternatives": [
+        {
+          "name": "@forkbomb/pio-agent",
+          "role": "candidate_alias",
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
+        }
+      ]
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "pypi",
+      "entries": [
+        {
+          "name": "pio-agent",
+          "role": "candidate_alias",
+          "packagePath": "packages/python-aliases/pio-agent",
+          "publishIntent": true,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:47.906Z",
+          "reason": null
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "ghcr",
+      "entries": [
+        {
+          "name": "ghcr.io/jl-codes/pio-agent",
+          "role": "candidate_container",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:48.773Z",
+          "reason": "Container packaging prepared; Linux amd64/arm64 execution, dependency locking, namespace authority and identical alias digest verification remain pending."
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "mcp",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "plugin",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/pio-agent",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715164,
+          "landingReadmeBlobSha": "919e3dd40077c9cf498c1b5a528c1cc6f719ba00",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "Docker Hub",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "VS Code Marketplace",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "Open VSX",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "Homebrew",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "winget",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "Chocolatey",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pio-agent",
+      "channel": "domains",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "npm",
+      "entries": [
+        {
+          "name": "platformiomcp",
+          "role": "blocked_naming_rule",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:46.736Z",
+          "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+        }
+      ],
+      "disposition": "blocked_naming_rule",
+      "scopedAlternatives": [
+        {
+          "name": "@forkbomb/platformiomcp",
+          "role": "candidate_alias",
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
+        }
+      ]
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "pypi",
+      "entries": [
+        {
+          "name": "platformiomcp",
+          "role": "candidate_alias",
+          "packagePath": "packages/python-aliases/platformiomcp",
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:48.921Z",
+          "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified."
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "ghcr",
+      "entries": [
+        {
+          "name": "ghcr.io/jl-codes/platformiomcp",
+          "role": "candidate_container",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:49.085Z",
+          "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "mcp",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "plugin",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/platformiomcp",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715205,
+          "landingReadmeBlobSha": "cd7a1154c618733c3c37b49ae8f328b936fb8b20",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "Docker Hub",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "VS Code Marketplace",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "Open VSX",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "Homebrew",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "winget",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "Chocolatey",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "platformiomcp",
+      "channel": "domains",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "npm",
+      "entries": [
+        {
+          "name": "pioagent",
+          "role": "blocked_naming_rule",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:47.109Z",
+          "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+        }
+      ],
+      "disposition": "blocked_naming_rule",
+      "scopedAlternatives": [
+        {
+          "name": "@forkbomb/pioagent",
+          "role": "candidate_alias",
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
+        }
+      ]
+    },
+    {
+      "alias": "pioagent",
+      "channel": "pypi",
+      "entries": [
+        {
+          "name": "pioagent",
+          "role": "candidate_alias",
+          "packagePath": "packages/python-aliases/pioagent",
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:49.085Z",
+          "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified."
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "ghcr",
+      "entries": [
+        {
+          "name": "ghcr.io/jl-codes/pioagent",
+          "role": "candidate_container",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:49.265Z",
+          "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "mcp",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "plugin",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/pioagent",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715245,
+          "landingReadmeBlobSha": "27fb4d1d4d28bb080fb624a68e41894393c1d70e",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "Docker Hub",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "VS Code Marketplace",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "Open VSX",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "Homebrew",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "winget",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "Chocolatey",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "pioagent",
+      "channel": "domains",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "npm",
+      "entries": [
+        {
+          "name": "flashagent",
+          "role": "candidate_alias",
+          "packagePath": "packages/flashagent",
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:48.773Z",
+          "reason": "Existing npm flash-agent@1.0.38 creates a punctuation-insensitive naming collision. A missing exact-name lookup does not prove eligibility; publication remains disabled pending registry resolution."
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": [
+        {
+          "name": "@forkbomb/flashagent",
+          "role": "candidate_alias",
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending."
+        }
+      ]
+    },
+    {
+      "alias": "flashagent",
+      "channel": "pypi",
+      "entries": [
+        {
+          "name": "flashagent",
+          "role": "candidate_alias",
+          "packagePath": "packages/python-aliases/flashagent",
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "lookup_missing",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:49.265Z",
+          "reason": "Functional wheel source prepared; publisher authority and naming eligibility remain unverified."
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "ghcr",
+      "entries": [
+        {
+          "name": "ghcr.io/jl-codes/flashagent",
+          "role": "candidate_container",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": false,
+          "namingEligibilityVerified": false,
+          "publicObservation": "unknown",
+          "landingRepositoryId": null,
+          "landingReadmeBlobSha": null,
+          "observedVersion": null,
+          "observedAt": "2026-09-20T03:52:49.425Z",
+          "reason": "Included in shared-image publisher; native acceptance, namespace authority and anonymous digest verification remain pending."
+        }
+      ],
+      "disposition": "candidate_not_secured",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "mcp",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "plugin",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "github",
+      "entries": [
+        {
+          "name": "jl-codes/flashagent",
+          "role": "official_landing",
+          "packagePath": null,
+          "publishIntent": false,
+          "authorityVerified": true,
+          "namingEligibilityVerified": false,
+          "publicObservation": "verified_public_landing",
+          "landingRepositoryId": 1378715300,
+          "landingReadmeBlobSha": "dc88413341cadae2743bd2755f8c3dcb84d9911f",
+          "observedVersion": null,
+          "observedAt": "2026-09-20T19:42:34.626134+00:00",
+          "reason": "Published project-owned landing page. Evidence: docs/reviews/github-alias-publication.json."
+        }
+      ],
+      "disposition": "published_official_landing",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "Docker Hub",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "VS Code Marketplace",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "Open VSX",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "Homebrew",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "winget",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "Chocolatey",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    },
+    {
+      "alias": "flashagent",
+      "channel": "domains",
+      "entries": [],
+      "disposition": "not_implemented",
+      "scopedAlternatives": []
+    }
+  ],
+  "limitation": "Public metadata and prepared packages do not establish publication authority, final-release deployment, or universal namespace protection."
+}

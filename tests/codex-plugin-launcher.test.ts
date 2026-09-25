@@ -99,7 +99,7 @@ describe("Codex plugin launcher", () => {
       expect(aliasPackage.version).toBe(PACKAGE_VERSION);
       expect(aliasPackage.bin[packageName]).toBe("bin.js");
       expect(aliasPackage.dependencies["platformio-mcp"]).toBe(
-        `^${PACKAGE_VERSION}`,
+        PACKAGE_VERSION,
       );
       expect(aliasLauncher).toContain('import("platformio-mcp/build/cli.js")');
     },
@@ -144,7 +144,7 @@ describeBundledRuntime("bundled Codex plugin runtime", () => {
         throw new Error(`${message}\nPackaged server stderr:\n${stderr}`);
       });
       const result = await client.listTools();
-      expect(result.tools).toHaveLength(42);
+      expect(result.tools).toHaveLength(72);
       expect(
         result.tools.every(
           (tool) =>

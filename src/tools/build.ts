@@ -9,7 +9,12 @@
  * - listTargets: Discovers valid compilation targets.
  */
 
+import type { ProcessDeviceCustody } from "../core/devices/process-device-custody.js";
+import { summarizeCheckOutput } from "../core/analysis/check-report.js";
+import { readCommandOutput } from "../utils/command-log.js";
+import { loadEffectivePolicyState } from "../core/policy/load-policy.js";
 import { platformioExecutor } from "../platformio.js";
+import type { SpoolingForegroundResult } from "../utils/spooler.js";
 import { executeWithSpooling } from "../utils/spooler.js";
 import type { BuildResult, CleanResult } from "../types.js";
 import {
@@ -42,6 +47,13 @@ import { diagnoseBuildLog } from "../core/diagnostics/build-diagnostics.js";
 import { diagnoseUploadLog } from "../core/diagnostics/upload-diagnostics.js";
 import { diagnoseSerialLog } from "../core/diagnostics/serial-diagnostics.js";
 import type { DiagnosticResult } from "../core/diagnostics/types.js";
+/** Trusted execution controls for callers that require a fresh, fully observed build. */
+export interface BuildExecutionOptions {
+  jobs?: number; // Positive parallel job count passed directly to PlatformIO.
+  forceExecution?: boolean; // Bypass content-cache replay without changing log verbosity.
+  timeoutMs?: number; // Foreground compatibility timeout override.
+  onResult?: (result: SpoolingForegroundResult) => Promise<void>; // Observe completed output.
+}
 /**
  * Builds a PlatformIO project.
  *
@@ -55,6 +67,7 @@ export async function buildProject(
   environment?: string,
   verbose?: boolean,
   background?: boolean,
+  execution: BuildExecutionOptions = {},
 ): Promise<BuildResult> {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
@@ -64,6 +77,13 @@ export async function buildProject(
       environment,
     });
   }
+
+  if (execution.forceExecution !== undefined && typeof execution.forceExecution !== "boolean")
+    throw new BuildError("Build forceExecution must be a boolean", { projectDir });
+  if (execution.jobs !== undefined && (!Number.isSafeInteger(execution.jobs) || execution.jobs < 1 || execution.jobs > 1024))
+    throw new BuildError("Build jobs must be an integer between 1 and 1024", { projectDir });
+  if (execution.timeoutMs !== undefined && (!Number.isInteger(execution.timeoutMs) || execution.timeoutMs < 1 || execution.timeoutMs > 3600000))
+    throw new BuildError("Build timeout must be between 1 and 3600000 milliseconds", { projectDir });
 
   // ----------------------------------------------------------------------------
   // 1. Content-hash cache short-circuit.
@@ -80,7 +100,7 @@ export async function buildProject(
   // want fresh ones from the compiler, not a cached tail.
   // ----------------------------------------------------------------------------
   const envName = environment || "default";
-  if (!background && !verbose) {
+  if (!background && !verbose && !execution.forceExecution && !execution.onResult) {
     const lookup = lookupBuildCache(validatedPath, envName);
     if (lookup.hit) {
       const cached = lookup.entry;
@@ -123,11 +143,13 @@ export async function buildProject(
       args.push("--verbose");
     }
 
+    if (execution.jobs !== undefined) args.push("--jobs", String(execution.jobs));
+
     // Build can take a while, especially first time
     const result = await executeWithSpooling("run", args, {
       cwd: validatedPath,
       projectDir: validatedPath,
-      timeout: background ? 3600000 : 600000, // 1 hour for background, 10 mins for foreground
+      timeout: execution.timeoutMs ?? (background ? 3600000 : 600000), // 1 hour for background, 10 mins for foreground
       background,
       rootCommandId
     });
@@ -138,6 +160,7 @@ export async function buildProject(
       return result as unknown as BuildResult;
     }
 
+    await execution.onResult?.(result);
     const success = result.exitCode === 0;
     const safeOutput = redactSecretsInText(result.finalOutput);
     const legacyErrors = success ? undefined : parseStderrErrors(safeOutput);
@@ -206,16 +229,24 @@ export async function buildProject(
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
-      throw new BuildError(`Build failed: ${error.message}`, {
-        projectDir,
-        environment,
-      });
+      throw error;
     }
     throw new BuildError(`Failed to build project: ${error}`, {
       projectDir,
       environment,
     });
   }
+}
+
+/** Structured static-analysis execution options, preserving legacy defaults when omitted. */
+export interface CheckExecutionOptions {
+  severity?: "low" | "medium" | "high"; // Minimum reported severity.
+  pattern?: string; // PlatformIO source pattern, passed as one argument.
+  skipPackages?: boolean; // Omit dependency source files from analysis.
+  tool?: string; // Configured analysis tool selector.
+  jsonOutput?: boolean; // Request machine-readable defects.
+  timeoutMs?: number; // Trusted bounded execution timeout.
+  onResult?: (result: SpoolingForegroundResult) => Promise<void>; // Observe completed output.
 }
 
 /**
@@ -230,6 +261,7 @@ export async function checkProject(
   projectDir: string,
   environment?: string,
   background?: boolean,
+  options: CheckExecutionOptions = {},
 ): Promise<BuildResult> {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
@@ -238,8 +270,25 @@ export async function checkProject(
     throw new BuildError(`Invalid environment name: ${environment}`, { environment });
   }
 
+  const severities = ["low", "medium", "high"] as const;
+  if (options.severity !== undefined && !severities.includes(options.severity))
+    throw new BuildError("Check severity must be low, medium, or high", { projectDir });
+  for (const value of [options.pattern, options.tool])
+    if (value !== undefined && (typeof value !== "string" || !value.length || value.length > 4096 || /[\x00-\x1f\x7f]/.test(value)))
+      throw new BuildError("Invalid check filter", { projectDir });
+  for (const value of [options.jsonOutput, options.skipPackages])
+    if (value !== undefined && typeof value !== "boolean")
+      throw new BuildError("Check switches must be booleans", { projectDir });
+  if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 3600000))
+    throw new BuildError("Invalid check timeout", { projectDir });
   try {
     const args: string[] = [];
+    if (options.jsonOutput) args.push("--json-output");
+    if (options.severity)
+      for (const severity of severities.slice(severities.indexOf(options.severity))) args.push("--severity", severity);
+    if (options.pattern) args.push("--pattern", options.pattern);
+    if (options.skipPackages) args.push("--skip-packages");
+    if (options.tool) args.push("--tool", options.tool);
     if (environment) {
       args.push("--environment", environment);
     }
@@ -247,7 +296,7 @@ export async function checkProject(
     const result = await executeWithSpooling("check", args, {
       cwd: validatedPath,
       projectDir: validatedPath,
-      timeout: background ? 3600000 : 600000,
+      timeout: options.timeoutMs ?? (background ? 3600000 : 600000),
       background,
       rootCommandId,
       artifactType: "check" as any, // "check" is handled cleanly by spooler
@@ -257,7 +306,11 @@ export async function checkProject(
       return result as unknown as BuildResult;
     }
 
-    const success = result.exitCode === 0;
+    await options.onResult?.(result);
+    const analysisReport = options.jsonOutput && !options.onResult
+      ? summarizeCheckOutput(await readCommandOutput(result.fullLogPath), validatedPath)
+      : undefined;
+    const success = result.exitCode === 0 && (!analysisReport || analysisReport.tools.every(tool => tool.succeeded));
     const errors = success ? undefined : parseStderrErrors(result.finalOutput);
 
     return {
@@ -265,13 +318,27 @@ export async function checkProject(
       environment: environment || "default",
       output: result.finalOutput,
       errors,
+      ...(analysisReport ? { analysisReport, rawLogPath: result.fullLogPath } : {}),
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
-      throw new BuildError(`Check failed: ${error.message}`, { projectDir, environment });
+      throw error;
     }
     throw new BuildError(`Failed to check project: ${error}`, { projectDir, environment });
   }
+}
+
+/** Additional test selections; compile-only and build-only restrictions always take precedence. */
+export interface TestExecutionOptions {
+  filter?: string; // Test suite inclusion glob.
+  ignore?: string; // Test suite exclusion glob.
+  withoutUploading?: boolean; // Skip upload, but does not by itself prevent device access.
+  withoutBuilding?: boolean; // Use existing artifacts when runtime execution is allowed.
+  uploadPort?: string; // Explicit transport selection bound by the calling adapter.
+  verbose?: boolean; // Emit verbose test output.
+  reportPath?: string; // Trusted adapter-owned JSON report destination, never an arbitrary command fragment.
+  timeoutMs?: number; // Trusted bounded timeout.
+  onResult?: (result: SpoolingForegroundResult) => Promise<void>; // Observe completed output.
 }
 
 /**
@@ -286,6 +353,8 @@ export async function runTests(
   projectDir: string,
   environment?: string,
   background?: boolean,
+  compileOnly?: boolean,
+  options: TestExecutionOptions = {},
 ): Promise<BuildResult> {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
@@ -294,8 +363,33 @@ export async function runTests(
     throw new BuildError(`Invalid environment name: ${environment}`, { environment });
   }
 
+  if (compileOnly !== undefined && typeof compileOnly !== "boolean") {
+    throw new BuildError("compileOnly must be a boolean", { projectDir });
+  }
+  for (const value of [options.filter, options.ignore, options.uploadPort, options.reportPath])
+    if (value !== undefined && (typeof value !== "string" || !value.length || value.length > 32768 || /[\x00-\x1f\x7f]/.test(value)))
+      throw new BuildError("Invalid test selection or report path", { projectDir });
+  for (const value of [options.withoutUploading, options.withoutBuilding, options.verbose])
+    if (value !== undefined && typeof value !== "boolean")
+      throw new BuildError("Test switches must be booleans", { projectDir });
+  if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 3600000))
+    throw new BuildError("Invalid test timeout", { projectDir });
+  // Resolve at execution time so every adapter obeys the current build-only profile.
+  // Both flags are essential: skipping upload alone can still reset/open a device.
+  const buildOnly = loadEffectivePolicyState(validatedPath).profile === "build_only";
+  if ((compileOnly || buildOnly) && options.withoutBuilding)
+    throw new BuildError("Cannot skip building in compile-only mode", { projectDir });
   try {
     const args: string[] = [];
+    if (compileOnly || buildOnly) {
+      args.push("--without-uploading", "--without-testing");
+    } else if (options.withoutUploading) args.push("--without-uploading");
+    if (options.withoutBuilding) args.push("--without-building");
+    if (options.filter) args.push("--filter", options.filter);
+    if (options.ignore) args.push("--ignore", options.ignore);
+    if (options.uploadPort && !compileOnly && !buildOnly) args.push("--upload-port", options.uploadPort);
+    if (options.verbose) args.push("--verbose");
+    if (options.reportPath) args.push("--json-output-path", options.reportPath);
     if (environment) {
       args.push("--environment", environment);
     }
@@ -303,7 +397,7 @@ export async function runTests(
     const result = await executeWithSpooling("test", args, {
       cwd: validatedPath,
       projectDir: validatedPath,
-      timeout: background ? 3600000 : 600000,
+      timeout: options.timeoutMs ?? (background ? 3600000 : 600000),
       background,
       artifactType: "test",
       rootCommandId
@@ -313,6 +407,7 @@ export async function runTests(
       return result as unknown as BuildResult;
     }
 
+    await options.onResult?.(result);
     const success = result.exitCode === 0;
     const errors = success ? undefined : parseStderrErrors(result.finalOutput);
 
@@ -324,10 +419,18 @@ export async function runTests(
     };
   } catch (error) {
     if (error instanceof PlatformIOError) {
-      throw new BuildError(`Tests failed: ${error.message}`, { projectDir, environment });
+      throw error;
     }
     throw new BuildError(`Failed to run tests: ${error}`, { projectDir, environment });
   }
+}
+
+/** Optional clean target selection used by compatibility adapters. */
+export interface CleanProjectOptions {
+  environment?: string; // Restrict cleanup to this validated environment.
+  full?: boolean; // Request PlatformIO fullclean, including downloaded dependencies.
+  timeoutMs?: number; // Trusted adapter timeout; canonical default remains 60 seconds.
+  onResult?: (result: SpoolingForegroundResult) => Promise<void>; // Observe completed output before failure projection.
 }
 
 /**
@@ -335,11 +438,31 @@ export async function runTests(
 
  *
  * @param projectDir - Discard compilation output for this project workspace.
+ * @param background - Return after dispatch when requested by an existing caller.
+ * @param options - Optional environment and fullclean target; defaults preserve canonical behavior.
  * @returns Indicates successful cleanup execution metadata.
  */
-export async function cleanProject(projectDir: string, background?: boolean): Promise<CleanResult> {
+export async function cleanProject(
+  projectDir: string,
+  background?: boolean,
+  options: CleanProjectOptions = {},
+): Promise<CleanResult> {
   const rootCommandId = mcpContext.getStore()?.activityId || crypto.randomUUID();
   const validatedPath = validateProjectPath(projectDir);
+
+  if (options.environment !== undefined && !validateEnvironmentName(options.environment)) {
+    throw new BuildError(`Invalid environment name: ${options.environment}`, {
+      environment: options.environment,
+    });
+  }
+  if (options.full !== undefined && typeof options.full !== "boolean") {
+    throw new BuildError("Clean full option must be a boolean", { projectDir });
+  }
+  if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 600000)) {
+    throw new BuildError("Clean timeout must be between 1 and 600000 milliseconds", { projectDir });
+  }
+  const args = ["--target", options.full ? "fullclean" : "clean"];
+  if (options.environment) args.push("--environment", options.environment);
 
   // Any user-initiated clean must wipe our cache; otherwise the next
   // `build_project` would short-circuit and return "success" without
@@ -349,11 +472,11 @@ export async function cleanProject(projectDir: string, background?: boolean): Pr
   try {
     const result = await executeWithSpooling(
       "run",
-      ["--target", "clean"],
+      args,
       {
         cwd: validatedPath,
         projectDir: validatedPath,
-        timeout: 60000,
+        timeout: options.timeoutMs ?? 60000,
         background,
         rootCommandId
       },
@@ -363,12 +486,14 @@ export async function cleanProject(projectDir: string, background?: boolean): Pr
       return result as unknown as CleanResult;
     }
 
+    await options.onResult?.(result);
     const success = result.exitCode === 0;
 
     if (!success) {
       throw new BuildError(`Clean failed: ${result.finalOutput}`, {
         projectDir,
         stderr: result.finalOutput,
+        exitCode: result.exitCode,
       });
     }
 
@@ -377,11 +502,22 @@ export async function cleanProject(projectDir: string, background?: boolean): Pr
       message: "Successfully cleaned build artifacts",
     };
   } catch (error) {
-    if (error instanceof BuildError) {
+    if (error instanceof PlatformIOError) {
       throw error;
     }
     throw new BuildError(`Failed to clean project: ${error}`, { projectDir });
   }
+}
+
+/** Trusted controls for an already-authorized named target; this helper does not grant device access. */
+export interface TargetExecutionOptions {
+  captureEnvironment?: NodeJS.ProcessEnv; // Host-only capture hook environment; never accepted from public tool arguments.
+  deviceCustody?: ProcessDeviceCustody; // Trusted retained upload-to-monitor ownership, never public arguments.
+  cancellation?: AbortSignal; // Owned workflow stop request; closure still must be confirmed.
+  serialPort?: string; // Host-resolved endpoint custody, separate from network upload destinations.
+  uploadPort?: string; // Explicit serial or network destination, kept as one argv value.
+  timeoutMs?: number; // Bounded execution deadline, defaulting to the existing ten minutes.
+  onResult?: (result: SpoolingForegroundResult) => Promise<void>; // Preserve full-log collection.
 }
 
 /**
@@ -398,7 +534,18 @@ export async function buildTarget(
   target: string,
   environment?: string,
   verbose?: boolean,
+  execution: TargetExecutionOptions = {},
 ): Promise<BuildResult> {
+  const validArgument = (value: string, maximum: number) =>
+    typeof value === "string" && value.trim().length > 0 && value.length <= maximum &&
+    !value.startsWith("-") && !/[\x00-\x1f\x7f]/.test(value);
+  if (!validArgument(target, 4096))
+    throw new BuildError("Invalid named target.", { target });
+  if (execution.uploadPort !== undefined && !validArgument(execution.uploadPort, 512))
+    throw new BuildError("Invalid target upload port.");
+  if (execution.timeoutMs !== undefined &&
+      (!Number.isSafeInteger(execution.timeoutMs) || execution.timeoutMs < 1 || execution.timeoutMs > 3600000))
+    throw new BuildError("Invalid target timeout.");
   const validatedPath = validateProjectPath(projectDir);
 
   if (environment && !validateEnvironmentName(environment)) {
@@ -414,6 +561,8 @@ export async function buildTarget(
       args.push("--environment", environment);
     }
 
+    if (execution.uploadPort) args.push("--upload-port", execution.uploadPort);
+
     if (verbose) {
       args.push("--verbose");
     }
@@ -421,13 +570,18 @@ export async function buildTarget(
     const result = await executeWithSpooling("run", args, {
       cwd: validatedPath,
       projectDir: validatedPath,
-      timeout: 600000,
+      timeout: execution.timeoutMs ?? 600000,
+      environment: execution.captureEnvironment,
+      devicePort: execution.serialPort,
+      deviceCustody: execution.deviceCustody,
+      cancellation: execution.cancellation,
     });
 
     if ('status' in result) {
       return result as unknown as BuildResult;
     }
 
+    await execution.onResult?.(result);
     const success = result.exitCode === 0;
     const errors = success ? undefined : parseStderrErrors(result.finalOutput);
 
@@ -451,13 +605,7 @@ export async function buildTarget(
       flashUsageBytes,
     };
   } catch (error) {
-    if (error instanceof PlatformIOError) {
-      throw new BuildError(`Target '${target}' failed: ${error.message}`, {
-        projectDir,
-        target,
-        environment,
-      });
-    }
+    if (error instanceof PlatformIOError) throw error;
     throw new BuildError(`Failed to build target '${target}': ${error}`, {
       projectDir,
       target,

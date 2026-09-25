@@ -6,6 +6,16 @@
 
 PIO Agent is the open-source, agent-first hardware execution layer for embedded development, built on the PlatformIO MCP runtime.
 
+## 3.1.0 development status
+
+The parity branch prepares an unreleased 3.1.0 version with optional reference tool
+aliases, owned serial workflows, retained flash, OTA and expanded distribution
+candidates. Existing published installations remain 3.0.0. See the
+[unreleased changelog](CHANGELOG.md#310---unreleased),
+[compatibility guide](docs/package-compatibility.md), and
+[distribution readiness](docs/DISTRIBUTION_READINESS.md) for implemented behavior,
+remaining acceptance, and which package names are prepared versus published.
+
 ## Brand and Compatibility
 
 **PIO Agent** is the product and Codex Plugin name. **PlatformIO MCP** is the underlying MCP runtime and the compatibility identity used by existing installations. The Codex plugin ID, marketplace ID, configuration keys, and skill namespace remain `platformio-mcp`. On npm, `platformio-mcp` is the canonical package while `pio-mcp` and `pio-agent` are thin compatibility packages that delegate to it. The canonical package also installs both `platformio-mcp` and `pio-agent` executable names. This lets existing consumers upgrade without migration while new users see PIO Agent throughout the interface.
@@ -129,7 +139,7 @@ npx -y platformio-mcp install --codex-plugin
 
 Start a new Codex task after installation. The legacy `install --codex` command remains available for MCP-only configuration. See the [full Codex Plugin guide](docs/CODEX.md) for update, uninstall, browser fallback, policy, automation, and rollback details.
 
-The plugin release gates run on Windows, macOS, and Linux, exercise the authenticated dashboard in Chromium, validate the bundled runtime and 42-tool registry, and keep physical-board evidence in a separate manual workflow. That workflow uploads only bounded, sanitized evidence; raw hardware logs stay on the self-hosted runner. See the [release and validation guide](docs/CODEX_PLUGIN_RELEASE.md).
+The plugin release gates run on Windows, macOS, and Linux, exercise the authenticated dashboard in Chromium, validate the bundled runtime and 44-tool registry, and keep physical-board evidence in a separate manual workflow. That workflow uploads only bounded, sanitized evidence; raw hardware logs stay on the self-hosted runner. See the [release and validation guide](docs/CODEX_PLUGIN_RELEASE.md).
 
 For headless verification and status inspection, the same CLI also provides `plugin validate`, `target-resolve`, `monitor-status`, `monitor-health`, `task-history`, `approval-status`, and `pending-approvals`. Run `platformio-mcp --help` for bounded options and JSON output support.
 
@@ -219,7 +229,7 @@ Specifications:
 ## Development
 
 Prerequisites:
-- Node.js >= 18
+- Node.js >= 20 (including the bundled direct-serial runtime)
 - PlatformIO Core CLI ([install guide](https://platformio.org/install/cli))
 
 Local setup:
@@ -250,3 +260,7 @@ Contributions are welcome.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+### Firmware crash and size analysis
+
+The MCP tools `decode_backtrace` and `size_report` analyze an explicitly selected project/environment using its registered GNU toolchain. Metadata and memory checks require build permission because they can execute project scripts. Reports identify the exact ELF, retain unresolved crash addresses, and distinguish PlatformIO memory usage from GNU estimates. They do not prove which firmware is on a device. See [firmware analysis](docs/firmware-analysis.md) for inputs, approval behavior, evidence and current limits.

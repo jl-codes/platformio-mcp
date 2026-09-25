@@ -19,6 +19,7 @@ import {
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { buildSerialRuntime } from "./build-serial-runtime.mjs";
 import { syncCodexPlugin } from "./sync-codex-plugin.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -118,6 +119,7 @@ export async function buildCodexPlugin() {
     entryPoints: [join(REPO_ROOT, "src", "index.ts")],
     outfile: join(RUNTIME_ROOT, "platformio-mcp.mjs"),
     bundle: true,
+    external: ["serialport"],
     platform: "node",
     format: "esm",
     target: "node18",
@@ -130,7 +132,9 @@ export async function buildCodexPlugin() {
     logLevel: "info",
   });
 
+  await buildSerialRuntime(REPO_ROOT, RUNTIME_ROOT);
   cpSync(webDist, join(RUNTIME_ROOT, "web"), { recursive: true });
+  cpSync(join(REPO_ROOT, "distribution", "capabilities.json"), join(RUNTIME_ROOT, "capabilities.json"));
   normalizeRuntimeText(RUNTIME_ROOT);
   const inventory = createInventory(RUNTIME_ROOT);
   writeFileSync(

@@ -1,3 +1,4 @@
+/** Upload selections reach PlatformIO exactly and custody errors survive adapter boundaries. */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import path from "node:path";
 import { uploadFirmware, uploadFilesystem } from "../src/tools/upload.js";
@@ -9,6 +10,7 @@ import {
   type PortClaim,
 } from "../src/utils/semaphore.js";
 import fs from "node:fs";
+import { PlatformIOError } from "../src/utils/errors.js";
 
 const mockProjectDir = path.join(process.cwd(), "test-project-upload");
 
@@ -184,100 +186,66 @@ describe("Upload Tools", () => {
 
     vi.useRealTimers();
   });
-
-  it("surfaces PORT_BUSY unchanged when the port is already claimed", async () => {
-    const { PortBusyError } = await import("../src/utils/semaphore.js");
-    vi.spyOn(portSemaphoreManager, "claimPort").mockImplementation(() => {
-      throw new PortBusyError("COM1", {
-        type: "upload",
-        owner_workspace: "/tmp/other",
-        owner_pid: 4242,
-        hostname: "h",
-        timestamp: Date.now(),
-      });
-    });
-
-    await expect(
-      uploadFirmware(mockProjectDir, "COM1", undefined, false, false, false),
-    ).rejects.toMatchObject({ code: "PORT_BUSY" });
-  });
-
-  it("surfaces PORT_BUSY unchanged for filesystem uploads", async () => {
-    const { PortBusyError } = await import("../src/utils/semaphore.js");
-    vi.spyOn(portSemaphoreManager, "claimPort").mockImplementation(() => {
-      throw new PortBusyError("COM1", {
-        type: "upload",
-        owner_workspace: "/tmp/other",
-        owner_pid: 4242,
-        hostname: "h",
-        timestamp: Date.now(),
-      });
-    });
-
-    await expect(
-      uploadFilesystem(mockProjectDir, "COM1", undefined, false, false, false),
-    ).rejects.toMatchObject({ code: "PORT_BUSY" });
-  });
-
-  it("surfaces CLAIM_IO_ERROR unchanged", async () => {
-    const { ClaimIoError } = await import("../src/utils/semaphore.js");
-    vi.spyOn(portSemaphoreManager, "claimPort").mockImplementation(() => {
-      throw new ClaimIoError(
-        "link",
-        "/tmp/x.json",
-        Object.assign(new Error("no space"), { code: "ENOSPC" }),
+  it.each([
+    ["firmware", uploadFirmware, "upload"],
+    ["filesystem", uploadFilesystem, "uploadfs"],
+  ] as const)(
+    "pins selected port in %s upload argv",
+    async (_name, upload, target) => {
+      await upload(mockProjectDir, "COM7", "default", false, false, false);
+      expect(spooler.executeWithSpooling).toHaveBeenCalledWith(
+        "run",
+        [
+          "--target",
+          target,
+          "--environment",
+          "default",
+          "--upload-port",
+          "COM7",
+        ],
+        expect.objectContaining({ activePort: "COM7" }),
       );
-    });
+    },
+  );
 
-    await expect(
-      uploadFirmware(mockProjectDir, "COM1", undefined, false, false, false),
-    ).rejects.toMatchObject({ code: "CLAIM_IO_ERROR" });
-  });
-});
+  it.each([uploadFirmware, uploadFilesystem])(
+    "pins the resolved fallback port in argv",
+    async (upload) => {
+      await upload(mockProjectDir, undefined, "default", false, false, false);
+      const call = vi.mocked(spooler.executeWithSpooling).mock.calls[0];
+      expect(call[1].slice(-2)).toEqual(["--upload-port", "COM1"]);
+      expect(call[2].activePort).toBe("COM1");
+    },
+  );
 
-describe("Upload claim release on spooler failure", () => {
-  // The spooler releases the claim on normal completion only. If the spawn
-  // fails or waitForProcessEnd times out it rejects before that code runs, so
-  // under the long-lived MCP server the claim outlived the upload and, with a
-  // live owner PID, wedged the port until `port release --force`.
-  it("releases the port claim when executeWithSpooling rejects", async () => {
-    vi.spyOn(spooler, "executeWithSpooling").mockRejectedValue(
-      new Error("Process timeout"),
-    );
-    vi.spyOn(monitor, "stopMonitor").mockResolvedValue({
-      success: true,
-      message: "Stopped",
-    });
-    vi.spyOn(devices, "findDeviceByPort").mockResolvedValue({
-      port: "COM1",
-      description: "d",
-      hwid: "1",
-    });
-    const claim = vi
-      .spyOn(portSemaphoreManager, "claimPort")
-      .mockImplementation(() => ({
-        type: "upload" as const,
-        owner_workspace: "/tmp",
-        owner_pid: process.pid,
-        hostname: "h",
-        timestamp: Date.now(),
-      }));
-    const release = vi
-      .spyOn(portSemaphoreManager, "releasePort")
-      .mockImplementation(() => true);
-    fs.mkdirSync(mockProjectDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(mockProjectDir, "platformio.ini"),
-      "[env:default]\nboard = esp32dev",
-    );
-
-    await expect(
-      uploadFirmware(mockProjectDir, "COM1", undefined, false, false, false),
-    ).rejects.toBeTruthy();
-
-    expect(claim).toHaveBeenCalledWith("COM1", "Firmware Upload");
-    expect(release).toHaveBeenCalledWith("COM1");
-    fs.rmSync(mockProjectDir, { recursive: true, force: true });
-    vi.restoreAllMocks();
-  });
+  it.each([uploadFirmware, uploadFilesystem])(
+    "retains uncertain custody through upload failure",
+    async (upload) => {
+      const failure = new PlatformIOError(
+        "termination unconfirmed",
+        "PROCESS_CLEANUP_PENDING",
+        {
+          cleanupPending: true,
+          fullLogPath: "fixture.log",
+        },
+      );
+      vi.mocked(spooler.executeWithSpooling).mockRejectedValueOnce(failure);
+      await expect(upload(mockProjectDir, "COM1", "default")).rejects.toBe(
+        failure,
+      );
+      expect(portSemaphoreManager.releasePort).not.toHaveBeenCalled();
+    },
+  );
+  it.each([uploadFirmware, uploadFilesystem])(
+    "never falls back to a different board after upload",
+    async (upload) => {
+      vi.mocked(devices.waitForDeviceByHwid).mockResolvedValueOnce(null);
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await upload(mockProjectDir, "COM1", "default", false, false, true);
+      await vi.mocked(spooler.executeWithSpooling).mock.calls[0][2]
+        .onSuccess!();
+      expect(devices.getFirstDevice).not.toHaveBeenCalled();
+      expect(monitor.startMonitor).not.toHaveBeenCalled();
+    },
+  );
 });
