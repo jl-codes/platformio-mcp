@@ -1,7 +1,11 @@
 /** Reference debugger command/list/stop vocabulary over connection-owned sessions. */
 import { z } from "zod";
 import type { DebugClientSessions } from "../core/debug/debug-client-sessions.js";
-import type { GdbMiField } from "../core/debug/gdb-mi.js";
+import type {
+  GdbMiField,
+  GdbMiValue,
+  GdbMiRecord,
+} from "../core/debug/gdb-mi.js";
 import type { GdbMiCommandResult } from "../core/debug/gdb-mi-session.js";
 import type { PolicyEvaluationContext } from "../core/policy/types.js";
 import { PlatformIOError } from "../utils/errors.js";
@@ -32,6 +36,48 @@ export const DebugStopCompatibilitySchema = z
 /** Listing is scoped to the authenticated connection and accepts no owner selector. */
 export const DebugListCompatibilitySchema = z.object({}).strict();
 
+/** Project ordered MI data into the reference JSON shape without prototype setters. */
+function payload(fields: readonly GdbMiField[]): Record<string, unknown> {
+  const output: Record<string, unknown> = Object.create(null);
+  const repeated = new Set<string>();
+  for (const entry of fields) {
+    const value = miValue(entry.value);
+    if (!Object.hasOwn(output, entry.name)) output[entry.name] = value;
+    else if (repeated.has(entry.name))
+      (output[entry.name] as unknown[]).push(value);
+    else {
+      output[entry.name] = [output[entry.name], value];
+      repeated.add(entry.name);
+    }
+  }
+  return output;
+}
+function miValue(value: GdbMiValue): unknown {
+  if (typeof value === "string") return value;
+  if (value.kind === "tuple") return payload(value.fields);
+  if (value.kind === "list") return value.values.map(miValue);
+  return value.fields.map((entry) => payload([entry]));
+}
+function referenceRecord(record: GdbMiRecord) {
+  if (record.kind === "stream")
+    return { kind: record.channel, text: record.text };
+  if (record.kind === "other") return { kind: record.kind, text: record.text };
+  if (record.kind === "prompt") return { kind: record.kind };
+  return {
+    kind: record.kind,
+    ...(record.token ? { token: record.token } : {}),
+    class: record.class,
+    ...(record.fields.length ? { payload: payload(record.fields) } : {}),
+  };
+}
+function lines(chunks: string[] = [], separator = "") {
+  const joined = chunks.join(separator);
+  if (!joined) return [];
+  const result = joined.split(/\r\n|\n|\r/);
+  if (result[result.length - 1] === "") result.pop();
+  return result;
+}
+
 function field(fields: readonly GdbMiField[], name: string) {
   return fields.find((entry) => entry.name === name)?.value;
 }
@@ -52,12 +98,28 @@ export function normalizeDebuggerStop(record?: GdbMiCommandResult["stopped"]) {
     signal_name: text(record.fields, "signal-name"),
     signal_meaning: text(record.fields, "signal-meaning"),
     thread_id: text(record.fields, "thread-id"),
+    ...Object.fromEntries(
+      ["bkptno", "exit-code", "disp"]
+        .filter((key) => field(record.fields, key) !== undefined)
+        .map((key) => [key.replaceAll("-", "_"), text(record.fields, key)]),
+    ),
     frame: fields.length
       ? {
           function: text(fields, "func"),
           address: text(fields, "addr"),
           file: text(fields, "fullname") ?? text(fields, "file"),
-          line: text(fields, "line"),
+          line: (() => {
+            const line = text(fields, "line");
+            return line !== null &&
+              /^-?[0-9]+$/.test(line) &&
+              Number.isSafeInteger(Number(line))
+              ? Number(line)
+              : line;
+          })(),
+          args:
+            field(fields, "args") === undefined
+              ? []
+              : miValue(field(fields, "args")!),
         }
       : null,
   };
@@ -77,7 +139,14 @@ export function formatDebuggerCommandResult(result: GdbMiCommandResult) {
     result_class: resultClass,
     // Preserve bounded ordered MI fields: inspection results may have no console stream.
     result_fields: result.result?.fields ?? [],
-    console: result.console,
+    result: payload(result.result?.fields ?? []),
+    console: lines(result.console),
+    log: lines(result.log),
+    target_output: lines(result.targetOutput),
+    other_output: lines(result.otherOutput, "\n"),
+    records: (result.records ?? []).map(referenceRecord),
+    duration_s: result.durationSeconds ?? 0,
+    note: null,
     error,
     stopped: normalizeDebuggerStop(result.stopped),
     running: result.running,
@@ -121,16 +190,19 @@ export async function executeDebugSessionCompatibility(
     const parsed = DebugCommandCompatibilitySchema.safeParse(input);
     if (!parsed.success) throw invalid();
     const args = parsed.data;
-    return formatDebuggerCommandResult(
-      await sessions.command(
-        args.session_id,
-        args.command,
-        caller,
-        Math.ceil(args.timeout_s * 1000),
-        args.approval_id,
-        args.target_approval_id,
-      ),
+    const result = await sessions.command(
+      args.session_id,
+      args.command,
+      caller,
+      Math.ceil(args.timeout_s * 1000),
+      args.approval_id,
+      args.target_approval_id,
     );
+    return {
+      ...formatDebuggerCommandResult(result),
+      session_id: args.session_id,
+      command: args.command.trim(),
+    };
   }
   const parsed = DebugStopCompatibilitySchema.safeParse(input);
   if (!parsed.success) throw invalid();

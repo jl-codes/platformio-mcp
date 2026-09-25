@@ -10,6 +10,7 @@ import {
   normalizeDebuggerStop,
 } from "../src/adapters/debug-session-compat.js";
 import { parseGdbMiRecord } from "../src/core/debug/gdb-mi.js";
+import { GdbMiSession } from "../src/core/debug/gdb-mi-session.js";
 import type { GdbMiCommandResult } from "../src/core/debug/gdb-mi-session.js";
 const result: GdbMiCommandResult = {
   token: "1",
@@ -36,7 +37,7 @@ it("maps known stop/frame fields without forwarding arbitrary keys", () => {
     normalizeDebuggerStop(record as GdbMiCommandResult["stopped"]),
   ).toMatchObject({
     reason: "breakpoint-hit",
-    frame: { function: "main", file: "/project/main.cpp", line: "42" },
+    frame: { function: "main", file: "/project/main.cpp", line: 42 },
   });
 });
 it("forwards both scoped grants and refuses another connection's session", async () => {
@@ -156,3 +157,48 @@ it.each([
     expect(Object.getPrototypeOf(formatted)).toBe(Object.prototype);
   },
 );
+
+it("preserves reference payload, separate streams and stopped-frame arguments from an MI transcript", async () => {
+  const session = new GdbMiSession(async () => {});
+  const pending = session.execute("-exec-next", 1000, true);
+  session.accept(
+    Buffer.from(
+      [
+        '~"console part"',
+        '~" two\\nnext\\n"',
+        '&"probe log\\n"',
+        '@"device text\\n"',
+        "backend banner",
+        '1^running,value="a",value="b",__proto__="inert"',
+        '*stopped,reason="breakpoint-hit",bkptno="2",disp="keep",frame={func="main",line="42",args=[{name="argc",value="1"}]}',
+      ].join("\n") + "\n",
+    ),
+  );
+  const formatted = formatDebuggerCommandResult(await pending);
+  expect(formatted).toMatchObject({
+    ok: true,
+    result: { value: ["a", "b"] },
+    console: ["console part two", "next"],
+    log: ["probe log"],
+    target_output: ["device text"],
+    other_output: ["backend banner"],
+    stopped: {
+      bkptno: "2",
+      disp: "keep",
+      frame: { line: 42, args: [{ name: "argc", value: "1" }] },
+    },
+    duration_s: expect.any(Number),
+    note: null,
+  });
+  expect(Object.getPrototypeOf(formatted.result)).toBeNull();
+  expect(Object.hasOwn(formatted.result, "__proto__")).toBe(true);
+  expect(JSON.parse(JSON.stringify(formatted)).result.__proto__).toBe("inert");
+  expect(formatted.records).toContainEqual({
+    kind: "target",
+    text: "device text\n",
+  });
+  expect(formatted.records.at(-1)).toMatchObject({
+    kind: "exec",
+    class: "stopped",
+  });
+});

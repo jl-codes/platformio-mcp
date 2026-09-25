@@ -6120,7 +6120,7 @@ var require_directives = __commonJS({
         return tag[0] === "!" ? tag : `!<${tag}>`;
       }
       toString(doc) {
-        const lines2 = this.yaml.explicit ? [`%YAML ${this.yaml.version || "1.2"}`] : [];
+        const lines3 = this.yaml.explicit ? [`%YAML ${this.yaml.version || "1.2"}`] : [];
         const tagEntries = Object.entries(this.tags);
         let tagNames;
         if (doc && tagEntries.length > 0 && identity.isNode(doc.contents)) {
@@ -6136,9 +6136,9 @@ var require_directives = __commonJS({
           if (handle === "!!" && prefix === "tag:yaml.org,2002:")
             continue;
           if (!doc || tagNames.some((tn) => tn.startsWith(prefix)))
-            lines2.push(`%TAG ${handle} ${prefix}`);
+            lines3.push(`%TAG ${handle} ${prefix}`);
         }
-        return lines2.join("\n");
+        return lines3.join("\n");
       }
     };
     Directives.defaultYaml = { explicit: false, version: "1.2" };
@@ -7599,22 +7599,22 @@ var require_stringifyCollection = __commonJS({
       const { indent, options: { commentString } } = ctx;
       const itemCtx = Object.assign({}, ctx, { indent: itemIndent, type: null });
       let chompKeep = false;
-      const lines2 = [];
+      const lines3 = [];
       for (let i = 0; i < items.length; ++i) {
         const item = items[i];
         let comment2 = null;
         if (identity.isNode(item)) {
           if (!chompKeep && item.spaceBefore)
-            lines2.push("");
-          addCommentBefore(ctx, lines2, item.commentBefore, chompKeep);
+            lines3.push("");
+          addCommentBefore(ctx, lines3, item.commentBefore, chompKeep);
           if (item.comment)
             comment2 = item.comment;
         } else if (identity.isPair(item)) {
           const ik = identity.isNode(item.key) ? item.key : null;
           if (ik) {
             if (!chompKeep && ik.spaceBefore)
-              lines2.push("");
-            addCommentBefore(ctx, lines2, ik.commentBefore, chompKeep);
+              lines3.push("");
+            addCommentBefore(ctx, lines3, ik.commentBefore, chompKeep);
           }
         }
         chompKeep = false;
@@ -7623,15 +7623,15 @@ var require_stringifyCollection = __commonJS({
           str2 += stringifyComment.lineComment(str2, itemIndent, commentString(comment2));
         if (chompKeep && comment2)
           chompKeep = false;
-        lines2.push(blockItemPrefix + str2);
+        lines3.push(blockItemPrefix + str2);
       }
       let str;
-      if (lines2.length === 0) {
+      if (lines3.length === 0) {
         str = flowChars.start + flowChars.end;
       } else {
-        str = lines2[0];
-        for (let i = 1; i < lines2.length; ++i) {
-          const line = lines2[i];
+        str = lines3[0];
+        for (let i = 1; i < lines3.length; ++i) {
+          const line = lines3[i];
           str += line ? `
 ${indent}${line}` : "\n";
         }
@@ -7654,22 +7654,22 @@ ${indent}${line}` : "\n";
       });
       let reqNewline = false;
       let linesAtValue = 0;
-      const lines2 = [];
+      const lines3 = [];
       for (let i = 0; i < items.length; ++i) {
         const item = items[i];
         let comment = null;
         if (identity.isNode(item)) {
           if (item.spaceBefore)
-            lines2.push("");
-          addCommentBefore(ctx, lines2, item.commentBefore, false);
+            lines3.push("");
+          addCommentBefore(ctx, lines3, item.commentBefore, false);
           if (item.comment)
             comment = item.comment;
         } else if (identity.isPair(item)) {
           const ik = identity.isNode(item.key) ? item.key : null;
           if (ik) {
             if (ik.spaceBefore)
-              lines2.push("");
-            addCommentBefore(ctx, lines2, ik.commentBefore, false);
+              lines3.push("");
+            addCommentBefore(ctx, lines3, ik.commentBefore, false);
             if (ik.comment)
               reqNewline = true;
           }
@@ -7686,12 +7686,12 @@ ${indent}${line}` : "\n";
         if (comment)
           reqNewline = true;
         let str = stringify.stringify(item, itemCtx, () => comment = null);
-        reqNewline || (reqNewline = lines2.length > linesAtValue || str.includes("\n"));
+        reqNewline || (reqNewline = lines3.length > linesAtValue || str.includes("\n"));
         if (i < items.length - 1) {
           str += ",";
         } else if (ctx.options.trailingComma) {
           if (ctx.options.lineWidth > 0) {
-            reqNewline || (reqNewline = lines2.reduce((sum, line) => sum + line.length + 2, 2) + (str.length + 2) > ctx.options.lineWidth);
+            reqNewline || (reqNewline = lines3.reduce((sum, line) => sum + line.length + 2, 2) + (str.length + 2) > ctx.options.lineWidth);
           }
           if (reqNewline) {
             str += ",";
@@ -7699,35 +7699,35 @@ ${indent}${line}` : "\n";
         }
         if (comment)
           str += stringifyComment.lineComment(str, itemIndent, commentString(comment));
-        lines2.push(str);
-        linesAtValue = lines2.length;
+        lines3.push(str);
+        linesAtValue = lines3.length;
       }
       const { start, end } = flowChars;
-      if (lines2.length === 0) {
+      if (lines3.length === 0) {
         return start + end;
       } else {
         if (!reqNewline) {
-          const len = lines2.reduce((sum, line) => sum + line.length + 2, 2);
+          const len = lines3.reduce((sum, line) => sum + line.length + 2, 2);
           reqNewline = ctx.options.lineWidth > 0 && len > ctx.options.lineWidth;
         }
         if (reqNewline) {
           let str = start;
-          for (const line of lines2)
+          for (const line of lines3)
             str += line ? `
 ${indentStep}${indent}${line}` : "\n";
           return `${str}
 ${indent}${end}`;
         } else {
-          return `${start}${fcPadding}${lines2.join(" ")}${fcPadding}${end}`;
+          return `${start}${fcPadding}${lines3.join(" ")}${fcPadding}${end}`;
         }
       }
     }
-    function addCommentBefore({ indent, options: { commentString } }, lines2, comment, chompKeep) {
+    function addCommentBefore({ indent, options: { commentString } }, lines3, comment, chompKeep) {
       if (comment && chompKeep)
         comment = comment.replace(/^\n+/, "");
       if (comment) {
         const ic = stringifyComment.indentComment(commentString(comment), indent);
-        lines2.push(ic.trimStart());
+        lines3.push(ic.trimStart());
       }
     }
     exports.stringifyCollection = stringifyCollection;
@@ -8365,11 +8365,11 @@ var require_binary = __commonJS({
         if (type !== Scalar.Scalar.QUOTE_DOUBLE) {
           const lineWidth = Math.max(ctx.options.lineWidth - ctx.indent.length, ctx.options.minContentWidth);
           const n = Math.ceil(str.length / lineWidth);
-          const lines2 = new Array(n);
+          const lines3 = new Array(n);
           for (let i = 0, o = 0; i < n; ++i, o += lineWidth) {
-            lines2[i] = str.substr(o, lineWidth);
+            lines3[i] = str.substr(o, lineWidth);
           }
-          str = lines2.join(type === Scalar.Scalar.BLOCK_LITERAL ? "\n" : " ");
+          str = lines3.join(type === Scalar.Scalar.BLOCK_LITERAL ? "\n" : " ");
         }
         return stringifyString.stringifyString({ comment, type, value: str }, ctx, onComment, onChompKeep);
       }
@@ -9049,35 +9049,35 @@ var require_stringifyDocument = __commonJS({
     var stringify = require_stringify();
     var stringifyComment = require_stringifyComment();
     function stringifyDocument(doc, options) {
-      const lines2 = [];
+      const lines3 = [];
       let hasDirectives = options.directives === true;
       if (options.directives !== false && doc.directives) {
         const dir = doc.directives.toString(doc);
         if (dir) {
-          lines2.push(dir);
+          lines3.push(dir);
           hasDirectives = true;
         } else if (doc.directives.docStart)
           hasDirectives = true;
       }
       if (hasDirectives)
-        lines2.push("---");
+        lines3.push("---");
       const ctx = stringify.createStringifyContext(doc, options);
       const { commentString } = ctx.options;
       if (doc.commentBefore) {
-        if (lines2.length !== 1)
-          lines2.unshift("");
+        if (lines3.length !== 1)
+          lines3.unshift("");
         const cs = commentString(doc.commentBefore);
-        lines2.unshift(stringifyComment.indentComment(cs, ""));
+        lines3.unshift(stringifyComment.indentComment(cs, ""));
       }
       let chompKeep = false;
       let contentComment = null;
       if (doc.contents) {
         if (identity.isNode(doc.contents)) {
           if (doc.contents.spaceBefore && hasDirectives)
-            lines2.push("");
+            lines3.push("");
           if (doc.contents.commentBefore) {
             const cs = commentString(doc.contents.commentBefore);
-            lines2.push(stringifyComment.indentComment(cs, ""));
+            lines3.push(stringifyComment.indentComment(cs, ""));
           }
           ctx.forceBlockIndent = !!doc.comment;
           contentComment = doc.contents.comment;
@@ -9086,36 +9086,36 @@ var require_stringifyDocument = __commonJS({
         let body = stringify.stringify(doc.contents, ctx, () => contentComment = null, onChompKeep);
         if (contentComment)
           body += stringifyComment.lineComment(body, "", commentString(contentComment));
-        if ((body[0] === "|" || body[0] === ">") && lines2[lines2.length - 1] === "---") {
-          lines2[lines2.length - 1] = `--- ${body}`;
+        if ((body[0] === "|" || body[0] === ">") && lines3[lines3.length - 1] === "---") {
+          lines3[lines3.length - 1] = `--- ${body}`;
         } else
-          lines2.push(body);
+          lines3.push(body);
       } else {
-        lines2.push(stringify.stringify(doc.contents, ctx));
+        lines3.push(stringify.stringify(doc.contents, ctx));
       }
       if (doc.directives?.docEnd) {
         if (doc.comment) {
           const cs = commentString(doc.comment);
           if (cs.includes("\n")) {
-            lines2.push("...");
-            lines2.push(stringifyComment.indentComment(cs, ""));
+            lines3.push("...");
+            lines3.push(stringifyComment.indentComment(cs, ""));
           } else {
-            lines2.push(`... ${cs}`);
+            lines3.push(`... ${cs}`);
           }
         } else {
-          lines2.push("...");
+          lines3.push("...");
         }
       } else {
         let dc = doc.comment;
         if (dc && chompKeep)
           dc = dc.replace(/^\n+/, "");
         if (dc) {
-          if ((!chompKeep || contentComment) && lines2[lines2.length - 1] !== "")
-            lines2.push("");
-          lines2.push(stringifyComment.indentComment(commentString(dc), ""));
+          if ((!chompKeep || contentComment) && lines3[lines3.length - 1] !== "")
+            lines3.push("");
+          lines3.push(stringifyComment.indentComment(commentString(dc), ""));
         }
       }
-      return lines2.join("\n") + "\n";
+      return lines3.join("\n") + "\n";
     }
     exports.stringifyDocument = stringifyDocument;
   }
@@ -10177,17 +10177,17 @@ var require_resolve_block_scalar = __commonJS({
       if (!header)
         return { value: "", type: null, comment: "", range: [start, start, start] };
       const type = header.mode === ">" ? Scalar.Scalar.BLOCK_FOLDED : Scalar.Scalar.BLOCK_LITERAL;
-      const lines2 = scalar.source ? splitLines(scalar.source) : [];
-      let chompStart = lines2.length;
-      for (let i = lines2.length - 1; i >= 0; --i) {
-        const content = lines2[i][1];
+      const lines3 = scalar.source ? splitLines(scalar.source) : [];
+      let chompStart = lines3.length;
+      for (let i = lines3.length - 1; i >= 0; --i) {
+        const content = lines3[i][1];
         if (content === "" || content === "\r")
           chompStart = i;
         else
           break;
       }
       if (chompStart === 0) {
-        const value3 = header.chomp === "+" && lines2.length > 0 ? "\n".repeat(Math.max(1, lines2.length - 1)) : "";
+        const value3 = header.chomp === "+" && lines3.length > 0 ? "\n".repeat(Math.max(1, lines3.length - 1)) : "";
         let end2 = start + header.length;
         if (scalar.source)
           end2 += scalar.source.length;
@@ -10197,7 +10197,7 @@ var require_resolve_block_scalar = __commonJS({
       let offset2 = scalar.offset + header.length;
       let contentStart = 0;
       for (let i = 0; i < chompStart; ++i) {
-        const [indent, content] = lines2[i];
+        const [indent, content] = lines3[i];
         if (content === "" || content === "\r") {
           if (header.indent === 0 && indent.length > trimIndent)
             trimIndent = indent.length;
@@ -10217,17 +10217,17 @@ var require_resolve_block_scalar = __commonJS({
         }
         offset2 += indent.length + content.length + 1;
       }
-      for (let i = lines2.length - 1; i >= chompStart; --i) {
-        if (lines2[i][0].length > trimIndent)
+      for (let i = lines3.length - 1; i >= chompStart; --i) {
+        if (lines3[i][0].length > trimIndent)
           chompStart = i + 1;
       }
       let value2 = "";
       let sep = "";
       let prevMoreIndented = false;
       for (let i = 0; i < contentStart; ++i)
-        value2 += lines2[i][0].slice(trimIndent) + "\n";
+        value2 += lines3[i][0].slice(trimIndent) + "\n";
       for (let i = contentStart; i < chompStart; ++i) {
-        let [indent, content] = lines2[i];
+        let [indent, content] = lines3[i];
         offset2 += indent.length + content.length + 1;
         const crlf = content[content.length - 1] === "\r";
         if (crlf)
@@ -10264,8 +10264,8 @@ var require_resolve_block_scalar = __commonJS({
         case "-":
           break;
         case "+":
-          for (let i = chompStart; i < lines2.length; ++i)
-            value2 += "\n" + lines2[i][0].slice(trimIndent);
+          for (let i = chompStart; i < lines3.length; ++i)
+            value2 += "\n" + lines3[i][0].slice(trimIndent);
           if (value2[value2.length - 1] !== "\n")
             value2 += "\n";
           break;
@@ -10340,10 +10340,10 @@ var require_resolve_block_scalar = __commonJS({
       const first = split[0];
       const m = first.match(/^( *)/);
       const line0 = m?.[1] ? [m[1], first.slice(m[1].length)] : ["", first];
-      const lines2 = [line0];
+      const lines3 = [line0];
       for (let i = 1; i < split.length; i += 2)
-        lines2.push([split[i], split[i + 1]]);
-      return lines2;
+        lines3.push([split[i], split[i + 1]]);
+      return lines3;
     }
     exports.resolveBlockScalar = resolveBlockScalar;
   }
@@ -13158,8 +13158,8 @@ Troubleshooting:
 }
 function parseStderrErrors(stderr) {
   const errors = [];
-  const lines2 = stderr.split("\n");
-  for (const line of lines2) {
+  const lines3 = stderr.split("\n");
+  for (const line of lines3) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     if (trimmed.includes("error:") || trimmed.includes("Error:") || trimmed.includes("ERROR:") || trimmed.includes("fatal:") || trimmed.includes("Failed")) {
@@ -13171,7 +13171,7 @@ function parseStderrErrors(stderr) {
 function parseStructuredBuildErrors(log) {
   if (!log) return [];
   const out = [];
-  const lines2 = log.split(/\r?\n/);
+  const lines3 = log.split(/\r?\n/);
   const reMissingHeader = /^(.*?):(\d+)(?::\d+)?:\s*fatal error:\s*([^:]+?):\s*No such file or directory/i;
   const reSyntax = /^(.*?):(\d+)(?::\d+)?:\s*error:\s*(.+)$/i;
   const reUndefRef = /undefined reference to\s+[`']?([^'"`\s]+)[`']?/i;
@@ -13180,7 +13180,7 @@ function parseStructuredBuildErrors(log) {
   const reLibMissing = /Library Manager:\s*(Warning|Error).*not found|LibraryNotFound/i;
   const rePermission = /(EACCES|Permission denied|EPERM)/i;
   const reToolchain = /(Could not install package|failed to download|PackageException)/i;
-  for (const line of lines2) {
+  for (const line of lines3) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     let m;
@@ -13580,7 +13580,7 @@ var init_events = __esm({
        * @param activityId A unique identifier for this activity
        */
       async emitActivity(toolName, args, status, activityId) {
-        const payload = {
+        const payload2 = {
           timestamp: Date.now(),
           toolName,
           args,
@@ -13589,7 +13589,7 @@ var init_events = __esm({
           status,
           activityId
         };
-        this.emit("agent_activity", payload);
+        this.emit("agent_activity", payload2);
         if (this.lastKnownProjectDir) {
           try {
             const workspaceDir = path6.join(this.lastKnownProjectDir, ".pio-mcp-workspace");
@@ -13604,7 +13604,7 @@ var init_events = __esm({
               }
             } catch {
             }
-            await fs4.promises.appendFile(logFile, JSON.stringify(payload) + "\n");
+            await fs4.promises.appendFile(logFile, JSON.stringify(payload2) + "\n");
           } catch {
           }
         }
@@ -15903,8 +15903,8 @@ async function executeWithSpooling(command, args, options) {
       let errorMessage2 = void 0;
       if (code !== 0) {
         try {
-          const lines2 = await tailFileBounded(logFile, 512 * 1024);
-          const errors = parseStderrErrors(lines2.join("\n"));
+          const lines3 = await tailFileBounded(logFile, 512 * 1024);
+          const errors = parseStderrErrors(lines3.join("\n"));
           if (errors && errors.length > 0) errorMessage2 = errors[0];
         } catch {
         }
@@ -15961,8 +15961,8 @@ async function executeWithSpooling(command, args, options) {
   let errorMessage = void 0;
   if (exitCode !== 0) {
     try {
-      const lines2 = await tailFileBounded(logFile, 512 * 1024);
-      const errors = parseStderrErrors(lines2.join("\n"));
+      const lines3 = await tailFileBounded(logFile, 512 * 1024);
+      const errors = parseStderrErrors(lines3.join("\n"));
       if (errors && errors.length > 0) errorMessage = errors[0];
     } catch {
     }
@@ -15989,8 +15989,8 @@ async function executeWithSpooling(command, args, options) {
   }
   let finalOutput = "";
   try {
-    const lines2 = await tailFileBounded(logFile, 512 * 1024);
-    finalOutput = lines2.slice(-150).join("\n");
+    const lines3 = await tailFileBounded(logFile, 512 * 1024);
+    finalOutput = lines3.slice(-150).join("\n");
   } catch (e) {
     finalOutput = `[Spooler Fetch Error] Could not parse log ending: ${e.message}`;
   }
@@ -16910,9 +16910,9 @@ function parsePlatformioIni(iniText) {
     environments.push(m[1]);
   }
   const libDeps = [];
-  const lines2 = iniText.split(/\r?\n/);
+  const lines3 = iniText.split(/\r?\n/);
   let inLibDeps = false;
-  for (const rawLine of lines2) {
+  for (const rawLine of lines3) {
     const line = rawLine.replace(/[\t ]+$/, "");
     const trimmed = line.trim();
     if (/^\s*\[[^\]]+\]\s*$/.test(line)) {
@@ -17103,8 +17103,8 @@ function regexSource(pattern, translate) {
   }
   return pattern.replace(/\(\?P<([A-Za-z_][A-Za-z0-9_]*)>/g, "(?<$1>").replace(/\(\?P=([A-Za-z_][A-Za-z0-9_]*)\)/g, "\\k<$1>");
 }
-async function runBoundedPattern(lines2, pattern, options = {}, extract = false) {
-  if (typeof pattern !== "string" || pattern.length > 4096 || lines2.length > 1e4 || lines2.some((line) => typeof line !== "string") || lines2.reduce((sum, line) => sum + Buffer.byteLength(line), 0) > 1024 * 1024) {
+async function runBoundedPattern(lines3, pattern, options = {}, extract = false) {
+  if (typeof pattern !== "string" || pattern.length > 4096 || lines3.length > 1e4 || lines3.some((line) => typeof line !== "string") || lines3.reduce((sum, line) => sum + Buffer.byteLength(line), 0) > 1024 * 1024) {
     throw new PlatformIOError(
       "Pattern matching is limited to 4096 pattern characters, 10000 lines and 1 MiB of input.",
       "PATTERN_INPUT_LIMIT"
@@ -17119,7 +17119,7 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
     const needle = options.ignoreCase ? pattern.toLowerCase() : pattern;
     return {
       captures: [],
-      indices: lines2.flatMap(
+      indices: lines3.flatMap(
         (line, index) => (options.ignoreCase ? line.toLowerCase() : line).includes(needle) ? [index] : []
       )
     };
@@ -17140,7 +17140,7 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
     const worker = new Worker(WORKER_SOURCE, {
       eval: true,
       workerData: {
-        lines: lines2,
+        lines: lines3,
         pattern: source,
         ignoreCase: options.ignoreCase ?? false,
         extract
@@ -17231,11 +17231,11 @@ async function runBoundedPattern(lines2, pattern, options = {}, extract = false)
     });
   });
 }
-async function matchBoundedLines(lines2, pattern, options = {}) {
-  return (await runBoundedPattern(lines2, pattern, options)).indices;
+async function matchBoundedLines(lines3, pattern, options = {}) {
+  return (await runBoundedPattern(lines3, pattern, options)).indices;
 }
-async function extractBoundedCaptures(lines2, pattern, options = {}) {
-  return (await runBoundedPattern(lines2, pattern, { ...options, mode: "regex" }, true)).captures;
+async function extractBoundedCaptures(lines3, pattern, options = {}) {
+  return (await runBoundedPattern(lines3, pattern, { ...options, mode: "regex" }, true)).captures;
 }
 var WORKER_SOURCE, activeRegexWorkers;
 var init_bounded_pattern = __esm({
@@ -20139,9 +20139,9 @@ var require_compile = __commonJS({
       if (_sch)
         return _sch;
       const rootId = (0, resolve_1.getFullPath)(this.opts.uriResolver, sch.root.baseId);
-      const { es5, lines: lines2 } = this.opts.code;
+      const { es5, lines: lines3 } = this.opts.code;
       const { ownProperties } = this.opts;
-      const gen = new codegen_1.CodeGen(this.scope, { es5, lines: lines2, ownProperties });
+      const gen = new codegen_1.CodeGen(this.scope, { es5, lines: lines3, ownProperties });
       let _ValidationError;
       if (sch.$async) {
         _ValidationError = gen.scopeValue("Error", {
@@ -21591,8 +21591,8 @@ var require_core = __commonJS({
         this._loading = {};
         this._cache = /* @__PURE__ */ new Map();
         opts = this.opts = { ...opts, ...requiredOptions(opts) };
-        const { es5, lines: lines2 } = this.opts.code;
-        this.scope = new codegen_2.ValueScope({ scope: {}, prefixes: EXT_SCOPE_NAMES, es5, lines: lines2 });
+        const { es5, lines: lines3 } = this.opts.code;
+        this.scope = new codegen_2.ValueScope({ scope: {}, prefixes: EXT_SCOPE_NAMES, es5, lines: lines3 });
         this.logger = getLogger(opts.logger);
         const formatOpt = opts.validateFormats;
         opts.validateFormats = false;
@@ -25067,7 +25067,7 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
     startedAt: daemon.startedAt
   };
 }
-async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDir, port) {
+async function queryLogs(lines3 = 100, searchPattern, taskId, logPath, projectDir, port) {
   let targetPaths = [];
   if (taskId) {
     const history = getCommandHistory(projectDir);
@@ -25116,8 +25116,8 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
       };
     }
   }
-  if (stitchedLines.length > lines2) {
-    stitchedLines = stitchedLines.slice(-lines2);
+  if (stitchedLines.length > lines3) {
+    stitchedLines = stitchedLines.slice(-lines3);
   }
   return {
     success: true,
@@ -25125,23 +25125,23 @@ async function queryLogs(lines2 = 100, searchPattern, taskId, logPath, projectDi
   };
 }
 function encodeMonitorCursor(logPath, offset2) {
-  const payload = {
+  const payload2 = {
     version: 1,
     logHash: crypto17.createHash("sha256").update(path98.resolve(logPath)).digest("hex"),
     offset: offset2
   };
-  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  return Buffer.from(JSON.stringify(payload2), "utf8").toString("base64url");
 }
 function decodeMonitorCursor(cursor, logPath) {
   try {
-    const payload = JSON.parse(
+    const payload2 = JSON.parse(
       Buffer.from(cursor, "base64url").toString("utf8")
     );
     const expectedHash = crypto17.createHash("sha256").update(path98.resolve(logPath)).digest("hex");
-    if (payload.version !== 1 || payload.logHash !== expectedHash || !Number.isSafeInteger(payload.offset) || (payload.offset ?? -1) < 0) {
+    if (payload2.version !== 1 || payload2.logHash !== expectedHash || !Number.isSafeInteger(payload2.offset) || (payload2.offset ?? -1) < 0) {
       throw new Error("invalid cursor");
     }
-    return payload.offset;
+    return payload2.offset;
   } catch {
     throw new PlatformIOError(
       "The serial cursor is invalid or belongs to an expired monitor log.",
@@ -85811,9 +85811,9 @@ var require_cjs3 = __commonJS({
           p.id = Number(str.substring(start, i + 1));
         }
         if (str.charAt(++i)) {
-          const payload = this.tryParse(str.substr(i));
-          if (_Decoder.isPayloadValid(p.type, payload)) {
-            p.data = payload;
+          const payload2 = this.tryParse(str.substr(i));
+          if (_Decoder.isPayloadValid(p.type, payload2)) {
+            p.data = payload2;
           } else {
             throw new Error("invalid payload");
           }
@@ -85828,20 +85828,20 @@ var require_cjs3 = __commonJS({
           return false;
         }
       }
-      static isPayloadValid(type, payload) {
+      static isPayloadValid(type, payload2) {
         switch (type) {
           case PacketType.CONNECT:
-            return isObject2(payload);
+            return isObject2(payload2);
           case PacketType.DISCONNECT:
-            return payload === void 0;
+            return payload2 === void 0;
           case PacketType.CONNECT_ERROR:
-            return typeof payload === "string" || isObject2(payload);
+            return typeof payload2 === "string" || isObject2(payload2);
           case PacketType.EVENT:
           case PacketType.BINARY_EVENT:
-            return Array.isArray(payload) && (typeof payload[0] === "number" || typeof payload[0] === "string" && RESERVED_EVENTS.indexOf(payload[0]) === -1);
+            return Array.isArray(payload2) && (typeof payload2[0] === "number" || typeof payload2[0] === "string" && RESERVED_EVENTS.indexOf(payload2[0]) === -1);
           case PacketType.ACK:
           case PacketType.BINARY_ACK:
-            return Array.isArray(payload);
+            return Array.isArray(payload2);
         }
       }
       /**
@@ -85898,18 +85898,18 @@ var require_cjs3 = __commonJS({
     function isObject2(value2) {
       return Object.prototype.toString.call(value2) === "[object Object]";
     }
-    function isDataValid(type, payload) {
+    function isDataValid(type, payload2) {
       switch (type) {
         case PacketType.CONNECT:
-          return payload === void 0 || isObject2(payload);
+          return payload2 === void 0 || isObject2(payload2);
         case PacketType.DISCONNECT:
-          return payload === void 0;
+          return payload2 === void 0;
         case PacketType.EVENT:
-          return Array.isArray(payload) && (typeof payload[0] === "number" || typeof payload[0] === "string" && RESERVED_EVENTS.indexOf(payload[0]) === -1);
+          return Array.isArray(payload2) && (typeof payload2[0] === "number" || typeof payload2[0] === "string" && RESERVED_EVENTS.indexOf(payload2[0]) === -1);
         case PacketType.ACK:
-          return Array.isArray(payload);
+          return Array.isArray(payload2);
         case PacketType.CONNECT_ERROR:
-          return typeof payload === "string" || isObject2(payload);
+          return typeof payload2 === "string" || isObject2(payload2);
         default:
           return false;
       }
@@ -93577,11 +93577,11 @@ function readRecentAuditEvents(opts) {
   if (!fs5.existsSync(sourceFile)) {
     return [];
   }
-  const lines2 = fs5.readFileSync(sourceFile, "utf8").split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const lines3 = fs5.readFileSync(sourceFile, "utf8").split(/\r?\n/).filter((line) => line.trim().length > 0);
   const events = [];
-  for (let i = lines2.length - 1; i >= 0 && events.length < limit; i--) {
+  for (let i = lines3.length - 1; i >= 0 && events.length < limit; i--) {
     try {
-      events.push(JSON.parse(lines2[i]));
+      events.push(JSON.parse(lines3[i]));
     } catch {
     }
   }
@@ -95164,9 +95164,9 @@ var serialMatchers = [
 
 // src/core/diagnostics/diagnose.ts
 function trimEvidence(log, pattern) {
-  const lines2 = log.split(/\r?\n/);
+  const lines3 = log.split(/\r?\n/);
   const matches = [];
-  for (const line of lines2) {
+  for (const line of lines3) {
     if (pattern.test(line)) {
       matches.push(line.trim());
       if (matches.length >= 4) break;
@@ -95663,8 +95663,8 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
       const latestLog = logPath || logPaths[logPaths.length - 1];
       if (latestLog && fs22.existsSync(latestLog)) {
         try {
-          const lines2 = await tailFileBounded(latestLog, 512 * 1024);
-          output = lines2.slice(status === "running" ? -30 : -150).join("\n");
+          const lines3 = await tailFileBounded(latestLog, 512 * 1024);
+          output = lines3.slice(status === "running" ? -30 : -150).join("\n");
         } catch (e) {
           output = `[Status Polling Error] Could not read log: ${e.message}`;
         }
@@ -95682,8 +95682,8 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
     if (fs22.existsSync(logFile)) {
       logPaths = [logFile];
       try {
-        const lines2 = await tailFileBounded(logFile, 512 * 1024);
-        output = lines2.slice(active ? -30 : -150).join("\n");
+        const lines3 = await tailFileBounded(logFile, 512 * 1024);
+        output = lines3.slice(active ? -30 : -150).join("\n");
       } catch (e) {
         output = `[Status Polling Error] Could not read log: ${e.message}`;
       }
@@ -99581,13 +99581,13 @@ function linesOf(text10) {
       "Analysis text exceeds 1 MiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
-  const lines2 = text10.split(/\r?\n/);
-  if (lines2.some((line) => line.length > 16384))
+  const lines3 = text10.split(/\r?\n/);
+  if (lines3.some((line) => line.length > 16384))
     throw new PlatformIOError(
       "Analysis line exceeds 16 KiB.",
       "ANALYSIS_INPUT_LIMIT"
     );
-  return lines2;
+  return lines3;
 }
 function normalizeAddress(address) {
   if (!/^0x[0-9a-f]{1,16}$/i.test(address))
@@ -99598,7 +99598,7 @@ function normalizeAddress(address) {
   return `0x${BigInt(address).toString(16).padStart(8, "0")}`;
 }
 function extractCrash(text10, includeAllHex = false) {
-  const lines2 = linesOf(text10);
+  const lines3 = linesOf(text10);
   const evidence = {
     addresses: [],
     causes: [],
@@ -99628,7 +99628,7 @@ function extractCrash(text10, includeAllHex = false) {
     seen.add(key);
     evidence.addresses.push({ address, role, register, frame });
   };
-  for (const line of lines2) {
+  for (const line of lines3) {
     for (const match of line.matchAll(
       new RegExp(
         `\\b(PC|A0|EXCVADDR|EPC[1-4]|MEPC|MTVAL|RA|r15|lr|r14|xpsr|psp|msp)\\b\\s*(?:\\((?:pc|lr)\\))?\\s*[:=]\\s*(${HEX})\\b`,
@@ -99666,7 +99666,7 @@ function extractCrash(text10, includeAllHex = false) {
       evidence.resetReasons.push(reset[1]);
   }
   if (includeAllHex || evidence.addresses.length === 0) {
-    for (const line of lines2)
+    for (const line of lines3)
       for (const match of line.matchAll(new RegExp(`\\b(${HEX})\\b`, "g")))
         add(match[1], "other");
   }
@@ -100592,7 +100592,7 @@ async function waitForPowerTrigger(manager, owner, sessionId2, input, signal) {
       "Trigger monitor is not open.",
       "POWER_TRIGGER_CLOSED"
     );
-  let cursor = selected.nextCursor, lines2 = 0, bytes = 0;
+  let cursor = selected.nextCursor, lines3 = 0, bytes = 0;
   await matchBoundedLines([], args.trigger, {
     mode: "regex",
     pythonNamedGroups: true
@@ -100606,7 +100606,7 @@ async function waitForPowerTrigger(manager, owner, sessionId2, input, signal) {
       );
     const page = await manager.read(owner, sessionId2, {
       cursor,
-      maxLines: Math.min(500, 1e4 - lines2),
+      maxLines: Math.min(500, 1e4 - lines3),
       maxBytes: 65536,
       timeoutMs: Math.min(
         250,
@@ -100625,7 +100625,7 @@ async function waitForPowerTrigger(manager, owner, sessionId2, input, signal) {
         "POWER_TRIGGER_LOSS"
       );
     cursor = page.cursor;
-    lines2 += page.lines.length;
+    lines3 += page.lines.length;
     bytes += page.lines.reduce((sum, line) => sum + Buffer.byteLength(line), 0);
     if (bytes > 1024 * 1024)
       throw new PlatformIOError(
@@ -100666,7 +100666,7 @@ async function waitForPowerTrigger(manager, owner, sessionId2, input, signal) {
         "Trigger monitor closed before a matching line.",
         "POWER_TRIGGER_CLOSED"
       );
-    if (lines2 >= 1e4 || bytes >= 1024 * 1024)
+    if (lines3 >= 1e4 || bytes >= 1024 * 1024)
       throw new PlatformIOError(
         "Trigger wait exceeded its evidence budget.",
         "POWER_TRIGGER_LIMIT"
@@ -100763,7 +100763,7 @@ async function captureSessionVerification(manager, owner, sessionId2, input = {}
   const args = await validateVerificationCapture(input);
   const started = performance3.now();
   const deadline = started + args.timeoutSeconds * 1e3;
-  const lines2 = [];
+  const lines3 = [];
   let cursor = 0, bytes = 0, lineCount = 0, droppedLines = 0, truncatedBytes = 0;
   let lastOutput = started, failureAt;
   let matchedLine = null, failureLine = null;
@@ -100813,10 +100813,10 @@ async function captureSessionVerification(manager, owner, sessionId2, input = {}
       failureLine = read.lines[failures2[0]];
     for (const line of read.lines) {
       lineCount++;
-      lines2.push(line);
+      lines3.push(line);
       bytes += Buffer.byteLength(line);
-      while (lines2.length > args.maxLines || bytes > 1024 * 1024)
-        bytes -= Buffer.byteLength(lines2.shift());
+      while (lines3.length > args.maxLines || bytes > 1024 * 1024)
+        bytes -= Buffer.byteLength(lines3.shift());
     }
     const assertions = evaluateRuntimeAssertions({
       serialOutput: read.lines.join("\n"),
@@ -100855,14 +100855,14 @@ async function captureSessionVerification(manager, owner, sessionId2, input = {}
     matched_line: failureLine ?? matchedLine,
     expect: args.expect,
     fail_on: args.failOn,
-    lines: lines2,
+    lines: lines3,
     line_count: lineCount,
     verify_s: (performance3.now() - started) / 1e3,
     port_error: portError,
     dropped_lines: droppedLines,
     truncated_bytes: truncatedBytes,
     evidence_complete: !lost && !cancelled && !closed && !portError,
-    retained_lines: lines2.length,
+    retained_lines: lines3.length,
     runtime_failures: [...runtimeFailures],
     redactionApplied,
     redactionOutputMayBeTruncated
@@ -101010,9 +101010,9 @@ function number(value2) {
     );
   return Number(value2);
 }
-async function parsePowerLines(lines2, pattern) {
+async function parsePowerLines(lines3, pattern) {
   const captures = await extractBoundedCaptures(
-    lines2,
+    lines3,
     pattern || DEFAULT_PATTERN,
     { pythonNamedGroups: true }
   );
@@ -101052,7 +101052,7 @@ async function parsePowerLines(lines2, pattern) {
   }
   return {
     samples,
-    unparsedLines: lines2.reduce(
+    unparsedLines: lines3.reduce(
       (count2, line, index) => count2 + (!matched.has(index) && line.trim() ? 1 : 0),
       0
     )
@@ -101097,20 +101097,20 @@ async function captureSessionPower(manager, owner, sessionId2, input = {}, signa
     dropped += last.droppedLines;
     redacted ||= last.redactionApplied;
     redactionClipped ||= last.redactionOutputMayBeTruncated;
-    const lines2 = [];
+    const lines3 = [];
     for (let index = 0; index < last.lines.length; index++) {
       const size = Buffer.byteLength(last.lines[index]);
       if (bytes + size > 1024 * 1024) {
         limit = true;
         break;
       }
-      lines2.push(last.lines[index]);
+      lines3.push(last.lines[index]);
       bytes += size;
       truncated += last.lineTruncatedBytes[index] ?? 0;
     }
-    cursor = last.cursor - last.lines.length + lines2.length;
-    lineCount += lines2.length;
-    const parsed = await parsePowerLines(lines2, args.pattern);
+    cursor = last.cursor - last.lines.length + lines3.length;
+    lineCount += lines3.length;
+    const parsed = await parsePowerLines(lines3, args.pattern);
     unparsed += parsed.unparsedLines;
     for (const sample of parsed.samples) {
       samples.push({ currentMa: sample.currentMa, elapsedSeconds });
@@ -101119,7 +101119,7 @@ async function captureSessionPower(manager, owner, sessionId2, input = {}, signa
     limit ||= lineCount >= args.maxLines || bytes >= 1024 * 1024;
     if (limit || last.readStatus === "cancelled" || signal?.aborted || last.state !== "open" || performance4.now() >= deadline)
       break;
-    if (!lines2.length) await delay4(1);
+    if (!lines3.length) await delay4(1);
   } while (true);
   const final = await manager.read(owner, sessionId2, {
     cursor,
@@ -101173,7 +101173,7 @@ init_zod();
 // src/core/memory-telemetry-parser.ts
 init_zod();
 init_errors2();
-function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
+function parseMemoryTelemetry(lines3, options = {}, excluded = []) {
   const settings = external_exports.object({
     stackUnit: external_exports.enum(["bytes", "words"]).optional(),
     stackWordBytes: external_exports.number().int().min(1).max(16).optional()
@@ -101183,7 +101183,7 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
       "Word-valued stack telemetry requires stackWordBytes.",
       "MEMORY_UNIT_REQUIRED"
     );
-  if (lines2.length > 1e4 || lines2.some((line) => typeof line !== "string" || line.length > 16384) || lines2.reduce((size, line) => size + Buffer.byteLength(line), 0) > 1024 * 1024)
+  if (lines3.length > 1e4 || lines3.some((line) => typeof line !== "string" || line.length > 16384) || lines3.reduce((size, line) => size + Buffer.byteLength(line), 0) > 1024 * 1024)
     throw new PlatformIOError(
       "Telemetry exceeds line or byte limits.",
       "MEMORY_TELEMETRY_LIMIT"
@@ -101205,7 +101205,7 @@ function parseMemoryTelemetry(lines2, options = {}, excluded = []) {
     samples.push({ line, metric, value: value2, unit, ...task ? { task } : {} });
   };
   let heapSummaryUntil = -1, totalsPending = false, taskTable = false;
-  lines2.forEach((raw, line) => {
+  lines3.forEach((raw, line) => {
     const text10 = raw.replace(/\x1b\[[0-9;]*m/g, "");
     const trimmed = text10.trim();
     if (/heap summary for capabilities/i.test(trimmed)) {
@@ -101458,23 +101458,23 @@ function memoryFragmentation(freeBytes, largestBlockBytes) {
 
 // src/core/memory-report.ts
 init_errors2();
-function analyzeMemoryTelemetry(lines2, options = {}) {
-  return analyzeParsedTelemetry(lines2, options);
+function analyzeMemoryTelemetry(lines3, options = {}) {
+  return analyzeParsedTelemetry(lines3, options);
 }
-function analyzeParsedTelemetry(lines2, options, custom3) {
+function analyzeParsedTelemetry(lines3, options, custom3) {
   const settings = external_exports.object({
     stackUnit: external_exports.enum(["bytes", "words"]).optional(),
     stackWordBytes: external_exports.number().int().min(1).max(16).optional(),
     stackWarnBytes: external_exports.number().int().nonnegative().max(1024 * 1024 * 1024).default(512),
     elapsedSeconds: external_exports.array(external_exports.number().finite().nonnegative()).max(1e4).optional()
   }).strict().parse(options);
-  if (settings.elapsedSeconds && settings.elapsedSeconds.length !== lines2.length)
+  if (settings.elapsedSeconds && settings.elapsedSeconds.length !== lines3.length)
     throw new PlatformIOError(
       "Telemetry timestamps must correspond to every input line.",
       "MEMORY_TIMESTAMPS_INVALID"
     );
   const parsed = parseMemoryTelemetry(
-    lines2,
+    lines3,
     {
       stackUnit: settings.stackUnit,
       stackWordBytes: settings.stackWordBytes
@@ -101560,13 +101560,13 @@ function analyzeParsedTelemetry(lines2, options, custom3) {
     samples: parsed.samples.slice(-200),
     samplesTruncated: parsed.samples.length > 200,
     unknownUnitSamples: parsed.unknownUnitSamples,
-    lineCount: lines2.length,
-    summary: parsed.recognized ? `${parsed.samples.length} memory observations in ${lines2.length} lines; trends describe this sample window and do not confirm a leak.` : `No recognized memory telemetry in ${lines2.length} lines. Add heap or stack instrumentation with explicit units.`
+    lineCount: lines3.length,
+    summary: parsed.recognized ? `${parsed.samples.length} memory observations in ${lines3.length} lines; trends describe this sample window and do not confirm a leak.` : `No recognized memory telemetry in ${lines3.length} lines. Add heap or stack instrumentation with explicit units.`
   };
 }
-async function analyzeMemoryTelemetryPattern(lines2, pattern, options = {}) {
-  analyzeMemoryTelemetry(lines2, options);
-  const normalizedLines = lines2.map(
+async function analyzeMemoryTelemetryPattern(lines3, pattern, options = {}) {
+  analyzeMemoryTelemetry(lines3, options);
+  const normalizedLines = lines3.map(
     (line) => line.replace(/\x1b\[[0-9;]*m/g, "")
   );
   const captures = await extractBoundedCaptures(normalizedLines, pattern, {
@@ -101626,7 +101626,7 @@ async function captureSessionMemory(manager, owner, sessionId2, input = {}, sign
   const args = MemoryCaptureSchema.parse(input);
   const started = performance5.now();
   const deadline = started + args.seconds * 1e3;
-  const lines2 = [];
+  const lines3 = [];
   let bytes = 0, cursor = args.cursor, droppedLines = 0, truncatedBytes = 0;
   let redactionApplied = false, redactionOutputMayBeTruncated = false;
   let last;
@@ -101635,7 +101635,7 @@ async function captureSessionMemory(manager, owner, sessionId2, input = {}, sign
     const remaining = Math.max(0, deadline - performance5.now());
     last = await manager.read(owner, sessionId2, {
       cursor,
-      maxLines: Math.min(500, args.maxLines - lines2.length),
+      maxLines: Math.min(500, args.maxLines - lines3.length),
       maxBytes: Math.max(65536, 1024 * 1024 - bytes),
       timeoutMs: Math.min(1e3, Math.ceil(remaining)),
       signal
@@ -101651,13 +101651,13 @@ async function captureSessionMemory(manager, owner, sessionId2, input = {}, sign
         limitReached = true;
         break;
       }
-      lines2.push(text10);
+      lines3.push(text10);
       accepted++;
       bytes += size;
       truncatedBytes += last.lineTruncatedBytes[index] ?? 0;
     }
     cursor = last.cursor - last.lines.length + accepted;
-    if (lines2.length >= args.maxLines || bytes >= 1024 * 1024)
+    if (lines3.length >= args.maxLines || bytes >= 1024 * 1024)
       limitReached = true;
     if (limitReached || last.readStatus === "cancelled" || last.state !== "open" && !last.moreAvailable || performance5.now() >= deadline && !last.moreAvailable)
       break;
@@ -101668,7 +101668,7 @@ async function captureSessionMemory(manager, owner, sessionId2, input = {}, sign
     stackWordBytes: args.stackWordBytes,
     stackWarnBytes: args.stackWarnBytes
   };
-  const report = args.pattern === void 0 ? analyzeMemoryTelemetry(lines2, options) : await analyzeMemoryTelemetryPattern(lines2, args.pattern, options);
+  const report = args.pattern === void 0 ? analyzeMemoryTelemetry(lines3, options) : await analyzeMemoryTelemetryPattern(lines3, args.pattern, options);
   const final = await manager.read(owner, sessionId2, {
     cursor,
     maxLines: 1,
@@ -102004,11 +102004,11 @@ var SerialSessionBuffer = class {
     );
     const first = this.count ? this.ring[this.head].cursor : this.nextCursor;
     let cursor = Math.max(first, requested), bytes = 0;
-    const lines2 = [], lineTruncatedBytes = [];
-    for (let offset2 = cursor - first; offset2 < this.count && lines2.length < limit; offset2++) {
+    const lines3 = [], lineTruncatedBytes = [];
+    for (let offset2 = cursor - first; offset2 < this.count && lines3.length < limit; offset2++) {
       const row = this.ring[(this.head + offset2) % this.capacity];
       if (bytes + row.bytes > byteLimit) break;
-      lines2.push(row.text);
+      lines3.push(row.text);
       lineTruncatedBytes.push(row.truncatedBytes);
       bytes += row.bytes;
       cursor = row.cursor + 1;
@@ -102016,12 +102016,12 @@ var SerialSessionBuffer = class {
     const renderedPartial = this.filterText(this.partial);
     const renderedPartialBytes = Buffer.byteLength(renderedPartial);
     const unreadLines = cursor < this.nextCursor;
-    const showPartial = !unreadLines && lines2.length < limit && bytes + renderedPartialBytes <= byteLimit;
+    const showPartial = !unreadLines && lines3.length < limit && bytes + renderedPartialBytes <= byteLimit;
     const moreAvailable = unreadLines || !showPartial && this.partialBytes > 0;
     return {
       redactionApplied: !!this.redactor,
       redactionOutputMayBeTruncated: this.redactionClipped,
-      lines: lines2,
+      lines: lines3,
       lineTruncatedBytes,
       cursor,
       firstAvailableCursor: first,
@@ -102034,7 +102034,7 @@ var SerialSessionBuffer = class {
       partialTruncatedBytes: showPartial ? this.partialLost : 0,
       state: this.state,
       error: this.error,
-      readStatus: this.state === "open" ? lines2.length || showPartial && this.partial.length ? "ready" : "empty" : "closed",
+      readStatus: this.state === "open" ? lines3.length || showPartial && this.partial.length ? "ready" : "empty" : "closed",
       matched: false,
       receivedBytes: this.received,
       totalDroppedLines: this.droppedLines,
@@ -105251,7 +105251,7 @@ async function executeRunCompatibility(mode, input, defaults, caller, onAuthoriz
 }
 function cleanCompatibilityResult(result, environment, duration4, timedOut = false, tool = "clean") {
   const output = normalizeCleanOutput(result.output);
-  const lines2 = output.split("\n");
+  const lines3 = output.split("\n");
   const diagnostics = [];
   const seen = /* @__PURE__ */ new Set();
   const linkerDiagnostics = [];
@@ -105259,7 +105259,7 @@ function cleanCompatibilityResult(result, environment, duration4, timedOut = fal
   const environments = [];
   const memory = {};
   let failed = false;
-  for (const line of lines2) {
+  for (const line of lines3) {
     const env = /^Processing (\S+) \(/.exec(line);
     if (env) environments.push(env[1]);
     if (/^=+ \[(FAILED|ERROR)\] Took /.test(line)) failed = true;
@@ -105356,15 +105356,15 @@ function cleanCompatibilityResult(result, environment, duration4, timedOut = fal
     duration_s: durationSeconds,
     exit_code: result.exitCode,
     log_path: result.logPath,
-    output_tail: lines2.slice(-40).join("\n"),
+    output_tail: lines3.slice(-40).join("\n"),
     port_error: ok ? null : classifyCleanPortError(output)
   };
 }
 function normalizeCleanOutput(output) {
-  const lines2 = output.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r\n?/g, "\n").split("\n");
+  const lines3 = output.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r\n?/g, "\n").split("\n");
   const result = [];
   let banner = false;
-  for (const line of lines2) {
+  for (const line of lines3) {
     const stripped = line.trim();
     if (/^\*{21,}$/.test(stripped)) {
       banner = !banner;
@@ -109841,6 +109841,13 @@ var GdbMiSession = class {
         token,
         waitForStop,
         console: [],
+        log: [],
+        targetOutput: [],
+        otherOutput: [],
+        records: [],
+        recordBytes: 0,
+        chunks: 0,
+        startedAt: performance.now(),
         bytes: 0,
         truncated: false,
         timer: setTimeout(() => this.complete(pending, true), timeoutMs),
@@ -109900,12 +109907,23 @@ var GdbMiSession = class {
     }
     const pending = this.pending;
     if (!pending) return;
+    const recordBytes = Buffer.byteLength(JSON.stringify(record3));
+    if (recordBytes <= MAX_OUTPUT_BYTES) {
+      while (pending.records.length >= 200 || pending.recordBytes + recordBytes > MAX_OUTPUT_BYTES) {
+        pending.recordBytes -= pending.records.shift().bytes;
+        pending.truncated = true;
+      }
+      pending.records.push({ record: record3, bytes: recordBytes });
+      pending.recordBytes += recordBytes;
+    } else pending.truncated = true;
     if (record3.kind === "stream" || record3.kind === "other") {
       const bytes = Buffer.from(record3.text);
       const remaining = MAX_OUTPUT_BYTES - pending.bytes;
-      if (remaining > 0 && pending.console.length < 4096) {
+      if (remaining > 0 && pending.chunks < 4096) {
         const selected = bytes.subarray(0, remaining);
-        pending.console.push(new StringDecoder4("utf8").write(selected));
+        const output = record3.kind === "other" ? pending.otherOutput : record3.channel === "log" ? pending.log : record3.channel === "target" ? pending.targetOutput : pending.console;
+        output.push(new StringDecoder4("utf8").write(selected));
+        pending.chunks++;
         pending.bytes += selected.length;
       } else pending.truncated = true;
       if (bytes.length > remaining) pending.truncated = true;
@@ -109926,6 +109944,14 @@ var GdbMiSession = class {
       result: pending.result,
       stopped: pending.stopped,
       console: pending.console,
+      log: pending.log,
+      targetOutput: pending.targetOutput,
+      otherOutput: pending.otherOutput,
+      records: pending.records.map((entry) => entry.record),
+      durationSeconds: Math.max(
+        0,
+        (performance.now() - pending.startedAt) / 1e3
+      ),
       truncated: pending.truncated,
       timedOut,
       running: this.running,
@@ -111614,6 +111640,46 @@ var DebugStopCompatibilitySchema = external_exports.object({
   process_only: external_exports.boolean().default(false)
 }).strict();
 var DebugListCompatibilitySchema = external_exports.object({}).strict();
+function payload(fields) {
+  const output = /* @__PURE__ */ Object.create(null);
+  const repeated = /* @__PURE__ */ new Set();
+  for (const entry of fields) {
+    const value2 = miValue(entry.value);
+    if (!Object.hasOwn(output, entry.name)) output[entry.name] = value2;
+    else if (repeated.has(entry.name))
+      output[entry.name].push(value2);
+    else {
+      output[entry.name] = [output[entry.name], value2];
+      repeated.add(entry.name);
+    }
+  }
+  return output;
+}
+function miValue(value2) {
+  if (typeof value2 === "string") return value2;
+  if (value2.kind === "tuple") return payload(value2.fields);
+  if (value2.kind === "list") return value2.values.map(miValue);
+  return value2.fields.map((entry) => payload([entry]));
+}
+function referenceRecord(record3) {
+  if (record3.kind === "stream")
+    return { kind: record3.channel, text: record3.text };
+  if (record3.kind === "other") return { kind: record3.kind, text: record3.text };
+  if (record3.kind === "prompt") return { kind: record3.kind };
+  return {
+    kind: record3.kind,
+    ...record3.token ? { token: record3.token } : {},
+    class: record3.class,
+    ...record3.fields.length ? { payload: payload(record3.fields) } : {}
+  };
+}
+function lines2(chunks = [], separator = "") {
+  const joined = chunks.join(separator);
+  if (!joined) return [];
+  const result = joined.split(/\r\n|\n|\r/);
+  if (result[result.length - 1] === "") result.pop();
+  return result;
+}
 function field2(fields, name2) {
   return fields.find((entry) => entry.name === name2)?.value;
 }
@@ -111630,11 +111696,18 @@ function normalizeDebuggerStop(record3) {
     signal_name: text4(record3.fields, "signal-name"),
     signal_meaning: text4(record3.fields, "signal-meaning"),
     thread_id: text4(record3.fields, "thread-id"),
+    ...Object.fromEntries(
+      ["bkptno", "exit-code", "disp"].filter((key) => field2(record3.fields, key) !== void 0).map((key) => [key.replaceAll("-", "_"), text4(record3.fields, key)])
+    ),
     frame: fields.length ? {
       function: text4(fields, "func"),
       address: text4(fields, "addr"),
       file: text4(fields, "fullname") ?? text4(fields, "file"),
-      line: text4(fields, "line")
+      line: (() => {
+        const line = text4(fields, "line");
+        return line !== null && /^-?[0-9]+$/.test(line) && Number.isSafeInteger(Number(line)) ? Number(line) : line;
+      })(),
+      args: field2(fields, "args") === void 0 ? [] : miValue(field2(fields, "args"))
     } : null
   };
 }
@@ -111646,7 +111719,14 @@ function formatDebuggerCommandResult(result) {
     result_class: resultClass,
     // Preserve bounded ordered MI fields: inspection results may have no console stream.
     result_fields: result.result?.fields ?? [],
-    console: result.console,
+    result: payload(result.result?.fields ?? []),
+    console: lines2(result.console),
+    log: lines2(result.log),
+    target_output: lines2(result.targetOutput),
+    other_output: lines2(result.otherOutput, "\n"),
+    records: (result.records ?? []).map(referenceRecord),
+    duration_s: result.durationSeconds ?? 0,
+    note: null,
     error: error2,
     stopped: normalizeDebuggerStop(result.stopped),
     running: result.running,
@@ -111679,16 +111759,19 @@ async function executeDebugSessionCompatibility(name2, input, sessions, caller =
     const parsed2 = DebugCommandCompatibilitySchema.safeParse(input);
     if (!parsed2.success) throw invalid4();
     const args2 = parsed2.data;
-    return formatDebuggerCommandResult(
-      await sessions.command(
-        args2.session_id,
-        args2.command,
-        caller,
-        Math.ceil(args2.timeout_s * 1e3),
-        args2.approval_id,
-        args2.target_approval_id
-      )
+    const result = await sessions.command(
+      args2.session_id,
+      args2.command,
+      caller,
+      Math.ceil(args2.timeout_s * 1e3),
+      args2.approval_id,
+      args2.target_approval_id
     );
+    return {
+      ...formatDebuggerCommandResult(result),
+      session_id: args2.session_id,
+      command: args2.command.trim()
+    };
   }
   const parsed = DebugStopCompatibilitySchema.safeParse(input);
   if (!parsed.success) throw invalid4();
@@ -112541,7 +112624,7 @@ async function runEspotaProcess(request) {
       "Invalid OTA uploader options.",
       "OTA_EXECUTION_INVALID"
     );
-  const payload = JSON.stringify({
+  const payload2 = JSON.stringify({
     options: options.data,
     script: request.uploaderScript,
     image: request.imagePath,
@@ -112552,7 +112635,7 @@ async function runEspotaProcess(request) {
     auth: request.auth ?? null,
     filesystem: request.filesystem
   });
-  if (Buffer.byteLength(payload) > 65536)
+  if (Buffer.byteLength(payload2) > 65536)
     throw new PlatformIOError(
       "OTA request exceeds the private input limit.",
       "OTA_EXECUTION_INVALID"
@@ -112615,7 +112698,7 @@ async function runEspotaProcess(request) {
     1e3,
     controller.signal
   );
-  proc.stdin.end(payload);
+  proc.stdin.end(payload2);
   let exitCode, failure;
   try {
     exitCode = await completion;
@@ -114100,9 +114183,9 @@ function inspectRawEspCoredump(input, encrypted = false) {
       "Declared core-dump length is outside the supplied input.",
       "COREDUMP_LENGTH_INVALID"
     );
-  const payload = bytes.subarray(0, length - checksumLength);
+  const payload2 = bytes.subarray(0, length - checksumLength);
   const checksum = bytes.subarray(length - checksumLength, length);
-  const valid = format.checksum === "sha256" ? timingSafeEqual(createHash18("sha256").update(payload).digest(), checksum) : crc32(payload) === checksum.readUInt32LE(0);
+  const valid = format.checksum === "sha256" ? timingSafeEqual(createHash18("sha256").update(payload2).digest(), checksum) : crc32(payload2) === checksum.readUInt32LE(0);
   if (!valid)
     throw new PlatformIOError(
       "Core-dump checksum does not match its declared bytes.",
@@ -114157,13 +114240,13 @@ function decodeEspCoredumpBase64(text10) {
   if (/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) {
     decoded = decodeChunk(compact);
   } else {
-    const lines2 = text10.split(/\r?\n/).map((line) => line.replace(/[ \t]/g, "")).filter(Boolean);
-    if (lines2.length > 65536)
+    const lines3 = text10.split(/\r?\n/).map((line) => line.replace(/[ \t]/g, "")).filter(Boolean);
+    if (lines3.length > 65536)
       throw new PlatformIOError(
         "Too many encoded core-dump lines.",
         "COREDUMP_INPUT_LIMIT"
       );
-    const chunks = lines2.map(decodeChunk);
+    const chunks = lines3.map(decodeChunk);
     const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
     if (length > MAX_DUMP_BYTES)
       throw new PlatformIOError(
@@ -114298,8 +114381,8 @@ import fs69 from "node:fs/promises";
 
 // src/core/analysis/esp-coredump-firmware.ts
 init_errors2();
-function readEspCoredumpFirmwareIdentity(payload, version2) {
-  const bytes = Buffer.from(payload);
+function readEspCoredumpFirmwareIdentity(payload2, version2) {
+  const bytes = Buffer.from(payload2);
   const invalid4 = (message) => {
     throw new PlatformIOError(message, "COREDUMP_ELF_INVALID");
   };
@@ -115606,8 +115689,8 @@ function parseDependencyGraph(output) {
       "Dependency build output exceeds 10 MiB.",
       "DEPENDENCY_GRAPH_LIMIT"
     );
-  const lines2 = redactSecretsInText(output).replace(/\x1b\[[0-9;]*m/g, "").split(/\r?\n/);
-  if (lines2.length > 1e5 || lines2.some((line) => line.length > 16384))
+  const lines3 = redactSecretsInText(output).replace(/\x1b\[[0-9;]*m/g, "").split(/\r?\n/);
+  if (lines3.length > 1e5 || lines3.some((line) => line.length > 16384))
     throw new PlatformIOError(
       "Dependency build output exceeds line limits.",
       "DEPENDENCY_GRAPH_LIMIT"
@@ -115617,7 +115700,7 @@ function parseDependencyGraph(output) {
   const graph = [];
   const stack = [];
   let found = false, active = false, malformed = false, nodes = 0;
-  for (const line of lines2) {
+  for (const line of lines3) {
     if (line.trim() === "Scanning dependencies...") {
       scanning = true;
       continue;
@@ -117605,19 +117688,19 @@ function invalid3() {
 }
 function parse(text10) {
   if (Buffer.byteLength(text10) > 1024 * 1024) invalid3();
-  const lines2 = text10.split(/\r?\n/);
+  const lines3 = text10.split(/\r?\n/);
   const sections = /* @__PURE__ */ new Map();
   let section;
   let entry;
   let optionIndent = 0;
-  for (let i = 0; i < lines2.length; i++) {
-    const line = lines2[i];
+  for (let i = 0; i < lines3.length; i++) {
+    const line = lines3[i];
     if (!line.trim() || /^\s*[#;]/.test(line)) continue;
     const heading = line.match(/^\s*\[([^\]]+)\]\s*(?:[#;].*)?$/);
     if (heading) {
       if (sections.has(heading[1])) invalid3();
       if (section) section.end = i;
-      section = { name: heading[1], end: lines2.length, entries: /* @__PURE__ */ new Map() };
+      section = { name: heading[1], end: lines3.length, entries: /* @__PURE__ */ new Map() };
       sections.set(section.name, section);
       entry = void 0;
       continue;
@@ -117640,7 +117723,7 @@ function parse(text10) {
   for (const section2 of sections.values())
     for (const entry2 of section2.entries.values())
       entry2.value = entry2.value.trim();
-  return { lines: lines2, sections, newline: text10.includes("\r\n") ? "\r\n" : "\n" };
+  return { lines: lines3, sections, newline: text10.includes("\r\n") ? "\r\n" : "\n" };
 }
 function mergePackageConfiguration(before, after, options) {
   const original = parse(before), updated = parse(after);
@@ -117692,26 +117775,26 @@ function linesFromOutput(output) {
       "Package output exceeds 10 MiB.",
       "PACKAGE_OUTPUT_LIMIT"
     );
-  const lines2 = output.replace(/\x1b\[[0-9;]*m/g, "").split(/\r?\n/);
-  if (lines2.length > 1e5 || lines2.some((line) => line.length > 16384))
+  const lines3 = output.replace(/\x1b\[[0-9;]*m/g, "").split(/\r?\n/);
+  if (lines3.length > 1e5 || lines3.some((line) => line.length > 16384))
     throw new PlatformIOError(
       "Package output exceeds line limits.",
       "PACKAGE_OUTPUT_LIMIT"
     );
-  return lines2;
+  return lines3;
 }
 function parsePackageSearch(output) {
-  const lines2 = linesFromOutput(output);
-  const header = lines2.map((line) => line.match(/^Found (\d+) packages \(page (\d+) of (\d+)\)$/)).find(Boolean);
-  const empty = lines2.some(
+  const lines3 = linesFromOutput(output);
+  const header = lines3.map((line) => line.match(/^Found (\d+) packages \(page (\d+) of (\d+)\)$/)).find(Boolean);
+  const empty = lines3.some(
     (line) => line === "Nothing has been found by your request"
   );
   const packages = [];
   let candidates = 0;
-  for (let i = 0; i + 1 < lines2.length; i++) {
-    const spec = lines2[i].trim();
+  for (let i = 0; i + 1 < lines3.length; i++) {
+    const spec = lines3[i].trim();
     if (!/^[a-zA-Z0-9_.-]+\/[^\s/][^/]*$/.test(spec)) continue;
-    const metadata = lines2[i + 1].match(
+    const metadata = lines3[i + 1].match(
       /^(?:(?:Official|Verified|Community) )?(Library|Platform|Tool) \u2022 (.+?) \u2022 Published on /
     );
     if (!metadata) continue;
@@ -117722,7 +117805,7 @@ function parsePackageSearch(output) {
         spec,
         kind: metadata[1].toLowerCase(),
         version: metadata[2],
-        description: lines2[i + 2]?.trim() || void 0
+        description: lines3[i + 2]?.trim() || void 0
       });
   }
   const numbers = header?.slice(1).map(Number);
@@ -117736,12 +117819,12 @@ function parsePackageSearch(output) {
   };
 }
 function parsePackageList(output) {
-  const lines2 = linesFromOutput(output);
+  const lines3 = linesFromOutput(output);
   const packages = [];
   let environment;
   let kind3;
   let empty = false, candidates = 0, unparsed = 0;
-  for (const line of lines2) {
+  for (const line of lines3) {
     const heading = line.match(/^Resolving (.+) dependencies\.\.\.$/);
     if (heading) {
       environment = heading[1];
@@ -118099,7 +118182,7 @@ async function mapPackageCompatibilityRequest(name2, input, defaults = {}) {
   };
 }
 function packageCompatibilityResult(result) {
-  const tail = (lines2) => result.outputTail.split("\n").slice(-lines2).join("\n");
+  const tail = (lines3) => result.outputTail.split("\n").slice(-lines3).join("\n");
   const common = {
     ok: result.ok,
     summary: result.summary,
@@ -118940,15 +119023,15 @@ var $ZodCheckLessThan = /* @__PURE__ */ $constructor("$ZodCheckLessThan", (inst,
         bag.exclusiveMaximum = def.value;
     }
   });
-  inst._zod.check = (payload) => {
-    if (def.inclusive ? payload.value <= def.value : payload.value < def.value) {
+  inst._zod.check = (payload2) => {
+    if (def.inclusive ? payload2.value <= def.value : payload2.value < def.value) {
       return;
     }
-    payload.issues.push({
+    payload2.issues.push({
       origin,
       code: "too_big",
       maximum: def.value,
-      input: payload.value,
+      input: payload2.value,
       inclusive: def.inclusive,
       inst,
       continue: !def.abort
@@ -118968,15 +119051,15 @@ var $ZodCheckGreaterThan = /* @__PURE__ */ $constructor("$ZodCheckGreaterThan", 
         bag.exclusiveMinimum = def.value;
     }
   });
-  inst._zod.check = (payload) => {
-    if (def.inclusive ? payload.value >= def.value : payload.value > def.value) {
+  inst._zod.check = (payload2) => {
+    if (def.inclusive ? payload2.value >= def.value : payload2.value > def.value) {
       return;
     }
-    payload.issues.push({
+    payload2.issues.push({
       origin,
       code: "too_small",
       minimum: def.value,
-      input: payload.value,
+      input: payload2.value,
       inclusive: def.inclusive,
       inst,
       continue: !def.abort
@@ -118989,17 +119072,17 @@ var $ZodCheckMultipleOf = /* @__PURE__ */ $constructor("$ZodCheckMultipleOf", (i
     var _a;
     (_a = inst2._zod.bag).multipleOf ?? (_a.multipleOf = def.value);
   });
-  inst._zod.check = (payload) => {
-    if (typeof payload.value !== typeof def.value)
+  inst._zod.check = (payload2) => {
+    if (typeof payload2.value !== typeof def.value)
       throw new Error("Cannot mix number and bigint in multiple_of check.");
-    const isMultiple = typeof payload.value === "bigint" ? payload.value % def.value === BigInt(0) : floatSafeRemainder2(payload.value, def.value) === 0;
+    const isMultiple = typeof payload2.value === "bigint" ? payload2.value % def.value === BigInt(0) : floatSafeRemainder2(payload2.value, def.value) === 0;
     if (isMultiple)
       return;
-    payload.issues.push({
-      origin: typeof payload.value,
+    payload2.issues.push({
+      origin: typeof payload2.value,
       code: "not_multiple_of",
       divisor: def.value,
-      input: payload.value,
+      input: payload2.value,
       inst,
       continue: !def.abort
     });
@@ -119019,11 +119102,11 @@ var $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat"
     if (isInt)
       bag.pattern = integer2;
   });
-  inst._zod.check = (payload) => {
-    const input = payload.value;
+  inst._zod.check = (payload2) => {
+    const input = payload2.value;
     if (isInt) {
       if (!Number.isInteger(input)) {
-        payload.issues.push({
+        payload2.issues.push({
           expected: origin,
           format: def.format,
           code: "invalid_type",
@@ -119034,7 +119117,7 @@ var $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat"
       }
       if (!Number.isSafeInteger(input)) {
         if (input > 0) {
-          payload.issues.push({
+          payload2.issues.push({
             input,
             code: "too_big",
             maximum: Number.MAX_SAFE_INTEGER,
@@ -119044,7 +119127,7 @@ var $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat"
             continue: !def.abort
           });
         } else {
-          payload.issues.push({
+          payload2.issues.push({
             input,
             code: "too_small",
             minimum: Number.MIN_SAFE_INTEGER,
@@ -119058,7 +119141,7 @@ var $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat"
       }
     }
     if (input < minimum) {
-      payload.issues.push({
+      payload2.issues.push({
         origin: "number",
         input,
         code: "too_small",
@@ -119069,7 +119152,7 @@ var $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat"
       });
     }
     if (input > maximum) {
-      payload.issues.push({
+      payload2.issues.push({
         origin: "number",
         input,
         code: "too_big",
@@ -119082,8 +119165,8 @@ var $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat"
 var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (inst, def) => {
   var _a;
   $ZodCheck.init(inst, def);
-  (_a = inst._zod.def).when ?? (_a.when = (payload) => {
-    const val = payload.value;
+  (_a = inst._zod.def).when ?? (_a.when = (payload2) => {
+    const val = payload2.value;
     return !nullish(val) && val.length !== void 0;
   });
   inst._zod.onattach.push((inst2) => {
@@ -119091,13 +119174,13 @@ var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (ins
     if (def.maximum < curr)
       inst2._zod.bag.maximum = def.maximum;
   });
-  inst._zod.check = (payload) => {
-    const input = payload.value;
+  inst._zod.check = (payload2) => {
+    const input = payload2.value;
     const length = input.length;
     if (length <= def.maximum)
       return;
     const origin = getLengthableOrigin(input);
-    payload.issues.push({
+    payload2.issues.push({
       origin,
       code: "too_big",
       maximum: def.maximum,
@@ -119111,8 +119194,8 @@ var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (ins
 var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (inst, def) => {
   var _a;
   $ZodCheck.init(inst, def);
-  (_a = inst._zod.def).when ?? (_a.when = (payload) => {
-    const val = payload.value;
+  (_a = inst._zod.def).when ?? (_a.when = (payload2) => {
+    const val = payload2.value;
     return !nullish(val) && val.length !== void 0;
   });
   inst._zod.onattach.push((inst2) => {
@@ -119120,13 +119203,13 @@ var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (ins
     if (def.minimum > curr)
       inst2._zod.bag.minimum = def.minimum;
   });
-  inst._zod.check = (payload) => {
-    const input = payload.value;
+  inst._zod.check = (payload2) => {
+    const input = payload2.value;
     const length = input.length;
     if (length >= def.minimum)
       return;
     const origin = getLengthableOrigin(input);
-    payload.issues.push({
+    payload2.issues.push({
       origin,
       code: "too_small",
       minimum: def.minimum,
@@ -119140,8 +119223,8 @@ var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (ins
 var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals", (inst, def) => {
   var _a;
   $ZodCheck.init(inst, def);
-  (_a = inst._zod.def).when ?? (_a.when = (payload) => {
-    const val = payload.value;
+  (_a = inst._zod.def).when ?? (_a.when = (payload2) => {
+    const val = payload2.value;
     return !nullish(val) && val.length !== void 0;
   });
   inst._zod.onattach.push((inst2) => {
@@ -119150,19 +119233,19 @@ var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals"
     bag.maximum = def.length;
     bag.length = def.length;
   });
-  inst._zod.check = (payload) => {
-    const input = payload.value;
+  inst._zod.check = (payload2) => {
+    const input = payload2.value;
     const length = input.length;
     if (length === def.length)
       return;
     const origin = getLengthableOrigin(input);
     const tooBig = length > def.length;
-    payload.issues.push({
+    payload2.issues.push({
       origin,
       ...tooBig ? { code: "too_big", maximum: def.length } : { code: "too_small", minimum: def.length },
       inclusive: true,
       exact: true,
-      input: payload.value,
+      input: payload2.value,
       inst,
       continue: !def.abort
     });
@@ -119180,15 +119263,15 @@ var $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringFormat"
     }
   });
   if (def.pattern)
-    (_a = inst._zod).check ?? (_a.check = (payload) => {
+    (_a = inst._zod).check ?? (_a.check = (payload2) => {
       def.pattern.lastIndex = 0;
-      if (def.pattern.test(payload.value))
+      if (def.pattern.test(payload2.value))
         return;
-      payload.issues.push({
+      payload2.issues.push({
         origin: "string",
         code: "invalid_format",
         format: def.format,
-        input: payload.value,
+        input: payload2.value,
         ...def.pattern ? { pattern: def.pattern.toString() } : {},
         inst,
         continue: !def.abort
@@ -119200,15 +119283,15 @@ var $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringFormat"
 });
 var $ZodCheckRegex = /* @__PURE__ */ $constructor("$ZodCheckRegex", (inst, def) => {
   $ZodCheckStringFormat.init(inst, def);
-  inst._zod.check = (payload) => {
+  inst._zod.check = (payload2) => {
     def.pattern.lastIndex = 0;
-    if (def.pattern.test(payload.value))
+    if (def.pattern.test(payload2.value))
       return;
-    payload.issues.push({
+    payload2.issues.push({
       origin: "string",
       code: "invalid_format",
       format: "regex",
-      input: payload.value,
+      input: payload2.value,
       pattern: def.pattern.toString(),
       inst,
       continue: !def.abort
@@ -119233,15 +119316,15 @@ var $ZodCheckIncludes = /* @__PURE__ */ $constructor("$ZodCheckIncludes", (inst,
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
     bag.patterns.add(pattern);
   });
-  inst._zod.check = (payload) => {
-    if (payload.value.includes(def.includes, def.position))
+  inst._zod.check = (payload2) => {
+    if (payload2.value.includes(def.includes, def.position))
       return;
-    payload.issues.push({
+    payload2.issues.push({
       origin: "string",
       code: "invalid_format",
       format: "includes",
       includes: def.includes,
-      input: payload.value,
+      input: payload2.value,
       inst,
       continue: !def.abort
     });
@@ -119256,15 +119339,15 @@ var $ZodCheckStartsWith = /* @__PURE__ */ $constructor("$ZodCheckStartsWith", (i
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
     bag.patterns.add(pattern);
   });
-  inst._zod.check = (payload) => {
-    if (payload.value.startsWith(def.prefix))
+  inst._zod.check = (payload2) => {
+    if (payload2.value.startsWith(def.prefix))
       return;
-    payload.issues.push({
+    payload2.issues.push({
       origin: "string",
       code: "invalid_format",
       format: "starts_with",
       prefix: def.prefix,
-      input: payload.value,
+      input: payload2.value,
       inst,
       continue: !def.abort
     });
@@ -119279,15 +119362,15 @@ var $ZodCheckEndsWith = /* @__PURE__ */ $constructor("$ZodCheckEndsWith", (inst,
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
     bag.patterns.add(pattern);
   });
-  inst._zod.check = (payload) => {
-    if (payload.value.endsWith(def.suffix))
+  inst._zod.check = (payload2) => {
+    if (payload2.value.endsWith(def.suffix))
       return;
-    payload.issues.push({
+    payload2.issues.push({
       origin: "string",
       code: "invalid_format",
       format: "ends_with",
       suffix: def.suffix,
-      input: payload.value,
+      input: payload2.value,
       inst,
       continue: !def.abort
     });
@@ -119295,8 +119378,8 @@ var $ZodCheckEndsWith = /* @__PURE__ */ $constructor("$ZodCheckEndsWith", (inst,
 });
 var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (inst, def) => {
   $ZodCheck.init(inst, def);
-  inst._zod.check = (payload) => {
-    payload.value = def.tx(payload.value);
+  inst._zod.check = (payload2) => {
+    payload2.value = def.tx(payload2.value);
   };
 });
 
@@ -119320,9 +119403,9 @@ var Doc = class {
       return;
     }
     const content = arg;
-    const lines2 = content.split("\n").filter((x) => x);
-    const minIndent = Math.min(...lines2.map((x) => x.length - x.trimStart().length));
-    const dedented = lines2.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
+    const lines3 = content.split("\n").filter((x) => x);
+    const minIndent = Math.min(...lines3.map((x) => x.length - x.trimStart().length));
+    const dedented = lines3.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
     for (const line of dedented) {
       this.content.push(line);
     }
@@ -119331,8 +119414,8 @@ var Doc = class {
     const F = Function;
     const args = this?.args;
     const content = this?.content ?? [``];
-    const lines2 = [...content.map((x) => `  ${x}`)];
-    return new F(...args, lines2.join("\n"));
+    const lines3 = [...content.map((x) => `  ${x}`)];
+    return new F(...args, lines3.join("\n"));
   }
 };
 
@@ -119365,48 +119448,48 @@ var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
       inst._zod.run = inst._zod.parse;
     });
   } else {
-    const runChecks = (payload, checks2, ctx) => {
-      let isAborted2 = aborted(payload);
+    const runChecks = (payload2, checks2, ctx) => {
+      let isAborted2 = aborted(payload2);
       let asyncResult;
       for (const ch of checks2) {
         if (ch._zod.def.when) {
-          const shouldRun = ch._zod.def.when(payload);
+          const shouldRun = ch._zod.def.when(payload2);
           if (!shouldRun)
             continue;
         } else if (isAborted2) {
           continue;
         }
-        const currLen = payload.issues.length;
-        const _ = ch._zod.check(payload);
+        const currLen = payload2.issues.length;
+        const _ = ch._zod.check(payload2);
         if (_ instanceof Promise && ctx?.async === false) {
           throw new $ZodAsyncError();
         }
         if (asyncResult || _ instanceof Promise) {
           asyncResult = (asyncResult ?? Promise.resolve()).then(async () => {
             await _;
-            const nextLen = payload.issues.length;
+            const nextLen = payload2.issues.length;
             if (nextLen === currLen)
               return;
             if (!isAborted2)
-              isAborted2 = aborted(payload, currLen);
+              isAborted2 = aborted(payload2, currLen);
           });
         } else {
-          const nextLen = payload.issues.length;
+          const nextLen = payload2.issues.length;
           if (nextLen === currLen)
             continue;
           if (!isAborted2)
-            isAborted2 = aborted(payload, currLen);
+            isAborted2 = aborted(payload2, currLen);
         }
       }
       if (asyncResult) {
         return asyncResult.then(() => {
-          return payload;
+          return payload2;
         });
       }
-      return payload;
+      return payload2;
     };
-    inst._zod.run = (payload, ctx) => {
-      const result = inst._zod.parse(payload, ctx);
+    inst._zod.run = (payload2, ctx) => {
+      const result = inst._zod.parse(payload2, ctx);
       if (result instanceof Promise) {
         if (ctx.async === false)
           throw new $ZodAsyncError();
@@ -119431,21 +119514,21 @@ var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
 var $ZodString = /* @__PURE__ */ $constructor("$ZodString", (inst, def) => {
   $ZodType.init(inst, def);
   inst._zod.pattern = [...inst?._zod.bag?.patterns ?? []].pop() ?? string(inst._zod.bag);
-  inst._zod.parse = (payload, _) => {
+  inst._zod.parse = (payload2, _) => {
     if (def.coerce)
       try {
-        payload.value = String(payload.value);
+        payload2.value = String(payload2.value);
       } catch (_2) {
       }
-    if (typeof payload.value === "string")
-      return payload;
-    payload.issues.push({
+    if (typeof payload2.value === "string")
+      return payload2;
+    payload2.issues.push({
       expected: "string",
       code: "invalid_type",
-      input: payload.value,
+      input: payload2.value,
       inst
     });
-    return payload;
+    return payload2;
   };
 });
 var $ZodStringFormat = /* @__PURE__ */ $constructor("$ZodStringFormat", (inst, def) => {
@@ -119482,20 +119565,20 @@ var $ZodEmail = /* @__PURE__ */ $constructor("$ZodEmail", (inst, def) => {
 });
 var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
   $ZodStringFormat.init(inst, def);
-  inst._zod.check = (payload) => {
+  inst._zod.check = (payload2) => {
     try {
-      const orig = payload.value;
+      const orig = payload2.value;
       const url = new URL(orig);
       const href = url.href;
       if (def.hostname) {
         def.hostname.lastIndex = 0;
         if (!def.hostname.test(url.hostname)) {
-          payload.issues.push({
+          payload2.issues.push({
             code: "invalid_format",
             format: "url",
             note: "Invalid hostname",
             pattern: hostname.source,
-            input: payload.value,
+            input: payload2.value,
             inst,
             continue: !def.abort
           });
@@ -119504,28 +119587,28 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
       if (def.protocol) {
         def.protocol.lastIndex = 0;
         if (!def.protocol.test(url.protocol.endsWith(":") ? url.protocol.slice(0, -1) : url.protocol)) {
-          payload.issues.push({
+          payload2.issues.push({
             code: "invalid_format",
             format: "url",
             note: "Invalid protocol",
             pattern: def.protocol.source,
-            input: payload.value,
+            input: payload2.value,
             inst,
             continue: !def.abort
           });
         }
       }
       if (!orig.endsWith("/") && href.endsWith("/")) {
-        payload.value = href.slice(0, -1);
+        payload2.value = href.slice(0, -1);
       } else {
-        payload.value = href;
+        payload2.value = href;
       }
       return;
     } catch (_) {
-      payload.issues.push({
+      payload2.issues.push({
         code: "invalid_format",
         format: "url",
-        input: payload.value,
+        input: payload2.value,
         inst,
         continue: !def.abort
       });
@@ -119591,14 +119674,14 @@ var $ZodIPv6 = /* @__PURE__ */ $constructor("$ZodIPv6", (inst, def) => {
     const bag = inst2._zod.bag;
     bag.format = `ipv6`;
   });
-  inst._zod.check = (payload) => {
+  inst._zod.check = (payload2) => {
     try {
-      new URL(`http://[${payload.value}]`);
+      new URL(`http://[${payload2.value}]`);
     } catch {
-      payload.issues.push({
+      payload2.issues.push({
         code: "invalid_format",
         format: "ipv6",
-        input: payload.value,
+        input: payload2.value,
         inst,
         continue: !def.abort
       });
@@ -119612,8 +119695,8 @@ var $ZodCIDRv4 = /* @__PURE__ */ $constructor("$ZodCIDRv4", (inst, def) => {
 var $ZodCIDRv6 = /* @__PURE__ */ $constructor("$ZodCIDRv6", (inst, def) => {
   def.pattern ?? (def.pattern = cidrv6);
   $ZodStringFormat.init(inst, def);
-  inst._zod.check = (payload) => {
-    const [address, prefix] = payload.value.split("/");
+  inst._zod.check = (payload2) => {
+    const [address, prefix] = payload2.value.split("/");
     try {
       if (!prefix)
         throw new Error();
@@ -119624,10 +119707,10 @@ var $ZodCIDRv6 = /* @__PURE__ */ $constructor("$ZodCIDRv6", (inst, def) => {
         throw new Error();
       new URL(`http://[${address}]`);
     } catch {
-      payload.issues.push({
+      payload2.issues.push({
         code: "invalid_format",
         format: "cidrv6",
-        input: payload.value,
+        input: payload2.value,
         inst,
         continue: !def.abort
       });
@@ -119652,13 +119735,13 @@ var $ZodBase64 = /* @__PURE__ */ $constructor("$ZodBase64", (inst, def) => {
   inst._zod.onattach.push((inst2) => {
     inst2._zod.bag.contentEncoding = "base64";
   });
-  inst._zod.check = (payload) => {
-    if (isValidBase64(payload.value))
+  inst._zod.check = (payload2) => {
+    if (isValidBase64(payload2.value))
       return;
-    payload.issues.push({
+    payload2.issues.push({
       code: "invalid_format",
       format: "base64",
-      input: payload.value,
+      input: payload2.value,
       inst,
       continue: !def.abort
     });
@@ -119677,13 +119760,13 @@ var $ZodBase64URL = /* @__PURE__ */ $constructor("$ZodBase64URL", (inst, def) =>
   inst._zod.onattach.push((inst2) => {
     inst2._zod.bag.contentEncoding = "base64url";
   });
-  inst._zod.check = (payload) => {
-    if (isValidBase64URL(payload.value))
+  inst._zod.check = (payload2) => {
+    if (isValidBase64URL(payload2.value))
       return;
-    payload.issues.push({
+    payload2.issues.push({
       code: "invalid_format",
       format: "base64url",
-      input: payload.value,
+      input: payload2.value,
       inst,
       continue: !def.abort
     });
@@ -119715,13 +119798,13 @@ function isValidJWT2(token, algorithm = null) {
 }
 var $ZodJWT = /* @__PURE__ */ $constructor("$ZodJWT", (inst, def) => {
   $ZodStringFormat.init(inst, def);
-  inst._zod.check = (payload) => {
-    if (isValidJWT2(payload.value, def.alg))
+  inst._zod.check = (payload2) => {
+    if (isValidJWT2(payload2.value, def.alg))
       return;
-    payload.issues.push({
+    payload2.issues.push({
       code: "invalid_format",
       format: "jwt",
-      input: payload.value,
+      input: payload2.value,
       inst,
       continue: !def.abort
     });
@@ -119730,25 +119813,25 @@ var $ZodJWT = /* @__PURE__ */ $constructor("$ZodJWT", (inst, def) => {
 var $ZodNumber = /* @__PURE__ */ $constructor("$ZodNumber", (inst, def) => {
   $ZodType.init(inst, def);
   inst._zod.pattern = inst._zod.bag.pattern ?? number2;
-  inst._zod.parse = (payload, _ctx) => {
+  inst._zod.parse = (payload2, _ctx) => {
     if (def.coerce)
       try {
-        payload.value = Number(payload.value);
+        payload2.value = Number(payload2.value);
       } catch (_) {
       }
-    const input = payload.value;
+    const input = payload2.value;
     if (typeof input === "number" && !Number.isNaN(input) && Number.isFinite(input)) {
-      return payload;
+      return payload2;
     }
     const received = typeof input === "number" ? Number.isNaN(input) ? "NaN" : !Number.isFinite(input) ? "Infinity" : void 0 : void 0;
-    payload.issues.push({
+    payload2.issues.push({
       expected: "number",
       code: "invalid_type",
       input,
       inst,
       ...received ? { received } : {}
     });
-    return payload;
+    return payload2;
   };
 });
 var $ZodNumberFormat = /* @__PURE__ */ $constructor("$ZodNumber", (inst, def) => {
@@ -119758,55 +119841,55 @@ var $ZodNumberFormat = /* @__PURE__ */ $constructor("$ZodNumber", (inst, def) =>
 var $ZodBoolean = /* @__PURE__ */ $constructor("$ZodBoolean", (inst, def) => {
   $ZodType.init(inst, def);
   inst._zod.pattern = boolean;
-  inst._zod.parse = (payload, _ctx) => {
+  inst._zod.parse = (payload2, _ctx) => {
     if (def.coerce)
       try {
-        payload.value = Boolean(payload.value);
+        payload2.value = Boolean(payload2.value);
       } catch (_) {
       }
-    const input = payload.value;
+    const input = payload2.value;
     if (typeof input === "boolean")
-      return payload;
-    payload.issues.push({
+      return payload2;
+    payload2.issues.push({
       expected: "boolean",
       code: "invalid_type",
       input,
       inst
     });
-    return payload;
+    return payload2;
   };
 });
 var $ZodNull = /* @__PURE__ */ $constructor("$ZodNull", (inst, def) => {
   $ZodType.init(inst, def);
   inst._zod.pattern = _null;
   inst._zod.values = /* @__PURE__ */ new Set([null]);
-  inst._zod.parse = (payload, _ctx) => {
-    const input = payload.value;
+  inst._zod.parse = (payload2, _ctx) => {
+    const input = payload2.value;
     if (input === null)
-      return payload;
-    payload.issues.push({
+      return payload2;
+    payload2.issues.push({
       expected: "null",
       code: "invalid_type",
       input,
       inst
     });
-    return payload;
+    return payload2;
   };
 });
 var $ZodUnknown = /* @__PURE__ */ $constructor("$ZodUnknown", (inst, def) => {
   $ZodType.init(inst, def);
-  inst._zod.parse = (payload) => payload;
+  inst._zod.parse = (payload2) => payload2;
 });
 var $ZodNever = /* @__PURE__ */ $constructor("$ZodNever", (inst, def) => {
   $ZodType.init(inst, def);
-  inst._zod.parse = (payload, _ctx) => {
-    payload.issues.push({
+  inst._zod.parse = (payload2, _ctx) => {
+    payload2.issues.push({
       expected: "never",
       code: "invalid_type",
-      input: payload.value,
+      input: payload2.value,
       inst
     });
-    return payload;
+    return payload2;
   };
 });
 function handleArrayResult(result, final, index) {
@@ -119817,18 +119900,18 @@ function handleArrayResult(result, final, index) {
 }
 var $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
   $ZodType.init(inst, def);
-  inst._zod.parse = (payload, ctx) => {
-    const input = payload.value;
+  inst._zod.parse = (payload2, ctx) => {
+    const input = payload2.value;
     if (!Array.isArray(input)) {
-      payload.issues.push({
+      payload2.issues.push({
         expected: "array",
         code: "invalid_type",
         input,
         inst
       });
-      return payload;
+      return payload2;
     }
-    payload.value = Array(input.length);
+    payload2.value = Array(input.length);
     const proms = [];
     for (let i = 0; i < input.length; i++) {
       const item = input[i];
@@ -119837,15 +119920,15 @@ var $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
         issues: []
       }, ctx);
       if (result instanceof Promise) {
-        proms.push(result.then((result2) => handleArrayResult(result2, payload, i)));
+        proms.push(result.then((result2) => handleArrayResult(result2, payload2, i)));
       } else {
-        handleArrayResult(result, payload, i);
+        handleArrayResult(result, payload2, i);
       }
     }
     if (proms.length) {
-      return Promise.all(proms).then(() => payload);
+      return Promise.all(proms).then(() => payload2);
     }
-    return payload;
+    return payload2;
   };
 });
 function handleObjectResult(result, final, key) {
@@ -119956,7 +120039,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     doc.write(`payload.value = newResult;`);
     doc.write(`return payload;`);
     const fn = doc.compile();
-    return (payload, ctx) => fn(shape, payload, ctx);
+    return (payload2, ctx) => fn(shape, payload2, ctx);
   };
   let fastpass;
   const isObject2 = isObject;
@@ -119965,41 +120048,41 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   const fastEnabled = jit && allowsEval2.value;
   const catchall = def.catchall;
   let value2;
-  inst._zod.parse = (payload, ctx) => {
+  inst._zod.parse = (payload2, ctx) => {
     value2 ?? (value2 = _normalized.value);
-    const input = payload.value;
+    const input = payload2.value;
     if (!isObject2(input)) {
-      payload.issues.push({
+      payload2.issues.push({
         expected: "object",
         code: "invalid_type",
         input,
         inst
       });
-      return payload;
+      return payload2;
     }
     const proms = [];
     if (jit && fastEnabled && ctx?.async === false && ctx.jitless !== true) {
       if (!fastpass)
         fastpass = generateFastpass(def.shape);
-      payload = fastpass(payload, ctx);
+      payload2 = fastpass(payload2, ctx);
     } else {
-      payload.value = {};
+      payload2.value = {};
       const shape = value2.shape;
       for (const key of value2.keys) {
         const el = shape[key];
         const r = el._zod.run({ value: input[key], issues: [] }, ctx);
         const isOptional = el._zod.optin === "optional" && el._zod.optout === "optional";
         if (r instanceof Promise) {
-          proms.push(r.then((r2) => isOptional ? handleOptionalObjectResult(r2, payload, key, input) : handleObjectResult(r2, payload, key)));
+          proms.push(r.then((r2) => isOptional ? handleOptionalObjectResult(r2, payload2, key, input) : handleObjectResult(r2, payload2, key)));
         } else if (isOptional) {
-          handleOptionalObjectResult(r, payload, key, input);
+          handleOptionalObjectResult(r, payload2, key, input);
         } else {
-          handleObjectResult(r, payload, key);
+          handleObjectResult(r, payload2, key);
         }
       }
     }
     if (!catchall) {
-      return proms.length ? Promise.all(proms).then(() => payload) : payload;
+      return proms.length ? Promise.all(proms).then(() => payload2) : payload2;
     }
     const unrecognized = [];
     const keySet = value2.keySet;
@@ -120014,13 +120097,13 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
       }
       const r = _catchall.run({ value: input[key], issues: [] }, ctx);
       if (r instanceof Promise) {
-        proms.push(r.then((r2) => handleObjectResult(r2, payload, key)));
+        proms.push(r.then((r2) => handleObjectResult(r2, payload2, key)));
       } else {
-        handleObjectResult(r, payload, key);
+        handleObjectResult(r, payload2, key);
       }
     }
     if (unrecognized.length) {
-      payload.issues.push({
+      payload2.issues.push({
         code: "unrecognized_keys",
         keys: unrecognized,
         input,
@@ -120028,9 +120111,9 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
       });
     }
     if (!proms.length)
-      return payload;
+      return payload2;
     return Promise.all(proms).then(() => {
-      return payload;
+      return payload2;
     });
   };
 });
@@ -120066,12 +120149,12 @@ var $ZodUnion = /* @__PURE__ */ $constructor("$ZodUnion", (inst, def) => {
     }
     return void 0;
   });
-  inst._zod.parse = (payload, ctx) => {
+  inst._zod.parse = (payload2, ctx) => {
     let async = false;
     const results = [];
     for (const option of def.options) {
       const result = option._zod.run({
-        value: payload.value,
+        value: payload2.value,
         issues: []
       }, ctx);
       if (result instanceof Promise) {
@@ -120084,9 +120167,9 @@ var $ZodUnion = /* @__PURE__ */ $constructor("$ZodUnion", (inst, def) => {
       }
     }
     if (!async)
-      return handleUnionResults(results, payload, inst, ctx);
+      return handleUnionResults(results, payload2, inst, ctx);
     return Promise.all(results).then((results2) => {
-      return handleUnionResults(results2, payload, inst, ctx);
+      return handleUnionResults(results2, payload2, inst, ctx);
     });
   };
 });
@@ -120125,25 +120208,25 @@ var $ZodDiscriminatedUnion = /* @__PURE__ */ $constructor("$ZodDiscriminatedUnio
     }
     return map;
   });
-  inst._zod.parse = (payload, ctx) => {
-    const input = payload.value;
+  inst._zod.parse = (payload2, ctx) => {
+    const input = payload2.value;
     if (!isObject(input)) {
-      payload.issues.push({
+      payload2.issues.push({
         code: "invalid_type",
         expected: "object",
         input,
         inst
       });
-      return payload;
+      return payload2;
     }
     const opt = disc.value.get(input?.[def.discriminator]);
     if (opt) {
-      return opt._zod.run(payload, ctx);
+      return opt._zod.run(payload2, ctx);
     }
     if (def.unionFallback) {
-      return _super(payload, ctx);
+      return _super(payload2, ctx);
     }
-    payload.issues.push({
+    payload2.issues.push({
       code: "invalid_union",
       errors: [],
       note: "No matching discriminator",
@@ -120151,22 +120234,22 @@ var $ZodDiscriminatedUnion = /* @__PURE__ */ $constructor("$ZodDiscriminatedUnio
       path: [def.discriminator],
       inst
     });
-    return payload;
+    return payload2;
   };
 });
 var $ZodIntersection = /* @__PURE__ */ $constructor("$ZodIntersection", (inst, def) => {
   $ZodType.init(inst, def);
-  inst._zod.parse = (payload, ctx) => {
-    const input = payload.value;
+  inst._zod.parse = (payload2, ctx) => {
+    const input = payload2.value;
     const left = def.left._zod.run({ value: input, issues: [] }, ctx);
     const right = def.right._zod.run({ value: input, issues: [] }, ctx);
     const async = left instanceof Promise || right instanceof Promise;
     if (async) {
       return Promise.all([left, right]).then(([left2, right2]) => {
-        return handleIntersectionResults(payload, left2, right2);
+        return handleIntersectionResults(payload2, left2, right2);
       });
     }
-    return handleIntersectionResults(payload, left, right);
+    return handleIntersectionResults(payload2, left, right);
   };
 });
 function mergeValues2(a, b) {
@@ -120231,36 +120314,36 @@ function handleIntersectionResults(result, left, right) {
 }
 var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
   $ZodType.init(inst, def);
-  inst._zod.parse = (payload, ctx) => {
-    const input = payload.value;
+  inst._zod.parse = (payload2, ctx) => {
+    const input = payload2.value;
     if (!isPlainObject(input)) {
-      payload.issues.push({
+      payload2.issues.push({
         expected: "record",
         code: "invalid_type",
         input,
         inst
       });
-      return payload;
+      return payload2;
     }
     const proms = [];
     if (def.keyType._zod.values) {
       const values = def.keyType._zod.values;
-      payload.value = {};
+      payload2.value = {};
       for (const key of values) {
         if (typeof key === "string" || typeof key === "number" || typeof key === "symbol") {
           const result = def.valueType._zod.run({ value: input[key], issues: [] }, ctx);
           if (result instanceof Promise) {
             proms.push(result.then((result2) => {
               if (result2.issues.length) {
-                payload.issues.push(...prefixIssues(key, result2.issues));
+                payload2.issues.push(...prefixIssues(key, result2.issues));
               }
-              payload.value[key] = result2.value;
+              payload2.value[key] = result2.value;
             }));
           } else {
             if (result.issues.length) {
-              payload.issues.push(...prefixIssues(key, result.issues));
+              payload2.issues.push(...prefixIssues(key, result.issues));
             }
-            payload.value[key] = result.value;
+            payload2.value[key] = result.value;
           }
         }
       }
@@ -120272,7 +120355,7 @@ var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
         }
       }
       if (unrecognized && unrecognized.length > 0) {
-        payload.issues.push({
+        payload2.issues.push({
           code: "unrecognized_keys",
           input,
           inst,
@@ -120280,7 +120363,7 @@ var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
         });
       }
     } else {
-      payload.value = {};
+      payload2.value = {};
       for (const key of Reflect.ownKeys(input)) {
         if (key === "__proto__")
           continue;
@@ -120289,7 +120372,7 @@ var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
           throw new Error("Async schemas not supported in object keys currently");
         }
         if (keyResult.issues.length) {
-          payload.issues.push({
+          payload2.issues.push({
             origin: "record",
             code: "invalid_key",
             issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config())),
@@ -120297,29 +120380,29 @@ var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
             path: [key],
             inst
           });
-          payload.value[keyResult.value] = keyResult.value;
+          payload2.value[keyResult.value] = keyResult.value;
           continue;
         }
         const result = def.valueType._zod.run({ value: input[key], issues: [] }, ctx);
         if (result instanceof Promise) {
           proms.push(result.then((result2) => {
             if (result2.issues.length) {
-              payload.issues.push(...prefixIssues(key, result2.issues));
+              payload2.issues.push(...prefixIssues(key, result2.issues));
             }
-            payload.value[keyResult.value] = result2.value;
+            payload2.value[keyResult.value] = result2.value;
           }));
         } else {
           if (result.issues.length) {
-            payload.issues.push(...prefixIssues(key, result.issues));
+            payload2.issues.push(...prefixIssues(key, result.issues));
           }
-          payload.value[keyResult.value] = result.value;
+          payload2.value[keyResult.value] = result.value;
         }
       }
     }
     if (proms.length) {
-      return Promise.all(proms).then(() => payload);
+      return Promise.all(proms).then(() => payload2);
     }
-    return payload;
+    return payload2;
   };
 });
 var $ZodEnum = /* @__PURE__ */ $constructor("$ZodEnum", (inst, def) => {
@@ -120327,54 +120410,54 @@ var $ZodEnum = /* @__PURE__ */ $constructor("$ZodEnum", (inst, def) => {
   const values = getEnumValues(def.entries);
   inst._zod.values = new Set(values);
   inst._zod.pattern = new RegExp(`^(${values.filter((k) => propertyKeyTypes.has(typeof k)).map((o) => typeof o === "string" ? escapeRegex(o) : o.toString()).join("|")})$`);
-  inst._zod.parse = (payload, _ctx) => {
-    const input = payload.value;
+  inst._zod.parse = (payload2, _ctx) => {
+    const input = payload2.value;
     if (inst._zod.values.has(input)) {
-      return payload;
+      return payload2;
     }
-    payload.issues.push({
+    payload2.issues.push({
       code: "invalid_value",
       values,
       input,
       inst
     });
-    return payload;
+    return payload2;
   };
 });
 var $ZodLiteral = /* @__PURE__ */ $constructor("$ZodLiteral", (inst, def) => {
   $ZodType.init(inst, def);
   inst._zod.values = new Set(def.values);
   inst._zod.pattern = new RegExp(`^(${def.values.map((o) => typeof o === "string" ? escapeRegex(o) : o ? o.toString() : String(o)).join("|")})$`);
-  inst._zod.parse = (payload, _ctx) => {
-    const input = payload.value;
+  inst._zod.parse = (payload2, _ctx) => {
+    const input = payload2.value;
     if (inst._zod.values.has(input)) {
-      return payload;
+      return payload2;
     }
-    payload.issues.push({
+    payload2.issues.push({
       code: "invalid_value",
       values: def.values,
       input,
       inst
     });
-    return payload;
+    return payload2;
   };
 });
 var $ZodTransform = /* @__PURE__ */ $constructor("$ZodTransform", (inst, def) => {
   $ZodType.init(inst, def);
-  inst._zod.parse = (payload, _ctx) => {
-    const _out = def.transform(payload.value, payload);
+  inst._zod.parse = (payload2, _ctx) => {
+    const _out = def.transform(payload2.value, payload2);
     if (_ctx.async) {
       const output = _out instanceof Promise ? _out : Promise.resolve(_out);
       return output.then((output2) => {
-        payload.value = output2;
-        return payload;
+        payload2.value = output2;
+        return payload2;
       });
     }
     if (_out instanceof Promise) {
       throw new $ZodAsyncError();
     }
-    payload.value = _out;
-    return payload;
+    payload2.value = _out;
+    return payload2;
   };
 });
 var $ZodOptional = /* @__PURE__ */ $constructor("$ZodOptional", (inst, def) => {
@@ -120388,14 +120471,14 @@ var $ZodOptional = /* @__PURE__ */ $constructor("$ZodOptional", (inst, def) => {
     const pattern = def.innerType._zod.pattern;
     return pattern ? new RegExp(`^(${cleanRegex(pattern.source)})?$`) : void 0;
   });
-  inst._zod.parse = (payload, ctx) => {
+  inst._zod.parse = (payload2, ctx) => {
     if (def.innerType._zod.optin === "optional") {
-      return def.innerType._zod.run(payload, ctx);
+      return def.innerType._zod.run(payload2, ctx);
     }
-    if (payload.value === void 0) {
-      return payload;
+    if (payload2.value === void 0) {
+      return payload2;
     }
-    return def.innerType._zod.run(payload, ctx);
+    return def.innerType._zod.run(payload2, ctx);
   };
 });
 var $ZodNullable = /* @__PURE__ */ $constructor("$ZodNullable", (inst, def) => {
@@ -120409,43 +120492,43 @@ var $ZodNullable = /* @__PURE__ */ $constructor("$ZodNullable", (inst, def) => {
   defineLazy(inst._zod, "values", () => {
     return def.innerType._zod.values ? /* @__PURE__ */ new Set([...def.innerType._zod.values, null]) : void 0;
   });
-  inst._zod.parse = (payload, ctx) => {
-    if (payload.value === null)
-      return payload;
-    return def.innerType._zod.run(payload, ctx);
+  inst._zod.parse = (payload2, ctx) => {
+    if (payload2.value === null)
+      return payload2;
+    return def.innerType._zod.run(payload2, ctx);
   };
 });
 var $ZodDefault = /* @__PURE__ */ $constructor("$ZodDefault", (inst, def) => {
   $ZodType.init(inst, def);
   inst._zod.optin = "optional";
   defineLazy(inst._zod, "values", () => def.innerType._zod.values);
-  inst._zod.parse = (payload, ctx) => {
-    if (payload.value === void 0) {
-      payload.value = def.defaultValue;
-      return payload;
+  inst._zod.parse = (payload2, ctx) => {
+    if (payload2.value === void 0) {
+      payload2.value = def.defaultValue;
+      return payload2;
     }
-    const result = def.innerType._zod.run(payload, ctx);
+    const result = def.innerType._zod.run(payload2, ctx);
     if (result instanceof Promise) {
       return result.then((result2) => handleDefaultResult(result2, def));
     }
     return handleDefaultResult(result, def);
   };
 });
-function handleDefaultResult(payload, def) {
-  if (payload.value === void 0) {
-    payload.value = def.defaultValue;
+function handleDefaultResult(payload2, def) {
+  if (payload2.value === void 0) {
+    payload2.value = def.defaultValue;
   }
-  return payload;
+  return payload2;
 }
 var $ZodPrefault = /* @__PURE__ */ $constructor("$ZodPrefault", (inst, def) => {
   $ZodType.init(inst, def);
   inst._zod.optin = "optional";
   defineLazy(inst._zod, "values", () => def.innerType._zod.values);
-  inst._zod.parse = (payload, ctx) => {
-    if (payload.value === void 0) {
-      payload.value = def.defaultValue;
+  inst._zod.parse = (payload2, ctx) => {
+    if (payload2.value === void 0) {
+      payload2.value = def.defaultValue;
     }
-    return def.innerType._zod.run(payload, ctx);
+    return def.innerType._zod.run(payload2, ctx);
   };
 });
 var $ZodNonOptional = /* @__PURE__ */ $constructor("$ZodNonOptional", (inst, def) => {
@@ -120454,60 +120537,60 @@ var $ZodNonOptional = /* @__PURE__ */ $constructor("$ZodNonOptional", (inst, def
     const v = def.innerType._zod.values;
     return v ? new Set([...v].filter((x) => x !== void 0)) : void 0;
   });
-  inst._zod.parse = (payload, ctx) => {
-    const result = def.innerType._zod.run(payload, ctx);
+  inst._zod.parse = (payload2, ctx) => {
+    const result = def.innerType._zod.run(payload2, ctx);
     if (result instanceof Promise) {
       return result.then((result2) => handleNonOptionalResult(result2, inst));
     }
     return handleNonOptionalResult(result, inst);
   };
 });
-function handleNonOptionalResult(payload, inst) {
-  if (!payload.issues.length && payload.value === void 0) {
-    payload.issues.push({
+function handleNonOptionalResult(payload2, inst) {
+  if (!payload2.issues.length && payload2.value === void 0) {
+    payload2.issues.push({
       code: "invalid_type",
       expected: "nonoptional",
-      input: payload.value,
+      input: payload2.value,
       inst
     });
   }
-  return payload;
+  return payload2;
 }
 var $ZodCatch = /* @__PURE__ */ $constructor("$ZodCatch", (inst, def) => {
   $ZodType.init(inst, def);
   inst._zod.optin = "optional";
   defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
   defineLazy(inst._zod, "values", () => def.innerType._zod.values);
-  inst._zod.parse = (payload, ctx) => {
-    const result = def.innerType._zod.run(payload, ctx);
+  inst._zod.parse = (payload2, ctx) => {
+    const result = def.innerType._zod.run(payload2, ctx);
     if (result instanceof Promise) {
       return result.then((result2) => {
-        payload.value = result2.value;
+        payload2.value = result2.value;
         if (result2.issues.length) {
-          payload.value = def.catchValue({
-            ...payload,
+          payload2.value = def.catchValue({
+            ...payload2,
             error: {
               issues: result2.issues.map((iss) => finalizeIssue(iss, ctx, config()))
             },
-            input: payload.value
+            input: payload2.value
           });
-          payload.issues = [];
+          payload2.issues = [];
         }
-        return payload;
+        return payload2;
       });
     }
-    payload.value = result.value;
+    payload2.value = result.value;
     if (result.issues.length) {
-      payload.value = def.catchValue({
-        ...payload,
+      payload2.value = def.catchValue({
+        ...payload2,
         error: {
           issues: result.issues.map((iss) => finalizeIssue(iss, ctx, config()))
         },
-        input: payload.value
+        input: payload2.value
       });
-      payload.issues = [];
+      payload2.issues = [];
     }
-    return payload;
+    return payload2;
   };
 });
 var $ZodPipe = /* @__PURE__ */ $constructor("$ZodPipe", (inst, def) => {
@@ -120515,8 +120598,8 @@ var $ZodPipe = /* @__PURE__ */ $constructor("$ZodPipe", (inst, def) => {
   defineLazy(inst._zod, "values", () => def.in._zod.values);
   defineLazy(inst._zod, "optin", () => def.in._zod.optin);
   defineLazy(inst._zod, "optout", () => def.out._zod.optout);
-  inst._zod.parse = (payload, ctx) => {
-    const left = def.in._zod.run(payload, ctx);
+  inst._zod.parse = (payload2, ctx) => {
+    const left = def.in._zod.run(payload2, ctx);
     if (left instanceof Promise) {
       return left.then((left2) => handlePipeResult(left2, def, ctx));
     }
@@ -120535,35 +120618,35 @@ var $ZodReadonly = /* @__PURE__ */ $constructor("$ZodReadonly", (inst, def) => {
   defineLazy(inst._zod, "values", () => def.innerType._zod.values);
   defineLazy(inst._zod, "optin", () => def.innerType._zod.optin);
   defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
-  inst._zod.parse = (payload, ctx) => {
-    const result = def.innerType._zod.run(payload, ctx);
+  inst._zod.parse = (payload2, ctx) => {
+    const result = def.innerType._zod.run(payload2, ctx);
     if (result instanceof Promise) {
       return result.then(handleReadonlyResult);
     }
     return handleReadonlyResult(result);
   };
 });
-function handleReadonlyResult(payload) {
-  payload.value = Object.freeze(payload.value);
-  return payload;
+function handleReadonlyResult(payload2) {
+  payload2.value = Object.freeze(payload2.value);
+  return payload2;
 }
 var $ZodCustom = /* @__PURE__ */ $constructor("$ZodCustom", (inst, def) => {
   $ZodCheck.init(inst, def);
   $ZodType.init(inst, def);
-  inst._zod.parse = (payload, _) => {
-    return payload;
+  inst._zod.parse = (payload2, _) => {
+    return payload2;
   };
-  inst._zod.check = (payload) => {
-    const input = payload.value;
+  inst._zod.check = (payload2) => {
+    const input = payload2.value;
     const r = def.fn(input);
     if (r instanceof Promise) {
-      return r.then((r2) => handleRefineResult(r2, payload, input, inst));
+      return r.then((r2) => handleRefineResult(r2, payload2, input, inst));
     }
-    handleRefineResult(r, payload, input, inst);
+    handleRefineResult(r, payload2, input, inst);
     return;
   };
 });
-function handleRefineResult(result, payload, input, inst) {
+function handleRefineResult(result, payload2, input, inst) {
   if (!result) {
     const _iss = {
       code: "custom",
@@ -120577,7 +120660,7 @@ function handleRefineResult(result, payload, input, inst) {
     };
     if (inst._zod.def.params)
       _iss.params = inst._zod.def.params;
-    payload.issues.push(issue(_iss));
+    payload2.issues.push(issue(_iss));
   }
 }
 
@@ -121767,30 +121850,30 @@ function literal(value2, params) {
 var ZodTransform = /* @__PURE__ */ $constructor("ZodTransform", (inst, def) => {
   $ZodTransform.init(inst, def);
   ZodType2.init(inst, def);
-  inst._zod.parse = (payload, _ctx) => {
-    payload.addIssue = (issue2) => {
+  inst._zod.parse = (payload2, _ctx) => {
+    payload2.addIssue = (issue2) => {
       if (typeof issue2 === "string") {
-        payload.issues.push(util_exports.issue(issue2, payload.value, def));
+        payload2.issues.push(util_exports.issue(issue2, payload2.value, def));
       } else {
         const _issue = issue2;
         if (_issue.fatal)
           _issue.continue = false;
         _issue.code ?? (_issue.code = "custom");
-        _issue.input ?? (_issue.input = payload.value);
+        _issue.input ?? (_issue.input = payload2.value);
         _issue.inst ?? (_issue.inst = inst);
         _issue.continue ?? (_issue.continue = true);
-        payload.issues.push(util_exports.issue(_issue));
+        payload2.issues.push(util_exports.issue(_issue));
       }
     };
-    const output = def.transform(payload.value, payload);
+    const output = def.transform(payload2.value, payload2);
     if (output instanceof Promise) {
       return output.then((output2) => {
-        payload.value = output2;
-        return payload;
+        payload2.value = output2;
+        return payload2;
       });
     }
-    payload.value = output;
-    return payload;
+    payload2.value = output;
+    return payload2;
   };
 });
 function transform(fn) {
@@ -121918,22 +122001,22 @@ function refine(fn, _params = {}) {
   return _refine(ZodCustom, fn, _params);
 }
 function superRefine(fn) {
-  const ch = check((payload) => {
-    payload.addIssue = (issue2) => {
+  const ch = check((payload2) => {
+    payload2.addIssue = (issue2) => {
       if (typeof issue2 === "string") {
-        payload.issues.push(util_exports.issue(issue2, payload.value, ch._zod.def));
+        payload2.issues.push(util_exports.issue(issue2, payload2.value, ch._zod.def));
       } else {
         const _issue = issue2;
         if (_issue.fatal)
           _issue.continue = false;
         _issue.code ?? (_issue.code = "custom");
-        _issue.input ?? (_issue.input = payload.value);
+        _issue.input ?? (_issue.input = payload2.value);
         _issue.inst ?? (_issue.inst = ch);
         _issue.continue ?? (_issue.continue = !ch._zod.def.abort);
-        payload.issues.push(util_exports.issue(_issue));
+        payload2.issues.push(util_exports.issue(_issue));
       }
     };
-    return fn(payload.value, payload);
+    return fn(payload2.value, payload2);
   });
   return ch;
 }
@@ -127503,8 +127586,8 @@ function parseDeviceLocks() {
     if (!file.endsWith(".json")) continue;
     const lockFile = path100.join(GLOBAL_LOCKS_DIR, file);
     try {
-      const payload = JSON.parse(fs89.readFileSync(lockFile, "utf8"));
-      const claim = payload?.current_claim ?? payload;
+      const payload2 = JSON.parse(fs89.readFileSync(lockFile, "utf8"));
+      const claim = payload2?.current_claim ?? payload2;
       locks.push({
         lockFile,
         port: file.replace(/\.json$/i, ""),
@@ -127773,8 +127856,8 @@ function startPortalServer(defaultPort = 8080) {
             continue;
           }
           try {
-            const lines2 = await tailFileBounded(firstLogPath, 128 * 1024);
-            const logText = lines2.join("\n");
+            const lines3 = await tailFileBounded(firstLogPath, 128 * 1024);
+            const logText = lines3.join("\n");
             const success = task.status === "success" || task.status === "terminated" || task.exitCode !== void 0 && task.exitCode === 0;
             const diagnostic = diagnoseByTaskType(
               task.type,
@@ -128416,8 +128499,8 @@ function startPortalServer(defaultPort = 8080) {
       if (daemon.logFile && fs89.existsSync(daemon.logFile)) {
         try {
           socket.emit("serial_clear", { port: port2, taskId: daemon.taskId });
-          const lines2 = await tailFileBounded(daemon.logFile);
-          const tailLines = lines2.slice(-1e3);
+          const lines3 = await tailFileBounded(daemon.logFile);
+          const tailLines = lines3.slice(-1e3);
           socket.emit("serial_log", {
             timestamp: Date.now(),
             port: port2,
@@ -128445,8 +128528,8 @@ function startPortalServer(defaultPort = 8080) {
       );
       if (fs89.existsSync(activityLogPath)) {
         try {
-          const lines2 = await tailFileBounded(activityLogPath);
-          const tailLines = lines2.slice(-100);
+          const lines3 = await tailFileBounded(activityLogPath);
+          const tailLines = lines3.slice(-100);
           for (const line of tailLines) {
             if (line.trim()) {
               socket.emit("agent_activity", JSON.parse(line));
@@ -128469,8 +128552,8 @@ function startPortalServer(defaultPort = 8080) {
         });
         socket.emit("build_clear", { logFile: latestBuildLog });
         try {
-          const lines2 = await tailFileBounded(latestBuildLog);
-          const tailLines = lines2.slice(-50);
+          const lines3 = await tailFileBounded(latestBuildLog);
+          const tailLines = lines3.slice(-50);
           for (const line of tailLines) {
             if (line.trim()) {
               socket.emit("build_log", {
@@ -128773,8 +128856,8 @@ function readJsonFile(filePath) {
     return null;
   }
 }
-function writeJsonFile(filePath, payload) {
-  fs90.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
+function writeJsonFile(filePath, payload2) {
+  fs90.writeFileSync(filePath, JSON.stringify(payload2, null, 2), "utf8");
 }
 function writeLastAgentReport(projectDir, report) {
   ensureArtifactsDir(projectDir);
@@ -128815,10 +128898,10 @@ function parseDefaultEnvironments(iniText) {
   return defaultMatch[1].split(",").map((item) => item.trim()).filter((item) => item.length > 0);
 }
 function parseEnvironmentsFromIni(iniText) {
-  const lines2 = iniText.split(/\r?\n/);
+  const lines3 = iniText.split(/\r?\n/);
   const environments = [];
   let activeEnv;
-  for (const rawLine of lines2) {
+  for (const rawLine of lines3) {
     const line = rawLine.trim();
     if (!line || line.startsWith(";") || line.startsWith("#")) continue;
     const sectionMatch = line.match(/^\[env:([^\]]+)\]$/i);
@@ -128904,14 +128987,14 @@ function buildValidationNextSteps(hasPlatformioIni, environments, sourceFiles, m
   }
   return steps;
 }
-function persistAgentReport(projectDir, tool, success, summary, payload) {
+function persistAgentReport(projectDir, tool, success, summary, payload2) {
   const report = {
     tool,
     timestamp: (/* @__PURE__ */ new Date()).toISOString(),
     projectDir,
     success,
     summary,
-    payload
+    payload: payload2
   };
   writeLastAgentReport(projectDir, report);
 }
@@ -129087,8 +129170,8 @@ function collectPinUsages(projectDir) {
     } catch {
       continue;
     }
-    const lines2 = text10.split(/\r?\n/);
-    for (const line of lines2) {
+    const lines3 = text10.split(/\r?\n/);
+    for (const line of lines3) {
       callRegex.lastIndex = 0;
       for (const match of line.matchAll(callRegex)) {
         const operation = match[1];

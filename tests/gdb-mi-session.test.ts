@@ -135,9 +135,42 @@ it("does not exceed the output byte limit when truncating a multibyte character"
   const request = session.execute("-thread-info");
   feed(session, '~"' + "x".repeat(600000) + '"\n');
   feed(session, '~"' + "\u6e2c".repeat(200000) + '"\n');
-  feed(session, '1^done\n');
+  feed(session, "1^done\n");
   const result = await request;
   expect(result.truncated).toBe(true);
-  expect(Buffer.byteLength(result.console.join(""))).toBeLessThanOrEqual(1024 * 1024);
+  expect(Buffer.byteLength(result.console.join(""))).toBeLessThanOrEqual(
+    1024 * 1024,
+  );
   expect(result.console.join("")).not.toContain("\ufffd");
+});
+
+it("bounds record retention independently of stream count and retains the final result", async () => {
+  const session = new GdbMiSession(async () => {});
+  const pending = session.execute("-thread-info");
+  for (let i = 0; i < 205; i++)
+    feed(session, '=thread-created,id="' + i + '"\n');
+  feed(session, "1^done,threads=[]\n");
+  const result = await pending;
+  expect(result.records).toHaveLength(200);
+  expect(result.records?.at(-1)).toMatchObject({ kind: "result", token: "1" });
+  expect(result.truncated).toBe(true);
+});
+it("shares the stream byte budget across console, log, target and unframed output", async () => {
+  const session = new GdbMiSession(async () => {});
+  const pending = session.execute("-thread-info");
+  for (const channel of ["~", "&", "@"])
+    feed(session, channel + '"' + "x".repeat(400000) + '"\n');
+  feed(session, "banner\n1^done\n");
+  const result = await pending;
+  expect(result.truncated).toBe(true);
+  expect(
+    Buffer.byteLength(
+      [result.console, result.log, result.targetOutput, result.otherOutput]
+        .flat()
+        .join(""),
+    ),
+  ).toBe(1024 * 1024);
+  expect(Buffer.byteLength(JSON.stringify(result.records))).toBeLessThan(
+    1024 * 1024 + 201,
+  );
 });

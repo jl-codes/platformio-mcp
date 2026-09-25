@@ -16,6 +16,11 @@ export interface GdbMiCommandResult {
   result?: ResultRecord;
   stopped?: ResultRecord;
   console: string[];
+  log?: string[];
+  targetOutput?: string[];
+  otherOutput?: string[];
+  records?: GdbMiRecord[];
+  durationSeconds?: number;
   truncated: boolean;
   timedOut: boolean;
   running: boolean;
@@ -28,6 +33,13 @@ interface PendingCommand {
   result?: ResultRecord;
   stopped?: ResultRecord;
   console: string[];
+  log: string[];
+  targetOutput: string[];
+  otherOutput: string[];
+  records: Array<{ record: GdbMiRecord; bytes: number }>;
+  recordBytes: number;
+  chunks: number;
+  startedAt: number;
   bytes: number;
   truncated: boolean;
   timer: ReturnType<typeof setTimeout>;
@@ -105,6 +117,13 @@ export class GdbMiSession {
         token,
         waitForStop,
         console: [],
+        log: [],
+        targetOutput: [],
+        otherOutput: [],
+        records: [],
+        recordBytes: 0,
+        chunks: 0,
+        startedAt: performance.now(),
         bytes: 0,
         truncated: false,
         timer: setTimeout(() => this.complete(pending, true), timeoutMs),
@@ -169,12 +188,33 @@ export class GdbMiSession {
     }
     const pending = this.pending;
     if (!pending) return;
+    const recordBytes = Buffer.byteLength(JSON.stringify(record));
+    if (recordBytes <= MAX_OUTPUT_BYTES) {
+      while (
+        pending.records.length >= 200 ||
+        pending.recordBytes + recordBytes > MAX_OUTPUT_BYTES
+      ) {
+        pending.recordBytes -= pending.records.shift()!.bytes;
+        pending.truncated = true;
+      }
+      pending.records.push({ record, bytes: recordBytes });
+      pending.recordBytes += recordBytes;
+    } else pending.truncated = true;
     if (record.kind === "stream" || record.kind === "other") {
       const bytes = Buffer.from(record.text);
       const remaining = MAX_OUTPUT_BYTES - pending.bytes;
-      if (remaining > 0 && pending.console.length < 4096) {
+      if (remaining > 0 && pending.chunks < 4096) {
         const selected = bytes.subarray(0, remaining);
-        pending.console.push(new StringDecoder("utf8").write(selected));
+        const output =
+          record.kind === "other"
+            ? pending.otherOutput
+            : record.channel === "log"
+              ? pending.log
+              : record.channel === "target"
+                ? pending.targetOutput
+                : pending.console;
+        output.push(new StringDecoder("utf8").write(selected));
+        pending.chunks++;
         pending.bytes += selected.length;
       } else pending.truncated = true;
       if (bytes.length > remaining) pending.truncated = true;
@@ -202,6 +242,14 @@ export class GdbMiSession {
       result: pending.result,
       stopped: pending.stopped,
       console: pending.console,
+      log: pending.log,
+      targetOutput: pending.targetOutput,
+      otherOutput: pending.otherOutput,
+      records: pending.records.map((entry) => entry.record),
+      durationSeconds: Math.max(
+        0,
+        (performance.now() - pending.startedAt) / 1000,
+      ),
       truncated: pending.truncated,
       timedOut,
       running: this.running,
