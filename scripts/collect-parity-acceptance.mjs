@@ -55,7 +55,7 @@ export function collectAcceptance(packetDirectories, destination, commit) {
           throw new Error("Duplicate or missing requirement; resolve competing evidence explicitly");
         seen.add(entry.requirementId);
         if (!Array.isArray(entry.artifacts)) throw new Error("Supporting artifacts are missing");
-        entries.push({...entry, evidence: copyArtifact(entry.evidence), artifacts: entry.artifacts.map(copyArtifact)});
+        entries.push({...entry, evidence: entry.outcome === "deferred" && entry.evidence == null ? null : copyArtifact(entry.evidence), artifacts: entry.artifacts.map(copyArtifact)});
       }
     }
     const manifest = {schemaVersion: 1, sourceCommit: commit, entries};

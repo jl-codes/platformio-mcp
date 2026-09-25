@@ -1,4 +1,8 @@
 # PlatformIO MCP feature parity, permission integration and namespace protection plan
+## Maintainer release acceptance amendment (2026-09-25)
+
+The existing [acceptance catalog](reviews/platformio-acceptance-requirements.json) records the authoritative 3.1.0 scope decision. Only its five named physical/platform certifications are deferred by the maintainer, not passed. This amendment supersedes conflicting gate statements below without removing implemented functionality or historical requirements. Retained assertions, software/security checks, ESP32 evidence, artifact integrity and actual published-artifact installation remain release gates. PPK2 sourcing remains explicitly authorized and is never enabled by default. Merge, tagging and publication through the existing protected workflows are authorized.
+
 
 ## Goal Description
 

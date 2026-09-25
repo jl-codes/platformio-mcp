@@ -29,6 +29,17 @@ describe("Codex plugin manifest", () => {
     });
   });
 
+  it("binds the host launcher to the installed plugin and carries explicit launch settings", () => {
+    const mcp = readJson("plugins/platformio-mcp/.mcp.json") as {
+      mcpServers: { platformio: { cwd: string; args: string[]; env_vars: string[] } };
+    };
+    expect(mcp.mcpServers.platformio.cwd).toBe(".");
+    expect(mcp.mcpServers.platformio.args).toEqual(["./scripts/launch-platformio-mcp.mjs"]);
+    expect(mcp.mcpServers.platformio.env_vars).toEqual([
+      "PIO_MCP_COMPAT", "PIO_MCP_POLICY_FILE", "PIO_MCP_DATA_DIR", "PIO_MCP_DISABLE_DASHBOARD",
+    ]);
+  });
+
   it("keeps package, plugin, and marketplace identities aligned", () => {
     const packageJson = readJson("package.json") as {
       bin: Record<string, string>;

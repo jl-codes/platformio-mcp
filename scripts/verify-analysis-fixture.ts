@@ -12,13 +12,14 @@ import { resolveAnalysisToolchain } from "../src/core/analysis/toolchain-resolve
 import { runAnalysisProcess } from "../src/core/analysis/analysis-process.js";
 import { parseNm } from "../src/core/analysis/size-parser.js";
 
-const [project, compiler, trustedRoot, output] = process.argv.slice(2);
+const [project, compiler, trustedRoot, output, target = "xtensa"] = process.argv.slice(2);
 assert(
   project && compiler && trustedRoot && output,
   "Usage: node --import tsx scripts/verify-analysis-fixture.ts PROJECT COMPILER TRUSTED_ROOT OUTPUT_JSON",
 );
 const projectDir = await fs.realpath(project);
-const environment = "analysis-esp32s3";
+assert(["xtensa", "arm"].includes(target), "Unsupported fixture target");
+const environment = target === "arm" ? "analysis-cortex-m" : "analysis-esp32s3";
 const elfPath = path.join(
   projectDir,
   ".pio",
@@ -27,7 +28,7 @@ const elfPath = path.join(
   "firmware.elf",
 );
 const identity = await readElfIdentity(elfPath);
-assert.equal(identity.architecture, "xtensa");
+assert.equal(identity.architecture, target);
 const tools = await resolveAnalysisToolchain(compiler, [trustedRoot]);
 const nm = await runAnalysisProcess(
   tools.nm,
@@ -49,19 +50,19 @@ const context = {
 };
 const crash = await decodeFirmwareCrash(
   context,
-  `Backtrace: ${symbol.address}:0x3fc00000 0xdeadbeef:0x3fc00010`,
+  target === "arm" ? `HardFault\nPC: ${symbol.address} LR: 0xdeadbeef` : `Backtrace: ${symbol.address}:0x3fc00000 0xdeadbeef:0x3fc00010`,
 );
 assert(crash.ok, "Fixture frame must resolve");
 assert("elf" in crash);
 assert.equal(crash.elf.sha256, identity.sha256);
 assert.equal(crash.artifactIdentity, "matched_expected_elf");
 assert.equal(crash.flashedFirmwareVerified, false);
-assert.equal(crash.frames[0].function, symbol.name);
+assert(crash.frames[0].function === symbol.name || crash.frames[0].inlined.some(frame => frame.function === symbol.name));
 assert(crash.frames[0].file?.replaceAll("\\", "/").endsWith("src/main.cpp"));
 assert(
   crash.frames[0].line &&
-    crash.frames[0].line >= 6 &&
-    crash.frames[0].line <= 8,
+    crash.frames[0].line >= (target === "arm" ? 4 : 6) &&
+    crash.frames[0].line <= 9,
 );
 assert.equal(crash.frames[1].resolved, false, "Unknown frame must be retained");
 const size = await reportFirmwareSize(context, 1000);
@@ -106,8 +107,8 @@ const evidence = {
     node: process.version,
   },
   environment,
-  board: "esp32-s3-devkitc-1",
-  platform: "espressif32@7.0.1",
+  board: target === "arm" ? "nucleo_f401re" : "esp32-s3-devkitc-1",
+  platform: target === "arm" ? "ststm32@19.4.0" : "espressif32@7.0.1",
   sourceSha256: crypto.createHash("sha256").update(source).digest("hex"),
   elf: {
     sha256: identity.sha256,
@@ -123,6 +124,7 @@ const evidence = {
     wrongHashRejected: true,
     symbolAttribution: true,
     filteredSymbols: true,
+    inlineFrames: crash.frames[0].inlined.length,
   },
   totals: size.totals,
   symbolCount: size.symbolCount,

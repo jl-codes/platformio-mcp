@@ -2,10 +2,19 @@
   "mcpServers": {
     "platformio": {
       "command": "node",
-      "args": ["./scripts/launch-platformio-mcp.mjs"],
+      "args": [
+        "./scripts/launch-platformio-mcp.mjs"
+      ],
       "env": {
         "PIO_MCP_NO_BROWSER": "true"
-      }
+      },
+      "cwd": ".",
+      "env_vars": [
+        "PIO_MCP_COMPAT",
+        "PIO_MCP_POLICY_FILE",
+        "PIO_MCP_DATA_DIR",
+        "PIO_MCP_DISABLE_DASHBOARD"
+      ]
     }
   }
 }

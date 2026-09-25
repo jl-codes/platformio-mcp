@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const read = file => JSON.parse(readFileSync(file, "utf8"));
 const requirements = read(path.join(root, "docs/reviews/platformio-acceptance-requirements.json"));
+const releaseVersion = read(path.join(root, "package.json")).version;
 const baseline = read(path.join(root, "docs/reviews/platformio-parity-baseline.json"));
 const legacy = read(path.join(root, "docs/reviews/platformio-product-contracts.json"));
 const ids = new Set(requirements.requirements.map(item => item.id));
@@ -30,19 +31,31 @@ export function validateAcceptance(manifest, packetRoot, commit) {
     if (createHash("sha256").update(readFileSync(resolved)).digest("hex") !== item.sha256) throw new Error("Evidence artifact hash mismatch");
     return resolved;
   };
+  const deferred = [];
   for (const requirement of requirements.requirements) {
     const entry = entries.get(requirement.id);
-    if (!entry || entry.implementationStatus !== "complete" || entry.outcome !== "pass" || entry.expectedAssertion !== requirement.assertion) throw new Error(`Incomplete acceptance: ${requirement.id}`);
+    const assertion = requirement.releaseAssertion ?? requirement.assertion;
+    if (entry?.deferralDecision || requirement.deferredCertification) {
+      if (!requirement.deferredCertification || requirements.releaseScope.version !== releaseVersion || entry?.deferralDecision !== requirements.releaseScope.decisionId || entry.deferredCertification !== requirement.deferredCertification)
+        throw new Error(`Unapproved certification deferral: ${requirement.id}`);
+      deferred.push({ requirementId: requirement.id, certification: requirement.deferredCertification, outcome: "deferred", decisionId: entry.deferralDecision });
+    }
+    if (requirement.releaseGate === "deferred") {
+      if (entry?.outcome !== "deferred" || entry.expectedAssertion !== assertion || entry.evidence != null || entry.artifacts?.length !== 0)
+        throw new Error(`Deferred certification must not claim passing evidence: ${requirement.id}`);
+      continue;
+    }
+    if (!entry || entry.implementationStatus !== "complete" || entry.outcome !== "pass" || entry.expectedAssertion !== assertion) throw new Error(`Incomplete acceptance: ${requirement.id}`);
     for (const field of ["procedure", "executor", "environment", "timestamp"]) if (typeof entry[field] !== "string" || !entry[field].trim()) throw new Error(`Missing ${field}: ${requirement.id}`);
     const timestamp = Date.parse(entry.timestamp);
     if (!Number.isFinite(timestamp) || timestamp > Date.now() + 60000) throw new Error(`Invalid evidence timestamp: ${requirement.id}`);
     if (!Array.isArray(entry.artifacts) || !entry.artifacts.length) throw new Error(`Missing supporting artifacts: ${requirement.id}`);
     for (const item of entry.artifacts) artifact(item);
     const evidence = read(artifact(entry.evidence));
-    if (evidence.sourceCommit !== commit || evidence.outcome !== "pass" || evidence.kind !== requirement.kind || !evidence.requirements?.includes(requirement.id) || !evidence.assertions?.includes(requirement.assertion)) throw new Error(`Evidence does not establish required scope: ${requirement.id}`);
+    if (evidence.sourceCommit !== commit || evidence.outcome !== "pass" || evidence.kind !== requirement.kind || !evidence.requirements?.includes(requirement.id) || !evidence.assertions?.includes(assertion)) throw new Error(`Evidence does not establish required scope: ${requirement.id}`);
     if (evidence.skipped !== 0 || evidence.failed !== 0 || !Number.isSafeInteger(evidence.passed) || evidence.passed < 1) throw new Error(`Skipped, failed or absent evidence: ${requirement.id}`);
   }
-  return { sourceCommit: commit, requirements: entries.size, outcome: "pass" };
+  return { sourceCommit: commit, requirements: entries.size, passedRequirements: entries.size - requirements.requirements.filter(item => item.releaseGate === "deferred").length, deferredCertifications: deferred, outcome: "pass" };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

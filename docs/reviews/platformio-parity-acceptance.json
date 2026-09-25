@@ -1300,8 +1300,11 @@
       "timestamp": null,
       "evidence": null,
       "artifacts": [],
-      "expectedAssertion": "win32-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
-      "nextAction": "Complete implementation and attach final-revision host evidence."
+      "expectedAssertion": "win32-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Minimum-OS certification",
+      "originalExpectedAssertion": "win32-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node"
     },
     {
       "requirementId": "NS-HOST-darwin-arm64",
@@ -1313,8 +1316,11 @@
       "timestamp": null,
       "evidence": null,
       "artifacts": [],
-      "expectedAssertion": "darwin-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
-      "nextAction": "Complete implementation and attach final-revision host evidence."
+      "expectedAssertion": "darwin-arm64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Minimum-OS certification",
+      "originalExpectedAssertion": "darwin-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node"
     },
     {
       "requirementId": "NS-HOST-darwin-x64",
@@ -1326,8 +1332,11 @@
       "timestamp": null,
       "evidence": null,
       "artifacts": [],
-      "expectedAssertion": "darwin-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
-      "nextAction": "Complete implementation and attach final-revision host evidence."
+      "expectedAssertion": "darwin-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Minimum-OS certification",
+      "originalExpectedAssertion": "darwin-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node"
     },
     {
       "requirementId": "NS-HOST-linux-arm64",
@@ -1339,8 +1348,11 @@
       "timestamp": null,
       "evidence": null,
       "artifacts": [],
-      "expectedAssertion": "linux-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
-      "nextAction": "Complete implementation and attach final-revision host evidence."
+      "expectedAssertion": "linux-arm64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Minimum-OS certification",
+      "originalExpectedAssertion": "linux-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node"
     },
     {
       "requirementId": "NS-HOST-linux-x64",
@@ -1352,8 +1364,11 @@
       "timestamp": null,
       "evidence": null,
       "artifacts": [],
-      "expectedAssertion": "linux-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
-      "nextAction": "Complete implementation and attach final-revision host evidence."
+      "expectedAssertion": "linux-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Minimum-OS certification",
+      "originalExpectedAssertion": "linux-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node"
     },
     {
       "requirementId": "PAR-HW-01",
@@ -1371,7 +1386,7 @@
     {
       "requirementId": "PAR-HW-02",
       "implementationStatus": "not_verified",
-      "outcome": "blocked",
+      "outcome": "deferred",
       "procedure": null,
       "environment": null,
       "executor": null,
@@ -1379,7 +1394,9 @@
       "evidence": null,
       "artifacts": [],
       "expectedAssertion": "Cortex-M physical fault-register PC/LR capture against flashed ELF",
-      "nextAction": "Complete implementation and attach final-revision hardware evidence."
+      "nextAction": "Maintainer-deferred certification; preserve the original physical procedure for a later certification run.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Physical Cortex-M acceptance"
     },
     {
       "requirementId": "PAR-HW-03",
@@ -1443,8 +1460,11 @@
       "timestamp": null,
       "evidence": null,
       "artifacts": [],
-      "expectedAssertion": "ESP32/ESP8266 firmware/filesystem OTA and real PPK2 measurement/source safety",
-      "nextAction": "Complete implementation and attach final-revision hardware evidence."
+      "expectedAssertion": "ESP32 firmware/filesystem OTA including independent runtime/filesystem verification and controlled failed transfer",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "ESP8266 OTA and PPK2 hardware acceptance",
+      "originalExpectedAssertion": "ESP32/ESP8266 firmware/filesystem OTA and real PPK2 measurement/source safety"
     },
     {
       "requirementId": "NS-CONTAINER",
@@ -1456,8 +1476,56 @@
       "timestamp": null,
       "evidence": null,
       "artifacts": [],
-      "expectedAssertion": "Native Linux amd64/arm64 container execution, policy configuration, MCP lifecycle and non-root device access with exact release image identity",
-      "nextAction": "Collect same-commit native acceptance on both Linux architectures before container publication."
+      "expectedAssertion": "Native Linux amd64/arm64 container execution, policy configuration and MCP lifecycle with exact release image identity",
+      "nextAction": "Attach evidence for the retained release assertion; the named certification is deferred, not passed.",
+      "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
+      "deferredCertification": "Container device-passthrough acceptance",
+      "originalExpectedAssertion": "Native Linux amd64/arm64 container execution, policy configuration, MCP lifecycle and non-root device access with exact release image identity"
     }
-  ]
+  ],
+  "releaseScopeDecision": "maintainer-2026-09-25-release-3.1.0",
+  "hostObservations": {
+    "scope": "Actual isolated host visibility and disabled mutation/alias enforcement; no model turn or physical operation. Working-tree declaration change recorded explicitly.",
+    "declarationSha256": "0f6e760467b054327ae378e3737d16f963dccb5d3b07b10dd03d0ac6e79a3723",
+    "reports": [
+      {
+        "version": "codex-cli 0.155.0-alpha.16.4",
+        "sourceCommit": "1d8c8af52ece0eb13dfb4550d02f29964b5afced",
+        "timestamp": "2026-09-25T19:15:06.048Z",
+        "mode": "standalone",
+        "server": "platformio",
+        "visible": 110,
+        "disabledAbsent": true,
+        "blocked": [
+          {
+            "tool": "build_project",
+            "error": "Error: {\"code\":-32603,\"message\":\"tool 'build_project' is disabled for MCP server 'platformio'\"}"
+          },
+          {
+            "tool": "pio_build",
+            "error": "Error: {\"code\":-32603,\"message\":\"tool 'pio_build' is disabled for MCP server 'platformio'\"}"
+          }
+        ]
+      },
+      {
+        "version": "codex-cli 0.155.0-alpha.16.4",
+        "sourceCommit": "1d8c8af52ece0eb13dfb4550d02f29964b5afced",
+        "timestamp": "2026-09-25T19:18:10.346Z",
+        "mode": "plugin",
+        "server": "platformio",
+        "visible": 110,
+        "disabledAbsent": true,
+        "blocked": [
+          {
+            "tool": "build_project",
+            "error": "Error: {\"code\":-32603,\"message\":\"tool 'build_project' is disabled for MCP server 'platformio'\"}"
+          },
+          {
+            "tool": "pio_build",
+            "error": "Error: {\"code\":-32603,\"message\":\"tool 'pio_build' is disabled for MCP server 'platformio'\"}"
+          }
+        ]
+      }
+    ]
+  }
 }

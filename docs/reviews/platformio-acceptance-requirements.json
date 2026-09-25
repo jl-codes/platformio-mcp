@@ -501,27 +501,37 @@
     {
       "id": "NS-HOST-win32-x64",
       "kind": "host",
-      "assertion": "win32-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node"
+      "assertion": "win32-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "releaseAssertion": "win32-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "deferredCertification": "Minimum-OS certification"
     },
     {
       "id": "NS-HOST-darwin-arm64",
       "kind": "host",
-      "assertion": "darwin-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node"
+      "assertion": "darwin-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "releaseAssertion": "darwin-arm64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "deferredCertification": "Minimum-OS certification"
     },
     {
       "id": "NS-HOST-darwin-x64",
       "kind": "host",
-      "assertion": "darwin-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node"
+      "assertion": "darwin-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "releaseAssertion": "darwin-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "deferredCertification": "Minimum-OS certification"
     },
     {
       "id": "NS-HOST-linux-arm64",
       "kind": "host",
-      "assertion": "linux-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node"
+      "assertion": "linux-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "releaseAssertion": "linux-arm64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "deferredCertification": "Minimum-OS certification"
     },
     {
       "id": "NS-HOST-linux-x64",
       "kind": "host",
-      "assertion": "linux-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node"
+      "assertion": "linux-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
+      "releaseAssertion": "linux-x64 wheel installation/signals/native ABI/update/uninstall without global Node",
+      "deferredCertification": "Minimum-OS certification"
     },
     {
       "id": "PAR-HW-01",
@@ -531,7 +541,9 @@
     {
       "id": "PAR-HW-02",
       "kind": "hardware",
-      "assertion": "Cortex-M physical fault-register PC/LR capture against flashed ELF"
+      "assertion": "Cortex-M physical fault-register PC/LR capture against flashed ELF",
+      "releaseGate": "deferred",
+      "deferredCertification": "Physical Cortex-M acceptance"
     },
     {
       "id": "PAR-HW-03",
@@ -556,12 +568,30 @@
     {
       "id": "PAR-HW-07",
       "kind": "hardware",
-      "assertion": "ESP32/ESP8266 firmware/filesystem OTA and real PPK2 measurement/source safety"
+      "assertion": "ESP32/ESP8266 firmware/filesystem OTA and real PPK2 measurement/source safety",
+      "releaseAssertion": "ESP32 firmware/filesystem OTA including independent runtime/filesystem verification and controlled failed transfer",
+      "deferredCertification": "ESP8266 OTA and PPK2 hardware acceptance"
     },
     {
       "id": "NS-CONTAINER",
       "kind": "host",
-      "assertion": "Native Linux amd64/arm64 container execution, policy configuration, MCP lifecycle and non-root device access with exact release image identity"
+      "assertion": "Native Linux amd64/arm64 container execution, policy configuration, MCP lifecycle and non-root device access with exact release image identity",
+      "releaseAssertion": "Native Linux amd64/arm64 container execution, policy configuration and MCP lifecycle with exact release image identity",
+      "deferredCertification": "Container device-passthrough acceptance"
     }
-  ]
+  ],
+  "releaseScope": {
+    "decisionId": "maintainer-2026-09-25-release-3.1.0",
+    "version": "3.1.0",
+    "authority": "Explicit maintainer instruction in the release task on 2026-09-25",
+    "status": "deferred_by_maintainer_not_passed",
+    "deferredCertifications": [
+      "Physical Cortex-M acceptance",
+      "ESP8266 OTA acceptance",
+      "PPK2 hardware acceptance",
+      "Minimum-OS certification",
+      "Container device-passthrough acceptance"
+    ],
+    "retainedGates": "Correctness, authorization, device ownership and cleanup, credential protection, package integrity, and installation of published artifacts remain required. PPK2 source mode must not be enabled by default."
+  }
 }
