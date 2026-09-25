@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 image, version, commit, output = sys.argv[1:]
 with tempfile.TemporaryDirectory(prefix='pio-container-policy-') as temporary:
-    policy=Path(temporary)/'policy.yaml'; policy.write_text('allow: []\napproval_required: []\n'); policy.chmod(0o644)
+    policy=Path(temporary)/'policy.yaml'; policy.write_text('allow: [get_policy_status]\napproval_required: []\n'); policy.chmod(0o644)
     messages=[
       {'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2024-11-05','capabilities':{},'clientInfo':{'name':'container-acceptance','version':'1'}}},
       {'jsonrpc':'2.0','method':'notifications/initialized'},
