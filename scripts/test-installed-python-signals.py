@@ -1,4 +1,5 @@
-"""Verify POSIX signal shutdown through the installed launcher without opening hardware."""
+"""Verify native signal shutdown through the installed launcher without opening hardware."""
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -13,7 +14,11 @@ import time
 def check(executable, version):
     """Initialize the installed server before signaling its PID, with bounded cleanup."""
     if os.name == "nt":
-        return {"outcome": "not_verified", "reason": "Windows console-control acceptance requires a separate procedure"}
+        spec = importlib.util.spec_from_file_location("windows_console_acceptance",
+            Path(__file__).with_name("test-installed-windows-console.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.check(executable, version)
     results = []
     for selected in (signal.SIGINT, signal.SIGTERM):
         with tempfile.TemporaryDirectory(prefix="pio-wheel-signal-") as working:

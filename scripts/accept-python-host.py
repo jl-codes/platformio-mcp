@@ -69,7 +69,7 @@ def accept(directory, host, evidence):
               "environment": {"os": platform.platform(), "python": platform.python_version(), "machine": platform.machine()},
               "timestamp": datetime.now(timezone.utc).isoformat(), "artifacts": selected, "commands": commands,
               "functionalAliases": [item["name"] for item in aliases], "aliasUninstallPreservesCanonical": True,
-              "mcp": protocol, "signals": signals, "scope": "native installation, CLI aliases, MCP stdio, EOF and POSIX idle-server signal shutdown; hardware, Windows console controls, active-session cleanup, minimum-OS and public-registry acceptance remain separate"}
+              "mcp": protocol, "signals": signals, "scope": "native installation, CLI aliases, MCP stdio, EOF and native idle-server signal shutdown (POSIX SIGINT/SIGTERM or Windows Ctrl-C); hardware, active-session cleanup, minimum-OS and public-registry acceptance remain separate"}
     evidence.parent.mkdir(parents=True, exist_ok=True)
     evidence.write_text(json.dumps(report, indent=2) + "\n")
     return report
