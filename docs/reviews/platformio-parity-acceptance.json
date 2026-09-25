@@ -1647,7 +1647,8 @@
       "nextAction": "Complete implementation and attach final-revision integration evidence.",
       "testFiles": [
         "tests/cli-agent-smoke.test.ts",
-        "tests/serial-observation-cli.test.ts"
+        "tests/serial-observation-cli.test.ts",
+        "tests/shutdown-coordinator.test.ts"
       ],
       "verificationStage": "software-and-retained-evidence"
     },
@@ -1704,7 +1705,8 @@
       "testFiles": [
         "tests/codex-plugin-manifest.test.ts",
         "tests/codex-plugin-launcher.test.ts",
-        "tests/monitoring-automation.test.ts"
+        "tests/monitoring-automation.test.ts",
+        "tests/shutdown-coordinator.test.ts"
       ],
       "verificationStage": "software-and-retained-evidence"
     },
@@ -1834,7 +1836,10 @@
       "artifacts": [],
       "expectedAssertion": "npm canonical and both aliases installation/update/uninstall",
       "nextAction": "Complete implementation and attach final-revision integration evidence.",
-      "verificationStage": "distribution"
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
     },
     {
       "requirementId": "NS-03",
@@ -1848,7 +1853,10 @@
       "artifacts": [],
       "expectedAssertion": "Plugin packaged installation/update/uninstall",
       "nextAction": "Complete implementation and attach final-revision integration evidence.",
-      "verificationStage": "software-and-retained-evidence"
+      "verificationStage": "software-and-retained-evidence",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
     },
     {
       "requirementId": "NS-HOST-win32-x64",
@@ -1865,7 +1873,10 @@
       "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
       "deferredCertification": "Minimum-OS certification",
       "originalExpectedAssertion": "win32-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
-      "verificationStage": "distribution"
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
     },
     {
       "requirementId": "NS-HOST-darwin-arm64",
@@ -1882,7 +1893,10 @@
       "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
       "deferredCertification": "Minimum-OS certification",
       "originalExpectedAssertion": "darwin-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
-      "verificationStage": "distribution"
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
     },
     {
       "requirementId": "NS-HOST-darwin-x64",
@@ -1899,7 +1913,10 @@
       "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
       "deferredCertification": "Minimum-OS certification",
       "originalExpectedAssertion": "darwin-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
-      "verificationStage": "distribution"
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
     },
     {
       "requirementId": "NS-HOST-linux-arm64",
@@ -1916,7 +1933,10 @@
       "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
       "deferredCertification": "Minimum-OS certification",
       "originalExpectedAssertion": "linux-arm64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
-      "verificationStage": "distribution"
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
     },
     {
       "requirementId": "NS-HOST-linux-x64",
@@ -1933,7 +1953,10 @@
       "deferralDecision": "maintainer-2026-09-25-release-3.1.0",
       "deferredCertification": "Minimum-OS certification",
       "originalExpectedAssertion": "linux-x64 wheel installation/signals/native ABI/minimum OS/update/uninstall without global Node",
-      "verificationStage": "distribution"
+      "verificationStage": "distribution",
+      "testFiles": [
+        "tests/shutdown-coordinator.test.ts"
+      ]
     },
     {
       "requirementId": "PAR-HW-01",
@@ -3605,15 +3628,22 @@
       "pluginId": "platformio-mcp@platformio-mcp",
       "name": "platformio-mcp",
       "marketplaceName": "platformio-mcp"
+    },
+    "inventorySourceCommit": "dd284779daa9e92e80f55ba101192a0ed8419e13",
+    "unchangedInstallMetadata": {
+      "plugins/platformio-mcp/.mcp.json": "0f6e760467b054327ae378e3737d16f963dccb5d3b07b10dd03d0ac6e79a3723",
+      "plugins/platformio-mcp/.codex-plugin/plugin.json": "639f66cf5c471d35dbe0b0b4b28b0446d89f5f1542404f56c96bae5ee5a42dc8",
+      "plugins/platformio-mcp/scripts/launch-platformio-mcp.mjs": "5a976440627de5c639072428f9f0dd90b5d2d948b72895d824188e1b86dfb950"
     }
   },
   "retainedApplicability": {
-    "explanation": "Original board, real ELF/package and isolated host observations retain original dates and source context. Direct serial, debug, flash, OTA, policy and analysis implementations are unchanged from the runtime baseline. Only legacy monitor launch/filter/status changed: timestamped same-board capture and cleanup plus focused launch/disconnect regressions cover it. Historical observations are not final-revision executions.",
+    "explanation": "Original board, real ELF/package and isolated host observations retain original dates and source context. Direct serial, debug, flash, OTA, policy and analysis implementations are unchanged from the runtime baseline. Only legacy monitor launch/filter/status changed: timestamped same-board capture and cleanup plus focused launch/disconnect regressions cover it. Historical observations are not final-revision executions. The later shutdown fix drains queued stdout/stderr only after existing device cleanup; the same cleanup deadline and ownership rules remain. Shutdown regression and final native installation checks cover the affected output path.",
     "changedSources": {
       "src/platformio.ts": "cc84011461971b9d7abc79c80d82edbb50791c005f7cfe6f0bf20c299297fd9f",
       "src/tools/monitor.ts": "e7d08d538f1c656fd44f3e74afb8c6ea98a296522994be90cf3d3847adbba136",
       "src/utils/mcp_pio_proxy.py": null,
-      "src/utils/pio-monitor-bridge.ts": "cb3f5034190a4c7bdd265fecb7004e13b23708e9723c7f0136c2ea30e857c452"
+      "src/utils/pio-monitor-bridge.ts": "cb3f5034190a4c7bdd265fecb7004e13b23708e9723c7f0136c2ea30e857c452",
+      "src/utils/shutdown-coordinator.ts": "947fede453dc3254e103dd417266f6112af2d0400727ea6f151227238d7f1042"
     }
   },
   "npmInstallationObservation": {

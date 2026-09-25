@@ -36,7 +36,21 @@ export function requestProcessShutdown(): void {
   handling = true;
   const deadline = setTimeout(() => process.exit(1), 15000);
   deadline.unref();
-  void shutdown.close().then((code) => {
+  void shutdown.close().then(async (code) => {
+    // Node pipes are asynchronous on POSIX. Exit only after queued MCP replies
+    // and cleanup diagnostics have reached the reader; retain the same deadline.
+    try {
+      await Promise.all(
+        [process.stdout, process.stderr].map(
+          (stream) =>
+            new Promise<void>((resolve, reject) => {
+              stream.write("", (error) => (error ? reject(error) : resolve()));
+            }),
+        ),
+      );
+    } catch {
+      code = 1;
+    }
     clearTimeout(deadline);
     process.exit(code);
   });

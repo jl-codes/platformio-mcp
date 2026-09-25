@@ -35,6 +35,6 @@ try {
   assert(checked.defect_count > 0, JSON.stringify(checked));
   assert(checked.defects.some((item: any) => /values|bounds|index/i.test(item.message)), JSON.stringify(checked));
   fs.mkdirSync(path.dirname(output), {recursive: true});
-  fs.writeFileSync(output, JSON.stringify({sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], {encoding: "utf8"}).trim(), timestamp: new Date().toISOString(), outcome: "pass", physicalDeviceTest: false, procedure: "Real MCP pio_test passing/failing native Unity fixtures and pio_check cppcheck defect", host: {platform: process.platform, arch: process.arch}, observations: {passed, failed, checked}}, null, 2) + "\n");
+  fs.writeFileSync(output, JSON.stringify({sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], {encoding: "utf8"}).trim(), sourceTree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], {encoding: "utf8"}).trim(), timestamp: new Date().toISOString(), outcome: "pass", physicalDeviceTest: false, procedure: "Real MCP pio_test passing/failing native Unity fixtures and pio_check cppcheck defect", host: {platform: process.platform, arch: process.arch}, observations: {passed, failed, checked}}, null, 2) + "\n");
   console.log("Real native passing/failing tests and static-analysis defect verified.");
 } finally { await harness.disconnect(); }

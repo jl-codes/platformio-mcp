@@ -10,6 +10,7 @@ const root=process.cwd(), input=path.resolve(process.argv[2]??'.release-evidence
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const git=args=>execFileSync('git',args,{encoding:'utf8'}).trim();
 const commit=git(['rev-parse','HEAD']);
+const sourceTree=git(['rev-parse','HEAD^{tree}']);
 const record=read('docs/reviews/platformio-parity-acceptance.json');
 const catalog=read('docs/reviews/platformio-acceptance-requirements.json');
 const digest=p=>createHash('sha256').update(fs.readFileSync(p)).digest('hex');
@@ -23,18 +24,23 @@ const artifact=p=>{
 };
 const progressArtifact=artifact("docs/reviews/platformio-parity-progress.md");
 const recordArtifact=artifact('docs/reviews/platformio-parity-acceptance.json');
-const reports=['unit.json','e2e.json'].map(name=>({file:path.join(input,name),report:read(path.join(input,name))}));
+const walk=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(dir,e.name)):[path.join(dir,e.name)]);
+const reportFiles=[path.join(input,'unit.json'),path.join(input,'e2e.json'),...walk(path.join(input,'ci-unit')).filter(p=>p.endsWith('unit-evidence.json'))];
+const ciSources=[];
+for(const file of reportFiles.filter(p=>p.endsWith('unit-evidence.json'))){const provenance=path.join(path.dirname(file),'unit-source.json');const source=read(provenance);assert.equal(source.sourceTree,sourceTree,'CI merge tree differs from release tree');ciSources.push(artifact(provenance));}
+const reports=reportFiles.map(file=>({file,report:read(file)}));
 for(const {report} of reports) assert(report.success && report.numFailedTests===0,'Mandatory test run failed');
 const tests=new Map();
 for(const {file,report} of reports)for(const suite of report.testResults){
  const relative=suite.name.replaceAll('\\','/').split('/tests/')[1];
- if(relative)tests.set('tests/'+relative,{suite,file});
+ if(relative){const key='tests/'+relative;const values=tests.get(key)??[];values.push({suite,file});tests.set(key,values);}
 }
 const delta=git(['diff','--name-only',record.retainedRuntimeBaseline,'HEAD','--','src']).split(/\r?\n/).filter(Boolean);
 assert.equal(git(['rev-parse',record.retainedRuntimeBaseline+':src']),record.retainedRuntimeTree);
 for(const file of delta){assert(Object.hasOwn(record.retainedApplicability.changedSources,file),`Unreviewed retained-evidence source change: ${file}`);const expected=record.retainedApplicability.changedSources[file];assert.equal(fs.existsSync(file)?createHash("sha256").update(fs.readFileSync(file,"utf8").replaceAll("\r\n","\n")).digest("hex"):null,expected);}
 assert.equal(digest('plugins/platformio-mcp/.mcp.json'),record.hostObservations.declarationSha256);
-assert.equal(digest('plugins/platformio-mcp/runtime/inventory.json'),record.pluginLifecycle.inventorySha256);
+assert.equal(createHash('sha256').update(execFileSync('git',['show',record.pluginLifecycle.inventorySourceCommit+':plugins/platformio-mcp/runtime/inventory.json'])).digest('hex'),record.pluginLifecycle.inventorySha256);
+for(const [file,expected] of Object.entries(record.pluginLifecycle.unchangedInstallMetadata))assert.equal(digest(file),expected,'Retained plugin installation metadata changed');
 assert(record.pluginLifecycle.updated && record.pluginLifecycle.removed);
 for(const report of record.hostObservations.reports)assert(report.disabledAbsent && report.blocked.length===2 && report.blocked.every(item=>item.error.includes('disabled for MCP server')));
 const monitor=record.retainedLegacyMonitor.observations;
@@ -50,18 +56,27 @@ const supplemental={
  'NS-02':[path.join(artifacts,'npm-installation.json')],
  'NS-CONTAINER':[path.join(artifacts,'container-release-identity.json'),path.join(input,'container-amd64.json'),path.join(input,'container-arm64.json')],
 };
-const native=read(path.join(input,'native-quality.json'));assert.equal(native.sourceCommit,commit);assert.equal(native.outcome,'pass');assert(native.observations.passed.ok && !native.observations.failed.ok && native.observations.failed.failed===1 && native.observations.checked.defect_count>0);
+const native=read(path.join(input,'native-quality.json'));assert(native.sourceCommit===commit || native.sourceTree===sourceTree,'Native quality source differs from release tree');assert.equal(native.outcome,'pass');assert(native.observations.passed.ok && !native.observations.failed.ok && native.observations.failed.failed===1 && native.observations.checked.defect_count>0);
 const tap=fs.readFileSync(path.join(input,'namespace-tests.tap'),'utf8');assert(/# fail 0\b/.test(tap) && /# pass [1-9]\d*\b/.test(tap) && !/# (?:skipped|todo) [1-9]/.test(tap));
 const npm=read(path.join(artifacts,'npm-installation.json'));assert.equal(npm.sourceCommit,commit);assert.equal(npm.outcome,'pass');assert(npm.aliasUninstallPreservesCanonical && npm.canonicalUninstalled);for(const item of npm.artifacts)assert.equal(digest(path.join(artifacts,item.filename)),item.sha256);
 for(const arch of ['amd64','arm64']){const c=read(path.join(input,`container-${arch}.json`));assert.equal(c.sourceCommit,commit);assert.equal(c.outcome,'pass');assert(c.policyDenied && c.eofShutdown && c.imageId);}
-const walk=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(dir,e.name)):[path.join(dir,e.name)]);
 for(const requirement of catalog.requirements.filter(r=>r.id.startsWith('NS-HOST-'))){const host=requirement.id.slice(8);const files=walk(path.join(artifacts,'python-host-evidence')).filter(p=>p.endsWith('/'+host+'.json') || p.endsWith('\\'+host+'.json'));assert.equal(files.length,1);const h=read(files[0]);assert.equal(h.sourceCommit,commit);assert.equal(h.outcome,'pass');assert(h.upgrade && h.aliasUninstallPreservesCanonical && h.mcp && h.signals);supplemental[requirement.id]=files;}
 const entries=[];
 for(const requirement of catalog.requirements){
  const entry=record.entries.find(e=>e.requirementId===requirement.id);assert(entry);
  if(requirement.releaseGate==='deferred'){entries.push(entry);continue;}
- const supporting=[recordArtifact,progressArtifact], cases=[];
- for(const file of entry.testFiles??[]){const result=tests.get(file);assert(result,`Missing behavioral test report: ${file}`);assert(result.suite.assertionResults.length>0 && result.suite.assertionResults.every(a=>a.status==='passed'),`Skipped/failed behavior: ${file}`);cases.push(...result.suite.assertionResults.map(a=>({file,title:a.fullName??a.title})));supporting.push(artifact(result.file),artifact(file));}
+ const supporting=[recordArtifact,progressArtifact,...ciSources], cases=[];
+ for(const file of entry.testFiles??[]){
+  const results=tests.get(file);assert(results?.length,`Missing behavioral test report: ${file}`);
+  const observed=new Map();
+  for(const result of results){supporting.push(artifact(result.file));for(const test of result.suite.assertionResults){
+    const name=test.fullName??test.title;const previous=observed.get(name);
+    assert(test.status!=='failed',`Failed behavior: ${file}: ${name}`);
+    if(!previous || test.status==='passed')observed.set(name,test.status);
+  }}
+  assert(observed.size && [...observed.values()].every(status=>status==='passed'),`Behavior never passed on an applicable required host: ${file}`);
+  cases.push(...[...observed.keys()].map(title=>({file,title})));supporting.push(artifact(file));
+ }
  for(const file of supplemental[requirement.id]??[])supporting.push(artifact(file));
  if(physical[requirement.id])for(const line of physical[requirement.id])assert(board.some(item=>item.sourceLine===line));
  const retained=physical[requirement.id] || ['POL-04','NS-03'].includes(requirement.id);

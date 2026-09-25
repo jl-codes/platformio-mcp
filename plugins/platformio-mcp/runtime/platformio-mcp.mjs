@@ -115800,7 +115800,18 @@ function requestProcessShutdown() {
   handling = true;
   const deadline = setTimeout(() => process.exit(1), 15e3);
   deadline.unref();
-  void shutdown.close().then((code) => {
+  void shutdown.close().then(async (code) => {
+    try {
+      await Promise.all(
+        [process.stdout, process.stderr].map(
+          (stream) => new Promise((resolve, reject) => {
+            stream.write("", (error2) => error2 ? reject(error2) : resolve());
+          })
+        )
+      );
+    } catch {
+      code = 1;
+    }
     clearTimeout(deadline);
     process.exit(code);
   });

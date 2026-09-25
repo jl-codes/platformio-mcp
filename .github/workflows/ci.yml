@@ -54,10 +54,16 @@ jobs:
       - name: Run unit and component tests
         run: npm run test:ci:unit -- --reporter=default --reporter=json --outputFile=unit-evidence.json
 
+      - name: Bind behavioral results to the tested tree
+        shell: bash
+        run: node -e 'const c=require("node:child_process"),f=require("node:fs");f.writeFileSync("unit-source.json",JSON.stringify({sourceCommit:c.execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim(),sourceTree:c.execFileSync("git",["rev-parse","HEAD^{tree}"],{encoding:"utf8"}).trim()}))'
+
       - uses: actions/upload-artifact@v7
         with:
           name: unit-evidence-${{ matrix.os }}
-          path: unit-evidence.json
+          path: |
+            unit-evidence.json
+            unit-source.json
           if-no-files-found: error
 
       - name: Verify native debug backend descendant cleanup

@@ -525,7 +525,9 @@ setInterval(()=>{},1000);
       const deadline = Date.now() + 10000;
       while (
         Date.now() < deadline &&
-        fs.readdirSync(root).some((name) => name.endsWith(".json"))
+        fs
+          .readdirSync(root)
+          .some((name) => name.endsWith(".json") || name.endsWith(".gate"))
       )
         await new Promise((resolve) => setTimeout(resolve, 25));
       const next = competitor.acquire(resource);
