@@ -8,15 +8,23 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const execFileAsync = promisify(execFile);
 
 async function runCli(args: string[], cwd: string) {
-  const { stdout } = await execFileAsync(
-    process.execPath,
-    ["--import", "tsx", "src/cli.ts", ...args],
-    {
-      cwd,
-      maxBuffer: 1024 * 1024,
-      env: process.env,
-    },
-  );
+  // A command whose operation ran but failed -- an unresolvable target, a build
+  // with compiler errors -- returns `success: false` AND exits non-zero, which
+  // execFile surfaces as a rejection. That is the payload these tests are
+  // asserting on, so read it off the error rather than treating a non-zero
+  // exit as "no result".
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync(
+      process.execPath,
+      ["--import", "tsx", "src/cli.ts", ...args],
+      { cwd, maxBuffer: 1024 * 1024, env: process.env },
+    ));
+  } catch (error) {
+    const failure = error as { stdout?: string; stderr?: string };
+    stdout = failure.stdout?.trim() ? failure.stdout : (failure.stderr ?? "");
+    if (!stdout.trim()) throw error;
+  }
   return JSON.parse(stdout) as unknown;
 }
 

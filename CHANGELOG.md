@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The CLI is the primary interface.** `pio-agent` (also `platformio-mcp`) is a
+  complete standalone adapter; nothing starts a long-lived process unless asked.
+  MCP is unchanged and fully supported, now behind an explicit `pio-agent serve`.
+  Bare invocation still starts the MCP server but prints a deprecation warning
+  on stderr; the installers generate the `serve` form.
+- Skills retargeted from MCP tool names to CLI commands. `pio-manager` is the
+  gateway skill: Tier 1 is the `pio-agent` CLI, MCP is Tier 2 only when a
+  server is already running, and it documents the stdout/stderr/exit-code
+  contract (three outcomes, not two) and the `PortBusy` / `DeviceBusy`
+  distinction. The dashboard skill never starts the dashboard itself; it tells
+  the user to run `pio-agent dashboard --serve`. README and the LLM
+  installation guide lead with the CLI; MCP is documented as optional.
+- CLI commands closing the gap with the MCP tools: `lib`, `project`, `logs`,
+  `board-info`, `system-info`, `monitor-stop`, `task-cancel`, `upload-fs`,
+  `lock status`, `port release --port <p> [--force]` (the claim errors point
+  users at the last two for recovery), plus `serve` and `dashboard --serve`.
+- `install_library` / `lib install` accept PlatformIO's canonical `owner/name`
+  identifier (`bblanchon/ArduinoJson`), and `validateSerialPort` accepts
+  `/dev/serial/by-id/...`, `/dev/serial/by-path/...` and `/dev/ttyAMA0`.
 - Optional `platformio-mcp-python` compatibility mode registers all 40 pinned
   reference tool names alongside 72 normal-mode tools. Registration is not a
   declaration of completed behavioral or physical acceptance.
@@ -26,6 +45,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`pio-agent dashboard` no longer boots the dashboard on demand.** It reports
+  whether one is running in any process and its URL; `pio-agent dashboard
+  --serve` starts it and prints the single-use launch URL (`--operator` mints
+  an operator session for that browser). Scripts that relied on the auto-boot
+  must pass `--serve`.
+- `--background` on the CLI now genuinely returns immediately: the command
+  re-executes itself detached with a preassigned task id, and
+  `task-status <id>` reads the result. Previously it printed `running` and then
+  blocked for the whole task.
+- Commands that ran but failed (`build` with compiler errors, `test`) exit
+  non-zero; queries that answer "no" (`task-cancel` on a finished task,
+  `monitor-health` with nothing to assert) still exit 0.
+- `--version` is a global flag only when it leads, so `lib install <name>
+  --version 1.2.3` installs that version instead of printing the CLI version.
+  `--help` works after any command. An unknown leading flag is an error rather
+  than starting the MCP server.
+- **Diagnostics: the log-matcher `errorType: "PortBusy"` is renamed
+  `"DeviceBusy"`** (the OS reporting the device busy, often transient, still
+  `safeToAutoRetry: true`). `"PortBusy"` now means another pio-agent process
+  holds a claim on the port and is `safeToAutoRetry: false`. This `diagnostic`
+  object ships inside MCP `upload_firmware` / `upload_filesystem` results, so
+  consumers matching the old string must update.
 - Resolve server policy and host configuration provenance without treating
   `config.toml` settings as blanket server authorization. Preserve existing Codex
   comments, restrictions, custom launchers and policy selectors during installation.
@@ -34,6 +75,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Two processes could flash the same board.** The per-port claim was not a
+  lock: `claimPort` overwrote any existing claim unconditionally and the flash
+  paths never checked it. Claims are now published atomically (temp file plus
+  `link()`, which never exposes a partial file), stale claims are reclaimed
+  under a breaker, releases are owner-checked, and a monitor claim tracks the
+  detached monitor child rather than the process that launched it. Two TTLs
+  apply -- 30 min for uploads (`PIO_PORT_CLAIM_TTL_MS`), 24 h for monitors
+  (`PIO_MONITOR_CLAIM_TTL_MS`) -- so a live monitor is never reclaimed by a
+  flash-sized timer, yet a recycled PID cannot wedge a port forever.
+- `stopMonitor` force-cleared a claim on a kill it never verified; it now
+  requires the identity-verified kill to succeed, and says on stderr whose
+  monitor it is stopping when that monitor belongs to another session.
+- `pio-agent monitor` printed its result and then never exited (an un-unref'd
+  log watcher; on Windows, also the polling fallback).
+- On Windows, a claim for `COM1`-`COM9` would have been written to the serial
+  device itself (reserved DOS device names); those filenames are now prefixed.
+- `reset_server_state` skipped `.reclaim` breakers and `.tmp.` files, so it
+  reported "all locks cleared" while leaving a wedged port behind.
 - Advertise retained flash resume and approval fields in MCP schemas.
 - Expose owned serial, retained flash and OTA capabilities in normal mode.
 - Return bounded schema-validation errors instead of internal errors for invalid

@@ -10,6 +10,7 @@
 
 import { matchBoundedLines } from "../core/bounded-pattern.js";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { validateSerialPort, validateBaudRate } from "../utils/validation.js";
@@ -108,6 +109,11 @@ function startWindowsPollingFallback(
   daemon.poller = setInterval(() => {
     emitNewLogBytes(port, daemon);
   }, 500);
+  // Same reason as the watcher unrefs: on Windows this poller IS the fs.watch
+  // fallback, and a ref'd interval keeps a one-shot CLI alive forever after it
+  // has printed its result. Long-lived hosts (MCP server, dashboard) hold their
+  // own references and are unaffected.
+  daemon.poller.unref();
 }
 
 /**
@@ -161,11 +167,65 @@ export async function stopMonitor(port: string, projectDir?: string) {
     `[Spooler Diagnostic] Triggering killPioMonitorByPort on ${port}...`,
     projectDir,
   );
-  const stopped = await killPioMonitorByPort(port, projectDir);
-  if (stopped) portSemaphoreManager.releasePort(port);
+  // A flash or a new monitor stops whatever monitor holds the port first, and
+  // since claims are shared across processes that now reaches a monitor some
+  // OTHER session started. That pre-emption is deliberate (see the design
+  // doc), but it must not be silent: the session that loses its monitor gets
+  // no signal, so at least say who is being stopped, and from where.
+  const preempted = portSemaphoreManager.getClaim(port);
+  if (
+    preempted?.type === "monitor" &&
+    !(
+      preempted.owner_pid === process.pid &&
+      preempted.hostname === os.hostname()
+    )
+  ) {
+    console.error(
+      `[pio-agent] Stopping a monitor on ${port} started by another process ` +
+        `(PID ${preempted.owner_pid}` +
+        (preempted.monitor_pid
+          ? `, monitor PID ${preempted.monitor_pid}`
+          : "") +
+        `, workspace ${preempted.owner_workspace}) to take the port.`,
+    );
+  }
+
+  // killPioMonitorByPort verifies the process IDENTITY before and after the
+  // kill and returns true only on a confirmed exit; it throws when the
+  // identity is unavailable or changed. Either non-true outcome means the kill
+  // is not proven, which below falls back to a non-force release.
+  let proven = false;
+  try {
+    proven = await killPioMonitorByPort(port, projectDir);
+  } catch (error) {
+    logDiag(
+      `[Spooler Diagnostic] Monitor kill not proven for ${port}: ${(error as Error).message}`,
+      projectDir,
+    );
+  }
   delete activeDaemons[port];
   portalEvents.emitSpoolerStates(getSpoolerStates());
   logDiag(`[Spooler Diagnostic] killPioMonitorByPort completed.`, projectDir);
+
+  // A monitor claim carries `monitor_pid` -- the detached child that actually
+  // holds the UART -- so isClaimStale can answer definitively and a plain
+  // non-force release is enough: it clears the claim exactly when that child
+  // is gone. `force` remains only as a fallback for claims with no
+  // monitor_pid (written before the field existed, or by a host that does
+  // not set it); there the rule is a proven kill AND the same host, because a
+  // kill proven from THIS host's pidsFile says nothing about a claim
+  // published by a different host on shared storage.
+  try {
+    const survivingClaim = portSemaphoreManager.getClaim(port);
+    const hasMonitorPid = typeof survivingClaim?.monitor_pid === "number";
+    portSemaphoreManager.releasePort(port, {
+      force:
+        !hasMonitorPid && proven && survivingClaim?.hostname === os.hostname(),
+      expectedType: "monitor",
+    });
+  } catch {
+    // Best-effort; never fail stopMonitor over a claim release.
+  }
 }
 
 async function spawnPioMonitor(
@@ -221,6 +281,27 @@ async function spawnPioMonitor(
       daemon.taskId,
       cliDesc,
     );
+    // The claim was taken before this child existed and records the LAUNCHER's
+    // pid. Under the CLI that process exits seconds from now while this child
+    // keeps the UART, so without this the claim would read stale and the next
+    // claimer would flash a port this monitor still holds.
+    const attached = portSemaphoreManager.attachMonitorPid(
+      targetPort,
+      proc.pid,
+    );
+    if (!attached) {
+      // Not benign: under the CLI the launcher is already exiting, so the
+      // claim immediately reads stale and the next claimer flashes a port this
+      // monitor still holds. Say so rather than leaving a monitor running
+      // behind an unusable claim.
+      logDiag(
+        `[Spooler] WARNING: could not record monitor PID ${proc.pid} on the ` +
+          `claim for ${targetPort}. The claim may read stale while this ` +
+          `monitor still holds the port. Stop it with ` +
+          `\`pio-agent monitor-stop --port ${targetPort}\`.`,
+        projectDir,
+      );
+    }
   }
 
   // Symlink or copy to 'latest-monitor.log' for easy querying
@@ -346,6 +427,7 @@ export async function rehydrateMonitors(): Promise<void> {
               daemon.watcher.on("error", () => {
                 // Ignore watcher errors on constrained environments.
               });
+              daemon.watcher.unref();
               startWindowsPollingFallback(port, daemon);
               rehydrationCount++;
               logDiag(
@@ -409,12 +491,6 @@ export async function startMonitor(
   // Relinquish previous bindings safely if re-invoked
   await stopMonitor(activePort, projectDir);
 
-  if (portSemaphoreManager.isPortClaimed(activePort))
-    throw new PlatformIOError(
-      `Port is currently locked: ${activePort}`,
-      "PORT_BUSY",
-    );
-
   const targetDir = getLogDir("monitor", projectDir);
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
@@ -466,6 +542,10 @@ export async function startMonitor(
     daemon.watcher.on("error", () => {
       // Ignore watcher errors on constrained environments.
     });
+    // A one-shot CLI must exit once it has printed the monitor's start result;
+    // the detached child keeps the UART, and this watcher only feeds the
+    // dashboard. Long-lived hosts hold their own references.
+    daemon.watcher.unref();
   } catch {
     logDiag(`[Spooler] Failed to attach fs.watch to ${logFile}`, projectDir);
   }

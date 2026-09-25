@@ -32,9 +32,9 @@ describe("Extended Diagnostic Matchers", () => {
     expect(result.errorType).toBe("UnknownFramework");
   });
 
-  it("matches PortBusy upload failures from fixture", () => {
+  it("matches DeviceBusy upload failures from fixture", () => {
     const result = diagnoseUploadLog(readFixture("port-busy.log"));
-    expect(result.errorType).toBe("PortBusy");
+    expect(result.errorType).toBe("DeviceBusy");
     expect(result.safeToAutoRetry).toBe(true);
   });
 
@@ -44,7 +44,9 @@ describe("Extended Diagnostic Matchers", () => {
   });
 
   it("matches PermissionDenied upload failures", () => {
-    const result = diagnoseUploadLog("Permission denied while opening serial port");
+    const result = diagnoseUploadLog(
+      "Permission denied while opening serial port",
+    );
     expect(result.errorType).toBe("PermissionDenied");
   });
 

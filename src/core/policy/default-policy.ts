@@ -58,6 +58,7 @@ export const defaultPolicy: PolicyConfig = {
     "install_library",
     "uninstall_library",
     "update_library",
+    "release_port_claim",
   ],
   deny: [
     "erase_disk",

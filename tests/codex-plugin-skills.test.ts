@@ -57,9 +57,10 @@ describe("Codex plugin skills", () => {
       "utf8",
     );
 
-    expect(dashboardSkill).toContain("`open: false`");
+    expect(dashboardSkill).toContain("pio-agent dashboard --json");
+    expect(dashboardSkill).toContain("**do not start one**");
     expect(dashboardSkill).toContain(
-      "Never open or refresh the dashboard from a scheduled task",
+      "Never open, refresh, or start the dashboard from a scheduled task",
     );
     expect(automationSkill).toContain(
       "Scheduled runs never open the dashboard",

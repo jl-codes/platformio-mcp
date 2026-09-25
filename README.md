@@ -27,6 +27,33 @@ It exposes PlatformIO workflows for board discovery, project setup, build, flash
 
 MCP is one adapter. PlatformIO is the first backend.
 
+## Quick start (recommended)
+
+```bash
+npm install -g platformio-mcp
+pio-agent devices
+pio-agent build --project-dir . --json
+```
+
+No server, no client configuration, nothing left running between commands.
+
+### Using it with a coding agent
+
+Install the skills and point your agent at the `pio-agent` binary. The
+`pio-manager` skill documents every command.
+
+## MCP server (optional)
+
+MCP remains fully supported for clients that prefer it:
+
+```bash
+claude mcp add platformio -- node /path/to/platformio-mcp/build/index.js
+```
+
+Note that each session that connects this way runs its own server process. The
+CLI above avoids that. See [Manual MCP Config](#manual-mcp-config) below for
+other hosts.
+
 ## Agent-First Capabilities
 
 - Project readiness validation (`agent_validate_project`)
@@ -48,7 +75,7 @@ All risky operations still honor policy and approval rules.
 ### 1. Run the dashboard
 
 ```bash
-npx platformio-mcp dashboard
+npx platformio-mcp dashboard --serve
 ```
 
 ### 2. Use the CLI
@@ -123,7 +150,7 @@ For headless verification and status inspection, the same CLI also provides `plu
   "mcpServers": {
     "platformio": {
       "command": "npx",
-      "args": ["-y", "platformio-mcp", "--open-dashboard-on-start"]
+      "args": ["-y", "platformio-mcp", "serve"]
     }
   }
 }

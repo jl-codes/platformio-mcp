@@ -1,3 +1,6 @@
+> **Optional.** MCP is no longer the default interface. Use this only when an
+> MCP server is already running in your session. Prefer `references/cli-reference.md`.
+
 # PIO Agent Command Reference
 
 This is a distilled reference designed specifically for AI agents. It contains the tools provided by PIO Agent's PlatformIO MCP server, focusing entirely on required arguments, best practices, and edge cases. JSON schemas and parameter types are omitted here as they are automatically provided to you via your native MCP Tool Declarations.

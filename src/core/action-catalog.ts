@@ -296,6 +296,10 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
 
 /** Implemented internal service actions; these are not advertised as MCP tools. */
 export const INTERNAL_ACTIONS: Record<string, ActionSafetyMetadata> = {
+  // CLI-only (`pio-agent port release`): clears a cross-process port claim.
+  // Not destructive to hardware, but it can pre-empt another session's
+  // upload, so it is medium risk rather than a plain read.
+  release_port_claim: { riskLevel: "medium", readOnly: false, destructive: false, idempotent: true, openWorld: false },
   power_profile: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", riskLevel: "critical", destructive: true, idempotent: false },
   pio_power_profile: { ...MCP_ACTIONS.start_monitor, policyAction: "power_profile", riskLevel: "critical", destructive: true, idempotent: false },
   power_meter_measure: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", idempotent: false },
@@ -375,9 +379,61 @@ export const actionRiskLevels: Record<string, PolicyRiskLevel> = {
   ssh_deploy: "critical",
 };
 
-/** Resolves the existing CLI spelling to its concrete operation. */
-export function operationForCliCommand(command: string): string {
+/**
+ * Resolves the existing CLI spelling to its concrete operation.
+ *
+ * `positionals` matters only for the commands whose handler dispatches its
+ * own subcommand from `positionals[0]` (`lib`, `project`, `logs`): a
+ * mutating subcommand (`lib install`) must get a different, higher-risk
+ * operation than a read-only one (`lib search`) sharing the same command word.
+ */
+export function operationForCliCommand(
+  command: string,
+  positionals: readonly string[] = [],
+): string {
   switch (command) {
+    case "board-info":
+      return "get_board_info";
+    case "system-info":
+      return "system_info";
+    case "lib":
+      switch (positionals[0]) {
+        case "install":
+          return "install_library";
+        case "uninstall":
+          return "uninstall_library";
+        case "update":
+          return "update_library";
+        case "list":
+          return "list_installed_libraries";
+        case "search":
+        default:
+          return "search_libraries";
+      }
+    case "project":
+      switch (positionals[0]) {
+        case "check":
+          return "check_project";
+        case "context":
+          return "get_project_context";
+        case "config":
+        default:
+          return "get_project_config";
+      }
+    case "logs":
+      return positionals[0] === "capture"
+        ? "capture_serial_window"
+        : "query_logs";
+    case "upload-fs":
+      return "upload_filesystem";
+    case "monitor-stop":
+      return "stop_monitor";
+    case "task-cancel":
+      return "cancel_task";
+    case "lock-status":
+      return "get_lock_status";
+    case "port-release":
+      return "release_port_claim";
     case "port-diagnose":
       return "port_diagnose";
     case "monitor-capture":
@@ -482,8 +538,11 @@ export function operationForCliCommand(command: string): string {
 }
 
 /** Resolves CLI names through the same permission mapping as the MCP registry. */
-export function policyActionForCliCommand(command: string): string {
-  const name = operationForCliCommand(command);
+export function policyActionForCliCommand(
+  command: string,
+  positionals: readonly string[] = [],
+): string {
+  const name = operationForCliCommand(command, positionals);
   return policyNamesForOperation(name).at(-1)!;
 }
 
