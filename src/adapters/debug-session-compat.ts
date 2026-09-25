@@ -161,6 +161,24 @@ export function formatDebuggerCommandResult(result: GdbMiCommandResult) {
         : `Debugger result: ${resultClass ?? "no result record"}.`),
   };
 }
+/** Share observed session metadata across start, list and stop replies. */
+export function formatDebuggerSessionInfo(
+  row: ReturnType<DebugClientSessions["list"]>[number],
+) {
+  const { lastStop, exitCode, stopCount, recordsBuffered, ...rest } = row;
+  const stopped = normalizeDebuggerStop(lastStop);
+  return {
+    ...rest,
+    exit_code: exitCode,
+    last_stop: stopped,
+    stopped,
+    stop_count: stopCount ?? null,
+    records_buffered: recordsBuffered ?? null,
+    error: row.error ?? null,
+    init_script_path: row.init_script_path ?? null,
+  };
+}
+
 /** Dispatch already-owned session operations; every command retains core policy enforcement. */
 export async function executeDebugSessionCompatibility(
   name: "pio_debug_cmd" | "pio_debug_list" | "pio_debug_stop",
@@ -175,11 +193,7 @@ export async function executeDebugSessionCompatibility(
     );
   if (name === "pio_debug_list") {
     if (!DebugListCompatibilitySchema.safeParse(input).success) throw invalid();
-    const rows = sessions.list().map(({ lastStop, exitCode, ...row }) => ({
-      ...row,
-      exit_code: exitCode,
-      stopped: normalizeDebuggerStop(lastStop),
-    }));
+    const rows = sessions.list().map(formatDebuggerSessionInfo);
     return {
       ok: true,
       sessions: rows,
@@ -224,6 +238,7 @@ export async function executeDebugSessionCompatibility(
     );
   return {
     ok: true,
+    ...(info ? formatDebuggerSessionInfo(info) : {}),
     session_id: args.session_id,
     project_dir: info?.project_dir,
     env: info?.env,
@@ -232,6 +247,8 @@ export async function executeDebugSessionCompatibility(
     uptime_s: info
       ? info.uptime_s + Math.max(0, (performance.now() - stoppingAt) / 1000)
       : null,
+    closed: true,
+    cleanupPending: false,
     cleanup_pending: false,
     reset_run_acknowledged: !args.process_only,
     target_running_verified: false,

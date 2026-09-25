@@ -174,3 +174,20 @@ it("shares the stream byte budget across console, log, target and unframed outpu
     1024 * 1024 + 201,
   );
 });
+
+it("reports observed stops and bounded session history across completed commands", async () => {
+  const session = new GdbMiSession(async () => {});
+  feed(session, '*stopped,reason="breakpoint-hit"\n');
+  const pending = session.execute("-thread-info");
+  feed(session, "1^done\n");
+  await pending;
+  expect(session.state()).toMatchObject({
+    stopCount: 1,
+    recordsBuffered: 2,
+    error: null,
+  });
+  for (let i = 0; i < 4005; i++) feed(session, "(gdb)\n");
+  expect(session.state().recordsBuffered).toBe(4000);
+  session.invalidate(new Error("transport lost"));
+  expect(session.state().error).toBe("transport lost");
+});

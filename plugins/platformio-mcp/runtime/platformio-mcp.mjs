@@ -109009,6 +109009,7 @@ async function retainInitialization(script, binding, template) {
     let release;
     const artifact = Object.freeze({
       path: file,
+      script,
       sha256,
       size: bytes.length,
       authorization: Object.freeze({
@@ -109065,7 +109066,11 @@ function ownDebugInitialization(process9, artifact) {
   assertDebugInitArtifact(artifact);
   return {
     command: process9.command.bind(process9),
-    state: () => ({ ...process9.state(), init_script: artifact.path }),
+    state: () => ({
+      ...process9.state(),
+      init_script: artifact.script,
+      init_script_path: artifact.path
+    }),
     async cleanupProcess() {
       await process9.cleanupProcess();
       await artifact.release();
@@ -109800,6 +109805,9 @@ var GdbMiSession = class {
   closed = false;
   exitCode = null;
   lastStop;
+  stopCount = 0;
+  history = [];
+  historyBytes = 0;
   /** Return observed target/process state without confusing a transport fault with confirmed exit. */
   state() {
     return {
@@ -109807,7 +109815,10 @@ var GdbMiSession = class {
       closed: this.closed,
       exitCode: this.exitCode,
       failed: !!this.failure,
-      lastStop: this.lastStop
+      lastStop: this.lastStop,
+      stopCount: this.stopCount,
+      recordsBuffered: this.history.length,
+      error: this.failure?.message ?? null
     };
   }
   /** Send one already-authorized MI command. Timeouts release the request slot, not the probe. */
@@ -109897,11 +109908,19 @@ var GdbMiSession = class {
     if (this.pending) this.complete(this.pending, false);
   }
   observe(record3) {
+    const historySize = Buffer.byteLength(JSON.stringify(record3));
+    if (historySize <= MAX_OUTPUT_BYTES) {
+      while (this.history.length >= 4e3 || this.historyBytes + historySize > MAX_OUTPUT_BYTES)
+        this.historyBytes -= this.history.shift().bytes;
+      this.history.push({ record: record3, bytes: historySize });
+      this.historyBytes += historySize;
+    }
     if (record3.kind === "exec") {
       if (record3.class === "running") this.running = true;
       if (record3.class === "stopped") {
         this.running = false;
         this.lastStop = record3;
+        this.stopCount++;
         if (this.pending) this.pending.stopped = record3;
       }
     }
@@ -111737,6 +111756,20 @@ function formatDebuggerCommandResult(result) {
     summary: error2 ?? (result.timedOut ? "Debugger command timed out; target state is reported separately." : `Debugger result: ${resultClass ?? "no result record"}.`)
   };
 }
+function formatDebuggerSessionInfo(row) {
+  const { lastStop, exitCode, stopCount, recordsBuffered, ...rest } = row;
+  const stopped = normalizeDebuggerStop(lastStop);
+  return {
+    ...rest,
+    exit_code: exitCode,
+    last_stop: stopped,
+    stopped,
+    stop_count: stopCount ?? null,
+    records_buffered: recordsBuffered ?? null,
+    error: row.error ?? null,
+    init_script_path: row.init_script_path ?? null
+  };
+}
 async function executeDebugSessionCompatibility(name2, input, sessions, caller = {}) {
   const invalid4 = () => new PlatformIOError(
     "Invalid debugger compatibility arguments.",
@@ -111744,11 +111777,7 @@ async function executeDebugSessionCompatibility(name2, input, sessions, caller =
   );
   if (name2 === "pio_debug_list") {
     if (!DebugListCompatibilitySchema.safeParse(input).success) throw invalid4();
-    const rows = sessions.list().map(({ lastStop, exitCode, ...row }) => ({
-      ...row,
-      exit_code: exitCode,
-      stopped: normalizeDebuggerStop(lastStop)
-    }));
+    const rows = sessions.list().map(formatDebuggerSessionInfo);
     return {
       ok: true,
       sessions: rows,
@@ -111791,12 +111820,15 @@ async function executeDebugSessionCompatibility(name2, input, sessions, caller =
     );
   return {
     ok: true,
+    ...info ? formatDebuggerSessionInfo(info) : {},
     session_id: args.session_id,
     project_dir: info?.project_dir,
     env: info?.env,
     debug_tool: info?.debug_tool ?? null,
     gdb_version: info?.gdb_version ?? null,
     uptime_s: info ? info.uptime_s + Math.max(0, (performance.now() - stoppingAt) / 1e3) : null,
+    closed: true,
+    cleanupPending: false,
     cleanup_pending: false,
     reset_run_acknowledged: !args.process_only,
     target_running_verified: false,
@@ -111946,6 +111978,7 @@ var DebugCompatibilityClient = class {
       });
       const state = this.sessions.list().find((session2) => session2.session_id === id);
       return {
+        ...state ? formatDebuggerSessionInfo(state) : {},
         ok: true,
         session_id: id,
         project_dir: prepared.projectDir,

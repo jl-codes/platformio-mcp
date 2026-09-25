@@ -58,6 +58,9 @@ export class GdbMiSession {
   private closed = false;
   private exitCode: number | null = null;
   private lastStop?: ResultRecord;
+  private stopCount = 0;
+  private readonly history: Array<{ record: GdbMiRecord; bytes: number }> = [];
+  private historyBytes = 0;
 
   /** The trusted writer must preserve ordering and report pipe failures. It grants no authorization. */
   constructor(private readonly write: (line: string) => Promise<void>) {}
@@ -70,6 +73,9 @@ export class GdbMiSession {
       exitCode: this.exitCode,
       failed: !!this.failure,
       lastStop: this.lastStop,
+      stopCount: this.stopCount,
+      recordsBuffered: this.history.length,
+      error: this.failure?.message ?? null,
     };
   }
 
@@ -178,11 +184,22 @@ export class GdbMiSession {
   }
 
   private observe(record: GdbMiRecord): void {
+    const historySize = Buffer.byteLength(JSON.stringify(record));
+    if (historySize <= MAX_OUTPUT_BYTES) {
+      while (
+        this.history.length >= 4000 ||
+        this.historyBytes + historySize > MAX_OUTPUT_BYTES
+      )
+        this.historyBytes -= this.history.shift()!.bytes;
+      this.history.push({ record, bytes: historySize });
+      this.historyBytes += historySize;
+    }
     if (record.kind === "exec") {
       if (record.class === "running") this.running = true;
       if (record.class === "stopped") {
         this.running = false;
         this.lastStop = record;
+        this.stopCount++;
         if (this.pending) this.pending.stopped = record;
       }
     }

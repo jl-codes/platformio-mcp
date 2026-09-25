@@ -143,7 +143,7 @@ it("returns the initial observed stop frame instead of requiring a later list ca
     closed: false,
     stopped: {
       reason: "breakpoint-hit",
-      frame: { function: "main", line: "12" },
+      frame: { function: "main", line: 12 },
     },
   });
   await client.close();

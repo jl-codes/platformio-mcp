@@ -18,6 +18,7 @@ export interface DebugInitBinding {
 /** Only the retaining module can mint this process-local script capability. */
 export interface DebugInitArtifact {
   readonly path: string;
+  readonly script: string;
   readonly sha256: string;
   readonly size: number;
   readonly binding: Readonly<DebugInitBinding>;
@@ -121,6 +122,7 @@ async function retainInitialization(
     let release: Promise<void> | undefined;
     const artifact: DebugInitArtifact = Object.freeze({
       path: file,
+      script,
       sha256,
       size: bytes.length,
       authorization: Object.freeze({
@@ -196,7 +198,11 @@ export function ownDebugInitialization(
   assertDebugInitArtifact(artifact);
   return {
     command: process.command.bind(process),
-    state: () => ({ ...process.state(), init_script: artifact.path }),
+    state: () => ({
+      ...process.state(),
+      init_script: artifact.script,
+      init_script_path: artifact.path,
+    }),
     async cleanupProcess() {
       await process.cleanupProcess();
       await artifact.release();

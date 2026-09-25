@@ -7,6 +7,7 @@ import {
 import {
   executeDebugSessionCompatibility,
   formatDebuggerCommandResult,
+  formatDebuggerSessionInfo,
   normalizeDebuggerStop,
 } from "../src/adapters/debug-session-compat.js";
 import { parseGdbMiRecord } from "../src/core/debug/gdb-mi.js";
@@ -201,4 +202,42 @@ it("preserves reference payload, separate streams and stopped-frame arguments fr
     kind: "exec",
     class: "stopped",
   });
+});
+
+it("shares reference session metadata without discarding the existing stopped field", () => {
+  const stopped = parseGdbMiRecord(
+    '*stopped,reason="breakpoint-hit",frame={func="main",line="12"}',
+  );
+  const row = {
+    session_id: "owned",
+    project_dir: "/project",
+    env: "debug",
+    debug_tool: "openocd",
+    uptime_s: 1,
+    running: false,
+    closed: false,
+    exitCode: null,
+    failed: false,
+    lastStop: stopped,
+    stopCount: 2,
+    recordsBuffered: 10,
+    error: null,
+    pid: 42,
+    cleanupPending: true,
+    stderr: "",
+    init_script: "target extended-remote 127.0.0.1:3333",
+    init_script_path: "/private/initialization.gdb",
+  } as Parameters<typeof formatDebuggerSessionInfo>[0];
+  const info = formatDebuggerSessionInfo(row);
+  expect(info).toMatchObject({
+    stop_count: 2,
+    records_buffered: 10,
+    error: null,
+    exit_code: null,
+    last_stop: { frame: { line: 12 } },
+    init_script_path: "/private/initialization.gdb",
+    pid: 42,
+  });
+  expect(info.last_stop).toEqual(info.stopped);
+  expect(info.init_script).toBe(row.init_script);
 });

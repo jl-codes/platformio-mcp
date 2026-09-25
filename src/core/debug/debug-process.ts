@@ -54,14 +54,22 @@ export interface DebugProcessOptions {
 }
 
 /** Observed process state, with optional launch metadata for alternate host-owned process implementations. */
-export type DebugProcessState = ReturnType<GdbMiSession["state"]> & {
-  pid: number | undefined;
-  cleanupPending: boolean;
-  stderr: string;
-  command?: string[];
-  init_script?: string | null;
-  gdb_version?: string | null;
-};
+type DebugObservationState = ReturnType<GdbMiSession["state"]>;
+export type DebugProcessState = Omit<
+  DebugObservationState,
+  "stopCount" | "recordsBuffered" | "error"
+> &
+  Partial<
+    Pick<DebugObservationState, "stopCount" | "recordsBuffered" | "error">
+  > & {
+    pid: number | undefined;
+    cleanupPending: boolean;
+    stderr: string;
+    command?: string[];
+    init_script?: string | null;
+    init_script_path?: string | null;
+    gdb_version?: string | null;
+  };
 
 /** One owned debugger process; process-only cleanup never sends resume/reset/quit commands. */
 export class DebugProcess {

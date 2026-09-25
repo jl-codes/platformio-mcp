@@ -19,6 +19,7 @@ import {
 import {
   executeDebugSessionCompatibility,
   normalizeDebuggerStop,
+  formatDebuggerSessionInfo,
 } from "./debug-session-compat.js";
 
 const approval = z.string().min(1).max(256).optional();
@@ -208,6 +209,7 @@ export class DebugCompatibilityClient {
         .list()
         .find((session) => session.session_id === id);
       return {
+        ...(state ? formatDebuggerSessionInfo(state) : {}),
         ok: true,
         session_id: id,
         project_dir: prepared.projectDir,
