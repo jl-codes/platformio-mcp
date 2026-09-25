@@ -15,9 +15,9 @@ process.env.PIO_MCP_DISABLE_DASHBOARD = "true";
 process.env.PIO_MCP_NO_BROWSER = "true";
 const harness = new MCPTestHarness();
 /** Retain real public responses, including an intentionally failing test case. */
-async function call(name: string, args: Record<string, unknown>) {
+async function call(name: string, args: Record<string, unknown>, expectedFailure?: boolean) {
   const result = await harness.client.callTool({name, arguments: args}, undefined, {timeout: 600000});
-  assert(!result.isError, JSON.stringify(result));
+  if (expectedFailure !== undefined) assert.equal(result.isError === true, expectedFailure, JSON.stringify(result));
   const structured = result.structuredContent as any;
   if (structured?.data) return structured.data;
   const text = (result.content as any[]).find(item => item.type === "text")?.text;
@@ -28,7 +28,7 @@ try {
   const passed = await call("pio_test", {project_dir: projectDir, env: "native-pass", without_uploading: true});
   assert.equal(passed.ok, true, JSON.stringify(passed));
   assert.equal(passed.total, 1, JSON.stringify(passed));
-  const failed = await call("pio_test", {project_dir: projectDir, env: "native-fail", without_uploading: true});
+  const failed = await call("pio_test", {project_dir: projectDir, env: "native-fail", without_uploading: true}, true);
   assert.equal(failed.ok, false, JSON.stringify(failed));
   assert.equal(failed.failed, 1, JSON.stringify(failed));
   const checked = await call("pio_check", {project_dir: projectDir, env: "native-pass", severity: "low"});

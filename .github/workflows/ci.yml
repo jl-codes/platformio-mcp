@@ -52,7 +52,13 @@ jobs:
           python-version: '3.12'
 
       - name: Run unit and component tests
-        run: npm run test:ci:unit
+        run: npm run test:ci:unit -- --reporter=default --reporter=json --outputFile=unit-evidence.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: unit-evidence-${{ matrix.os }}
+          path: unit-evidence.json
+          if-no-files-found: error
 
       - name: Verify native debug backend descendant cleanup
         shell: bash

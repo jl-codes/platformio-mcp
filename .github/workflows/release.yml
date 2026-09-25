@@ -147,6 +147,7 @@ jobs:
           actual="$(docker run --rm --network none "pio-agent:$GITHUB_SHA" --version)"
           test "$actual" = "$version"
           mkdir -p container-artifacts
+          python scripts/accept-container-runtime.py "pio-agent:$GITHUB_SHA" "$version" "$GITHUB_SHA" "container-artifacts/container-${{ matrix.arch }}.json"
           docker image inspect "pio-agent:$GITHUB_SHA" > "container-artifacts/image-${{ matrix.arch }}.json"
           docker save "pio-agent:$GITHUB_SHA" --output "container-artifacts/pio-agent-${{ matrix.arch }}.tar"
           sha256sum "container-artifacts/pio-agent-${{ matrix.arch }}.tar" > "container-artifacts/pio-agent-${{ matrix.arch }}.sha256"
@@ -209,14 +210,15 @@ jobs:
           npm run lint
           npm audit --audit-level=low
           npm --prefix web audit --audit-level=low
-          npm run test:ci:unit
-          npm run test:namespaces
+          mkdir -p .release-evidence
+          npm run test:ci:unit -- --reporter=default --reporter=json --outputFile=.release-evidence/unit.json
+          npm run test:namespaces | tee .release-evidence/namespace-tests.tap
           npm run aliases:check
           python3 tests/test-container-release.py
           python3 tests/test-container-publication.py
           npm run registry:validate
           npm --prefix web run test -- --run
-          npm run test:e2e:ci
+          npm run test:e2e:ci -- --reporter=default --reporter=json --outputFile=.release-evidence/e2e.json
           npm --prefix web run test:e2e:codex
           npm run plugin:sync:check
           npm run plugin:build
@@ -243,6 +245,9 @@ jobs:
       - name: Package functional npm namespace candidates
         run: npm run package:aliases
 
+      - name: Verify exact npm installation and upgrade lifecycle
+        run: npm run accept:npm
+
       - name: Collect validated Python wheels from this run
         env:
           GH_TOKEN: ${{ github.token }}
@@ -259,6 +264,28 @@ jobs:
           gh run download "$GITHUB_RUN_ID" --name platformio-container-amd64 --dir container-release-artifacts
           gh run download "$GITHUB_RUN_ID" --name platformio-container-arm64 --dir container-release-artifacts
           python3 scripts/validate-container-release.py container-release-artifacts --load --output release-artifacts/container-release-identity.json
+
+      - name: Assemble complete acceptance packet for nonpublishing candidate
+        if: github.event_name == 'workflow_dispatch' && !inputs.publish_npm && !inputs.publish_pypi && !inputs.publish_mcp_registry && !inputs.publish_ghcr && !startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ci_run="$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
+          [[ "$ci_run" =~ ^[0-9]+$ ]] || { echo 'Successful same-commit CI with native quality evidence is required.' >&2; exit 1; }
+          gh run download "$ci_run" --name native-quality-evidence --dir .release-evidence/native-quality
+          cp .release-evidence/native-quality/result.json .release-evidence/native-quality.json
+          cp container-release-artifacts/container-amd64.json .release-evidence/
+          cp container-release-artifacts/container-arm64.json .release-evidence/
+          node scripts/assemble-release-acceptance.mjs .release-evidence release-artifacts .release-acceptance-current
+          node scripts/validate-parity-acceptance.mjs .release-acceptance-current/manifest.json
+
+      - name: Retain candidate acceptance packet
+        if: github.event_name == 'workflow_dispatch' && !inputs.publish_npm && !inputs.publish_pypi && !inputs.publish_mcp_registry && !inputs.publish_ghcr && !startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v7
+        with:
+          name: platformio-parity-acceptance
+          path: .release-acceptance-current
+          if-no-files-found: error
 
       - name: Upload immutable artifacts
         uses: actions/upload-artifact@v7

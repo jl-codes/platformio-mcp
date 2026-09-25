@@ -155,7 +155,6 @@ export async function stopMonitor(port: string, projectDir?: string) {
         daemon.watcher.close();
       } catch {}
     }
-
   }
 
   logDiag(
@@ -177,7 +176,8 @@ async function spawnPioMonitor(
   const daemon = activeDaemons[targetPort];
   if (!daemon) return;
 
-  const monitorArgs = ["--port", targetPort, "--quiet", "--raw"];
+  // Preserve project filters: --raw bypasses PlatformIO transformations.
+  const monitorArgs = ["--port", targetPort];
 
   if (daemon.environment) {
     monitorArgs.push("--environment", daemon.environment);
@@ -192,16 +192,22 @@ async function spawnPioMonitor(
 
   // Instead of node managing the streams via stdout.on, we pass the file descriptor directly to the OS.
   const outFd = fs.openSync(daemon.logFile, "a");
-  const proc = await platformioExecutor.spawn(
-    "device",
-    ["monitor", ...monitorArgs],
-    {
-      cwd: projectDir,
-      detached: true,
-      useFakeTty: true,
-      stdio: ["ignore", outFd, outFd],
-    },
-  );
+  let proc;
+  try {
+    proc = await platformioExecutor.spawn(
+      "device",
+      ["monitor", ...monitorArgs],
+      {
+        cwd: projectDir,
+        detached: true,
+        useFakeTty: true,
+        env: { PYTHONUNBUFFERED: "1" },
+        stdio: ["ignore", outFd, outFd],
+      },
+    );
+  } finally {
+    fs.closeSync(outFd);
+  }
 
   if (proc.pid) {
     // Record PID to workspace tracker
@@ -541,13 +547,20 @@ export async function queryLogs(
 
   if (searchPattern) {
     try {
-      const indices = await matchBoundedLines(stitchedLines, searchPattern, {mode:"regex", ignoreCase:true});
-      stitchedLines = indices.map(index => stitchedLines[index]);
+      const indices = await matchBoundedLines(stitchedLines, searchPattern, {
+        mode: "regex",
+        ignoreCase: true,
+      });
+      stitchedLines = indices.map((index) => stitchedLines[index]);
     } catch (error) {
       return {
         success: false,
-        code: error instanceof PlatformIOError ? error.code : "PATTERN_WORKER_FAILED",
-        content: error instanceof Error ? error.message : "Pattern matching failed.",
+        code:
+          error instanceof PlatformIOError
+            ? error.code
+            : "PATTERN_WORKER_FAILED",
+        content:
+          error instanceof Error ? error.message : "Pattern matching failed.",
       };
     }
   }
@@ -665,7 +678,8 @@ export function getMonitorStatus(
       const trackedPid = trackedPids[activePort];
       const stale =
         !fs.existsSync(daemon.logFile) ||
-        (trackedPid !== undefined && !isPidAlive(trackedPid));
+        trackedPid === undefined ||
+        !isPidAlive(trackedPid);
       return {
         state: stale ? "stale" : "active",
         port: activePort,

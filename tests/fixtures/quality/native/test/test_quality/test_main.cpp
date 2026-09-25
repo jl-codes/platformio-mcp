@@ -9,4 +9,4 @@ void expected_case() {
     TEST_ASSERT_EQUAL(2, 1 + 1);
 #endif
 }
-int main() { UNITY_BEGIN(); RUN_TEST(expected_case); return UNITY_END(); }
+int main() { UNITY_BEGIN(); RUN_TEST(expected_case); UNITY_END(); return 0; }

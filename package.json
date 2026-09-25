@@ -59,7 +59,8 @@
     "package:container": "python scripts/prepare-container-context.py",
     "aliases:sync": "node scripts/sync-npm-aliases.mjs",
     "aliases:check": "node scripts/sync-npm-aliases.mjs --check",
-    "namespace:coverage": "node scripts/namespace-coverage.mjs docs/reviews/platformio-namespace-coverage.json"
+    "namespace:coverage": "node scripts/namespace-coverage.mjs docs/reviews/platformio-namespace-coverage.json",
+    "accept:npm": "node scripts/accept-npm-release.mjs"
   },
   "keywords": [
     "mcp",

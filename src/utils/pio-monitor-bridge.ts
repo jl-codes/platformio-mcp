@@ -1,30 +1,6 @@
-"""
-PlatformIO MCP Proxy Bridge
-
-This utility wrapper is strictly necessary to run `pio device monitor` as a background daemon
-within a headless Node.js environment (like the Model Context Protocol server).
-
-Why is this needed?
-1. The 'miniterm.py' library used by PlatformIO natively assumes it is attached to an interactive 
-   terminal. It leverages low-level POSIX functions ('tcsetattr') to manipulate the keyboard. 
-   When spawned in the background via Node.js 'child_process.spawn', it receives standard Unix
-   pipes rather than a Pseudo-Terminal (PTY), causing it to crash immediately with:
-   'termios.error: (22, Invalid argument)' or 'Operation not supported on socket'.
-
-2. Hardware Lock Glitches: When terminating a serial monitor natively capturing an ESP32-S3 over 
-   USB CDC-ACM (macOS specifically), sending a sudden SIGKILL causes the Apple kernel driver to 
-   leave the port in a "Resource Busy" or "Device not configured" state. 
-
-This proxy solves both issues by:
-- Wrapping the requested 'pio' command inside a native Python Pseudo-Terminal ('pty.openpty').
-- Bridging standard output back to Node.js transparently.
-- Intercepting Node's SIGTERM/SIGINT shutdown signals and instead passing a graceful 'Ctrl+]'
-  (ASCII 29 '\\x1d') into the virtual terminal. This allows 'miniterm' to cleanly release the
-  underlying file descriptors, preventing macOS driver lockups prior to flashing firmware.
-"""
-
+/** Embedded headless PlatformIO monitor bridge, included in npm and bundled runtimes. */
+export const PIO_MONITOR_BRIDGE = String.raw`
 import os
-import pty
 import sys
 import subprocess
 
@@ -33,6 +9,25 @@ def main():
         print("Usage: python mcp_pio_proxy.py [COMMAND...]", file=sys.stderr)
         sys.exit(1)
 
+    if os.name == "nt":
+        # Keep PlatformIO's reader and configured filters, but do not start a
+        # Windows keyboard console in a detached process with no console handle.
+        import runpy
+        import threading
+        from serial.tools import miniterm
+
+        def headless_writer(terminal):
+            # Reader failures set alive=False; let PlatformIO reconnect normally.
+            while terminal.alive:
+                threading.Event().wait(0.1)
+
+        miniterm.Console = miniterm.ConsoleBase
+        miniterm.Miniterm.writer = headless_writer
+        sys.argv = ["platformio", *sys.argv[2:]]
+        runpy.run_module("platformio", run_name="__main__")
+        return
+
+    import pty
     cmd = sys.argv[1:]
     
     # Create a pseudo-terminal pair
@@ -99,3 +94,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+`;

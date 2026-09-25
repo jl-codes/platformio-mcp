@@ -14628,6 +14628,110 @@ var init_command_registry = __esm({
   }
 });
 
+// src/utils/pio-monitor-bridge.ts
+var PIO_MONITOR_BRIDGE;
+var init_pio_monitor_bridge = __esm({
+  "src/utils/pio-monitor-bridge.ts"() {
+    "use strict";
+    PIO_MONITOR_BRIDGE = String.raw`
+import os
+import sys
+import subprocess
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python mcp_pio_proxy.py [COMMAND...]", file=sys.stderr)
+        sys.exit(1)
+
+    if os.name == "nt":
+        # Keep PlatformIO's reader and configured filters, but do not start a
+        # Windows keyboard console in a detached process with no console handle.
+        import runpy
+        import threading
+        from serial.tools import miniterm
+
+        def headless_writer(terminal):
+            # Reader failures set alive=False; let PlatformIO reconnect normally.
+            while terminal.alive:
+                threading.Event().wait(0.1)
+
+        miniterm.Console = miniterm.ConsoleBase
+        miniterm.Miniterm.writer = headless_writer
+        sys.argv = ["platformio", *sys.argv[2:]]
+        runpy.run_module("platformio", run_name="__main__")
+        return
+
+    import pty
+    cmd = sys.argv[1:]
+
+    # Create a pseudo-terminal pair
+    master_fd, slave_fd = pty.openpty()
+
+    # Spawn the target command, attaching its I/O directly to the slave PTY
+    proc = subprocess.Popen(
+        cmd,
+        stdin=slave_fd,
+        stdout=slave_fd,
+        stderr=slave_fd,
+        close_fds=True,
+        start_new_session=True
+    )
+
+    # We close the slave in the parent so the master gets an EOF when the child exits
+    os.close(slave_fd)
+
+    import signal
+    import time
+
+    def cleanup_and_exit(signum, frame):
+        # Gracefully tell miniterm to exit by sending Ctrl+] (ASCII 29)
+        try:
+            os.write(master_fd, b'\x1d')
+            # Give it a fraction of a second to gracefully close the serial port
+            time.sleep(0.2)
+        except Exception:
+            pass
+        finally:
+            proc.terminate()
+            time.sleep(0.1)
+            if proc.poll() is None:
+                proc.kill()
+            sys.exit(0)
+
+    signal.signal(signal.SIGTERM, cleanup_and_exit)
+    signal.signal(signal.SIGINT, cleanup_and_exit)
+
+    try:
+        # Loop forever reading from the child process's stdout (the master PTY)
+        while True:
+            data = os.read(master_fd, 1024)
+            if not data:
+                break
+
+            # Write raw bytes out to our actual standard output
+            sys.stdout.buffer.write(data)
+            sys.stdout.buffer.flush()
+
+    except OSError:
+        # An OSError (often errno 5: Input/output error) is standard when the child
+        # process closes the PTY connection from its end (e.g. process termination)
+        pass
+    finally:
+        try:
+            os.close(master_fd)
+        except Exception:
+            pass
+
+    # Wait for the child process to definitively end
+    proc.wait()
+    sys.exit(proc.returncode)
+
+if __name__ == "__main__":
+    main()
+`;
+  }
+});
+
 // src/utils/mcp-context.ts
 import { AsyncLocalStorage as AsyncLocalStorage2 } from "node:async_hooks";
 var mcpContext;
@@ -14805,6 +14909,7 @@ var init_platformio = __esm({
     "use strict";
     init_zod();
     init_command_registry();
+    init_pio_monitor_bridge();
     init_mcp_context();
     init_errors2();
     __filename2 = fileURLToPath2(import.meta.url);
@@ -14923,19 +15028,24 @@ var init_platformio = __esm({
           ...process.env,
           ...options.env
         };
-        if (options.useFakeTty && process.platform !== "win32") {
+        if (options.useFakeTty) {
           const absolutePio = resolvePioPath();
-          const proxyScriptPath = path21.join(
-            __dirname3,
-            "..",
-            "src",
-            "utils",
-            "mcp_pio_proxy.py"
-          );
           pioBinary = "python3";
-          pioArgs = [proxyScriptPath, absolutePio, command, ...args];
+          if (process.platform === "win32") {
+            const info = await this.execute("system", ["info", "--json-output"], {
+              cwd: options.cwd,
+              env,
+              timeout: 15e3
+            });
+            const python = JSON.parse(info.stdout)?.python_exe?.value;
+            if (typeof python !== "string" || !path21.isAbsolute(python) || /[\x00-\x1f\x7f]/.test(python) || /\.(?:cmd|bat|ps1|sh)$/i.test(python)) {
+              throw new PlatformIOError("PlatformIO did not report a native Python interpreter.", "MONITOR_PYTHON_UNAVAILABLE");
+            }
+            pioBinary = python;
+          }
+          pioArgs = ["-c", PIO_MONITOR_BRIDGE, absolutePio, command, ...args];
         }
-        const fullCmd = `${pioBinary} ${pioArgs.join(" ")}`;
+        const fullCmd = options.useFakeTty ? `${pioBinary} <monitor-bridge> ${command} ${args.join(" ")}` : `${pioBinary} ${pioArgs.join(" ")}`;
         try {
           const logDir = path21.join(__dirname3, "..", "logs");
           if (!fs15.existsSync(logDir)) fs15.mkdirSync(logDir, { recursive: true });
@@ -25666,7 +25776,7 @@ async function stopMonitor(port, projectDir) {
 async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
   const daemon = activeDaemons[targetPort];
   if (!daemon) return;
-  const monitorArgs = ["--port", targetPort, "--quiet", "--raw"];
+  const monitorArgs = ["--port", targetPort];
   if (daemon.environment) {
     monitorArgs.push("--environment", daemon.environment);
   } else {
@@ -25677,16 +25787,22 @@ async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
     projectDir
   );
   const outFd = fs83.openSync(daemon.logFile, "a");
-  const proc = await platformioExecutor.spawn(
-    "device",
-    ["monitor", ...monitorArgs],
-    {
-      cwd: projectDir,
-      detached: true,
-      useFakeTty: true,
-      stdio: ["ignore", outFd, outFd]
-    }
-  );
+  let proc;
+  try {
+    proc = await platformioExecutor.spawn(
+      "device",
+      ["monitor", ...monitorArgs],
+      {
+        cwd: projectDir,
+        detached: true,
+        useFakeTty: true,
+        env: { PYTHONUNBUFFERED: "1" },
+        stdio: ["ignore", outFd, outFd]
+      }
+    );
+  } finally {
+    fs83.closeSync(outFd);
+  }
   if (proc.pid) {
     const cliDesc = `pio device monitor ${monitorArgs.join(" ")}`;
     await registerPioMonitorPid(
@@ -25943,7 +26059,10 @@ async function queryLogs(lines3 = 100, searchPattern, taskId, logPath, projectDi
   }
   if (searchPattern) {
     try {
-      const indices = await matchBoundedLines(stitchedLines, searchPattern, { mode: "regex", ignoreCase: true });
+      const indices = await matchBoundedLines(stitchedLines, searchPattern, {
+        mode: "regex",
+        ignoreCase: true
+      });
       stitchedLines = indices.map((index) => stitchedLines[index]);
     } catch (error2) {
       return {
@@ -26000,7 +26119,7 @@ function getMonitorStatus(port, projectDir) {
     } catch {
     }
     const trackedPid = trackedPids[activePort];
-    const stale = !fs83.existsSync(daemon.logFile) || trackedPid !== void 0 && !isPidAlive(trackedPid);
+    const stale = !fs83.existsSync(daemon.logFile) || trackedPid === void 0 || !isPidAlive(trackedPid);
     return {
       state: stale ? "stale" : "active",
       port: activePort,

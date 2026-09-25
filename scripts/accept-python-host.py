@@ -44,6 +44,9 @@ def accept(directory, host, evidence):
         python = binary / ("python.exe" if os.name == "nt" else "python")
         wheels = [str((directory / item["file"]).resolve()) for item in selected]
         subprocess.run([str(python), "-m", "pip", "install", "--no-index", "--no-deps", *wheels], check=True, timeout=180)
+        # First Python release: exercise the upgrade/replacement path with the
+        # same immutable wheel set; do not claim a previous published version.
+        subprocess.run([str(python), "-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-index", "--no-deps", *wheels], check=True, timeout=180)
         subprocess.run([str(python), "-m", "pip", "check"], check=True, timeout=30)
         environment = os.environ.copy()
         environment.update(PATH=str(binary), PIO_MCP_NO_BROWSER="true", PIO_MCP_DISABLE_DASHBOARD="true", PIO_MCP_DATA_DIR=str(root / "state"))
@@ -68,7 +71,7 @@ def accept(directory, host, evidence):
     report = {"schemaVersion": 1, "outcome": "pass", "sourceCommit": identity["sourceCommit"], "host": host,
               "environment": {"os": platform.platform(), "python": platform.python_version(), "machine": platform.machine()},
               "timestamp": datetime.now(timezone.utc).isoformat(), "artifacts": selected, "commands": commands,
-              "functionalAliases": [item["name"] for item in aliases], "aliasUninstallPreservesCanonical": True,
+              "functionalAliases": [item["name"] for item in aliases], "aliasUninstallPreservesCanonical": True, "upgrade": "same-version immutable wheel replacement (first Python release)",
               "mcp": protocol, "signals": signals, "scope": "native installation, CLI aliases, MCP stdio, EOF and native idle-server signal shutdown (POSIX SIGINT/SIGTERM or Windows Ctrl-C); hardware, active-session cleanup, minimum-OS and public-registry acceptance remain separate"}
     evidence.parent.mkdir(parents=True, exist_ok=True)
     evidence.write_text(json.dumps(report, indent=2) + "\n")
