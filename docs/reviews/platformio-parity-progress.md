@@ -1,6 +1,6 @@
 # Implementation evidence and remaining work
 
-Goal active. Branch: `codex/platformio-parity-permissions`.
+Existing goal runtime reports usageLimited; user-authorized completion work continues without creating a replacement goal. Branch: `codex/platformio-parity-permissions`.
 Product base: `40e12ccb8e85fcaf33b46c50b6d832665728e773`.
 Competitor contract: `a7b31021982f20b5406eaf80732899f8e75bd464` (40 tools).
 
@@ -36,17 +36,29 @@ These are partial S2 implementation changes, not completion of S0-S7 or the full
 - Node 24.15.0; npm 11.12.1; Python 3.14.4.
 - Registry metadata is not proof of publishing authority. No distribution published yet; no PR created yet.
 
-## Next work
+## Current completion blockers (reconciled 2026-09-25)
 
-1. Finish launch help and invalid-policy recovery cleanup. Policy source unit tests are implemented. Add project enrollment and scoped single-use approval grants; consolidate enforcement across entrypoints.
-2. Codex installer preservation and CODEX_HOME selection are implemented and fixture-tested; actual isolated-host acceptance remains pending. Host config remains host-enforced; do not reinterpret host approval/sandbox settings as hardware permission grants.
-3. Execute remaining S0-S7 items in the reviewed plan: shared action catalog, all 40 parity contracts/handlers, artifact identity, cross-install locks, bounded serial matching, debug/session lifecycle, Python runtime packaging and release channels.
-4. Preserve all existing tool/CLI/dashboard behavior and run required host/platform/hardware acceptance. Record unavailable prerequisites explicitly; do not substitute mocked tests for physical acceptance.
-5. Create the implementation PR, publish only project-controlled functional distributions through verified authorized workflows, and verify installed artifacts. Do not merge the PR without authorization.
+The user explicitly authorizes implementation, commits, pushes, merge of PR #26, and publication through existing security controls. Preserve the full agreed parity scope and all seven namespace families. This section supersedes historical next-action statements below; historical results remain evidence only for their tested behavior and revision.
 
-Namespace coverage is finite. Python package-name normalization makes the competitor's `platformio.mcp` equivalent to `platformio-mcp`; do not attempt to publish that occupied Python identity. Follow the checked-in namespace inventory and authenticate candidate ownership before publishing.
+1. **Software parity — Codex:** local debugger commits 3f0d432d, 591352b7 and dfc986a5 are descendants of PR head 508aa11c, with a clean working tree at reconciliation. Their focused validation is recorded below and need not be repeated unchanged. Push them with this release-inventory correction. Remote startup is still embedding-host-only: standalone trusted target binding, remaining remote/DNS/pipe and standalone st-util backend behavior remain incomplete. Complete the pinned 40-tool behavioral/result/error contracts and legacy retention requirements; registration and CI alone do not satisfy them.
+2. **Required acceptance — Codex plus hardware owner:** reuse existing native installs, container builds, POSIX signal results and POL-05 evidence where unchanged. Complete remaining required Windows console-control/minimum-platform and actual host enforcement evidence, and existing physical tests for ESP32/Cortex-M crashes, serial reconnect/exclusion, debug-probe cleanup, partitions/core dumps, ESP32/ESP8266 firmware/filesystem OTA, and PPK2 measurement/source limits/output-off. Exact host/project/environment/device bindings requested from user; unavailable hardware remains a blocker, not a passing result.
+3. **Release access — maintainer/release operator:** npm authentication is forkbomb and all seven scoped aliases at 3.0.0 are verified on 2026-09-25. No republish is needed. GitHub release environments are absent. PyPI account and pypi/ghcr/mcp-registry environment reviewer identity requested from user; configure approved identities through existing controls. Do not weaken gates. Packaging capability is distinct from publisher access.
+4. **Merge and release — Codex:** after implementation and mandatory acceptance are satisfied, merge PR #26 and publish the actual release through existing workflows, then verify installed release identity. The PR remains draft and no 3.1.0 release is claimed. No additional acceptance criteria are introduced here.
 
+### Verified npm namespace disposition
 
+On 2026-09-25 npm authenticated as forkbomb; public metadata verifies 3.0.0 for @forkbomb/platformio-mcp, @forkbomb/pio-mcp, @forkbomb/platformio.mcp, @forkbomb/pio-agent, @forkbomb/platformiomcp, @forkbomb/pioagent and @forkbomb/flashagent. These functional wrappers pin canonical platformio-mcp 3.0.0. Updated the existing release inventory to include these controlled, accepted names in subsequent releases.
+
+Authenticated publication attempts returned E403 with the exact registry message form: `Package name too similar to existing package <existing>; try renaming your package to '@forkbomb/<requested>' and publishing with 'npm publish --access=public' instead`.
+
+| Requested unscoped name | Existing name cited by npm | Disposition / permitted next action |
+| --- | --- | --- |
+| platformio.mcp | platformio-mcp | Blocked by registry naming rule; use published scoped alias. Maintainer can request npm Support review; no exception assumed. |
+| platformiomcp | platformio-mcp | Same disposition. |
+| pioagent | pio-agent | Same disposition. |
+| flashagent | flash-agent | Blocked by registry naming rule involving a third-party package; use published scoped alias. No overwrite or ownership claim. Maintainer can request registry review. |
+
+These are verified naming-rule dispositions, not publication of the unscoped variants. A 404 never established claimability. npm guidance: https://docs.npmjs.com/package-name-guidelines/ and https://docs.npmjs.com/about-scopes/ . No universal protection claim is made. Python normalizes platformio.mcp and platformio-mcp to the same third-party-occupied name; that identity remains excluded.
 
 ## Approval integrity milestone
 

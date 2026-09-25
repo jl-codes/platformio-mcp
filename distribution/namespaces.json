@@ -34,19 +34,21 @@
     {
       "registry": "npm",
       "name": "@forkbomb/platformio-mcp",
-      "role": "candidate_alias",
-      "publishIntent": false,
+      "role": "functional_alias",
+      "publishIntent": true,
       "packagePath": "packages/scoped-platformio-mcp",
-      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "publicationControlVerified": true
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "npm",
       "name": "platformio.mcp",
       "role": "blocked_naming_rule",
       "publishIntent": false,
-      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+      "reason": "2026-09-25 authenticated npm publish returned E403: Package name too similar to existing package platformio-mcp; try renaming your package to '@forkbomb/platformio.mcp' and publishing with 'npm publish --access=public' instead. Scoped functional alias is published. No unscoped retry without a registry eligibility change; maintainer may request npm Support review, with no exception or ownership transfer assumed.",
+      "namingEligibilityVerified": false
     },
     {
       "registry": "npm",
@@ -60,7 +62,8 @@
       "name": "platformiomcp",
       "role": "blocked_naming_rule",
       "publishIntent": false,
-      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+      "reason": "2026-09-25 authenticated npm publish returned E403: Package name too similar to existing package platformio-mcp; try renaming your package to '@forkbomb/platformiomcp' and publishing with 'npm publish --access=public' instead. Scoped functional alias is published. No unscoped retry without a registry eligibility change; maintainer may request npm Support review, with no exception or ownership transfer assumed.",
+      "namingEligibilityVerified": false
     },
     {
       "registry": "npm",
@@ -81,7 +84,8 @@
       "name": "pioagent",
       "role": "blocked_naming_rule",
       "publishIntent": false,
-      "reason": "Punctuation-only collision with an existing canonical/alias name under npm moniker rules; a 404 is not proof of registration eligibility."
+      "reason": "2026-09-25 authenticated npm publish returned E403: Package name too similar to existing package pio-agent; try renaming your package to '@forkbomb/pioagent' and publishing with 'npm publish --access=public' instead. Scoped functional alias is published. No unscoped retry without a registry eligibility change; maintainer may request npm Support review, with no exception or ownership transfer assumed.",
+      "namingEligibilityVerified": false
     },
     {
       "registry": "npm",
@@ -157,32 +161,35 @@
     {
       "registry": "npm",
       "name": "@forkbomb/platformio.mcp",
-      "role": "candidate_alias",
-      "publishIntent": false,
+      "role": "functional_alias",
+      "publishIntent": true,
       "packagePath": "packages/scoped-platformio.mcp",
-      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "publicationControlVerified": true
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "npm",
       "name": "@forkbomb/pio-mcp",
-      "role": "candidate_alias",
-      "publishIntent": false,
+      "role": "functional_alias",
+      "publishIntent": true,
       "packagePath": "packages/scoped-pio-mcp",
-      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "publicationControlVerified": true
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "npm",
       "name": "@forkbomb/pio-agent",
-      "role": "candidate_alias",
-      "publishIntent": false,
+      "role": "functional_alias",
+      "publishIntent": true,
       "packagePath": "packages/scoped-pio-agent",
-      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "publicationControlVerified": true
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "ghcr",
@@ -219,11 +226,11 @@
     {
       "registry": "npm",
       "name": "flashagent",
-      "role": "candidate_alias",
+      "role": "blocked_naming_rule",
       "publishIntent": false,
       "packagePath": "packages/flashagent",
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Existing npm flash-agent@1.0.38 creates a punctuation-insensitive naming collision. A missing exact-name lookup does not prove eligibility; publication remains disabled pending registry resolution.",
+      "reason": "2026-09-25 authenticated npm publish returned E403: Package name too similar to existing package flash-agent; try renaming your package to '@forkbomb/flashagent' and publishing with 'npm publish --access=public' instead. Scoped functional alias is published. No unscoped retry without a registry eligibility change; maintainer may request npm Support review, with no exception or ownership transfer assumed.",
       "namingEligibilityVerified": false
     },
     {
@@ -303,12 +310,13 @@
     {
       "registry": "npm",
       "name": "@forkbomb/flashagent",
-      "role": "candidate_alias",
-      "publishIntent": false,
+      "role": "functional_alias",
+      "publishIntent": true,
       "packagePath": "packages/scoped-flashagent",
       "source": "https://github.com/jl-codes/platformio-mcp",
-      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
-      "publicationControlVerified": true
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
+      "publicationControlVerified": true,
+      "namingEligibilityVerified": true
     },
     {
       "registry": "pypi",
@@ -326,22 +334,24 @@
     {
       "registry": "npm",
       "name": "@forkbomb/platformiomcp",
-      "role": "candidate_alias",
-      "publishIntent": false,
-      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "role": "functional_alias",
+      "publishIntent": true,
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
       "publicationControlVerified": true,
       "packagePath": "packages/scoped-platformiomcp",
-      "source": "https://github.com/jl-codes/platformio-mcp"
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "namingEligibilityVerified": true
     },
     {
       "registry": "npm",
       "name": "@forkbomb/pioagent",
-      "role": "candidate_alias",
-      "publishIntent": false,
-      "reason": "Personal scope control verified from authenticated npm user forkbomb and npm scope rules; registry naming eligibility and release publishing setup remain pending.",
+      "role": "functional_alias",
+      "publishIntent": true,
+      "reason": "Published as forkbomb at 3.0.0 and verified in the public npm registry on 2026-09-25. Include in subsequent canonical releases through existing release gates.",
       "publicationControlVerified": true,
       "packagePath": "packages/scoped-pioagent",
-      "source": "https://github.com/jl-codes/platformio-mcp"
+      "source": "https://github.com/jl-codes/platformio-mcp",
+      "namingEligibilityVerified": true
     },
     {
       "registry": "ghcr",

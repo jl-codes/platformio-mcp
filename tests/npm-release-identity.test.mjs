@@ -34,10 +34,10 @@ test("namespace inventory preserves existing names and keeps unverified candidat
  const {fileURLToPath}=await import("node:url");
  const root=fileURLToPath(new URL("..",import.meta.url));
  const released=npmReleasePackages(root);
- assert.deepEqual(released.map(item=>item.name).sort(),["pio-agent","pio-mcp","platformio-mcp"]);
+ const families=["platformio-mcp","pio-mcp","platformio.mcp","pio-agent","platformiomcp","pioagent","flashagent"];
+ assert.deepEqual(released.map(item=>item.name).sort(),["pio-agent","pio-mcp","platformio-mcp",...families.map(name=>"@forkbomb/"+name)].sort());
  const candidates=npmReleasePackages(root,{includeCandidates:true}).filter(item=>!item.publishIntent);
- assert.equal(candidates.length,8);
- for (const name of ["@forkbomb/platformiomcp", "@forkbomb/pioagent"]) assert.ok(candidates.some(item=>item.name===name));
- assert.ok(candidates.some(item=>item.name==="@forkbomb/platformio.mcp"));
- assert.ok(candidates.every(item=>(item.filename.startsWith("forkbomb-") || item.name==="flashagent") && item.version===released[0].version));
+ assert.equal(candidates.length,0);
+ for (const name of ["platformio.mcp","platformiomcp","pioagent","flashagent"]) assert.ok(!released.some(item=>item.name===name));
+ assert.ok(released.every(item=>item.version===released[0].version));
 });
