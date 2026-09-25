@@ -25,19 +25,13 @@ export async function prepareLocalDebugBackend(
 ) {
   const guard = createPolicyRevisionGuard(prepared.projectDir);
   guard();
-  const { server, readyPattern, supervisorPython } = prepared.configuration;
+  const { server, supervisorPython } = prepared.configuration;
   if (!server || !prepared.trustedBackendRoots)
     throw new PlatformIOError(
       "Local debugger startup requires a trusted owned backend.",
       "DEBUG_BACKEND_REQUIRED",
     );
   const endpoint = selectLocalDebugEndpoint(prepared.configuration.port);
-  if (!readyPattern)
-    throw new PlatformIOError(
-      "The configured backend has no readiness expression.",
-      "DEBUG_READY_PATTERN_INVALID",
-    );
-  await validateBackendReadyPattern(readyPattern);
   const executable = await resolveDebugBackendExecutable(
     server.executable,
     prepared.trustedBackendRoots,
@@ -46,6 +40,19 @@ export async function prepareLocalDebugBackend(
   const selected = selectDebugProbe([probe]);
   const command = { ...server, executable };
   const name = path.basename(executable);
+  // Core permits omitted patterns and may choose an OpenOCD pipe at launch.
+  // Our separately owned TCP backend waits for its exact GDB listener instead.
+  const readyPattern =
+    prepared.configuration.readyPattern ??
+    (/^openocd(?:\.exe)?$/i.test(name)
+      ? `Listening on port ${endpoint.port} for gdb connections`
+      : null);
+  if (!readyPattern)
+    throw new PlatformIOError(
+      "The configured backend has no readiness expression.",
+      "DEBUG_READY_PATTERN_INVALID",
+    );
+  await validateBackendReadyPattern(readyPattern);
   const bound = /^openocd(?:\.exe)?$/i.test(name)
     ? bindOpenOcdProbe(command, selected.probe, endpoint.port)
     : /^JLinkGDBServer(?:CL)?(?:Exe)?(?:\.exe)?$/i.test(name)

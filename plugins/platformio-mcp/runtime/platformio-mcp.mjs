@@ -111243,19 +111243,13 @@ function bindJLinkProbe(command, selected, port) {
 async function prepareLocalDebugBackend(prepared, probe) {
   const guard = createPolicyRevisionGuard(prepared.projectDir);
   guard();
-  const { server: server2, readyPattern, supervisorPython } = prepared.configuration;
+  const { server: server2, supervisorPython } = prepared.configuration;
   if (!server2 || !prepared.trustedBackendRoots)
     throw new PlatformIOError(
       "Local debugger startup requires a trusted owned backend.",
       "DEBUG_BACKEND_REQUIRED"
     );
   const endpoint = selectLocalDebugEndpoint(prepared.configuration.port);
-  if (!readyPattern)
-    throw new PlatformIOError(
-      "The configured backend has no readiness expression.",
-      "DEBUG_READY_PATTERN_INVALID"
-    );
-  await validateBackendReadyPattern(readyPattern);
   const executable = await resolveDebugBackendExecutable(
     server2.executable,
     prepared.trustedBackendRoots,
@@ -111264,6 +111258,13 @@ async function prepareLocalDebugBackend(prepared, probe) {
   const selected = selectDebugProbe([probe]);
   const command = { ...server2, executable };
   const name2 = path71.basename(executable);
+  const readyPattern = prepared.configuration.readyPattern ?? (/^openocd(?:\.exe)?$/i.test(name2) ? `Listening on port ${endpoint.port} for gdb connections` : null);
+  if (!readyPattern)
+    throw new PlatformIOError(
+      "The configured backend has no readiness expression.",
+      "DEBUG_READY_PATTERN_INVALID"
+    );
+  await validateBackendReadyPattern(readyPattern);
   const bound = /^openocd(?:\.exe)?$/i.test(name2) ? bindOpenOcdProbe(command, selected.probe, endpoint.port) : /^JLinkGDBServer(?:CL)?(?:Exe)?(?:\.exe)?$/i.test(name2) ? bindJLinkProbe(command, selected.probe, endpoint.port) : void 0;
   if (!bound)
     throw new PlatformIOError(
@@ -127700,11 +127701,13 @@ function startPortalServer(defaultPort = 8080) {
     throw new Error("PIO_MCP_APPROVAL_TOKEN must contain 32 to 256 characters.");
   }
   const requireApprovalAuthority = (req, res) => {
+    const dashboardOrigin = `${req.protocol}://${req.get("host")}`;
+    if (hasValidDashboardSession(req.headers.cookie) && req.headers.origin === dashboardOrigin && req.headers["x-pio-dashboard-approval"] === "1") return true;
     const supplied = req.headers["x-pio-approval-token"];
     const expected = approvalCapability ? Buffer.from(approvalCapability) : void 0;
     const candidate = typeof supplied === "string" ? Buffer.from(supplied) : void 0;
     if (!expected || !candidate || expected.length !== candidate.length || !crypto19.timingSafeEqual(expected, candidate)) {
-      res.status(403).json({ code: "OPERATOR_APPROVAL_REQUIRED", error: "Approval changes require the separately configured operator capability. Use the local approve/deny CLI or provide the operator capability; dashboard access alone is insufficient." });
+      res.status(403).json({ code: "OPERATOR_APPROVAL_REQUIRED", error: "Open the dashboard and approve from its authenticated session, or use the local approve/deny CLI." });
       return false;
     }
     return true;
@@ -127958,7 +127961,7 @@ function startPortalServer(defaultPort = 8080) {
       appendAuditEvent({
         action: "dashboard_approve_request",
         status: "approved",
-        reason: `Approval ${id} was approved using the operator dashboard capability.`,
+        reason: `Approval ${id} was approved through an authenticated approval request.`,
         riskLevel: existing.riskLevel,
         approvalId: id,
         actorClass: "interactive",
@@ -127990,7 +127993,7 @@ function startPortalServer(defaultPort = 8080) {
       appendAuditEvent({
         action: "dashboard_deny_request",
         status: "denied",
-        reason: `Approval ${id} was denied using the operator dashboard capability.`,
+        reason: `Approval ${id} was denied through an authenticated approval request.`,
         riskLevel: existing.riskLevel,
         approvalId: id,
         actorClass: "interactive",

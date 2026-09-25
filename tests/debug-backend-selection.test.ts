@@ -77,8 +77,8 @@ it("rejects unsupported probe adapters even for a trusted executable", async () 
     { code: "DEBUG_BACKEND_BINDING_UNSUPPORTED" },
   );
 });
-it("rejects missing readiness and externally managed endpoints", async () => {
-  prepared.configuration.readyPattern = null;
+it("rejects empty explicit readiness and externally managed endpoints", async () => {
+  prepared.configuration.readyPattern = "";
   await expect(prepareLocalDebugBackend(prepared, probe)).rejects.toMatchObject(
     { code: "DEBUG_READY_PATTERN_INVALID" },
   );
@@ -94,5 +94,19 @@ it("revalidates executable roots after project preparation", async () => {
   prepared.configuration.server!.executable = file;
   await expect(prepareLocalDebugBackend(prepared, probe)).rejects.toMatchObject(
     { code: "DEBUG_BACKEND_EXECUTABLE_UNTRUSTED" },
+  );
+});
+
+it("supports Core's automatic OpenOCD configuration without a custom readiness pattern", async () => {
+  prepared.configuration.readyPattern = null;
+  const selected = await prepareLocalDebugBackend(prepared, probe);
+  expect(selected.readyPattern).toBe(
+    "Listening on port 3333 for gdb connections",
+  );
+  expect(selected.options.command.arguments).toContain("gdb_port 3333");
+  expect(selected.options.command.arguments).toContain("bindto 127.0.0.1");
+  prepared.configuration.port = ":4444";
+  expect((await prepareLocalDebugBackend(prepared, probe)).readyPattern).toBe(
+    "Listening on port 4444 for gdb connections",
   );
 });
