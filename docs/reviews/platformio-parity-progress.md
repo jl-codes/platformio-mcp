@@ -2214,3 +2214,10 @@ Added the missing native Windows procedure to the existing Python host acceptanc
 Reused the Windows wheel from successful artifact run 35536115719 (source 1aae2a11e056a4242ad54a4c8ee032ee868a599d), SHA-256 522a43e0db16407bd9707d04c5e0237d8d9755ea23aaf71066fe7b961fe7d12c. Its launcher source matches the current launcher. Native installed initialization returned 3.1.0; Ctrl-C returned exit 0 in 0.025 seconds. Local result: .platformio-mcp/windows-console-result.json. This covers the unchanged launcher's idle-console path on this host, not final-revision runtime, minimum Windows version, active hardware cleanup or publication. No artifact rebuild, POSIX rerun, serial repetition or full suite occurred.
 
 CI for fa99fa08 passed all reported checks, including macOS and Windows units and plugin validation (run 36138870672; installer run 36138870486). This resolves the previously observed CI failures, without claiming outstanding physical or publisher requirements passed.
+
+
+## Debugger exited-session lifecycle parity (2026-09-25)
+
+Fixed default pio_debug_stop for a GDB process that already exited: perform owned cleanup without trying an impossible reset/run hook, retain the session on failed cleanup, and report reset_run_acknowledged=false. Live-session target/host authorization is unchanged. The pinned reference stop likewise skips GDB commands once its process is closed. Also connected the supervisor's validated backend exit code to the GDB transport; previously every supervised GDB close reported null. Missing or contradictory supervisor records still yield an unknown exit status and cannot prove cleanup.
+
+Validation: 33 focused session/stop/permission checks and 17 supervisor lifecycle checks passed; TypeScript passed. Rebuilt only the changed plugin server bundle using committed API/web/native content, preserving unrelated local edits. No physical operation, full suite, native artifact matrix or namespace retry. This is software lifecycle evidence; remaining backend-scope decision, physical acceptance and publisher identities remain in the existing blocker list.

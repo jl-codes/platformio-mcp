@@ -42,10 +42,10 @@ export class SupervisedDebugChild
       onStderr: (data) => {
         this.stderr.write(data);
       },
-      onClose: () => {
+      onClose: (exitCode) => {
         this.stdout.end();
         this.stderr.end();
-        this.emit("close", null);
+        this.emit("close", exitCode);
       },
     });
   }

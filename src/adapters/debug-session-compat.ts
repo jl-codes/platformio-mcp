@@ -225,7 +225,10 @@ export async function executeDebugSessionCompatibility(
     .list()
     .find((row) => row.session_id === args.session_id);
   const stoppingAt = performance.now();
-  if (args.process_only) await sessions.stop(args.session_id);
+  // An exited GDB cannot acknowledge a target hook. Still require owned cleanup
+  // proof before removing its session or releasing probe custody.
+  const resetRun = !args.process_only && info?.closed !== true;
+  if (!resetRun) await sessions.stop(args.session_id);
   else
     await sessions.resetRunAndStop(
       args.session_id,
@@ -250,9 +253,9 @@ export async function executeDebugSessionCompatibility(
     closed: true,
     cleanupPending: false,
     cleanup_pending: false,
-    reset_run_acknowledged: !args.process_only,
+    reset_run_acknowledged: resetRun,
     target_running_verified: false,
-    summary: args.process_only
+    summary: !resetRun
       ? "Owned debugger processes closed and probe custody released."
       : "Configured reset/run hook acknowledged; owned debugger processes closed and probe custody released.",
   };

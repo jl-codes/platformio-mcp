@@ -12,7 +12,9 @@ function fixture(onStdout?: (data: Buffer) => void) {
     stderr: new PassThrough(),
     pid: 100,
   });
+  const onClose = vi.fn();
   const owner = new DebugBackendProcess({
+    onClose,
     onStdout,
     pythonExecutable: path.resolve("python.exe"),
     command: {
@@ -24,7 +26,7 @@ function fixture(onStdout?: (data: Buffer) => void) {
   });
   const event = (value: unknown) =>
     child.stdout.write(JSON.stringify(value) + "\n");
-  return { child, owner, event };
+  return { child, owner, event, onClose };
 }
 it("requires confirmed group cleanup and supervisor closure", async () => {
   const { child, owner, event } = fixture();
@@ -147,3 +149,32 @@ it("waits for descendant cleanup when a finite command is cancelled", async () =
     context: { cleanupPending: false },
   });
 });
+
+it.each([0, 7, -15, 3221225477])(
+  "reports backend exit %s instead of supervisor exit",
+  async (exitCode) => {
+    const { child, owner, event, onClose } = fixture();
+    event({ event: "started", pid: 101 });
+    await owner.waitStarted();
+    event({ event: "stopped", cleanupConfirmed: true, exitCode });
+    expect(onClose).not.toHaveBeenCalled();
+    child.emit("close", 0);
+    expect(onClose).toHaveBeenCalledExactlyOnceWith(exitCode);
+    await owner.cleanupProcess();
+  },
+);
+it.each(["missing", "contradictory"])(
+  "leaves an unverified %s exit status unknown",
+  async (mode) => {
+    const { child, owner, event, onClose } = fixture();
+    event({ event: "started", pid: 101 });
+    await owner.waitStarted();
+    if (mode === "contradictory") {
+      event({ event: "stopped", cleanupConfirmed: true, exitCode: 0 });
+      event({ event: "started", pid: 102 });
+    }
+    child.emit("close", 0);
+    expect(onClose).toHaveBeenCalledExactlyOnceWith(null);
+    expect(owner.state().cleanupPending).toBe(true);
+  },
+);

@@ -71,46 +71,50 @@ it("forwards both scoped grants and refuses another connection's session", async
     ),
   ).rejects.toMatchObject({ code: "DEBUG_SESSION_NOT_FOUND" });
 });
-it("retains failed cleanup and offers explicit process-only recovery without target claims", async () => {
-  const sessions = new DebugClientSessions();
-  const cleanup = vi
-    .fn()
-    .mockRejectedValueOnce(new Error("still owned"))
-    .mockResolvedValue(undefined);
-  const process: OwnedDebugProcess = {
-    command: vi.fn(),
-    cleanupProcess: cleanup,
-    state: () => ({
-      running: false,
-      closed: true,
-      exitCode: 0,
-      failed: false,
-      lastStop: undefined,
-      pid: 1,
-      cleanupPending: true,
-      stderr: "",
-    }),
-  };
-  const id = await sessions.start("/project", "debug", async () => process);
-  const args = { session_id: id, process_only: true };
-  await expect(
-    executeDebugSessionCompatibility("pio_debug_stop", args, sessions),
-  ).rejects.toThrow("still owned");
-  expect(sessions.list()).toHaveLength(1);
-  expect(
-    await executeDebugSessionCompatibility("pio_debug_stop", args, sessions),
-  ).toMatchObject({
-    ok: true,
-    project_dir: "/project",
-    env: "debug",
-    debug_tool: null,
-    uptime_s: expect.any(Number),
-    reset_run_acknowledged: false,
-    target_running_verified: false,
-  });
-  expect(sessions.list()).toHaveLength(0);
-  expect(process.command).not.toHaveBeenCalled();
-});
+it.each([true, false])(
+  "cleans an exited debugger without target claims (process_only=%s)",
+  async (processOnly) => {
+    const sessions = new DebugClientSessions();
+    const cleanup = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("still owned"))
+      .mockResolvedValue(undefined);
+    const process: OwnedDebugProcess = {
+      command: vi.fn(),
+      cleanupProcess: cleanup,
+      state: () => ({
+        running: false,
+        closed: true,
+        exitCode: 0,
+        failed: false,
+        lastStop: undefined,
+        pid: 1,
+        cleanupPending: true,
+        stderr: "",
+      }),
+    };
+    const id = await sessions.start("/project", "debug", async () => process);
+    const args = { session_id: id, process_only: processOnly };
+    await expect(
+      executeDebugSessionCompatibility("pio_debug_stop", args, sessions),
+    ).rejects.toThrow("still owned");
+    expect(sessions.list()).toHaveLength(1);
+    expect(
+      await executeDebugSessionCompatibility("pio_debug_stop", args, sessions),
+    ).toMatchObject({
+      ok: true,
+      project_dir: "/project",
+      env: "debug",
+      debug_tool: null,
+      uptime_s: expect.any(Number),
+      reset_run_acknowledged: false,
+      target_running_verified: false,
+    });
+    expect(sessions.list()).toHaveLength(0);
+    expect(process.command).not.toHaveBeenCalled();
+    expect(process.command).not.toHaveBeenCalled();
+  },
+);
 it("rejects owner selection and invalid timeout before dispatch", async () => {
   const sessions = new DebugClientSessions();
   await expect(

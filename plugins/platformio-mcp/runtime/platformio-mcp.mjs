@@ -98039,7 +98039,7 @@ var DebugBackendProcess = class {
         this.protocolFailed = true;
       }
       this.resolveClosed();
-      options.onClose?.();
+      options.onClose?.(this.protocolFailed ? null : this.exitCode ?? null);
     });
     this.child.stdin.write(
       JSON.stringify({ ...command, interactive: Boolean(this.onStdout) }) + "\n"
@@ -109206,10 +109206,10 @@ var SupervisedDebugChild = class extends EventEmitter2 {
       onStderr: (data) => {
         this.stderr.write(data);
       },
-      onClose: () => {
+      onClose: (exitCode) => {
         this.stdout.end();
         this.stderr.end();
-        this.emit("close", null);
+        this.emit("close", exitCode);
       }
     });
   }
@@ -111814,7 +111814,8 @@ async function executeDebugSessionCompatibility(name2, input, sessions, caller =
   const args = parsed.data;
   const info = sessions.list().find((row) => row.session_id === args.session_id);
   const stoppingAt = performance.now();
-  if (args.process_only) await sessions.stop(args.session_id);
+  const resetRun = !args.process_only && info?.closed !== true;
+  if (!resetRun) await sessions.stop(args.session_id);
   else
     await sessions.resetRunAndStop(
       args.session_id,
@@ -111837,9 +111838,9 @@ async function executeDebugSessionCompatibility(name2, input, sessions, caller =
     closed: true,
     cleanupPending: false,
     cleanup_pending: false,
-    reset_run_acknowledged: !args.process_only,
+    reset_run_acknowledged: resetRun,
     target_running_verified: false,
-    summary: args.process_only ? "Owned debugger processes closed and probe custody released." : "Configured reset/run hook acknowledged; owned debugger processes closed and probe custody released."
+    summary: !resetRun ? "Owned debugger processes closed and probe custody released." : "Configured reset/run hook acknowledged; owned debugger processes closed and probe custody released."
   };
 }
 

@@ -11,7 +11,7 @@ import { POSIX_BACKEND_SUPERVISOR } from "./posix-backend-supervisor.js";
 export interface DebugBackendProcessOptions {
   pythonExecutable: string;
   command: DebugServerCommand;
-  onClose?: () => void; // Trusted transport observer; never proof of descendant cleanup by itself.
+  onClose?: (exitCode: number | null) => void; // Trusted transport observer; never proof of descendant cleanup by itself.
   onStderr?: (data: Buffer) => void;
   onStdout?: (data: Buffer) => void; // Trusted interactive MI consumer; Supervisor control records remain separate from this channel.
   launch?: typeof spawn; // Trusted host/test dependency only.
@@ -121,7 +121,7 @@ export class DebugBackendProcess {
         this.protocolFailed = true;
       }
       this.resolveClosed();
-      options.onClose?.();
+      options.onClose?.(this.protocolFailed ? null : (this.exitCode ?? null));
     });
     this.child.stdin.write(
       JSON.stringify({ ...command, interactive: Boolean(this.onStdout) }) +
