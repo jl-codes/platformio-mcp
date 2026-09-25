@@ -15,7 +15,9 @@ vi.mock("../src/core/debug/debug-startup.js", () => ({
 }));
 let root: string;
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-remote-start-"));
+  root = fs.realpathSync.native(
+    fs.mkdtempSync(path.join(os.tmpdir(), "pio-remote-start-")),
+  );
   vi.resetAllMocks();
 });
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
