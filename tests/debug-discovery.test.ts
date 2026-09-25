@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   discoverDebuggerRoots,
   discoverDebugBackendRoots,
@@ -199,4 +199,61 @@ it("requires backend package registration to match the installed manifest", asyn
   await expect(
     discoverDebugBackendRoots(backend, info, project, {}),
   ).rejects.toMatchObject({ code: "DEBUG_BACKEND_EXECUTABLE_UNTRUSTED" });
+});
+
+it("resolves extensionless Windows backend metadata through registered roots", async () => {
+  vi.stubGlobal("process", { ...process, platform: "win32" });
+  try {
+    const core = path.join(root, "core");
+    const pkg = path.join(core, "packages", "tool-openocd-esp32");
+    fs.mkdirSync(pkg, { recursive: true });
+    const candidate = path.join(pkg, "openocd");
+    fs.writeFileSync(candidate + ".exe", "fixture");
+    const metadata = { name: "tool-openocd-esp32", version: "1.0" };
+    fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify(metadata));
+    fs.writeFileSync(
+      path.join(pkg, ".piopm"),
+      JSON.stringify({ ...metadata, type: "tool" }),
+    );
+    const roots = await discoverDebugBackendRoots(
+      candidate,
+      { core_dir: { value: core } },
+      project,
+      {},
+    );
+    expect(await resolveDebugBackendExecutable(candidate, roots, project)).toBe(
+      await fs.promises.realpath(candidate + ".exe"),
+    );
+    expect(
+      await discoverDebugBackendRoots(candidate, null, project, {
+        PIO_MCP_DEBUG_BACKEND_ROOTS: JSON.stringify(roots),
+      }),
+    ).toEqual(roots);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it("does not use Windows script fallbacks or allow an executable suffix to escape trust", async () => {
+  vi.stubGlobal("process", { ...process, platform: "win32" });
+  try {
+    const candidate = path.join(install, "openocd");
+    fs.writeFileSync(candidate + ".cmd", "fixture");
+    await expect(
+      resolveDebugBackendExecutable(candidate, [install], project),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    const local = path.join(project, "openocd.exe");
+    fs.writeFileSync(local, "fixture");
+    const alias = path.join(install, "redirect");
+    fs.symlinkSync(project, alias, "junction");
+    await expect(
+      resolveDebugBackendExecutable(
+        path.join(alias, "openocd"),
+        [install],
+        project,
+      ),
+    ).rejects.toMatchObject({ code: "DEBUG_BACKEND_EXECUTABLE_UNTRUSTED" });
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

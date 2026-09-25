@@ -42,7 +42,10 @@ it("a matching message from an exited process is not readiness", async () => {
       "ready",
       { timeoutMs: 1000, guard() {} },
     ),
-  ).rejects.toMatchObject({ code: "DEBUG_BACKEND_NOT_READY" });
+  ).rejects.toMatchObject({
+    code: "DEBUG_BACKEND_NOT_READY",
+    context: { outputTail: "ready" },
+  });
 });
 it("rechecks process state after the worker evaluates matching output", async () => {
   let reads = 0;

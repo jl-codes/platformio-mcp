@@ -57,6 +57,7 @@ export async function waitForBackendReady(
       throw new PlatformIOError(
         "Debugger backend exited or failed before readiness.",
         "DEBUG_BACKEND_NOT_READY",
+        { outputTail: state.outputTail },
       );
     return state;
   };

@@ -92,6 +92,21 @@ export function resolveDebugBackendExecutable(
   );
 }
 
+/** Resolve Core's extensionless Windows metadata without PATH or shell-script fallback. */
+async function realpathNativeExecutable(candidate: string): Promise<string> {
+  try {
+    return await fs.realpath(candidate);
+  } catch (error) {
+    if (
+      process.platform !== "win32" ||
+      path.extname(candidate) !== "" ||
+      (error as NodeJS.ErrnoException).code !== "ENOENT"
+    )
+      throw error;
+    return fs.realpath(candidate + ".exe");
+  }
+}
+
 async function resolveInstalledDebugExecutable(
   candidate: string,
   trustedRoots: readonly string[],
@@ -110,7 +125,7 @@ async function resolveInstalledDebugExecutable(
   )
     return invalid("Debugger requires absolute host installation roots.");
   const [executable, project, roots] = await Promise.all([
-    fs.realpath(candidate),
+    realpathNativeExecutable(candidate),
     fs.realpath(projectDir),
     Promise.all(trustedRoots.map((root) => fs.realpath(root))),
   ]);
@@ -221,7 +236,7 @@ async function discoverInstalledDebugRoots(
       "PlatformIO system info did not identify an absolute Core directory.",
     );
   const packages = await fs.realpath(path.join(core, "packages"));
-  const executable = await fs.realpath(debuggerPath);
+  const executable = await realpathNativeExecutable(debuggerPath);
   if (!within(packages, executable))
     return invalid(
       "Debugger is outside registered host packages; configure an operator root.",

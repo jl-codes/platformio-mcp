@@ -99193,6 +99193,15 @@ function resolveDebugBackendExecutable(candidate, trustedRoots, projectDir) {
     backendTrust
   );
 }
+async function realpathNativeExecutable(candidate) {
+  try {
+    return await fs41.realpath(candidate);
+  } catch (error2) {
+    if (process.platform !== "win32" || path48.extname(candidate) !== "" || error2.code !== "ENOENT")
+      throw error2;
+    return fs41.realpath(candidate + ".exe");
+  }
+}
 async function resolveInstalledDebugExecutable(candidate, trustedRoots, projectDir, trust) {
   const invalid4 = (message) => {
     throw new PlatformIOError(message, trust.errorCode);
@@ -99200,7 +99209,7 @@ async function resolveInstalledDebugExecutable(candidate, trustedRoots, projectD
   if (!path48.isAbsolute(candidate) || !path48.isAbsolute(projectDir) || trustedRoots.length < 1 || trustedRoots.length > 32 || trustedRoots.some((root) => !path48.isAbsolute(root)))
     return invalid4("Debugger requires absolute host installation roots.");
   const [executable, project, roots] = await Promise.all([
-    fs41.realpath(candidate),
+    realpathNativeExecutable(candidate),
     fs41.realpath(projectDir),
     Promise.all(trustedRoots.map((root) => fs41.realpath(root)))
   ]);
@@ -99270,7 +99279,7 @@ async function discoverInstalledDebugRoots(debuggerPath, systemInfo, projectDir,
       "PlatformIO system info did not identify an absolute Core directory."
     );
   const packages = await fs41.realpath(path48.join(core, "packages"));
-  const executable = await fs41.realpath(debuggerPath);
+  const executable = await realpathNativeExecutable(debuggerPath);
   if (!within3(packages, executable))
     return invalid4(
       "Debugger is outside registered host packages; configure an operator root."
@@ -110367,7 +110376,8 @@ async function waitForBackendReady(backend, pattern, options) {
     if (state.failed || state.closed)
       throw new PlatformIOError(
         "Debugger backend exited or failed before readiness.",
-        "DEBUG_BACKEND_NOT_READY"
+        "DEBUG_BACKEND_NOT_READY",
+        { outputTail: state.outputTail }
       );
     return state;
   };
