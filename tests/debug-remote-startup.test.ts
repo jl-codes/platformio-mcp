@@ -107,3 +107,25 @@ it("rejects mismatched host endpoint before startup", async () => {
   ).rejects.toMatchObject({ code: "DEBUG_REMOTE_BINDING_INVALID" });
   expect(startPreparedDebugger).not.toHaveBeenCalled();
 });
+
+it("uses the pinned numeric address for a matching hostname and rejects a different selection", async () => {
+  const { input } = fixture();
+  input.prepared.configuration.port = "Debug.Example.:3333";
+  input.binding.sourceEndpoint = "debug.example:3333";
+  vi.mocked(startPreparedDebugger).mockImplementation(
+    async (_sessions, selection) => {
+      expect(selection.target.host).toBe("192.0.2.1");
+      expect(selection.target.port).toBe(3333);
+      return "session";
+    },
+  );
+  expect(
+    await startRemotePreparedDebugger(new DebugClientSessions(), input),
+  ).toBe("session");
+  vi.mocked(startPreparedDebugger).mockClear();
+  input.binding.sourceEndpoint = "other.example:3333";
+  await expect(
+    startRemotePreparedDebugger(new DebugClientSessions(), input),
+  ).rejects.toMatchObject({ code: "DEBUG_REMOTE_BINDING_INVALID" });
+  expect(startPreparedDebugger).not.toHaveBeenCalled();
+});

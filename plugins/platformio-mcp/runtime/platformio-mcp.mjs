@@ -17031,9 +17031,9 @@ async function getProjectContext(projectDir, includeBuildHistory) {
   }
   const defaultEnvironment = environments?.[0];
   const cacheEnv = defaultEnvironment || "default";
-  const lookup2 = lookupBuildCache(validatedPath, cacheEnv);
-  const cacheReady = lookup2.hit;
-  const firmwarePath = cacheReady ? lookup2.entry.firmwarePath : findFirmwareArtifact(validatedPath, cacheEnv);
+  const lookup3 = lookupBuildCache(validatedPath, cacheEnv);
+  const cacheReady = lookup3.hit;
+  const firmwarePath = cacheReady ? lookup3.entry.firmwarePath : findFirmwareArtifact(validatedPath, cacheEnv);
   const sourceFiles = listSourceFiles(validatedPath);
   const lastBuild = includeBuildHistory ? inferLastBuild(validatedPath) : void 0;
   const partial2 = {
@@ -40601,7 +40601,7 @@ var require_mime_types = __commonJS({
     exports.contentType = contentType;
     exports.extension = extension;
     exports.extensions = /* @__PURE__ */ Object.create(null);
-    exports.lookup = lookup2;
+    exports.lookup = lookup3;
     exports.types = /* @__PURE__ */ Object.create(null);
     exports._extensionConflicts = [];
     populateMaps(exports.extensions, exports.types);
@@ -40644,7 +40644,7 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup2(path104) {
+    function lookup3(path104) {
       if (!path104 || typeof path104 !== "string") {
         return false;
       }
@@ -44369,7 +44369,7 @@ var require_view = __commonJS({
       this.engine = opts.engines[this.ext];
       this.path = this.lookup(fileName);
     }
-    View.prototype.lookup = function lookup2(name2) {
+    View.prototype.lookup = function lookup3(name2) {
       var path105;
       var roots = [].concat(this.root);
       debug('lookup "%s"', name2);
@@ -53983,7 +53983,7 @@ var require_mime_types2 = __commonJS({
     exports.contentType = contentType;
     exports.extension = extension;
     exports.extensions = /* @__PURE__ */ Object.create(null);
-    exports.lookup = lookup2;
+    exports.lookup = lookup3;
     exports.types = /* @__PURE__ */ Object.create(null);
     exports._extensionConflicts = [];
     populateMaps(exports.extensions, exports.types);
@@ -54026,7 +54026,7 @@ var require_mime_types2 = __commonJS({
       }
       return exts[0];
     }
-    function lookup2(path104) {
+    function lookup3(path104) {
       if (!path104 || typeof path104 !== "string") {
         return false;
       }
@@ -67177,7 +67177,7 @@ var require_mime_types3 = __commonJS({
     exports.contentType = contentType;
     exports.extension = extension;
     exports.extensions = /* @__PURE__ */ Object.create(null);
-    exports.lookup = lookup2;
+    exports.lookup = lookup3;
     exports.types = /* @__PURE__ */ Object.create(null);
     exports._extensionConflicts = [];
     populateMaps(exports.extensions, exports.types);
@@ -67220,7 +67220,7 @@ var require_mime_types3 = __commonJS({
       }
       return exts[0];
     }
-    function lookup2(path104) {
+    function lookup3(path104) {
       if (!path104 || typeof path104 !== "string") {
         return false;
       }
@@ -77489,7 +77489,7 @@ var require_mime_types4 = __commonJS({
     exports.contentType = contentType;
     exports.extension = extension;
     exports.extensions = /* @__PURE__ */ Object.create(null);
-    exports.lookup = lookup2;
+    exports.lookup = lookup3;
     exports.types = /* @__PURE__ */ Object.create(null);
     populateMaps(exports.extensions, exports.types);
     function charset(type) {
@@ -77531,7 +77531,7 @@ var require_mime_types4 = __commonJS({
       }
       return exts[0];
     }
-    function lookup2(path104) {
+    function lookup3(path104) {
       if (!path104 || typeof path104 !== "string") {
         return false;
       }
@@ -95276,9 +95276,9 @@ async function buildProject(projectDir, environment, verbose, background, execut
     throw new BuildError("Build timeout must be between 1 and 3600000 milliseconds", { projectDir });
   const envName = environment || "default";
   if (!background && !verbose && !execution.forceExecution && !execution.onResult) {
-    const lookup2 = lookupBuildCache(validatedPath, envName);
-    if (lookup2.hit) {
-      const cached2 = lookup2.entry;
+    const lookup3 = lookupBuildCache(validatedPath, envName);
+    if (lookup3.hit) {
+      const cached2 = lookup3.entry;
       const tail = cached2.finalOutputTail || "(cached build \u2014 output omitted)";
       const structuredErrors = parseStructuredBuildErrors(tail);
       logDiagnostic(
@@ -108782,6 +108782,29 @@ function parseRemoteDebugEndpoint(value2) {
     })
   });
 }
+function parseRemoteDebugSelection(value2) {
+  try {
+    return parseRemoteDebugEndpoint(value2);
+  } catch (error2) {
+    if (typeof value2 !== "string" || value2.length > 260) throw error2;
+    const match = /^([a-zA-Z0-9.-]+):([0-9]{1,5})$/.exec(value2);
+    if (!match) throw error2;
+    const host = match[1].toLowerCase().replace(/\.$/, "");
+    const port = Number(match[2]);
+    if (host.length > 253 || !/[a-z]/.test(host) || port < 1 || port > 65535 || host.split(".").some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)))
+      throw error2;
+    if (host === "localhost")
+      return parseRemoteDebugEndpoint(`127.0.0.1:${port}`);
+    return Object.freeze({
+      host,
+      port,
+      resource: Object.freeze({
+        kind: "network",
+        identity: `debug-dns:${host}:${port}`
+      })
+    });
+  }
+}
 
 // src/core/debug/debug-endpoint-custody.ts
 init_device_lease();
@@ -110723,10 +110746,15 @@ async function startRemotePreparedDebugger(sessions, input, caller = {}) {
       "Remote startup cannot launch a configured local backend.",
       "DEBUG_REMOTE_BACKEND_CONFLICT"
     );
-  const endpoint = parseRemoteDebugEndpoint(prepared.configuration.port);
-  const authorizedEndpoint = parseRemoteDebugEndpoint(binding.endpoint);
+  const selectedEndpoint = parseRemoteDebugSelection(
+    prepared.configuration.port
+  );
+  const sourceEndpoint = parseRemoteDebugSelection(
+    binding.sourceEndpoint ?? binding.endpoint
+  );
+  const endpoint = parseRemoteDebugEndpoint(binding.endpoint);
   const identity = binding.identity;
-  if (endpoint.resource.identity !== authorizedEndpoint.resource.identity || typeof identity !== "string" || !identity.trim() || identity.length > 1024 || /[\x00-\x1f\x7f]/.test(identity) || typeof binding.acquireTarget !== "function" || typeof binding.revalidate !== "function")
+  if (selectedEndpoint.resource.identity !== sourceEndpoint.resource.identity || selectedEndpoint.port !== endpoint.port || selectedEndpoint.resource.identity.startsWith("debug-tcp:") && selectedEndpoint.resource.identity !== endpoint.resource.identity || typeof identity !== "string" || !identity.trim() || identity.length > 1024 || /[\x00-\x1f\x7f]/.test(identity) || typeof binding.acquireTarget !== "function" || typeof binding.revalidate !== "function")
     throw new PlatformIOError(
       "Remote debugger endpoint has no matching host target binding.",
       "DEBUG_REMOTE_BINDING_INVALID"
@@ -110800,6 +110828,7 @@ var import_yaml2 = __toESM(require_dist(), 1);
 init_zod();
 init_errors2();
 import fs59 from "node:fs";
+import { lookup } from "node:dns/promises";
 import path68 from "node:path";
 import { createHash as createHash15 } from "node:crypto";
 init_device_lease();
@@ -110865,14 +110894,14 @@ async function resolveOperatorRemoteDebugBinding(selection, host = {}) {
       error2.code === "ENOENT" ? "DEBUG_REMOTE_BINDING_REQUIRED" : "DEBUG_REMOTE_BINDING_INVALID"
     );
   }
-  const endpoint = parseRemoteDebugEndpoint(selection.endpoint);
+  const endpoint = parseRemoteDebugSelection(selection.endpoint);
   const matches = snapshot.data.bindings.filter((binding) => {
     if (!path68.isAbsolute(binding.projectDir))
       throw new PlatformIOError(
         "Target maps require absolute project paths.",
         "DEBUG_REMOTE_BINDING_INVALID"
       );
-    return path68.normalize(binding.projectDir) === project && binding.environment === selection.environment && parseRemoteDebugEndpoint(binding.endpoint).resource.identity === endpoint.resource.identity;
+    return path68.normalize(binding.projectDir) === project && binding.environment === selection.environment && parseRemoteDebugSelection(binding.endpoint).resource.identity === endpoint.resource.identity;
   });
   if (matches.length !== 1)
     throw new PlatformIOError(
@@ -110880,6 +110909,28 @@ async function resolveOperatorRemoteDebugBinding(selection, host = {}) {
       "DEBUG_REMOTE_BINDING_REQUIRED"
     );
   const selected = matches[0];
+  let pinned = endpoint;
+  if (endpoint.resource.identity.startsWith("debug-dns:")) {
+    let timer;
+    try {
+      const resolved = await Promise.race([
+        (host.lookup ?? lookup)(endpoint.host),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error("DNS timeout")), 3e3);
+        })
+      ]);
+      pinned = parseRemoteDebugEndpoint(
+        `${resolved.address.includes(":") ? "[" + resolved.address + "]" : resolved.address}:${endpoint.port}`
+      );
+    } catch {
+      throw new PlatformIOError(
+        "Could not resolve the bound debugger hostname to a unicast address within three seconds.",
+        "DEBUG_REMOTE_RESOLUTION_FAILED"
+      );
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
   const resource = Object.freeze({
     kind: "network",
     identity: "debug-target:" + selected.targetId
@@ -110898,7 +110949,8 @@ async function resolveOperatorRemoteDebugBinding(selection, host = {}) {
     }
   };
   return Object.freeze({
-    endpoint: selected.endpoint,
+    endpoint: `${pinned.host.includes(":") ? "[" + pinned.host + "]" : pinned.host}:${pinned.port}`,
+    sourceEndpoint: selected.endpoint,
     identity: JSON.stringify([resource.identity, snapshot.digest]),
     revalidate,
     acquireTarget: async () => {
@@ -112320,9 +112372,9 @@ async function resolveOtaTools(projectDir, family, systemInfo, environment = pro
 // src/core/devices/ota-target.ts
 init_errors2();
 init_device_lease();
-import { lookup } from "node:dns/promises";
+import { lookup as lookup2 } from "node:dns/promises";
 import { isIP as isIP7 } from "node:net";
-async function resolveOtaTarget(host, port, resolve = (host2) => lookup(host2, { all: true, family: 4 })) {
+async function resolveOtaTarget(host, port, resolve = (host2) => lookup2(host2, { all: true, family: 4 })) {
   if (typeof host !== "string" || !host || host.length > 253 || host !== host.trim() || !Number.isInteger(port) || port < 1 || port > 65535)
     throw new PlatformIOError("Invalid OTA destination.", "OTA_TARGET_INVALID");
   const name2 = host.toLowerCase().replace(/\.$/, "");

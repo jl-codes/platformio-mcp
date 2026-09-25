@@ -39,3 +39,36 @@ export function parseRemoteDebugEndpoint(value: string | null) {
     }),
   });
 }
+
+/** Canonicalize an operator-selected TCP address without resolving project-controlled hostnames. */
+export function parseRemoteDebugSelection(value: string | null) {
+  try {
+    return parseRemoteDebugEndpoint(value);
+  } catch (error) {
+    if (typeof value !== "string" || value.length > 260) throw error;
+    const match = /^([a-zA-Z0-9.-]+):([0-9]{1,5})$/.exec(value);
+    if (!match) throw error;
+    const host = match[1].toLowerCase().replace(/\.$/, "");
+    const port = Number(match[2]);
+    if (
+      host.length > 253 ||
+      !/[a-z]/.test(host) ||
+      port < 1 ||
+      port > 65535 ||
+      host
+        .split(".")
+        .some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))
+    )
+      throw error;
+    if (host === "localhost")
+      return parseRemoteDebugEndpoint(`127.0.0.1:${port}`);
+    return Object.freeze({
+      host,
+      port,
+      resource: Object.freeze({
+        kind: "network" as const,
+        identity: `debug-dns:${host}:${port}`,
+      }),
+    });
+  }
+}

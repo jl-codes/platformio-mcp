@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { resolveOperatorRemoteDebugBinding } from "../src/core/debug/debug-operator-binding.js";
 import { DeviceLeaseStore } from "../src/core/devices/device-lease.js";
 let root: string, project: string, filename: string, store: DeviceLeaseStore;
@@ -103,5 +103,59 @@ it("rejects project-owned maps, duplicate keys, unknown fields and oversize inpu
     await expect(resolve()).rejects.toMatchObject({
       code: "DEBUG_REMOTE_BINDING_INVALID",
     });
+  }
+});
+
+it("resolves only a matched operator hostname and pins it across target handoff", async () => {
+  const config = document();
+  config.bindings[0].endpoint = "Debug.Example.:3333";
+  fs.writeFileSync(filename, JSON.stringify(config));
+  const lookup = vi.fn(async () => ({ address: "192.0.2.10" }));
+  const select = (endpoint: string) =>
+    resolveOperatorRemoteDebugBinding(
+      { projectDir: project, environment: "debug", endpoint },
+      { filename, store, lookup },
+    );
+  await expect(select("unbound.example:3333")).rejects.toMatchObject({
+    code: "DEBUG_REMOTE_BINDING_REQUIRED",
+  });
+  expect(lookup).not.toHaveBeenCalled();
+  const binding = await select("debug.example:3333");
+  expect(binding.endpoint).toBe("192.0.2.10:3333");
+  expect(binding.sourceEndpoint).toBe("Debug.Example.:3333");
+  lookup.mockResolvedValue({ address: "192.0.2.99" });
+  const target = await binding.acquireTarget();
+  await target.prepareSpawn();
+  expect(binding.endpoint).toBe("192.0.2.10:3333");
+  expect(lookup).toHaveBeenCalledTimes(1);
+  target.releaseAfterExit();
+});
+it("bounds DNS failures and rejects non-unicast results before custody", async () => {
+  const config = document();
+  config.bindings[0].endpoint = "debug.example:3333";
+  fs.writeFileSync(filename, JSON.stringify(config));
+  const select = (lookup: (host: string) => Promise<{ address: string }>) =>
+    resolveOperatorRemoteDebugBinding(
+      {
+        projectDir: project,
+        environment: "debug",
+        endpoint: "debug.example:3333",
+      },
+      { filename, store, lookup },
+    );
+  for (const address of ["0.0.0.0", "224.0.0.1", "::", "another.example"]) {
+    await expect(select(async () => ({ address }))).rejects.toMatchObject({
+      code: "DEBUG_REMOTE_RESOLUTION_FAILED",
+    });
+  }
+  vi.useFakeTimers();
+  try {
+    const pending = expect(
+      select(() => new Promise(() => {})),
+    ).rejects.toMatchObject({ code: "DEBUG_REMOTE_RESOLUTION_FAILED" });
+    await vi.advanceTimersByTimeAsync(3000);
+    await pending;
+  } finally {
+    vi.useRealTimers();
   }
 });

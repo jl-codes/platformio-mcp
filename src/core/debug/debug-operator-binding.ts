@@ -1,5 +1,6 @@
 /** Resolve standalone remote-debugger custody from an operator-owned target map. */
 import fs from "node:fs";
+import { lookup } from "node:dns/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { parseDocument } from "yaml";
@@ -7,7 +8,10 @@ import { z } from "zod";
 import { PlatformIOError } from "../../utils/errors.js";
 import { resolvePolicyDirectory } from "../policy/policy-sources.js";
 import { DeviceLeaseStore } from "../devices/device-lease.js";
-import { parseRemoteDebugEndpoint } from "./debug-remote-endpoint.js";
+import {
+  parseRemoteDebugEndpoint,
+  parseRemoteDebugSelection,
+} from "./debug-remote-endpoint.js";
 import type { RemoteDebugTargetBinding } from "./debug-remote-startup.js";
 
 const text = z
@@ -86,7 +90,11 @@ function readBindings(filename: string, project: string) {
 /** Supply retained per-account leases to the same supervised remote path used by embedding hosts. */
 export async function resolveOperatorRemoteDebugBinding(
   selection: Readonly<RemoteDebugSelection>,
-  host: { filename?: string; store?: DeviceLeaseStore } = {},
+  host: {
+    filename?: string;
+    store?: DeviceLeaseStore;
+    lookup?: (hostname: string) => Promise<{ address: string }>;
+  } = {},
 ): Promise<RemoteDebugTargetBinding> {
   const filename =
     host.filename ?? path.join(resolvePolicyDirectory(), "debug-targets.json");
@@ -104,7 +112,7 @@ export async function resolveOperatorRemoteDebugBinding(
         : "DEBUG_REMOTE_BINDING_INVALID",
     );
   }
-  const endpoint = parseRemoteDebugEndpoint(selection.endpoint);
+  const endpoint = parseRemoteDebugSelection(selection.endpoint);
   const matches = snapshot.data.bindings.filter((binding) => {
     if (!path.isAbsolute(binding.projectDir))
       throw new PlatformIOError(
@@ -114,7 +122,7 @@ export async function resolveOperatorRemoteDebugBinding(
     return (
       path.normalize(binding.projectDir) === project &&
       binding.environment === selection.environment &&
-      parseRemoteDebugEndpoint(binding.endpoint).resource.identity ===
+      parseRemoteDebugSelection(binding.endpoint).resource.identity ===
         endpoint.resource.identity
     );
   });
@@ -124,6 +132,29 @@ export async function resolveOperatorRemoteDebugBinding(
       "DEBUG_REMOTE_BINDING_REQUIRED",
     );
   const selected = matches[0];
+  let pinned = endpoint;
+  if (endpoint.resource.identity.startsWith("debug-dns:")) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const resolved = await Promise.race([
+        (host.lookup ?? lookup)(endpoint.host),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("DNS timeout")), 3000);
+        }),
+      ]);
+      pinned = parseRemoteDebugEndpoint(
+        `${resolved.address.includes(":") ? "[" + resolved.address + "]" : resolved.address}:${endpoint.port}`,
+      );
+    } catch {
+      throw new PlatformIOError(
+        "Could not resolve the bound debugger hostname to a unicast address within three seconds.",
+        "DEBUG_REMOTE_RESOLUTION_FAILED",
+      );
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   const resource = Object.freeze({
     kind: "network" as const,
     identity: "debug-target:" + selected.targetId,
@@ -142,7 +173,8 @@ export async function resolveOperatorRemoteDebugBinding(
     }
   };
   return Object.freeze({
-    endpoint: selected.endpoint,
+    endpoint: `${pinned.host.includes(":") ? "[" + pinned.host + "]" : pinned.host}:${pinned.port}`,
+    sourceEndpoint: selected.endpoint,
     identity: JSON.stringify([resource.identity, snapshot.digest]),
     revalidate,
     acquireTarget: async () => {

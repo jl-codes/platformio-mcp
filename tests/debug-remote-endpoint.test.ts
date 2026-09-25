@@ -1,6 +1,9 @@
 /** Numeric debugger endpoint identities are inert and consistent across equivalent spellings. */
 import { expect, it } from "vitest";
-import { parseRemoteDebugEndpoint } from "../src/core/debug/debug-remote-endpoint.js";
+import {
+  parseRemoteDebugEndpoint,
+  parseRemoteDebugSelection,
+} from "../src/core/debug/debug-remote-endpoint.js";
 it("shares local endpoint identity with owned backend custody", () => {
   for (const input of [
     ":3333",
@@ -40,4 +43,22 @@ it.each([
   expect(() => parseRemoteDebugEndpoint(value)).toThrowError(
     expect.objectContaining({ code: "DEBUG_ENDPOINT_UNSUPPORTED" }),
   );
+});
+
+it("normalizes bounded DNS selections without accepting GDB commands or invalid addresses", () => {
+  expect(
+    parseRemoteDebugSelection("Debug.Example.:03333").resource.identity,
+  ).toBe("debug-dns:debug.example:3333");
+  for (const value of [
+    "| command",
+    "bad_name:3333",
+    "-bad.example:3333",
+    "a..b:3333",
+    "224.0.0.1:3333",
+    "[::]:3333",
+    "a:65536",
+    "a:3333\n",
+  ]) {
+    expect(() => parseRemoteDebugSelection(value)).toThrow();
+  }
 });

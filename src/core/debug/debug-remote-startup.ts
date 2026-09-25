@@ -6,13 +6,18 @@ import type { PolicyEvaluationContext } from "../policy/types.js";
 import { createPolicyRevisionGuard } from "../policy/revision-guard.js";
 import type { prepareDebuggerProject } from "./debug-project.js";
 import type { DebugClientSessions } from "./debug-client-sessions.js";
-import { parseRemoteDebugEndpoint } from "./debug-remote-endpoint.js";
+import {
+  parseRemoteDebugEndpoint,
+  parseRemoteDebugSelection,
+} from "./debug-remote-endpoint.js";
 import { createRemoteDebugEndpointCustody } from "./debug-endpoint-custody.js";
 import { startPreparedDebugger } from "./debug-startup.js";
 
 /** A trusted host supplies identity and ownership; neither is accepted from MCP request arguments. */
 export interface RemoteDebugTargetBinding {
   endpoint: string;
+  /** Original operator-bound selection when endpoint is a pinned DNS result. */
+  sourceEndpoint?: string;
   identity: string;
   acquireTarget(): Promise<ProcessDeviceCustody>; // Returns retained, retryable target ownership.
   revalidate(): Promise<void> | void; // Detect host binding changes before target handoff.
@@ -44,11 +49,19 @@ export async function startRemotePreparedDebugger(
       "Remote startup cannot launch a configured local backend.",
       "DEBUG_REMOTE_BACKEND_CONFLICT",
     );
-  const endpoint = parseRemoteDebugEndpoint(prepared.configuration.port);
-  const authorizedEndpoint = parseRemoteDebugEndpoint(binding.endpoint);
+  const selectedEndpoint = parseRemoteDebugSelection(
+    prepared.configuration.port,
+  );
+  const sourceEndpoint = parseRemoteDebugSelection(
+    binding.sourceEndpoint ?? binding.endpoint,
+  );
+  const endpoint = parseRemoteDebugEndpoint(binding.endpoint);
   const identity = binding.identity;
   if (
-    endpoint.resource.identity !== authorizedEndpoint.resource.identity ||
+    selectedEndpoint.resource.identity !== sourceEndpoint.resource.identity ||
+    selectedEndpoint.port !== endpoint.port ||
+    (selectedEndpoint.resource.identity.startsWith("debug-tcp:") &&
+      selectedEndpoint.resource.identity !== endpoint.resource.identity) ||
     typeof identity !== "string" ||
     !identity.trim() ||
     identity.length > 1024 ||

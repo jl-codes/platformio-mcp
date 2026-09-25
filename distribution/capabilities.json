@@ -73,7 +73,7 @@
       "installation": "Explicitly install the selected PlatformIO debug packages and host USB drivers. Configure the project debug environment and tool.",
       "limits": [
         "Owned local loopback TCP backends; externally managed numeric TCP endpoints require an operator debug-targets.json mapping outside the project.",
-        "ST-Link probes through OpenOCD are implemented; standalone st-util and pipe backend custody remain unsupported; DNS endpoints require prior operator resolution. Remote mappings coordinate clients on this host, not unrelated processes on a remote host.",
+        "ST-Link probes through OpenOCD are implemented; standalone st-util and pipe backend custody remain unsupported; Operator-bound DNS endpoints resolve with a three-second limit and remain pinned to a numeric address through startup. Remote mappings coordinate clients on this host, not unrelated processes on a remote host.",
         "Physical release acceptance remains pending."
       ]
     },
