@@ -13,7 +13,8 @@ const seen = new Set();
 // Validate the complete edit set before writing anything. Registry authority flags are never changed.
 for (const entry of inventory.entries) {
   if (entry.registry !== "npm" || entry.name === canonical.name || !entry.packagePath) continue;
-  if (!["functional_alias", "candidate_alias"].includes(entry.role) || entry.source !== inventory.canonicalSource || seen.has(entry.name)) throw new Error("Invalid npm alias inventory");
+  if (entry.role === "blocked_naming_rule" && entry.publishIntent !== false) throw new Error("Blocked npm alias cannot enable publication");
+  if (!["functional_alias", "candidate_alias", "blocked_naming_rule"].includes(entry.role) || entry.source !== inventory.canonicalSource || seen.has(entry.name)) throw new Error("Invalid npm alias inventory");
   seen.add(entry.name);
   const directory = realpathSync(path.resolve(root, entry.packagePath));
   const relative = path.relative(path.join(root, "packages"), directory);
