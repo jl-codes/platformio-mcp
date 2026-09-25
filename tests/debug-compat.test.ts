@@ -33,6 +33,8 @@ vi.mock("../src/core/devices/debug-probe-discovery.js", () => ({
     execute: (read: typeof mocks.inventory) => Promise<unknown>,
   ) => execute(mocks.inventory),
 }));
+import { PlatformIOError } from "../src/utils/errors.js";
+import { compatibilityErrorResult } from "../src/adapters/compatibility-error.js";
 import { DebugCompatibilityClient } from "../src/adapters/debug-compat.js";
 beforeEach(() => {
   vi.resetAllMocks();
@@ -236,4 +238,33 @@ it("uses the operator resolver by default for standalone MCP and CLI clients", a
   } finally {
     resolver.mockRestore();
   }
+});
+
+it("returns reference startup diagnostics while retaining canonical failure identity", async () => {
+  mocks.prepare.mockRejectedValue(
+    new PlatformIOError("Debug build failed", "DEBUG_BUILD_FAILED", {
+      environment: "selected-debug",
+      debugTool: "stlink",
+      outputTail: "x".repeat(3000),
+    }),
+  );
+  const client = new DebugCompatibilityClient();
+  const error = await client.start({}).catch((error) => error);
+  expect(error.code).toBe("DEBUG_BUILD_FAILED");
+  expect(compatibilityErrorResult(error).structuredContent).toMatchObject({
+    ok: false,
+    error: "build_failed",
+    env: "selected-debug",
+    debug_tool: "stlink",
+    output_tail: "x".repeat(2500),
+    details: { code: "DEBUG_BUILD_FAILED" },
+  });
+});
+it("does not translate or replace startup approval errors", async () => {
+  const denied = new PlatformIOError("Approval needed", "APPROVAL_REQUIRED", {
+    policyDecision: { approvalId: "retained" },
+  });
+  mocks.prepare.mockRejectedValue(denied);
+  const client = new DebugCompatibilityClient();
+  expect(await client.start({}).catch((error) => error)).toBe(denied);
 });

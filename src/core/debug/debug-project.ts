@@ -121,7 +121,12 @@ export async function prepareDebuggerProject(
             throw new PlatformIOError(
               "Debug firmware preparation failed.",
               "DEBUG_BUILD_FAILED",
-              { environment: selected.environment, exitCode: result.exitCode },
+              {
+                environment: selected.environment,
+                debugTool: selected.debugTool,
+                exitCode: result.exitCode,
+                outputTail: (result.stdout + "\n" + result.stderr).slice(-2500),
+              },
             );
         },
       ),

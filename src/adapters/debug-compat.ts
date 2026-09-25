@@ -1,5 +1,6 @@
 /** Connection-owned reference debugger startup and session dispatch composition. */
 import { z } from "zod";
+import { redactSecretsInText } from "../core/policy/redact.js";
 import { randomUUID } from "node:crypto";
 import { DebugClientSessions } from "../core/debug/debug-client-sessions.js";
 import { DebugPreparationCache } from "../core/debug/debug-preparation-cache.js";
@@ -104,6 +105,8 @@ export class DebugCompatibilityClient {
         "COMPAT_ARGUMENT_INVALID",
       );
     const args = parsed.data;
+    let selectedEnvironment: string | null = args.env ?? null;
+    let selectedTool: string | null = null;
     // MCP activity IDs change on approval retries; checkpoint ownership is this connection.
     caller = { ...caller, taskId: this.taskId };
     const operation = (async () => {
@@ -128,6 +131,8 @@ export class DebugCompatibilityClient {
         caller,
         this.abort.signal,
       );
+      selectedEnvironment = prepared.environment;
+      selectedTool = prepared.configuration?.debugTool ?? null;
       const remaining = Math.floor(deadline - performance.now());
       if (remaining < 1)
         throw new PlatformIOError(
@@ -231,6 +236,34 @@ export class DebugCompatibilityClient {
     this.pending.add(operation);
     try {
       return await operation;
+    } catch (error) {
+      if (
+        error instanceof PlatformIOError &&
+        /^(?:DEBUG_|GDB_)/.test(error.code ?? "")
+      ) {
+        const context = error.context ?? {};
+        const output =
+          typeof context.outputTail === "string"
+            ? context.outputTail
+            : typeof context.stderr === "string"
+              ? context.stderr
+              : "";
+        throw new PlatformIOError(error.message, error.code, {
+          ...context,
+          debuggerStart: {
+            env:
+              typeof context.environment === "string"
+                ? context.environment
+                : selectedEnvironment,
+            debug_tool:
+              typeof context.debugTool === "string"
+                ? context.debugTool
+                : selectedTool,
+            output_tail: redactSecretsInText(output).slice(-2500),
+          },
+        });
+      }
+      throw error;
     } finally {
       this.pending.delete(operation);
     }

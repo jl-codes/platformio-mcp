@@ -107822,6 +107822,7 @@ async function executePowerCompatibility(serial, meter, input, defaults, caller,
 
 // src/adapters/debug-compat.ts
 init_zod();
+init_redact();
 import { randomUUID as randomUUID9 } from "node:crypto";
 
 // src/core/debug/debug-reset-run.ts
@@ -108523,7 +108524,12 @@ async function prepareDebuggerProject(input, caller = {}, signal, checkpoint) {
             throw new PlatformIOError(
               "Debug firmware preparation failed.",
               "DEBUG_BUILD_FAILED",
-              { environment: selected.environment, exitCode: result.exitCode }
+              {
+                environment: selected.environment,
+                debugTool: selected.debugTool,
+                exitCode: result.exitCode,
+                outputTail: (result.stdout + "\n" + result.stderr).slice(-2500)
+              }
             );
         }
       )
@@ -111888,6 +111894,8 @@ var DebugCompatibilityClient = class {
         "COMPAT_ARGUMENT_INVALID"
       );
     const args = parsed.data;
+    let selectedEnvironment = args.env ?? null;
+    let selectedTool = null;
     caller = { ...caller, taskId: this.taskId };
     const operation = (async () => {
       const deadline = performance.now() + args.timeout_s * 1e3;
@@ -111911,6 +111919,8 @@ var DebugCompatibilityClient = class {
         caller,
         this.abort.signal
       );
+      selectedEnvironment = prepared.environment;
+      selectedTool = prepared.configuration?.debugTool ?? null;
       const remaining = Math.floor(deadline - performance.now());
       if (remaining < 1)
         throw new PlatformIOError(
@@ -111999,6 +112009,20 @@ var DebugCompatibilityClient = class {
     this.pending.add(operation);
     try {
       return await operation;
+    } catch (error2) {
+      if (error2 instanceof PlatformIOError && /^(?:DEBUG_|GDB_)/.test(error2.code ?? "")) {
+        const context = error2.context ?? {};
+        const output = typeof context.outputTail === "string" ? context.outputTail : typeof context.stderr === "string" ? context.stderr : "";
+        throw new PlatformIOError(error2.message, error2.code, {
+          ...context,
+          debuggerStart: {
+            env: typeof context.environment === "string" ? context.environment : selectedEnvironment,
+            debug_tool: typeof context.debugTool === "string" ? context.debugTool : selectedTool,
+            output_tail: redactSecretsInText(output).slice(-2500)
+          }
+        });
+      }
+      throw error2;
     } finally {
       this.pending.delete(operation);
     }
@@ -116569,9 +116593,38 @@ function compatibilityErrorResult(error2) {
     resumeId: external_exports.string().uuid(),
     manifestSha256: external_exports.string().regex(/^[a-f0-9]{64}$/).optional()
   }).safeParse(context) : void 0;
+  const debuggerStart = /^(?:DEBUG_|GDB_)/.test(code) ? external_exports.object({
+    env: external_exports.string().max(50).nullable(),
+    debug_tool: external_exports.string().max(256).nullable(),
+    output_tail: external_exports.string().max(2500)
+  }).strict().safeParse(context.debuggerStart) : void 0;
+  const debuggerNames = {
+    DEBUG_BUILD_FAILED: "build_failed",
+    DEBUG_ENVIRONMENT_INVALID: "bad_env",
+    DEBUG_PROBE_NOT_FOUND: "probe_not_found",
+    DEBUG_BACKEND_REQUIRED: "debug_tool_missing",
+    DEBUG_PYTHON_UNAVAILABLE: "debug_tool_missing",
+    DEBUG_PREPARATION_TIMEOUT: "start_timeout",
+    DEBUG_START_TIMEOUT: "start_timeout",
+    DEBUG_BACKEND_READY_TIMEOUT: "start_timeout",
+    DEBUG_INIT_TIMEOUT: "start_timeout",
+    GDB_INIT_TIMEOUT: "start_timeout",
+    DEBUG_INIT_FAILED: "init_script_failed",
+    GDB_INIT_FAILED: "init_script_failed",
+    DEBUG_BACKEND_NOT_READY: "debug_exited",
+    GDB_START_FAILED: "debug_exited"
+  };
   const result = {
     ok: false,
-    error: names[code] ?? code,
+    error: (debuggerStart?.success ? debuggerNames[code] : void 0) ?? names[code] ?? code,
+    ...debuggerStart?.success ? {
+      ...debuggerStart.data,
+      ...typeof context.cleanupPending === "boolean" ? { cleanup_pending: context.cleanupPending } : {},
+      ...external_exports.string().uuid().safeParse(context.sessionId).success ? { session_id: context.sessionId } : {},
+      output_tail: redactSecretsInText(
+        debuggerStart.data.output_tail
+      ).slice(-2500)
+    } : {},
     summary: redactSecretsInText(
       error2 instanceof external_exports.ZodError ? "Compatibility arguments do not match the tool schema." : typeof record3.message === "string" ? record3.message : "Compatibility operation failed."
     ).slice(0, 8192),
@@ -127701,13 +127754,11 @@ function startPortalServer(defaultPort = 8080) {
     throw new Error("PIO_MCP_APPROVAL_TOKEN must contain 32 to 256 characters.");
   }
   const requireApprovalAuthority = (req, res) => {
-    const dashboardOrigin = `${req.protocol}://${req.get("host")}`;
-    if (hasValidDashboardSession(req.headers.cookie) && req.headers.origin === dashboardOrigin && req.headers["x-pio-dashboard-approval"] === "1") return true;
     const supplied = req.headers["x-pio-approval-token"];
     const expected = approvalCapability ? Buffer.from(approvalCapability) : void 0;
     const candidate = typeof supplied === "string" ? Buffer.from(supplied) : void 0;
     if (!expected || !candidate || expected.length !== candidate.length || !crypto19.timingSafeEqual(expected, candidate)) {
-      res.status(403).json({ code: "OPERATOR_APPROVAL_REQUIRED", error: "Open the dashboard and approve from its authenticated session, or use the local approve/deny CLI." });
+      res.status(403).json({ code: "OPERATOR_APPROVAL_REQUIRED", error: "Approval changes require the separately configured operator capability. Use the local approve/deny CLI or provide the operator capability; dashboard access alone is insufficient." });
       return false;
     }
     return true;
@@ -127961,7 +128012,7 @@ function startPortalServer(defaultPort = 8080) {
       appendAuditEvent({
         action: "dashboard_approve_request",
         status: "approved",
-        reason: `Approval ${id} was approved through an authenticated approval request.`,
+        reason: `Approval ${id} was approved using the operator dashboard capability.`,
         riskLevel: existing.riskLevel,
         approvalId: id,
         actorClass: "interactive",
@@ -127993,7 +128044,7 @@ function startPortalServer(defaultPort = 8080) {
       appendAuditEvent({
         action: "dashboard_deny_request",
         status: "denied",
-        reason: `Approval ${id} was denied through an authenticated approval request.`,
+        reason: `Approval ${id} was denied using the operator dashboard capability.`,
         riskLevel: existing.riskLevel,
         approvalId: id,
         actorClass: "interactive",

@@ -75,9 +75,52 @@ export function compatibilityErrorResult(error: unknown) {
           })
           .safeParse(context)
       : undefined;
+  const debuggerStart = /^(?:DEBUG_|GDB_)/.test(code)
+    ? z
+        .object({
+          env: z.string().max(50).nullable(),
+          debug_tool: z.string().max(256).nullable(),
+          output_tail: z.string().max(2500),
+        })
+        .strict()
+        .safeParse(context.debuggerStart)
+    : undefined;
+  const debuggerNames: Record<string, string> = {
+    DEBUG_BUILD_FAILED: "build_failed",
+    DEBUG_ENVIRONMENT_INVALID: "bad_env",
+    DEBUG_PROBE_NOT_FOUND: "probe_not_found",
+    DEBUG_BACKEND_REQUIRED: "debug_tool_missing",
+    DEBUG_PYTHON_UNAVAILABLE: "debug_tool_missing",
+    DEBUG_PREPARATION_TIMEOUT: "start_timeout",
+    DEBUG_START_TIMEOUT: "start_timeout",
+    DEBUG_BACKEND_READY_TIMEOUT: "start_timeout",
+    DEBUG_INIT_TIMEOUT: "start_timeout",
+    GDB_INIT_TIMEOUT: "start_timeout",
+    DEBUG_INIT_FAILED: "init_script_failed",
+    GDB_INIT_FAILED: "init_script_failed",
+    DEBUG_BACKEND_NOT_READY: "debug_exited",
+    GDB_START_FAILED: "debug_exited",
+  };
   const result = {
     ok: false as const,
-    error: names[code] ?? code,
+    error:
+      (debuggerStart?.success ? debuggerNames[code] : undefined) ??
+      names[code] ??
+      code,
+    ...(debuggerStart?.success
+      ? {
+          ...debuggerStart.data,
+          ...(typeof context.cleanupPending === "boolean"
+            ? { cleanup_pending: context.cleanupPending }
+            : {}),
+          ...(z.string().uuid().safeParse(context.sessionId).success
+            ? { session_id: context.sessionId as string }
+            : {}),
+          output_tail: redactSecretsInText(
+            debuggerStart.data.output_tail,
+          ).slice(-2500),
+        }
+      : {}),
     summary: redactSecretsInText(
       error instanceof z.ZodError
         ? "Compatibility arguments do not match the tool schema."

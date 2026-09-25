@@ -117,3 +117,45 @@ it("reports raw schema failures without echoing input values", () => {
   });
   expect(JSON.stringify(result)).not.toContain("private-payload");
 });
+
+it("preserves cleanup ownership in a bounded debugger startup failure", () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  const result = compatibilityErrorResult(
+    new PlatformIOError("Cleanup pending", "GDB_START_FAILED", {
+      sessionId: id,
+      cleanupPending: true,
+      debuggerStart: {
+        env: "debug",
+        debug_tool: "openocd",
+        output_tail: "probe failed",
+      },
+      unrelated: "do not copy",
+    }),
+  );
+  expect(result.structuredContent).toMatchObject({
+    error: "debug_exited",
+    session_id: id,
+    cleanup_pending: true,
+    env: "debug",
+    output_tail: "probe failed",
+  });
+  expect(JSON.stringify(result)).not.toContain("do not copy");
+});
+it("does not change unrelated canonical errors or accept malformed startup metadata", () => {
+  for (const context of [
+    {},
+    {
+      debuggerStart: {
+        env: "debug",
+        debug_tool: null,
+        output_tail: "x".repeat(2501),
+      },
+    },
+  ]) {
+    const result = compatibilityErrorResult(
+      new PlatformIOError("failed", "DEBUG_BUILD_FAILED", context),
+    );
+    expect(result.structuredContent.error).toBe("DEBUG_BUILD_FAILED");
+    expect(result.structuredContent).not.toHaveProperty("output_tail");
+  }
+});

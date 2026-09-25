@@ -2191,3 +2191,10 @@ One CRASH command produced PIO_HIL_READY_BEFORE_CRASH, abort/backtrace, RTC_SW_C
 Explicit serial stop returned closed=true/cleanup_pending=false; list returned zero owned sessions. A separate MCP process then successfully reopened COM5 and exited. This proves exclusion and reopen after cleanup, not physical USB removal/reconnection. Normal fixture firmware remains installed; no repeated crash command was sent.
 
 Evidence retained locally in .platformio-mcp/serial-acceptance-session.jsonl, serial-competing-owner-result.json, serial-reopen-result.json and esp32s3-crash-verdict.json. Tested HEAD was 31668d15 with concurrent unrelated approval/dashboard edits in src/api/server.ts, tests/api.test.ts, web/src/lib/operator-approval.ts, web/src/__tests__/operator-approval.test.ts and generated web assets. Those edits were preserved and are not included in this evidence commit; this is explicitly working-tree evidence, not a clean final-release acceptance packet. Remaining gates and owners are in the single blocker list above.
+
+
+## Debugger startup failure contract (2026-09-25)
+
+Startup failures now retain bounded/redacted output_tail and known environment/debug-tool metadata. Reference error names are applied only to validated debugger-start metadata; original canonical codes remain in details. Build failures preserve the selected environment/tool and output tail. Cleanup-pending failures expose the retained session ID and cleanup status for recovery. Policy-denial/approval exceptions remain unchanged and unrelated exception context is not copied into compatibility responses.
+
+Thirty-two focused startup/error/preparation checks and TypeScript passed. Rebuilt only the server bundle with src/api/server.ts supplied from committed HEAD, updating its inventory entry while reusing committed web/native artifacts. Concurrent unrelated approval/dashboard edits remain untouched and unstaged. This avoids silently including those edits in this capability. Original backend limitations and required acceptance remain open; no full parity or release completion claimed.
