@@ -233,10 +233,16 @@ export async function executeCoredump(
             dump_export: exported,
           };
         }
-        const result = await analyzeEspCoredump(
-          { ...selection, elfPath: request.elfPath!, validatePolicy },
-          { ...tools!, validatePolicy },
-          capturedBytes,
+        const result = await dispatchAuthorizedAction(
+          "coredump_analyze",
+          commandArgs,
+          context,
+          () =>
+            analyzeEspCoredump(
+              { ...selection, elfPath: request.elfPath!, validatePolicy },
+              { ...tools!, validatePolicy },
+              capturedBytes,
+            ),
         );
         validatePolicy();
         return {
@@ -247,14 +253,9 @@ export async function executeCoredump(
           dump_export: exported,
         };
       };
-      return request.analyze
-        ? dispatchAuthorizedAction(
-            "coredump_analyze",
-            commandArgs,
-            context,
-            execute,
-          )
-        : execute();
+      // Preflight analysis above, but consume its one-use grant only when the
+      // analyzer runs; nested device-read approvals must not exhaust it.
+      return execute();
     },
   );
 }

@@ -118,8 +118,8 @@
     },
     {
       "path": "platformio-mcp.mjs",
-      "bytes": 4729959,
-      "sha256": "0460982ed56b714a2f954613d49a14493b8332bb830d9ce08190329867981e80"
+      "bytes": 4730428,
+      "sha256": "4e1589f78c667abf19383ff654be3b071deac4ff11f68ddada9282576ddeeb0a"
     },
     {
       "path": "prebuilds/darwin-x64+arm64/@serialport+bindings-cpp.node",
@@ -152,9 +152,9 @@
       "sha256": "eead9115994f9ad9471cd607ead9aa5c3dbf460c878bafdde41b68b57679fefc"
     },
     {
-      "path": "web/assets/index-Ckt1g-9A.js",
-      "bytes": 994685,
-      "sha256": "2e0b32b4ae0c22da3f6bde9aaa927ff32be2a1bd234810e4015905dff951ccb3"
+      "path": "web/assets/index-CvYWrGjG.js",
+      "bytes": 994282,
+      "sha256": "bee55b442934ec61d24b417f96e693786952627043c8b2f3847e7e58702a2c8e"
     },
     {
       "path": "web/assets/index-DE-4pUMU.css",
@@ -164,7 +164,7 @@
     {
       "path": "web/index.html",
       "bytes": 615,
-      "sha256": "93ace85160751ac41cf93c498fcc01707b69aade63231f4e233b0596898d62b6"
+      "sha256": "3803b204fc57707146a186871620a2671c6548bd12364529e2f2cbad48ce5382"
     },
     {
       "path": "web/pio_agent.png",

@@ -79,6 +79,7 @@ import {
 } from "./core/tasks.js";
 import { resolveTarget } from "./core/target-resolution.js";
 import { getDashboardStatusCore } from "./core/dashboard.js";
+import { getOperatorDashboardStatus } from "./api/server.js";
 import { toCliStructuredError } from "./core/cli-diagnostics.js";
 import { authorizeAction, dispatchAuthorizedAction } from "./core/action-dispatcher.js";
 import { getPolicyStatus } from "./core/policy/status.js";
@@ -162,7 +163,7 @@ COMMANDS:
   pending-approvals [--project-dir <dir>] [--limit <n>]
   approve <approval-id>
   deny <approval-id>
-  dashboard
+  dashboard [--operator]
   install --<cline|claude|vscode|antigravity|codex|codex-plugin>
   plugin validate [--require-runtime]
 
@@ -1166,7 +1167,9 @@ async function runCliCommand(command: string, rawArgs: string[]) {
           open: true,
           projectDir: asString(options["project-dir"]),
         });
-        const result = await getDashboardStatusCore(params);
+        const result = asBoolean(options.operator)
+          ? await getOperatorDashboardStatus(params.open, params.projectDir)
+          : await getDashboardStatusCore(params);
         printOutput(result, jsonMode);
         return;
       }

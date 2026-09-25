@@ -256,7 +256,7 @@ describe("Portal API Security & Telemetry Tailing", () => {
   });
 
   describe("Safety Approval APIs", () => {
-    it("rejects MCP dashboard launch and bearer authority for approval mutation", async () => {
+    it("rejects approval mutations without the browser click origin and session", async () => {
       const {getDashboardStatus} = await import("../src/api/server.js");
       const {createApprovalRequest, getApproval} = await import("../src/core/policy/approvals.js");
       const pending = createApprovalRequest({action:"upload_firmware",riskLevel:"high",reason:"attack path",requestedBy:"agent"});
@@ -267,9 +267,30 @@ describe("Portal API Security & Telemetry Tailing", () => {
       for (const action of ["approve", "deny"]) {
         const endpoint = `/api/safety/approvals/${pending.id}/${action}`;
         expect((await request(server).post(endpoint).set("Cookie",cookie)).status).toBe(403);
+        const launch = new URL(status.launchUrl);
+        expect((await request(server).post(endpoint).set("Cookie",cookie).set("Host",launch.host).set("Origin",launch.origin).set("X-Pio-Dashboard-Approval","1")).status).toBe(403);
         expect((await request(server).post(endpoint).set("Authorization",`Bearer ${authToken}`)).status).toBe(403);
       }
       expect(getApproval(pending.id)?.status).toBe("pending");
+    });
+
+    it("accepts a same-origin dashboard approval click without a second capability", async () => {
+      const {getOperatorDashboardStatus} = await import("../src/api/server.js");
+      const {createApprovalRequest, getApproval} = await import("../src/core/policy/approvals.js");
+      const status = await getOperatorDashboardStatus(false);
+      const launch = new URL(status.launchUrl);
+      const launched = await request(server).get(launch.pathname + launch.search);
+      const cookie = launched.headers["set-cookie"];
+      for (const action of ["approve", "deny"]) {
+        const pending = createApprovalRequest({action:"upload_firmware",riskLevel:"high",reason:"dashboard click",requestedBy:"agent"});
+        const endpoint = `/api/safety/approvals/${pending.id}/${action}`;
+        const send = () => request(server).post(endpoint).set("Host", launch.host).set("X-Pio-Dashboard-Approval", "1");
+        expect((await send().set("Origin", launch.origin).set("Authorization", `Bearer ${authToken}`)).status).toBe(403);
+        expect((await send().set("Cookie", cookie).set("Origin", "http://localhost:1")).status).toBe(403);
+        expect(getApproval(pending.id)?.status).toBe("pending");
+        expect((await send().set("Cookie", cookie).set("Origin", launch.origin)).status).toBe(200);
+        expect(getApproval(pending.id)?.status).toBe(action === "approve" ? "approved" : "denied");
+      }
     });
 
     it("lists approvals and supports approve/deny actions", async () => {

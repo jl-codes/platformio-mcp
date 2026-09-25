@@ -115159,10 +115159,15 @@ async function executeCoredump(input, caller = {}, onAuthorized) {
             dump_export: exported
           };
         }
-        const result = await analyzeEspCoredump(
-          { ...selection, elfPath: request.elfPath, validatePolicy },
-          { ...tools, validatePolicy },
-          capturedBytes
+        const result = await dispatchAuthorizedAction(
+          "coredump_analyze",
+          commandArgs,
+          context,
+          () => analyzeEspCoredump(
+            { ...selection, elfPath: request.elfPath, validatePolicy },
+            { ...tools, validatePolicy },
+            capturedBytes
+          )
         );
         validatePolicy();
         return {
@@ -115173,12 +115178,7 @@ async function executeCoredump(input, caller = {}, onAuthorized) {
           dump_export: exported
         };
       };
-      return request.analyze ? dispatchAuthorizedAction(
-        "coredump_analyze",
-        commandArgs,
-        context,
-        execute3
-      ) : execute3();
+      return execute3();
     }
   );
 }
@@ -127607,6 +127607,7 @@ var LAUNCH_TICKET_TTL_MS = 6e4;
 var DASHBOARD_SESSION_TTL_MS = 8 * 60 * 60 * 1e3;
 var launchTickets = /* @__PURE__ */ new Map();
 var dashboardSessions = /* @__PURE__ */ new Map();
+var OPERATOR_LAUNCH = /* @__PURE__ */ Symbol("operator-dashboard-launch");
 var activePortalStatus = {
   running: false,
   port: 0,
@@ -127647,22 +127648,23 @@ function parseCookies(header) {
   }
   return cookies;
 }
-function hasValidDashboardSession(cookieHeader) {
+function hasValidDashboardSession(cookieHeader, requireOperator = false) {
   const now = Date.now();
-  for (const [sessionId3, expiresAt] of dashboardSessions) {
-    if (expiresAt <= now) dashboardSessions.delete(sessionId3);
+  for (const [sessionId3, session3] of dashboardSessions) {
+    if (session3.expiresAt <= now) dashboardSessions.delete(sessionId3);
   }
   const sessionId2 = parseCookies(cookieHeader)[DASHBOARD_SESSION_COOKIE];
-  return Boolean(sessionId2 && (dashboardSessions.get(sessionId2) ?? 0) > now);
+  const session2 = sessionId2 ? dashboardSessions.get(sessionId2) : void 0;
+  return Boolean(session2 && session2.expiresAt > now && (!requireOperator || session2.operator));
 }
-function issueLaunchTicket(projectDir) {
+function issueLaunchTicket(projectDir, operator = false) {
   const now = Date.now();
   for (const [ticket2, value2] of launchTickets) {
     if (value2.expiresAt <= now) launchTickets.delete(ticket2);
   }
   const ticket = crypto19.randomBytes(32).toString("base64url");
   const expiresAt = now + LAUNCH_TICKET_TTL_MS;
-  launchTickets.set(ticket, { expiresAt, projectDir });
+  launchTickets.set(ticket, { expiresAt, projectDir, operator });
   return { ticket, expiresAt: new Date(expiresAt).toISOString() };
 }
 function parseDeviceLocks() {
@@ -127702,7 +127704,7 @@ function diagnoseByTaskType(type, logText, rawLogPath, success) {
   }
   return diagnoseBuildLog(logText, { rawLogPath, success });
 }
-async function getDashboardStatus(autoOpen = false, projectDir) {
+async function getDashboardStatus(autoOpen = false, projectDir, authority) {
   if (process.argv.includes("--disable-dashboard") || process.env.PIO_MCP_DISABLE_DASHBOARD === "true") {
     throw new Error(
       "Dashboard is administratively disabled by the host environment."
@@ -127727,7 +127729,7 @@ async function getDashboardStatus(autoOpen = false, projectDir) {
     });
   }
   const baseUrl = `http://${formatUrlHost(activePortalStatus.host)}:${activePortalStatus.port}`;
-  const launch = issueLaunchTicket(projectDir);
+  const launch = issueLaunchTicket(projectDir, authority === OPERATOR_LAUNCH);
   const launchUrl = `${baseUrl}/auth/launch?ticket=${encodeURIComponent(launch.ticket)}`;
   if (autoOpen) {
     if (process.env.PIO_MCP_NO_BROWSER === "true" || process.argv.includes("--no-browser")) {
@@ -127755,11 +127757,13 @@ function startPortalServer(defaultPort = 8080) {
     throw new Error("PIO_MCP_APPROVAL_TOKEN must contain 32 to 256 characters.");
   }
   const requireApprovalAuthority = (req, res) => {
+    const dashboardOrigin = `${req.protocol}://${req.get("host")}`;
+    if (hasValidDashboardSession(req.headers.cookie, true) && req.headers.origin === dashboardOrigin && req.headers["x-pio-dashboard-approval"] === "1") return true;
     const supplied = req.headers["x-pio-approval-token"];
     const expected = approvalCapability ? Buffer.from(approvalCapability) : void 0;
     const candidate = typeof supplied === "string" ? Buffer.from(supplied) : void 0;
     if (!expected || !candidate || expected.length !== candidate.length || !crypto19.timingSafeEqual(expected, candidate)) {
-      res.status(403).json({ code: "OPERATOR_APPROVAL_REQUIRED", error: "Approval changes require the separately configured operator capability. Use the local approve/deny CLI or provide the operator capability; dashboard access alone is insufficient." });
+      res.status(403).json({ code: "OPERATOR_APPROVAL_REQUIRED", error: "Enroll this browser with the local dashboard --operator command, or use the local approve/deny CLI." });
       return false;
     }
     return true;
@@ -127808,7 +127812,7 @@ function startPortalServer(defaultPort = 8080) {
       return;
     }
     const sessionId2 = crypto19.randomBytes(32).toString("base64url");
-    dashboardSessions.set(sessionId2, Date.now() + DASHBOARD_SESSION_TTL_MS);
+    dashboardSessions.set(sessionId2, { expiresAt: Date.now() + DASHBOARD_SESSION_TTL_MS, operator: launch.operator });
     res.cookie(DASHBOARD_SESSION_COOKIE, sessionId2, {
       httpOnly: true,
       sameSite: "strict",
@@ -128013,7 +128017,7 @@ function startPortalServer(defaultPort = 8080) {
       appendAuditEvent({
         action: "dashboard_approve_request",
         status: "approved",
-        reason: `Approval ${id} was approved using the operator dashboard capability.`,
+        reason: `Approval ${id} was approved through an authenticated approval request.`,
         riskLevel: existing.riskLevel,
         approvalId: id,
         actorClass: "interactive",
@@ -128045,7 +128049,7 @@ function startPortalServer(defaultPort = 8080) {
       appendAuditEvent({
         action: "dashboard_deny_request",
         status: "denied",
-        reason: `Approval ${id} was denied using the operator dashboard capability.`,
+        reason: `Approval ${id} was denied through an authenticated approval request.`,
         riskLevel: existing.riskLevel,
         approvalId: id,
         actorClass: "interactive",

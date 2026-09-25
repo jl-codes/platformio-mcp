@@ -13,6 +13,7 @@ vi.mock("../src/core/analysis/esp-coredump-tools.js", () => ({
 }));
 import { resolveEspCoredumpTools } from "../src/core/analysis/esp-coredump-tools.js";
 import { PlatformIOError } from "../src/utils/errors.js";
+import { approveRequest, getApproval } from "../src/core/policy/approvals.js";
 import { executeCoredump } from "../src/tools/coredump.js";
 let root: string, state: string;
 beforeEach(() => {
@@ -197,3 +198,43 @@ it.each([
   },
   20000,
 );
+
+it("preserves an approved analysis grant while device acquisition requests its own approval", async () => {
+  const policy = path.join(state, "operator.json");
+  vi.stubEnv("PIO_MCP_POLICY_FILE", policy);
+  fs.writeFileSync(
+    policy,
+    JSON.stringify({
+      profile: "lab_admin",
+      overrides: {
+        allow: ["get_project_config", "run_shell_command"],
+        deny: [],
+        approval_required: ["run_shell_command"],
+        audit_all_agent_actions: false,
+      },
+    }),
+  );
+  const input = {
+    ...request(),
+    outPath: undefined,
+    analyze: true,
+    elfPath: "firmware.elf",
+  };
+  const error = (await executeCoredump(input).catch(
+    (value: unknown) => value,
+  )) as PlatformIOError;
+  expect(error.code).toBe("APPROVAL_REQUIRED");
+  const approvalId = (error.context?.policyDecision as { approvalId: string })
+    .approvalId;
+  approveRequest(approvalId);
+  const nested = new PlatformIOError(
+    "Read approval required",
+    "APPROVAL_REQUIRED",
+  );
+  vi.mocked(acquireProjectCoredump).mockRejectedValueOnce(nested);
+  await expect(
+    executeCoredump({ ...input, commandApprovalId: approvalId }),
+  ).rejects.toBe(nested);
+  expect(getApproval(approvalId)?.status).toBe("approved");
+  expect(resolveEspCoredumpTools).not.toHaveBeenCalled();
+});
