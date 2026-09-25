@@ -1,5 +1,8 @@
 /** Permission-gated host USB inventory shared by debugger adapters and pre-spawn revalidation. */
 import fs from "node:fs/promises";
+import { listDevicesCore } from "../devices.js";
+import type { SerialDevice } from "../../types.js";
+import type { UsbProbeRecord } from "./debug-probe.js";
 import { PlatformIOError } from "../../utils/errors.js";
 import { dispatchAuthorizedAction } from "../action-dispatcher.js";
 import { createPolicyRevisionGuard } from "../policy/revision-guard.js";
@@ -91,5 +94,39 @@ async function readHostInventory() {
       "USB probe discovery is unsupported on this host.",
       "DEBUG_PROBE_PLATFORM_UNSUPPORTED",
     );
-  return result;
+  const serial = await listDevicesCore();
+  return { ...result, devices: bindProbeSerialPorts(result.devices, serial) };
+}
+
+/** Match complete host-reported USB identities; descriptions and historical port numbers never bind a probe. */
+export function bindProbeSerialPorts(
+  probes: readonly UsbProbeRecord[],
+  serial: readonly SerialDevice[],
+): UsbProbeRecord[] {
+  if (serial.length > 1024)
+    throw new PlatformIOError(
+      "Serial inventory exceeds limits.",
+      "DEBUG_PROBE_INVENTORY_INVALID",
+    );
+  return probes.map((probe) => ({
+    ...probe,
+    serialPorts: serial
+      .filter((device) => {
+        if (typeof device.hwid !== "string" || device.hwid.length > 4096)
+          return false;
+        const tokens = device.hwid.trim().split(/\s+/);
+        const ids = tokens.filter((token) =>
+          /^VID:PID=[0-9a-f]{4}:[0-9a-f]{4}$/i.test(token),
+        );
+        const serials = tokens.filter((token) => /^SER=\S+$/.test(token));
+        return (
+          ids.length === 1 &&
+          serials.length === 1 &&
+          ids[0].slice(8).toLowerCase() ===
+            `${probe.vendorId}:${probe.productId}`.toLowerCase() &&
+          serials[0].slice(4) === probe.serialNumber
+        );
+      })
+      .map((device) => device.port),
+  }));
 }

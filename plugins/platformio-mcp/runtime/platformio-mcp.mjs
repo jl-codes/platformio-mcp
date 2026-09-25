@@ -16160,6 +16160,500 @@ var init_build_cache = __esm({
   }
 });
 
+// src/core/esp-partitions.ts
+import { createHash as createHash2 } from "node:crypto";
+function invalid(message) {
+  throw new PlatformIOError(message, "PARTITION_TABLE_INVALID");
+}
+function unsigned(value2, maximum, label) {
+  if (!Number.isSafeInteger(value2) || value2 < 0 || value2 > maximum)
+    invalid("Invalid " + label + ".");
+  return value2;
+}
+function parsePartitionNumber(text10) {
+  const match = /^(0x[0-9a-f]+|[0-9]+)([km])?$/i.exec(text10.trim());
+  if (!match) invalid("Invalid partition number.");
+  return unsigned(
+    Number(match[1]) * (match[2]?.toLowerCase() === "k" ? 1024 : match[2] ? 1048576 : 1),
+    UINT32_END,
+    "partition number"
+  );
+}
+function validateLocation(layout) {
+  unsigned(layout.tableOffset, UINT32_END - SECTOR, "partition table offset");
+  if (layout.tableOffset % SECTOR)
+    invalid("Partition table offset is not sector aligned.");
+  if (layout.flashSize !== void 0) {
+    unsigned(layout.flashSize, UINT32_END, "flash size");
+    if (layout.flashSize < layout.tableOffset + SECTOR)
+      invalid("Partition table exceeds flash size.");
+  }
+}
+function validateEspPartitions(parts, layout) {
+  validateLocation(layout);
+  if (parts.length > 95) invalid("Partition table exceeds the 95-entry limit.");
+  const names = /* @__PURE__ */ new Set();
+  let end = layout.tableOffset + SECTOR;
+  let otaCount = 0;
+  for (const part of [...parts].sort((a, b) => a.offset - b.offset)) {
+    if (!part.name || Buffer.byteLength(part.name, "utf8") > 16 || /[\x00-\x1f\x7f]/.test(part.name))
+      invalid("Invalid partition label.");
+    if (names.has(part.name)) invalid("Duplicate partition label.");
+    names.add(part.name);
+    unsigned(part.type, 255, "partition type");
+    unsigned(part.subtype, 255, "partition subtype");
+    unsigned(part.flags, 4294967295, "partition flags");
+    unsigned(part.offset, 4294967295, "partition offset");
+    unsigned(part.size, 4294967295, "partition size");
+    if (!part.size || part.offset + part.size > UINT32_END)
+      invalid("Invalid partition address range.");
+    if (part.offset < end)
+      invalid("Partition overlaps the table or another partition.");
+    if (part.offset % (part.type === 0 ? 65536 : SECTOR))
+      invalid("Partition offset is not aligned for its type.");
+    if (part.type === 0 && part.size % SECTOR)
+      invalid("Application size is not sector aligned.");
+    if (part.type === 1 && [0, 3].includes(part.subtype) && part.flags & 2)
+      invalid("OTA metadata and core-dump partitions cannot be read-only.");
+    if (part.type === 1 && part.subtype === 0) {
+      if (++otaCount > 1 || part.size !== 8192)
+        invalid("Invalid OTA metadata partition.");
+    }
+    end = part.offset + part.size;
+    if (layout.flashSize !== void 0 && end > layout.flashSize)
+      invalid("Partition exceeds flash size.");
+  }
+}
+function parseEspPartitionCsv(text10, layout) {
+  validateLocation(layout);
+  if (Buffer.byteLength(text10, "utf8") > 65536)
+    invalid("Partition CSV exceeds 64 KiB.");
+  const parts = [];
+  let end = layout.tableOffset + SECTOR;
+  for (const line of text10.replace(/^\uFEFF/, "").split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+    const fields = line.split(",").map((field3) => field3.trim());
+    if (fields.length < 5 || fields.length > 6)
+      invalid("Expected five or six CSV columns.");
+    const [name2, rawType, rawSubtype, offsetText, sizeText, flagText = ""] = fields;
+    const typeText = rawType.toLowerCase();
+    const subtypeText = rawSubtype.toLowerCase();
+    const type = typeText === "app" ? 0 : typeText === "data" ? 1 : parsePartitionNumber(typeText);
+    let subtype;
+    const ota = /^ota_([0-9]|1[0-5])$/.exec(subtypeText);
+    if (type !== 0 && !subtypeText) subtype = 6;
+    else if (type === 0 && subtypeText === "factory") subtype = 0;
+    else if (type === 0 && subtypeText === "test") subtype = 32;
+    else if (type === 0 && ota) subtype = 16 + Number(ota[1]);
+    else if (type === 1 && Object.hasOwn(DATA_SUBTYPES, subtypeText))
+      subtype = DATA_SUBTYPES[subtypeText];
+    else subtype = parsePartitionNumber(subtypeText);
+    const alignment = type === 0 ? 65536 : SECTOR;
+    const offset2 = offsetText ? parsePartitionNumber(offsetText) : Math.ceil(end / alignment) * alignment;
+    const size = sizeText.startsWith("-") ? parsePartitionNumber(sizeText.slice(1)) - offset2 : parsePartitionNumber(sizeText);
+    let flags = 0;
+    for (const flag of flagText.split(":").filter(Boolean)) {
+      if (flag === "encrypted") flags |= 1;
+      else if (flag === "readonly") flags |= 2;
+      else invalid("Unsupported partition flag.");
+    }
+    parts.push({ name: name2, type, subtype, offset: offset2, size, flags });
+    if (parts.length > 95)
+      invalid("Partition table exceeds the 95-entry limit.");
+    end = offset2 + size;
+  }
+  validateEspPartitions(parts, layout);
+  return parts;
+}
+function parseEspPartitionBinary(input, layout) {
+  validateLocation(layout);
+  const data = Buffer.from(input);
+  if (!data.length || data.length > SECTOR || data.length % 32)
+    invalid("Partition binary must contain 32-byte records within one sector.");
+  const parts = [];
+  let checksumSeen = false;
+  for (let index = 0; index < Math.min(data.length, 3072); index += 32) {
+    const record3 = data.subarray(index, index + 32);
+    if (record3.every((byte) => byte === 255)) {
+      if (!data.subarray(index, Math.min(data.length, 3072)).every((byte) => byte === 255))
+        invalid("Unexpected data after partition terminator.");
+      validateEspPartitions(parts, layout);
+      return parts;
+    }
+    if (record3.readUInt16LE(0) === 60395) {
+      if (checksumSeen || !record3.subarray(2, 16).every((byte) => byte === 255))
+        invalid("Invalid partition checksum record.");
+      if (!createHash2("md5").update(data.subarray(0, index)).digest().equals(record3.subarray(16)))
+        invalid("Partition checksum mismatch.");
+      checksumSeen = true;
+      continue;
+    }
+    if (checksumSeen || record3.readUInt16LE(0) !== 20650)
+      invalid("Invalid partition record magic or record order.");
+    const label = record3.subarray(12, 28);
+    const zero = label.indexOf(0);
+    let name2;
+    try {
+      name2 = new TextDecoder("utf-8", { fatal: true }).decode(
+        zero < 0 ? label : label.subarray(0, zero)
+      );
+    } catch {
+      return invalid("Partition label is not valid UTF-8.");
+    }
+    parts.push({
+      name: name2,
+      type: record3[2],
+      subtype: record3[3],
+      offset: record3.readUInt32LE(4),
+      size: record3.readUInt32LE(8),
+      flags: record3.readUInt32LE(28)
+    });
+  }
+  return invalid("Partition binary is missing its terminator.");
+}
+var SECTOR, UINT32_END, DATA_SUBTYPES;
+var init_esp_partitions = __esm({
+  "src/core/esp-partitions.ts"() {
+    "use strict";
+    init_errors2();
+    SECTOR = 4096;
+    UINT32_END = 4294967296;
+    DATA_SUBTYPES = {
+      ota: 0,
+      phy: 1,
+      nvs: 2,
+      coredump: 3,
+      nvs_keys: 4,
+      efuse: 5,
+      undefined: 6,
+      esphttpd: 128,
+      fat: 129,
+      spiffs: 130,
+      littlefs: 131
+    };
+  }
+});
+
+// src/core/esp-partition-report.ts
+function projectEspPartition(part) {
+  const subtype = part.type === 0 ? part.subtype === 0 ? "factory" : part.subtype === 32 ? "test" : part.subtype >= 16 && part.subtype < 32 ? "ota_" + (part.subtype - 16) : hex(part.subtype) : part.type === 1 ? dataNames[part.subtype] ?? hex(part.subtype) : hex(part.subtype);
+  return {
+    name: part.name,
+    type: part.type === 0 ? "app" : part.type === 1 ? "data" : hex(part.type),
+    subtype,
+    offset: part.offset,
+    size: part.size,
+    flags: [
+      ...part.flags & 1 ? ["encrypted"] : [],
+      ...part.flags & 2 ? ["readonly"] : []
+    ],
+    unknown_flags: (part.flags & ~3) >>> 0,
+    offset_hex: hex(part.offset),
+    size_hex: hex(part.size),
+    end_hex: hex(part.offset + part.size)
+  };
+}
+function compareEspPartitions(expected, observed, layout) {
+  validateEspPartitions(expected, layout);
+  validateEspPartitions(observed, layout);
+  const wanted = new Map(expected.map((part) => [part.name, part]));
+  const actual = new Map(observed.map((part) => [part.name, part]));
+  const differences = [];
+  for (const [name2, part] of wanted) {
+    const other = actual.get(name2);
+    if (!other)
+      differences.push({
+        name: name2,
+        kind: "missing_on_device",
+        expected: projectEspPartition(part)
+      });
+    else {
+      const fields = ["type", "subtype", "offset", "size", "flags"].filter((field3) => part[field3] !== other[field3]);
+      if (fields.length)
+        differences.push({
+          name: name2,
+          kind: "changed",
+          fields,
+          expected: projectEspPartition(part),
+          device: projectEspPartition(other)
+        });
+    }
+  }
+  for (const [name2, part] of actual) {
+    if (!wanted.has(name2))
+      differences.push({
+        name: name2,
+        kind: "extra_on_device",
+        device: projectEspPartition(part)
+      });
+  }
+  const order = { missing_on_device: 0, changed: 1, extra_on_device: 2 };
+  return differences.sort(
+    (a, b) => order[a.kind] - order[b.kind] || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
+  );
+}
+function reportEspPartitions(parts, layout, firmwareSize) {
+  validateEspPartitions(parts, { tableOffset: layout.tableOffset });
+  if (layout.flashSize !== void 0 && (!Number.isSafeInteger(layout.flashSize) || layout.flashSize <= 0 || layout.flashSize > 4294967296))
+    throw new PlatformIOError("Invalid flash size.", "PARTITION_TABLE_INVALID");
+  if (firmwareSize !== void 0 && (!Number.isSafeInteger(firmwareSize) || firmwareSize < 0 || firmwareSize > 4294967295))
+    throw new PlatformIOError(
+      "Invalid firmware size.",
+      "PARTITION_TABLE_INVALID"
+    );
+  const issues = [];
+  const add = (severity, code, message, fix) => issues.push({ severity, code, message, fix });
+  const apps2 = parts.filter((part) => part.type === 0);
+  const slots = apps2.filter((part) => part.subtype >= 16 && part.subtype < 32);
+  const hasData = (subtype) => parts.some((part) => part.type === 1 && part.subtype === subtype);
+  const end = Math.max(
+    layout.tableOffset + 4096,
+    ...parts.map((part) => part.offset + part.size)
+  );
+  if (!parts.length)
+    add(
+      "error",
+      "empty_table",
+      "The table contains no partitions.",
+      "Select the project's effective partition table."
+    );
+  if (!apps2.length)
+    add(
+      "error",
+      "no_app",
+      "No application partition is present.",
+      "Add an application partition suitable for the selected chip."
+    );
+  if (slots.length && !hasData(0))
+    add(
+      "error",
+      "ota_without_otadata",
+      "OTA application slots have no OTA selection metadata.",
+      "Add a correctly sized OTA metadata partition."
+    );
+  if (!slots.length && hasData(0))
+    add(
+      "warning",
+      "otadata_without_ota",
+      "OTA selection metadata exists without OTA application slots.",
+      "Check whether OTA is intended for this layout."
+    );
+  if (slots.length === 1)
+    add(
+      "warning",
+      "single_ota_slot",
+      "Only one OTA application slot is available.",
+      "Review update recovery and add an alternate slot if needed."
+    );
+  if (new Set(slots.map((part) => part.size)).size > 1)
+    add(
+      "warning",
+      "uneven_ota_slots",
+      "OTA slots have different capacities.",
+      "Ensure each intended update fits its destination slot."
+    );
+  if (!hasData(2))
+    add(
+      "warning",
+      "no_nvs",
+      "The layout has no NVS partition.",
+      "Check application persistence and framework requirements."
+    );
+  if (!hasData(3))
+    add(
+      "info",
+      "no_coredump",
+      "No flash core-dump partition is present.",
+      "Configure crash storage if flash core dumps are required."
+    );
+  if (layout.flashSize !== void 0) {
+    if (end > layout.flashSize)
+      add(
+        "error",
+        "exceeds_flash",
+        "The layout extends beyond the supplied flash capacity.",
+        "Verify the actual chip capacity and partition sizes."
+      );
+    else if (layout.flashSize - end >= 1048576)
+      add(
+        "info",
+        "unused_flash",
+        String(layout.flashSize - end) + " trailing flash bytes are unassigned.",
+        "Review whether the remaining capacity should be allocated."
+      );
+  }
+  const fits = firmwareSize === void 0 ? [] : apps2.map((part) => ({
+    name: part.name,
+    size: part.size,
+    firmware_size: firmwareSize,
+    fits: firmwareSize <= part.size,
+    used_percent: Math.round(firmwareSize / part.size * 1e3) / 10
+  }));
+  if (fits.length) {
+    const limiting = fits.reduce((a, b) => a.size <= b.size ? a : b);
+    if (!limiting.fits)
+      add(
+        "error",
+        "app_too_big",
+        "Firmware exceeds app partition " + limiting.name + ".",
+        "Select the intended destination explicitly or reduce firmware size."
+      );
+    else if (limiting.used_percent >= 90)
+      add(
+        "warning",
+        "app_nearly_full",
+        "Firmware uses " + limiting.used_percent + "% of the smallest app partition.",
+        "Review space needed for future updates."
+      );
+    else
+      add(
+        "info",
+        "app_fits",
+        "Firmware fits all declared application partitions.",
+        ""
+      );
+  }
+  return {
+    ok: !issues.some((issue2) => issue2.severity === "error"),
+    table_offset: layout.tableOffset,
+    table_end: end,
+    flash_size: layout.flashSize ?? null,
+    firmware_size: firmwareSize ?? null,
+    partitions: parts.map(projectEspPartition),
+    application_fit: fits,
+    issues,
+    error_count: issues.filter((issue2) => issue2.severity === "error").length,
+    warning_count: issues.filter((issue2) => issue2.severity === "warning").length,
+    evidence: "offline_layout"
+  };
+}
+var dataNames, hex;
+var init_esp_partition_report = __esm({
+  "src/core/esp-partition-report.ts"() {
+    "use strict";
+    init_errors2();
+    init_esp_partitions();
+    dataNames = {
+      0: "ota",
+      1: "phy",
+      2: "nvs",
+      3: "coredump",
+      4: "nvs_keys",
+      5: "efuse",
+      6: "undefined",
+      128: "esphttpd",
+      129: "fat",
+      130: "spiffs",
+      131: "littlefs"
+    };
+    hex = (value2) => "0x" + value2.toString(16);
+  }
+});
+
+// src/core/esp-partition-artifacts.ts
+import fs24 from "node:fs/promises";
+import path31 from "node:path";
+import { createHash as createHash3 } from "node:crypto";
+function contained(root, target) {
+  const relative = path31.relative(root, target);
+  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path31.sep) && !path31.isAbsolute(relative);
+}
+async function readPartitionArtifact(root, requested, limit) {
+  const lexical = path31.resolve(root, requested);
+  const canonical3 = await fs24.realpath(lexical);
+  if (!contained(root, canonical3))
+    throw new PlatformIOError(
+      "Partition artifact is outside the authorized workspace.",
+      "PARTITION_ARTIFACT_OUTSIDE_WORKSPACE"
+    );
+  const handle = await fs24.open(canonical3, "r");
+  try {
+    const before = await handle.stat();
+    if (!before.isFile() || before.size > limit)
+      throw new PlatformIOError(
+        "Partition artifact is not a bounded regular file.",
+        "PARTITION_ARTIFACT_INVALID"
+      );
+    const bytes = Buffer.alloc(before.size + 1);
+    let used = 0;
+    while (used < bytes.length) {
+      const read = await handle.read(bytes, used, bytes.length - used, used);
+      if (!read.bytesRead) break;
+      used += read.bytesRead;
+    }
+    const after = await handle.stat();
+    const current = await fs24.stat(canonical3);
+    const resolved = await fs24.realpath(lexical);
+    if (used !== before.size || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || before.ino !== current.ino || before.dev !== current.dev || current.size !== after.size || current.mtimeMs !== after.mtimeMs || resolved !== canonical3)
+      throw new PlatformIOError(
+        "Partition artifact changed during inspection; retry with a stable copy.",
+        "PARTITION_ARTIFACT_CHANGED"
+      );
+    const content = bytes.subarray(0, used);
+    return {
+      content,
+      identity: {
+        path: canonical3,
+        size: used,
+        sha256: createHash3("sha256").update(content).digest("hex")
+      }
+    };
+  } finally {
+    await handle.close();
+  }
+}
+async function inspectEspPartitionArtifacts(input) {
+  const root = await fs24.realpath(input.workspaceDir);
+  const table = await readPartitionArtifact(
+    input.trustedTableRoot ? await fs24.realpath(input.trustedTableRoot) : root,
+    input.tablePath,
+    input.format === "csv" ? 65536 : 4096
+  );
+  let text10;
+  if (input.format === "csv") {
+    try {
+      text10 = new TextDecoder("utf-8", { fatal: true }).decode(table.content);
+    } catch {
+      throw new PlatformIOError(
+        "Partition CSV is not valid UTF-8.",
+        "PARTITION_TABLE_INVALID"
+      );
+    }
+  }
+  const parts = input.format === "csv" ? parseEspPartitionCsv(text10, { tableOffset: input.layout.tableOffset }) : parseEspPartitionBinary(table.content, {
+    tableOffset: input.layout.tableOffset
+  });
+  const firmware = input.firmwarePath ? await readPartitionArtifact(root, input.firmwarePath, 128 * 1024 * 1024) : null;
+  const observed = input.observedTablePath ? await readPartitionArtifact(root, input.observedTablePath, 4096) : null;
+  const comparison = observed ? compareEspPartitions(
+    parts,
+    parseEspPartitionBinary(observed.content, {
+      tableOffset: input.layout.tableOffset
+    }),
+    { tableOffset: input.layout.tableOffset }
+  ) : null;
+  return {
+    ...reportEspPartitions(parts, input.layout, firmware?.identity.size),
+    partitionRecords: parts,
+    artifacts: {
+      table: table.identity,
+      firmware: firmware?.identity ?? null,
+      observed_table: observed?.identity ?? null
+    },
+    comparison,
+    // An offline copy can be stale; never label it a verified live-device match.
+    comparison_source: observed ? "offline_binary" : null
+  };
+}
+var init_esp_partition_artifacts = __esm({
+  "src/core/esp-partition-artifacts.ts"() {
+    "use strict";
+    init_errors2();
+    init_esp_partitions();
+    init_esp_partition_report();
+  }
+});
+
 // src/types.ts
 var BoardInfoSchema, BoardsArraySchema, SerialDeviceSchema, DevicesArraySchema, ProjectConfigSchema, UploadConfigSchema, LibraryInfoSchema, LibrariesArraySchema, LibrariesObjectSchema, LibrarySearchResponseSchema, LibrarySearchConfigSchema, LibraryInstallConfigSchema, ListBoardsParamsSchema, AcquireLockParamsSchema, ReleaseLockParamsSchema, GetBoardInfoParamsSchema, InitProjectParamsSchema, GetProjectConfigParamsSchema, SystemInfoParamsSchema, BuildProjectParamsSchema, CleanProjectParamsSchema, CheckProjectParamsSchema, RunTestsParamsSchema, UploadFirmwareParamsSchema, UploadFilesystemParamsSchema, SearchLibrariesParamsSchema, InstallLibraryParamsSchema, UninstallLibraryParamsSchema, UpdateLibraryParamsSchema, ListInstalledLibrariesParamsSchema, StartMonitorParamsSchema, StopMonitorParamsSchema, QueryLogsParamsSchema, CheckTaskStatusParamsSchema, TargetBindingSchema, AgentResolveTargetParamsSchema, GetMonitorStatusParamsSchema, CaptureSerialWindowParamsSchema, AgentMonitorHealthParamsSchema, CancelTaskParamsSchema, ListTaskHistoryParamsSchema, GetApprovalRequestParamsSchema, ListPendingApprovalsParamsSchema, GetDashboardUrlParamsSchema, GetProjectContextParamsSchema, AgentValidateProjectParamsSchema, AgentBuildDiagnoseParamsSchema, AgentSafePinAuditParamsSchema, AgentFlashMonitorVerifyParamsSchema, AgentGetLastReportParamsSchema, AgentGenerateBoardReportParamsSchema, GetPolicyStatusParamsSchema;
 var init_types2 = __esm({
@@ -17073,6 +17567,331 @@ var init_projects = __esm({
     init_build_cache();
     PLATFORMIO_INI_ENV_RE = /^\s*\[env:([^\]\s]+)\]\s*$/gm;
     MAX_SRC_FILES = 50;
+  }
+});
+
+// src/core/esp-partition-framework.ts
+import fs38 from "node:fs/promises";
+import path45 from "node:path";
+function within2(root, target) {
+  const relative = path45.relative(root, target);
+  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path45.sep) && !path45.isAbsolute(relative);
+}
+function partitionFrameworkCandidates(includes) {
+  const candidates = /* @__PURE__ */ new Set();
+  for (const include of includes) {
+    const normalized = include.replace(/\\/g, "/");
+    const match = /^(.*\/framework-(?:arduinoespressif32|espidf)(?:@[^/]+)?)(?:\/|$)/.exec(
+      normalized
+    );
+    if (match) candidates.add(path45.normalize(match[1]));
+  }
+  if (candidates.size > 32)
+    throw new PlatformIOError(
+      "Too many framework package candidates.",
+      "PARTITION_FRAMEWORK_AMBIGUOUS"
+    );
+  return [...candidates];
+}
+async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, projectDir) {
+  if (!filename || filename !== path45.basename(filename) || !/\.csv$/i.test(filename) || filename.length > 256 || /[\x00-\x1f\x7f]/.test(filename))
+    throw new PlatformIOError(
+      "Framework lookup requires one CSV filename.",
+      "PARTITION_FRAMEWORK_INVALID"
+    );
+  const core = systemInfo?.core_dir?.value;
+  if (typeof core !== "string" || !path45.isAbsolute(core))
+    throw new PlatformIOError(
+      "Host Core package location is unavailable.",
+      "PARTITION_FRAMEWORK_UNTRUSTED"
+    );
+  const packages = await fs38.realpath(path45.join(core, "packages"));
+  const project = await fs38.realpath(projectDir);
+  if (packages === project || within2(project, packages) || within2(packages, project))
+    throw new PlatformIOError(
+      "Framework installation overlaps the project workspace.",
+      "PARTITION_FRAMEWORK_UNTRUSTED"
+    );
+  if (candidates.length > 32)
+    throw new PlatformIOError(
+      "Too many framework candidates.",
+      "PARTITION_FRAMEWORK_AMBIGUOUS"
+    );
+  const found = [];
+  for (const candidate of new Set(candidates)) {
+    const root = await fs38.realpath(candidate);
+    if (!within2(packages, root) || path45.relative(packages, root).split(path45.sep).length !== 1)
+      throw new PlatformIOError(
+        "Framework is outside registered host packages.",
+        "PARTITION_FRAMEWORK_UNTRUSTED"
+      );
+    const manifestBytes = await readPartitionArtifact(
+      root,
+      "package.json",
+      65536
+    );
+    const recordBytes = await readPartitionArtifact(root, ".piopm", 65536);
+    let manifest, record3;
+    try {
+      manifest = JSON.parse(manifestBytes.content.toString("utf8"));
+      record3 = JSON.parse(recordBytes.content.toString("utf8"));
+    } catch {
+      throw new PlatformIOError(
+        "Invalid framework package registration.",
+        "PARTITION_FRAMEWORK_UNTRUSTED"
+      );
+    }
+    if (!manifest || !record3 || typeof manifest.name !== "string" || !["framework-arduinoespressif32", "framework-espidf"].includes(
+      manifest.name
+    ) || typeof manifest.version !== "string" || !manifest.version || record3.name !== manifest.name || record3.version !== manifest.version || record3.type !== "tool")
+      throw new PlatformIOError(
+        "Framework registration does not match its manifest.",
+        "PARTITION_FRAMEWORK_UNTRUSTED"
+      );
+    const relative = path45.join(
+      manifest.name === "framework-espidf" ? "components/partition_table" : "tools/partitions",
+      filename
+    );
+    try {
+      const csv = await readPartitionArtifact(root, relative, 65536);
+      found.push({
+        root,
+        tablePath: csv.identity.path,
+        packageName: manifest.name,
+        packageVersion: manifest.version
+      });
+    } catch (error2) {
+      if (error2.code !== "ENOENT") throw error2;
+    }
+  }
+  const unique = [
+    ...new Map(found.map((entry) => [entry.tablePath, entry])).values()
+  ];
+  if (unique.length !== 1)
+    throw new PlatformIOError(
+      unique.length ? "Multiple selected frameworks contain that CSV." : "The selected frameworks do not contain that CSV.",
+      unique.length ? "PARTITION_FRAMEWORK_AMBIGUOUS" : "PARTITION_FRAMEWORK_NOT_FOUND"
+    );
+  return unique[0];
+}
+var init_esp_partition_framework = __esm({
+  "src/core/esp-partition-framework.ts"() {
+    "use strict";
+    init_esp_partition_artifacts();
+    init_errors2();
+  }
+});
+
+// src/core/project-inspection.ts
+function readJson(output) {
+  if (Buffer.byteLength(output) > 10 * 1024 * 1024)
+    throw new PlatformIOError(
+      "Project output exceeds 10 MiB.",
+      "PROJECT_OUTPUT_LIMIT"
+    );
+  let raw;
+  try {
+    raw = JSON.parse(output);
+  } catch {
+    throw new PlatformIOError(
+      "Project output is not valid JSON.",
+      "PROJECT_OUTPUT_INVALID"
+    );
+  }
+  let nodes = 0;
+  const clean = (item, depth) => {
+    if (++nodes > 1e5 || depth > 24)
+      throw new PlatformIOError(
+        "Project output exceeds structural limits.",
+        "PROJECT_OUTPUT_LIMIT"
+      );
+    if (typeof item === "string") return redactSecretsInText(item);
+    if (Array.isArray(item))
+      return item.map((child) => clean(child, depth + 1));
+    if (item && typeof item === "object")
+      return Object.fromEntries(
+        Object.entries(item).map(([key, child]) => [
+          key,
+          depth > 0 && /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
+            key
+          ) ? "[REDACTED_SECRET]" : clean(child, depth + 1)
+        ])
+      );
+    return item;
+  };
+  return clean(raw, 0);
+}
+function parseProjectEnvironments(output) {
+  const parsed = configSchema.safeParse(readJson(output));
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Unexpected computed configuration shape.",
+      "PROJECT_CONFIG_INVALID"
+    );
+  const sections = /* @__PURE__ */ new Map();
+  for (const [name2, options] of parsed.data) {
+    if (sections.has(name2) || new Set(options.map(([key]) => key)).size !== options.length)
+      throw new PlatformIOError(
+        "Duplicate computed configuration section or option.",
+        "PROJECT_CONFIG_INVALID"
+      );
+    sections.set(
+      name2,
+      Object.fromEntries(
+        options.map(([key, field3]) => [
+          key,
+          /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
+            key
+          ) ? "[REDACTED_SECRET]" : field3
+        ])
+      )
+    );
+  }
+  const envs = [...sections.entries()].filter(([name2]) => name2.startsWith("env:")).map(([section, options]) => ({
+    name: section.slice(4),
+    board: options.board ?? null,
+    platform: options.platform ?? null,
+    framework: options.framework ?? null,
+    monitorSpeed: options.monitor_speed ?? null,
+    monitorPort: options.monitor_port ?? null,
+    uploadPort: options.upload_port ?? null,
+    uploadProtocol: options.upload_protocol ?? null,
+    partitionTable: options["board_build.partitions"] ?? null,
+    sdkconfigPath: options["board_build.esp-idf.sdkconfig_path"] ?? null,
+    partitionTableUploadOffset: options["board_upload.partition_table_offset"] ?? null,
+    flashSize: options["board_upload.flash_size"] ?? null,
+    mcu: options["board_build.mcu"] ?? null,
+    libraryDependencies: options.lib_deps ?? [],
+    libraryExtraDirectories: options.lib_extra_dirs ?? [],
+    libraryDependencyFinderMode: options.lib_ldf_mode ?? null,
+    libraryCompatibilityMode: options.lib_compat_mode ?? null,
+    buildFlags: options.build_flags ?? [],
+    extends: options.extends ?? []
+  }));
+  if (envs.length > 256 || envs.some((env) => !env.name))
+    throw new PlatformIOError(
+      "Invalid environment inventory.",
+      "PROJECT_CONFIG_INVALID"
+    );
+  const platformioSection = sections.get("platformio") ?? {};
+  const rawDefaults = platformioSection.default_envs;
+  const defaults = typeof rawDefaults === "string" ? rawDefaults.split(/[,\r\n]/).map((item) => item.trim()).filter(Boolean) : Array.isArray(rawDefaults) ? rawDefaults : rawDefaults == null ? [] : void 0;
+  if (!defaults || defaults.some((name2) => !envs.some((env) => env.name === name2)))
+    throw new PlatformIOError(
+      "Default environments do not match the resolved inventory.",
+      "PROJECT_CONFIG_INVALID"
+    );
+  return {
+    envs,
+    defaultEnvironments: defaults.length ? defaults : envs.map((env) => env.name),
+    platformioSection
+  };
+}
+function parseProjectMetadata(output, environment) {
+  const parsed = metadataSchema.safeParse(readJson(output));
+  if (!parsed.success)
+    throw new PlatformIOError(
+      "Unexpected build metadata shape.",
+      "PROJECT_METADATA_INVALID"
+    );
+  const entries = Object.entries(parsed.data);
+  if (entries.length < 1 || entries.length > 256 || environment && (entries.length !== 1 || entries[0][0] !== environment))
+    throw new PlatformIOError(
+      "Metadata does not match the selected environments.",
+      "PROJECT_METADATA_INVALID"
+    );
+  const envs = Object.fromEntries(
+    entries.map(([name2, item]) => {
+      if (!name2 || item.env_name && item.env_name !== name2)
+        throw new PlatformIOError(
+          "Metadata environment identity disagrees with its key.",
+          "PROJECT_METADATA_INVALID"
+        );
+      return [
+        name2,
+        {
+          buildType: item.build_type ?? null,
+          defines: item.defines ?? [],
+          includeDirs: item.includes?.build?.slice(0, 40) ?? [],
+          partitionFrameworkCandidates: partitionFrameworkCandidates(item.includes?.build ?? []),
+          includeDirCount: item.includes?.build?.length ?? 0,
+          toolchainIncludeDirCount: item.includes?.toolchain?.length ?? 0,
+          librarySourceDirs: item.libsource_dirs ?? [],
+          cc: item.cc_path ?? null,
+          cxx: item.cxx_path ?? null,
+          gdb: item.gdb_path ?? null,
+          compilerType: item.compiler_type ?? null,
+          ccFlags: item.cc_flags ?? [],
+          cxxFlags: item.cxx_flags ?? [],
+          programPath: item.prog_path ?? null,
+          svdPath: item.svd_path ?? null,
+          extra: item.extra ?? null,
+          targets: item.targets ?? [],
+          targetsAvailable: item.targets !== void 0
+        }
+      ];
+    })
+  );
+  return {
+    envs,
+    targets: Object.entries(envs).flatMap(
+      ([name2, item]) => item.targets.map((target) => ({ environment: name2, ...target }))
+    ),
+    targetsAvailable: Object.values(envs).every(
+      (item) => item.targetsAvailable
+    )
+  };
+}
+var text2, value, configSchema, targetSchema, metadataSchema;
+var init_project_inspection = __esm({
+  "src/core/project-inspection.ts"() {
+    "use strict";
+    init_zod();
+    init_esp_partition_framework();
+    init_errors2();
+    init_redact();
+    text2 = external_exports.string().max(65536);
+    value = external_exports.union([
+      text2,
+      external_exports.number().finite(),
+      external_exports.boolean(),
+      external_exports.null(),
+      external_exports.array(text2).max(1e4)
+    ]);
+    configSchema = external_exports.array(
+      external_exports.tuple([
+        external_exports.string().max(256),
+        external_exports.array(external_exports.tuple([external_exports.string().max(256), value])).max(2048)
+      ])
+    ).max(512);
+    targetSchema = external_exports.object({
+      name: external_exports.string().min(1).max(256),
+      title: text2.nullish(),
+      description: text2.nullish(),
+      group: text2.nullish()
+    });
+    metadataSchema = external_exports.record(
+      external_exports.object({
+        env_name: external_exports.string().optional(),
+        build_type: text2.nullish(),
+        defines: external_exports.array(text2).max(1e4).optional(),
+        includes: external_exports.object({
+          build: external_exports.array(text2).max(1e4).optional(),
+          toolchain: external_exports.array(text2).max(1e4).optional()
+        }).passthrough().nullish(),
+        libsource_dirs: external_exports.array(text2).max(4096).optional(),
+        cc_path: text2.nullish(),
+        cxx_path: text2.nullish(),
+        gdb_path: text2.nullish(),
+        prog_path: text2.nullish(),
+        svd_path: text2.nullish(),
+        compiler_type: text2.nullish(),
+        cc_flags: external_exports.array(text2).max(1e4).optional(),
+        cxx_flags: external_exports.array(text2).max(1e4).optional(),
+        targets: external_exports.array(targetSchema).max(2048).optional(),
+        extra: external_exports.unknown().optional()
+      }).passthrough()
+    );
   }
 });
 
@@ -24509,7 +25328,23 @@ async function resolveTarget(input, discoveredDevices) {
       nextSteps: ["Initialize or select a PlatformIO project, then resolve the target again."]
     };
   }
-  const parsed = parseTargetEnvironments(fs82.readFileSync(iniPath, "utf8"));
+  const iniText = fs82.readFileSync(iniPath, "utf8");
+  let parsed = parseTargetEnvironments(iniText);
+  if (/^\s*(?:extends|extra_configs)\s*=|^\s*\[env\]\s*$|\$\{/mu.test(iniText)) {
+    const report = parseProjectEnvironments(JSON.stringify(await getProjectConfig(projectDir)));
+    parsed = {
+      defaults: report.defaultEnvironments,
+      environments: report.envs.map((env) => {
+        if (env.board !== null && typeof env.board !== "string")
+          throw new PlatformIOError("Computed board is not a string.", "INVALID_TARGET_CONFIG");
+        return {
+          name: env.name,
+          ...env.board ? { board: env.board } : {},
+          ...typeof env.framework === "string" ? { framework: env.framework } : {}
+        };
+      })
+    };
+  }
   let selectedEnvironment;
   if (input.environment) {
     selectedEnvironment = parsed.environments.find(
@@ -24726,6 +25561,8 @@ var init_target_resolution = __esm({
     init_errors2();
     init_validation();
     init_devices2();
+    init_projects();
+    init_project_inspection();
     MAX_BINDING_TTL_SECONDS = 900;
   }
 });
@@ -81870,7 +82707,7 @@ var require_websocket2 = __commonJS({
     var http = __require("http");
     var net2 = __require("net");
     var tls = __require("tls");
-    var { randomBytes, createHash: createHash22 } = __require("crypto");
+    var { randomBytes, createHash: createHash23 } = __require("crypto");
     var { Duplex, Readable } = __require("stream");
     var { URL: URL2 } = __require("url");
     var PerMessageDeflate = require_permessage_deflate();
@@ -82538,7 +83375,7 @@ var require_websocket2 = __commonJS({
           abortHandshake(websocket, socket, "Invalid Upgrade header");
           return;
         }
-        const digest = createHash22("sha1").update(key + GUID).digest("base64");
+        const digest = createHash23("sha1").update(key + GUID).digest("base64");
         if (res.headers["sec-websocket-accept"] !== digest) {
           abortHandshake(websocket, socket, "Invalid Sec-WebSocket-Accept header");
           return;
@@ -82907,7 +83744,7 @@ var require_websocket_server = __commonJS({
     var EventEmitter3 = __require("events");
     var http = __require("http");
     var { Duplex } = __require("stream");
-    var { createHash: createHash22 } = __require("crypto");
+    var { createHash: createHash23 } = __require("crypto");
     var extension = require_extension();
     var PerMessageDeflate = require_permessage_deflate();
     var subprotocol = require_subprotocol();
@@ -83214,7 +84051,7 @@ var require_websocket_server = __commonJS({
           );
         }
         if (this._state > RUNNING) return abortHandshake(socket, 503);
-        const digest = createHash22("sha1").update(key + GUID).digest("base64");
+        const digest = createHash23("sha1").update(key + GUID).digest("base64");
         const headers = [
           "HTTP/1.1 101 Switching Protocols",
           "Upgrade: websocket",
@@ -95985,487 +96822,10 @@ function uploadCaptureEnvironment(scriptPath, inherited = process.env) {
 
 // src/core/analysis/upload-capture-record.ts
 init_zod();
+init_esp_partition_artifacts();
+init_errors2();
 import fs32 from "node:fs/promises";
 import path38 from "node:path";
-
-// src/core/esp-partition-artifacts.ts
-init_errors2();
-import fs24 from "node:fs/promises";
-import path31 from "node:path";
-import { createHash as createHash3 } from "node:crypto";
-
-// src/core/esp-partitions.ts
-init_errors2();
-import { createHash as createHash2 } from "node:crypto";
-var SECTOR = 4096;
-var UINT32_END = 4294967296;
-var DATA_SUBTYPES = {
-  ota: 0,
-  phy: 1,
-  nvs: 2,
-  coredump: 3,
-  nvs_keys: 4,
-  efuse: 5,
-  undefined: 6,
-  esphttpd: 128,
-  fat: 129,
-  spiffs: 130,
-  littlefs: 131
-};
-function invalid(message) {
-  throw new PlatformIOError(message, "PARTITION_TABLE_INVALID");
-}
-function unsigned(value2, maximum, label) {
-  if (!Number.isSafeInteger(value2) || value2 < 0 || value2 > maximum)
-    invalid("Invalid " + label + ".");
-  return value2;
-}
-function parsePartitionNumber(text10) {
-  const match = /^(0x[0-9a-f]+|[0-9]+)([km])?$/i.exec(text10.trim());
-  if (!match) invalid("Invalid partition number.");
-  return unsigned(
-    Number(match[1]) * (match[2]?.toLowerCase() === "k" ? 1024 : match[2] ? 1048576 : 1),
-    UINT32_END,
-    "partition number"
-  );
-}
-function validateLocation(layout) {
-  unsigned(layout.tableOffset, UINT32_END - SECTOR, "partition table offset");
-  if (layout.tableOffset % SECTOR)
-    invalid("Partition table offset is not sector aligned.");
-  if (layout.flashSize !== void 0) {
-    unsigned(layout.flashSize, UINT32_END, "flash size");
-    if (layout.flashSize < layout.tableOffset + SECTOR)
-      invalid("Partition table exceeds flash size.");
-  }
-}
-function validateEspPartitions(parts, layout) {
-  validateLocation(layout);
-  if (parts.length > 95) invalid("Partition table exceeds the 95-entry limit.");
-  const names = /* @__PURE__ */ new Set();
-  let end = layout.tableOffset + SECTOR;
-  let otaCount = 0;
-  for (const part of [...parts].sort((a, b) => a.offset - b.offset)) {
-    if (!part.name || Buffer.byteLength(part.name, "utf8") > 16 || /[\x00-\x1f\x7f]/.test(part.name))
-      invalid("Invalid partition label.");
-    if (names.has(part.name)) invalid("Duplicate partition label.");
-    names.add(part.name);
-    unsigned(part.type, 255, "partition type");
-    unsigned(part.subtype, 255, "partition subtype");
-    unsigned(part.flags, 4294967295, "partition flags");
-    unsigned(part.offset, 4294967295, "partition offset");
-    unsigned(part.size, 4294967295, "partition size");
-    if (!part.size || part.offset + part.size > UINT32_END)
-      invalid("Invalid partition address range.");
-    if (part.offset < end)
-      invalid("Partition overlaps the table or another partition.");
-    if (part.offset % (part.type === 0 ? 65536 : SECTOR))
-      invalid("Partition offset is not aligned for its type.");
-    if (part.type === 0 && part.size % SECTOR)
-      invalid("Application size is not sector aligned.");
-    if (part.type === 1 && [0, 3].includes(part.subtype) && part.flags & 2)
-      invalid("OTA metadata and core-dump partitions cannot be read-only.");
-    if (part.type === 1 && part.subtype === 0) {
-      if (++otaCount > 1 || part.size !== 8192)
-        invalid("Invalid OTA metadata partition.");
-    }
-    end = part.offset + part.size;
-    if (layout.flashSize !== void 0 && end > layout.flashSize)
-      invalid("Partition exceeds flash size.");
-  }
-}
-function parseEspPartitionCsv(text10, layout) {
-  validateLocation(layout);
-  if (Buffer.byteLength(text10, "utf8") > 65536)
-    invalid("Partition CSV exceeds 64 KiB.");
-  const parts = [];
-  let end = layout.tableOffset + SECTOR;
-  for (const line of text10.replace(/^\uFEFF/, "").split(/\r?\n/)) {
-    if (!line.trim() || line.trimStart().startsWith("#")) continue;
-    const fields = line.split(",").map((field3) => field3.trim());
-    if (fields.length < 5 || fields.length > 6)
-      invalid("Expected five or six CSV columns.");
-    const [name2, rawType, rawSubtype, offsetText, sizeText, flagText = ""] = fields;
-    const typeText = rawType.toLowerCase();
-    const subtypeText = rawSubtype.toLowerCase();
-    const type = typeText === "app" ? 0 : typeText === "data" ? 1 : parsePartitionNumber(typeText);
-    let subtype;
-    const ota = /^ota_([0-9]|1[0-5])$/.exec(subtypeText);
-    if (type !== 0 && !subtypeText) subtype = 6;
-    else if (type === 0 && subtypeText === "factory") subtype = 0;
-    else if (type === 0 && subtypeText === "test") subtype = 32;
-    else if (type === 0 && ota) subtype = 16 + Number(ota[1]);
-    else if (type === 1 && Object.hasOwn(DATA_SUBTYPES, subtypeText))
-      subtype = DATA_SUBTYPES[subtypeText];
-    else subtype = parsePartitionNumber(subtypeText);
-    const alignment = type === 0 ? 65536 : SECTOR;
-    const offset2 = offsetText ? parsePartitionNumber(offsetText) : Math.ceil(end / alignment) * alignment;
-    const size = sizeText.startsWith("-") ? parsePartitionNumber(sizeText.slice(1)) - offset2 : parsePartitionNumber(sizeText);
-    let flags = 0;
-    for (const flag of flagText.split(":").filter(Boolean)) {
-      if (flag === "encrypted") flags |= 1;
-      else if (flag === "readonly") flags |= 2;
-      else invalid("Unsupported partition flag.");
-    }
-    parts.push({ name: name2, type, subtype, offset: offset2, size, flags });
-    if (parts.length > 95)
-      invalid("Partition table exceeds the 95-entry limit.");
-    end = offset2 + size;
-  }
-  validateEspPartitions(parts, layout);
-  return parts;
-}
-function parseEspPartitionBinary(input, layout) {
-  validateLocation(layout);
-  const data = Buffer.from(input);
-  if (!data.length || data.length > SECTOR || data.length % 32)
-    invalid("Partition binary must contain 32-byte records within one sector.");
-  const parts = [];
-  let checksumSeen = false;
-  for (let index = 0; index < Math.min(data.length, 3072); index += 32) {
-    const record3 = data.subarray(index, index + 32);
-    if (record3.every((byte) => byte === 255)) {
-      if (!data.subarray(index, Math.min(data.length, 3072)).every((byte) => byte === 255))
-        invalid("Unexpected data after partition terminator.");
-      validateEspPartitions(parts, layout);
-      return parts;
-    }
-    if (record3.readUInt16LE(0) === 60395) {
-      if (checksumSeen || !record3.subarray(2, 16).every((byte) => byte === 255))
-        invalid("Invalid partition checksum record.");
-      if (!createHash2("md5").update(data.subarray(0, index)).digest().equals(record3.subarray(16)))
-        invalid("Partition checksum mismatch.");
-      checksumSeen = true;
-      continue;
-    }
-    if (checksumSeen || record3.readUInt16LE(0) !== 20650)
-      invalid("Invalid partition record magic or record order.");
-    const label = record3.subarray(12, 28);
-    const zero = label.indexOf(0);
-    let name2;
-    try {
-      name2 = new TextDecoder("utf-8", { fatal: true }).decode(
-        zero < 0 ? label : label.subarray(0, zero)
-      );
-    } catch {
-      return invalid("Partition label is not valid UTF-8.");
-    }
-    parts.push({
-      name: name2,
-      type: record3[2],
-      subtype: record3[3],
-      offset: record3.readUInt32LE(4),
-      size: record3.readUInt32LE(8),
-      flags: record3.readUInt32LE(28)
-    });
-  }
-  return invalid("Partition binary is missing its terminator.");
-}
-
-// src/core/esp-partition-report.ts
-init_errors2();
-var dataNames = {
-  0: "ota",
-  1: "phy",
-  2: "nvs",
-  3: "coredump",
-  4: "nvs_keys",
-  5: "efuse",
-  6: "undefined",
-  128: "esphttpd",
-  129: "fat",
-  130: "spiffs",
-  131: "littlefs"
-};
-var hex = (value2) => "0x" + value2.toString(16);
-function projectEspPartition(part) {
-  const subtype = part.type === 0 ? part.subtype === 0 ? "factory" : part.subtype === 32 ? "test" : part.subtype >= 16 && part.subtype < 32 ? "ota_" + (part.subtype - 16) : hex(part.subtype) : part.type === 1 ? dataNames[part.subtype] ?? hex(part.subtype) : hex(part.subtype);
-  return {
-    name: part.name,
-    type: part.type === 0 ? "app" : part.type === 1 ? "data" : hex(part.type),
-    subtype,
-    offset: part.offset,
-    size: part.size,
-    flags: [
-      ...part.flags & 1 ? ["encrypted"] : [],
-      ...part.flags & 2 ? ["readonly"] : []
-    ],
-    unknown_flags: (part.flags & ~3) >>> 0,
-    offset_hex: hex(part.offset),
-    size_hex: hex(part.size),
-    end_hex: hex(part.offset + part.size)
-  };
-}
-function compareEspPartitions(expected, observed, layout) {
-  validateEspPartitions(expected, layout);
-  validateEspPartitions(observed, layout);
-  const wanted = new Map(expected.map((part) => [part.name, part]));
-  const actual = new Map(observed.map((part) => [part.name, part]));
-  const differences = [];
-  for (const [name2, part] of wanted) {
-    const other = actual.get(name2);
-    if (!other)
-      differences.push({
-        name: name2,
-        kind: "missing_on_device",
-        expected: projectEspPartition(part)
-      });
-    else {
-      const fields = ["type", "subtype", "offset", "size", "flags"].filter((field3) => part[field3] !== other[field3]);
-      if (fields.length)
-        differences.push({
-          name: name2,
-          kind: "changed",
-          fields,
-          expected: projectEspPartition(part),
-          device: projectEspPartition(other)
-        });
-    }
-  }
-  for (const [name2, part] of actual) {
-    if (!wanted.has(name2))
-      differences.push({
-        name: name2,
-        kind: "extra_on_device",
-        device: projectEspPartition(part)
-      });
-  }
-  const order = { missing_on_device: 0, changed: 1, extra_on_device: 2 };
-  return differences.sort(
-    (a, b) => order[a.kind] - order[b.kind] || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
-  );
-}
-function reportEspPartitions(parts, layout, firmwareSize) {
-  validateEspPartitions(parts, { tableOffset: layout.tableOffset });
-  if (layout.flashSize !== void 0 && (!Number.isSafeInteger(layout.flashSize) || layout.flashSize <= 0 || layout.flashSize > 4294967296))
-    throw new PlatformIOError("Invalid flash size.", "PARTITION_TABLE_INVALID");
-  if (firmwareSize !== void 0 && (!Number.isSafeInteger(firmwareSize) || firmwareSize < 0 || firmwareSize > 4294967295))
-    throw new PlatformIOError(
-      "Invalid firmware size.",
-      "PARTITION_TABLE_INVALID"
-    );
-  const issues = [];
-  const add = (severity, code, message, fix) => issues.push({ severity, code, message, fix });
-  const apps2 = parts.filter((part) => part.type === 0);
-  const slots = apps2.filter((part) => part.subtype >= 16 && part.subtype < 32);
-  const hasData = (subtype) => parts.some((part) => part.type === 1 && part.subtype === subtype);
-  const end = Math.max(
-    layout.tableOffset + 4096,
-    ...parts.map((part) => part.offset + part.size)
-  );
-  if (!parts.length)
-    add(
-      "error",
-      "empty_table",
-      "The table contains no partitions.",
-      "Select the project's effective partition table."
-    );
-  if (!apps2.length)
-    add(
-      "error",
-      "no_app",
-      "No application partition is present.",
-      "Add an application partition suitable for the selected chip."
-    );
-  if (slots.length && !hasData(0))
-    add(
-      "error",
-      "ota_without_otadata",
-      "OTA application slots have no OTA selection metadata.",
-      "Add a correctly sized OTA metadata partition."
-    );
-  if (!slots.length && hasData(0))
-    add(
-      "warning",
-      "otadata_without_ota",
-      "OTA selection metadata exists without OTA application slots.",
-      "Check whether OTA is intended for this layout."
-    );
-  if (slots.length === 1)
-    add(
-      "warning",
-      "single_ota_slot",
-      "Only one OTA application slot is available.",
-      "Review update recovery and add an alternate slot if needed."
-    );
-  if (new Set(slots.map((part) => part.size)).size > 1)
-    add(
-      "warning",
-      "uneven_ota_slots",
-      "OTA slots have different capacities.",
-      "Ensure each intended update fits its destination slot."
-    );
-  if (!hasData(2))
-    add(
-      "warning",
-      "no_nvs",
-      "The layout has no NVS partition.",
-      "Check application persistence and framework requirements."
-    );
-  if (!hasData(3))
-    add(
-      "info",
-      "no_coredump",
-      "No flash core-dump partition is present.",
-      "Configure crash storage if flash core dumps are required."
-    );
-  if (layout.flashSize !== void 0) {
-    if (end > layout.flashSize)
-      add(
-        "error",
-        "exceeds_flash",
-        "The layout extends beyond the supplied flash capacity.",
-        "Verify the actual chip capacity and partition sizes."
-      );
-    else if (layout.flashSize - end >= 1048576)
-      add(
-        "info",
-        "unused_flash",
-        String(layout.flashSize - end) + " trailing flash bytes are unassigned.",
-        "Review whether the remaining capacity should be allocated."
-      );
-  }
-  const fits = firmwareSize === void 0 ? [] : apps2.map((part) => ({
-    name: part.name,
-    size: part.size,
-    firmware_size: firmwareSize,
-    fits: firmwareSize <= part.size,
-    used_percent: Math.round(firmwareSize / part.size * 1e3) / 10
-  }));
-  if (fits.length) {
-    const limiting = fits.reduce((a, b) => a.size <= b.size ? a : b);
-    if (!limiting.fits)
-      add(
-        "error",
-        "app_too_big",
-        "Firmware exceeds app partition " + limiting.name + ".",
-        "Select the intended destination explicitly or reduce firmware size."
-      );
-    else if (limiting.used_percent >= 90)
-      add(
-        "warning",
-        "app_nearly_full",
-        "Firmware uses " + limiting.used_percent + "% of the smallest app partition.",
-        "Review space needed for future updates."
-      );
-    else
-      add(
-        "info",
-        "app_fits",
-        "Firmware fits all declared application partitions.",
-        ""
-      );
-  }
-  return {
-    ok: !issues.some((issue2) => issue2.severity === "error"),
-    table_offset: layout.tableOffset,
-    table_end: end,
-    flash_size: layout.flashSize ?? null,
-    firmware_size: firmwareSize ?? null,
-    partitions: parts.map(projectEspPartition),
-    application_fit: fits,
-    issues,
-    error_count: issues.filter((issue2) => issue2.severity === "error").length,
-    warning_count: issues.filter((issue2) => issue2.severity === "warning").length,
-    evidence: "offline_layout"
-  };
-}
-
-// src/core/esp-partition-artifacts.ts
-function contained(root, target) {
-  const relative = path31.relative(root, target);
-  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path31.sep) && !path31.isAbsolute(relative);
-}
-async function readPartitionArtifact(root, requested, limit) {
-  const lexical = path31.resolve(root, requested);
-  const canonical3 = await fs24.realpath(lexical);
-  if (!contained(root, canonical3))
-    throw new PlatformIOError(
-      "Partition artifact is outside the authorized workspace.",
-      "PARTITION_ARTIFACT_OUTSIDE_WORKSPACE"
-    );
-  const handle = await fs24.open(canonical3, "r");
-  try {
-    const before = await handle.stat();
-    if (!before.isFile() || before.size > limit)
-      throw new PlatformIOError(
-        "Partition artifact is not a bounded regular file.",
-        "PARTITION_ARTIFACT_INVALID"
-      );
-    const bytes = Buffer.alloc(before.size + 1);
-    let used = 0;
-    while (used < bytes.length) {
-      const read = await handle.read(bytes, used, bytes.length - used, used);
-      if (!read.bytesRead) break;
-      used += read.bytesRead;
-    }
-    const after = await handle.stat();
-    const current = await fs24.stat(canonical3);
-    const resolved = await fs24.realpath(lexical);
-    if (used !== before.size || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || before.ino !== current.ino || before.dev !== current.dev || current.size !== after.size || current.mtimeMs !== after.mtimeMs || resolved !== canonical3)
-      throw new PlatformIOError(
-        "Partition artifact changed during inspection; retry with a stable copy.",
-        "PARTITION_ARTIFACT_CHANGED"
-      );
-    const content = bytes.subarray(0, used);
-    return {
-      content,
-      identity: {
-        path: canonical3,
-        size: used,
-        sha256: createHash3("sha256").update(content).digest("hex")
-      }
-    };
-  } finally {
-    await handle.close();
-  }
-}
-async function inspectEspPartitionArtifacts(input) {
-  const root = await fs24.realpath(input.workspaceDir);
-  const table = await readPartitionArtifact(
-    input.trustedTableRoot ? await fs24.realpath(input.trustedTableRoot) : root,
-    input.tablePath,
-    input.format === "csv" ? 65536 : 4096
-  );
-  let text10;
-  if (input.format === "csv") {
-    try {
-      text10 = new TextDecoder("utf-8", { fatal: true }).decode(table.content);
-    } catch {
-      throw new PlatformIOError(
-        "Partition CSV is not valid UTF-8.",
-        "PARTITION_TABLE_INVALID"
-      );
-    }
-  }
-  const parts = input.format === "csv" ? parseEspPartitionCsv(text10, { tableOffset: input.layout.tableOffset }) : parseEspPartitionBinary(table.content, {
-    tableOffset: input.layout.tableOffset
-  });
-  const firmware = input.firmwarePath ? await readPartitionArtifact(root, input.firmwarePath, 128 * 1024 * 1024) : null;
-  const observed = input.observedTablePath ? await readPartitionArtifact(root, input.observedTablePath, 4096) : null;
-  const comparison = observed ? compareEspPartitions(
-    parts,
-    parseEspPartitionBinary(observed.content, {
-      tableOffset: input.layout.tableOffset
-    }),
-    { tableOffset: input.layout.tableOffset }
-  ) : null;
-  return {
-    ...reportEspPartitions(parts, input.layout, firmware?.identity.size),
-    partitionRecords: parts,
-    artifacts: {
-      table: table.identity,
-      firmware: firmware?.identity ?? null,
-      observed_table: observed?.identity ?? null
-    },
-    comparison,
-    // An offline copy can be stale; never label it a verified live-device match.
-    comparison_source: observed ? "offline_binary" : null
-  };
-}
-
-// src/core/analysis/upload-capture-record.ts
-init_errors2();
 
 // src/core/analysis/esptool-upload-manifest.ts
 init_errors2();
@@ -96477,6 +96837,7 @@ import { createHash as createHash8 } from "node:crypto";
 init_zod();
 init_paths();
 init_errors2();
+init_esp_partition_artifacts();
 import fs29 from "node:fs/promises";
 import path35 from "node:path";
 import { createHash as createHash7, randomUUID as randomUUID4 } from "node:crypto";
@@ -96521,6 +96882,7 @@ function readEspAppElfHash(image) {
 // src/core/ota/ota-image-archive.ts
 init_paths();
 init_errors2();
+init_esp_partition_artifacts();
 import fs25 from "node:fs/promises";
 import path32 from "node:path";
 import { createHash as createHash5, randomUUID as randomUUID2 } from "node:crypto";
@@ -96580,6 +96942,7 @@ async function archiveOtaImage(snapshot, sourcePath, expectedSha256, archiveRoot
 
 // src/core/ota/ota-artifacts.ts
 import path33 from "node:path";
+init_esp_partition_artifacts();
 init_errors2();
 async function retainOtaImage(projectDir, imagePath, expectedSha256, archiveRoot) {
   if (expectedSha256 !== void 0 && !/^[a-fA-F0-9]{64}$/.test(expectedSha256))
@@ -97402,6 +97765,7 @@ async function withTargetUploadCapture(input, use) {
 // src/core/analysis/upload-installation.ts
 init_zod();
 init_errors2();
+init_esp_partition_artifacts();
 import fs34 from "node:fs/promises";
 import path40 from "node:path";
 var PackageSchema = external_exports.object({
@@ -98622,322 +98986,7 @@ async function inspectPortDiagnostics(port, listed) {
 init_zod();
 init_platformio();
 import fs39 from "node:fs/promises";
-
-// src/core/project-inspection.ts
-init_zod();
-
-// src/core/esp-partition-framework.ts
-import fs38 from "node:fs/promises";
-import path45 from "node:path";
-init_errors2();
-function within2(root, target) {
-  const relative = path45.relative(root, target);
-  return relative !== "" && relative !== ".." && !relative.startsWith(".." + path45.sep) && !path45.isAbsolute(relative);
-}
-function partitionFrameworkCandidates(includes) {
-  const candidates = /* @__PURE__ */ new Set();
-  for (const include of includes) {
-    const normalized = include.replace(/\\/g, "/");
-    const match = /^(.*\/framework-(?:arduinoespressif32|espidf)(?:@[^/]+)?)(?:\/|$)/.exec(
-      normalized
-    );
-    if (match) candidates.add(path45.normalize(match[1]));
-  }
-  if (candidates.size > 32)
-    throw new PlatformIOError(
-      "Too many framework package candidates.",
-      "PARTITION_FRAMEWORK_AMBIGUOUS"
-    );
-  return [...candidates];
-}
-async function resolveFrameworkPartitionCsv(filename, candidates, systemInfo, projectDir) {
-  if (!filename || filename !== path45.basename(filename) || !/\.csv$/i.test(filename) || filename.length > 256 || /[\x00-\x1f\x7f]/.test(filename))
-    throw new PlatformIOError(
-      "Framework lookup requires one CSV filename.",
-      "PARTITION_FRAMEWORK_INVALID"
-    );
-  const core = systemInfo?.core_dir?.value;
-  if (typeof core !== "string" || !path45.isAbsolute(core))
-    throw new PlatformIOError(
-      "Host Core package location is unavailable.",
-      "PARTITION_FRAMEWORK_UNTRUSTED"
-    );
-  const packages = await fs38.realpath(path45.join(core, "packages"));
-  const project = await fs38.realpath(projectDir);
-  if (packages === project || within2(project, packages) || within2(packages, project))
-    throw new PlatformIOError(
-      "Framework installation overlaps the project workspace.",
-      "PARTITION_FRAMEWORK_UNTRUSTED"
-    );
-  if (candidates.length > 32)
-    throw new PlatformIOError(
-      "Too many framework candidates.",
-      "PARTITION_FRAMEWORK_AMBIGUOUS"
-    );
-  const found = [];
-  for (const candidate of new Set(candidates)) {
-    const root = await fs38.realpath(candidate);
-    if (!within2(packages, root) || path45.relative(packages, root).split(path45.sep).length !== 1)
-      throw new PlatformIOError(
-        "Framework is outside registered host packages.",
-        "PARTITION_FRAMEWORK_UNTRUSTED"
-      );
-    const manifestBytes = await readPartitionArtifact(
-      root,
-      "package.json",
-      65536
-    );
-    const recordBytes = await readPartitionArtifact(root, ".piopm", 65536);
-    let manifest, record3;
-    try {
-      manifest = JSON.parse(manifestBytes.content.toString("utf8"));
-      record3 = JSON.parse(recordBytes.content.toString("utf8"));
-    } catch {
-      throw new PlatformIOError(
-        "Invalid framework package registration.",
-        "PARTITION_FRAMEWORK_UNTRUSTED"
-      );
-    }
-    if (!manifest || !record3 || typeof manifest.name !== "string" || !["framework-arduinoespressif32", "framework-espidf"].includes(
-      manifest.name
-    ) || typeof manifest.version !== "string" || !manifest.version || record3.name !== manifest.name || record3.version !== manifest.version || record3.type !== "tool")
-      throw new PlatformIOError(
-        "Framework registration does not match its manifest.",
-        "PARTITION_FRAMEWORK_UNTRUSTED"
-      );
-    const relative = path45.join(
-      manifest.name === "framework-espidf" ? "components/partition_table" : "tools/partitions",
-      filename
-    );
-    try {
-      const csv = await readPartitionArtifact(root, relative, 65536);
-      found.push({
-        root,
-        tablePath: csv.identity.path,
-        packageName: manifest.name,
-        packageVersion: manifest.version
-      });
-    } catch (error2) {
-      if (error2.code !== "ENOENT") throw error2;
-    }
-  }
-  const unique = [
-    ...new Map(found.map((entry) => [entry.tablePath, entry])).values()
-  ];
-  if (unique.length !== 1)
-    throw new PlatformIOError(
-      unique.length ? "Multiple selected frameworks contain that CSV." : "The selected frameworks do not contain that CSV.",
-      unique.length ? "PARTITION_FRAMEWORK_AMBIGUOUS" : "PARTITION_FRAMEWORK_NOT_FOUND"
-    );
-  return unique[0];
-}
-
-// src/core/project-inspection.ts
-init_errors2();
-init_redact();
-var text2 = external_exports.string().max(65536);
-var value = external_exports.union([
-  text2,
-  external_exports.number().finite(),
-  external_exports.boolean(),
-  external_exports.null(),
-  external_exports.array(text2).max(1e4)
-]);
-var configSchema = external_exports.array(
-  external_exports.tuple([
-    external_exports.string().max(256),
-    external_exports.array(external_exports.tuple([external_exports.string().max(256), value])).max(2048)
-  ])
-).max(512);
-var targetSchema = external_exports.object({
-  name: external_exports.string().min(1).max(256),
-  title: text2.nullish(),
-  description: text2.nullish(),
-  group: text2.nullish()
-});
-var metadataSchema = external_exports.record(
-  external_exports.object({
-    env_name: external_exports.string().optional(),
-    build_type: text2.nullish(),
-    defines: external_exports.array(text2).max(1e4).optional(),
-    includes: external_exports.object({
-      build: external_exports.array(text2).max(1e4).optional(),
-      toolchain: external_exports.array(text2).max(1e4).optional()
-    }).passthrough().nullish(),
-    libsource_dirs: external_exports.array(text2).max(4096).optional(),
-    cc_path: text2.nullish(),
-    cxx_path: text2.nullish(),
-    gdb_path: text2.nullish(),
-    prog_path: text2.nullish(),
-    svd_path: text2.nullish(),
-    compiler_type: text2.nullish(),
-    cc_flags: external_exports.array(text2).max(1e4).optional(),
-    cxx_flags: external_exports.array(text2).max(1e4).optional(),
-    targets: external_exports.array(targetSchema).max(2048).optional(),
-    extra: external_exports.unknown().optional()
-  }).passthrough()
-);
-function readJson(output) {
-  if (Buffer.byteLength(output) > 10 * 1024 * 1024)
-    throw new PlatformIOError(
-      "Project output exceeds 10 MiB.",
-      "PROJECT_OUTPUT_LIMIT"
-    );
-  let raw;
-  try {
-    raw = JSON.parse(output);
-  } catch {
-    throw new PlatformIOError(
-      "Project output is not valid JSON.",
-      "PROJECT_OUTPUT_INVALID"
-    );
-  }
-  let nodes = 0;
-  const clean = (item, depth) => {
-    if (++nodes > 1e5 || depth > 24)
-      throw new PlatformIOError(
-        "Project output exceeds structural limits.",
-        "PROJECT_OUTPUT_LIMIT"
-      );
-    if (typeof item === "string") return redactSecretsInText(item);
-    if (Array.isArray(item))
-      return item.map((child) => clean(child, depth + 1));
-    if (item && typeof item === "object")
-      return Object.fromEntries(
-        Object.entries(item).map(([key, child]) => [
-          key,
-          depth > 0 && /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
-            key
-          ) ? "[REDACTED_SECRET]" : clean(child, depth + 1)
-        ])
-      );
-    return item;
-  };
-  return clean(raw, 0);
-}
-function parseProjectEnvironments(output) {
-  const parsed = configSchema.safeParse(readJson(output));
-  if (!parsed.success)
-    throw new PlatformIOError(
-      "Unexpected computed configuration shape.",
-      "PROJECT_CONFIG_INVALID"
-    );
-  const sections = /* @__PURE__ */ new Map();
-  for (const [name2, options] of parsed.data) {
-    if (sections.has(name2) || new Set(options.map(([key]) => key)).size !== options.length)
-      throw new PlatformIOError(
-        "Duplicate computed configuration section or option.",
-        "PROJECT_CONFIG_INVALID"
-      );
-    sections.set(
-      name2,
-      Object.fromEntries(
-        options.map(([key, field3]) => [
-          key,
-          /(?:password|passphrase|api[_-]?key|secret|access[_-]?token)/i.test(
-            key
-          ) ? "[REDACTED_SECRET]" : field3
-        ])
-      )
-    );
-  }
-  const envs = [...sections.entries()].filter(([name2]) => name2.startsWith("env:")).map(([section, options]) => ({
-    name: section.slice(4),
-    board: options.board ?? null,
-    platform: options.platform ?? null,
-    framework: options.framework ?? null,
-    monitorSpeed: options.monitor_speed ?? null,
-    monitorPort: options.monitor_port ?? null,
-    uploadPort: options.upload_port ?? null,
-    uploadProtocol: options.upload_protocol ?? null,
-    partitionTable: options["board_build.partitions"] ?? null,
-    sdkconfigPath: options["board_build.esp-idf.sdkconfig_path"] ?? null,
-    partitionTableUploadOffset: options["board_upload.partition_table_offset"] ?? null,
-    flashSize: options["board_upload.flash_size"] ?? null,
-    mcu: options["board_build.mcu"] ?? null,
-    libraryDependencies: options.lib_deps ?? [],
-    libraryExtraDirectories: options.lib_extra_dirs ?? [],
-    libraryDependencyFinderMode: options.lib_ldf_mode ?? null,
-    libraryCompatibilityMode: options.lib_compat_mode ?? null,
-    buildFlags: options.build_flags ?? [],
-    extends: options.extends ?? []
-  }));
-  if (envs.length > 256 || envs.some((env) => !env.name))
-    throw new PlatformIOError(
-      "Invalid environment inventory.",
-      "PROJECT_CONFIG_INVALID"
-    );
-  const platformioSection = sections.get("platformio") ?? {};
-  const rawDefaults = platformioSection.default_envs;
-  const defaults = typeof rawDefaults === "string" ? rawDefaults.split(/[,\r\n]/).map((item) => item.trim()).filter(Boolean) : Array.isArray(rawDefaults) ? rawDefaults : rawDefaults == null ? [] : void 0;
-  if (!defaults || defaults.some((name2) => !envs.some((env) => env.name === name2)))
-    throw new PlatformIOError(
-      "Default environments do not match the resolved inventory.",
-      "PROJECT_CONFIG_INVALID"
-    );
-  return {
-    envs,
-    defaultEnvironments: defaults.length ? defaults : envs.map((env) => env.name),
-    platformioSection
-  };
-}
-function parseProjectMetadata(output, environment) {
-  const parsed = metadataSchema.safeParse(readJson(output));
-  if (!parsed.success)
-    throw new PlatformIOError(
-      "Unexpected build metadata shape.",
-      "PROJECT_METADATA_INVALID"
-    );
-  const entries = Object.entries(parsed.data);
-  if (entries.length < 1 || entries.length > 256 || environment && (entries.length !== 1 || entries[0][0] !== environment))
-    throw new PlatformIOError(
-      "Metadata does not match the selected environments.",
-      "PROJECT_METADATA_INVALID"
-    );
-  const envs = Object.fromEntries(
-    entries.map(([name2, item]) => {
-      if (!name2 || item.env_name && item.env_name !== name2)
-        throw new PlatformIOError(
-          "Metadata environment identity disagrees with its key.",
-          "PROJECT_METADATA_INVALID"
-        );
-      return [
-        name2,
-        {
-          buildType: item.build_type ?? null,
-          defines: item.defines ?? [],
-          includeDirs: item.includes?.build?.slice(0, 40) ?? [],
-          partitionFrameworkCandidates: partitionFrameworkCandidates(item.includes?.build ?? []),
-          includeDirCount: item.includes?.build?.length ?? 0,
-          toolchainIncludeDirCount: item.includes?.toolchain?.length ?? 0,
-          librarySourceDirs: item.libsource_dirs ?? [],
-          cc: item.cc_path ?? null,
-          cxx: item.cxx_path ?? null,
-          gdb: item.gdb_path ?? null,
-          compilerType: item.compiler_type ?? null,
-          ccFlags: item.cc_flags ?? [],
-          cxxFlags: item.cxx_flags ?? [],
-          programPath: item.prog_path ?? null,
-          svdPath: item.svd_path ?? null,
-          extra: item.extra ?? null,
-          targets: item.targets ?? [],
-          targetsAvailable: item.targets !== void 0
-        }
-      ];
-    })
-  );
-  return {
-    envs,
-    targets: Object.entries(envs).flatMap(
-      ([name2, item]) => item.targets.map((target) => ({ environment: name2, ...target }))
-    ),
-    targetsAvailable: Object.values(envs).every(
-      (item) => item.targetsAvailable
-    )
-  };
-}
-
-// src/tools/project-inspection.ts
+init_project_inspection();
 init_redact();
 init_errors2();
 var base = {
@@ -108153,6 +108202,7 @@ init_errors2();
 init_platformio();
 init_errors2();
 init_validation();
+init_project_inspection();
 function selectDebugConfiguration(output, environment) {
   const view = parseProjectEnvironments(output);
   const raw = JSON.parse(output);
@@ -111059,11 +111109,20 @@ function selectDebugProbe(records, selector = {}) {
   const serial = selector.serialNumber === void 0 ? void 0 : text10(selector.serialNumber);
   const candidates = /* @__PURE__ */ new Map();
   for (const record3 of records) {
+    if (record3.serialPorts !== void 0 && (!Array.isArray(record3.serialPorts) || record3.serialPorts.length > 32 || record3.serialPorts.some(
+      (port) => typeof port !== "string" || !port || port.length > 512 || /[\x00-\x1f\x7f]/.test(port)
+    )))
+      return invalid4();
     const probe2 = {
       vendorId: hex2(record3.vendorId),
       productId: hex2(record3.productId),
       serialNumber: text10(record3.serialNumber),
-      location: text10(record3.location)
+      location: text10(record3.location),
+      ...record3.serialPorts === void 0 ? {} : {
+        serialPorts: [
+          ...new Set(record3.serialPorts)
+        ].sort()
+      }
     };
     if (vendor && probe2.vendorId !== vendor || product && probe2.productId !== product || serial && probe2.serialNumber !== serial)
       continue;
@@ -111074,8 +111133,16 @@ function selectDebugProbe(records, selector = {}) {
       probe2.serialNumber
     ]);
     const previous = candidates.get(identity2);
-    if (previous) previous.locations.add(probe2.location);
-    else
+    if (previous) {
+      previous.locations.add(probe2.location);
+      if (probe2.serialPorts || previous.probe.serialPorts)
+        previous.probe.serialPorts = [
+          .../* @__PURE__ */ new Set([
+            ...previous.probe.serialPorts ?? [],
+            ...probe2.serialPorts ?? []
+          ])
+        ].sort();
+    } else
       candidates.set(identity2, { probe: probe2, locations: /* @__PURE__ */ new Set([probe2.location]) });
   }
   if (candidates.size !== 1 || [...candidates.values()].some((value2) => value2.locations.size !== 1))
@@ -111091,11 +111158,38 @@ function selectDebugProbe(records, selector = {}) {
 }
 
 // src/core/devices/debug-probe-custody.ts
+init_serial_endpoint();
 init_errors2();
 init_device_lease();
-async function acquireDebugProbeCustody(enumerate, selector, store = new DeviceLeaseStore()) {
+import { createHash as createHash16 } from "node:crypto";
+async function acquireDebugProbeCustody(enumerate, selector, store = new DeviceLeaseStore(), resolveEndpoint = resolveSerialEndpoint) {
   const selected = selectDebugProbe(await enumerate(), selector);
-  const lease = store.acquire(selected.resource);
+  const endpoints = (selected.probe.serialPorts ?? []).map(
+    (port) => resolveEndpoint(port)
+  );
+  const usbIdentity = "usb:" + createHash16("sha256").update(
+    JSON.stringify([
+      selected.probe.vendorId,
+      selected.probe.productId,
+      selected.probe.serialNumber
+    ])
+  ).digest("hex");
+  const resources = [
+    selected.resource,
+    { kind: "serial", identity: usbIdentity },
+    ...endpoints.map((endpoint) => endpoint.resource)
+  ];
+  const leases = [];
+  try {
+    for (const resource of new Map(
+      resources.map((resource2) => [JSON.stringify(resource2), resource2])
+    ).values())
+      leases.push(store.acquire(resource));
+  } catch (error2) {
+    for (const lease of leases.reverse()) store.release(lease);
+    throw error2;
+  }
+  const released = /* @__PURE__ */ new Set();
   const custody = {
     async prepareSpawn() {
       const observed = selectDebugProbe(await enumerate(), {
@@ -111103,17 +111197,22 @@ async function acquireDebugProbeCustody(enumerate, selector, store = new DeviceL
         productId: selected.probe.productId,
         serialNumber: selected.probe.serialNumber
       });
-      if (observed.resource.identity !== selected.resource.identity || observed.probe.location !== selected.probe.location)
+      if (observed.resource.identity !== selected.resource.identity || observed.probe.location !== selected.probe.location || JSON.stringify(observed.probe.serialPorts ?? []) !== JSON.stringify(selected.probe.serialPorts ?? []))
         throw new PlatformIOError(
           "Selected debug probe changed before startup.",
           "DEBUG_PROBE_CHANGED"
         );
-      store.beginHandoff(lease);
+      for (const endpoint of endpoints) endpoint.revalidate();
+      for (const lease of leases) store.beginHandoff(lease);
     },
     releaseAfterExit() {
       try {
-        store.cancelHandoff(lease);
-        store.release(lease);
+        for (const lease of [...leases].reverse()) {
+          if (released.has(lease)) continue;
+          store.cancelHandoff(lease);
+          store.release(lease);
+          released.add(lease);
+        }
       } catch (error2) {
         throw new PlatformIOError(
           error2 instanceof Error ? error2.message : "Probe lease cleanup failed.",
@@ -111379,6 +111478,7 @@ async function startLocalPreparedDebugger(sessions, input, caller = {}) {
 }
 
 // src/core/devices/debug-probe-discovery.ts
+init_devices2();
 init_errors2();
 import fs61 from "node:fs/promises";
 
@@ -111649,7 +111749,28 @@ async function readHostInventory() {
       "USB probe discovery is unsupported on this host.",
       "DEBUG_PROBE_PLATFORM_UNSUPPORTED"
     );
-  return result;
+  const serial = await listDevicesCore();
+  return { ...result, devices: bindProbeSerialPorts(result.devices, serial) };
+}
+function bindProbeSerialPorts(probes, serial) {
+  if (serial.length > 1024)
+    throw new PlatformIOError(
+      "Serial inventory exceeds limits.",
+      "DEBUG_PROBE_INVENTORY_INVALID"
+    );
+  return probes.map((probe) => ({
+    ...probe,
+    serialPorts: serial.filter((device) => {
+      if (typeof device.hwid !== "string" || device.hwid.length > 4096)
+        return false;
+      const tokens = device.hwid.trim().split(/\s+/);
+      const ids = tokens.filter(
+        (token) => /^VID:PID=[0-9a-f]{4}:[0-9a-f]{4}$/i.test(token)
+      );
+      const serials = tokens.filter((token) => /^SER=\S+$/.test(token));
+      return ids.length === 1 && serials.length === 1 && ids[0].slice(8).toLowerCase() === `${probe.vendorId}:${probe.productId}`.toLowerCase() && serials[0].slice(4) === probe.serialNumber;
+    }).map((device) => device.port)
+  }));
 }
 
 // src/adapters/debug-compat.ts
@@ -112267,6 +112388,7 @@ init_redact();
 import fs64 from "node:fs/promises";
 
 // src/core/ota/ota-elf-match.ts
+init_esp_partition_artifacts();
 import fs62 from "node:fs/promises";
 import path75 from "node:path";
 init_errors2();
@@ -112369,8 +112491,9 @@ function parseOtaUploaderOptions(flags, filesystem) {
 }
 
 // src/core/ota/ota-configuration.ts
-import path76 from "node:path";
+init_project_inspection();
 init_errors2();
+import path76 from "node:path";
 function selectOtaConfiguration(output, projectDir, environment) {
   const publicView = parseProjectEnvironments(output);
   const selected = environment ?? publicView.defaultEnvironments[0];
@@ -112455,9 +112578,10 @@ function selectOtaConfiguration(output, projectDir, environment) {
 }
 
 // src/core/ota/ota-tools.ts
+init_esp_partition_artifacts();
+init_errors2();
 import fs63 from "node:fs/promises";
 import path77 from "node:path";
-init_errors2();
 function within5(root, target) {
   const relative = path77.relative(root, target);
   return !relative || relative !== ".." && !relative.startsWith(".." + path77.sep) && !path77.isAbsolute(relative);
@@ -113357,7 +113481,8 @@ init_paths();
 init_errors2();
 import fs65 from "node:fs/promises";
 import path80 from "node:path";
-import { createHash as createHash16 } from "node:crypto";
+import { createHash as createHash17 } from "node:crypto";
+init_esp_partition_artifacts();
 var LIFETIME_MS = 24 * 60 * 60 * 1e3;
 var ROOT = path80.join(SERVER_DATA_DIR, "artifacts", "coredumps");
 var ENTRY = /^pio-private-analysis-[A-Za-z0-9]{6}$/;
@@ -113439,7 +113564,7 @@ async function retainEspCoredump(input, root = ROOT, now = Date.now()) {
     const directory = await createPrivateAnalysisDirectory(canonical3);
     try {
       const bytes = Buffer.from(input);
-      const sha256 = createHash16("sha256").update(bytes).digest("hex");
+      const sha256 = createHash17("sha256").update(bytes).digest("hex");
       const destination = path80.join(directory, "dump.bin");
       const expiresAt = now + LIFETIME_MS;
       await fs65.writeFile(destination, bytes, { flag: "wx", mode: 384 });
@@ -113507,13 +113632,13 @@ async function startCoredumpRetentionCleanup(reportFailure, root = ROOT) {
 
 // src/tools/coredump.ts
 import fs74 from "node:fs/promises";
-import { createHash as createHash20 } from "node:crypto";
+import { createHash as createHash21 } from "node:crypto";
 
 // src/core/analysis/esp-coredump-export.ts
 init_errors2();
 import fs66 from "node:fs/promises";
 import path81 from "node:path";
-import { createHash as createHash17 } from "node:crypto";
+import { createHash as createHash18 } from "node:crypto";
 async function exportEspCoredump(workspaceDir, destination, input) {
   if (!destination || /[\x00-\x1f\x7f]/.test(destination) || input.byteLength > 16 * 1024 * 1024)
     throw new PlatformIOError(
@@ -113537,7 +113662,7 @@ async function exportEspCoredump(workspaceDir, destination, input) {
     );
   const canonicalTarget = path81.join(parent, name2);
   const bytes = Buffer.from(input);
-  const sha256 = createHash17("sha256").update(bytes).digest("hex");
+  const sha256 = createHash18("sha256").update(bytes).digest("hex");
   return withPrivateAnalysisDirectory(async (directory) => {
     const staged = path81.join(directory, "dump.bin");
     await fs66.writeFile(staged, bytes, { flag: "wx", mode: 384 });
@@ -113573,6 +113698,7 @@ init_errors2();
 
 // src/tools/partition-table.ts
 init_projects();
+init_esp_partition_framework();
 import fs68 from "node:fs/promises";
 import path84 from "node:path";
 
@@ -113582,6 +113708,7 @@ init_zod();
 import path82 from "node:path";
 init_serial_endpoint();
 init_spooler();
+init_esp_partition_artifacts();
 init_errors2();
 var schema = external_exports.object({
   projectDir: external_exports.string().min(1).max(32768),
@@ -113694,11 +113821,16 @@ async function readEspFlash(input, caller = {}) {
   });
 }
 
+// src/tools/partition-table.ts
+init_esp_partitions();
+init_esp_partition_report();
+
 // src/tools/partition-project.ts
 import path83 from "node:path";
 
 // src/core/esp-partition-location.ts
 init_errors2();
+init_esp_partitions();
 function offset(value2) {
   const parsed = typeof value2 === "string" ? parsePartitionNumber(value2) : value2;
   if (typeof parsed !== "number" || !Number.isSafeInteger(parsed) || parsed < 0 || parsed > 4294963200 || parsed % 4096)
@@ -113785,6 +113917,7 @@ function resolvePartitionOffset(evidence, configuredUploadOffset) {
 
 // src/tools/partition-project.ts
 init_errors2();
+init_esp_partitions();
 async function resolveProjectPartitionInputs(projectDir, environment, caller, approvalId2) {
   const report = await executeProjectInspection(
     "project_envs",
@@ -113929,6 +114062,7 @@ async function resolvePartitionBoardInfo(projectDir, boardId, caller, approvalId
 
 // src/tools/partition-table.ts
 init_zod();
+init_esp_partition_artifacts();
 init_errors2();
 var PartitionTableSchema = external_exports.object({
   projectDir: external_exports.string().min(1).max(32768),
@@ -114181,7 +114315,7 @@ async function executePartitionTable(input, caller = {}, onAuthorized) {
 
 // src/core/analysis/esp-coredump-input.ts
 init_errors2();
-import { createHash as createHash18, timingSafeEqual } from "node:crypto";
+import { createHash as createHash19, timingSafeEqual } from "node:crypto";
 var MAX_DUMP_BYTES = 16 * 1024 * 1024;
 var chips = {
   0: "esp32",
@@ -114254,7 +114388,7 @@ function inspectRawEspCoredump(input, encrypted = false) {
     );
   const payload2 = bytes.subarray(0, length - checksumLength);
   const checksum = bytes.subarray(length - checksumLength, length);
-  const valid = format.checksum === "sha256" ? timingSafeEqual(createHash18("sha256").update(payload2).digest(), checksum) : crc32(payload2) === checksum.readUInt32LE(0);
+  const valid = format.checksum === "sha256" ? timingSafeEqual(createHash19("sha256").update(payload2).digest(), checksum) : crc32(payload2) === checksum.readUInt32LE(0);
   if (!valid)
     throw new PlatformIOError(
       "Core-dump checksum does not match its declared bytes.",
@@ -114268,8 +114402,8 @@ function inspectRawEspCoredump(input, encrypted = false) {
   return {
     bytes: bytes.subarray(0, length),
     identity: {
-      sha256: createHash18("sha256").update(bytes.subarray(0, length)).digest("hex"),
-      input_sha256: createHash18("sha256").update(bytes).digest("hex"),
+      sha256: createHash19("sha256").update(bytes.subarray(0, length)).digest("hex"),
+      input_sha256: createHash19("sha256").update(bytes).digest("hex"),
       length,
       input_length: bytes.length,
       trailing_bytes: bytes.length - length,
@@ -114526,6 +114660,7 @@ function matchEspCoredumpFirmware(identity, elfSha256) {
 }
 
 // src/core/analysis/esp-coredump-artifact.ts
+init_esp_partition_artifacts();
 init_errors2();
 async function readEspCoredumpArtifact(input) {
   if (input.format !== "raw" && input.format !== "base64")
@@ -114652,9 +114787,10 @@ async function withEspCoredumpArtifacts(input, analyze, capturedBytes) {
 
 // src/core/analysis/esp-coredump-conversion.ts
 init_errors2();
+init_esp_partition_artifacts();
 import fs71 from "node:fs/promises";
 import path86 from "node:path";
-import { createHash as createHash19 } from "node:crypto";
+import { createHash as createHash20 } from "node:crypto";
 
 // src/core/analysis/esp-coredump-converter.ts
 var ESP_COREDUMP_VERSION = "1.10.0";
@@ -114736,7 +114872,7 @@ except Exception as error:
 // src/core/analysis/esp-coredump-conversion.ts
 async function withConvertedEspCoredump(artifacts, options, use) {
   options.validatePolicy();
-  if (createHash19("sha256").update(artifacts.dump.bytes).digest("hex") !== artifacts.dump.identity.sha256)
+  if (createHash20("sha256").update(artifacts.dump.bytes).digest("hex") !== artifacts.dump.identity.sha256)
     throw new PlatformIOError(
       "Core-dump bytes changed before conversion.",
       "COREDUMP_IDENTITY_MISMATCH"
@@ -115114,7 +115250,7 @@ async function executeCoredump(input, caller = {}, onAuthorized) {
           caller
         ) : null;
         validatePolicy();
-        if (capture && request.expectedInputSha256 && createHash20("sha256").update(capture.bytes).digest("hex") !== request.expectedInputSha256.toLowerCase())
+        if (capture && request.expectedInputSha256 && createHash21("sha256").update(capture.bytes).digest("hex") !== request.expectedInputSha256.toLowerCase())
           throw new PlatformIOError(
             "Captured partition does not match the selected input identity.",
             "COREDUMP_IDENTITY_MISMATCH"
@@ -115539,22 +115675,22 @@ var ShutdownCoordinator = class {
 };
 var shutdown = new ShutdownCoordinator();
 var installed = false;
+var handling = false;
+function requestProcessShutdown() {
+  if (handling) return;
+  handling = true;
+  const deadline = setTimeout(() => process.exit(1), 15e3);
+  deadline.unref();
+  void shutdown.close().then((code) => {
+    clearTimeout(deadline);
+    process.exit(code);
+  });
+}
 function registerShutdownTask(task) {
   if (!installed) {
     installed = true;
-    let handling = false;
-    const handle = () => {
-      if (handling) return;
-      handling = true;
-      const deadline = setTimeout(() => process.exit(1), 15e3);
-      deadline.unref();
-      void shutdown.close().then((code) => {
-        clearTimeout(deadline);
-        process.exit(code);
-      });
-    };
-    process.on("SIGINT", handle);
-    process.on("SIGTERM", handle);
+    process.on("SIGINT", requestProcessShutdown);
+    process.on("SIGTERM", requestProcessShutdown);
   }
   return shutdown.register(task);
 }
@@ -125793,7 +125929,7 @@ var import_debug = __toESM(require_src(), 1);
 import { isIPv6 } from "node:net";
 import { isIPv6 as isIPv62 } from "node:net";
 import { Buffer as Buffer2 } from "node:buffer";
-import { createHash as createHash21 } from "node:crypto";
+import { createHash as createHash22 } from "node:crypto";
 import { isIP as isIP9 } from "node:net";
 var ipv4CompatibleSubnet = new import_ip_address.Address6("::/96");
 function ipKeyGenerator(ip, ipv6Subnet = 56) {
@@ -125975,7 +126111,7 @@ var getResetSeconds = (windowMs, resetTime) => {
   return resetSeconds;
 };
 var getPartitionKey = (key) => {
-  const hash = createHash21("sha256");
+  const hash = createHash22("sha256");
   hash.update(key);
   const partitionKey = hash.digest("hex").slice(0, 12);
   return Buffer2.from(partitionKey).toString("base64");
@@ -132317,6 +132453,7 @@ async function main() {
       "The server will start but commands will fail until PlatformIO is installed.\n"
     );
   }
+  process.stdin.once("end", requestProcessShutdown);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   try {

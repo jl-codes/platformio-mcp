@@ -28,25 +28,26 @@ export class ShutdownCoordinator {
 
 const shutdown = new ShutdownCoordinator();
 let installed = false;
+let handling = false;
+
+/** Finish owned subsystem cleanup on an explicit process shutdown request. */
+export function requestProcessShutdown(): void {
+  if (handling) return;
+  handling = true;
+  const deadline = setTimeout(() => process.exit(1), 15000);
+  deadline.unref();
+  void shutdown.close().then((code) => {
+    clearTimeout(deadline);
+    process.exit(code);
+  });
+}
 
 /** Register process-wide cleanup; signal handling is installed once for all participating subsystems. */
 export function registerShutdownTask(task: () => Promise<void>): () => void {
   if (!installed) {
     installed = true;
-    let handling = false;
-    const handle = () => {
-      if (handling) return;
-      handling = true;
-      // Repeated signals share the same cleanup; the deadline bounds unresponsive transports.
-      const deadline = setTimeout(() => process.exit(1), 15000);
-      deadline.unref();
-      void shutdown.close().then((code) => {
-        clearTimeout(deadline);
-        process.exit(code);
-      });
-    };
-    process.on("SIGINT", handle);
-    process.on("SIGTERM", handle);
+    process.on("SIGINT", requestProcessShutdown);
+    process.on("SIGTERM", requestProcessShutdown);
   }
   return shutdown.register(task);
 }

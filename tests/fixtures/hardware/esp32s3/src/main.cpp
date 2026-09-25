@@ -4,6 +4,11 @@
 #include <cstdlib>
 #include <cstring>
 
+// Native flash verification requires a quiet window after bounded health telemetry.
+#ifndef PIO_HIL_HEARTBEAT_UNTIL_MS
+#define PIO_HIL_HEARTBEAT_UNTIL_MS 0
+#endif
+
 static char command[64];
 static size_t commandLength = 0;
 static bool commandOverflow = false;
@@ -39,7 +44,8 @@ void loop() {
         } else commandOverflow = true;
     }
     const uint32_t now = millis();
-    if (now - lastHeartbeat >= 1000) {
+    if (now - lastHeartbeat >= 1000 &&
+        (PIO_HIL_HEARTBEAT_UNTIL_MS == 0 || now <= PIO_HIL_HEARTBEAT_UNTIL_MS)) {
         lastHeartbeat = now;
         Serial.println("PIO_HIL_HEALTHY");
     }

@@ -18,7 +18,7 @@ import { executePartitionTable } from "./tools/partition-table.js";
 import { executeSystemCompatibility } from "./adapters/system-compat.js";
 import { executeUploadCompatibility } from "./adapters/upload-compat.js";
 import { executeNamedTarget, executeRunTargetAction } from "./tools/run-target.js";
-import { registerShutdownTask } from "./utils/shutdown-coordinator.js";
+import { registerShutdownTask, requestProcessShutdown } from "./utils/shutdown-coordinator.js";
 import {
   executeDeviceCompatibility,
   withDeviceCompatibility,
@@ -2866,6 +2866,8 @@ async function main() {
     );
   }
 
+  // The SDK transport does not forward client EOF; finish owned cleanup before forced termination.
+  process.stdin.once("end", requestProcessShutdown);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 

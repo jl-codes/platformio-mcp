@@ -8,6 +8,7 @@ export interface UsbProbeRecord {
   productId: string;
   serialNumber: string;
   location: string;
+  serialPorts?: readonly string[]; // Same-device endpoints from authorized host enumeration.
 }
 
 /** Caller selection narrows trusted discovery; it does not assert device presence or ownership. */
@@ -57,11 +58,31 @@ export function selectDebugProbe(
     { probe: UsbProbeRecord; locations: Set<string> }
   >();
   for (const record of records) {
+    if (
+      record.serialPorts !== undefined &&
+      (!Array.isArray(record.serialPorts) ||
+        record.serialPorts.length > 32 ||
+        record.serialPorts.some(
+          (port: unknown) =>
+            typeof port !== "string" ||
+            !port ||
+            port.length > 512 ||
+            /[\x00-\x1f\x7f]/.test(port),
+        ))
+    )
+      return invalid();
     const probe = {
       vendorId: hex(record.vendorId),
       productId: hex(record.productId),
       serialNumber: text(record.serialNumber),
       location: text(record.location),
+      ...(record.serialPorts === undefined
+        ? {}
+        : {
+            serialPorts: [
+              ...new Set<string>(record.serialPorts as string[]),
+            ].sort(),
+          }),
     };
     if (
       (vendor && probe.vendorId !== vendor) ||
@@ -76,8 +97,16 @@ export function selectDebugProbe(
       probe.serialNumber,
     ]);
     const previous = candidates.get(identity);
-    if (previous) previous.locations.add(probe.location);
-    else
+    if (previous) {
+      previous.locations.add(probe.location);
+      if (probe.serialPorts || previous.probe.serialPorts)
+        previous.probe.serialPorts = [
+          ...new Set([
+            ...(previous.probe.serialPorts ?? []),
+            ...(probe.serialPorts ?? []),
+          ]),
+        ].sort();
+    } else
       candidates.set(identity, { probe, locations: new Set([probe.location]) });
   }
   if (

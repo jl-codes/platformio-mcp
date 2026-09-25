@@ -39,3 +39,41 @@ it("does not revisit explicitly closed subsystems", async () => {
   expect(await coordinator.close()).toBe(0);
   expect(cleanup).not.toHaveBeenCalled();
 });
+
+
+it("finishes registered cleanup after actual client stdin disconnect", async () => {
+  const { spawn } = await import("node:child_process");
+  const moduleUrl = new URL("../src/utils/shutdown-coordinator.ts", import.meta.url).href;
+  const child = spawn(process.execPath, ["--import", "tsx", "--input-type=module", "--eval", `
+    import { registerShutdownTask, requestProcessShutdown } from ${JSON.stringify(moduleUrl)};
+    process.stdin.once("end", requestProcessShutdown);
+    const keepAlive = setInterval(() => {}, 1000);
+    registerShutdownTask(async () => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      clearInterval(keepAlive);
+      process.stdout.write("cleaned");
+    });
+    process.stdin.resume();
+    process.stdout.write("ready");
+  `], { stdio: ["pipe", "pipe", "pipe"] });
+  let output = "";
+  let stderr = "";
+  child.stderr.on("data", data => { stderr += data; });
+  child.stdout.on("data", data => {
+    output += data;
+    if (output.includes("ready")) child.stdin.end();
+  });
+  const deadline = setTimeout(() => child.kill(), 5000);
+  try {
+    const code = await new Promise<number | null>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", resolve);
+    });
+    expect(stderr).toBe("");
+    expect(code).toBe(0);
+    expect(output).toBe("readycleaned");
+  } finally {
+    clearTimeout(deadline);
+    if (child.exitCode === null) child.kill();
+  }
+}, 10000);
