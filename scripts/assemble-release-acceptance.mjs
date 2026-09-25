@@ -38,9 +38,13 @@ for(const {file,report} of reports)for(const suite of report.testResults){
 const delta=git(['diff','--name-only',record.retainedRuntimeBaseline,'HEAD','--','src']).split(/\r?\n/).filter(Boolean);
 assert.equal(git(['rev-parse',record.retainedRuntimeBaseline+':src']),record.retainedRuntimeTree);
 for(const file of delta){assert(Object.hasOwn(record.retainedApplicability.changedSources,file),`Unreviewed retained-evidence source change: ${file}`);const expected=record.retainedApplicability.changedSources[file];assert.equal(fs.existsSync(file)?createHash("sha256").update(fs.readFileSync(file,"utf8").replaceAll("\r\n","\n")).digest("hex"):null,expected);}
-assert.equal(digest('plugins/platformio-mcp/.mcp.json'),record.hostObservations.declarationSha256);
+const matchesObservedTextDigest=(p,expected)=>{const text=fs.readFileSync(p,'utf8').replaceAll('\r\n','\n');return [text,text.replaceAll('\n','\r\n')].some(value=>createHash('sha256').update(value).digest('hex')===expected);};
+assert(matchesObservedTextDigest('plugins/platformio-mcp/.mcp.json',record.hostObservations.declarationSha256),'Retained host declaration changed');
 assert.equal(createHash('sha256').update(execFileSync('git',['show',record.pluginLifecycle.inventorySourceCommit+':plugins/platformio-mcp/runtime/inventory.json'])).digest('hex'),record.pluginLifecycle.inventorySha256);
-for(const [file,expected] of Object.entries(record.pluginLifecycle.unchangedInstallMetadata))assert.equal(digest(file),expected,'Retained plugin installation metadata changed');
+for(const [file,expected] of Object.entries(record.pluginLifecycle.unchangedInstallMetadata)){
+ assert(matchesObservedTextDigest(file,expected),'Retained plugin installation metadata changed');
+ assert.equal(fs.readFileSync(file,'utf8').replaceAll('\r\n','\n'),execFileSync('git',['show',record.pluginLifecycle.inventorySourceCommit+':'+file],{encoding:'utf8'}).replaceAll('\r\n','\n'),'Retained plugin installation content changed');
+}
 assert(record.pluginLifecycle.updated && record.pluginLifecycle.removed);
 for(const report of record.hostObservations.reports)assert(report.disabledAbsent && report.blocked.length===2 && report.blocked.every(item=>item.error.includes('disabled for MCP server')));
 const monitor=record.retainedLegacyMonitor.observations;
