@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "capabilities.json",
-      "bytes": 4630,
-      "sha256": "a5c27c5e02fd3373eae929c8189f23d5745bd63e9d4b324fb60c10406ad550a4"
+      "bytes": 4866,
+      "sha256": "900582e9f0eebaa851883c3ccb71f708c901c6f087043e2cad33b9102527f832"
     },
     {
       "path": "native/dependencies.json",
@@ -118,8 +118,8 @@
     },
     {
       "path": "platformio-mcp.mjs",
-      "bytes": 4715325,
-      "sha256": "d8ad5e9ead0dbaf7d366e46100dbc4af909b2bb0ef8040a806a0887d03aa2792"
+      "bytes": 4720256,
+      "sha256": "fa7e966a6d8ebdf5b73a8a211c685d218146efa057828ae33c21fb346fccc7de"
     },
     {
       "path": "prebuilds/darwin-x64+arm64/@serialport+bindings-cpp.node",

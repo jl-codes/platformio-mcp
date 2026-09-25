@@ -196,6 +196,7 @@ async function spawnPioMonitor(
     "device",
     ["monitor", ...monitorArgs],
     {
+      cwd: projectDir,
       detached: true,
       useFakeTty: true,
       stdio: ["ignore", outFd, outFd],

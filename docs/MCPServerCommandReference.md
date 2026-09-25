@@ -1348,3 +1348,14 @@ When you execute a prompt like this, your agent will typically make the followin
 | `projectDir` | string | no | Optional directory used to resolve `.pio-mcp-policy.json` |
 
 - **Returns:** Profile metadata plus allowed, approval-required, and denied operations.
+
+
+### Standalone remote debugger binding
+
+For a PlatformIO debug environment with no local `debug_server`, standalone MCP and `debug-run` resolve the configured numeric TCP endpoint through the operator's `debug-targets.json` in the server policy directory (normally `~/.platformio-mcp`; respects explicit `PIO_MCP_DATA_DIR`). The file must be outside the project. It is operator configuration, never a tool argument or project permission grant.
+
+```json
+{"version":1,"bindings":[{"projectDir":"/absolute/real/project","environment":"debug","endpoint":"192.0.2.10:3333","targetId":"lab-host/board-a"}]}
+```
+
+Use the same stable `targetId` for every endpoint leading to the same target. The operator must establish that mapping; it is not automatic physical-device authentication. The map is bound to approvals and revalidated before acquisition/handoff. Endpoint and target leases coordinate this account's installations; they do not lock unrelated clients on the remote server. GDB is supervised locally; the external server is not terminated. Existing host-code and target permissions still apply. Missing, ambiguous, changed or project-controlled maps fail closed. A local `probe` selector is rejected for remote startup. DNS and pipe endpoints remain unsupported.

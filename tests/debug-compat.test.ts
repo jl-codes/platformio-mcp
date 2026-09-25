@@ -187,3 +187,53 @@ it("requires a host remote binding and never falls back to local USB discovery",
   });
   expect(resolve).toHaveBeenCalledOnce();
 });
+
+it("does not silently ignore a local probe selector for a remote target", async () => {
+  mocks.prepare.mockResolvedValue({
+    projectDir: "/project",
+    environment: "debug",
+    load: false,
+    configuration: { server: null, port: "192.0.2.1:3333" },
+  });
+  const resolve = vi.fn();
+  await expect(
+    new DebugCompatibilityClient(undefined, resolve).start({
+      probe: { serial_number: "1234" },
+    }),
+  ).rejects.toMatchObject({ code: "DEBUG_REMOTE_PROBE_SELECTOR_UNSUPPORTED" });
+  expect(resolve).not.toHaveBeenCalled();
+  expect(mocks.remote).not.toHaveBeenCalled();
+});
+
+it("uses the operator resolver by default for standalone MCP and CLI clients", async () => {
+  const operator = await import("../src/core/debug/debug-operator-binding.js");
+  const binding = {
+    endpoint: "192.0.2.1:3333",
+    identity: "operator-target",
+    revalidate: vi.fn(),
+    acquireTarget: vi.fn(),
+  };
+  const resolver = vi
+    .spyOn(operator, "resolveOperatorRemoteDebugBinding")
+    .mockResolvedValue(binding);
+  try {
+    mocks.prepare.mockResolvedValue({
+      projectDir: "/project",
+      environment: "debug",
+      load: false,
+      configuration: { server: null, port: "192.0.2.1:3333" },
+    });
+    mocks.remote.mockResolvedValue("standalone-remote");
+    await expect(
+      new DebugCompatibilityClient().start({ load: false }),
+    ).resolves.toMatchObject({ session_id: "standalone-remote" });
+    expect(resolver).toHaveBeenCalledWith({
+      projectDir: "/project",
+      environment: "debug",
+      endpoint: "192.0.2.1:3333",
+    });
+    expect(mocks.remote.mock.calls[0][1].binding).toBe(binding);
+  } finally {
+    resolver.mockRestore();
+  }
+});

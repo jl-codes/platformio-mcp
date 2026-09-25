@@ -7,6 +7,7 @@ import {
   startRemotePreparedDebugger,
   type RemoteDebugTargetBinding,
 } from "../core/debug/debug-remote-startup.js";
+import { resolveOperatorRemoteDebugBinding } from "../core/debug/debug-operator-binding.js";
 import { startLocalPreparedDebugger } from "../core/debug/debug-local-startup.js";
 import { withDebugProbeDiscovery } from "../core/devices/debug-probe-discovery.js";
 import type { PolicyEvaluationContext } from "../core/policy/types.js";
@@ -75,13 +76,13 @@ export class DebugCompatibilityClient {
   /** Optional host verification supplements mandatory native supervisor proofs; never request-controlled. */
   constructor(
     private readonly confirmProbeReleased?: () => Promise<boolean>,
-    private readonly resolveRemoteBinding?: (
+    private readonly resolveRemoteBinding: (
       selection: Readonly<{
         projectDir: string;
         environment: string;
         endpoint: string | null;
       }>,
-    ) => Promise<RemoteDebugTargetBinding>,
+    ) => Promise<RemoteDebugTargetBinding> = resolveOperatorRemoteDebugBinding,
   ) {}
 
   /** Prepare once across approvals, then select and revalidate the physical probe during owned startup. */
@@ -133,6 +134,11 @@ export class DebugCompatibilityClient {
           "DEBUG_START_TIMEOUT",
         );
       const remote = prepared.configuration?.server === null;
+      if (remote && args.probe)
+        throw new PlatformIOError(
+          "Remote target selection comes from the operator binding, not a local USB selector.",
+          "DEBUG_REMOTE_PROBE_SELECTOR_UNSUPPORTED",
+        );
       if (remote && !this.resolveRemoteBinding)
         throw new PlatformIOError(
           "Remote debugger startup requires a trusted host target binding.",
