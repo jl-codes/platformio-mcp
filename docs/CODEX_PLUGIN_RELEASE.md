@@ -27,9 +27,16 @@ On Windows, macOS, and Linux:
 1. Clone into a new path and install dependencies from the lockfiles.
 2. Run the build/validation commands above.
 3. Run `node build/cli.js plugin validate --require-runtime`, then `node build/cli.js install --codex-plugin`.
-4. Start a new Codex task and confirm eight skills and 42 annotated tools.
+4. Start a new Codex task and confirm all nine packaged skills, including
+   `get-started`, and the annotated MCP tool catalog.
 5. Temporarily make the source checkout unavailable and verify the cached plugin still initializes, lists tools, and shuts down.
 6. Confirm `install --codex` still preserves unrelated `config.toml` content.
+
+For the native extension, use a Codex desktop build that supports local bundled
+MCP Apps. Open `open_pio_agent_panel`, select a project, inspect live task/log
+state, run a permitted build, and confirm the explicit operator-dashboard
+handoff. Record the exact client version and OS. MCP resource discovery in the
+CLI alone does not prove the panel renders.
 
 Record OS, Node version, package/plugin version, commit, runtime inventory checksum, and pass/fail. Never record launch tickets, cookies, raw device serial numbers, or full local paths in public evidence.
 

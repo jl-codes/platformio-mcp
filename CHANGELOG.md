@@ -5,7 +5,21 @@ All notable changes to **platformio-mcp** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.1.0] - Unreleased
+## [3.2.0] - Unreleased
+
+### Added
+
+- A native Codex conversation panel for project, device, task, log, policy,
+  lock, approval, and monitor visibility, backed by the existing local MCP
+  server and its policy controls.
+- A project-first onboarding skill and public listing metadata for PIO Agent.
+
+### Changed
+
+- The Codex plugin bundles its MCP Apps resource and panel assets while retaining
+  the standalone dashboard and headless tool workflows.
+
+## [3.1.0] - 2026-09-25
 
 ### Added
 
@@ -41,11 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Release status
 
-3.1.0 is prepared but not published. Native wheel installation on five hosts and
-amd64/arm64 container builds passed on the recorded pre-release source. Full parity,
-required physical acceptance, publisher setup and registry-installed verification
-remain incomplete. See [distribution readiness](docs/DISTRIBUTION_READINESS.md)
-and the [compatibility guide](docs/package-compatibility.md) for current limits.
+The canonical 3.1.0 npm package and GitHub release were published on
+2026-09-25. See [distribution readiness](docs/DISTRIBUTION_READINESS.md)
+and the [compatibility guide](docs/package-compatibility.md) for the status of
+other namespaces and parity acceptance.
 
 ## [3.0.0] - 2026-09-08
 
