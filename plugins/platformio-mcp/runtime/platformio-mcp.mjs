@@ -22319,13 +22319,14 @@ var require_fast_uri = __commonJS({
         if (!malformedIPLiteral) {
           malformedHost = canonicalizeHost(parsed, options, schemeHandler, isIP10);
         }
-        if (!schemeHandler || schemeHandler && !schemeHandler.skipNormalize) {
-          if (uri.indexOf("%") !== -1) {
-            if (parsed.host !== void 0 && !malformedIPLiteral) {
-              const host = isIP10 ? parsed.host : normalizePercentEncoding(parsed.host, true);
-              parsed.host = reescapeHostDelimiters(host, isIP10);
-            }
+        if (uri.indexOf("%") !== -1 && parsed.host !== void 0 && !malformedIPLiteral) {
+          let host = isIP10 ? parsed.host : normalizePercentEncoding(parsed.host, true);
+          if (!isIP10) {
+            host = normalizePercentEncoding(host.toLowerCase());
           }
+          parsed.host = reescapeHostDelimiters(host, isIP10);
+        }
+        if (!schemeHandler || schemeHandler && !schemeHandler.skipNormalize) {
           if (parsed.path) {
             parsed.path = normalizePathEncoding(parsed.path);
           }
@@ -91334,6 +91335,9 @@ var require_common2 = __commonJS({
       return isHostInSubnet.call(this, address);
     }
     function isHostInSubnet(address) {
+      if (this.binaryZeroPad().length !== address.binaryZeroPad().length) {
+        return false;
+      }
       return this.mask(address.subnetMask) === address.mask();
     }
     function isGloballyReachable(entries) {
@@ -91512,6 +91516,10 @@ var require_ipv4 = __commonJS({
           }
           address = address.replace(constants3.RE_SUBNET_STRING, "");
         }
+        const longest = constants3.GROUPS * 4 - 1;
+        if (address.length > longest) {
+          throw new address_error_1.AddressError(`IPv4 addresses are at most ${longest} characters.`);
+        }
         this.addressMinusSuffix = address;
         this.parsedAddress = this.parse(address);
       }
@@ -91648,15 +91656,18 @@ var require_ipv4 = __commonJS({
         return _Address4.fromHex(integer3.toString(16).padStart(8, "0"));
       }
       /**
-       * Return an address from in-addr.arpa form
+       * Return an address from in-addr.arpa form: the four octets reversed, with
+       * or without the `.in-addr.arpa` suffix and root dot, in any case. Throws
+       * `AddressError` unless the reversed labels form a valid IPv4 address, so
+       * `fromArpa(x.reverseForm())` round-trips {@link reverseForm}.
        * @param {string} arpaFormAddress - an 'in-addr.arpa' form ipv4 address
        * @returns {Adress4}
        * @example
-       * var address = Address4.fromArpa(42.2.0.192.in-addr.arpa.)
+       * var address = Address4.fromArpa('42.2.0.192.in-addr.arpa.')
        * address.correctForm(); // '192.0.2.42'
        */
       static fromArpa(arpaFormAddress) {
-        const leader = arpaFormAddress.replace(/(\.in-addr\.arpa)?\.$/, "");
+        const leader = arpaFormAddress.replace(/(\.in-addr\.arpa)?\.?$/i, "");
         const address = leader.split(".").reverse().join(".");
         return new _Address4(address);
       }
@@ -92344,6 +92355,10 @@ var require_ipv6 = __commonJS({
           this.zone = zone[0];
           address = address.replace(constants6.RE_ZONE_STRING, "");
         }
+        const longest = this.groups * 5 + 5;
+        if (address.length > longest) {
+          throw new address_error_1.AddressError(`IPv6 addresses are at most ${longest} characters.`);
+        }
         this.addressMinusSuffix = address;
         this.parsedAddress = this.parse(this.addressMinusSuffix);
       }
@@ -92540,7 +92555,7 @@ var require_ipv6 = __commonJS({
        * Address6.fromArpa('8.b.d.0.1.0.0.2.ip6.arpa.').networkForm(); // '2001:db8::/32'
        */
       static fromArpa(arpaFormAddress) {
-        const nibbles = arpaFormAddress.replace(/(\.ip6\.arpa)?\.?$/, "");
+        const nibbles = arpaFormAddress.replace(/(\.ip6\.arpa)?\.?$/i, "");
         if (!/^[0-9a-f](\.[0-9a-f]){0,31}$/i.test(nibbles)) {
           throw new address_error_1.AddressError("Invalid 'ip6.arpa' form.");
         }
