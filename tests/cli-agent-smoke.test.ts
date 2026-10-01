@@ -118,7 +118,7 @@ describe("CLI agent workflow smoke tests", () => {
     };
     expect(payload).toEqual({
       success: true,
-      skills: 8,
+      skills: 9,
       runtimePresent: true,
     });
   });

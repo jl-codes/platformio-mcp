@@ -44,6 +44,7 @@ const TOOL_NAMES = [
   "reset_server_state",
   "check_task_status",
   "get_dashboard_url",
+  "open_pio_agent_panel",
   "get_project_context",
   "get_project_config",
   "agent_validate_project",
@@ -80,7 +81,7 @@ describe("MCP tool registry", () => {
   it("assigns one complete contract and fixed-name handler to every tool", async () => {
     const registry = createToolRegistry<string>(definitions());
     const listed = listRegisteredTools(registry);
-    expect(listed).toHaveLength(57);
+    expect(listed).toHaveLength(58);
     expect(
       listed.every(
         (tool) =>
