@@ -4,9 +4,9 @@
   "description": "PIO Agent builds, flashes, tests, and monitors PlatformIO firmware safely from Codex using PlatformIO MCP.",
   "author": {
     "name": "Tony Loehr",
-    "url": "https://github.com/jl-codes"
+    "url": "https://pioagent.dev/"
   },
-  "homepage": "https://github.com/jl-codes/platformio-mcp#readme",
+  "homepage": "https://pioagent.dev/",
   "repository": "https://github.com/jl-codes/platformio-mcp",
   "license": "MIT",
   "keywords": [
@@ -31,7 +31,10 @@
       "Interactive",
       "Write"
     ],
-    "websiteURL": "https://github.com/jl-codes/platformio-mcp",
+    "websiteURL": "https://pioagent.dev/",
+    "supportURL": "https://pioagent.dev/support/",
+    "privacyPolicyURL": "https://pioagent.dev/privacy/",
+    "termsOfServiceURL": "https://pioagent.dev/terms/",
     "brandColor": "#1687F8",
     "composerIcon": "./assets/icon.png",
     "logo": "./assets/logo.png",
