@@ -112,7 +112,7 @@ npx -y platformio-mcp install --codex-plugin
 
 Start a new Codex task after installation. The legacy `install --codex` command remains available for MCP-only configuration. See the [full Codex Plugin guide](docs/CODEX.md) for update, uninstall, browser fallback, policy, automation, and rollback details.
 
-The plugin release gates run on Windows, macOS, and Linux, exercise the authenticated dashboard in Chromium, validate the bundled runtime and 44-tool registry, and keep physical-board evidence in a separate manual workflow. That workflow uploads only bounded, sanitized evidence; raw hardware logs stay on the self-hosted runner. See the [release and validation guide](docs/CODEX_PLUGIN_RELEASE.md).
+The plugin release gates run on Windows, macOS, and Linux, exercise the authenticated dashboard in Chromium, validate the bundled runtime and public tool registry, and keep physical-board evidence in a separate manual workflow. That workflow uploads only bounded, sanitized evidence; raw hardware logs stay on the self-hosted runner. See the [release and validation guide](docs/CODEX_PLUGIN_RELEASE.md).
 
 For headless verification and status inspection, the same CLI also provides `plugin validate`, `target-resolve`, `monitor-status`, `monitor-health`, `task-history`, `approval-status`, and `pending-approvals`. Run `platformio-mcp --help` for bounded options and JSON output support.
 

@@ -1,10 +1,21 @@
 # PIO Agent Codex Plugin
 
-The repository ships the complete PIO Agent Codex Plugin, built on PlatformIO MCP: a self-contained MCP server, eight workflow skills, the live PIO Agent dashboard, and safety primitives for physical hardware and recurring monitoring. The stable package, marketplace, plugin identifier, and skill namespace remain `platformio-mcp`; the preferred executable alias and user-facing product name are `pio-agent` and PIO Agent.
+The repository ships the PIO Agent Codex plugin, built on PlatformIO MCP: a self-contained MCP server, workflow skills, a native MCP Apps panel, the local browser dashboard, and safety primitives for physical hardware and recurring monitoring. The stable package, marketplace, plugin identifier, and skill namespace remain `platformio-mcp`; the preferred executable alias and user-facing product name are `pio-agent` and PIO Agent.
 
 ## Install from a clone
 
-Prerequisites are Node.js 18 or newer, PlatformIO Core on `PATH`, Git, and a current Codex installation.
+Prerequisites are Node.js 20 or newer, PlatformIO Core on `PATH`, Git, and a current Codex installation.
+
+## Install from the Git marketplace
+
+After the extension release is published, add the public repository marketplace and install its plugin:
+
+```bash
+codex plugin marketplace add jl-codes/platformio-mcp
+codex plugin add platformio-mcp@platformio-mcp
+```
+
+The public Codex directory listing is a separate distribution path and will be linked here after OpenAI publishes it. A local marketplace install does not establish directory availability.
 
 ```bash
 git clone https://github.com/jl-codes/platformio-mcp.git
@@ -48,15 +59,15 @@ Uninstalling the plugin does not remove PlatformIO projects or project-local `.p
 7. Evaluate bounded runtime evidence with `capture_serial_window` or `agent_monitor_health`.
 8. Correlate long operations by `taskId`; use `cancel_task` and `list_task_history` for controlled cleanup.
 
-All 42 tools publish read-only, destructive, idempotency, and open-world annotations. The server independently enforces policy, approvals, target bindings, locks, workspace boundaries, automation scope, and redaction; prompts cannot weaken those controls.
+Public tools publish explicit safety annotations. The server independently enforces policy, approvals, target bindings, locks, workspace boundaries, automation scope, and redaction; prompts cannot weaken those controls.
 
 ## Dashboard in Codex
 
-Ask Codex to open the PIO Agent dashboard. The `platformio-dashboard` skill calls `get_dashboard_url` with `open: false`, then opens the returned one-time launch URL in a right-side in-app browser when that host capability is available.
+Ask Codex to open the PIO Agent dashboard. On a host with MCP Apps support, the `platformio-dashboard` skill calls `open_pio_agent_panel` for project, device, policy, lock, approval-summary, monitor, task, bounded log, and build activity in a native conversation panel. On clients without that capability, it calls `get_dashboard_url` with `open: false` and opens the returned one-time launch URL in an in-app browser when available.
 
 The dashboard reuses the existing React UI. It supports narrow and full-width layouts, project switching, devices, command/task activity, logs, locks, approvals, and monitor state. The launch ticket expires quickly, is single-use, exchanges for an HttpOnly same-site cookie, and is removed from browser history after redirect. The listener is loopback-only by default and applies strict security headers, origin checks, request bounds, rate limits, and authenticated Socket.IO sessions.
 
-Codex CLI and IDE hosts without the in-app browser receive a clickable local launch URL and retain every workflow through MCP. Scheduled tasks must never open or refresh the dashboard.
+Codex CLI and IDE hosts without the panel or in-app browser receive a clickable local launch URL and retain every workflow through MCP. The ordinary panel and MCP dashboard link cannot approve hardware writes; use `pio-agent dashboard --operator` or the local approve/deny CLI for operator actions. Scheduled tasks must never open or refresh the dashboard.
 
 ## Monitoring automations
 
