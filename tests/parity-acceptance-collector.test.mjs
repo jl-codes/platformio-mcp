@@ -9,6 +9,8 @@ import { collectAcceptance } from "../scripts/collect-parity-acceptance.mjs";
 import { validateAcceptance } from "../scripts/validate-parity-acceptance.mjs";
 const commit = "a".repeat(40);
 const catalog = JSON.parse(fs.readFileSync(new URL("../docs/reviews/platformio-acceptance-requirements.json", import.meta.url)));
+const packageVersion = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url))).version;
+const deferralsApprovedForVersion = catalog.releaseScope.version === packageVersion;
 const requirements = catalog.requirements;
 function fixture(run) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-acceptance-collector-"));
@@ -32,7 +34,12 @@ function fixture(run) {
     run(packets, path.join(root, "output"));
   } finally {fs.rmSync(root, {recursive: true, force: true});}
 }
-test("combines disjoint full-inventory evidence while preserving source packets", () => fixture((packets, out) => {
+test("combines approved full-inventory evidence and rejects stale release scope", () => fixture((packets, out) => {
+  if (!deferralsApprovedForVersion) {
+    assert.throws(() => collectAcceptance(packets, out, commit), /Unapproved certification deferral/);
+    assert.equal(fs.existsSync(out), false);
+    return;
+  }
   const before = fs.readFileSync(path.join(packets[0], "manifest.json"));
   assert.equal(collectAcceptance(packets, out, commit).outcome, "pass");
   const manifest = JSON.parse(fs.readFileSync(path.join(out, "manifest.json")));
@@ -58,7 +65,11 @@ test("rejects altered artifacts and escaping references", () => fixture((packets
   assert.equal(fs.existsSync(out), false);
 }));
 
-test("records certifications as deferred without counting them as passed", () => fixture((packets, out) => {
+test("records only version-approved certifications as deferred", () => fixture((packets, out) => {
+  if (!deferralsApprovedForVersion) {
+    assert.throws(() => collectAcceptance(packets, out, commit), /Unapproved certification deferral/);
+    return;
+  }
   const result = collectAcceptance(packets, out, commit);
   assert.equal(result.passedRequirements, requirements.length - 1);
   assert.equal(result.deferredCertifications.length, 8);
@@ -78,7 +89,9 @@ test("rejects invented deferrals and missing retained ESP32 evidence", () => fix
     const esp = value.entries.find(item => item.requirementId === "PAR-HW-07");
     if (esp) { esp.outcome = "deferred"; esp.evidence = null; esp.artifacts = []; fs.writeFileSync(name, JSON.stringify(value)); }
   }
-  assert.throws(() => collectAcceptance(packets, out, commit), /Incomplete acceptance: PAR-HW-07/);
+  assert.throws(() => collectAcceptance(packets, out, commit), deferralsApprovedForVersion
+    ? /Incomplete acceptance: PAR-HW-07/
+    : /Unapproved certification deferral/);
 }));
 test("rejects a fabricated pass for deferred Cortex-M certification", () => fixture((packets, out) => {
   for (const packet of packets) {
