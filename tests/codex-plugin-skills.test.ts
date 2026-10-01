@@ -28,6 +28,7 @@ describe("Codex plugin skills", () => {
     expect(skillNames).toEqual([
       "esp32-flash-monitor",
       "firmware-bringup",
+      "get-started",
       "hardware-in-the-loop-test",
       "pio-manager",
       "platformio-dashboard",

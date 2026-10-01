@@ -25,6 +25,7 @@ export interface ToolDefinition {
   description: string;
   inputSchema: Record<string, unknown>;
   annotations?: Partial<ToolAnnotations>;
+  _meta?: Record<string, unknown>;
 }
 
 /** Context supplied by the MCP request adapter to registered handlers. */
@@ -112,11 +113,12 @@ export function listRegisteredTools<TResult>(
   registry: ReadonlyMap<string, RegisteredTool<TResult>>,
 ): ToolDefinition[] {
   return [...registry.values()].map(
-    ({ name, description, inputSchema, annotations }) => ({
+    ({ name, description, inputSchema, annotations, _meta }) => ({
       name,
       description,
       inputSchema,
       annotations,
+      ...(_meta ? { _meta } : {}),
     }),
   );
 }

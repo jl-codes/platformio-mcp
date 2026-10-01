@@ -118,8 +118,8 @@
     },
     {
       "path": "platformio-mcp.mjs",
-      "bytes": 4740779,
-      "sha256": "0d0405f646ac6f823839ee732367b4e9dc0e1a02b4f4389f9ca12a05bd8fa31c"
+      "bytes": 5095379,
+      "sha256": "ba4175e48c43014fe4f10f14950f5ebb7fe33dadfe2ecd0d0a092111dcc8dc73"
     },
     {
       "path": "prebuilds/darwin-x64+arm64/@serialport+bindings-cpp.node",
@@ -180,6 +180,11 @@
       "path": "web/pio_mcp_220x220.png",
       "bytes": 70018,
       "sha256": "5ff7a448d82ba6025e3e3688398737a8055d899b4b06cb53f625ea25cc261a37"
+    },
+    {
+      "path": "web/pio-agent-panel.js",
+      "bytes": 456003,
+      "sha256": "011c50c782cfaf9ef3ff58ab61775a53a8bcde797733e100f21d551a76b565f6"
     }
   ]
 }

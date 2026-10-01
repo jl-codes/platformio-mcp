@@ -214,6 +214,7 @@ export const MCP_ACTIONS: Record<string, ActionSafetyMetadata> = {
   },
   check_task_status: { ...READ, policyAction: "query_logs" },
   get_dashboard_url: { ...READ, policyAction: "query_logs" },
+  open_pio_agent_panel: { ...READ, policyAction: "query_logs" },
   get_project_context: READ,
   get_project_config: READ,
   agent_validate_project: READ,

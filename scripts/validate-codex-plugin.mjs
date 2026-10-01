@@ -60,7 +60,7 @@ function readPngMetadata(imagePath, pluginRoot) {
 
 /**
  * Validates the packaged plugin and repository marketplace.
- * @param {{ requireRuntime?: boolean, repoRoot?: string }} [options] Validation options.
+ * @param {{ requireRuntime?: boolean, requireSubmissionMetadata?: boolean, repoRoot?: string }} [options] Validation options.
  * @returns {{ skills: number, runtimePresent: boolean }} Validation summary.
  */
 export function validateCodexPlugin(options = {}) {
@@ -95,6 +95,28 @@ export function validateCodexPlugin(options = {}) {
   }
   if (JSON.stringify(manifest).includes("[TODO:"))
     errors.push("Plugin manifest has TODO markers.");
+  if (!manifest.author?.name || !manifest.interface?.developerName)
+    errors.push("Plugin publisher name is missing.");
+  for (const [field, limit] of [
+    ["displayName", 30],
+    ["shortDescription", 30],
+    ["longDescription", 4000],
+    ["developerName", 80],
+  ]) {
+    const value = manifest.interface?.[field];
+    if (typeof value !== "string" || !value.trim() || value.length > limit)
+      errors.push(`Plugin ${field} must be 1-${limit} characters.`);
+  }
+  if (options.requireSubmissionMetadata) {
+    for (const field of ["websiteURL", "supportURL", "privacyPolicyURL", "termsOfServiceURL"]) {
+      const value = manifest.interface?.[field];
+      try {
+        if (new URL(value).protocol !== "https:") throw new Error("not HTTPS");
+      } catch {
+        errors.push(`Plugin ${field} must be a public HTTPS URL for MCP submission.`);
+      }
+    }
+  }
 
   const assetPaths = [
     manifest.interface?.composerIcon,
@@ -107,6 +129,7 @@ export function validateCodexPlugin(options = {}) {
   for (const pathValue of [
     manifest.skills,
     manifest.mcpServers,
+    manifest.onboardingSkill,
     ...assetPaths,
   ]) {
     try {
@@ -129,6 +152,9 @@ export function validateCodexPlugin(options = {}) {
       }
       if (image.width < 64 || image.height < 64) {
         errors.push(`Plugin image is smaller than 64x64: ${pathValue}`);
+      }
+      if (!manifest.interface?.screenshots?.includes(pathValue) && image.width !== image.height) {
+        errors.push(`Plugin icon is not square: ${pathValue}`);
       }
       if (isScreenshot && (image.width < 800 || image.height < 450)) {
         errors.push(`Plugin screenshot is smaller than 800x450: ${pathValue}`);
@@ -198,6 +224,9 @@ export function validateCodexPlugin(options = {}) {
   if (options.requireRuntime && !runtimePresent)
     errors.push("Bundled runtime is missing.");
   if (runtimePresent) {
+    const panelPath = join(pluginRoot, "runtime", "web", "pio-agent-panel.js");
+    if (!existsSync(panelPath))
+      errors.push("Bundled MCP Apps panel is missing.");
     for (const file of SERIAL_RUNTIME_FILES) {
       if (!existsSync(join(pluginRoot, "runtime", file)))
         errors.push(`Native serial payload missing: ${file}`);
@@ -216,6 +245,8 @@ export function validateCodexPlugin(options = {}) {
         if (!inventoryPaths.has(file))
           errors.push(`Native serial payload is not inventoried: ${file}`);
       }
+      if (!inventoryPaths.has("web/pio-agent-panel.js"))
+        errors.push("MCP Apps panel is not inventoried.");
       for (const entry of Array.isArray(inventory.files)
         ? inventory.files
         : []) {
@@ -258,6 +289,7 @@ if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
   try {
     const result = validateCodexPlugin({
       requireRuntime: process.argv.includes("--require-runtime"),
+      requireSubmissionMetadata: process.argv.includes("--submission-ready"),
     });
     console.log(
       `Codex plugin is valid (${result.skills} skills, runtime ${result.runtimePresent ? "present" : "not built"}).`,

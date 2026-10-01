@@ -134,6 +134,17 @@ export async function buildCodexPlugin() {
 
   await buildSerialRuntime(REPO_ROOT, RUNTIME_ROOT);
   cpSync(webDist, join(RUNTIME_ROOT, "web"), { recursive: true });
+  await build({
+    entryPoints: [join(REPO_ROOT, "web", "src", "pio-agent-panel.tsx")],
+    outfile: join(RUNTIME_ROOT, "web", "pio-agent-panel.js"),
+    bundle: true,
+    platform: "browser",
+    format: "esm",
+    target: "es2022",
+    minify: true,
+    legalComments: "none",
+    logLevel: "warning",
+  });
   cpSync(join(REPO_ROOT, "distribution", "capabilities.json"), join(RUNTIME_ROOT, "capabilities.json"));
   normalizeRuntimeText(RUNTIME_ROOT);
   const inventory = createInventory(RUNTIME_ROOT);

@@ -38,6 +38,7 @@ const SOURCE_SKILLS = [
   [".skills/serial-diagnostics", "serial-diagnostics"],
   [".skills/hardware-in-the-loop-test", "hardware-in-the-loop-test"],
   [".skills/platformio-dashboard", "platformio-dashboard"],
+  [".skills/get-started", "get-started"],
   [
     ".skills/platformio-monitoring-automation",
     "platformio-monitoring-automation",

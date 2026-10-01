@@ -51,6 +51,7 @@ export const defaultPolicy: PolicyConfig = {
     "list_installed_libraries",
     "system_info",
     "get_dashboard_url",
+    "open_pio_agent_panel",
     "acquire_lock",
     "release_lock",
     "init_project",

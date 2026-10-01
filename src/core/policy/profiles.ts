@@ -42,6 +42,7 @@ const READ_ONLY_ALLOW = [
   "list_installed_libraries",
   "system_info",
   "get_dashboard_url",
+  "open_pio_agent_panel",
 ];
 
 const BUILD_ONLY_ALLOW = [

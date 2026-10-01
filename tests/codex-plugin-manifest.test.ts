@@ -24,7 +24,7 @@ function readJson(relativePath: string): unknown {
 describe("Codex plugin manifest", () => {
   it("validates the package before the generated runtime is built", () => {
     expect(validateCodexPlugin()).toEqual({
-      skills: 8,
+      skills: 9,
       runtimePresent: expect.any(Boolean),
     });
   });
@@ -125,7 +125,7 @@ describe("Codex plugin manifest", () => {
       tools: Record<string, string[]>;
     };
 
-    expect(declaredTools.size).toBe(57);
+    expect(declaredTools.size).toBe(58);
     expect(new Set(Object.keys(coverage.tools))).toEqual(declaredTools);
     for (const skillNames of Object.values(coverage.tools)) {
       expect(skillNames.length).toBeGreaterThan(0);

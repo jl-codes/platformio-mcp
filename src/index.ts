@@ -58,7 +58,13 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import {
+  PIO_AGENT_PANEL_URI,
+  readPioAgentPanel,
+} from "./ui/plugin-panel.js";
 
 // Import types and schemas for validation
 import {
@@ -202,6 +208,7 @@ const server = new Server(
   {
     capabilities: {
       tools: {},
+      resources: {},
     },
   },
 );
@@ -1092,16 +1099,42 @@ const toolDefinitions: ToolDefinition[] = [
   {
     name: "get_dashboard_url",
     description:
-      "Retrieves the address and auth token for the MCP Web Dashboard. Automatically starts the web server on demand if offline.",
+      "Retrieves a short-lived authenticated launch URL for the browser dashboard. Automatically starts the local web server on demand if offline.",
     inputSchema: {
       type: "object",
       properties: {
+        projectDir: {
+          type: "string",
+          description: "Optional PlatformIO project directory to show in the panel.",
+        },
         open: {
           type: "boolean",
           description:
             "If true, automatically opens the authenticated GUI link natively in the system's browser.",
         },
       },
+    },
+  },
+  {
+    name: "open_pio_agent_panel",
+    description:
+      "Opens the PIO Agent project, device, and task panel in a Codex host that supports MCP Apps. The headless result identifies the selected project without starting the browser dashboard.",
+    _meta: {
+      ui: { resourceUri: PIO_AGENT_PANEL_URI },
+      "openai/ui": { entrypoints: [{ type: "thread" }] },
+    },
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: { type: "string", description: "Optional PlatformIO project directory to inspect in the panel." },
+      },
+    },
+    annotations: {
+      title: "Open PIO Agent Panel",
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
   {
@@ -1670,6 +1703,21 @@ let compatibilityProjectDir: string | undefined;
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools: listRegisteredTools(toolRegistry) };
+});
+
+server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+  resources: [{
+    uri: PIO_AGENT_PANEL_URI,
+    name: "PIO Agent panel",
+    mimeType: "text/html;profile=mcp-app",
+  }],
+}));
+
+server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  if (request.params.uri !== PIO_AGENT_PANEL_URI) {
+    throw new Error(`Unknown UI resource: ${request.params.uri}`);
+  }
+  return readPioAgentPanel();
 });
 
 /**
@@ -2318,6 +2366,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   content: [
                     { type: "text", text: JSON.stringify(result, null, 2) },
                   ],
+                };
+              }
+
+              case "open_pio_agent_panel": {
+                const projectDir = typeof args.projectDir === "string" ? args.projectDir : undefined;
+                return {
+                  content: [{
+                    type: "text",
+                    text: JSON.stringify({ status: "ready", projectDir, panel: PIO_AGENT_PANEL_URI }),
+                  }],
                 };
               }
 

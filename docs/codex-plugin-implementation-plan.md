@@ -1,14 +1,150 @@
-# PIO Agent Codex Plugin Implementation Plan
+# PIO Agent Plugin Extensions and Distribution Plan
 
 ## Goal Description
 
-Ship the first-class PIO Agent Codex Plugin, built on PlatformIO MCP, from this repository under the stable `platformio-mcp` plugin identifier. A developer who clones the repository should be able to discover PIO Agent in the repo-local marketplace, invoke it through either the `pio-agent` or `platformio-mcp` executable, start the bundled PlatformIO MCP server, use focused embedded-development skills, operate the existing dashboard, and create safe monitoring automations without manually assembling MCP configuration.
+Deliver a released, publicly discoverable PIO Agent Codex plugin with a working native conversation panel, published marketplace/package artifacts, and verified installation from its live public listing. Reuse the runtime, UI, skills, installer, and release machinery already implemented. This 2026-09-30 addendum is the authoritative delivery scope and definition of done; the earlier plan below is historical context only. Its speculative features and broader test matrices do not add new prerequisites to this goal. Existing mandatory repository/release controls still apply.
+
+### Verified baseline
+
+Source inspection used GitHub main commit `241c5e36049cf5f0de1f8b31bdc3bc32f5953467`, verified against the GitHub API. This working checkout is older (`a88b6351`, local package version 2.3.0) and has unrelated modifications. Implement against current main in an isolated checkout; do not rebuild the old implementation or overwrite local changes.
+
+| Area | Actual status | Remaining change |
+| --- | --- | --- |
+| Plugin package | Current main contains a 3.1.0 compatibility manifest, MCP configuration, marketplace, branded assets, eight skills, bundled runtime/dashboard, launcher, and inventory | Reuse; add public listing metadata and validate packaging for the selected distribution channel |
+| Installation | Plugin installer and manifest/launcher/skill tests already exist; a 3.0.0 plugin is present in this machine's Codex cache | Verify current artifact installation and update; do not treat the installed 3.0.0 copy as current main |
+| Runtime and policy | Current main includes annotations, structured results, monitoring integration, and server-side policy | Preserve behavior and policy; add only UI-facing contracts needed by the adapter |
+| Dashboard | React/Ant Design UI using REST and Socket.IO; current main already has loopback binding, expiring launch tickets, sessions, and browser tests | Add a host bridge transport; preserve standalone browser transport |
+| Native extensions | No MCP Apps resource registration, `resourceUri`, `openai/ui`, or extension SDK usage found in current source/package manifests | Register UI resource and conversation entrypoint; integrate the existing UI with the host bridge |
+| Distribution evidence | Existing namespace record observed npm 3.0.0 on 2026-09-20; source manifest is 3.1.0 | Recheck registry/release artifacts before publishing; source version is not proof of published version |
+| Public Codex directory | No public listing verified in this review | Obtain the supported local-MCP submission route and complete listing/review/publication |
+
+This is a source/configuration assessment, not a fresh runtime, hardware, CI, or publication acceptance run. Earlier findings about missing packaging and dashboard hardening applied to the stale checkout, not current main.
+
+## User Review Required
+
+> [!IMPORTANT]
+> Public directory discovery has one external dependency. The linked OpenAI packaging section says local MCP servers must use a public HTTPS endpoint for standard submission, or the developer must contact OpenAI for local MCP support. Owner: project publisher/OpenAI contact. Ask for the supported submission/install route for a bundled local stdio server with USB access and MCP Apps UI. This does not block Git marketplace distribution or implementing the adapter. Do not expose the local dashboard publicly or add a hosted hardware relay merely to satisfy this requirement.
+
+> [!NOTE]
+> Recommended defaults: retain stable plugin ID `platformio-mcp`, display name **PIO Agent**, local hardware execution, existing approvals, and all current functionality. Deliver a conversation panel first. Sidebar entry can reuse that UI if supported. Rich forms, file viewers, new automations, hosted services, and runtime refactors are not prerequisites. No additional permission is needed to prepare this plan.
+
+## Proposed Changes
+
+### 1. Reuse the package and simplify discovery
+
+- [MODIFY] [plugin manifest](../plugins/platformio-mcp/.codex-plugin/plugin.json): retain the working compatibility format for the smallest change. Complete support/privacy/terms URLs, publisher identity, accurate capability copy, and onboarding metadata required by the submission route. Use three prompts covering project inspection, approved flash/verification, and opening the dashboard. Verify ownership of artwork and naming; do not imply PlatformIO or OpenAI endorsement.
+- [MODIFY] [marketplace](../.agents/plugins/marketplace.json), [README](../README.md), and [Codex guide](CODEX.md): document adding the existing Git marketplace and installing `platformio-mcp@platformio-mcp`. Verify the commands on the supported client before publishing them. Add a directory install link only after the listing exists; an unknown marketplace deep link is not a bootstrap installer.
+- [MODIFY] [plugin release guide](CODEX_PLUGIN_RELEASE.md): clearly distinguish Git-marketplace installability, plugin-extension compatibility, and public-directory publication. Reuse existing release records for status, including namespace targets; do not create another release tracker.
+- [NEW] [onboarding skill](../plugins/platformio-mcp/skills/get-started/SKILL.md), generated through the existing [skill sync script](../scripts/sync-codex-plugin.mjs): inspect Node/PlatformIO availability, select a project, explain missing prerequisites, and perform a useful read-only inspection. No automatic flash or unexpected browser launch. Do not duplicate existing workflow skills.
+- Keep existing build/launcher, checksum inventory, release artifacts, and npm aliases. Do not introduce lifecycle hooks: none are needed to register the UI or launch the existing server, and hooks add a separate trust/setup step.
+- A portable root `plugin.json`/`mcp.json` is optional modernization, not an acceptance blocker: the compatibility manifest remains supported. If the chosen submission route requires migration, generate both layouts from one metadata source and test launcher/validator/package-file changes together. Preserve the existing format for older clients; do not assume overlays merge.
+
+### 2. Prove the UI bridge on the actual local plugin
+
+- [NEW] [MCP UI resource module](../src/ui/plugin-ui.ts); [MODIFY] [MCP entry point](../src/index.ts): register a bundled dashboard HTML resource and an additive dashboard-opening tool with `_meta.ui.resourceUri`. Add OpenAI conversation entrypoint metadata (`openai/ui`, `type: thread`) using the documented extension API. Leave `get_dashboard_url` compatible.
+- [NEW] [plugin UI entry](../web/src/plugin-app.tsx) and [MCP transport](../web/src/lib/mcp-dashboard-transport.ts); [MODIFY] [web build configuration](../web/vite.config.ts): build an iframe-compatible asset using the existing React components and MCP Apps bridge. First prove initialize, one read-only status request, refresh, panel rendering, and teardown through the installed bundled stdio server in the target Codex client.
+- Feature-detect the bridge and extension capabilities. Record the exact client/version tested. An ordinary in-app browser tab is a fallback, not evidence of native extension support.
+- If the target client cannot render local bundled MCP Apps, record that exact compatibility blocker. Keep the existing distribution working and resolve host support before broad UI adaptation. Do not claim extension compatibility based on tool registration alone.
+
+### 3. Adapt the existing dashboard without rebuilding it
+
+- [NEW] [dashboard transport interface](../web/src/lib/dashboard-transport.ts) and [browser transport](../web/src/lib/browser-dashboard-transport.ts); [MODIFY] [app](../web/src/app.tsx) and the existing components issuing REST calls: inject operations and subscriptions instead of binding every component to `window.location`, bearer tokens, fetch, and Socket.IO. Browser mode retains the current behavior; plugin mode uses the host bridge.
+- Inventory current dashboard actions against existing MCP/core operations before coding. Reuse typed core functions for any missing UI operation, with explicit schemas and the same workspace/policy checks. Never add a generic HTTP proxy or arbitrary command tool to shortcut the mapping.
+- Use existing task/log/monitor snapshots for bounded refresh while the panel is visible. Stop refresh on disconnect/unmount. Add event integration only if required to preserve a current dashboard behavior; do not invent a new monitoring subsystem.
+- Keep selections and useful status in model-visible context, with bounded payloads. Do not send raw logs, credentials, or every UI event to the model.
+- Preserve operator approval separation. Route privileged approval decisions through the existing trusted operator surface until an equivalent host-authenticated human interaction is established. Never expose approval creation/acceptance as an unrestricted model-callable shortcut. Clearly label any action that opens the existing dashboard.
+- Retain the full standalone UI and its protections. Current main uses same-origin frame restrictions and session cookies; embedding its localhost URL inside another iframe is not a drop-in solution. The MCP resource serves the compiled UI and bridge transport, not a nested iframe around localhost. Do not relax CORS/frame policy to make the prototype work.
+- [MODIFY] [plugin build script](../scripts/build-codex-plugin.mjs), [validator](../scripts/validate-codex-plugin.mjs), and [package file list](../package.json): include the new UI artifact, resources, and dependencies in the existing inventory and package checks. Keep all resources independent of the original checkout. PlatformIO Core/toolchains remain documented prerequisites.
+
+### 4. Prepare public discovery alongside implementation
+
+- Publisher confirms local-MCP eligibility with OpenAI and supplies verified developer identity, support/privacy pages, and required review materials. Engineering supplies an installable artifact and reproducible prompts that reviewers can execute, including a no-board inspection path and explicit hardware requirements.
+- Submit the MCP-backed product through the agreed route. Do not submit a temporary skills-only listing with an assumption that MCP can be added later; current submission guidance disallows that conversion.
+- After approval, publish and verify search by **PIO Agent**, the listing link, installation, and a first useful task. Directory publication is complete only when that listing is live. Marketing can then link it from the project README and website.
+- Do not promise featured placement or recommendations. Test skill/tool activation with direct requests, implicit firmware requests, and unrelated prompts; tune metadata to actual capabilities.
+
+### 5. Merge, publish, and accept the deployed product
+
+- [MODIFY] [existing release workflow](../.github/workflows/release.yml) and [release guide](CODEX_PLUGIN_RELEASE.md) only where needed to include the UI resources and agreed distribution route. Use existing protected publishing and provenance controls; do not create a parallel release pipeline.
+- Merge the reviewed implementation after required checks pass. Produce the versioned release from that merged commit using the existing tag/release process. Publish the canonical runtime package, the plugin artifact, and existing release-required compatibility distributions; preserve all requested namespace families and accurately record unavailable or blocked destinations in existing release records. Do not make new namespace expansion a prerequisite for this Codex goal.
+- Point the live marketplace at the intended released artifact/ref, with a tested update and rollback path. Keep runtime, plugin, inventory, and listing metadata consistent with the accepted release; record commit, versions, checksums, and public URLs in the existing release record.
+- Resolve review findings, obtain approval, and explicitly publish the public listing. Deploy working support/privacy/terms pages and installation instructions at their advertised URLs. Replace placeholders before publication. A submitted or approved draft is not deployed.
+- Install through the live listing using a clean Codex profile or independent tester with ordinary consumer access, without the developer checkout or preinstalled PIO Agent cache. Complete onboarding, open the native panel, inspect a project, and perform a representative build/task/log workflow. Separately verify the documented Git-marketplace installation route. Confirm updater behavior against the previous supported release and that uninstall preserves user projects/state.
+- If post-publication acceptance fails, correct and republish through the same controls, or roll back and report the remaining blocker. A rollback is recovery, not completion of the requested new release.
+
+## Goal Execution Order
+
+Use this sequence as one delivery goal. Do not create a second implementation plan or a separate audit project.
+
+1. **Establish the release baseline and access.** Recheck current upstream once, preserve the dirty checkout, and use an isolated current-main checkout. Inspect existing release evidence. Identify exact publisher access, signing/registry permissions, directory identity, and host access needed. Request only missing owner actions; never secrets in chat. Start the local-MCP directory eligibility process immediately.
+2. **Resolve native-host feasibility.** Prove the installed local runtime can render and call through the native panel in the intended Codex desktop client. Record minimum supported client versions and OS coverage. This is a feasibility gate, not a shippable substitute for the dashboard. If unsupported, seek the exact host/local-MCP support decision before expanding implementation.
+3. **Complete the capability.** Implement the transport adapter, resource/entrypoint, dashboard behavior, onboarding, and listing metadata as a coherent change. Preserve existing tools, device controls, and standalone UI. Route ordinary dashboard work through the native panel; only privileged operator actions and explicitly unsupported host capabilities may use the documented external fallback. Do not call a link-only panel extension completion.
+4. **Validate and merge.** Run affected tests and required release checks on the final candidate. Reuse valid unchanged evidence. Resolve concrete failures, merge, and proceed to publishing without another generic audit.
+5. **Publish and verify.** Complete Proposed Changes 5 and every mandatory definition-of-done item below. Directory review may run alongside independent implementation/release work; it cannot be omitted from completion.
+
+Maintain only the blocker table below, updating each entry with next action, owner, and evidence in the existing release record. Distinguish implemented, validated, merged, published, and accepted in updates. Do not poll unchanged external reviews or fill an external wait with new features, documentation polish, or unrelated cleanup. If external support or authorization is unavailable, report the exact unmet acceptance item and follow the applicable goal-blocking rules; do not mark complete or silently substitute Git-only distribution or a hosted relay. A material architecture change requires a concrete decision from the user.
+
+Suggested goal objective (for a later explicitly started goal):
+
+> Deliver PIO Agent fully deployed as a publicly discoverable Codex plugin with a functioning native dashboard conversation panel. Follow the current addendum in docs/codex-plugin-implementation-plan.md from the verified current-main baseline through implementation, required validation, merge, protected release publishing, public-directory publication, and clean installation acceptance. Preserve existing functionality and permission controls. Use its single blocker list and mandatory definition of done; do not stop at a prototype, Git marketplace, submitted listing, or approval awaiting publication. Request exact missing external actions early and do not expand scope to work around unavailable platform support.
+
+## Verification Plan
+
+For implementation, extend the existing plugin tests rather than repeat completed release work:
+
+1. Package/resource contract tests: resource MIME/metadata, host entrypoint, packaged assets, initialization, headless compatibility, and existing tool contract preservation.
+2. UI transport tests: project selection, status/log updates, representative action dispatch, unauthorized/denied operations, disconnect/reconnect, and unmount cleanup. Verify every existing dashboard action either functions through the adapter or visibly opens the unchanged operator/dashboard surface.
+3. Cached-install acceptance: source checkout unavailable; current packaged server and UI initialize; update/remove do not delete projects or shared lock state. Verify supported Windows/macOS/Linux launch behavior using existing checks.
+4. Actual Codex panel test: render, resize, invoke a read-only operation, observe a task, and confirm fallback on clients without UI support. A screenshot alone does not establish bridge behavior.
+5. Run focused affected checks plus required existing release gates once on the final candidate. Reuse valid unchanged hardware evidence; perform additional hardware testing only if execution, target selection, approval, or transport changes affect it. Report unavailable hardware separately.
+6. Before claiming publication, verify the actual released package/version, marketplace artifact, and public listing independently. None was freshly accepted by this planning task.
+
+### Remaining blockers and next actions
+
+| Blocker | Next action | Owner |
+| --- | --- | --- |
+| Native panel support and dashboard parity unverified | Bundled MCP Apps resource and typed project/device/task/log/policy/lock/approval/monitor reads, build call, and browser handoff pass local package/protocol checks. Local `codex features list` reports `enable_mcp_apps` under development and false; current public Codex main also defaults it off. Obtain the supported desktop host/version or enablement path from OpenAI, render and exercise it there, then verify the panel's ordinary dashboard workflow and explicit local operator handoff without reducing the standalone dashboard | Engineering; OpenAI for host support |
+| Listing/onboarding incomplete | First-run onboarding skill and Tony Loehr publisher name are packaged. Publisher prefers pioagent.dev but its site and legal paths are not reachable from this review; confirm domain control, publish the product/support/privacy/terms pages, and verify the selected developer identity. Engineering then completes live manifest links, install instructions, and review materials. Submission-ready validation correctly fails on the three missing legal/support URLs | Engineering/publisher |
+| Local-MCP public-directory route | Publisher has an OpenAI contact; ask whether bundled local stdio MCP with USB access and MCP Apps UI is eligible for public Codex directory submission, and obtain the exact review/publish process | Publisher/OpenAI |
+| Extension acceptance unverified | Codex CLI 0.159.2 installed the current worktree plugin in an isolated profile and the cached copy passed MCP panel resource/tool discovery; run actual Codex desktop render/bridge, adapter behavior, and final-candidate clean install checks. CLI resource discovery alone is insufficient | Engineering |
+| Release and public deployment unverified | npm currently serves canonical `platformio-mcp` 3.1.0, the same version as the implementation baseline; bump the final extension candidate, merge, publish exact artifacts/listing/pages through the protected workflow, and verify both live installation routes. GitHub repository admin access is present; local npm authentication is absent, so verify CI trusted-publisher configuration before release | Engineering/publisher; OpenAI for directory review |
+
+## Definition of Done — All Items Mandatory
+
+- [ ] **Implemented and merged:** the reviewed changes are merged into the canonical repository; existing PIO Agent functionality, namespace identities, and permission controls are retained.
+- [ ] **Native extension works:** on the declared supported Codex desktop client/version and supported desktop OS targets, the installed plugin opens the real dashboard panel, selects a project, displays current task/log state, and executes representative permitted actions through the host bridge. Privileged operator handoffs are explicit and functional. CLI/IDE clients retain the documented headless/browser fallback. No claim of universal host support is required.
+- [ ] **Checks passed:** affected adapter/package/UI/policy checks and existing mandatory release gates pass for the shipped candidate. Existing hardware evidence is reused only where still valid; any changed hardware execution/approval path has the necessary acceptance evidence. Unsupported optional hardware does not become an invented release prerequisite.
+- [ ] **Artifacts published:** the canonical runtime and plugin release artifacts are publicly downloadable, version/commit/inventory identities agree, and existing release-required compatibility distributions have accurate recorded status. A local bundle or Git tag alone is insufficient.
+- [ ] **Marketplace deployed:** the public Git marketplace installs the intended release through documented commands; updates and rollback work and uninstall preserves user data.
+- [ ] **Public Codex discovery live:** OpenAI has accepted the actual local-MCP/extension distribution approach, the listing has been approved AND published, PIO Agent is findable by name from the supported Codex plugin directory, and the public listing/install link works for an eligible ordinary user. No featured placement or ranking guarantee is required.
+- [ ] **Consumer installation accepted:** a clean profile or independent tester installs from the live listing without a source checkout/manual MCP editing, follows declared prerequisites, completes a useful project inspection/build workflow, and operates the native panel. Record client/OS/version and evidence in the existing release record. Missing hardware is explained accurately; installation does not silently provision toolchains or flash devices.
+- [ ] **Public documentation live:** README/install links, support/privacy/terms URLs, prerequisites, host compatibility, and rollback instructions resolve and describe the shipped behavior.
+
+The goal is complete only when every mandatory item is satisfied. An external dependency marked pending, unavailable, or blocked is an honest status, never an alternate definition of done. In particular, Git-marketplace delivery does not substitute for public Codex discovery, and a browser URL does not substitute for the native extension. This plan does not guarantee OpenAI approval; it makes that dependency explicit so the goal cannot falsely finish without it.
+
+### Sources checked on 2026-09-30
+
+- [Bundled servers and hooks](https://developers.openai.com/plugins/build/plugins#bundled-mcp-servers-and-lifecycle-hooks): packaging, local-MCP public-submission boundary, optional hook trust.
+- [MCP Apps UI](https://developers.openai.com/plugins/build/chatgpt-ui): resource linkage, host bridge, feature detection, and headless fallback.
+- [Plugin Extensions](https://developers.openai.com/plugins/build/extensions): conversation/sidebar entrypoints and extension surfaces.
+- [Submission](https://developers.openai.com/plugins/deploy/submission): identity, package review, publication, and skills-only conversion restriction.
+- [Current Codex MCP Apps feature declaration](https://github.com/openai/codex/blob/main/codex-rs/features/src/lib.rs): `enable_mcp_apps` remains under development and disabled by default when checked on 2026-10-01; this is source evidence, not a test of the installed desktop client.
+- [Codex desktop rendering report](https://github.com/openai/codex/issues/21019): prior local-stdio MCP Apps resource was not rendered, so tool/resource registration alone is insufficient.
+- [Inspected source commit](https://github.com/jl-codes/platformio-mcp/tree/241c5e36049cf5f0de1f8b31bdc3bc32f5953467): authoritative baseline for this addendum. Repository-relative proposed paths refer to that baseline, some of which are absent from this older working checkout.
+
+---
+
+# Historical PlatformIO MCP Codex Plugin Implementation Plan
+
+## Goal Description
+
+Ship a first-class `platformio-mcp` Codex Plugin from this repository. A developer who clones the repository should be able to discover and install the plugin from the repo-local marketplace, start the bundled PlatformIO MCP server, invoke focused embedded-development skills, use the existing dashboard, and create safe monitoring automations without manually assembling MCP configuration.
 
 The plugin will combine:
 
-- the original 34-tool PlatformIO MCP surface plus eight integration primitives, represented by one typed 42-tool registry;
+- the existing local PlatformIO MCP server and its 34 tools;
 - focused skills for discovery, bring-up, build diagnosis, flashing, serial monitoring, hardware-in-the-loop testing, and automation setup;
-- a dashboard-launch skill that opens the authenticated PIO Agent UI in Codex desktop's in-app browser panel and degrades cleanly to a clickable local URL on hosts without that browser;
+- a dashboard-launch skill that opens the existing authenticated PlatformIO MCP UI in Codex desktop's in-app browser panel and degrades cleanly to a clickable local URL on hosts without that browser;
 - explicit tool metadata and server-side policy enforcement for physical-device safety;
 - a repo-local marketplace entry, branded install metadata, validation, tests, and release automation;
 - bounded, change-aware monitoring primitives that work well in both interactive Codex tasks and unattended scheduled tasks.
@@ -25,23 +161,6 @@ The integration is successful when a fresh clone can offer the plugin without re
 8. Open the live dashboard inside Codex for visual inspection, approvals, logs, and task control when the host supports it.
 9. Persist evidence and report only meaningful changes.
 10. Optionally schedule safe, recurring health checks through Codex.
-
-## Implementation Status (2026-09-07)
-
-This plan is being implemented on draft PR [#20](https://github.com/jl-codes/platformio-mcp/pull/20). The minimum physical-board gate is satisfied; the pull request remains in draft for final maintainer review and publication of the latest evidence commit.
-
-| Plan area | Current status | Evidence or remaining gate |
-| --- | --- | --- |
-| Plugin package and marketplace | Implemented | Repo-local marketplace, canonical manifest, branding, eight synced skills, self-contained bundled runtime, install/update flow, cache-portability contracts, version parity, and deterministic inventory are present. |
-| Complete MCP integration | Implemented | The typed registry exposes 42 tools with one handler, schema, annotations, policy action, risk classification, skill/command-reference coverage, and automated registry validation. |
-| Existing dashboard in Codex | Software-complete | The existing React dashboard is bundled unchanged in purpose and enhanced for narrow Codex panels, authenticated REST/Socket.IO, approvals, task cancellation, monitor state, policy visibility, and safe cursor reset. Chromium acceptance passes for the single-use launch session, 320 px and 430 px side panels, the 820 px responsive header, and full-width rendering. The rebuilt bundle was also visually reviewed in Codex with live PlatformIO telemetry. A sanitized screenshot-only Playwright case remains opt-in. |
-| Monitoring and task control | Implemented | Target binding, bounded incremental capture, cursors/digests, health transitions, task history/cancellation, monitor leases, cleanup, and project-local automation state are covered by tests. |
-| Automation integration and safety | Validated | The automation skill uses Codex host automations rather than a plugin scheduler; quiet-success, alert/recovery, teardown, and UI-free background behavior are specified. Default profiles cannot perform unattended writes. The explicit `lab_runner` path is independently bounded by exact project/environment/device binding, expiry, cooldown, and write budget. Host create, view, resume, pause, delete, and cleanup acceptance passed with a temporary paused read-only PlatformIO monitor definition. |
-| Software verification | Passing locally | 155 root tests, 12 agent/CLI E2E tests, 10 dashboard component tests, 12 plugin tests, and 4 Chromium journeys pass; typecheck, production build, smoke test, sync/manifest validation, deterministic rebuild, package dry-run, and both dependency audits pass. Three additional MCP agent smoke cases are Linux-only and configured in CI. Lint has zero errors. |
-| CI, release, and evidence handling | Passing | Windows/macOS/Linux quality and plugin jobs, Chromium, Agent/CLI E2E, package smoke, deterministic rebuild, npm-pack inspection, and dependency audits pass on the draft PR. The obsolete Cline PR Detective workflow is disabled in GitHub and removed from the branch; the repository-owned CI matrix is authoritative. Active workflows use the Node 24-based `actions/checkout@v7` and `actions/setup-node@v7` runtimes while testing the package on Node 20. Manual hardware E2E and sanitized hardware-evidence packaging are defined. Raw hardware logs remain on the self-hosted runner. |
-| Physical hardware acceptance | Minimum release gate satisfied | The [redacted ESP32-S3 acceptance record](hardware-acceptance-esp32s3.md) combines a prior user-authorized, SHA-verified physical upload/re-enumeration/serial run and user-confirmed working display with a current non-invasive check through the 42-tool bundled runtime. The current check resolved the exact project/environment/device, enforced `flash_requires_approval`, issued a short-lived binding, exposed history, and left no lock, running task, active monitor, or pending approval. No new flash or GPIO change was performed. RP2040, STM32, Arduino-class, fresh-workflow, and deliberate crash-injection rows remain explicitly unavailable rather than inferred. |
-
-The status table is the delivery checkpoint; the detailed matrix and release gates below remain authoritative. A software-complete row does not waive its listed manual or hardware proof.
 
 ## User Review Required
 
@@ -188,7 +307,7 @@ The checked-in plugin directory is the installable product. Source skills remain
   - Keep the entry repo-local so a clone can be added with Codex's marketplace command or discovered by supported desktop project flows.
 
 - [NEW] [`plugins/platformio-mcp/.codex-plugin/plugin.json`](../plugins/platformio-mcp/.codex-plugin/plugin.json)
-  - Use `platformio-mcp` as the immutable plugin identifier and component namespace. Codex does not define plugin-ID aliases; expose PIO Agent through `interface.displayName`, marketplace display metadata, and the supported `pio-agent` executable alias.
+  - Use `platformio-mcp` as the immutable plugin identifier.
   - Keep the plugin version synchronized with the root package version.
   - Point `skills` at `./skills/` and `mcpServers` at `./.mcp.json`.
   - Include repository, license, homepage, publisher, keywords, and complete interface metadata.
@@ -215,7 +334,7 @@ The checked-in plugin directory is the installable product. Source skills remain
   - Never interpolate user text into a shell command.
 
 - [NEW] [`plugins/platformio-mcp/assets/`](../plugins/platformio-mcp/assets/)
-  - Derive plugin icon and logo files from [`docs/assets/pio_agent.png`](assets/pio_agent.png).
+  - Derive plugin icon and logo files from [`docs/assets/pio_mcp_220x220.png`](assets/pio_mcp_220x220.png).
   - Add one current dashboard screenshot after removing project paths, ports, tokens, and device identifiers.
   - Validate image existence, format, dimensions, contrast, and file size in CI.
 
@@ -282,7 +401,7 @@ Every plugin skill must name the relevant MCP tools, require explicit `projectDi
   - For actuators or high-power outputs, require a separate physical-safety confirmation even if firmware upload is already approved.
 
 - [NEW] [`plugins/platformio-mcp/skills/platformio-dashboard/SKILL.md`](../plugins/platformio-mcp/skills/platformio-dashboard/SKILL.md)
-  - Trigger when the user asks to open, show, inspect, or work in the PIO Agent dashboard.
+  - Trigger when the user asks to open, show, inspect, or work in the PlatformIO MCP dashboard.
   - Resolve the requested `projectDir`, call `get_dashboard_url` with `open: false`, verify the dashboard health endpoint, and pass the short-lived launch URL to the host's browser-opening capability.
   - On Codex desktop, open the page in a right-side in-app browser panel and reuse the existing dashboard tab when the host exposes a tab identifier.
   - Feature-detect browser support. On Codex CLI, the IDE extension, or another headless client, return one clearly labeled clickable URL and continue to offer every operation through MCP tools.
@@ -538,10 +657,8 @@ The MCP tools remain the canonical execution API. The browser is a complementary
   - Add a plugin-installed test path on the self-hosted rig.
   - Exercise discover, resolve, build, approved flash, monitor reattach, runtime assertions, cancellation, and lock release.
   - Add a repeated monitor-health run to prove change detection and recovery reporting.
-  - Require exact project/environment/port inputs and an explicit workflow-dispatch hardware-write confirmation.
-  - Run protocol tests through the bundled plugin launcher, reject a post-flash device-identity change, prove no tracked task remains, and upload only sanitized evidence.
 
-- [NEW] [`.github/workflows/release.yml`](../.github/workflows/release.yml)
+- [NEW] [`.github/workflows/codex-plugin-release.yml`](../.github/workflows/codex-plugin-release.yml)
   - Build and validate plugin artifacts from the same commit as the npm package.
   - Verify package/plugin semantic version parity.
   - Produce a deterministic plugin archive and checksum.
@@ -573,7 +690,7 @@ Feature-complete means every row passes its software proof, safety proof, and—
 
 ### Host and Plugin Responsibilities
 
-| Responsibility                                | Codex host                          | PIO Agent plugin                     |
+| Responsibility                                | Codex host                          | PlatformIO MCP plugin                |
 | --------------------------------------------- | ----------------------------------- | ------------------------------------ |
 | Store cadence and wake a task                 | Yes                                 | No                                   |
 | Choose same-task heartbeat or standalone run  | Yes, guided by the automation skill | No                                   |
@@ -794,10 +911,10 @@ For every skill, test:
 
 | Scenario                     | Minimum coverage                                                           |
 | ---------------------------- | -------------------------------------------------------------------------- |
-| ESP32 family                 | Accepted: build, user-authorized SHA-verified flash, USB re-enumeration, serial assertion, and working display. Deliberate crash injection was not run under the non-invasive gate; see [record](hardware-acceptance-esp32s3.md). |
-| RP2040 family                | Unavailable for this acceptance: build, approved flash, monitor reconnect  |
-| STM32 family                 | Unavailable for this acceptance: build and upload method selection; monitor when supported |
-| Arduino-class board          | Unavailable for this acceptance: build, approved flash, simple boot marker |
+| ESP32 family                 | Build, approved flash, USB re-enumeration, serial assertion, crash pattern |
+| RP2040 family                | Build, approved flash, monitor reconnect                                   |
+| STM32 family                 | Build and upload method selection; monitor when supported                  |
+| Arduino-class board          | Build, approved flash, simple boot marker                                  |
 | No device attached           | Build-only success and explicit monitoring/flash blocker                   |
 | Multiple devices attached    | Ambiguity response; no guessed write target                                |
 | Simulator/native environment | Build and tests without requiring physical hardware                        |
@@ -833,7 +950,7 @@ The work is complete when:
 
 - the repo contains a valid installable `platformio-mcp` plugin and repo marketplace;
 - a fresh clone offers the plugin through documented Codex flows;
-- the PIO Agent plugin exposes all existing PlatformIO MCP functionality and focused workflow skills;
+- the plugin exposes all existing PlatformIO MCP functionality and focused workflow skills;
 - build, flash, filesystem upload, monitor, diagnostics, locks, libraries, dashboard, policy, and agent workflows remain functional and represented in the generated traceability report;
 - an interactive request opens the existing authenticated dashboard in Codex desktop's in-app browser panel, while CLI/IDE clients receive an honest link/headless fallback and scheduled runs remain UI-free;
 - monitoring is bounded, incremental, change-aware, cancellable, and safe for scheduled runs;
@@ -851,4 +968,4 @@ The work is complete when:
 - [OpenAI MCP plugin UI](https://developers.openai.com/plugins/build/chatgpt-ui)
 - [Codex scheduled tasks](https://learn.chatgpt.com/docs/automations)
 - [PlatformIO MCP command reference](MCPServerCommandReference.md)
-- [PIO Agent Codex guide](CODEX.md)
+- [PlatformIO MCP Codex guide](CODEX.md)

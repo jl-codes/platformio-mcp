@@ -33,6 +33,7 @@ const REQUIRED_FILES = [
   "plugins/platformio-mcp/runtime/inventory.json",
   "plugins/platformio-mcp/runtime/platformio-mcp.mjs",
   "plugins/platformio-mcp/runtime/web/index.html",
+  "plugins/platformio-mcp/runtime/web/pio-agent-panel.js",
   "web/dist/index.html",
 ];
 
