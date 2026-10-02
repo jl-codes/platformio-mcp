@@ -8,7 +8,7 @@
 - Source: https://github.com/jl-codes/platformio-mcp
 - Canonical npm package: platformio-mcp
 - Codex plugin and marketplace identifier: platformio-mcp
-- Full Codex plugin: `npx platformio-mcp install --codex-plugin`
+- Full Codex plugin: run `codex plugin marketplace add jl-codes/platformio-mcp --ref main`, then `codex plugin add platformio-mcp@platformio-mcp`.
 - Codex MCP-only setup: `npx platformio-mcp install --codex`
 - Other supported installer targets: `--claude`, `--cline`, `--vscode`, `--antigravity`.
 - Requirements: Node.js 20+; PlatformIO Core for firmware workflows; a supported local host and a compatible connected board for flashing and physical serial verification.

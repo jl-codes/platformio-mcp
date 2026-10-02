@@ -810,6 +810,7 @@ h2 {
 .command code {
   font: 12px/1.7 monospace;
   color: #a6d6ff;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .command button {

@@ -24,7 +24,7 @@
     "hardware_workflows": "Compatible connected board, selected project, and applicable human approval"
   },
   "installation": {
-    "codex_plugin": "npx platformio-mcp install --codex-plugin",
+    "codex_plugin": "codex plugin marketplace add jl-codes/platformio-mcp --ref main\ncodex plugin add platformio-mcp@platformio-mcp",
     "codex_mcp_only": "npx platformio-mcp install --codex",
     "claude_desktop": "npx platformio-mcp install --claude",
     "cline": "npx platformio-mcp install --cline",

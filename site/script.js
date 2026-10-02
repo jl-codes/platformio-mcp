@@ -58,15 +58,20 @@ document.querySelectorAll("[data-scenario]").forEach((button) => {
 const hostSelect = document.querySelector("#host-select");
 const command = document.querySelector("#install-command");
 const copyStatus = document.querySelector("#copy-status");
+const codexPluginCommands =
+  "codex plugin marketplace add jl-codes/platformio-mcp --ref main\n" +
+  "codex plugin add platformio-mcp@platformio-mcp";
 document.querySelectorAll("[data-codex-install]").forEach((link) => {
   link.addEventListener("click", () => {
     hostSelect.value = "codex-plugin";
-    command.textContent = "npx platformio-mcp install --codex-plugin";
+    command.textContent = codexPluginCommands;
     copyStatus.textContent = "";
   });
 });
 hostSelect.addEventListener("change", () => {
-  command.textContent = `npx platformio-mcp install --${hostSelect.value}`;
+  command.textContent = hostSelect.value === "codex-plugin"
+    ? codexPluginCommands
+    : `npx platformio-mcp install --${hostSelect.value}`;
   copyStatus.textContent = "";
 });
 
