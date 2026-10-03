@@ -82,3 +82,9 @@ __pycache__/
 
 # Local namespace observation cache
 .namespace-audit/
+
+# Build artifacts from `npm pack`
+*.tgz
+
+# Agent worktrees checked out inside the repo; never source.
+.claude/worktrees/

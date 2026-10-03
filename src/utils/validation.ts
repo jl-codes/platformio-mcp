@@ -136,8 +136,15 @@ export function validateSerialPort(port: string): boolean {
     return false;
   }
 
-  // Unix/Linux/macOS patterns: /dev/ttyUSB0, /dev/ttyACM0, /dev/cu.usbserial-*
-  const unixPattern = /^\/dev\/(tty(USB|ACM|S)\d+|cu\.[a-zA-Z0-9_\-\.]+)$/;
+  // Unix/Linux/macOS patterns: /dev/ttyUSB0, /dev/ttyACM0, /dev/cu.usbserial-*,
+  // plus the names Linux users are actually told to use: the stable udev paths
+  // /dev/serial/by-id/usb-... and /dev/serial/by-path/..., and the Raspberry
+  // Pi UART /dev/ttyAMA0. The CLI routes every --port through here, so
+  // rejecting these locked those users out entirely. The character class stays
+  // strict: the value becomes an argv element, never shell text, but it also
+  // becomes a filename via sanitizePortName, so no spaces or metacharacters.
+  const unixPattern =
+    /^\/dev\/(tty(USB|ACM|S|AMA)\d+|cu\.[a-zA-Z0-9_\-\.]+|serial\/by-(id|path)\/[a-zA-Z0-9_\-\.:]+)$/;
 
   // Windows patterns: COM1, COM10, etc.
   const windowsPattern = /^COM\d{1,3}$/;
@@ -162,9 +169,28 @@ export function validateLibraryName(name: string): boolean {
     return false;
   }
 
-  // Allow alphanumeric, spaces, hyphens, underscores, and dots
-  // Also allow @ for scoped packages and numbers for IDs
-  const validPattern = /^[a-zA-Z0-9_\-\.\s@]+$/;
+  // PlatformIO's canonical package identifier is `owner/name` -- its own
+  // registry returns e.g. "bblanchon/ArduinoJson" -- so a single slash must be
+  // accepted. Rejecting it made install_library and `pio-agent lib install`
+  // refuse the most common way users name a library.
+  //
+  // The name is passed to execFile as a single argv element with no shell, so
+  // a slash carries no injection risk. Path traversal is still refused: the
+  // value reaches `pio lib install` which resolves registry specs, and a
+  // traversal segment there is never legitimate.
+  if (name.includes("..")) {
+    return false;
+  }
+
+  // At most one slash, and never leading or trailing.
+  const slashCount = (name.match(/\//g) ?? []).length;
+  if (slashCount > 1 || name.startsWith("/") || name.endsWith("/")) {
+    return false;
+  }
+
+  // Alphanumerics, spaces, hyphens, underscores, dots, @ for scoped packages
+  // and version suffixes, and the owner/name separator.
+  const validPattern = /^[a-zA-Z0-9_\-\.\s@\/]+$/;
   return validPattern.test(name);
 }
 

@@ -103,6 +103,20 @@ export interface SpoolingForegroundResult {
 
 export type SpoolingResult = SpoolingBackgroundResult | SpoolingForegroundResult;
 
+/**
+ * Releasing a port claim is best-effort bookkeeping and must never turn a
+ * completed (or already-failed) task into a claim error. releasePort is
+ * owner-checked and can throw on an unreadable claim directory.
+ */
+function releaseClaimBestEffort(port?: string) {
+  if (!port) return;
+  try {
+    portSemaphoreManager.releasePort(port);
+  } catch {
+    // Best-effort; the task outcome is what the caller must see.
+  }
+}
+
 function ensureLatestLogPointer(logFile: string, latestLog: string): { mirrorLatest: boolean } {
   try {
     if (fs.existsSync(latestLog)) fs.unlinkSync(latestLog);
@@ -175,7 +189,7 @@ export async function executeWithSpooling(
   } catch (error) {
     try { fs.closeSync(outFd); } catch {}
     deviceCustody?.releaseAfterExit();
-    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+    releaseClaimBestEffort(options.activePort);
     throw new PlatformIOError(
       error instanceof Error ? error.message : "Process could not be started.",
       "PROCESS_START_FAILED",
@@ -231,7 +245,7 @@ export async function executeWithSpooling(
       if (!cleanupPending) {
         deviceCustody?.releaseAfterExit();
         await unregisterBuildPid(targetProjectArea).catch(() => {});
-        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+        releaseClaimBestEffort(options.activePort);
       }
     } finally {
       try { fs.closeSync(outFd); } catch {}
@@ -274,6 +288,10 @@ export async function executeWithSpooling(
     watcher.on("error", () => {
       // Swallow watcher errors (common on CI/Windows) so they don't crash test runtime.
     });
+    // A one-shot CLI must exit once its result is printed; an active
+    // FSEvents/inotify handle would keep the event loop alive after the task
+    // has finished. closeOutput() still closes it explicitly on completion.
+    watcher.unref();
   } catch {}
 
   // Close local resources even when persistent registry/lease cleanup fails.
@@ -327,7 +345,7 @@ export async function executeWithSpooling(
         if (!cleanupPending) {
           deviceCustody?.releaseAfterExit();
           await unregisterBuildPid(targetProjectArea);
-          if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+          releaseClaimBestEffort(options.activePort);
         }
       } finally {
         closeOutput();
@@ -358,7 +376,7 @@ export async function executeWithSpooling(
       if (!cleanupPending) {
         deviceCustody?.releaseAfterExit();
         await unregisterBuildPid(projectArea);
-        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+        releaseClaimBestEffort(options.activePort);
       }
     } finally {
       closeOutput();
@@ -387,7 +405,7 @@ export async function executeWithSpooling(
   try {
     deviceCustody?.releaseAfterExit();
     await unregisterBuildPid(projectArea);
-    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+    releaseClaimBestEffort(options.activePort);
   } finally {
     closeOutput();
   }

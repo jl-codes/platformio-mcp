@@ -1623,27 +1623,27 @@ var require_adapter = __commonJS({
 var require_proper_lockfile = __commonJS({
   "node_modules/proper-lockfile/index.js"(exports, module) {
     "use strict";
-    var lockfile8 = require_lockfile();
+    var lockfile9 = require_lockfile();
     var { toPromise, toSync, toSyncOptions } = require_adapter();
     async function lock(file2, options) {
-      const release = await toPromise(lockfile8.lock)(file2, options);
+      const release = await toPromise(lockfile9.lock)(file2, options);
       return toPromise(release);
     }
     function lockSync(file2, options) {
-      const release = toSync(lockfile8.lock)(file2, toSyncOptions(options));
+      const release = toSync(lockfile9.lock)(file2, toSyncOptions(options));
       return toSync(release);
     }
     function unlock(file2, options) {
-      return toPromise(lockfile8.unlock)(file2, options);
+      return toPromise(lockfile9.unlock)(file2, options);
     }
     function unlockSync(file2, options) {
-      return toSync(lockfile8.unlock)(file2, toSyncOptions(options));
+      return toSync(lockfile9.unlock)(file2, toSyncOptions(options));
     }
     function check2(file2, options) {
-      return toPromise(lockfile8.check)(file2, options);
+      return toPromise(lockfile9.check)(file2, options);
     }
     function checkSync(file2, options) {
-      return toSync(lockfile8.check)(file2, toSyncOptions(options));
+      return toSync(lockfile9.check)(file2, toSyncOptions(options));
     }
     module.exports = lock;
     module.exports.lock = lock;
@@ -13452,7 +13452,10 @@ function ensureGlobalDirs() {
   ensureDir(GLOBAL_LOCKS_DIR);
 }
 function sanitizePortName(port) {
-  return port.replace(/[\/\.:]/g, "_").replace(/^_+|_+$/g, "");
+  const base2 = port.replace(/[\/\.:]/g, "_").replace(/^_+|_+$/g, "");
+  const RESERVED = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+  if (RESERVED.test(base2)) return `port_${base2}`;
+  return base2 === "" ? "port_unnamed" : base2;
 }
 var __filename, __dirname2, PROJECT_ROOT, SERVER_DATA_DIR, GLOBAL_LOCKS_DIR;
 var init_paths = __esm({
@@ -13800,7 +13803,7 @@ function validateSerialPort(port) {
   if (!port || typeof port !== "string") {
     return false;
   }
-  const unixPattern = /^\/dev\/(tty(USB|ACM|S)\d+|cu\.[a-zA-Z0-9_\-\.]+)$/;
+  const unixPattern = /^\/dev\/(tty(USB|ACM|S|AMA)\d+|cu\.[a-zA-Z0-9_\-\.]+|serial\/by-(id|path)\/[a-zA-Z0-9_\-\.:]+)$/;
   const windowsPattern = /^COM\d{1,3}$/;
   return unixPattern.test(port) || windowsPattern.test(port);
 }
@@ -13811,7 +13814,14 @@ function validateLibraryName(name2) {
   if (name2.length < 1 || name2.length > 100) {
     return false;
   }
-  const validPattern = /^[a-zA-Z0-9_\-\.\s@]+$/;
+  if (name2.includes("..")) {
+    return false;
+  }
+  const slashCount = (name2.match(/\//g) ?? []).length;
+  if (slashCount > 1 || name2.startsWith("/") || name2.endsWith("/")) {
+    return false;
+  }
+  const validPattern = /^[a-zA-Z0-9_\-\.\s@\/]+$/;
   return validPattern.test(name2);
 }
 function validateFramework(framework) {
@@ -13884,6 +13894,8 @@ function inspectProcessIdentity(pid) {
       "Invalid process ID.",
       "PROCESS_IDENTITY_INVALID"
     );
+  if (pid === process.pid && ownProcessIdentity)
+    return { status: "running", identity: ownProcessIdentity };
   try {
     let startToken;
     if (process.platform === "linux") {
@@ -13913,8 +13925,8 @@ function inspectProcessIdentity(pid) {
         ],
         {
           encoding: "utf8",
-          // Windows PowerShell cold startup can exceed three seconds on loaded hosts.
-          timeout: 1e4,
+          // Windows PowerShell cold startup can be heavily delayed on loaded CI hosts.
+          timeout: WINDOWS_IDENTITY_TIMEOUT_MS,
           maxBuffer: 8192,
           windowsHide: true,
           stdio: ["ignore", "pipe", "pipe"]
@@ -13938,10 +13950,9 @@ function inspectProcessIdentity(pid) {
       ))
         return { status: "unknown" };
     } else return { status: "unknown" };
-    return {
-      status: "running",
-      identity: { pid, platform: process.platform, startToken }
-    };
+    const identity = { pid, platform: process.platform, startToken };
+    if (pid === process.pid) ownProcessIdentity = identity;
+    return { status: "running", identity };
   } catch {
     try {
       process.kill(pid, 0);
@@ -13959,10 +13970,12 @@ function compareProcessIdentity(owner, observation) {
     return "unknown";
   return owner.startToken === observation.identity.startToken ? "alive" : "stale";
 }
+var WINDOWS_IDENTITY_TIMEOUT_MS, ownProcessIdentity;
 var init_process_identity = __esm({
   "src/core/devices/process-identity.ts"() {
     "use strict";
     init_errors2();
+    WINDOWS_IDENTITY_TIMEOUT_MS = 3e4;
   }
 });
 
@@ -15680,12 +15693,64 @@ var init_process_manager = __esm({
 
 // src/utils/semaphore.ts
 import fs18 from "node:fs";
+import os6 from "node:os";
 import path24 from "node:path";
-var SemaphoreManager, portSemaphoreManager;
+import { randomUUID as randomUUID2 } from "node:crypto";
+function monitorClaimTtlMs() {
+  const raw = process.env.PIO_MONITOR_CLAIM_TTL_MS;
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MONITOR_CLAIM_TTL_MS;
+}
+function ttlForClaim(claim) {
+  return claim.type === "monitor" ? monitorClaimTtlMs() : claimTtlMs();
+}
+function claimTtlMs() {
+  const raw = process.env.PIO_PORT_CLAIM_TTL_MS;
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_CLAIM_TTL_MS;
+}
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+var import_proper_lockfile6, ClaimError, ClaimIoError, PortBusyError, DEFAULT_CLAIM_TTL_MS, DEFAULT_MONITOR_CLAIM_TTL_MS, UNREADABLE_GRACE_MS, GUARD_STALE_MS, GUARD_WAIT_MS, GUARD_POLL_MS, SemaphoreManager, portSemaphoreManager;
 var init_semaphore = __esm({
   "src/utils/semaphore.ts"() {
     "use strict";
+    import_proper_lockfile6 = __toESM(require_proper_lockfile(), 1);
     init_paths();
+    init_errors2();
+    ClaimError = class extends PlatformIOError {
+      constructor(message, code, context) {
+        super(message, code, context);
+        this.name = "ClaimError";
+      }
+    };
+    ClaimIoError = class extends ClaimError {
+      constructor(operation, filePath, error40) {
+        super(
+          `Failed to ${operation} port claim file ${filePath}: ${error40.code ?? error40.message}`,
+          "CLAIM_IO_ERROR",
+          { operation, filePath, errno: error40.code }
+        );
+        this.name = "ClaimIoError";
+      }
+    };
+    PortBusyError = class extends ClaimError {
+      constructor(port, claim, reason) {
+        super(
+          claim ? `Port ${port} is already claimed by PID ${claim.owner_pid} (${claim.type}) in ${claim.owner_workspace}.` : reason ?? `Port ${port} was taken by another process while reclaiming a stale claim.`,
+          "PORT_BUSY",
+          { port, claim }
+        );
+        this.name = "PortBusyError";
+      }
+    };
+    DEFAULT_CLAIM_TTL_MS = 30 * 60 * 1e3;
+    DEFAULT_MONITOR_CLAIM_TTL_MS = 24 * 60 * 60 * 1e3;
+    UNREADABLE_GRACE_MS = 5e3;
+    GUARD_STALE_MS = 5e3;
+    GUARD_WAIT_MS = 2e3;
+    GUARD_POLL_MS = 10;
     SemaphoreManager = class _SemaphoreManager {
       static instance;
       constructor() {
@@ -15697,58 +15762,473 @@ var init_semaphore = __esm({
         }
         return _SemaphoreManager.instance;
       }
+      /**
+       * Serialises every mutation of one port's claim file across processes.
+       *
+       * The claim file itself is published with link()/rename(), which are
+       * atomic, but a classify-then-act pair (`releasePort`'s read and unlink,
+       * `claimPort`'s stale check and republish) is two syscalls, and a
+       * replacement claim published between them would be acted on under the
+       * old claim's authority. The guard closes that window. It is a
+       * proper-lockfile directory beside the claim file, chosen over the reclaim
+       * breaker because it is crash-safe: a lock left by a dead process goes
+       * stale after GUARD_STALE_MS and is taken over, so the highest-frequency
+       * cleanup path in this file cannot wedge a port. Contention is brief (the
+       * critical sections are a handful of syscalls), so callers spin for at most
+       * GUARD_WAIT_MS before reporting the port busy.
+       */
+      withPortGuard(port, filePath, fn) {
+        const guard = `${filePath}.guard`;
+        const deadline = Date.now() + GUARD_WAIT_MS;
+        let release;
+        for (; ; ) {
+          try {
+            release = import_proper_lockfile6.default.lockSync(guard, {
+              realpath: false,
+              stale: GUARD_STALE_MS,
+              // The default handler throws from a timer if the guard's mtime
+              // refresh fails -- say, a reset_server_state sweep removed the
+              // directory while it was held -- which would crash the process
+              // from an unrelated code path. The critical section is over in
+              // milliseconds; a compromised guard is simply not ours to report.
+              onCompromised: () => {
+              }
+            });
+            break;
+          } catch (error40) {
+            const code = error40.code;
+            if (code !== "ELOCKED") {
+              throw new ClaimIoError("lock", guard, error40);
+            }
+            if (Date.now() >= deadline) {
+              throw new PortBusyError(
+                port,
+                this.getClaim(port),
+                `Port ${port}'s claim is being updated by another process right now.`
+              );
+            }
+            sleepSync(GUARD_POLL_MS);
+          }
+        }
+        try {
+          return fn();
+        } finally {
+          try {
+            release();
+          } catch {
+          }
+        }
+      }
       getLockFilePath(port) {
         const id = sanitizePortName(port);
         return path24.join(GLOBAL_LOCKS_DIR, `${id}.json`);
       }
       /**
-       * Claims a physical port by creating a lock file.
-       * If the file already exists, it updates the timestamp.
+       * Claims a physical port. Throws PortBusyError if the port is held by a live
+       * claim from another process. Stale claims are reclaimed under a breaker so
+       * two processes cannot reclaim the same claim simultaneously.
        */
       claimPort(port, reason = "Flash Operation") {
+        ensureGlobalDirs();
         const filePath = this.getLockFilePath(port);
-        const content = JSON.stringify({
-          status: "busy",
-          current_claim: {
-            type: reason.toLowerCase().includes("monitor") ? "monitor" : "upload",
-            owner_workspace: process.cwd(),
-            owner_pid: process.pid,
-            timestamp: Date.now()
+        const claim = {
+          type: reason.toLowerCase().includes("monitor") ? "monitor" : "upload",
+          owner_workspace: process.cwd(),
+          owner_pid: process.pid,
+          hostname: os6.hostname(),
+          timestamp: Date.now(),
+          port
+        };
+        const content = JSON.stringify(
+          { status: "busy", current_claim: claim },
+          null,
+          2
+        );
+        return this.withPortGuard(port, filePath, () => {
+          if (this.tryCreateExclusive(filePath, content)) return claim;
+          if (this.evaluateExisting(filePath, port) === "reentrant") {
+            this.replaceClaimAtomically(
+              filePath,
+              this.refreshedContent(port, claim)
+            );
+            return claim;
           }
-        }, null, 2);
-        fs18.writeFileSync(filePath, content);
+          return this.withReclaimBreaker(port, filePath, () => {
+            const recheck = this.evaluateExisting(filePath, port);
+            if (recheck === "reentrant") {
+              this.replaceClaimAtomically(
+                filePath,
+                this.refreshedContent(port, claim)
+              );
+              return claim;
+            }
+            if (recheck === "reclaim") fs18.rmSync(filePath, { force: true });
+            if (this.tryCreateExclusive(filePath, content)) return claim;
+            throw new PortBusyError(port, this.getClaim(port));
+          });
+        });
       }
       /**
-       * Releases a claim by removing the lock file.
+       * Publishes `content` at `filePath` atomically, or reports that it is taken.
+       * Writes a temp file and links it into place: link() is atomic, fails EEXIST,
+       * and never exposes a partially written file under the real name. It is also
+       * the portable idiom over NFS, where O_EXCL is not reliably atomic.
        */
-      releasePort(port) {
+      tryCreateExclusive(filePath, content) {
+        const tmp = `${filePath}.tmp.${process.pid}.${randomUUID2()}`;
+        try {
+          fs18.writeFileSync(tmp, content);
+        } catch (error40) {
+          fs18.rmSync(tmp, { force: true });
+          throw new ClaimIoError("write", tmp, error40);
+        }
+        try {
+          fs18.linkSync(tmp, filePath);
+          return true;
+        } catch (error40) {
+          const code = error40.code;
+          if (code === "EEXIST") return false;
+          if (code === "EPERM" || code === "ENOTSUP" || code === "EOPNOTSUPP" || code === "ENOSYS" || // Windows FAT32/exFAT surfaces here via libuv
+          // Windows: CreateHardLinkW on FAT32/exFAT/SMB reports
+          // ERROR_ACCESS_DENIED, which libuv maps to EACCES -- not EPERM. On
+          // POSIX an EACCES from link(2) is a real permission problem and must
+          // NOT silently degrade, so this is platform-gated.
+          code === "EACCES" && process.platform === "win32") {
+            return this.createExclusiveWithoutLink(filePath, content);
+          }
+          throw new ClaimIoError("link", filePath, error40);
+        } finally {
+          fs18.rmSync(tmp, { force: true });
+        }
+      }
+      warnedNoHardLinks = false;
+      /**
+       * Fallback for filesystems without hard links. O_EXCL alone cannot prevent a
+       * reader seeing a zero-length file mid-write, so the UNREADABLE_GRACE_MS rule
+       * in evaluateExisting is what keeps this safe: a fresh unreadable file is
+       * treated as held, never reclaimed.
+       */
+      createExclusiveWithoutLink(filePath, content) {
+        if (!this.warnedNoHardLinks) {
+          this.warnedNoHardLinks = true;
+          console.error(
+            `[pio-agent] ${path24.dirname(filePath)} does not support hard links, so port claims use a weaker exclusion primitive there. Set PIO_MCP_DATA_DIR to a path on a modern filesystem for full protection.`
+          );
+        }
+        try {
+          fs18.writeFileSync(filePath, content, { flag: "wx" });
+          return true;
+        } catch (error40) {
+          if (error40.code === "EEXIST") return false;
+          throw new ClaimIoError(
+            "create",
+            filePath,
+            error40
+          );
+        }
+      }
+      /** Replaces our own claim without ever exposing a truncated file. */
+      replaceClaimAtomically(filePath, content) {
+        const tmp = `${filePath}.tmp.${process.pid}.${randomUUID2()}`;
+        try {
+          fs18.writeFileSync(tmp, content);
+          fs18.renameSync(tmp, filePath);
+        } catch (error40) {
+          fs18.rmSync(tmp, { force: true });
+          throw new ClaimIoError(
+            "replace",
+            filePath,
+            error40
+          );
+        }
+      }
+      /**
+       * Decides what to do about an existing claim file. Throws PortBusyError when
+       * the port is genuinely held. Never returns "reclaim" for a file that might
+       * belong to a live process.
+       */
+      evaluateExisting(filePath, port) {
+        const state = this.classifyClaimFile(filePath, port);
+        switch (state.kind) {
+          case "absent":
+            return "absent";
+          case "denied":
+            throw new ClaimError(
+              `Port claim file ${filePath} exists but cannot be read (${state.errno}). Refusing to reclaim a claim that may be live.`,
+              "CLAIM_ACCESS_DENIED",
+              { port, filePath, errno: state.errno }
+            );
+          case "unreadable":
+            if (state.ageMs < UNREADABLE_GRACE_MS) {
+              throw new PortBusyError(
+                port,
+                null,
+                `Port ${port} is being claimed by another process right now.`
+              );
+            }
+            return "reclaim";
+          case "ok":
+            if (this.isOwnedByThisProcess(state.claim)) return "reentrant";
+            if (!this.isClaimStale(state.claim))
+              throw new PortBusyError(port, state.claim);
+            return "reclaim";
+        }
+      }
+      /** Distinguishes absent, valid, unreadable and unauthorised claim files. */
+      classifyClaimFile(filePath, port) {
+        let raw;
+        try {
+          raw = fs18.readFileSync(filePath, "utf-8");
+        } catch (error40) {
+          const code = error40.code;
+          if (code === "ENOENT") return { kind: "absent" };
+          if (code === "EACCES" || code === "EPERM" || code === "EISDIR") {
+            return { kind: "denied", errno: code };
+          }
+          throw new ClaimIoError("read", filePath, error40);
+        }
+        try {
+          const parsed = JSON.parse(raw);
+          const claim = this.normaliseClaim(parsed.current_claim ?? parsed, port);
+          if (claim) return { kind: "ok", claim, raw };
+        } catch {
+        }
+        let ageMs = Number.POSITIVE_INFINITY;
+        try {
+          ageMs = Date.now() - fs18.statSync(filePath).mtimeMs;
+        } catch {
+        }
+        return { kind: "unreadable", ageMs, raw };
+      }
+      normaliseClaim(raw, port) {
+        if (!raw || typeof raw.owner_pid !== "number") return null;
+        return {
+          type: raw.type === "monitor" ? "monitor" : "upload",
+          owner_workspace: String(raw.owner_workspace ?? "unknown"),
+          owner_pid: raw.owner_pid,
+          hostname: String(raw.hostname ?? ""),
+          timestamp: Number(raw.timestamp ?? 0),
+          port: raw.port ? String(raw.port) : port,
+          ...typeof raw.monitor_pid === "number" ? { monitor_pid: raw.monitor_pid } : {}
+        };
+      }
+      /**
+       * Serialises stale-claim reclamation so two reclaimers cannot both win.
+       *
+       * There is deliberately NO auto-recovery of an abandoned breaker. Removing a
+       * breaker we do not own and then re-creating it is unlink-then-create, the
+       * exact ABA this class exists to prevent, and guarding it with a read-back
+       * only narrows the window rather than closing it: a stomp landing after the
+       * read-back is invisible. An abandoned breaker therefore wedges one port
+       * until `pio-agent port release --port <p>` clears it, which is the same
+       * out-of-band recovery path a leaked claim already needs.
+       */
+      withReclaimBreaker(port, filePath, fn) {
+        const breaker = `${filePath}.reclaim`;
+        const payload2 = JSON.stringify({
+          pid: process.pid,
+          hostname: os6.hostname(),
+          at: Date.now()
+        });
+        if (!this.tryCreateExclusive(breaker, payload2)) {
+          throw new PortBusyError(
+            port,
+            null,
+            `Port ${port} is being reclaimed by another process. If no such process exists, run: pio-agent port release --port ${port}`
+          );
+        }
+        try {
+          return fn();
+        } finally {
+          fs18.rmSync(breaker, { force: true });
+        }
+      }
+      /** True when the PID is definitively gone. EPERM means alive under another user. */
+      isPidGone(pid) {
+        try {
+          process.kill(pid, 0);
+          return false;
+        } catch (error40) {
+          return error40.code === "ESRCH";
+        }
+      }
+      /**
+       * Records the monitor child's PID on an existing claim.
+       *
+       * Called after the child spawns, since its PID is not known at claim time.
+       * Best-effort: a failure here degrades to the old launcher-PID behaviour
+       * rather than breaking a working monitor.
+       */
+      attachMonitorPid(port, monitorPid) {
         const filePath = this.getLockFilePath(port);
-        if (fs18.existsSync(filePath)) {
+        const claim = this.getClaim(port);
+        if (!claim || claim.type !== "monitor") return false;
+        if (!this.isOwnedByThisProcess(claim)) return false;
+        try {
+          return this.withPortGuard(port, filePath, () => {
+            const current = this.getClaim(port);
+            if (!current || !this.isOwnedByThisProcess(current)) return false;
+            const updated = { ...current, monitor_pid: monitorPid };
+            this.replaceClaimAtomically(
+              filePath,
+              JSON.stringify({ status: "busy", current_claim: updated }, null, 2)
+            );
+            return true;
+          });
+        } catch {
+          return false;
+        }
+      }
+      /**
+       * Content for a re-entrant refresh of OUR OWN claim. The fresh claim never
+       * carries monitor_pid (it is attached only after the child spawns), so
+       * writing it verbatim silently downgraded a monitor claim to launcher-PID
+       * staleness. Keep whatever monitor_pid is already on disk.
+       */
+      refreshedContent(port, fresh) {
+        const existing = this.getClaim(port);
+        const merged = existing && typeof existing.monitor_pid === "number" ? { ...fresh, monitor_pid: existing.monitor_pid } : fresh;
+        return JSON.stringify({ status: "busy", current_claim: merged }, null, 2);
+      }
+      isOwnedByThisProcess(claim) {
+        return claim.owner_pid === process.pid && claim.hostname === os6.hostname();
+      }
+      /**
+       * Clears an abandoned reclaim breaker. Abandoned breakers are never recovered
+       * automatically, so this is the sanctioned out-of-band recovery, used by
+       * `pio-agent port release`. Returns true if a breaker was removed.
+       */
+      clearReclaimBreaker(port) {
+        const breaker = `${this.getLockFilePath(port)}.reclaim`;
+        if (!fs18.existsSync(breaker)) return false;
+        fs18.rmSync(breaker, { force: true });
+        return true;
+      }
+      /**
+       * Releases a claim. Only the owning process may release, unless the claim is
+       * stale or `force` is passed. When `expectedType` is given, the type check
+       * happens inside the same classify that authorises the unlink, so a claim
+       * that changed between an earlier read and this call cannot be force-deleted
+       * under the wrong type's authority (check-then-act). Returns true if a claim
+       * was removed.
+       *
+       * Classify and unlink are two syscalls, so on their own a replacement claim
+       * published between them (a reclaim that won, a fresh claim after another
+       * releaser cleared the file) would be deleted under the OLD claim's
+       * authority, freeing a port some process believes it holds. Two things
+       * close that:
+       *
+       * - The whole method runs under the per-port guard, which every publish
+       *   path also takes, so no cooperating process can replace the file while
+       *   this one is between its read and its unlink.
+       * - The unlink is conditional on the claim bytes being exactly what was
+       *   classified. Anything else on disk -- a different claim, a file that
+       *   vanished -- is left alone and reported as "not released". This also
+       *   covers writers that bypass the guard (an admin reset, a legacy
+       *   version of this tool sharing the directory).
+       *
+       * The guard is proper-lockfile rather than the reclaim breaker on purpose:
+       * the breaker has no auto-recovery, and this method is the cleanup path of
+       * every upload and every monitor stop, so a crash mid-release must not
+       * wedge the port. The breaker still exists for the same reason it always
+       * did -- to make an abandoned reclaim visible -- and `port release` still
+       * clears it.
+       */
+      releasePort(port, options = {}) {
+        const filePath = this.getLockFilePath(port);
+        return this.withPortGuard(port, filePath, () => {
+          const state = this.classifyClaimFile(filePath, port);
+          if (state.kind === "absent") return false;
+          if (state.kind === "denied") return false;
+          if (state.kind === "unreadable") {
+            if (options.expectedType) return false;
+            if (state.ageMs < UNREADABLE_GRACE_MS) return false;
+            return this.unlinkClaimIfUnchanged(filePath, state.raw);
+          }
+          if (options.expectedType && state.claim.type !== options.expectedType) {
+            return false;
+          }
+          if (options.force)
+            return this.unlinkClaimIfUnchanged(filePath, state.raw);
+          if (this.isOwnedByThisProcess(state.claim) || this.isClaimStale(state.claim)) {
+            return this.unlinkClaimIfUnchanged(filePath, state.raw);
+          }
+          return false;
+        });
+      }
+      /**
+       * Removes the claim file only if it still holds exactly the bytes that were
+       * classified. A different claim, or none, means the decision above was
+       * about a claim that no longer exists, and deleting what replaced it would
+       * free a port another process holds. Reports honestly if it had vanished.
+       */
+      unlinkClaimIfUnchanged(filePath, expectedRaw) {
+        let current;
+        try {
+          current = fs18.readFileSync(filePath, "utf-8");
+        } catch (error40) {
+          if (error40.code === "ENOENT") return false;
+          throw new ClaimIoError("read", filePath, error40);
+        }
+        if (current !== expectedRaw) return false;
+        try {
           fs18.unlinkSync(filePath);
+          return true;
+        } catch (error40) {
+          if (error40.code === "ENOENT") return false;
+          throw new ClaimIoError(
+            "unlink",
+            filePath,
+            error40
+          );
         }
       }
       /**
        * Checks if a port is physically claimed by a high-priority operation.
+       *
+       * Deliberately naive: existence only, ignoring staleness. It has no callers
+       * left in this codebase — the one former caller (`startMonitor`'s pre-check)
+       * was removed as a TOCTOU against `claimPort`. Callers almost certainly want
+       * `getClaim`, which distinguishes stale/live/foreign and is race-safe when
+       * paired with `claimPort`/`releasePort`'s own classify-then-act logic.
        */
       isPortClaimed(port) {
         const filePath = this.getLockFilePath(port);
         return fs18.existsSync(filePath);
       }
-      /**
-       * Retrieves the current claim payload for a port, if it exists.
-       */
+      /** Retrieves the current claim for a port, normalised, or null. Never throws. */
       getClaim(port) {
-        const filePath = this.getLockFilePath(port);
-        if (fs18.existsSync(filePath)) {
-          try {
-            const content = fs18.readFileSync(filePath, "utf-8");
-            const parsed = JSON.parse(content);
-            return parsed.current_claim || parsed;
-          } catch {
-            return null;
-          }
+        try {
+          const state = this.classifyClaimFile(this.getLockFilePath(port), port);
+          return state.kind === "ok" ? state.claim : null;
+        } catch {
+          return null;
         }
-        return null;
+      }
+      /**
+       * Stale under exactly one of two tests, chosen by whether liveness is provable.
+       *
+       * Same host: `process.kill(owner_pid, 0)` is authoritative in BOTH directions —
+       * a live PID is never stale however old the claim, and a dead one is always
+       * stale. A serial monitor is routinely held for hours; reclaiming a
+       * provably-live holder because a timer expired is never correct.
+       *
+       * Different host, or an empty hostname from a legacy claim file written before
+       * hostnames were recorded: the PID cannot be probed, so the TTL is all there
+       * is. This fails safe when PIO_MCP_DATA_DIR points at shared storage — probing
+       * an ambiguous PID could incorrectly mark a live foreign claim as stale,
+       * opening the double-flash bug this class exists to prevent.
+       */
+      isClaimStale(claim) {
+        if (claim.type === "monitor" && typeof claim.monitor_pid === "number" && claim.hostname === os6.hostname()) {
+          if (Date.now() - claim.timestamp > ttlForClaim(claim)) return true;
+          return this.isPidGone(claim.monitor_pid);
+        }
+        if (claim.hostname === os6.hostname()) {
+          if (Date.now() - claim.timestamp > ttlForClaim(claim)) return true;
+          return this.isPidGone(claim.owner_pid);
+        }
+        return Date.now() - claim.timestamp > ttlForClaim(claim);
       }
     };
     portSemaphoreManager = SemaphoreManager.getInstance();
@@ -15816,6 +16296,13 @@ function rotateSpoolerStreams(verb, projectDir) {
   const latestLog = path25.join(targetDir, `latest-${verb}.log`);
   return { logFile, latestLog };
 }
+function releaseClaimBestEffort(port) {
+  if (!port) return;
+  try {
+    portSemaphoreManager.releasePort(port);
+  } catch {
+  }
+}
 function ensureLatestLogPointer(logFile, latestLog) {
   try {
     if (fs20.existsSync(latestLog)) fs20.unlinkSync(latestLog);
@@ -15870,7 +16357,7 @@ async function executeWithSpooling(command, args, options) {
     } catch {
     }
     deviceCustody?.releaseAfterExit();
-    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+    releaseClaimBestEffort(options.activePort);
     throw new PlatformIOError(
       error40 instanceof Error ? error40.message : "Process could not be started.",
       "PROCESS_START_FAILED",
@@ -15924,7 +16411,7 @@ async function executeWithSpooling(command, args, options) {
         deviceCustody?.releaseAfterExit();
         await unregisterBuildPid(targetProjectArea).catch(() => {
         });
-        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+        releaseClaimBestEffort(options.activePort);
       }
     } finally {
       try {
@@ -15967,6 +16454,7 @@ async function executeWithSpooling(command, args, options) {
     });
     watcher.on("error", () => {
     });
+    watcher.unref();
   } catch {
   }
   const closeOutput = () => {
@@ -16029,7 +16517,7 @@ async function executeWithSpooling(command, args, options) {
         if (!cleanupPending) {
           deviceCustody?.releaseAfterExit();
           await unregisterBuildPid(targetProjectArea);
-          if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+          releaseClaimBestEffort(options.activePort);
         }
       } finally {
         closeOutput();
@@ -16059,7 +16547,7 @@ async function executeWithSpooling(command, args, options) {
       if (!cleanupPending) {
         deviceCustody?.releaseAfterExit();
         await unregisterBuildPid(projectArea);
-        if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+        releaseClaimBestEffort(options.activePort);
       }
     } finally {
       closeOutput();
@@ -16086,7 +16574,7 @@ async function executeWithSpooling(command, args, options) {
   try {
     deviceCustody?.releaseAfterExit();
     await unregisterBuildPid(projectArea);
-    if (options.activePort) portSemaphoreManager.releasePort(options.activePort);
+    releaseClaimBestEffort(options.activePort);
   } finally {
     closeOutput();
   }
@@ -37300,6 +37788,7 @@ __export(monitor_exports, {
   stopMonitor: () => stopMonitor
 });
 import fs83 from "node:fs";
+import os12 from "node:os";
 import path98 from "node:path";
 import crypto17 from "node:crypto";
 function getSpoolerStates() {
@@ -37342,6 +37831,7 @@ function startWindowsPollingFallback(port, daemon) {
   daemon.poller = setInterval(() => {
     emitNewLogBytes(port, daemon);
   }, 500);
+  daemon.poller.unref();
 }
 async function stopMonitor(port, projectDir) {
   logDiagnostic(
@@ -37377,11 +37867,33 @@ async function stopMonitor(port, projectDir) {
     `[Spooler Diagnostic] Triggering killPioMonitorByPort on ${port}...`,
     projectDir
   );
-  const stopped = await killPioMonitorByPort(port, projectDir);
-  if (stopped) portSemaphoreManager.releasePort(port);
+  const preempted = portSemaphoreManager.getClaim(port);
+  if (preempted?.type === "monitor" && !(preempted.owner_pid === process.pid && preempted.hostname === os12.hostname())) {
+    console.error(
+      `[pio-agent] Stopping a monitor on ${port} started by another process (PID ${preempted.owner_pid}` + (preempted.monitor_pid ? `, monitor PID ${preempted.monitor_pid}` : "") + `, workspace ${preempted.owner_workspace}) to take the port.`
+    );
+  }
+  let proven = false;
+  try {
+    proven = await killPioMonitorByPort(port, projectDir);
+  } catch (error40) {
+    logDiagnostic(
+      `[Spooler Diagnostic] Monitor kill not proven for ${port}: ${error40.message}`,
+      projectDir
+    );
+  }
   delete activeDaemons[port];
   portalEvents.emitSpoolerStates(getSpoolerStates());
   logDiagnostic(`[Spooler Diagnostic] killPioMonitorByPort completed.`, projectDir);
+  try {
+    const survivingClaim = portSemaphoreManager.getClaim(port);
+    const hasMonitorPid = typeof survivingClaim?.monitor_pid === "number";
+    portSemaphoreManager.releasePort(port, {
+      force: !hasMonitorPid && proven && survivingClaim?.hostname === os12.hostname(),
+      expectedType: "monitor"
+    });
+  } catch {
+  }
 }
 async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
   const daemon = activeDaemons[targetPort];
@@ -37424,6 +37936,16 @@ async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
       daemon.taskId,
       cliDesc
     );
+    const attached = portSemaphoreManager.attachMonitorPid(
+      targetPort,
+      proc.pid
+    );
+    if (!attached) {
+      logDiagnostic(
+        `[Spooler] WARNING: could not record monitor PID ${proc.pid} on the claim for ${targetPort}. The claim may read stale while this monitor still holds the port. Stop it with \`pio-agent monitor-stop --port ${targetPort}\`.`,
+        projectDir
+      );
+    }
   }
   const targetDir = getLogDir("monitor", projectDir);
   const latestLog = path98.join(targetDir, "latest-monitor.log");
@@ -37520,6 +38042,7 @@ async function rehydrateMonitors() {
               });
               daemon.watcher.on("error", () => {
               });
+              daemon.watcher.unref();
               startWindowsPollingFallback(port, daemon);
               rehydrationCount++;
               logDiagnostic(
@@ -37568,11 +38091,6 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
   if (baud && !validateBaudRate(baud))
     throw new PlatformIOError(`Invalid baud rate: ${baud}`, "INVALID_BAUD");
   await stopMonitor(activePort, projectDir);
-  if (portSemaphoreManager.isPortClaimed(activePort))
-    throw new PlatformIOError(
-      `Port is currently locked: ${activePort}`,
-      "PORT_BUSY"
-    );
   const targetDir = getLogDir("monitor", projectDir);
   if (!fs83.existsSync(targetDir)) {
     fs83.mkdirSync(targetDir, { recursive: true });
@@ -37617,6 +38135,7 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
     });
     daemon.watcher.on("error", () => {
     });
+    daemon.watcher.unref();
   } catch {
     logDiagnostic(`[Spooler] Failed to attach fs.watch to ${logFile}`, projectDir);
   }
@@ -38383,7 +38902,7 @@ var require_has_flag = __commonJS({
 var require_supports_color = __commonJS({
   "node_modules/supports-color/index.js"(exports, module) {
     "use strict";
-    var os12 = __require("os");
+    var os14 = __require("os");
     var tty = __require("tty");
     var hasFlag = require_has_flag();
     var { env } = process;
@@ -38431,7 +38950,7 @@ var require_supports_color = __commonJS({
         return min;
       }
       if (process.platform === "win32") {
-        const osRelease = os12.release().split(".");
+        const osRelease = os14.release().split(".");
         if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
           return Number(osRelease[2]) >= 14931 ? 3 : 2;
         }
@@ -105549,6 +106068,10 @@ var MCP_ACTIONS = {
   }
 };
 var INTERNAL_ACTIONS = {
+  // CLI-only (`pio-agent port release`): clears a cross-process port claim.
+  // Not destructive to hardware, but it can pre-empt another session's
+  // upload, so it is medium risk rather than a plain read.
+  release_port_claim: { riskLevel: "medium", readOnly: false, destructive: false, idempotent: true, openWorld: false },
   power_profile: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", riskLevel: "critical", destructive: true, idempotent: false },
   pio_power_profile: { ...MCP_ACTIONS.start_monitor, policyAction: "power_profile", riskLevel: "critical", destructive: true, idempotent: false },
   power_meter_measure: { ...MCP_ACTIONS.start_monitor, policyAction: "start_monitor", idempotent: false },
@@ -105721,7 +106244,8 @@ var defaultPolicy = {
     "clean_project",
     "install_library",
     "uninstall_library",
-    "update_library"
+    "update_library",
+    "release_port_claim"
   ],
   deny: [
     "erase_disk",
@@ -107672,9 +108196,9 @@ var buildMatchers = [
 ];
 var uploadMatchers = [
   {
-    errorType: "PortBusy",
+    errorType: "DeviceBusy",
     pattern: /Resource busy|Access is denied|device or resource busy/i,
-    recommendedAction: "Release the serial port lock or stop the active monitor process.",
+    recommendedAction: "The OS reported the serial device as busy, which is often transient. Close any other serial monitor, wait a moment, and retry once. This is distinct from PortBusy, which means another pio-agent process holds a claim on the port.",
     severity: "error",
     safeToAutoRetry: true
   },
@@ -108318,7 +108842,7 @@ init_errors2();
 // src/core/analysis/private-analysis-directory.ts
 init_errors2();
 import fs23 from "node:fs/promises";
-import os6 from "node:os";
+import os7 from "node:os";
 import path28 from "node:path";
 import { execFile as execFile2 } from "node:child_process";
 import { promisify } from "node:util";
@@ -108338,7 +108862,7 @@ if (-not $actual.AreAccessRulesProtected) { throw 'Unprotected analysis director
 $rules = $actual.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])
 if ($rules.Count -ne 1 -or $rules[0].IdentityReference.Value -ne $sid.Value -or $rules[0].AccessControlType -ne 'Allow' -or $rules[0].FileSystemRights -ne 'FullControl') { throw 'Unexpected analysis ACL' }
 `;
-async function createPrivateAnalysisDirectory(parent = os6.tmpdir()) {
+async function createPrivateAnalysisDirectory(parent = os7.tmpdir()) {
   const directory = await fs23.mkdtemp(
     path28.join(parent, "pio-private-analysis-")
   );
@@ -108586,7 +109110,7 @@ init_errors2();
 init_esp_partition_artifacts();
 import fs29 from "node:fs/promises";
 import path35 from "node:path";
-import { createHash as createHash7, randomUUID as randomUUID4 } from "node:crypto";
+import { createHash as createHash7, randomUUID as randomUUID5 } from "node:crypto";
 
 // src/core/ota/ota-artifacts.ts
 import fs26 from "node:fs/promises";
@@ -108631,7 +109155,7 @@ init_errors2();
 init_esp_partition_artifacts();
 import fs25 from "node:fs/promises";
 import path32 from "node:path";
-import { createHash as createHash5, randomUUID as randomUUID2 } from "node:crypto";
+import { createHash as createHash5, randomUUID as randomUUID3 } from "node:crypto";
 async function archiveOtaImage(snapshot, sourcePath, expectedSha256, archiveRoot = path32.join(SERVER_DATA_DIR, "artifacts", "ota")) {
   const image = await readPartitionArtifact(
     path32.dirname(snapshot),
@@ -108654,7 +109178,7 @@ async function archiveOtaImage(snapshot, sourcePath, expectedSha256, archiveRoot
     );
   const root = await fs25.realpath(directory);
   const destination = path32.join(root, expectedSha256 + ".bin");
-  const temporary = path32.join(root, "." + randomUUID2() + ".tmp");
+  const temporary = path32.join(root, "." + randomUUID3() + ".tmp");
   try {
     await fs25.writeFile(temporary, image.content, { flag: "wx", mode: 384 });
     try {
@@ -108763,7 +109287,7 @@ init_errors2();
 import fs28 from "node:fs/promises";
 import { constants as constants2 } from "node:fs";
 import path34 from "node:path";
-import { createHash as createHash6, randomUUID as randomUUID3 } from "node:crypto";
+import { createHash as createHash6, randomUUID as randomUUID4 } from "node:crypto";
 
 // src/core/analysis/elf-identity.ts
 init_errors2();
@@ -108875,7 +109399,7 @@ async function retainElfSnapshot(snapshot, expectedSha256, archiveRoot = path34.
     );
   const root = await fs28.realpath(archiveRoot);
   const destination = path34.join(root, identity.sha256 + ".elf");
-  const temporary = path34.join(root, "." + randomUUID3() + ".tmp");
+  const temporary = path34.join(root, "." + randomUUID4() + ".tmp");
   try {
     await fs28.copyFile(identity.path, temporary, constants2.COPYFILE_EXCL);
     await fs28.chmod(temporary, 384);
@@ -109104,7 +109628,7 @@ async function captureUploadManifest(input, archiveRoot, trustedImageRoots = [])
       );
     const root = await fs29.realpath(directory);
     const destination = path35.join(root, sha256 + ".json");
-    const temporary = path35.join(root, "." + randomUUID4() + ".tmp");
+    const temporary = path35.join(root, "." + randomUUID5() + ".tmp");
     try {
       await fs29.writeFile(temporary, encoded, { flag: "wx", mode: 384 });
       try {
@@ -111735,12 +112259,12 @@ async function runAnalysisProcess(executable, args, options = {}) {
 
 // src/core/analysis/elf-snapshot.ts
 import fs43 from "node:fs/promises";
-import os7 from "node:os";
+import os8 from "node:os";
 import path52 from "node:path";
 async function withElfSnapshot(elfPath, expectedSha256, analyze, sourcePath = elfPath) {
   const identity = await readElfIdentity(elfPath, expectedSha256);
   const directory = await fs43.mkdtemp(
-    path52.join(os7.tmpdir(), "pio-elf-analysis-")
+    path52.join(os8.tmpdir(), "pio-elf-analysis-")
   );
   try {
     await fs43.chmod(directory, 448);
@@ -112126,12 +112650,12 @@ async function getBoardInfo(boardId) {
 // src/adapters/compatibility-project.ts
 init_errors2();
 import fs45 from "node:fs/promises";
-import os8 from "node:os";
+import os9 from "node:os";
 import path53 from "node:path";
 async function resolveCompatibilityProject(requested, defaults) {
   let selected = requested || defaults.projectDir || defaults.cwd || process.cwd();
   if (selected === "~" || selected.startsWith("~/") || selected.startsWith("~\\"))
-    selected = path53.join(defaults.home ?? os8.homedir(), selected.slice(2));
+    selected = path53.join(defaults.home ?? os9.homedir(), selected.slice(2));
   else if (selected.startsWith("~"))
     throw new PlatformIOError(
       "Named-user home expansion is unsupported; pass an absolute project path.",
@@ -114553,7 +115077,7 @@ init_errors2();
 // src/core/serial/session-manager.ts
 import fs47 from "node:fs";
 import path54 from "node:path";
-import { createHash as createHash10, randomUUID as randomUUID5 } from "node:crypto";
+import { createHash as createHash10, randomUUID as randomUUID6 } from "node:crypto";
 import { performance as performance7 } from "node:perf_hooks";
 init_serial_endpoint();
 init_errors2();
@@ -114580,7 +115104,7 @@ var SerialSessionManager = class {
   makeTransport;
   /** Trusted adapters create one principal per authenticated client/session, never from caller-supplied IDs. */
   createOwner() {
-    const owner = Object.freeze({ id: randomUUID5() });
+    const owner = Object.freeze({ id: randomUUID6() });
     this.owners.add(owner);
     return owner;
   }
@@ -114706,7 +115230,7 @@ var SerialSessionManager = class {
     this.prune();
     this.requireCapacity();
     const session2 = {
-      id: randomUUID5(),
+      id: randomUUID6(),
       owner,
       buffer,
       startedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -116798,7 +117322,7 @@ init_serial_endpoint();
 // src/utils/lock-manager.ts
 init_errors2();
 init_events();
-import { randomUUID as randomUUID6 } from "node:crypto";
+import { randomUUID as randomUUID7 } from "node:crypto";
 var QueueEnforcementError = class extends PlatformIOError {
   constructor(message, context) {
     super(message, "QUEUE_ENFORCEMENT_FAILED", context);
@@ -116887,7 +117411,7 @@ var HardwareLockManager = class _HardwareLockManager {
    * Grabs the lock implicitly, awaits the job, then releases it.
    */
   async withImplicitLock(action) {
-    const implicitSessionId = `__IMPLICIT_${randomUUID6()}__`;
+    const implicitSessionId = `__IMPLICIT_${randomUUID7()}__`;
     this.acquireLock(implicitSessionId, "Implicit Tool Execution");
     let cleanupPending = false;
     try {
@@ -118193,12 +118717,12 @@ async function executeTriggeredMeter(serial, meter, params, defaults, caller, gu
 init_zod();
 import fs53 from "node:fs/promises";
 import path60 from "node:path";
-import os9 from "node:os";
+import os10 from "node:os";
 
 // src/adapters/power-meter-client.ts
 init_zod();
 init_errors2();
-import { randomUUID as randomUUID7 } from "node:crypto";
+import { randomUUID as randomUUID8 } from "node:crypto";
 
 // src/core/power/ppk2-environment.ts
 init_errors2();
@@ -119372,7 +119896,7 @@ var PowerMeterClient = class {
           },
           caller
         );
-        const id = randomUUID7();
+        const id = randomUUID8();
         this.owners.set(id, operation);
         onOwnership();
         try {
@@ -119600,7 +120124,7 @@ async function executePowerCompatibility(serial, meter, input, defaults, caller,
   const params = request.source === "ppk2" ? Ppk2CompatibilitySchema.parse(request) : SerialPowerCompatibilitySchema.parse(request);
   let selected = params.project_dir || defaults.projectDir || defaults.cwd || process.cwd();
   if (selected === "~" || selected.startsWith("~/") || selected.startsWith("~\\"))
-    selected = path60.join(defaults.home ?? os9.homedir(), selected.slice(2));
+    selected = path60.join(defaults.home ?? os10.homedir(), selected.slice(2));
   const projectDir = await fs53.realpath(
     path60.resolve(defaults.cwd ?? process.cwd(), selected)
   );
@@ -119627,7 +120151,7 @@ async function executePowerCompatibility(serial, meter, input, defaults, caller,
 // src/adapters/debug-compat.ts
 init_zod();
 init_redact();
-import { randomUUID as randomUUID9 } from "node:crypto";
+import { randomUUID as randomUUID10 } from "node:crypto";
 
 // src/core/debug/debug-reset-run.ts
 init_errors2();
@@ -119698,7 +120222,7 @@ function retainUnstartedDebugCustody(custody) {
 
 // src/core/debug/debug-client-sessions.ts
 init_errors2();
-import { randomUUID as randomUUID8 } from "node:crypto";
+import { randomUUID as randomUUID9 } from "node:crypto";
 var DebugClientSessions = class {
   sessions = /* @__PURE__ */ new Map();
   starting = /* @__PURE__ */ new Set();
@@ -119737,7 +120261,7 @@ var DebugClientSessions = class {
         "Pending debugger approvals have reached capacity.",
         "DEBUG_SESSION_LIMIT"
       );
-    const id = (requestIdentity ? this.approvalReservations.get(requestIdentity)?.id : void 0) ?? randomUUID8();
+    const id = (requestIdentity ? this.approvalReservations.get(requestIdentity)?.id : void 0) ?? randomUUID9();
     if (requestIdentity) this.activeRequests.add(requestIdentity);
     const startedAt = performance.now();
     const debugTool = metadata.debugTool ?? null;
@@ -123753,7 +124277,7 @@ var DebugCompatibilityClient = class {
   }
   confirmProbeReleased;
   resolveRemoteBinding;
-  taskId = randomUUID9();
+  taskId = randomUUID10();
   sessions = new DebugClientSessions();
   preparation = new DebugPreparationCache();
   abort = new AbortController();
@@ -125222,7 +125746,7 @@ async function executeOtaCompatibility(input, defaults = {}, caller = {}, onAuth
 }
 
 // src/core/analysis/esp-coredump-retention.ts
-var import_proper_lockfile6 = __toESM(require_proper_lockfile(), 1);
+var import_proper_lockfile7 = __toESM(require_proper_lockfile(), 1);
 init_paths();
 init_errors2();
 import fs65 from "node:fs/promises";
@@ -125243,7 +125767,7 @@ async function withStore(root, use) {
   const canonical3 = await fs65.realpath(root);
   let release;
   try {
-    release = await import_proper_lockfile6.default.lock(canonical3, { stale: 12e4, retries: 0 });
+    release = await import_proper_lockfile7.default.lock(canonical3, { stale: 12e4, retries: 0 });
   } catch {
     throw new PlatformIOError(
       "Core-dump retention store is busy.",
@@ -127453,7 +127977,7 @@ function registerShutdownTask(task) {
 }
 
 // src/core/analysis/pending-upload-store.ts
-import { randomUUID as randomUUID10 } from "node:crypto";
+import { randomUUID as randomUUID11 } from "node:crypto";
 init_errors2();
 var PendingUploadStore = class {
   constructor(now = () => performance.now()) {
@@ -127480,7 +128004,7 @@ var PendingUploadStore = class {
         "UPLOAD_CAPTURE_CONTEXT_CHANGED"
       );
     guard();
-    const resumeId = randomUUID10();
+    const resumeId = randomUUID11();
     this.records.set(resumeId, {
       retained,
       scope: selected,
@@ -129295,7 +129819,7 @@ init_zod();
 init_projects();
 import fs80 from "node:fs/promises";
 import path94 from "node:path";
-import os10 from "node:os";
+import os11 from "node:os";
 init_redact();
 init_errors2();
 async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
@@ -129309,7 +129833,7 @@ async function executeInitCompatibility(input, defaults, caller, onAuthorized) {
   }).strict().parse(input);
   let requested = params.project_dir;
   if (requested === "~" || requested.startsWith("~/") || requested.startsWith("~\\"))
-    requested = path94.join(defaults.home ?? os10.homedir(), requested.slice(2));
+    requested = path94.join(defaults.home ?? os11.homedir(), requested.slice(2));
   else if (requested.startsWith("~"))
     throw new PlatformIOError(
       "Named-user home expansion is unsupported.",
@@ -129657,7 +130181,7 @@ init_zod();
 init_errors2();
 
 // src/tools/packages.ts
-var import_proper_lockfile7 = __toESM(require_proper_lockfile(), 1);
+var import_proper_lockfile8 = __toESM(require_proper_lockfile(), 1);
 init_zod();
 init_platformio();
 init_errors2();
@@ -129991,7 +130515,7 @@ async function executePackageAction(action, input, caller = {}, onAuthorized, ou
     const validatePolicy = createPolicyRevisionGuard(context.workspaceDir);
     await onAuthorized?.();
     validatePolicy();
-    const release = projectDir ? await import_proper_lockfile7.default.lock(projectDir, {
+    const release = projectDir ? await import_proper_lockfile8.default.lock(projectDir, {
       realpath: true,
       lockfilePath: path96.join(projectDir, ".pio-mcp-packages.lock"),
       retries: 0
@@ -135090,7 +135614,7 @@ import fs87, { constants as fsConstants } from "node:fs/promises";
 
 // node_modules/is-wsl/index.js
 import process3 from "node:process";
-import os11 from "node:os";
+import os13 from "node:os";
 import fs86 from "node:fs";
 
 // node_modules/is-inside-container/index.js
@@ -135143,7 +135667,7 @@ var isWsl = () => {
   if (process3.platform !== "linux") {
     return false;
   }
-  if (os11.release().toLowerCase().includes("microsoft")) {
+  if (os13.release().toLowerCase().includes("microsoft")) {
     if (isInsideContainer()) {
       return false;
     }
@@ -136036,6 +136560,44 @@ async function getDashboardStatus(autoOpen = false, projectDir, authority) {
     deprecatedAuthenticationFields: ["url", "secureLink", "token"]
   };
 }
+var PORTAL_STATE_FILE = path100.join(SERVER_DATA_DIR, "portal.json");
+function publishPortalState(host, port) {
+  try {
+    ensureDir(SERVER_DATA_DIR);
+    const state = {
+      pid: process.pid,
+      host,
+      port,
+      startedAt: Date.now()
+    };
+    fs89.writeFileSync(PORTAL_STATE_FILE, JSON.stringify(state, null, 2));
+  } catch {
+  }
+}
+function clearPortalState() {
+  try {
+    const state = readPortalStateFile();
+    if (!state || state.pid === process.pid) {
+      fs89.rmSync(PORTAL_STATE_FILE, { force: true });
+    }
+  } catch {
+  }
+}
+function readPortalStateFile() {
+  try {
+    const raw = JSON.parse(fs89.readFileSync(PORTAL_STATE_FILE, "utf8"));
+    if (typeof raw?.pid !== "number" || typeof raw?.port !== "number")
+      return null;
+    return {
+      pid: raw.pid,
+      host: String(raw.host ?? "127.0.0.1"),
+      port: raw.port,
+      startedAt: Number(raw.startedAt ?? 0)
+    };
+  } catch {
+    return null;
+  }
+}
 function startPortalServer(defaultPort = 8080) {
   const approvalCapability = process.env.PIO_MCP_APPROVAL_TOKEN;
   if (approvalCapability !== void 0 && (approvalCapability.length < 32 || approvalCapability.length > 256)) {
@@ -136516,8 +137078,11 @@ function startPortalServer(defaultPort = 8080) {
         try {
           if (fs89.existsSync(GLOBAL_LOCKS_DIR)) {
             for (const file2 of fs89.readdirSync(GLOBAL_LOCKS_DIR)) {
-              if (file2.endsWith(".json") || file2.endsWith(".lock")) {
-                fs89.unlinkSync(path100.join(GLOBAL_LOCKS_DIR, file2));
+              if (file2.endsWith(".json") || file2.endsWith(".lock") || file2.endsWith(".reclaim") || file2.includes(".tmp.")) {
+                fs89.rmSync(path100.join(GLOBAL_LOCKS_DIR, file2), {
+                  recursive: true,
+                  force: true
+                });
               }
             }
           }
@@ -136975,6 +137540,7 @@ function startPortalServer(defaultPort = 8080) {
     httpServer.listen(port, portalHost, () => {
       activePortalStatus.running = true;
       activePortalStatus.port = httpServer.address()?.port || port;
+      publishPortalState(portalHost, activePortalStatus.port);
       console.error(`
 ======================================================`);
       console.error(
@@ -137035,6 +137601,7 @@ function startPortalServer(defaultPort = 8080) {
     activePortalStatus.running = false;
     activePortalStatus.port = 0;
     activePortalStatus.browserOpened = false;
+    clearPortalState();
   };
   const unregisterShutdown = registerShutdownTask(close);
   return { app, httpServer, io: io2, authToken: PORTAL_AUTH_TOKEN, close };
@@ -140120,8 +140687,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               try {
                 if (fs92.existsSync(GLOBAL_LOCKS_DIR)) {
                   for (const file2 of fs92.readdirSync(GLOBAL_LOCKS_DIR)) {
-                    if (file2.endsWith(".json") || file2.endsWith(".lock")) {
-                      fs92.unlinkSync(path103.join(GLOBAL_LOCKS_DIR, file2));
+                    if (file2.endsWith(".json") || file2.endsWith(".lock") || file2.endsWith(".reclaim") || file2.includes(".tmp.")) {
+                      fs92.rmSync(path103.join(GLOBAL_LOCKS_DIR, file2), {
+                        recursive: true,
+                        force: true
+                      });
                     }
                   }
                 }

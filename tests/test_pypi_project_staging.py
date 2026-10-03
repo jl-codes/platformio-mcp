@@ -20,7 +20,7 @@ class ProjectStagingTests(unittest.TestCase):
                 filename = name + ".whl"
                 data = name.encode()
                 (directory / filename).write_bytes(data)
-                artifacts.append({"name": name, "version": "3.1.0", "file": filename, "sha256": hashlib.sha256(data).hexdigest()})
+                artifacts.append({"name": name, "version": "3.2.0", "file": filename, "sha256": hashlib.sha256(data).hexdigest()})
             validator = SimpleNamespace(validate=lambda _: {"sourceCommit": "a" * 40, "artifacts": artifacts})
             loader = SimpleNamespace(loader=SimpleNamespace(exec_module=lambda _: None))
             def registry(name, version):

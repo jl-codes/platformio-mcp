@@ -2315,8 +2315,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 try {
                   if (fs.existsSync(GLOBAL_LOCKS_DIR)) {
                     for (const file of fs.readdirSync(GLOBAL_LOCKS_DIR)) {
-                      if (file.endsWith(".json") || file.endsWith(".lock")) {
-                        fs.unlinkSync(path.join(GLOBAL_LOCKS_DIR, file));
+                      // .reclaim breakers are never auto-recovered, and .tmp.
+                      // files leak if a process dies mid-publish, so a "reset
+                      // all locks" that skips them leaves the port wedged.
+                      if (
+                        file.endsWith(".json") ||
+                        file.endsWith(".lock") ||
+                        file.endsWith(".reclaim") ||
+                        file.includes(".tmp.")
+                      ) {
+                        // A per-port guard (proper-lockfile) is a directory, not a file.
+                        fs.rmSync(path.join(GLOBAL_LOCKS_DIR, file), {
+                          recursive: true,
+                          force: true,
+                        });
                       }
                     }
                   }

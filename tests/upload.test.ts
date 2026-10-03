@@ -5,7 +5,10 @@ import { uploadFirmware, uploadFilesystem } from "../src/tools/upload.js";
 import * as spooler from "../src/utils/spooler.js";
 import * as monitor from "../src/tools/monitor.js";
 import * as devices from "../src/tools/devices.js";
-import { portSemaphoreManager } from "../src/utils/semaphore.js";
+import {
+  portSemaphoreManager,
+  type PortClaim,
+} from "../src/utils/semaphore.js";
 import fs from "node:fs";
 import { PlatformIOError } from "../src/utils/errors.js";
 
@@ -41,8 +44,19 @@ describe("Upload Tools", () => {
       port: "COM1",
       pid: 1234,
     });
-    vi.spyOn(portSemaphoreManager, "claimPort").mockImplementation(() => {});
-    vi.spyOn(portSemaphoreManager, "releasePort").mockImplementation(() => {});
+    vi.spyOn(portSemaphoreManager, "claimPort").mockImplementation(
+      (port: string): PortClaim => ({
+        type: "upload",
+        owner_workspace: process.cwd(),
+        owner_pid: process.pid,
+        hostname: "mock-host",
+        timestamp: Date.now(),
+        port,
+      }),
+    );
+    vi.spyOn(portSemaphoreManager, "releasePort").mockImplementation(
+      () => true,
+    );
     vi.spyOn(devices, "getFirstDevice").mockResolvedValue({
       port: "COM1",
       description: "Mock Device",

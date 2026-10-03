@@ -16,7 +16,7 @@ export type DiagnosticErrorType =
   | "WrongFramework"
   | "UnknownBoard"
   | "UnknownFramework"
-  | "PortBusy"
+  | "DeviceBusy"
   | "PermissionDenied"
   | "UploadSyncFailed"
   | "DeviceDisconnected"

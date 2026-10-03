@@ -88,7 +88,7 @@ describe("process ownership identity", () => {
     const first = observe();
     expect(first.status).toBe("running");
     expect(observe()).toEqual(first);
-  }, 45000);
+  }, 75000);
 });
 
 describe("physical device lease store", () => {

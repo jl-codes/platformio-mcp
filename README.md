@@ -8,8 +8,9 @@ PIO Agent is the open-source, agent-first hardware execution layer for embedded 
 
 ## Release status
 
-The canonical 3.1.0 runtime is published. The 3.2.0 candidate adds a native
-Codex panel and public plugin listing metadata. See the
+The canonical 3.1.0 runtime is published. The 3.2.0 candidate makes the
+`pio-agent` CLI the primary adapter (nothing stays running unless asked), and
+adds a native Codex panel and public plugin listing metadata. See the
 [changelog](CHANGELOG.md), [compatibility guide](docs/package-compatibility.md),
 and [distribution readiness](docs/DISTRIBUTION_READINESS.md) for implemented
 behavior and the publication status of each package name.
@@ -24,6 +25,33 @@ It exposes PlatformIO workflows for board discovery, project setup, build, flash
 - an optional local dashboard for visibility and control
 
 MCP is one adapter. PlatformIO is the first backend.
+
+## Quick start (recommended)
+
+```bash
+npm install -g platformio-mcp
+pio-agent devices
+pio-agent build --project-dir . --json
+```
+
+No server, no client configuration, nothing left running between commands.
+
+### Using it with a coding agent
+
+Install the skills and point your agent at the `pio-agent` binary. The
+`pio-manager` skill documents every command.
+
+## MCP server (optional)
+
+MCP remains fully supported for clients that prefer it:
+
+```bash
+claude mcp add platformio -- node /path/to/platformio-mcp/build/index.js
+```
+
+Note that each session that connects this way runs its own server process. The
+CLI above avoids that. See [Manual MCP Config](#manual-mcp-config) below for
+other hosts.
 
 ## Agent-First Capabilities
 
@@ -46,7 +74,7 @@ All risky operations still honor policy and approval rules.
 ### 1. Run the dashboard
 
 ```bash
-npx platformio-mcp dashboard
+npx platformio-mcp dashboard --serve
 ```
 
 ### 2. Use the CLI
@@ -121,7 +149,7 @@ For headless verification and status inspection, the same CLI also provides `plu
   "mcpServers": {
     "platformio": {
       "command": "npx",
-      "args": ["-y", "platformio-mcp", "--open-dashboard-on-start"]
+      "args": ["-y", "platformio-mcp", "serve"]
     }
   }
 }

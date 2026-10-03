@@ -5,6 +5,12 @@ description: Validate firmware behavior on real hardware rather than compilation
 
 # Hardware-in-the-Loop Test
 
+> **Reading results:** a non-zero exit means look at BOTH streams. An operation
+> that ran but failed (a build with errors) puts `success: false` on **stdout**;
+> one that could not run (bad arguments, policy, a busy port) puts `errorType` on
+> **stderr** with stdout empty. Capture both (`--json 2>&1`). See the
+> `pio-manager` skill for the full contract.
+
 ## Purpose
 
 Use this skill to validate firmware behavior on a real device, not just through compilation.
@@ -20,13 +26,13 @@ Use this skill to validate firmware behavior on a real device, not just through 
 ## Workflow
 
 1. Define finite expected markers, rejected patterns, timeout, stability window, and safe physical behavior.
-2. Resolve one project, environment, board, and stable device binding; stop on ambiguity or replacement.
-3. Validate and build with `agent_build_diagnose`.
+2. Resolve one project, environment, board, and stable device binding with `pio-agent target-resolve`; stop on ambiguity or replacement.
+3. Validate and build with `pio-agent agent-build-diagnose`.
 4. Ask for an approval scoped to the exact flash workflow and target binding.
-5. Run `agent_flash_monitor_verify` after approval.
+5. Run `pio-agent agent-flash-monitor-verify` after approval.
 6. Check bounded serial markers, timing, or telemetry and retain task/log/artifact references.
 7. Mark build, flash, monitor, and assertions independently as pass, fail, or inconclusive.
-8. Cancel runaway tracked tasks with `cancel_task`; confirm cleanup with `list_task_history`, `get_monitor_status`, and lock status.
+8. Cancel runaway tracked tasks with `pio-agent task-cancel <id>`; confirm cleanup with `pio-agent task-history --project-dir <dir>`, `pio-agent monitor-status`, and `pio-agent lock status`.
 9. Save redacted evidence and summarize the result.
 
 Scheduled HIL writes require a pre-existing, exact, expiring `lab_runner` policy. A saved prompt cannot create, approve, or broaden that policy, and default scheduled monitoring must remain read/build/monitor-only.

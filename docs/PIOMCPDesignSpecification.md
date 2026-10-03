@@ -150,7 +150,7 @@ interface LibraryInfo {
 **Diagnostic Types (Agentic Upgrade):**
 ```typescript
 interface DiagnosticSummary {
-  errorType: 'MissingHeader' | 'MemoryOverflow' | 'PortBusy' | 'SyntaxError' | 'Unknown';
+  errorType: 'MissingHeader' | 'MemoryOverflow' | 'DeviceBusy' | 'SyntaxError' | 'Unknown';
   summary: string;
   truncatedStderr: string;
 }

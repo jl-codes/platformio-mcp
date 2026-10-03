@@ -19,6 +19,9 @@ export type ProcessObservation =
   | { status: "absent" }
   | { status: "unknown" };
 
+const WINDOWS_IDENTITY_TIMEOUT_MS = 30000;
+let ownProcessIdentity: ProcessIdentity | undefined;
+
 /** Parse Linux stat after the last closing parenthesis; process names can contain spaces/parentheses. */
 export function linuxStartToken(
   stat: string,
@@ -52,6 +55,8 @@ export function inspectProcessIdentity(pid: number): ProcessObservation {
       "Invalid process ID.",
       "PROCESS_IDENTITY_INVALID",
     );
+  if (pid === process.pid && ownProcessIdentity)
+    return { status: "running", identity: ownProcessIdentity };
   try {
     let startToken: string;
     if (process.platform === "linux") {
@@ -82,8 +87,8 @@ export function inspectProcessIdentity(pid: number): ProcessObservation {
         ],
         {
           encoding: "utf8",
-          // Windows PowerShell cold startup can exceed three seconds on loaded hosts.
-          timeout: 10000,
+          // Windows PowerShell cold startup can be heavily delayed on loaded CI hosts.
+          timeout: WINDOWS_IDENTITY_TIMEOUT_MS,
           maxBuffer: 8192,
           windowsHide: true,
           stdio: ["ignore", "pipe", "pipe"],
@@ -110,10 +115,9 @@ export function inspectProcessIdentity(pid: number): ProcessObservation {
         return { status: "unknown" };
       // ps has second precision: an equal token conservatively keeps ownership, even on rapid PID reuse.
     } else return { status: "unknown" };
-    return {
-      status: "running",
-      identity: { pid, platform: process.platform, startToken },
-    };
+    const identity = { pid, platform: process.platform, startToken };
+    if (pid === process.pid) ownProcessIdentity = identity;
+    return { status: "running", identity };
   } catch {
     try {
       process.kill(pid, 0);

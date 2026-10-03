@@ -120,8 +120,22 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Setup Python for PlatformIO CLI coverage
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned PlatformIO CLI
+        run: python -m pip install platformio==6.1.18
+
       - name: Install dependencies
         run: npm ci
+
+      # The e2e suites drive the COMPILED output: port-claim-concurrency spawns
+      # children that import build/utils/semaphore.js, and cli-entrypoint spawns
+      # build/cli.js. build/ is gitignored, so without this they all fail.
+      - name: Build
+        run: npm run build
 
       - name: Run CI-safe agent/CLI e2e suite
         run: npm run test:e2e:ci

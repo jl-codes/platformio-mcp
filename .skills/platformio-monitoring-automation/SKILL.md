@@ -5,12 +5,18 @@ description: Create or update recurring PlatformIO build, device-presence, seria
 
 # PlatformIO Monitoring Automation
 
-Use Codex's host scheduler for cadence and PIO Agent's PlatformIO MCP runtime for bounded observations. Do not implement a second scheduler or edit scheduler files directly.
+> **Reading results:** a non-zero exit means look at BOTH streams. An operation
+> that ran but failed (a build with errors) puts `success: false` on **stdout**;
+> one that could not run (bad arguments, policy, a busy port) puts `errorType` on
+> **stderr** with stdout empty. Capture both (`--json 2>&1`). See the
+> `pio-manager` skill for the full contract.
+
+Use Codex's host scheduler for cadence and the `pio-agent` CLI for bounded observations. Do not implement a second scheduler or edit scheduler files directly.
 
 ## Preconditions
 
-1. Resolve one `projectDir` and PlatformIO environment. Resolve a stable device binding when hardware is involved; stop on ambiguity.
-2. Call `get_policy_status` and identify the allowed profile before drafting the automation.
+1. Resolve one `projectDir` and PlatformIO environment. Resolve a stable device binding with `pio-agent target-resolve` when hardware is involved; stop on ambiguity.
+2. Call `pio-agent policy-status --project-dir <dir>` and identify the allowed profile before drafting the automation.
 3. Run the proposed observation once interactively with the same bounds, markers, and project. Fix broad or noisy behavior before scheduling it.
 4. Read [monitoring prompt patterns](references/prompt-patterns.md) only when drafting the saved prompt.
 

@@ -2,6 +2,101 @@
 
 This guide is designed for AI agents like Antigravity and Cline to successfully set up the PlatformIO MCP Server.
 
+> Also referred to elsewhere as `llms-install.md`. The CLI section below is
+> the fastest path for an agent to get working; the MCP server setup further
+> down remains fully supported for hosts that prefer it.
+
+## CLI (recommended)
+
+Most agents do not need a resident server at all. Install the CLI globally
+and invoke it per command — nothing stays running between invocations, and
+there is no client configuration file to edit:
+
+```bash
+npm install -g platformio-mcp
+pio-agent devices --json
+pio-agent build --project-dir . --json
+```
+
+The package installs two equivalent binary names, `platformio-mcp` (canonical)
+and `pio-agent`; either runs the same CLI. Run `pio-agent --help` to see the
+full command surface for the version actually installed, and
+`pio-agent <command> --help` before relying on any specific flag.
+
+### The `--json` convention
+
+Every command accepts a global `--json` flag. Pass it whenever the output
+will be parsed rather than read: it switches stdout to a single
+machine-readable JSON document instead of formatted text. Successful
+commands emit their result as JSON on success; failed commands emit a
+structured error object with the same shape instead of throwing free text at
+the terminal, for example:
+
+```json
+{
+  "success": false,
+  "stage": "upload",
+  "errorType": "PortBusy",
+  "summary": "Port /dev/cu.usbserial-0001 is already claimed by PID 41213 (upload) in /Users/me/firmware.",
+  "recommendedAction": "Another process holds this port. Report the holding PID and workspace to the user rather than retrying; if it is known to be finished, run `pio-agent port release --port <port>`.",
+  "safeToAutoRetry": false,
+  "details": { "port": "/dev/cu.usbserial-0001", "claim": { "owner_pid": 41213, "owner_workspace": "/Users/me/firmware", "type": "upload" } }
+}
+```
+
+Parse `errorType` and `safeToAutoRetry`, not the wording of `summary` — the
+message text can change; the fields are the contract.
+
+### The `PORT_BUSY` contract
+
+`PORT_BUSY` is the internal error code the port semaphore raises when a
+serial port is already claimed by another live process. In CLI JSON output it
+surfaces as `errorType: "PortBusy"` (PascalCase, like every other `errorType`
+value) with `safeToAutoRetry: false`.
+
+**Do not retry a `PortBusy` failure in a loop.** It means a different
+process — possibly another concurrent agent session — genuinely holds the
+port right now; retrying does not free it. The correct response is to report
+the holder back to the user, using:
+
+- `details.claim.owner_pid` — the PID holding the claim
+- `details.claim.owner_workspace` — the workspace that claimed it
+
+List every current claim without triggering an error:
+
+```bash
+pio-agent lock status --json
+```
+
+If you are certain the holder is gone (a crashed process, a stale claim left
+over from a previous run), clear it explicitly:
+
+```bash
+pio-agent port release --port <port>
+```
+
+`port release` refuses to clear a claim whose owner PID is still alive unless
+you also pass `--force`:
+
+```bash
+pio-agent port release --port <port> --force
+```
+
+**`PortBusy` is not the same condition as `DeviceBusy`.** `DeviceBusy` is a
+separate diagnostic classification (surfaced as a nested `diagnostic.errorType:
+"DeviceBusy"` from workflow commands like `agent-flash-monitor-verify`) for
+when the operating system itself reports the serial device as busy
+(`Resource busy`, `Access is denied`, `device or resource busy`) — typically
+transient, for example another program briefly holding the device handle.
+Unlike `PortBusy`, `DeviceBusy` has `safeToAutoRetry: true`: closing any other
+serial monitor and retrying once is the correct response.
+
+## MCP server
+
+The MCP server remains fully supported for hosts that prefer it over the
+CLI. Each session that connects to it runs its own resident server process,
+which the CLI above avoids entirely. Follow the sections below to set it up.
+
 ## Prerequisites Check
 
 Before installation, verify these requirements:

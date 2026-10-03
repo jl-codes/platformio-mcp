@@ -27,13 +27,13 @@ export function mcpServerConfigBlock() {
     }
     return {
       command: python,
-      args: ["-m", "pio_agent_launcher", "--open-dashboard-on-start"],
+      args: ["-m", "pio_agent_launcher"],
     };
   }
   const command = process.platform === "win32" ? "npx.cmd" : "npx";
   return {
     command,
-    args: ["-y", "platformio-mcp", "--open-dashboard-on-start"],
+    args: ["-y", "platformio-mcp", "serve"],
   };
 }
 
