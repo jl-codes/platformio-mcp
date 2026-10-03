@@ -1103,6 +1103,8 @@ h2 {
   }
   .footer-links {
     margin: 0;
+    flex-wrap: wrap;
+    gap: 12px 20px;
   }
   .footer-note {
     max-width: none;
