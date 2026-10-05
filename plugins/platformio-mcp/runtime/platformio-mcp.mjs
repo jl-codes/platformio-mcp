@@ -13457,10 +13457,38 @@ function sanitizePortName(port) {
   if (RESERVED.test(base2)) return `port_${base2}`;
   return base2 === "" ? "port_unnamed" : base2;
 }
+function canonicalPortName(port) {
+  const windowsName = port.startsWith("\\\\.\\") ? port.slice(4) : port;
+  const windowsPort = /^COM([1-9][0-9]*)$/i.exec(windowsName);
+  if (windowsPort) return `COM${windowsPort[1]}`;
+  if (!port.startsWith("/dev/")) return port;
+  try {
+    const canonical3 = fs2.realpathSync.native(port);
+    if (!canonical3.startsWith("/dev/")) {
+      throw new PlatformIOError(
+        "Serial alias resolves outside /dev.",
+        "SERIAL_ENDPOINT_INVALID",
+        { port }
+      );
+    }
+    return canonical3;
+  } catch (error40) {
+    if (error40 instanceof PlatformIOError) throw error40;
+    const code = error40.code;
+    const isStableAlias = /^\/dev\/serial\/by-(?:id|path)\//.test(port);
+    if (!isStableAlias && (code === "ENOENT" || code === "ENODEV")) return port;
+    throw new PlatformIOError(
+      "Serial endpoint alias cannot be resolved safely.",
+      "SERIAL_ENDPOINT_UNAVAILABLE",
+      { port, errno: code }
+    );
+  }
+}
 var __filename, __dirname2, PROJECT_ROOT, SERVER_DATA_DIR, GLOBAL_LOCKS_DIR;
 var init_paths = __esm({
   "src/utils/paths.ts"() {
     "use strict";
+    init_errors2();
     __filename = fileURLToPath(import.meta.url);
     __dirname2 = path4.dirname(__filename);
     PROJECT_ROOT = path4.resolve(__dirname2, "..", "..");
@@ -15334,19 +15362,48 @@ function readMonitorIdentities(pidsFile) {
   const file2 = pidsFile + ".identities.json";
   if (!fs17.existsSync(file2)) return {};
   if (fs17.statSync(file2).size > 1024 * 1024)
-    throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
+    throw new PlatformIOError(
+      "Monitor identity registry exceeds limits.",
+      "PROCESS_IDENTITY_INVALID"
+    );
   const value2 = JSON.parse(fs17.readFileSync(file2, "utf8"));
   if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
-    throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
+    throw new PlatformIOError(
+      "Invalid monitor identity registry.",
+      "PROCESS_IDENTITY_INVALID"
+    );
   return value2;
 }
+function monitorRegistryKeys(pids, port) {
+  const canonical3 = canonicalPortName(port);
+  return Object.keys(pids).filter((key) => {
+    if (key === port || key === canonical3) return true;
+    try {
+      return canonicalPortName(key) === canonical3;
+    } catch {
+      return false;
+    }
+  });
+}
+function sameMonitorPort(candidate, port) {
+  if (!candidate) return false;
+  if (candidate === port) return true;
+  try {
+    return canonicalPortName(candidate) === canonicalPortName(port);
+  } catch {
+    return false;
+  }
+}
 async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFile, taskId, commandDesc) {
+  const canonicalPort = canonicalPortName(port);
   const pidsFile = getPidsFilePath(projectDir);
   const dir = path23.dirname(pidsFile);
   if (!fs17.existsSync(dir)) fs17.mkdirSync(dir, { recursive: true });
   if (!fs17.existsSync(pidsFile)) fs17.writeFileSync(pidsFile, "{}");
   try {
-    const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    const release = await import_proper_lockfile5.default.lock(pidsFile, {
+      retries: { retries: 5, minTimeout: 50, maxTimeout: 200 }
+    });
     try {
       let pids = {};
       try {
@@ -15354,52 +15411,89 @@ async function registerPioMonitorPid(port, pid, projectDir, rootCommandId, logFi
       } catch {
       }
       const identities = readMonitorIdentities(pidsFile);
+      const matchingKeys = monitorRegistryKeys(pids, canonicalPort);
+      for (const key of matchingKeys) {
+        if (pids[key] !== pid && inspectProcessIdentity(pids[key]).status !== "absent")
+          throw new PlatformIOError(
+            "A different monitor still owns this serial endpoint.",
+            "PROCESS_REGISTRATION_CONFLICT",
+            { port: canonicalPort }
+          );
+      }
+      for (const key of matchingKeys) {
+        delete pids[key];
+        delete identities[key];
+      }
       const observed = inspectProcessIdentity(pid);
-      if (observed.status === "running") identities[port] = observed.identity;
-      else delete identities[port];
-      fs17.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-      pids[port] = pid;
+      if (observed.status === "running")
+        identities[canonicalPort] = observed.identity;
+      else delete identities[canonicalPort];
+      fs17.writeFileSync(
+        pidsFile + ".identities.json",
+        JSON.stringify(identities, null, 2)
+      );
+      pids[canonicalPort] = pid;
       fs17.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
     } finally {
       await release();
     }
   } catch (e) {
+    if (e instanceof PlatformIOError) throw e;
     throw new Error(`Registry contention timeout: ${e.message}`);
   }
   try {
     const commandId = rootCommandId || crypto9.randomUUID();
     const effectiveTaskId = taskId || crypto9.randomUUID();
-    await registerCommand({
-      id: commandId,
-      commandDesc: `PIO Serial Monitor: ${port}`,
-      timestamp: Date.now(),
-      status: "running",
-      tasks: [{
-        taskId: effectiveTaskId,
-        type: "monitor",
+    await registerCommand(
+      {
+        id: commandId,
+        commandDesc: `PIO Serial Monitor: ${port}`,
+        timestamp: Date.now(),
         status: "running",
-        port,
-        pid,
-        commandDesc,
-        logPaths: logFile ? [logFile] : []
-      }]
-    }, projectDir);
+        tasks: [
+          {
+            taskId: effectiveTaskId,
+            type: "monitor",
+            status: "running",
+            port,
+            pid,
+            commandDesc,
+            logPaths: logFile ? [logFile] : []
+          }
+        ]
+      },
+      projectDir
+    );
   } catch (e) {
-    logDiagnostic(`[ProcessManager] Failed to register monitor command: ${e.message}`, projectDir);
+    logDiagnostic(
+      `[ProcessManager] Failed to register monitor command: ${e.message}`,
+      projectDir
+    );
   }
 }
 async function unregisterPioMonitorPid(port, projectDir) {
+  const canonicalPort = canonicalPortName(port);
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
   if (fs17.existsSync(pidsFile)) {
     try {
-      const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+      const release = await import_proper_lockfile5.default.lock(pidsFile, {
+        retries: { retries: 5, minTimeout: 50, maxTimeout: 200 }
+      });
       try {
-        const pids = JSON.parse(fs17.readFileSync(pidsFile, "utf8"));
-        if (pids[port]) {
-          delete pids[port];
+        const pids = JSON.parse(
+          fs17.readFileSync(pidsFile, "utf8")
+        );
+        const matchingKeys = monitorRegistryKeys(pids, canonicalPort);
+        if (matchingKeys.length > 0) {
           const identities = readMonitorIdentities(pidsFile);
-          delete identities[port];
-          fs17.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+          for (const key of matchingKeys) {
+            delete pids[key];
+            delete identities[key];
+          }
+          fs17.writeFileSync(
+            pidsFile + ".identities.json",
+            JSON.stringify(identities, null, 2)
+          );
           fs17.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
         }
       } finally {
@@ -15412,35 +15506,68 @@ async function unregisterPioMonitorPid(port, projectDir) {
   try {
     const history = getCommandHistory(projectDir);
     const activeCommand = [...history].reverse().find(
-      (cmd) => cmd.tasks?.some((a) => a.type === "monitor" && a.status === "running" && a.port === port)
+      (cmd) => cmd.tasks?.some(
+        (a) => a.type === "monitor" && a.status === "running" && sameMonitorPort(a.port, canonicalPort)
+      )
     );
     if (activeCommand) {
-      const activeTask = activeCommand.tasks.find((a) => a.type === "monitor" && a.status === "running" && a.port === port);
+      const activeTask = activeCommand.tasks.find(
+        (a) => a.type === "monitor" && a.status === "running" && sameMonitorPort(a.port, canonicalPort)
+      );
       if (activeTask) {
-        await updateTaskStatus(activeCommand.id, activeTask.taskId, { status: "terminated" }, projectDir);
+        await updateTaskStatus(
+          activeCommand.id,
+          activeTask.taskId,
+          { status: "terminated" },
+          projectDir
+        );
       }
     }
   } catch (e) {
-    logDiagnostic(`[ProcessManager] Failed to update monitor command status: ${e.message}`, projectDir);
+    logDiagnostic(
+      `[ProcessManager] Failed to update monitor command status: ${e.message}`,
+      projectDir
+    );
   }
 }
 async function killPioMonitorByPort(port, projectDir) {
+  const canonicalPort = canonicalPortName(port);
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
   if (!fs17.existsSync(pidsFile)) return false;
   let stoppedPid;
-  const release = await import_proper_lockfile5.default.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+  const release = await import_proper_lockfile5.default.lock(pidsFile, {
+    retries: { retries: 5, minTimeout: 50, maxTimeout: 200 }
+  });
   try {
     const pids = JSON.parse(fs17.readFileSync(pidsFile, "utf8"));
-    const pid = pids[port];
-    if (!pid) return false;
+    const matchingKeys = monitorRegistryKeys(pids, canonicalPort);
+    if (matchingKeys.length === 0) return false;
+    const matchingPids = new Set(matchingKeys.map((key) => pids[key]));
+    if (matchingPids.size !== 1)
+      throw new PlatformIOError(
+        "Conflicting monitor processes are recorded for this serial endpoint.",
+        "PROCESS_IDENTITY_UNVERIFIED",
+        { port: canonicalPort }
+      );
+    const pid = pids[matchingKeys[0]];
     stoppedPid = pid;
-    const identity = readMonitorIdentities(pidsFile)[port];
+    const recordedIdentities = readMonitorIdentities(pidsFile);
+    const identity = matchingKeys.map((key) => recordedIdentities[key]).find((value2) => value2?.pid === pid);
     const observation = inspectProcessIdentity(pid);
     if (observation.status === "absent") {
     } else {
       if (!identity || identity.pid !== pid || compareProcessIdentity(identity, observation) !== "alive")
-        throw new PlatformIOError("Monitor process identity is unavailable or changed; refusing PID-only termination.", "PROCESS_IDENTITY_UNVERIFIED");
-      await new Promise((resolve, reject) => (0, import_tree_kill.default)(pid, "SIGKILL", (error40) => error40 ? reject(error40) : resolve()));
+        throw new PlatformIOError(
+          "Monitor process identity is unavailable or changed; refusing PID-only termination.",
+          "PROCESS_IDENTITY_UNVERIFIED"
+        );
+      await new Promise(
+        (resolve, reject) => (0, import_tree_kill.default)(
+          pid,
+          "SIGKILL",
+          (error40) => error40 ? reject(error40) : resolve()
+        )
+      );
       let confirmed = false;
       for (let attempt = 0; attempt < 20; attempt++) {
         if (compareProcessIdentity(identity, inspectProcessIdentity(pid)) === "stale") {
@@ -15449,12 +15576,21 @@ async function killPioMonitorByPort(port, projectDir) {
         }
         await delay(50);
       }
-      if (!confirmed) throw new PlatformIOError("Monitor exit could not be confirmed.", "PROCESS_CLEANUP_PENDING");
+      if (!confirmed)
+        throw new PlatformIOError(
+          "Monitor exit could not be confirmed.",
+          "PROCESS_CLEANUP_PENDING"
+        );
     }
-    delete pids[port];
     const identities = readMonitorIdentities(pidsFile);
-    delete identities[port];
-    fs17.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+    for (const key of matchingKeys) {
+      delete pids[key];
+      delete identities[key];
+    }
+    fs17.writeFileSync(
+      pidsFile + ".identities.json",
+      JSON.stringify(identities, null, 2)
+    );
     fs17.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
   } finally {
     await release();
@@ -15462,8 +15598,13 @@ async function killPioMonitorByPort(port, projectDir) {
   const history = getCommandHistory(projectDir);
   for (const command of history) {
     for (const task of command.tasks ?? []) {
-      if (task.type === "monitor" && task.port === port && task.pid === stoppedPid && task.status === "running")
-        await updateTaskStatus(command.id, task.taskId, { status: "terminated" }, projectDir);
+      if (task.type === "monitor" && sameMonitorPort(task.port, canonicalPort) && task.pid === stoppedPid && task.status === "running")
+        await updateTaskStatus(
+          command.id,
+          task.taskId,
+          { status: "terminated" },
+          projectDir
+        );
     }
   }
   return true;
@@ -15473,7 +15614,9 @@ function isPidAlive(pid) {
     process.kill(pid, 0);
     if (os5.platform() !== "win32") {
       try {
-        const stdout = execSync2(`ps -p ${pid} -o command=`, { encoding: "utf8" }).toLowerCase();
+        const stdout = execSync2(`ps -p ${pid} -o command=`, {
+          encoding: "utf8"
+        }).toLowerCase();
         if (!stdout.includes("platformio") && !stdout.includes("pio") && !stdout.includes("python")) {
           return false;
         }
@@ -15497,7 +15640,22 @@ function getActiveMonitorPids(projectDir) {
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
   if (!fs17.existsSync(pidsFile)) return {};
   try {
-    return JSON.parse(fs17.readFileSync(pidsFile, "utf8"));
+    const persisted = JSON.parse(fs17.readFileSync(pidsFile, "utf8"));
+    const canonical3 = {};
+    for (const [port, pid] of Object.entries(persisted)) {
+      let key = port;
+      try {
+        key = canonicalPortName(port);
+      } catch {
+      }
+      if (canonical3[key] !== void 0 && canonical3[key] !== pid)
+        throw new PlatformIOError(
+          "Conflicting monitor aliases in PID registry.",
+          "PROCESS_IDENTITY_UNVERIFIED"
+        );
+      canonical3[key] = pid;
+    }
+    return canonical3;
   } catch {
     return {};
   }
@@ -15589,7 +15747,7 @@ async function killTrackedTaskProcess(task, projectDir) {
       buildPids = {};
     }
   }
-  const trackedMonitor = task.type === "monitor" && Boolean(task.port) && monitorPids[task.port] === task.pid;
+  const trackedMonitor = task.type === "monitor" && Boolean(task.port) && monitorPids[canonicalPortName(task.port)] === task.pid;
   const trackedBuild = task.type !== "monitor" && Object.hasOwn(buildPids, String(task.pid));
   if (!trackedMonitor && !trackedBuild) {
     if (!isPidAlive(task.pid)) return false;
@@ -15820,15 +15978,15 @@ var init_semaphore = __esm({
         }
       }
       getLockFilePath(port) {
-        const id = sanitizePortName(port);
+        const id = sanitizePortName(canonicalPortName(port));
         return path24.join(GLOBAL_LOCKS_DIR, `${id}.json`);
       }
       /**
        * Claims a physical port. Throws PortBusyError if the port is held by a live
-       * claim from another process. Stale claims are reclaimed under a breaker so
-       * two processes cannot reclaim the same claim simultaneously.
+       * distinct operation, including one in this process. An operation may refresh
+       * its own same-type claim by supplying the returned operation_id.
        */
-      claimPort(port, reason = "Flash Operation") {
+      claimPort(port, reason = "Flash Operation", options = {}) {
         ensureGlobalDirs();
         const filePath = this.getLockFilePath(port);
         const claim = {
@@ -15837,16 +15995,19 @@ var init_semaphore = __esm({
           owner_pid: process.pid,
           hostname: os6.hostname(),
           timestamp: Date.now(),
+          operation_id: options.operationId ?? randomUUID2(),
           port
         };
+        if (claim.type === "monitor") claim.startup_pending = true;
         const content = JSON.stringify(
           { status: "busy", current_claim: claim },
           null,
           2
         );
         return this.withPortGuard(port, filePath, () => {
+          this.reconcileAliasClaims(port, filePath);
           if (this.tryCreateExclusive(filePath, content)) return claim;
-          if (this.evaluateExisting(filePath, port) === "reentrant") {
+          if (this.evaluateExisting(filePath, port, claim) === "reentrant") {
             this.replaceClaimAtomically(
               filePath,
               this.refreshedContent(port, claim)
@@ -15854,7 +16015,7 @@ var init_semaphore = __esm({
             return claim;
           }
           return this.withReclaimBreaker(port, filePath, () => {
-            const recheck = this.evaluateExisting(filePath, port);
+            const recheck = this.evaluateExisting(filePath, port, claim);
             if (recheck === "reentrant") {
               this.replaceClaimAtomically(
                 filePath,
@@ -15867,6 +16028,47 @@ var init_semaphore = __esm({
             throw new PortBusyError(port, this.getClaim(port));
           });
         });
+      }
+      /** Locate old claim filenames whose recorded port names the same canonical endpoint. */
+      getAliasClaims(port, filePath) {
+        if (!fs18.existsSync(GLOBAL_LOCKS_DIR)) return [];
+        const canonicalPort = canonicalPortName(port);
+        const matches = [];
+        for (const entry of fs18.readdirSync(GLOBAL_LOCKS_DIR)) {
+          if (!entry.endsWith(".json")) continue;
+          const candidate = path24.join(GLOBAL_LOCKS_DIR, entry);
+          if (candidate === filePath || process.platform === "win32" && candidate.toLowerCase() === filePath.toLowerCase())
+            continue;
+          try {
+            const raw = fs18.readFileSync(candidate, "utf8");
+            const value2 = JSON.parse(raw);
+            const recorded = value2.current_claim ?? value2;
+            if (typeof recorded?.port !== "string" || canonicalPortName(recorded.port) !== canonicalPort)
+              continue;
+            const claim = this.normaliseClaim(recorded, recorded.port);
+            if (claim) matches.push({ filePath: candidate, claim, raw });
+          } catch (error40) {
+            if (error40.code === "ENOENT" || error40 instanceof SyntaxError || error40 instanceof PlatformIOError && error40.code === "SERIAL_ENDPOINT_UNAVAILABLE")
+              continue;
+            throw error40;
+          }
+        }
+        return matches;
+      }
+      /** Preserve pre-upgrade alias ownership before publishing or releasing the canonical key. */
+      reconcileAliasClaims(port, filePath) {
+        for (const alias of this.getAliasClaims(port, filePath)) {
+          const current = this.classifyClaimFile(filePath, port);
+          if (current.kind === "absent" && this.tryCreateExclusive(filePath, alias.raw)) {
+            this.unlinkClaimIfUnchanged(alias.filePath, alias.raw);
+          } else if (current.kind === "ok" && this.matchesClaim(current.claim, alias.claim)) {
+            this.unlinkClaimIfUnchanged(alias.filePath, alias.raw);
+          } else if (this.isClaimStale(alias.claim)) {
+            this.unlinkClaimIfUnchanged(alias.filePath, alias.raw);
+          } else {
+            throw new PortBusyError(port, alias.claim);
+          }
+        }
       }
       /**
        * Publishes `content` at `filePath` atomically, or reports that it is taken.
@@ -15947,7 +16149,7 @@ var init_semaphore = __esm({
        * the port is genuinely held. Never returns "reclaim" for a file that might
        * belong to a live process.
        */
-      evaluateExisting(filePath, port) {
+      evaluateExisting(filePath, port, requested) {
         const state = this.classifyClaimFile(filePath, port);
         switch (state.kind) {
           case "absent":
@@ -15968,7 +16170,8 @@ var init_semaphore = __esm({
             }
             return "reclaim";
           case "ok":
-            if (this.isOwnedByThisProcess(state.claim)) return "reentrant";
+            if (this.isOwnedByThisProcess(state.claim) && state.claim.type === requested.type && state.claim.operation_id === requested.operation_id && typeof state.claim.operation_id === "string")
+              return "reentrant";
             if (!this.isClaimStale(state.claim))
               throw new PortBusyError(port, state.claim);
             return "reclaim";
@@ -16008,6 +16211,8 @@ var init_semaphore = __esm({
           owner_pid: raw.owner_pid,
           hostname: String(raw.hostname ?? ""),
           timestamp: Number(raw.timestamp ?? 0),
+          ...typeof raw.operation_id === "string" ? { operation_id: raw.operation_id } : {},
+          ...typeof raw.startup_pending === "boolean" ? { startup_pending: raw.startup_pending } : {},
           port: raw.port ? String(raw.port) : port,
           ...typeof raw.monitor_pid === "number" ? { monitor_pid: raw.monitor_pid } : {}
         };
@@ -16059,16 +16264,22 @@ var init_semaphore = __esm({
        * Best-effort: a failure here degrades to the old launcher-PID behaviour
        * rather than breaking a working monitor.
        */
-      attachMonitorPid(port, monitorPid) {
+      attachMonitorPid(port, monitorPid, operationId) {
         const filePath = this.getLockFilePath(port);
         const claim = this.getClaim(port);
         if (!claim || claim.type !== "monitor") return false;
         if (!this.isOwnedByThisProcess(claim)) return false;
         try {
           return this.withPortGuard(port, filePath, () => {
+            this.reconcileAliasClaims(port, filePath);
             const current = this.getClaim(port);
-            if (!current || !this.isOwnedByThisProcess(current)) return false;
-            const updated = { ...current, monitor_pid: monitorPid };
+            if (!current || current.type !== "monitor" || !this.isOwnedByThisProcess(current) || operationId !== void 0 && current.operation_id !== operationId)
+              return false;
+            const updated = {
+              ...current,
+              monitor_pid: monitorPid,
+              startup_pending: false
+            };
             this.replaceClaimAtomically(
               filePath,
               JSON.stringify({ status: "busy", current_claim: updated }, null, 2)
@@ -16087,8 +16298,11 @@ var init_semaphore = __esm({
        */
       refreshedContent(port, fresh) {
         const existing = this.getClaim(port);
-        const merged = existing && typeof existing.monitor_pid === "number" ? { ...fresh, monitor_pid: existing.monitor_pid } : fresh;
-        return JSON.stringify({ status: "busy", current_claim: merged }, null, 2);
+        if (existing && typeof existing.monitor_pid === "number") {
+          fresh.monitor_pid = existing.monitor_pid;
+          fresh.startup_pending = existing.startup_pending;
+        }
+        return JSON.stringify({ status: "busy", current_claim: fresh }, null, 2);
       }
       isOwnedByThisProcess(claim) {
         return claim.owner_pid === process.pid && claim.hostname === os6.hostname();
@@ -16137,17 +16351,22 @@ var init_semaphore = __esm({
       releasePort(port, options = {}) {
         const filePath = this.getLockFilePath(port);
         return this.withPortGuard(port, filePath, () => {
+          this.reconcileAliasClaims(port, filePath);
           const state = this.classifyClaimFile(filePath, port);
           if (state.kind === "absent") return false;
           if (state.kind === "denied") return false;
           if (state.kind === "unreadable") {
-            if (options.expectedType) return false;
+            if (options.expectedType || options.expectedClaim) return false;
             if (state.ageMs < UNREADABLE_GRACE_MS) return false;
             return this.unlinkClaimIfUnchanged(filePath, state.raw);
           }
           if (options.expectedType && state.claim.type !== options.expectedType) {
             return false;
           }
+          if (options.expectedClaim && !this.matchesClaim(state.claim, options.expectedClaim)) {
+            return false;
+          }
+          if (options.requireStale && !this.isClaimStale(state.claim)) return false;
           if (options.force)
             return this.unlinkClaimIfUnchanged(filePath, state.raw);
           if (this.isOwnedByThisProcess(state.claim) || this.isClaimStale(state.claim)) {
@@ -16155,6 +16374,10 @@ var init_semaphore = __esm({
           }
           return false;
         });
+      }
+      /** Compare a stop's snapshot with the claim classified under the port guard. */
+      matchesClaim(current, expected) {
+        return current.operation_id === expected.operation_id && current.owner_pid === expected.owner_pid && current.hostname === expected.hostname && current.timestamp === expected.timestamp && current.type === expected.type && current.monitor_pid === expected.monitor_pid && current.startup_pending === expected.startup_pending && current.owner_workspace === expected.owner_workspace;
       }
       /**
        * Removes the claim file only if it still holds exactly the bytes that were
@@ -16199,8 +16422,10 @@ var init_semaphore = __esm({
       /** Retrieves the current claim for a port, normalised, or null. Never throws. */
       getClaim(port) {
         try {
-          const state = this.classifyClaimFile(this.getLockFilePath(port), port);
-          return state.kind === "ok" ? state.claim : null;
+          const filePath = this.getLockFilePath(port);
+          const state = this.classifyClaimFile(filePath, port);
+          if (state.kind === "ok") return state.claim;
+          return state.kind === "absent" ? this.getAliasClaims(port, filePath)[0]?.claim ?? null : null;
         } catch {
           return null;
         }
@@ -16220,12 +16445,11 @@ var init_semaphore = __esm({
        * opening the double-flash bug this class exists to prevent.
        */
       isClaimStale(claim) {
+        if (claim.type === "monitor" && claim.startup_pending) return false;
         if (claim.type === "monitor" && typeof claim.monitor_pid === "number" && claim.hostname === os6.hostname()) {
-          if (Date.now() - claim.timestamp > ttlForClaim(claim)) return true;
           return this.isPidGone(claim.monitor_pid);
         }
         if (claim.hostname === os6.hostname()) {
-          if (Date.now() - claim.timestamp > ttlForClaim(claim)) return true;
           return this.isPidGone(claim.owner_pid);
         }
         return Date.now() - claim.timestamp > ttlForClaim(claim);
@@ -37801,6 +38025,16 @@ function getSpoolerStates() {
   }
   return clean;
 }
+async function withMonitorTransition(port, action) {
+  if (monitorTransitions.has(port))
+    throw new PortBusyError(port, portSemaphoreManager.getClaim(port));
+  monitorTransitions.add(port);
+  try {
+    return await action();
+  } finally {
+    monitorTransitions.delete(port);
+  }
+}
 function emitNewLogBytes(port, daemon) {
   let fd;
   try {
@@ -37834,13 +38068,36 @@ function startWindowsPollingFallback(port, daemon) {
   daemon.poller.unref();
 }
 async function stopMonitor(port, projectDir) {
+  const activePort = canonicalPortName(port);
+  return withMonitorTransition(
+    activePort,
+    () => stopMonitorPort(activePort, projectDir)
+  );
+}
+async function stopMonitorPort(port, projectDir) {
   logDiagnostic(
     `[Spooler Diagnostic] stopMonitor called for port ${port}.`,
     projectDir
   );
-  if (activeDaemons[port]) {
+  const daemon = activeDaemons[port];
+  const preempted = portSemaphoreManager.getClaim(port);
+  if (preempted?.type === "monitor" && !(preempted.owner_pid === process.pid && preempted.hostname === os12.hostname())) {
+    console.error(
+      `[pio-agent] Stopping a monitor on ${port} started by another process (PID ${preempted.owner_pid}, workspace ${preempted.owner_workspace}) to take the port.`
+    );
+  }
+  const proven = await killPioMonitorByPort(port, projectDir);
+  const monitorClaim = preempted?.type === "monitor" ? preempted : void 0;
+  const legacyKillProven = proven && monitorClaim?.hostname === os12.hostname() && typeof monitorClaim.monitor_pid !== "number";
+  if (monitorClaim && !legacyKillProven && !portSemaphoreManager.isClaimStale(monitorClaim)) {
+    throw new PlatformIOError(
+      `Monitor termination could not be confirmed for ${port}. Its port claim was retained.`,
+      "PROCESS_CLEANUP_PENDING",
+      { port, cleanupPending: true }
+    );
+  }
+  if (daemon) {
     logDiagnostic(`[Spooler Diagnostic] Deleting activeDaemons context.`, projectDir);
-    const daemon = activeDaemons[port];
     if (daemon.poller) {
       clearInterval(daemon.poller);
       daemon.poller = void 0;
@@ -37863,36 +38120,51 @@ async function stopMonitor(port, projectDir) {
       }
     }
   }
-  logDiagnostic(
-    `[Spooler Diagnostic] Triggering killPioMonitorByPort on ${port}...`,
-    projectDir
-  );
-  const preempted = portSemaphoreManager.getClaim(port);
-  if (preempted?.type === "monitor" && !(preempted.owner_pid === process.pid && preempted.hostname === os12.hostname())) {
-    console.error(
-      `[pio-agent] Stopping a monitor on ${port} started by another process (PID ${preempted.owner_pid}` + (preempted.monitor_pid ? `, monitor PID ${preempted.monitor_pid}` : "") + `, workspace ${preempted.owner_workspace}) to take the port.`
-    );
-  }
-  let proven = false;
-  try {
-    proven = await killPioMonitorByPort(port, projectDir);
-  } catch (error40) {
-    logDiagnostic(
-      `[Spooler Diagnostic] Monitor kill not proven for ${port}: ${error40.message}`,
-      projectDir
-    );
-  }
   delete activeDaemons[port];
   portalEvents.emitSpoolerStates(getSpoolerStates());
   logDiagnostic(`[Spooler Diagnostic] killPioMonitorByPort completed.`, projectDir);
   try {
-    const survivingClaim = portSemaphoreManager.getClaim(port);
-    const hasMonitorPid = typeof survivingClaim?.monitor_pid === "number";
-    portSemaphoreManager.releasePort(port, {
-      force: !hasMonitorPid && proven && survivingClaim?.hostname === os12.hostname(),
-      expectedType: "monitor"
-    });
+    if (monitorClaim)
+      portSemaphoreManager.releasePort(port, {
+        force: legacyKillProven,
+        expectedType: "monitor",
+        expectedClaim: monitorClaim,
+        requireStale: !legacyKillProven
+      });
   } catch {
+  }
+}
+async function cleanupSpawnedMonitor(proc, observation) {
+  if (proc.exitCode !== null || proc.signalCode !== null) return;
+  if (!proc.pid || observation.status !== "running" || compareProcessIdentity(
+    observation.identity,
+    inspectProcessIdentity(proc.pid)
+  ) !== "alive") {
+    throw new PlatformIOError(
+      "Monitor child cleanup requires a verified process identity.",
+      "PROCESS_CLEANUP_PENDING",
+      { cleanupPending: true }
+    );
+  }
+  const exited = waitForOwnedProcess(proc, 2e3, 500);
+  void exited.catch(() => {
+  });
+  await new Promise(
+    (resolve, reject) => (0, import_tree_kill2.default)(proc.pid, "SIGKILL", (error40) => {
+      if (error40)
+        reject(
+          new PlatformIOError(error40.message, "PROCESS_CLEANUP_PENDING", {
+            cleanupPending: true
+          })
+        );
+      else resolve();
+    })
+  );
+  try {
+    await exited;
+  } catch (error40) {
+    if (!(error40 instanceof PlatformIOError) || error40.context?.cleanupPending !== false)
+      throw error40;
   }
 }
 async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
@@ -37925,7 +38197,18 @@ async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
   } finally {
     fs83.closeSync(outFd);
   }
-  if (proc.pid) {
+  const observation = proc.pid ? inspectProcessIdentity(proc.pid) : { status: "absent" };
+  try {
+    if (!proc.pid || !portSemaphoreManager.attachMonitorPid(
+      targetPort,
+      proc.pid,
+      daemon.operationId
+    )) {
+      throw new PlatformIOError(
+        "Could not record the monitor child on its port claim.",
+        "MONITOR_CLAIM_FAILED"
+      );
+    }
     const cliDesc = `pio device monitor ${monitorArgs.join(" ")}`;
     await registerPioMonitorPid(
       targetPort,
@@ -37936,16 +38219,13 @@ async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
       daemon.taskId,
       cliDesc
     );
-    const attached = portSemaphoreManager.attachMonitorPid(
-      targetPort,
-      proc.pid
+  } catch (error40) {
+    await cleanupSpawnedMonitor(proc, observation);
+    throw new PlatformIOError(
+      error40 instanceof Error ? error40.message : "Monitor startup failed.",
+      "MONITOR_START_FAILED",
+      { cleanupPending: false }
     );
-    if (!attached) {
-      logDiagnostic(
-        `[Spooler] WARNING: could not record monitor PID ${proc.pid} on the claim for ${targetPort}. The claim may read stale while this monitor still holds the port. Stop it with \`pio-agent monitor-stop --port ${targetPort}\`.`,
-        projectDir
-      );
-    }
   }
   const targetDir = getLogDir("monitor", projectDir);
   const latestLog = path98.join(targetDir, "latest-monitor.log");
@@ -38090,66 +38370,86 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
     );
   if (baud && !validateBaudRate(baud))
     throw new PlatformIOError(`Invalid baud rate: ${baud}`, "INVALID_BAUD");
-  await stopMonitor(activePort, projectDir);
-  const targetDir = getLogDir("monitor", projectDir);
-  if (!fs83.existsSync(targetDir)) {
-    fs83.mkdirSync(targetDir, { recursive: true });
-  }
-  const { logFile } = rotateSpoolerStreams("monitor", projectDir);
-  portSemaphoreManager.claimPort(activePort, "Monitor Daemon");
-  const monitorTaskId = crypto17.randomUUID();
-  const daemon = {
-    baudRate: baud,
-    environment,
-    hwid: activeHwid,
-    logFile,
-    fileOffset: 0,
-    taskId: monitorTaskId,
-    projectDir,
-    startedAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  activeDaemons[activePort] = daemon;
-  await spawnPioMonitor(activePort, projectDir, effectiveCommandId);
-  try {
-    daemon.watcher = fs83.watch(logFile, (eventType) => {
-      if (eventType === "change") {
-        try {
-          const stat = fs83.statSync(logFile);
-          if (stat.size > (daemon.fileOffset || 0)) {
-            const stream = fs83.createReadStream(logFile, {
-              start: daemon.fileOffset || 0,
-              end: stat.size - 1
-            });
-            stream.on("data", (chunk) => {
-              portalEvents.emitSerialLog(
-                activePort,
-                chunk.toString(),
-                daemon.taskId
-              );
-            });
-            daemon.fileOffset = stat.size;
-          }
-        } catch {
+  const targetPort = canonicalPortName(activePort);
+  return withMonitorTransition(targetPort, async () => {
+    await stopMonitorPort(targetPort, projectDir);
+    const targetDir = getLogDir("monitor", projectDir);
+    if (!fs83.existsSync(targetDir)) {
+      fs83.mkdirSync(targetDir, { recursive: true });
+    }
+    const { logFile } = rotateSpoolerStreams("monitor", projectDir);
+    const claim = portSemaphoreManager.claimPort(targetPort, "Monitor Daemon");
+    const monitorTaskId = crypto17.randomUUID();
+    const daemon = {
+      baudRate: baud,
+      environment,
+      hwid: activeHwid,
+      logFile,
+      fileOffset: 0,
+      taskId: monitorTaskId,
+      projectDir,
+      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      operationId: claim.operation_id
+    };
+    activeDaemons[targetPort] = daemon;
+    try {
+      await spawnPioMonitor(targetPort, projectDir, effectiveCommandId);
+    } catch (error40) {
+      const cleanupPending = error40 instanceof PlatformIOError && error40.context?.cleanupPending === true;
+      if (!cleanupPending) {
+        const current = portSemaphoreManager.getClaim(targetPort);
+        if (current && current.operation_id === claim.operation_id) {
+          portSemaphoreManager.releasePort(targetPort, {
+            expectedClaim: current
+          });
         }
+        delete activeDaemons[targetPort];
+        portalEvents.emitSpoolerStates(getSpoolerStates());
       }
-    });
-    daemon.watcher.on("error", () => {
-    });
-    daemon.watcher.unref();
-  } catch {
-    logDiagnostic(`[Spooler] Failed to attach fs.watch to ${logFile}`, projectDir);
-  }
-  startWindowsPollingFallback(activePort, daemon);
-  portalEvents.emitSpoolerStates(getSpoolerStates());
-  return {
-    success: true,
-    port: activePort,
-    logFile,
-    taskId: monitorTaskId,
-    startedAt: daemon.startedAt
-  };
+      throw error40;
+    }
+    try {
+      daemon.watcher = fs83.watch(logFile, (eventType) => {
+        if (eventType === "change") {
+          try {
+            const stat = fs83.statSync(logFile);
+            if (stat.size > (daemon.fileOffset || 0)) {
+              const stream = fs83.createReadStream(logFile, {
+                start: daemon.fileOffset || 0,
+                end: stat.size - 1
+              });
+              stream.on("data", (chunk) => {
+                portalEvents.emitSerialLog(
+                  targetPort,
+                  chunk.toString(),
+                  daemon.taskId
+                );
+              });
+              daemon.fileOffset = stat.size;
+            }
+          } catch {
+          }
+        }
+      });
+      daemon.watcher.on("error", () => {
+      });
+      daemon.watcher.unref();
+    } catch {
+      logDiagnostic(`[Spooler] Failed to attach fs.watch to ${logFile}`, projectDir);
+    }
+    startWindowsPollingFallback(targetPort, daemon);
+    portalEvents.emitSpoolerStates(getSpoolerStates());
+    return {
+      success: true,
+      port: targetPort,
+      logFile,
+      taskId: monitorTaskId,
+      startedAt: daemon.startedAt
+    };
+  });
 }
 async function queryLogs(lines3 = 100, searchPattern, taskId, logPath, projectDir, port) {
+  if (port) port = canonicalPortName(port);
   let targetPaths = [];
   if (taskId) {
     const history = getCommandHistory(projectDir);
@@ -38235,6 +38535,7 @@ function decodeMonitorCursor(cursor, logPath) {
   }
 }
 function getMonitorStatus(port, projectDir) {
+  if (port) port = canonicalPortName(port);
   const trackedPids = getActiveMonitorPids(projectDir);
   const statuses = Object.entries(activeDaemons).filter(
     ([activePort, daemon]) => (!port || activePort === port) && (!projectDir || path98.resolve(daemon.projectDir ?? "") === path98.resolve(projectDir))
@@ -38396,14 +38697,18 @@ async function captureSerialWindow(input) {
     }
   }
 }
-var activeDaemons, captureLeases;
+var import_tree_kill2, activeDaemons, monitorTransitions, captureLeases;
 var init_monitor = __esm({
   "src/tools/monitor.ts"() {
     "use strict";
     init_bounded_pattern();
+    import_tree_kill2 = __toESM(require_tree_kill(), 1);
     init_validation();
     init_errors2();
     init_semaphore();
+    init_paths();
+    init_owned_process_wait();
+    init_process_identity();
     init_devices();
     init_process_manager();
     init_platformio();
@@ -38418,6 +38723,7 @@ var init_monitor = __esm({
     init_target_resolution();
     init_command_registry();
     activeDaemons = {};
+    monitorTransitions = /* @__PURE__ */ new Set();
     captureLeases = /* @__PURE__ */ new Map();
   }
 });
@@ -108766,6 +109072,7 @@ async function checkTaskStatus(taskId, logPath, projectDir) {
     const cmd = history.find((c) => c.id === resolvedTaskId);
     if (cmd) {
       status = cmd.status;
+      output = cmd.error ?? "";
       logPaths = cmd.tasks.flatMap((a) => a.logPaths || []).filter((f2) => Boolean(f2));
       const latestLog = logPath || logPaths[logPaths.length - 1];
       if (latestLog && fs22.existsSync(latestLog)) {
@@ -134549,12 +134856,6 @@ async function cancelTaskCore(input) {
       processTerminated: false
     };
   }
-  await updateTaskStatus(
-    resolved.command.id,
-    resolved.task.taskId,
-    { status: "terminated", error: "Cancelled by MCP request." },
-    resolved.projectDir
-  );
   let processTerminated = false;
   if (resolved.task.type === "monitor" && resolved.task.port) {
     await stopMonitor(resolved.task.port, resolved.projectDir);
@@ -134565,6 +134866,12 @@ async function cancelTaskCore(input) {
       resolved.projectDir
     );
   }
+  await updateTaskStatus(
+    resolved.command.id,
+    resolved.task.taskId,
+    { status: "terminated", error: "Cancelled by MCP request." },
+    resolved.projectDir
+  );
   return {
     success: true,
     taskId: resolved.task.taskId,
