@@ -153,7 +153,7 @@ describe("monitor operation safety", () => {
     >("../src/core/devices/device-lease.js");
     let ownerRunning = true;
     const store = new ActualStore({
-      root: path.join(testDataDir, "orphan-upload-lease"),
+      root: path.join(fs.realpathSync(testDataDir), "orphan-upload-lease"),
       inspect: (pid) =>
         ownerRunning
           ? {
