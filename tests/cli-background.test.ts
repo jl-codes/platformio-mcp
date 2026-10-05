@@ -81,6 +81,42 @@ afterAll(() => {
 
 describe("background worker dispatch", () => {
   it.each([
+    ["--jobs"],
+    ["--jobs="],
+    ["--jobs=bogus"],
+    ["--jobs=Infinity"],
+    ["--jobs=-1"],
+    ["--jobs=1.5"],
+    ["--jobs=1025"],
+  ])(
+    "rejects invalid numeric %j before any authorization or detached task",
+    async (...numericArgs) => {
+      const previousRecords = getCommandHistory(testDataDir);
+      vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+      await runCliCommand("build", [
+        "--project-dir",
+        testDataDir,
+        ...numericArgs,
+        "--background",
+        "--approve",
+        "--json",
+      ]);
+      expect(process.exit).toHaveBeenCalledWith(1);
+      const error = JSON.parse(
+        String(vi.mocked(console.error).mock.calls[0][0]),
+      );
+      expect(error.errorType).toBe("InvalidArgument");
+      expect(error.summary).toContain("--jobs");
+      expect(mocks.authorize).not.toHaveBeenCalled();
+      expect(mocks.prompt).not.toHaveBeenCalled();
+      expect(mocks.approve).not.toHaveBeenCalled();
+      expect(mocks.spawn).not.toHaveBeenCalled();
+      expect(handler).not.toHaveBeenCalled();
+      expect(getCommandHistory(testDataDir)).toEqual(previousRecords);
+    },
+  );
+
+  it.each([
     ["--background"],
     ["--background=true"],
     ["--background=1"],

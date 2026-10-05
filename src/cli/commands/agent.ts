@@ -22,15 +22,17 @@ import {
   asNumber,
   asCsv,
   normalizePortOption,
+  validateNumericCommandOptions,
 } from "../args.js";
 import type { CommandHandler } from "./types.js";
 
 export const targetResolve: CommandHandler = async (ctx) => {
+  validateNumericCommandOptions("target-resolve", ctx.options);
   const params = AgentResolveTargetParamsSchema.parse({
     projectDir: asString(ctx.options["project-dir"]),
     environment: asString(ctx.options.environment),
     port: normalizePortOption(asString(ctx.options.port)),
-    bindingTtlSeconds: asNumber(ctx.options["binding-ttl"]),
+    bindingTtlSeconds: asNumber(ctx.options["binding-ttl"], "binding-ttl"),
   });
   return resolveTarget(params);
 };
@@ -66,14 +68,18 @@ export const agentSafePinAuditCmd: CommandHandler = async (ctx) => {
 };
 
 export const agentFlashMonitorVerifyCmd: CommandHandler = async (ctx) => {
+  validateNumericCommandOptions("agent-flash-monitor-verify", ctx.options);
   const params = AgentFlashMonitorVerifyParamsSchema.parse({
     projectDir: asString(ctx.options["project-dir"]),
     environment: asString(ctx.options.environment),
     port: normalizePortOption(asString(ctx.options.port)),
     expect_all: asCsv(ctx.options["expect-all"]),
     reject_patterns: asCsv(ctx.options["reject-patterns"]),
-    timeoutSeconds: asNumber(ctx.options.timeout),
-    stabilityWindowSeconds: asNumber(ctx.options["stability-window"]),
+    timeoutSeconds: asNumber(ctx.options.timeout, "timeout"),
+    stabilityWindowSeconds: asNumber(
+      ctx.options["stability-window"],
+      "stability-window",
+    ),
     autoBuild: asBoolean(ctx.options["auto-build"]),
   });
   return agentFlashMonitorVerify({

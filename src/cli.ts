@@ -69,7 +69,11 @@ import {
   SELF_AUTHORIZING_COMMANDS,
   runSelfAuthorizingCommand,
 } from "./cli/commands/self-authorizing.js";
-import { asString, asBoolean } from "./cli/args.js";
+import {
+  asString,
+  asBoolean,
+  validateNumericCommandOptions,
+} from "./cli/args.js";
 
 export const COMMANDS: Record<string, CommandHandler> = {
   devices,
@@ -427,6 +431,9 @@ export async function runCliCommand(command: string, rawArgs: string[]) {
   }
 
   try {
+    // Fail malformed numeric input before approvals, audit writes, or a
+    // detached process can be created; retain raw options for policy scope.
+    validateNumericCommandOptions(command, options, positionals);
     if (
       (options["__task-id"] !== undefined &&
         (!preassignedTaskId || !/^[a-f0-9-]{36}$/i.test(preassignedTaskId))) ||

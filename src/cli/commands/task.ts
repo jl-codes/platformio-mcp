@@ -8,7 +8,7 @@ import {
   cancelTaskCore,
 } from "../../core/tasks.js";
 import { PlatformIOError } from "../../utils/errors.js";
-import { asString, asNumber } from "../args.js";
+import { asString, asNumber, validateNumericCommandOptions } from "../args.js";
 import type { CommandHandler } from "./types.js";
 
 export const taskStatus: CommandHandler = async (ctx) => {
@@ -22,9 +22,10 @@ export const taskStatus: CommandHandler = async (ctx) => {
 };
 
 export const taskHistory: CommandHandler = async (ctx) => {
+  validateNumericCommandOptions("task-history", ctx.options);
   const params = ListTaskHistoryParamsSchema.parse({
     projectDir: asString(ctx.options["project-dir"]),
-    limit: asNumber(ctx.options.limit),
+    limit: asNumber(ctx.options.limit, "limit"),
     status: asString(ctx.options.status),
   });
   return listTaskHistoryCore(params);

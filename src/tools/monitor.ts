@@ -43,6 +43,7 @@ import { getLogDir, rotateSpoolerStreams } from "../utils/spooler.js";
 import { getWorkspaces, rewriteRegistry } from "../utils/workspace-registry.js";
 import {
   getActiveMonitorPids,
+  getPersistedMonitorStatuses,
   isPidAlive,
   isBuildActive,
 } from "../utils/process-manager.js";
@@ -403,6 +404,11 @@ async function spawnPioMonitor(
       daemon.logFile,
       daemon.taskId,
       cliDesc,
+      {
+        baudRate: daemon.baudRate,
+        environment: daemon.environment,
+        startedAt: daemon.startedAt,
+      },
     );
   } catch (error) {
     await cleanupSpawnedMonitor(proc, observation);
@@ -865,11 +871,17 @@ function decodeMonitorCursor(cursor: string, logPath: string): number {
   }
 }
 
+/** Normalize exact workspace selectors without attributing unscoped monitors to the CLI cwd. */
+function monitorProjectKey(projectDir?: string): string | undefined {
+  if (projectDir === undefined) return undefined;
+  const resolved = path.resolve(projectDir);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
 /**
- * Returns active, inactive, or stale monitor state without changing hardware.
- *
- * @param port - Optional exact port selector.
- * @param projectDir - Optional project scope.
+ * Returns identity-verified durable monitor state without starting watchers or changing hardware.
+ * @param port - Optional canonical endpoint selector.
+ * @param projectDir - Optional exact owning workspace.
  * @returns One status record when selected, otherwise all matching records.
  */
 export function getMonitorStatus(
@@ -877,40 +889,67 @@ export function getMonitorStatus(
   projectDir?: string,
 ): MonitorStatusResult | { monitors: MonitorStatusResult[] } {
   if (port) port = canonicalPortName(port);
-  const trackedPids = getActiveMonitorPids(projectDir);
-  const statuses = Object.entries(activeDaemons)
-    .filter(
-      ([activePort, daemon]) =>
-        (!port || activePort === port) &&
+  const persisted = getPersistedMonitorStatuses(projectDir);
+  const ports = new Set([
+    ...persisted.map((record) => record.port),
+    ...Object.entries(activeDaemons)
+      .filter(
+        ([, daemon]) =>
+          !projectDir ||
+          monitorProjectKey(daemon.projectDir) ===
+            monitorProjectKey(projectDir),
+      )
+      .map(([activePort]) => activePort),
+  ]);
+  const statuses = [...ports]
+    .filter((activePort) => !port || activePort === port)
+    .map((activePort): MonitorStatusResult => {
+      const record = persisted.find(
+        (candidate) => candidate.port === activePort,
+      );
+      const candidateDaemon = activeDaemons[activePort];
+      const daemon =
+        candidateDaemon &&
+        (!record ||
+          (record.taskId === candidateDaemon.taskId &&
+            Boolean(record.taskId) &&
+            monitorProjectKey(record.projectDir) ===
+              monitorProjectKey(candidateDaemon.projectDir))) &&
         (!projectDir ||
-          path.resolve(daemon.projectDir ?? "") === path.resolve(projectDir)),
-    )
-    .map(([activePort, daemon]): MonitorStatusResult => {
+          monitorProjectKey(candidateDaemon.projectDir) ===
+            monitorProjectKey(projectDir))
+          ? candidateDaemon
+          : undefined;
+      const logFile = record?.logFile ?? daemon?.logFile;
       let size = 0;
-      let lastActivityAt = daemon.lastActivityAt;
+      let lastActivityAt = daemon?.lastActivityAt;
+      let logAvailable = false;
       try {
-        const stats = fs.statSync(daemon.logFile);
-        size = stats.size;
-        lastActivityAt = lastActivityAt ?? stats.mtime.toISOString();
+        const stats = logFile ? fs.statSync(logFile) : undefined;
+        if (stats) {
+          size = stats.size;
+          lastActivityAt = lastActivityAt ?? stats.mtime.toISOString();
+          logAvailable = stats.isFile();
+        }
       } catch {
         // A missing spool file is represented as stale below.
       }
-      const trackedPid = trackedPids[activePort];
       const stale =
-        !fs.existsSync(daemon.logFile) ||
-        trackedPid === undefined ||
-        !isPidAlive(trackedPid);
+        record?.state !== "active" || (Boolean(logFile) && !logAvailable);
       return {
         state: stale ? "stale" : "active",
         port: activePort,
-        baudRate: daemon.baudRate,
-        environment: daemon.environment,
-        projectDir: daemon.projectDir,
-        taskId: daemon.taskId,
-        leaseOwner: captureLeases.get(activePort)?.leaseId,
-        logPath: daemon.logFile,
-        cursor: encodeMonitorCursor(daemon.logFile, size),
-        startedAt: daemon.startedAt,
+        baudRate: record?.baudRate ?? daemon?.baudRate,
+        environment: record?.environment ?? daemon?.environment,
+        projectDir: record?.projectDir ?? daemon?.projectDir,
+        taskId: record?.taskId ?? daemon?.taskId,
+        leaseOwner: daemon ? captureLeases.get(activePort)?.leaseId : undefined,
+        logPath: logFile,
+        cursor:
+          logAvailable && logFile
+            ? encodeMonitorCursor(logFile, size)
+            : undefined,
+        startedAt: record?.startedAt ?? daemon?.startedAt,
         lastActivityAt,
       };
     });

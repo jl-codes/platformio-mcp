@@ -6,7 +6,11 @@ import {
   updateLibrary,
 } from "../../tools/libraries.js";
 import { PlatformIOError } from "../../utils/errors.js";
-import { asString, parseNumberOption } from "../args.js";
+import {
+  asString,
+  parseNumberOption,
+  validateNumericCommandOptions,
+} from "../args.js";
 import type { CommandContext, CommandHandler } from "./types.js";
 
 function requireArg(ctx: CommandContext, index: number, name: string): string {
@@ -22,6 +26,7 @@ function requireArg(ctx: CommandContext, index: number, name: string): string {
 }
 
 export const lib: CommandHandler = async (ctx) => {
+  validateNumericCommandOptions("lib", ctx.options, ctx.positionals);
   const sub = ctx.positionals[0];
   const projectDir = asString(ctx.options["project-dir"]);
 
