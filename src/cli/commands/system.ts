@@ -7,7 +7,12 @@ import {
   issueDashboardLaunchUrl,
   startPortalServer,
 } from "../../api/server.js";
-import { asBoolean, asString, parseNumberOption } from "../args.js";
+import {
+  asBoolean,
+  asString,
+  parseNumberOption,
+  validateNumericCommandOptions,
+} from "../args.js";
 import { PlatformIOError } from "../../utils/errors.js";
 import type { CommandHandler } from "./types.js";
 
@@ -48,6 +53,7 @@ export const systemInfo: CommandHandler = async () => getSystemInfo();
  * whether one is already running, and must get a side-effect-free answer.
  */
 export const dashboard: CommandHandler = async (ctx) => {
+  validateNumericCommandOptions("dashboard", ctx.options);
   // Browser sessions are minted from single-use launch tickets that live in
   // the serving process, so an operator session can only be issued by the
   // process that binds the listener: --operator is a serve-mode option.

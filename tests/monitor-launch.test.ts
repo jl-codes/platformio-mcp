@@ -26,6 +26,10 @@ afterAll(() => {
 const state = vi.hoisted(() => ({
   spawn: vi.fn(),
   pids: {} as Record<string, number>,
+  records: {} as Record<
+    string,
+    import("../src/utils/process-manager.js").PersistedMonitorStatus
+  >,
   alive: true,
 }));
 vi.mock("../src/platformio.js", () => ({
@@ -35,14 +39,41 @@ vi.mock("../src/tools/devices.js", () => ({
   findDeviceByPort: async () => ({ hwid: "test" }),
 }));
 vi.mock("../src/utils/process-manager.js", () => ({
-  registerPioMonitorPid: async (port: string, pid: number) => {
+  registerPioMonitorPid: async (
+    port: string,
+    pid: number,
+    projectDir?: string,
+    _root?: string,
+    logFile?: string,
+    taskId?: string,
+    _command?: string,
+    details?: import("../src/utils/process-manager.js").MonitorRegistrationDetails,
+  ) => {
     state.pids[port] = pid;
+    state.records[port] = {
+      port,
+      pid,
+      state: "active",
+      projectDir,
+      logFile,
+      taskId,
+      ...details,
+    };
   },
   killPioMonitorByPort: async (port: string) => {
     delete state.pids[port];
     return true;
   },
   getActiveMonitorPids: () => state.pids,
+  getPersistedMonitorStatuses: (projectDir?: string) =>
+    Object.entries(state.pids)
+      .map(([port, pid]) => ({
+        ...state.records[port],
+        port,
+        pid,
+        state: state.alive ? "active" : "stale",
+      }))
+      .filter((record) => !projectDir || record.projectDir === projectDir),
   isPidAlive: () => state.alive,
   isBuildActive: () => false,
 }));
@@ -80,7 +111,39 @@ afterEach(async () => {
     fs.rmSync(root, { recursive: true, force: true });
   vi.clearAllMocks();
   state.pids = {};
+  state.records = {};
   state.alive = true;
+});
+
+it("does not blend an old in-memory daemon into a replacement persisted monitor", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-monitor-launch-"));
+  roots.push(root);
+  state.spawn.mockImplementation(async () =>
+    Object.assign(new EventEmitter(), { pid: 12345, unref: vi.fn() }),
+  );
+  await startMonitor("COM42", 115200, root, "old-environment");
+  state.pids.COM42 = 54321;
+  state.records.COM42 = {
+    port: "COM42",
+    pid: 54321,
+    state: "active",
+    projectDir: `${root}-replacement`,
+    taskId: "replacement-task",
+  };
+  const status = getMonitorStatus("COM42");
+  expect(status).toMatchObject({
+    state: "active",
+    taskId: "replacement-task",
+    projectDir: `${root}-replacement`,
+  });
+  expect(status).toMatchObject({
+    baudRate: undefined,
+    environment: undefined,
+    logPath: undefined,
+    cursor: undefined,
+    lastActivityAt: undefined,
+    leaseOwner: undefined,
+  });
 });
 it("retains configured filtering and exposes a dead or missing tracked process as stale", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pio-monitor-launch-"));

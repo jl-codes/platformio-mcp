@@ -1,9 +1,14 @@
 import { queryLogs, captureSerialWindow } from "../../tools/monitor.js";
 import { PlatformIOError } from "../../utils/errors.js";
-import { asString, parseNumberOption } from "../args.js";
+import {
+  asString,
+  parseNumberOption,
+  validateNumericCommandOptions,
+} from "../args.js";
 import type { CommandHandler } from "./types.js";
 
 export const logs: CommandHandler = async (ctx) => {
+  validateNumericCommandOptions("logs", ctx.options, ctx.positionals);
   const sub = ctx.positionals[0];
   const projectDir = asString(ctx.options["project-dir"]);
 

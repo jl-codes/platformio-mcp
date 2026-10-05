@@ -12,7 +12,7 @@ import {
   listApprovalRequests,
   listPendingApprovalSummaries,
 } from "../../core/policy/approvals.js";
-import { asString, asNumber } from "../args.js";
+import { asString, asNumber, validateNumericCommandOptions } from "../args.js";
 import { PlatformIOError } from "../../utils/errors.js";
 import type { CommandHandler } from "./types.js";
 
@@ -24,6 +24,7 @@ export const policyStatus: CommandHandler = async (ctx) => {
 };
 
 export const approvals: CommandHandler = async (ctx) => {
+  validateNumericCommandOptions("approvals", ctx.options);
   const status = asString(ctx.options.status) as
     | "pending"
     | "approved"
@@ -31,7 +32,7 @@ export const approvals: CommandHandler = async (ctx) => {
     | "expired"
     | "consumed"
     | undefined;
-  const limit = asNumber(ctx.options.limit);
+  const limit = asNumber(ctx.options.limit, "limit");
   return listApprovalRequests({ status, limit });
 };
 
@@ -55,9 +56,10 @@ export const approvalStatus: CommandHandler = async (ctx) => {
 };
 
 export const pendingApprovals: CommandHandler = async (ctx) => {
+  validateNumericCommandOptions("pending-approvals", ctx.options);
   const params = ListPendingApprovalsParamsSchema.parse({
     projectDir: asString(ctx.options["project-dir"]),
-    limit: asNumber(ctx.options.limit),
+    limit: asNumber(ctx.options.limit, "limit"),
   });
   const result = listPendingApprovalSummaries(params);
   return { approvals: result };

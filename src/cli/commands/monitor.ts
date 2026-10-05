@@ -17,12 +17,14 @@ import {
   asNumber,
   asCsv,
   normalizePortOption,
+  validateNumericCommandOptions,
 } from "../args.js";
 import type { CommandHandler } from "./types.js";
 
 export const monitor: CommandHandler = async (ctx) => {
+  validateNumericCommandOptions("monitor", ctx.options);
   const { options, jsonMode } = ctx;
-  const timeoutSeconds = asNumber(options.timeout) ?? 30;
+  const timeoutSeconds = asNumber(options.timeout, "timeout") ?? 30;
   const expect = asString(options.expect);
   const background = asBoolean(options.background) ?? false;
 
@@ -109,18 +111,22 @@ export const monitorStop: CommandHandler = async (ctx) => {
 };
 
 export const monitorHealth: CommandHandler = async (ctx) => {
+  validateNumericCommandOptions("monitor-health", ctx.options);
   const params = AgentMonitorHealthParamsSchema.parse({
     projectDir: asString(ctx.options["project-dir"]),
     environment: asString(ctx.options.environment),
     port: normalizePortOption(asString(ctx.options.port)),
-    baudRate: asNumber(ctx.options["baud-rate"]),
-    captureDurationSeconds: asNumber(ctx.options.duration),
-    maxBytes: asNumber(ctx.options["max-bytes"]),
+    baudRate: asNumber(ctx.options["baud-rate"], "baud-rate"),
+    captureDurationSeconds: asNumber(ctx.options.duration, "duration"),
+    maxBytes: asNumber(ctx.options["max-bytes"], "max-bytes"),
     expectedMarkers: asCsv(ctx.options["expect-all"]),
     rejectedPatterns: asCsv(ctx.options["reject-patterns"]),
     automationKey: asString(ctx.options["automation-key"]),
     cursor: asString(ctx.options.cursor),
-    failureThreshold: asNumber(ctx.options["failure-threshold"]),
+    failureThreshold: asNumber(
+      ctx.options["failure-threshold"],
+      "failure-threshold",
+    ),
   });
   return agentMonitorHealth(params);
 };

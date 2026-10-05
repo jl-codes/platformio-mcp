@@ -21,6 +21,7 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import treeKill from "tree-kill";
 import lockfile from "proper-lockfile";
+import { z } from "zod";
 import { logDiagnostic as logDiag } from "./logger.js";
 import {
   registerCommand,
@@ -39,6 +40,123 @@ const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOCKS_DIR = "locks";
 const SERIAL_PIDS_FILE = "monitor-pids.json";
 const BUILD_PIDS_FILE = "active_tasks.json";
+
+/** Optional durable monitor context, independent of the rotating command history. */
+export interface MonitorRegistrationDetails {
+  baudRate?: number; // Effective unfiltered serial baud rate.
+  environment?: string; // Project-defined monitor environment.
+  startedAt?: string; // ISO timestamp of the monitor's startup.
+}
+
+/** Read-only monitor record whose process start identity has been checked. */
+export interface PersistedMonitorStatus extends MonitorRegistrationDetails {
+  port: string; // Canonical endpoint selector.
+  pid: number; // Persisted child PID, not authority to terminate it.
+  state: "active" | "stale"; // Unknown identity is conservatively stale.
+  projectDir?: string; // Exact owning workspace, if durably recorded.
+  logFile?: string; // Spool file associated with this child.
+  taskId?: string; // Stable monitor task identifier.
+}
+
+const ProcessIdentitySchema = z.object({
+  pid: z.number().int().min(1).max(2147483647),
+  platform: z.enum([
+    "aix",
+    "android",
+    "darwin",
+    "freebsd",
+    "haiku",
+    "linux",
+    "openbsd",
+    "sunos",
+    "win32",
+    "cygwin",
+    "netbsd",
+  ]),
+  startToken: z.string().min(1).max(8192),
+});
+const MonitorMetadataSchema = z.object({
+  pid: z.number().int().min(1).max(2147483647),
+  identity: ProcessIdentitySchema.optional(),
+  projectDir: z.string().min(1).max(32768).optional(),
+  logFile: z.string().min(1).max(32768).optional(),
+  taskId: z.string().min(1).max(512).optional(),
+  startedAt: z.string().datetime().optional(),
+  baudRate: z.number().int().positive().max(10000000).optional(),
+  environment: z.string().min(1).max(512).optional(),
+});
+type MonitorMetadata = z.infer<typeof MonitorMetadataSchema>;
+
+/** Read bounded registry JSON without creating files or recovering ownership. */
+function readMonitorRegistry<T>(
+  file: string,
+  schema: z.ZodType<T>,
+  empty: unknown = {},
+): T {
+  try {
+    if (!fs.existsSync(file)) return schema.parse(empty);
+    if (fs.statSync(file).size > 1024 * 1024)
+      throw new Error("Registry exceeds limits");
+    return schema.parse(JSON.parse(fs.readFileSync(file, "utf8")));
+  } catch (error) {
+    throw new PlatformIOError(
+      "Persisted monitor registry is unreadable or invalid.",
+      "MONITOR_REGISTRY_INVALID",
+      { file, detail: error instanceof Error ? error.message : undefined },
+    );
+  }
+}
+
+/** Recover pre-metadata context only from a PID-and-port-matched task in the selected registry. */
+function readLegacyMonitorContext(
+  port: string,
+  pid: number,
+  projectDir?: string,
+): MonitorMetadata | undefined {
+  const file = path.join(
+    projectDir ? path.resolve(projectDir) : SERVER_DATA_DIR,
+    WORKSPACE_DIR,
+    "registry",
+    "command_history.json",
+  );
+  const history = readMonitorRegistry(
+    file,
+    z.array(
+      z.object({
+        timestamp: z.number().finite().nonnegative().max(8640000000000000),
+        tasks: z.array(
+          z.object({
+            type: z.string(),
+            status: z.string(),
+            pid: z.number().int().positive().optional(),
+            port: z.string().max(512).optional(),
+            taskId: z.string().max(512).optional(),
+            logPaths: z.array(z.string().min(1).max(32768)).optional(),
+          }),
+        ),
+      }),
+    ),
+    [],
+  );
+  for (const command of [...history].reverse()) {
+    const task = command.tasks.find(
+      (candidate) =>
+        candidate.type === "monitor" &&
+        candidate.status === "running" &&
+        candidate.pid === pid &&
+        sameMonitorPort(candidate.port, port),
+    );
+    if (task)
+      return {
+        pid,
+        projectDir: projectDir ? path.resolve(projectDir) : undefined,
+        taskId: task.taskId,
+        logFile: task.logPaths?.[0],
+        startedAt: new Date(command.timestamp).toISOString(),
+      };
+  }
+  return undefined;
+}
 
 /**
  * Gets the absolute path to the PID tracking file.
@@ -125,6 +243,7 @@ export async function registerPioMonitorPid(
   logFile?: string,
   taskId?: string,
   commandDesc?: string,
+  details: MonitorRegistrationDetails = {},
 ): Promise<void> {
   const canonicalPort = canonicalPortName(port);
   const pidsFile = getPidsFilePath(projectDir);
@@ -142,6 +261,10 @@ export async function registerPioMonitorPid(
         pids = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
       } catch {}
       const identities = readMonitorIdentities(pidsFile);
+      const metadata = readMonitorRegistry(
+        pidsFile + ".metadata.json",
+        z.record(MonitorMetadataSchema),
+      );
       const matchingKeys = monitorRegistryKeys(pids, canonicalPort);
       for (const key of matchingKeys) {
         if (
@@ -157,11 +280,26 @@ export async function registerPioMonitorPid(
       for (const key of matchingKeys) {
         delete pids[key];
         delete identities[key];
+        delete metadata[key];
       }
       const observed = inspectProcessIdentity(pid);
       if (observed.status === "running")
         identities[canonicalPort] = observed.identity;
       else delete identities[canonicalPort];
+      metadata[canonicalPort] = MonitorMetadataSchema.parse({
+        pid,
+        identity: observed.status === "running" ? observed.identity : undefined,
+        projectDir: projectDir ? path.resolve(projectDir) : undefined,
+        logFile,
+        taskId,
+        startedAt: details.startedAt ?? new Date().toISOString(),
+        baudRate: details.baudRate,
+        environment: details.environment,
+      });
+      fs.writeFileSync(
+        pidsFile + ".metadata.json",
+        JSON.stringify(metadata, null, 2),
+      );
       fs.writeFileSync(
         pidsFile + ".identities.json",
         JSON.stringify(identities, null, 2),
@@ -230,15 +368,24 @@ export async function unregisterPioMonitorPid(
         const matchingKeys = monitorRegistryKeys(pids, canonicalPort);
         if (matchingKeys.length > 0) {
           const identities = readMonitorIdentities(pidsFile);
+          const metadata = readMonitorRegistry(
+            pidsFile + ".metadata.json",
+            z.record(MonitorMetadataSchema),
+          );
           for (const key of matchingKeys) {
             delete pids[key];
             delete identities[key];
+            delete metadata[key];
           }
           fs.writeFileSync(
             pidsFile + ".identities.json",
             JSON.stringify(identities, null, 2),
           );
           fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+          fs.writeFileSync(
+            pidsFile + ".metadata.json",
+            JSON.stringify(metadata, null, 2),
+          );
         }
       } finally {
         await release();
@@ -355,15 +502,24 @@ export async function killPioMonitorByPort(
         );
     }
     const identities = readMonitorIdentities(pidsFile);
+    const metadata = readMonitorRegistry(
+      pidsFile + ".metadata.json",
+      z.record(MonitorMetadataSchema),
+    );
     for (const key of matchingKeys) {
       delete pids[key];
       delete identities[key];
+      delete metadata[key];
     }
     fs.writeFileSync(
       pidsFile + ".identities.json",
       JSON.stringify(identities, null, 2),
     );
     fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
+    fs.writeFileSync(
+      pidsFile + ".metadata.json",
+      JSON.stringify(metadata, null, 2),
+    );
   } finally {
     await release();
   }
@@ -456,6 +612,104 @@ export function getActiveMonitorPids(
   } catch {
     return {};
   }
+}
+
+/**
+ * Reads durable monitor context and verifies the exact child start identity.
+ * This query neither starts watchers nor creates, recovers, or removes registry records.
+ * @param projectDir - Optional exact owning workspace selector.
+ * @returns Canonical monitor records; missing or unverifiable identities remain stale.
+ */
+export function getPersistedMonitorStatuses(
+  projectDir?: string,
+): PersistedMonitorStatus[] {
+  const pidsFile = path.join(
+    SERVER_DATA_DIR,
+    "serial_monitors",
+    SERIAL_PIDS_FILE,
+  );
+  const pids = readMonitorRegistry(
+    pidsFile,
+    z.record(z.number().int().min(1).max(2147483647)),
+  );
+  const identities = readMonitorRegistry(
+    pidsFile + ".identities.json",
+    z.record(ProcessIdentitySchema),
+  );
+  const metadata = readMonitorRegistry(
+    pidsFile + ".metadata.json",
+    z.record(MonitorMetadataSchema),
+  );
+  const records = new Map<
+    string,
+    { keys: string[]; pid: number; resolved: boolean }
+  >();
+  for (const [port, pid] of Object.entries(pids)) {
+    let canonical = port;
+    let resolved = true;
+    try {
+      canonical = canonicalPortName(port);
+    } catch {
+      resolved = false;
+    }
+    const previous = records.get(canonical);
+    if (previous && previous.pid !== pid) {
+      throw new PlatformIOError(
+        "Conflicting monitor aliases in PID registry.",
+        "MONITOR_REGISTRY_INVALID",
+        { port: canonical },
+      );
+    }
+    if (previous) previous.keys.push(port);
+    else records.set(canonical, { keys: [port], pid, resolved });
+  }
+  const statuses: PersistedMonitorStatus[] = [];
+  for (const [port, record] of records) {
+    const identity = record.keys
+      .map((key) => identities[key])
+      .find((value) => value?.pid === record.pid);
+    const hasMetadata = record.keys.some((key) => metadata[key] !== undefined);
+    const context: MonitorMetadata | undefined =
+      record.keys
+        .map((key) => metadata[key])
+        .find(
+          (value) =>
+            value?.pid === record.pid &&
+            value.identity?.pid === identity?.pid &&
+            value.identity?.platform === identity?.platform &&
+            value.identity?.startToken === identity?.startToken,
+        ) ??
+      (!hasMetadata
+        ? readLegacyMonitorContext(port, record.pid, projectDir)
+        : undefined);
+    const owningProject = context?.projectDir
+      ? path.resolve(context.projectDir)
+      : undefined;
+    const selectedProject = projectDir ? path.resolve(projectDir) : undefined;
+    const sameProject =
+      process.platform === "win32"
+        ? owningProject?.toLowerCase() === selectedProject?.toLowerCase()
+        : owningProject === selectedProject;
+    if (projectDir && !sameProject) continue;
+    const proven =
+      record.resolved &&
+      identity &&
+      (!hasMetadata || context) &&
+      compareProcessIdentity(identity, inspectProcessIdentity(record.pid)) ===
+        "alive";
+    statuses.push({
+      port,
+      pid: record.pid,
+      state: proven ? "active" : "stale",
+      projectDir: context?.projectDir,
+      logFile: context?.logFile,
+      taskId: context?.taskId,
+      startedAt: context?.startedAt,
+      baudRate: context?.baudRate,
+      environment: context?.environment,
+    });
+  }
+  return statuses;
 }
 
 /**

@@ -239,6 +239,76 @@ describe("global flags are not swallowed by commands", () => {
 });
 
 describe("--background returns immediately", () => {
+  it("rejects invalid numeric input before background dispatch or approval writes", async () => {
+    const testDir = fs.mkdtempSync(path.join(os.tmpdir(), "pio-bg-numeric-"));
+    const projectDir = path.join(testDir, "project");
+    const dataDir = path.join(testDir, "operator");
+    fs.mkdirSync(projectDir);
+    fs.mkdirSync(dataDir);
+    try {
+      const result = await new Promise<{
+        code: number | null;
+        out: string;
+        err: string;
+      }>((resolve, reject) => {
+        const child = spawn(
+          process.execPath,
+          [
+            "build/cli.js",
+            "build",
+            "--project-dir",
+            projectDir,
+            "--jobs=bogus",
+            "--background",
+            "--approve",
+            "--json",
+          ],
+          {
+            stdio: ["ignore", "pipe", "pipe"],
+            env: {
+              ...process.env,
+              PIO_MCP_DATA_DIR: dataDir,
+              PIO_MCP_POLICY_FILE: undefined,
+            },
+          },
+        );
+        let out = "";
+        let err = "";
+        const timer = setTimeout(() => child.kill("SIGKILL"), 10000);
+        child.stdout.on("data", (value) => {
+          out += String(value);
+        });
+        child.stderr.on("data", (value) => {
+          err += String(value);
+        });
+        child.once("error", (error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+        child.once("close", (code) => {
+          clearTimeout(timer);
+          resolve({ code, out, err });
+        });
+      });
+      expect(result.code).toBe(1);
+      expect(result.out).toBe("");
+      expect(JSON.parse(result.err)).toMatchObject({
+        errorType: "InvalidArgument",
+        summary: expect.stringContaining("--jobs"),
+      });
+      expect(fs.readdirSync(projectDir)).toEqual([]);
+      // Import-time serial-lock setup may create empty directories; no task,
+      // approval, or policy-audit file may be written for rejected input.
+      expect(
+        fs
+          .readdirSync(dataDir, { recursive: true, withFileTypes: true })
+          .filter((entry) => entry.isFile()),
+      ).toEqual([]);
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   it("prints status running with a task id and exits before the work finishes", async () => {
     // The spooler's background mode keeps the parent alive to do completion
     // bookkeeping, so `build --background` printed {status:"running"} and then
@@ -263,10 +333,17 @@ describe("--background returns immediately", () => {
             "--project-dir",
             projectDir,
             "--background",
-            "--jobs=0",
+            "--environment=invalid environment !",
             "--json",
           ],
-          { stdio: ["ignore", "pipe", "pipe"] },
+          {
+            stdio: ["ignore", "pipe", "pipe"],
+            env: {
+              ...process.env,
+              PIO_MCP_DATA_DIR: path.join(projectDir, "operator"),
+              PIO_MCP_POLICY_FILE: undefined,
+            },
+          },
         );
         let out = "";
         child.stdout.on("data", (c) => (out += String(c)));
@@ -316,7 +393,7 @@ describe("--background returns immediately", () => {
   }, 30000);
 
   it("keeps the selected policy, consumes approval once, and records worker startup failure", async () => {
-    // Invalid jobs fail before PlatformIO or hardware execution. Requiring a
+    // Invalid environments fail before PlatformIO or hardware execution. Requiring a
     // one-use approval also bounds any accidental recursive dispatch in this
     // real-process regression test: a second worker cannot replay the grant.
     const testDir = fs.mkdtempSync(path.join(os.tmpdir(), "pio-bg-policy-"));
@@ -354,7 +431,7 @@ describe("--background returns immediately", () => {
             "build",
             "--project-dir",
             projectDir,
-            "--jobs=0",
+            "--environment=invalid environment !",
             "--background",
             "--json=true",
             "--approve",
