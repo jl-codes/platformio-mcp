@@ -79,6 +79,7 @@ const { portSemaphoreManager, PortBusyError } =
   await import("../src/utils/semaphore.js");
 const { PlatformIOError } = await import("../src/utils/errors.js");
 const processIdentity = await import("../src/core/devices/process-identity.js");
+const serialEndpoint = await import("../src/core/devices/serial-endpoint.js");
 const port = "COM42";
 const fixturePorts = new Set([port]);
 
@@ -242,6 +243,54 @@ describe("monitor operation safety", () => {
     expect(getSpoolerStates()[port]).toBeUndefined();
   });
 
+  it("rejects endpoint changes before preempting a monitor", async () => {
+    vi.mocked(serialEndpoint.resolveSerialEndpoint).mockReturnValueOnce({
+      requestedPort: port,
+      canonicalPort: port,
+      resource: { kind: "serial", identity: `monitor-test:${port}` },
+      revalidate: () => {
+        throw new PlatformIOError(
+          "Endpoint changed",
+          "SERIAL_ENDPOINT_CHANGED",
+        );
+      },
+      identityBasis: "windows-port-name",
+      presence: "unverified",
+      survivesReenumeration: false,
+    });
+    await expect(startMonitor(port, 115200, testDataDir)).rejects.toMatchObject(
+      {
+        code: "SERIAL_ENDPOINT_CHANGED",
+      },
+    );
+    expect(dependencies.kill).not.toHaveBeenCalled();
+    expect(dependencies.spawn).not.toHaveBeenCalled();
+    expect(portSemaphoreManager.getClaim(port)).toBeNull();
+  });
+
+  it("publishes child custody even when closing its log descriptor fails", async () => {
+    const realClose = fs.closeSync;
+    let logDescriptor: number | undefined;
+    dependencies.spawn.mockImplementationOnce((_command, _args, options) => {
+      logDescriptor = options.stdio[1];
+      return fakeChild();
+    });
+    vi.spyOn(fs, "closeSync").mockImplementation((descriptor) => {
+      realClose(descriptor);
+      if (descriptor === logDescriptor) {
+        logDescriptor = undefined;
+        throw new Error("Fixture descriptor close error");
+      }
+    });
+    await expect(
+      startMonitor(port, 115200, testDataDir),
+    ).resolves.toMatchObject({
+      success: true,
+    });
+    expect(dependencies.register).toHaveBeenCalled();
+    expect(portSemaphoreManager.getClaim(port)?.monitor_pid).toBe(process.pid);
+  });
+
   it("rejects concurrent monitor starts before a second child can spawn", async () => {
     let releaseSpawn!: (child: ChildProcess) => void;
     dependencies.spawn.mockImplementationOnce(
@@ -341,6 +390,15 @@ describe("monitor operation safety", () => {
         return originalRealpath(target, options);
       },
     );
+    vi.mocked(serialEndpoint.resolveSerialEndpoint).mockReturnValueOnce({
+      requestedPort: alias,
+      canonicalPort: nativePort,
+      resource: { kind: "serial", identity: `monitor-test:${nativePort}` },
+      revalidate: vi.fn(),
+      identityBasis: "unix-device-number",
+      presence: "character-device",
+      survivesReenumeration: false,
+    });
     await startMonitor(alias, 115200, testDataDir);
     expect(getSpoolerStates()[nativePort]).toBeDefined();
     expect(getSpoolerStates()[alias]).toBeUndefined();

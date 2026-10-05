@@ -365,7 +365,15 @@ async function spawnPioMonitor(
       },
     );
   } finally {
-    fs.closeSync(outFd);
+    try {
+      fs.closeSync(outFd);
+    } catch (error) {
+      // A descriptor-close error must not skip custody publication for a live child.
+      void logDiag(
+        `[Spooler] Failed to close monitor log descriptor: ${error}`,
+        projectDir,
+      ).catch(() => {});
+    }
   }
 
   const observation = proc.pid
@@ -589,10 +597,10 @@ export async function startMonitor(
   if (baud && !validateBaudRate(baud))
     throw new PlatformIOError(`Invalid baud rate: ${baud}`, "INVALID_BAUD");
 
-  const requestedPort = activePort;
-  const targetPort = canonicalPortName(requestedPort);
+  const endpoint = resolveSerialEndpoint(activePort);
+  const targetPort = endpoint.canonicalPort;
   return withMonitorTransition(targetPort, async () => {
-    const endpoint = resolveSerialEndpoint(requestedPort);
+    endpoint.revalidate();
     assertMonitorCustodyAvailable(endpoint);
     // Relinquish previous bindings safely if re-invoked
     await stopMonitorPort(targetPort, projectDir);
