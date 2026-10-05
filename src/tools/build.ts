@@ -729,6 +729,8 @@ export async function checkTaskStatus(taskId?: string, logPath?: string, project
     const cmd = history.find(c => c.id === resolvedTaskId);
     if (cmd) {
       status = cmd.status;
+      // A detached worker can fail validation before it creates a spool log.
+      output = cmd.error ?? "";
       logPaths = cmd.tasks
         .flatMap(a => a.logPaths || [])
         .filter((f): f is string => Boolean(f));

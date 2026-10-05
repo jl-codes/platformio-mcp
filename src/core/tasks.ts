@@ -1,13 +1,14 @@
+/**
+ * Project-scoped task status, history, and cancellation.
+ * Cancellation becomes terminal only after process cleanup succeeds.
+ */
 import { checkTaskStatus } from "../tools/build.js";
 import {
   findCommandAcrossWorkspaces,
   getCommandHistory,
   updateTaskStatus,
 } from "../utils/command-registry.js";
-import type {
-  CommandRecord,
-  TaskRecord,
-} from "../utils/command-registry.js";
+import type { CommandRecord, TaskRecord } from "../utils/command-registry.js";
 import {
   killTrackedTaskProcess,
   sweepGhostTasks,
@@ -26,10 +27,16 @@ export async function checkTaskStatusCore(input: TaskStatusCoreInput) {
 }
 
 export async function checkTaskStatusSummaryCore(input: TaskStatusCoreInput) {
-  const raw = await checkTaskStatus(input.taskId, input.logPath, input.projectDir);
+  const raw = await checkTaskStatus(
+    input.taskId,
+    input.logPath,
+    input.projectDir,
+  );
   const commandId = raw.taskId;
   const history = getCommandHistory(input.projectDir);
-  const cmd = commandId ? history.find((item) => item.id === commandId) : undefined;
+  const cmd = commandId
+    ? history.find((item) => item.id === commandId)
+    : undefined;
   const firstTask = cmd?.tasks?.[0];
 
   return {
@@ -85,7 +92,8 @@ export async function listTaskHistoryCore(input: {
     .filter((task) => !input.status || task.status === input.status)
     .sort(
       (left, right) =>
-        new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime(),
+        new Date(right.startedAt).getTime() -
+        new Date(left.startedAt).getTime(),
     )
     .slice(0, Math.min(100, Math.max(1, input.limit ?? 20)));
   return { tasks, observedAt: new Date().toISOString() };
@@ -167,13 +175,6 @@ export async function cancelTaskCore(input: {
     };
   }
 
-  await updateTaskStatus(
-    resolved.command.id,
-    resolved.task.taskId,
-    { status: "terminated", error: "Cancelled by MCP request." },
-    resolved.projectDir,
-  );
-
   let processTerminated = false;
   if (resolved.task.type === "monitor" && resolved.task.port) {
     await stopMonitor(resolved.task.port, resolved.projectDir);
@@ -184,6 +185,15 @@ export async function cancelTaskCore(input: {
       resolved.projectDir,
     );
   }
+
+  // Failed or unverified cleanup must leave the task retryable. Publishing a
+  // terminal state first would make the next cancellation skip a live process.
+  await updateTaskStatus(
+    resolved.command.id,
+    resolved.task.taskId,
+    { status: "terminated", error: "Cancelled by MCP request." },
+    resolved.projectDir,
+  );
 
   return {
     success: true,

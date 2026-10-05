@@ -13,9 +13,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
+import type { ChildProcess } from "node:child_process";
+import treeKill from "tree-kill";
 import { validateSerialPort, validateBaudRate } from "../utils/validation.js";
 import { PlatformIOError } from "../utils/errors.js";
-import { portSemaphoreManager } from "../utils/semaphore.js";
+import { portSemaphoreManager, PortBusyError } from "../utils/semaphore.js";
+import { canonicalPortName } from "../utils/paths.js";
+import { waitForOwnedProcess } from "../utils/owned-process-wait.js";
+import {
+  compareProcessIdentity,
+  inspectProcessIdentity,
+  type ProcessObservation,
+} from "../core/devices/process-identity.js";
 import { getFirstDevice } from "./devices.js";
 import {
   registerPioMonitorPid,
@@ -54,15 +63,19 @@ type DaemonContext = {
   projectDir?: string; // Workspace that owns the monitor log
   startedAt: string; // Monitor start or rehydration timestamp
   lastActivityAt?: string; // Last observed log write timestamp
+  operationId?: string; // Claim ownership retained across asynchronous monitor startup.
 };
 
 // Global pool of hardware streams managed by the MCP server
 const activeDaemons: Record<string, DaemonContext> = {};
+/** Reject overlapping startup/stop transitions before either can overwrite a child. */
+const monitorTransitions = new Set<string>();
 const captureLeases = new Map<
   string,
   { leaseId: string; acquiredAt: string; projectDir: string }
 >();
 
+/** Return serial monitor metadata without active watcher handles. */
 export function getSpoolerStates() {
   const clean: Record<string, Omit<DaemonContext, "watcher" | "poller">> = {};
   for (const [port, daemon] of Object.entries(activeDaemons)) {
@@ -72,6 +85,21 @@ export function getSpoolerStates() {
     clean[port] = rest;
   }
   return clean;
+}
+
+/** Serialize one process's monitor transitions; filesystem claims coordinate other processes. */
+async function withMonitorTransition<T>(
+  port: string,
+  action: () => Promise<T>,
+): Promise<T> {
+  if (monitorTransitions.has(port))
+    throw new PortBusyError(port, portSemaphoreManager.getClaim(port));
+  monitorTransitions.add(port);
+  try {
+    return await action();
+  } finally {
+    monitorTransitions.delete(port);
+  }
 }
 
 function emitNewLogBytes(port: string, daemon: DaemonContext): void {
@@ -129,14 +157,59 @@ function startWindowsPollingFallback(
  * @param projectDir - Optional project directory context.
  */
 export async function stopMonitor(port: string, projectDir?: string) {
+  const activePort = canonicalPortName(port);
+  return withMonitorTransition(activePort, () =>
+    stopMonitorPort(activePort, projectDir),
+  );
+}
+
+/** Stop the captured monitor before removing its watchers or releasing its specific claim. */
+async function stopMonitorPort(
+  port: string,
+  projectDir?: string,
+): Promise<void> {
   logDiag(
     `[Spooler Diagnostic] stopMonitor called for port ${port}.`,
     projectDir,
   );
 
-  if (activeDaemons[port]) {
+  const daemon = activeDaemons[port];
+  const preempted = portSemaphoreManager.getClaim(port);
+  if (
+    preempted?.type === "monitor" &&
+    !(
+      preempted.owner_pid === process.pid &&
+      preempted.hostname === os.hostname()
+    )
+  ) {
+    console.error(
+      `[pio-agent] Stopping a monitor on ${port} started by another process ` +
+        `(PID ${preempted.owner_pid}, workspace ${preempted.owner_workspace}) to take the port.`,
+    );
+  }
+
+  // Identity or exit verification failure is a failed stop. Keep the live
+  // daemon and its claim so callers cannot report success or open the UART.
+  const proven = await killPioMonitorByPort(port, projectDir);
+  const monitorClaim = preempted?.type === "monitor" ? preempted : undefined;
+  const legacyKillProven =
+    proven &&
+    monitorClaim?.hostname === os.hostname() &&
+    typeof monitorClaim.monitor_pid !== "number";
+  if (
+    monitorClaim &&
+    !legacyKillProven &&
+    !portSemaphoreManager.isClaimStale(monitorClaim)
+  ) {
+    throw new PlatformIOError(
+      `Monitor termination could not be confirmed for ${port}. Its port claim was retained.`,
+      "PROCESS_CLEANUP_PENDING",
+      { port, cleanupPending: true },
+    );
+  }
+
+  if (daemon) {
     logDiag(`[Spooler Diagnostic] Deleting activeDaemons context.`, projectDir);
-    const daemon = activeDaemons[port];
     if (daemon.poller) {
       clearInterval(daemon.poller);
       daemon.poller = undefined;
@@ -163,68 +236,66 @@ export async function stopMonitor(port: string, projectDir?: string) {
     }
   }
 
-  logDiag(
-    `[Spooler Diagnostic] Triggering killPioMonitorByPort on ${port}...`,
-    projectDir,
-  );
-  // A flash or a new monitor stops whatever monitor holds the port first, and
-  // since claims are shared across processes that now reaches a monitor some
-  // OTHER session started. That pre-emption is deliberate (see the design
-  // doc), but it must not be silent: the session that loses its monitor gets
-  // no signal, so at least say who is being stopped, and from where.
-  const preempted = portSemaphoreManager.getClaim(port);
-  if (
-    preempted?.type === "monitor" &&
-    !(
-      preempted.owner_pid === process.pid &&
-      preempted.hostname === os.hostname()
-    )
-  ) {
-    console.error(
-      `[pio-agent] Stopping a monitor on ${port} started by another process ` +
-        `(PID ${preempted.owner_pid}` +
-        (preempted.monitor_pid
-          ? `, monitor PID ${preempted.monitor_pid}`
-          : "") +
-        `, workspace ${preempted.owner_workspace}) to take the port.`,
-    );
-  }
-
-  // killPioMonitorByPort verifies the process IDENTITY before and after the
-  // kill and returns true only on a confirmed exit; it throws when the
-  // identity is unavailable or changed. Either non-true outcome means the kill
-  // is not proven, which below falls back to a non-force release.
-  let proven = false;
-  try {
-    proven = await killPioMonitorByPort(port, projectDir);
-  } catch (error) {
-    logDiag(
-      `[Spooler Diagnostic] Monitor kill not proven for ${port}: ${(error as Error).message}`,
-      projectDir,
-    );
-  }
   delete activeDaemons[port];
   portalEvents.emitSpoolerStates(getSpoolerStates());
   logDiag(`[Spooler Diagnostic] killPioMonitorByPort completed.`, projectDir);
 
-  // A monitor claim carries `monitor_pid` -- the detached child that actually
-  // holds the UART -- so isClaimStale can answer definitively and a plain
-  // non-force release is enough: it clears the claim exactly when that child
-  // is gone. `force` remains only as a fallback for claims with no
-  // monitor_pid (written before the field existed, or by a host that does
-  // not set it); there the rule is a proven kill AND the same host, because a
-  // kill proven from THIS host's pidsFile says nothing about a claim
-  // published by a different host on shared storage.
+  // Compare the pre-kill snapshot under the guard. A replacement monitor is
+  // never released under the authority of the child that just terminated.
   try {
-    const survivingClaim = portSemaphoreManager.getClaim(port);
-    const hasMonitorPid = typeof survivingClaim?.monitor_pid === "number";
-    portSemaphoreManager.releasePort(port, {
-      force:
-        !hasMonitorPid && proven && survivingClaim?.hostname === os.hostname(),
-      expectedType: "monitor",
-    });
+    if (monitorClaim)
+      portSemaphoreManager.releasePort(port, {
+        force: legacyKillProven,
+        expectedType: "monitor",
+        expectedClaim: monitorClaim,
+        requireStale: !legacyKillProven,
+      });
   } catch {
     // Best-effort; never fail stopMonitor over a claim release.
+  }
+}
+
+/** Terminate an owned startup child tree and confirm exit before releasing the UART claim. */
+async function cleanupSpawnedMonitor(
+  proc: ChildProcess,
+  observation: ProcessObservation,
+): Promise<void> {
+  if (proc.exitCode !== null || proc.signalCode !== null) return;
+  if (
+    !proc.pid ||
+    observation.status !== "running" ||
+    compareProcessIdentity(
+      observation.identity,
+      inspectProcessIdentity(proc.pid),
+    ) !== "alive"
+  ) {
+    throw new PlatformIOError(
+      "Monitor child cleanup requires a verified process identity.",
+      "PROCESS_CLEANUP_PENDING",
+      { cleanupPending: true },
+    );
+  }
+  const exited = waitForOwnedProcess(proc, 2000, 500);
+  void exited.catch(() => {});
+  await new Promise<void>((resolve, reject) =>
+    treeKill(proc.pid!, "SIGKILL", (error) => {
+      if (error)
+        reject(
+          new PlatformIOError(error.message, "PROCESS_CLEANUP_PENDING", {
+            cleanupPending: true,
+          }),
+        );
+      else resolve();
+    }),
+  );
+  try {
+    await exited;
+  } catch (error) {
+    if (
+      !(error instanceof PlatformIOError) ||
+      error.context?.cleanupPending !== false
+    )
+      throw error;
   }
 }
 
@@ -269,7 +340,23 @@ async function spawnPioMonitor(
     fs.closeSync(outFd);
   }
 
-  if (proc.pid) {
+  const observation = proc.pid
+    ? inspectProcessIdentity(proc.pid)
+    : { status: "absent" as const };
+  try {
+    if (
+      !proc.pid ||
+      !portSemaphoreManager.attachMonitorPid(
+        targetPort,
+        proc.pid,
+        daemon.operationId,
+      )
+    ) {
+      throw new PlatformIOError(
+        "Could not record the monitor child on its port claim.",
+        "MONITOR_CLAIM_FAILED",
+      );
+    }
     // Record PID to workspace tracker
     const cliDesc = `pio device monitor ${monitorArgs.join(" ")}`;
     await registerPioMonitorPid(
@@ -281,27 +368,13 @@ async function spawnPioMonitor(
       daemon.taskId,
       cliDesc,
     );
-    // The claim was taken before this child existed and records the LAUNCHER's
-    // pid. Under the CLI that process exits seconds from now while this child
-    // keeps the UART, so without this the claim would read stale and the next
-    // claimer would flash a port this monitor still holds.
-    const attached = portSemaphoreManager.attachMonitorPid(
-      targetPort,
-      proc.pid,
+  } catch (error) {
+    await cleanupSpawnedMonitor(proc, observation);
+    throw new PlatformIOError(
+      error instanceof Error ? error.message : "Monitor startup failed.",
+      "MONITOR_START_FAILED",
+      { cleanupPending: false },
     );
-    if (!attached) {
-      // Not benign: under the CLI the launcher is already exiting, so the
-      // claim immediately reads stale and the next claimer flashes a port this
-      // monitor still holds. Say so rather than leaving a monitor running
-      // behind an unusable claim.
-      logDiag(
-        `[Spooler] WARNING: could not record monitor PID ${proc.pid} on the ` +
-          `claim for ${targetPort}. The claim may read stale while this ` +
-          `monitor still holds the port. Stop it with ` +
-          `\`pio-agent monitor-stop --port ${targetPort}\`.`,
-        projectDir,
-      );
-    }
   }
 
   // Symlink or copy to 'latest-monitor.log' for easy querying
@@ -488,79 +561,100 @@ export async function startMonitor(
   if (baud && !validateBaudRate(baud))
     throw new PlatformIOError(`Invalid baud rate: ${baud}`, "INVALID_BAUD");
 
-  // Relinquish previous bindings safely if re-invoked
-  await stopMonitor(activePort, projectDir);
+  const targetPort = canonicalPortName(activePort);
+  return withMonitorTransition(targetPort, async () => {
+    // Relinquish previous bindings safely if re-invoked
+    await stopMonitorPort(targetPort, projectDir);
 
-  const targetDir = getLogDir("monitor", projectDir);
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
-  }
+    const targetDir = getLogDir("monitor", projectDir);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
 
-  const { logFile } = rotateSpoolerStreams("monitor", projectDir);
+    const { logFile } = rotateSpoolerStreams("monitor", projectDir);
 
-  portSemaphoreManager.claimPort(activePort, "Monitor Daemon");
+    const claim = portSemaphoreManager.claimPort(targetPort, "Monitor Daemon");
 
-  const monitorTaskId = crypto.randomUUID();
+    const monitorTaskId = crypto.randomUUID();
 
-  const daemon: DaemonContext = {
-    baudRate: baud,
-    environment,
-    hwid: activeHwid,
-    logFile,
-    fileOffset: 0,
-    taskId: monitorTaskId,
-    projectDir,
-    startedAt: new Date().toISOString(),
-  };
-  activeDaemons[activePort] = daemon;
+    const daemon: DaemonContext = {
+      baudRate: baud,
+      environment,
+      hwid: activeHwid,
+      logFile,
+      fileOffset: 0,
+      taskId: monitorTaskId,
+      projectDir,
+      startedAt: new Date().toISOString(),
+      operationId: claim.operation_id,
+    };
+    activeDaemons[targetPort] = daemon;
 
-  await spawnPioMonitor(activePort, projectDir, effectiveCommandId);
-
-  // Attach UI portal tailing
-  try {
-    daemon.watcher = fs.watch(logFile, (eventType) => {
-      if (eventType === "change") {
-        try {
-          const stat = fs.statSync(logFile);
-          if (stat.size > (daemon.fileOffset || 0)) {
-            const stream = fs.createReadStream(logFile, {
-              start: daemon.fileOffset || 0,
-              end: stat.size - 1,
-            });
-            stream.on("data", (chunk) => {
-              portalEvents.emitSerialLog(
-                activePort!,
-                chunk.toString(),
-                daemon.taskId,
-              );
-            });
-            daemon.fileOffset = stat.size;
-          }
-        } catch {}
+    try {
+      await spawnPioMonitor(targetPort, projectDir, effectiveCommandId);
+    } catch (error) {
+      const cleanupPending =
+        error instanceof PlatformIOError &&
+        error.context?.cleanupPending === true;
+      if (!cleanupPending) {
+        const current = portSemaphoreManager.getClaim(targetPort);
+        if (current && current.operation_id === claim.operation_id) {
+          portSemaphoreManager.releasePort(targetPort, {
+            expectedClaim: current,
+          });
+        }
+        delete activeDaemons[targetPort];
+        portalEvents.emitSpoolerStates(getSpoolerStates());
       }
-    });
-    daemon.watcher.on("error", () => {
-      // Ignore watcher errors on constrained environments.
-    });
-    // A one-shot CLI must exit once it has printed the monitor's start result;
-    // the detached child keeps the UART, and this watcher only feeds the
-    // dashboard. Long-lived hosts hold their own references.
-    daemon.watcher.unref();
-  } catch {
-    logDiag(`[Spooler] Failed to attach fs.watch to ${logFile}`, projectDir);
-  }
+      throw error;
+    }
 
-  startWindowsPollingFallback(activePort, daemon);
+    // Attach UI portal tailing
+    try {
+      daemon.watcher = fs.watch(logFile, (eventType) => {
+        if (eventType === "change") {
+          try {
+            const stat = fs.statSync(logFile);
+            if (stat.size > (daemon.fileOffset || 0)) {
+              const stream = fs.createReadStream(logFile, {
+                start: daemon.fileOffset || 0,
+                end: stat.size - 1,
+              });
+              stream.on("data", (chunk) => {
+                portalEvents.emitSerialLog(
+                  targetPort,
+                  chunk.toString(),
+                  daemon.taskId,
+                );
+              });
+              daemon.fileOffset = stat.size;
+            }
+          } catch {}
+        }
+      });
+      daemon.watcher.on("error", () => {
+        // Ignore watcher errors on constrained environments.
+      });
+      // A one-shot CLI must exit once it has printed the monitor's start result;
+      // the detached child keeps the UART, and this watcher only feeds the
+      // dashboard. Long-lived hosts hold their own references.
+      daemon.watcher.unref();
+    } catch {
+      logDiag(`[Spooler] Failed to attach fs.watch to ${logFile}`, projectDir);
+    }
 
-  portalEvents.emitSpoolerStates(getSpoolerStates());
+    startWindowsPollingFallback(targetPort, daemon);
 
-  return {
-    success: true,
-    port: activePort,
-    logFile,
-    taskId: monitorTaskId,
-    startedAt: daemon.startedAt,
-  };
+    portalEvents.emitSpoolerStates(getSpoolerStates());
+
+    return {
+      success: true,
+      port: targetPort,
+      logFile,
+      taskId: monitorTaskId,
+      startedAt: daemon.startedAt,
+    };
+  });
 }
 
 import {
@@ -579,6 +673,7 @@ export async function queryLogs(
   projectDir?: string,
   port?: string,
 ) {
+  if (port) port = canonicalPortName(port);
   let targetPaths: string[] = [];
 
   if (taskId) {
@@ -737,6 +832,7 @@ export function getMonitorStatus(
   port?: string,
   projectDir?: string,
 ): MonitorStatusResult | { monitors: MonitorStatusResult[] } {
+  if (port) port = canonicalPortName(port);
   const trackedPids = getActiveMonitorPids(projectDir);
   const statuses = Object.entries(activeDaemons)
     .filter(
