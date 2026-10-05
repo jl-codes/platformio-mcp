@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, afterEach } from "vitest";
+import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -266,26 +266,31 @@ describe("board-info command", () => {
   });
 
   it("accepts the board id via --board or positional equivalently", async () => {
-    const viaFlag = await boardInfo({
-      options: { board: "esp32dev" },
-      positionals: [],
-      jsonMode: true,
-    }).catch((error) => error);
-    const viaPositional = await boardInfo({
-      options: {},
-      positionals: ["esp32dev"],
-      jsonMode: true,
-    }).catch((error) => error);
-
-    // Neither form should fail argument validation; both reach the same
-    // underlying getBoardInfo call, so whatever it does (succeed, or fail
-    // e.g. because PlatformIO isn't installed in the test environment)
-    // should happen identically for both.
-    expect(viaFlag).not.toMatchObject({ code: "MISSING_ARGUMENT" });
-    expect(viaPositional).not.toMatchObject({ code: "MISSING_ARGUMENT" });
-    expect((viaFlag as { code?: string })?.code).toBe(
-      (viaPositional as { code?: string })?.code,
-    );
+    // This is an argument-routing contract; invoking the real board database
+    // makes it depend on external runtime discovery and cold network caches.
+    const boardTools = await import("../src/tools/boards.js");
+    const unavailable = { code: "TEST_BOARD_UNAVAILABLE" };
+    const lookup = vi
+      .spyOn(boardTools, "getBoardInfo")
+      .mockRejectedValue(unavailable);
+    try {
+      const viaFlag = await boardInfo({
+        options: { board: "esp32dev" },
+        positionals: [],
+        jsonMode: true,
+      }).catch((error) => error);
+      const viaPositional = await boardInfo({
+        options: {},
+        positionals: ["esp32dev"],
+        jsonMode: true,
+      }).catch((error) => error);
+      expect(viaFlag).toBe(unavailable);
+      expect(viaPositional).toBe(unavailable);
+      expect(lookup).toHaveBeenNthCalledWith(1, "esp32dev");
+      expect(lookup).toHaveBeenNthCalledWith(2, "esp32dev");
+    } finally {
+      lookup.mockRestore();
+    }
   });
 });
 

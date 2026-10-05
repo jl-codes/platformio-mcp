@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 import lockfile from "proper-lockfile";
 import {
   GLOBAL_LOCKS_DIR,
+  canonicalPortName,
   ensureGlobalDirs,
   sanitizePortName,
 } from "./paths.js";
@@ -28,6 +29,8 @@ export interface PortClaim {
   /** Empty string for legacy claim files written before hostnames were recorded. */
   hostname: string;
   timestamp: number;
+  operation_id?: string; // Distinguishes concurrent operations owned by the same process.
+  startup_pending?: boolean; // Detached custody is uncertain until its child PID is published.
   /**
    * The real port path. Optional because claim filenames are sanitised and
    * lossy ("/dev/cu.x" becomes "dev_cu_x"), so legacy files cannot recover it.
@@ -99,11 +102,8 @@ export class PortBusyError extends ClaimError {
 const DEFAULT_CLAIM_TTL_MS = 30 * 60 * 1000;
 
 /**
- * A monitor is legitimately held for hours, so its TTL cannot be the flash-
- * sized 30 minutes -- that reclaimed live monitors out from under users. It
- * cannot be infinite either: a recycled PID (routine on Windows) would then
- * report "held" forever. 24h caps the damage of PID reuse while never
- * reclaiming a monitor within a working day.
+ * Foreign-host monitors cannot be probed, so use a longer fallback TTL.
+ * Local live monitors never expire; uncertain PID reuse needs explicit recovery.
  */
 const DEFAULT_MONITOR_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -224,18 +224,19 @@ export class SemaphoreManager {
   }
 
   private getLockFilePath(port: string): string {
-    const id = sanitizePortName(port);
+    const id = sanitizePortName(canonicalPortName(port));
     return path.join(GLOBAL_LOCKS_DIR, `${id}.json`);
   }
 
   /**
    * Claims a physical port. Throws PortBusyError if the port is held by a live
-   * claim from another process. Stale claims are reclaimed under a breaker so
-   * two processes cannot reclaim the same claim simultaneously.
+   * distinct operation, including one in this process. An operation may refresh
+   * its own same-type claim by supplying the returned operation_id.
    */
   public claimPort(
     port: string,
     reason: string = "Flash Operation",
+    options: { operationId?: string } = {},
   ): PortClaim {
     ensureGlobalDirs();
     const filePath = this.getLockFilePath(port);
@@ -245,8 +246,10 @@ export class SemaphoreManager {
       owner_pid: process.pid,
       hostname: os.hostname(),
       timestamp: Date.now(),
+      operation_id: options.operationId ?? randomUUID(),
       port,
     };
+    if (claim.type === "monitor") claim.startup_pending = true;
     const content = JSON.stringify(
       { status: "busy", current_claim: claim },
       null,
@@ -254,9 +257,10 @@ export class SemaphoreManager {
     );
 
     return this.withPortGuard(port, filePath, () => {
+      this.reconcileAliasClaims(port, filePath);
       if (this.tryCreateExclusive(filePath, content)) return claim;
 
-      if (this.evaluateExisting(filePath, port) === "reentrant") {
+      if (this.evaluateExisting(filePath, port, claim) === "reentrant") {
         this.replaceClaimAtomically(
           filePath,
           this.refreshedContent(port, claim),
@@ -266,7 +270,7 @@ export class SemaphoreManager {
 
       // Reclaimable. Serialise the unlink+create so two reclaimers cannot both win.
       return this.withReclaimBreaker(port, filePath, () => {
-        const recheck = this.evaluateExisting(filePath, port);
+        const recheck = this.evaluateExisting(filePath, port, claim);
         if (recheck === "reentrant") {
           this.replaceClaimAtomically(
             filePath,
@@ -279,6 +283,75 @@ export class SemaphoreManager {
         throw new PortBusyError(port, this.getClaim(port));
       });
     });
+  }
+
+  /** Locate old claim filenames whose recorded port names the same canonical endpoint. */
+  private getAliasClaims(
+    port: string,
+    filePath: string,
+  ): Array<{ filePath: string; claim: PortClaim; raw: string }> {
+    if (!fs.existsSync(GLOBAL_LOCKS_DIR)) return [];
+    const canonicalPort = canonicalPortName(port);
+    const matches: Array<{ filePath: string; claim: PortClaim; raw: string }> =
+      [];
+    for (const entry of fs.readdirSync(GLOBAL_LOCKS_DIR)) {
+      if (!entry.endsWith(".json")) continue;
+      const candidate = path.join(GLOBAL_LOCKS_DIR, entry);
+      // Windows filename casing does not distinguish a legacy COM key from
+      // its canonical name; never unlink the same file as an alias duplicate.
+      if (
+        candidate === filePath ||
+        (process.platform === "win32" &&
+          candidate.toLowerCase() === filePath.toLowerCase())
+      )
+        continue;
+      try {
+        const raw = fs.readFileSync(candidate, "utf8");
+        const value = JSON.parse(raw);
+        const recorded = value.current_claim ?? value;
+        if (
+          typeof recorded?.port !== "string" ||
+          canonicalPortName(recorded.port) !== canonicalPort
+        )
+          continue;
+        const claim = this.normaliseClaim(recorded, recorded.port);
+        if (claim) matches.push({ filePath: candidate, claim, raw });
+      } catch (error) {
+        // Missing unrelated aliases cannot identify this endpoint. Requested
+        // aliases are resolved separately and fail closed when unavailable.
+        if (
+          (error as NodeJS.ErrnoException).code === "ENOENT" ||
+          error instanceof SyntaxError ||
+          (error instanceof PlatformIOError &&
+            error.code === "SERIAL_ENDPOINT_UNAVAILABLE")
+        )
+          continue;
+        throw error;
+      }
+    }
+    return matches;
+  }
+
+  /** Preserve pre-upgrade alias ownership before publishing or releasing the canonical key. */
+  private reconcileAliasClaims(port: string, filePath: string): void {
+    for (const alias of this.getAliasClaims(port, filePath)) {
+      const current = this.classifyClaimFile(filePath, port);
+      if (
+        current.kind === "absent" &&
+        this.tryCreateExclusive(filePath, alias.raw)
+      ) {
+        this.unlinkClaimIfUnchanged(alias.filePath, alias.raw);
+      } else if (
+        current.kind === "ok" &&
+        this.matchesClaim(current.claim, alias.claim)
+      ) {
+        this.unlinkClaimIfUnchanged(alias.filePath, alias.raw);
+      } else if (this.isClaimStale(alias.claim)) {
+        this.unlinkClaimIfUnchanged(alias.filePath, alias.raw);
+      } else {
+        throw new PortBusyError(port, alias.claim);
+      }
+    }
   }
 
   /**
@@ -380,6 +453,7 @@ export class SemaphoreManager {
   private evaluateExisting(
     filePath: string,
     port: string,
+    requested: PortClaim,
   ): "absent" | "reentrant" | "reclaim" {
     const state = this.classifyClaimFile(filePath, port);
     switch (state.kind) {
@@ -405,7 +479,13 @@ export class SemaphoreManager {
         }
         return "reclaim";
       case "ok":
-        if (this.isOwnedByThisProcess(state.claim)) return "reentrant";
+        if (
+          this.isOwnedByThisProcess(state.claim) &&
+          state.claim.type === requested.type &&
+          state.claim.operation_id === requested.operation_id &&
+          typeof state.claim.operation_id === "string"
+        )
+          return "reentrant";
         if (!this.isClaimStale(state.claim))
           throw new PortBusyError(port, state.claim);
         return "reclaim";
@@ -449,6 +529,12 @@ export class SemaphoreManager {
       owner_pid: raw.owner_pid,
       hostname: String(raw.hostname ?? ""),
       timestamp: Number(raw.timestamp ?? 0),
+      ...(typeof raw.operation_id === "string"
+        ? { operation_id: raw.operation_id }
+        : {}),
+      ...(typeof raw.startup_pending === "boolean"
+        ? { startup_pending: raw.startup_pending }
+        : {}),
       port: raw.port ? String(raw.port) : port,
       ...(typeof raw.monitor_pid === "number"
         ? { monitor_pid: raw.monitor_pid }
@@ -512,7 +598,11 @@ export class SemaphoreManager {
    * Best-effort: a failure here degrades to the old launcher-PID behaviour
    * rather than breaking a working monitor.
    */
-  public attachMonitorPid(port: string, monitorPid: number): boolean {
+  public attachMonitorPid(
+    port: string,
+    monitorPid: number,
+    operationId?: string,
+  ): boolean {
     const filePath = this.getLockFilePath(port);
     const claim = this.getClaim(port);
     if (!claim || claim.type !== "monitor") return false;
@@ -525,11 +615,22 @@ export class SemaphoreManager {
     if (!this.isOwnedByThisProcess(claim)) return false;
     try {
       return this.withPortGuard(port, filePath, () => {
+        this.reconcileAliasClaims(port, filePath);
         // Re-read under the guard: the claim checked above may have been
         // released and republished by another process in the meantime.
         const current = this.getClaim(port);
-        if (!current || !this.isOwnedByThisProcess(current)) return false;
-        const updated: PortClaim = { ...current, monitor_pid: monitorPid };
+        if (
+          !current ||
+          current.type !== "monitor" ||
+          !this.isOwnedByThisProcess(current) ||
+          (operationId !== undefined && current.operation_id !== operationId)
+        )
+          return false;
+        const updated: PortClaim = {
+          ...current,
+          monitor_pid: monitorPid,
+          startup_pending: false,
+        };
         this.replaceClaimAtomically(
           filePath,
           JSON.stringify({ status: "busy", current_claim: updated }, null, 2),
@@ -549,11 +650,11 @@ export class SemaphoreManager {
    */
   private refreshedContent(port: string, fresh: PortClaim): string {
     const existing = this.getClaim(port);
-    const merged: PortClaim =
-      existing && typeof existing.monitor_pid === "number"
-        ? { ...fresh, monitor_pid: existing.monitor_pid }
-        : fresh;
-    return JSON.stringify({ status: "busy", current_claim: merged }, null, 2);
+    if (existing && typeof existing.monitor_pid === "number") {
+      fresh.monitor_pid = existing.monitor_pid;
+      fresh.startup_pending = existing.startup_pending;
+    }
+    return JSON.stringify({ status: "busy", current_claim: fresh }, null, 2);
   }
 
   private isOwnedByThisProcess(claim: PortClaim): boolean {
@@ -604,10 +705,16 @@ export class SemaphoreManager {
    */
   public releasePort(
     port: string,
-    options: { force?: boolean; expectedType?: PortClaimType } = {},
+    options: {
+      force?: boolean;
+      expectedType?: PortClaimType;
+      expectedClaim?: PortClaim;
+      requireStale?: boolean;
+    } = {},
   ): boolean {
     const filePath = this.getLockFilePath(port);
     return this.withPortGuard(port, filePath, () => {
+      this.reconcileAliasClaims(port, filePath);
       const state = this.classifyClaimFile(filePath, port);
 
       if (state.kind === "absent") return false;
@@ -617,7 +724,7 @@ export class SemaphoreManager {
         // A file mid-write is unreadable for milliseconds; only an old unreadable
         // file is genuinely abandoned. An expectedType cannot be confirmed on an
         // unreadable file, so refuse when one was required.
-        if (options.expectedType) return false;
+        if (options.expectedType || options.expectedClaim) return false;
         if (state.ageMs < UNREADABLE_GRACE_MS) return false;
         return this.unlinkClaimIfUnchanged(filePath, state.raw);
       }
@@ -625,6 +732,16 @@ export class SemaphoreManager {
       if (options.expectedType && state.claim.type !== options.expectedType) {
         return false;
       }
+
+      // A confirmed stop authorizes this operation's claim, never a new monitor
+      // that started while the asynchronous process termination was in flight.
+      if (
+        options.expectedClaim &&
+        !this.matchesClaim(state.claim, options.expectedClaim)
+      ) {
+        return false;
+      }
+      if (options.requireStale && !this.isClaimStale(state.claim)) return false;
 
       if (options.force)
         return this.unlinkClaimIfUnchanged(filePath, state.raw);
@@ -637,6 +754,20 @@ export class SemaphoreManager {
       }
       return false;
     });
+  }
+
+  /** Compare a stop's snapshot with the claim classified under the port guard. */
+  private matchesClaim(current: PortClaim, expected: PortClaim): boolean {
+    return (
+      current.operation_id === expected.operation_id &&
+      current.owner_pid === expected.owner_pid &&
+      current.hostname === expected.hostname &&
+      current.timestamp === expected.timestamp &&
+      current.type === expected.type &&
+      current.monitor_pid === expected.monitor_pid &&
+      current.startup_pending === expected.startup_pending &&
+      current.owner_workspace === expected.owner_workspace
+    );
   }
 
   /**
@@ -687,8 +818,12 @@ export class SemaphoreManager {
   /** Retrieves the current claim for a port, normalised, or null. Never throws. */
   public getClaim(port: string): PortClaim | null {
     try {
-      const state = this.classifyClaimFile(this.getLockFilePath(port), port);
-      return state.kind === "ok" ? state.claim : null;
+      const filePath = this.getLockFilePath(port);
+      const state = this.classifyClaimFile(filePath, port);
+      if (state.kind === "ok") return state.claim;
+      return state.kind === "absent"
+        ? (this.getAliasClaims(port, filePath)[0]?.claim ?? null)
+        : null;
     } catch {
       return null;
     }
@@ -709,6 +844,9 @@ export class SemaphoreManager {
    * opening the double-flash bug this class exists to prevent.
    */
   public isClaimStale(claim: PortClaim): boolean {
+    // Persist before spawn: failed attachment plus unconfirmed cleanup must
+    // remain held even after the one-shot launcher has exited.
+    if (claim.type === "monitor" && claim.startup_pending) return false;
     // A monitor claim is held by its detached child, not by whoever launched
     // it. That child is what owns the UART, so its liveness decides staleness
     // in both directions: a dead monitor frees the port even if the launcher
@@ -719,21 +857,14 @@ export class SemaphoreManager {
       typeof claim.monitor_pid === "number" &&
       claim.hostname === os.hostname()
     ) {
-      // A TTL still applies, but the MONITOR one: a detached child dies
-      // routinely and a recycled PID would otherwise report "held" forever,
-      // yet a monitor is legitimately held for hours and must not be reclaimed
-      // by a flash-sized timer.
-      if (Date.now() - claim.timestamp > ttlForClaim(claim)) return true;
+      // A multi-day capture still owns its UART. PID reuse is uncertain and
+      // requires explicit recovery rather than reclaiming a potentially live child.
       return this.isPidGone(claim.monitor_pid);
     }
 
     if (claim.hostname === os.hostname()) {
-      // The TTL applies here too. The launcher of an upload is the flashing
-      // process itself, which never legitimately outlives the TTL, while a
-      // recycled PID -- routine on Windows, which reuses PIDs from a small
-      // pool -- would otherwise report "held" forever. Monitors are handled
-      // above via monitor_pid; only legacy monitor claims reach this branch.
-      if (Date.now() - claim.timestamp > ttlForClaim(claim)) return true;
+      // Background uploads and multi-day monitors can outlive fallback TTLs.
+      // An alive or unprobeable PID remains held until explicit recovery.
       return this.isPidGone(claim.owner_pid);
     }
     return Date.now() - claim.timestamp > ttlForClaim(claim);

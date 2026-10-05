@@ -9,12 +9,14 @@
  * - ensureDir: Generic directory creation helper.
  * - ensureLocksDir: Specific helper for internal locks.
  * - sanitizePortName: Filename-safe transformation for serial paths.
+ * - canonicalPortName: Shared ownership key for serial endpoint aliases.
  */
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import os from "node:os";
+import { PlatformIOError } from "./errors.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -100,4 +102,41 @@ export function sanitizePortName(port: string): string {
 
   // ".." sanitises to nothing, which would name the claim file ".json".
   return base === "" ? "port_unnamed" : base;
+}
+
+/**
+ * Resolves serial spelling aliases to one claim, monitor and transition key.
+ * Missing direct device names remain usable for unplugged-device cleanup; a
+ * stable Unix alias must resolve, because guessing its target defeats exclusion.
+ * This key does not authorize hardware or prove board identity across reconnects.
+ * @param port - Requested serial name; it remains available to the execution adapter.
+ * @returns Canonical local endpoint path or normalized Windows COM name.
+ */
+export function canonicalPortName(port: string): string {
+  const windowsName = port.startsWith("\\\\.\\") ? port.slice(4) : port;
+  const windowsPort = /^COM([1-9][0-9]*)$/i.exec(windowsName);
+  if (windowsPort) return `COM${windowsPort[1]}`;
+  if (!port.startsWith("/dev/")) return port;
+
+  try {
+    const canonical = fs.realpathSync.native(port);
+    if (!canonical.startsWith("/dev/")) {
+      throw new PlatformIOError(
+        "Serial alias resolves outside /dev.",
+        "SERIAL_ENDPOINT_INVALID",
+        { port },
+      );
+    }
+    return canonical;
+  } catch (error) {
+    if (error instanceof PlatformIOError) throw error;
+    const code = (error as NodeJS.ErrnoException).code;
+    const isStableAlias = /^\/dev\/serial\/by-(?:id|path)\//.test(port);
+    if (!isStableAlias && (code === "ENOENT" || code === "ENODEV")) return port;
+    throw new PlatformIOError(
+      "Serial endpoint alias cannot be resolved safely.",
+      "SERIAL_ENDPOINT_UNAVAILABLE",
+      { port, errno: code },
+    );
+  }
 }

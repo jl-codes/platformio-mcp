@@ -9,7 +9,11 @@
  */
 
 import fs from "node:fs";
-import { inspectProcessIdentity, compareProcessIdentity, type ProcessIdentity } from "../core/devices/process-identity.js";
+import {
+  inspectProcessIdentity,
+  compareProcessIdentity,
+  type ProcessIdentity,
+} from "../core/devices/process-identity.js";
 import { PlatformIOError } from "./errors.js";
 import { setTimeout as delay } from "node:timers/promises";
 import os from "node:os";
@@ -18,10 +22,18 @@ import { execSync } from "node:child_process";
 import treeKill from "tree-kill";
 import lockfile from "proper-lockfile";
 import { logDiagnostic as logDiag } from "./logger.js";
-import { registerCommand, updateTaskStatus, getCommandHistory } from "./command-registry.js";
+import {
+  registerCommand,
+  updateTaskStatus,
+  getCommandHistory,
+} from "./command-registry.js";
 import type { TaskRecord } from "./command-registry.js";
 import crypto from "node:crypto";
-import { SERVER_DATA_DIR, ensureGlobalDirs } from "./paths.js";
+import {
+  SERVER_DATA_DIR,
+  ensureGlobalDirs,
+  canonicalPortName,
+} from "./paths.js";
 
 const WORKSPACE_DIR = ".pio-mcp-workspace";
 const LOCKS_DIR = "locks";
@@ -31,7 +43,10 @@ const BUILD_PIDS_FILE = "active_tasks.json";
 /**
  * Gets the absolute path to the PID tracking file.
  */
-function getPidsFilePath(projectDir?: string, file: string = SERIAL_PIDS_FILE): string {
+function getPidsFilePath(
+  projectDir?: string,
+  file: string = SERIAL_PIDS_FILE,
+): string {
   if (file === SERIAL_PIDS_FILE) {
     // Serial ports are global OS-level hardware resources.
     // Tracking them globally prevents Project B from attempting to open a port held by Project A.
@@ -53,95 +68,176 @@ function getPidsFilePath(projectDir?: string, file: string = SERIAL_PIDS_FILE): 
 }
 
 /** Read bounded supplemental start identities; legacy numeric PID files remain unchanged. */
-function readMonitorIdentities(pidsFile: string): Record<string, ProcessIdentity> {
+function readMonitorIdentities(
+  pidsFile: string,
+): Record<string, ProcessIdentity> {
   const file = pidsFile + ".identities.json";
   if (!fs.existsSync(file)) return {};
   if (fs.statSync(file).size > 1024 * 1024)
-    throw new PlatformIOError("Monitor identity registry exceeds limits.", "PROCESS_IDENTITY_INVALID");
+    throw new PlatformIOError(
+      "Monitor identity registry exceeds limits.",
+      "PROCESS_IDENTITY_INVALID",
+    );
   const value = JSON.parse(fs.readFileSync(file, "utf8"));
   if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new PlatformIOError("Invalid monitor identity registry.", "PROCESS_IDENTITY_INVALID");
+    throw new PlatformIOError(
+      "Invalid monitor identity registry.",
+      "PROCESS_IDENTITY_INVALID",
+    );
   return value;
+}
+
+/** Find canonical and legacy alias entries without losing unrelated unplugged monitors. */
+function monitorRegistryKeys(
+  pids: Record<string, number>,
+  port: string,
+): string[] {
+  const canonical = canonicalPortName(port);
+  return Object.keys(pids).filter((key) => {
+    if (key === port || key === canonical) return true;
+    try {
+      return canonicalPortName(key) === canonical;
+    } catch {
+      return false;
+    }
+  });
+}
+
+/** Compare persisted task selectors against canonical registry keys. */
+function sameMonitorPort(candidate: string | undefined, port: string): boolean {
+  if (!candidate) return false;
+  if (candidate === port) return true;
+  try {
+    return canonicalPortName(candidate) === canonicalPortName(port);
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Records a given process ID belonging to a started serial monitor.
  */
 export async function registerPioMonitorPid(
-  port: string, 
-  pid: number, 
-  projectDir?: string, 
-  rootCommandId?: string, 
+  port: string,
+  pid: number,
+  projectDir?: string,
+  rootCommandId?: string,
   logFile?: string,
   taskId?: string,
-  commandDesc?: string
+  commandDesc?: string,
 ): Promise<void> {
+  const canonicalPort = canonicalPortName(port);
   const pidsFile = getPidsFilePath(projectDir);
   const dir = path.dirname(pidsFile);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   if (!fs.existsSync(pidsFile)) fs.writeFileSync(pidsFile, "{}");
 
   try {
-    const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    const release = await lockfile.lock(pidsFile, {
+      retries: { retries: 5, minTimeout: 50, maxTimeout: 200 },
+    });
     try {
       let pids: Record<string, number> = {};
       try {
         pids = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
       } catch {}
       const identities = readMonitorIdentities(pidsFile);
+      const matchingKeys = monitorRegistryKeys(pids, canonicalPort);
+      for (const key of matchingKeys) {
+        if (
+          pids[key] !== pid &&
+          inspectProcessIdentity(pids[key]).status !== "absent"
+        )
+          throw new PlatformIOError(
+            "A different monitor still owns this serial endpoint.",
+            "PROCESS_REGISTRATION_CONFLICT",
+            { port: canonicalPort },
+          );
+      }
+      for (const key of matchingKeys) {
+        delete pids[key];
+        delete identities[key];
+      }
       const observed = inspectProcessIdentity(pid);
-      if (observed.status === "running") identities[port] = observed.identity;
-      else delete identities[port];
-      fs.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
-      pids[port] = pid;
+      if (observed.status === "running")
+        identities[canonicalPort] = observed.identity;
+      else delete identities[canonicalPort];
+      fs.writeFileSync(
+        pidsFile + ".identities.json",
+        JSON.stringify(identities, null, 2),
+      );
+      pids[canonicalPort] = pid;
       fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
     } finally {
       await release();
     }
   } catch (e: any) {
+    if (e instanceof PlatformIOError) throw e;
     throw new Error(`Registry contention timeout: ${e.message}`);
   }
 
   try {
     const commandId = rootCommandId || crypto.randomUUID();
     const effectiveTaskId = taskId || crypto.randomUUID();
-    
-    await registerCommand({
-      id: commandId,
-      commandDesc: `PIO Serial Monitor: ${port}`,
-      timestamp: Date.now(),
-      status: "running",
-      tasks: [{
-        taskId: effectiveTaskId,
-        type: "monitor",
+
+    await registerCommand(
+      {
+        id: commandId,
+        commandDesc: `PIO Serial Monitor: ${port}`,
+        timestamp: Date.now(),
         status: "running",
-        port: port,
-        pid: pid,
-        commandDesc: commandDesc,
-        logPaths: logFile ? [logFile] : []
-      }]
-    }, projectDir);
+        tasks: [
+          {
+            taskId: effectiveTaskId,
+            type: "monitor",
+            status: "running",
+            port: port,
+            pid: pid,
+            commandDesc: commandDesc,
+            logPaths: logFile ? [logFile] : [],
+          },
+        ],
+      },
+      projectDir,
+    );
   } catch (e: any) {
-    logDiag(`[ProcessManager] Failed to register monitor command: ${e.message}`, projectDir);
+    logDiag(
+      `[ProcessManager] Failed to register monitor command: ${e.message}`,
+      projectDir,
+    );
   }
 }
 
 /**
  * Removes the recorded PID tracking for a specific port.
  */
-export async function unregisterPioMonitorPid(port: string, projectDir?: string): Promise<void> {
+export async function unregisterPioMonitorPid(
+  port: string,
+  projectDir?: string,
+): Promise<void> {
+  const canonicalPort = canonicalPortName(port);
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
-  
+
   if (fs.existsSync(pidsFile)) {
     try {
-      const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+      const release = await lockfile.lock(pidsFile, {
+        retries: { retries: 5, minTimeout: 50, maxTimeout: 200 },
+      });
       try {
-        const pids: Record<string, number> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
-        if (pids[port]) {
-          delete pids[port];
+        const pids: Record<string, number> = JSON.parse(
+          fs.readFileSync(pidsFile, "utf8"),
+        );
+        const matchingKeys = monitorRegistryKeys(pids, canonicalPort);
+        if (matchingKeys.length > 0) {
           const identities = readMonitorIdentities(pidsFile);
-          delete identities[port];
-          fs.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+          for (const key of matchingKeys) {
+            delete pids[key];
+            delete identities[key];
+          }
+          fs.writeFileSync(
+            pidsFile + ".identities.json",
+            JSON.stringify(identities, null, 2),
+          );
           fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
         }
       } finally {
@@ -155,57 +251,137 @@ export async function unregisterPioMonitorPid(port: string, projectDir?: string)
   try {
     const history = getCommandHistory(projectDir);
     // Find the command that contains an actively running monitor task for this port
-    const activeCommand = [...history].reverse().find(cmd => 
-      cmd.tasks?.some(a => a.type === "monitor" && a.status === "running" && a.port === port)
-    );
+    const activeCommand = [...history]
+      .reverse()
+      .find((cmd) =>
+        cmd.tasks?.some(
+          (a) =>
+            a.type === "monitor" &&
+            a.status === "running" &&
+            sameMonitorPort(a.port, canonicalPort),
+        ),
+      );
     if (activeCommand) {
-      const activeTask = activeCommand.tasks.find(a => a.type === "monitor" && a.status === "running" && a.port === port);
+      const activeTask = activeCommand.tasks.find(
+        (a) =>
+          a.type === "monitor" &&
+          a.status === "running" &&
+          sameMonitorPort(a.port, canonicalPort),
+      );
       if (activeTask) {
-        await updateTaskStatus(activeCommand.id, activeTask.taskId, { status: "terminated" }, projectDir);
+        await updateTaskStatus(
+          activeCommand.id,
+          activeTask.taskId,
+          { status: "terminated" },
+          projectDir,
+        );
       }
     }
   } catch (e: any) {
-    logDiag(`[ProcessManager] Failed to update monitor command status: ${e.message}`, projectDir);
+    logDiag(
+      `[ProcessManager] Failed to update monitor command status: ${e.message}`,
+      projectDir,
+    );
   }
 }
 
 /**
  * Target-kills a stray or explicitly stopped monitor process via tree-kill.
  */
-export async function killPioMonitorByPort(port: string, projectDir?: string): Promise<boolean> {
+export async function killPioMonitorByPort(
+  port: string,
+  projectDir?: string,
+): Promise<boolean> {
+  const canonicalPort = canonicalPortName(port);
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
   if (!fs.existsSync(pidsFile)) return false;
   let stoppedPid: number | undefined;
-  const release = await lockfile.lock(pidsFile, {retries: {retries: 5, minTimeout: 50, maxTimeout: 200}});
+  const release = await lockfile.lock(pidsFile, {
+    retries: { retries: 5, minTimeout: 50, maxTimeout: 200 },
+  });
   try {
-    const pids = JSON.parse(fs.readFileSync(pidsFile, "utf8")) as Record<string, number>;
-    const pid = pids[port];
-    if (!pid) return false;
+    const pids = JSON.parse(fs.readFileSync(pidsFile, "utf8")) as Record<
+      string,
+      number
+    >;
+    const matchingKeys = monitorRegistryKeys(pids, canonicalPort);
+    if (matchingKeys.length === 0) return false;
+    const matchingPids = new Set(matchingKeys.map((key) => pids[key]));
+    if (matchingPids.size !== 1)
+      throw new PlatformIOError(
+        "Conflicting monitor processes are recorded for this serial endpoint.",
+        "PROCESS_IDENTITY_UNVERIFIED",
+        { port: canonicalPort },
+      );
+    const pid = pids[matchingKeys[0]];
     stoppedPid = pid;
-    const identity = readMonitorIdentities(pidsFile)[port];
+    const recordedIdentities = readMonitorIdentities(pidsFile);
+    const identity = matchingKeys
+      .map((key) => recordedIdentities[key])
+      .find((value) => value?.pid === pid);
     const observation = inspectProcessIdentity(pid);
-    if (observation.status === "absent") { /* Nothing remains to terminate. */ }
-    else {
-      if (!identity || identity.pid !== pid || compareProcessIdentity(identity, observation) !== "alive")
-        throw new PlatformIOError("Monitor process identity is unavailable or changed; refusing PID-only termination.", "PROCESS_IDENTITY_UNVERIFIED");
-      await new Promise<void>((resolve, reject) => treeKill(pid, "SIGKILL", error => error ? reject(error) : resolve()));
+    if (observation.status === "absent") {
+      /* Nothing remains to terminate. */
+    } else {
+      if (
+        !identity ||
+        identity.pid !== pid ||
+        compareProcessIdentity(identity, observation) !== "alive"
+      )
+        throw new PlatformIOError(
+          "Monitor process identity is unavailable or changed; refusing PID-only termination.",
+          "PROCESS_IDENTITY_UNVERIFIED",
+        );
+      await new Promise<void>((resolve, reject) =>
+        treeKill(pid, "SIGKILL", (error) =>
+          error ? reject(error) : resolve(),
+        ),
+      );
       let confirmed = false;
       for (let attempt = 0; attempt < 20; attempt++) {
-        if (compareProcessIdentity(identity, inspectProcessIdentity(pid)) === "stale") {confirmed = true; break;}
+        if (
+          compareProcessIdentity(identity, inspectProcessIdentity(pid)) ===
+          "stale"
+        ) {
+          confirmed = true;
+          break;
+        }
         await delay(50);
       }
-      if (!confirmed) throw new PlatformIOError("Monitor exit could not be confirmed.", "PROCESS_CLEANUP_PENDING");
+      if (!confirmed)
+        throw new PlatformIOError(
+          "Monitor exit could not be confirmed.",
+          "PROCESS_CLEANUP_PENDING",
+        );
     }
-    delete pids[port];
-    const identities = readMonitorIdentities(pidsFile); delete identities[port];
-    fs.writeFileSync(pidsFile + ".identities.json", JSON.stringify(identities, null, 2));
+    const identities = readMonitorIdentities(pidsFile);
+    for (const key of matchingKeys) {
+      delete pids[key];
+      delete identities[key];
+    }
+    fs.writeFileSync(
+      pidsFile + ".identities.json",
+      JSON.stringify(identities, null, 2),
+    );
     fs.writeFileSync(pidsFile, JSON.stringify(pids, null, 2));
-  } finally {await release();}
+  } finally {
+    await release();
+  }
   const history = getCommandHistory(projectDir);
   for (const command of history) {
     for (const task of command.tasks ?? []) {
-      if (task.type === "monitor" && task.port === port && task.pid === stoppedPid && task.status === "running")
-        await updateTaskStatus(command.id, task.taskId, {status: "terminated"}, projectDir);
+      if (
+        task.type === "monitor" &&
+        sameMonitorPort(task.port, canonicalPort) &&
+        task.pid === stoppedPid &&
+        task.status === "running"
+      )
+        await updateTaskStatus(
+          command.id,
+          task.taskId,
+          { status: "terminated" },
+          projectDir,
+        );
     }
   }
   return true;
@@ -219,12 +395,20 @@ export function isPidAlive(pid: number): boolean {
     process.kill(pid, 0); // Throws if process is dead
     if (os.platform() !== "win32") {
       try {
-        const stdout = execSync(`ps -p ${pid} -o command=`, { encoding: "utf8" }).toLowerCase();
-        if (!stdout.includes("platformio") && !stdout.includes("pio") && !stdout.includes("python")) {
+        const stdout = execSync(`ps -p ${pid} -o command=`, {
+          encoding: "utf8",
+        }).toLowerCase();
+        if (
+          !stdout.includes("platformio") &&
+          !stdout.includes("pio") &&
+          !stdout.includes("python")
+        ) {
           return false;
         }
         try {
-          const stat = execSync(`ps -p ${pid} -o stat=`, { encoding: "utf8" }).trim().toUpperCase();
+          const stat = execSync(`ps -p ${pid} -o stat=`, { encoding: "utf8" })
+            .trim()
+            .toUpperCase();
           if (stat.startsWith("Z")) {
             return false;
           }
@@ -243,11 +427,32 @@ export function isPidAlive(pid: number): boolean {
 /**
  * Reads the raw track-list of active monitor daemon PIDs for a specific workspace.
  */
-export function getActiveMonitorPids(projectDir?: string): Record<string, number> {
+export function getActiveMonitorPids(
+  projectDir?: string,
+): Record<string, number> {
   const pidsFile = getPidsFilePath(projectDir, SERIAL_PIDS_FILE);
   if (!fs.existsSync(pidsFile)) return {};
   try {
-    return JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+    const persisted = JSON.parse(fs.readFileSync(pidsFile, "utf8")) as Record<
+      string,
+      number
+    >;
+    const canonical: Record<string, number> = {};
+    for (const [port, pid] of Object.entries(persisted)) {
+      let key = port;
+      try {
+        key = canonicalPortName(port);
+      } catch {
+        /* Preserve unplugged legacy aliases. */
+      }
+      if (canonical[key] !== undefined && canonical[key] !== pid)
+        throw new PlatformIOError(
+          "Conflicting monitor aliases in PID registry.",
+          "PROCESS_IDENTITY_UNVERIFIED",
+        );
+      canonical[key] = pid;
+    }
+    return canonical;
   } catch {
     return {};
   }
@@ -378,7 +583,7 @@ export async function killTrackedTaskProcess(
   const trackedMonitor =
     task.type === "monitor" &&
     Boolean(task.port) &&
-    monitorPids[task.port!] === task.pid;
+    monitorPids[canonicalPortName(task.port!)] === task.pid;
   const trackedBuild =
     task.type !== "monitor" && Object.hasOwn(buildPids, String(task.pid));
   if (!trackedMonitor && !trackedBuild) {

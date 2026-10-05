@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
+/** One-shot CLI routing, scoped authorization, and durable background workers. */
+
 import fs from "node:fs";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,12 +12,20 @@ import { toCliStructuredError } from "./core/cli-diagnostics.js";
 import { authorizeAction } from "./core/action-dispatcher.js";
 import { approveRequest } from "./core/policy/approvals.js";
 import { operationForCliCommand } from "./core/action-catalog.js";
-import { configurePolicyFileFromArgs } from "./core/policy/policy-sources.js";
+import {
+  configurePolicyFileFromArgs,
+  resolvePolicyFile,
+} from "./core/policy/policy-sources.js";
 import { parseCompatibilityLaunch } from "./adapters/compatibility-mode.js";
 import { readRuntimeVersion } from "./utils/runtime-version.js";
 import { printOutput } from "./cli/output.js";
 import { promptApproval } from "./cli/prompt.js";
 import { mcpContext } from "./utils/mcp-context.js";
+import {
+  getCommandHistory,
+  registerCommand,
+  updateCommandStatus,
+} from "./utils/command-registry.js";
 import type { CommandHandler, OptionValue } from "./cli/commands/types.js";
 import { devices } from "./cli/commands/devices.js";
 import { boards, boardInfo } from "./cli/commands/boards.js";
@@ -276,12 +286,10 @@ export const OPERATION_COMMANDS = new Set([
  * `{status:"running"}` and then sat there for the whole build, which is the
  * opposite of what the skills promise agents.
  *
- * So the CLI backgrounds by re-executing ITSELF in foreground mode as a
- * detached child, with the task id assigned up front. The foreground path
- * already does all of the bookkeeping, including onSuccess hooks, so nothing
- * has to be serialised across processes and the MCP path is untouched. The
- * child is short-lived (it ends with the task), which is consistent with
- * "nothing outlives the command it was asked for".
+ * The CLI re-executes itself as a detached worker with an assigned task id.
+ * The worker retains background operation semantics (timeouts, cache bypass,
+ * and completion hooks), but its task marker prevents a second dispatch.
+ * It remains alive only while the spooler completes the requested work.
  */
 const BACKGROUND_REEXEC_COMMANDS = new Set([
   "build",
@@ -295,30 +303,90 @@ const BACKGROUND_REEXEC_COMMANDS = new Set([
 
 /** Hidden flag the detached child receives so both sides agree on the task id. */
 const TASK_ID_FLAG = "--__task-id";
+/** Scoped one-use approval passed to the worker without consuming it in the parent. */
+const WORKER_APPROVAL_FLAG = "--__approval-id";
 
-function dispatchDetached(
+/** Records completion even when a worker fails before the spooler registers its task. */
+async function finishDetachedTask(
+  taskId: string,
+  projectDir: string | undefined,
+  error?: string,
+): Promise<void> {
+  const command = getCommandHistory(projectDir).find(
+    (item) => item.id === taskId,
+  );
+  if (!command) return;
+  const status = error ? "error" : "success";
+  if (command.tasks.length === 0) {
+    await registerCommand(
+      {
+        ...command,
+        status,
+        tasks: [{ taskId, type: "build", status, ...(error ? { error } : {}) }],
+      },
+      projectDir,
+    );
+  }
+  await updateCommandStatus(
+    taskId,
+    { status, ...(error ? { error } : {}) },
+    projectDir,
+  );
+}
+
+/** Starts exactly one authorized worker and makes its task visible before returning. */
+async function dispatchDetached(
   command: string,
   rest: string[],
   jsonMode: boolean,
-): void {
+  projectDir: string | undefined,
+  approvalId?: string,
+): Promise<void> {
   const taskId = crypto.randomUUID();
   const childArgs = [
+    ...process.execArgv,
     process.argv[1],
     command,
-    ...rest.filter((a) => a !== "--background"),
+    ...rest,
     TASK_ID_FLAG,
     taskId,
+    ...(approvalId ? [WORKER_APPROVAL_FLAG, approvalId] : []),
   ];
-  if (jsonMode && !childArgs.includes("--json")) childArgs.push("--json");
+  const policyFile = resolvePolicyFile();
+  await registerCommand(
+    {
+      id: taskId,
+      commandDesc: `CLI ${command}`,
+      timestamp: Date.now(),
+      status: "running",
+      tasks: [],
+    },
+    projectDir,
+  );
 
-  // The child's own stdout/stderr are not ours to relay -- its result is
-  // recorded via task status, which is what `task-status <id>` reads.
-  const child = spawn(process.execPath, childArgs, {
-    detached: true,
-    stdio: "ignore",
-    env: process.env,
-  });
-  child.unref();
+  let child: ChildProcess;
+  try {
+    child = spawn(process.execPath, childArgs, {
+      detached: true,
+      stdio: "ignore",
+      env: {
+        ...process.env,
+        ...(policyFile ? { PIO_MCP_POLICY_FILE: policyFile } : {}),
+      },
+    });
+    await new Promise<void>((resolve, reject) => {
+      child.once("spawn", resolve);
+      child.once("error", reject);
+    });
+    child.unref();
+  } catch (error) {
+    await finishDetachedTask(
+      taskId,
+      projectDir,
+      error instanceof Error ? error.message : "Worker could not start.",
+    );
+    throw error;
+  }
 
   printOutput(
     {
@@ -333,18 +401,42 @@ function dispatchDetached(
   );
 }
 
+/** Authorizes and executes a command, or hands its scoped approval to one worker. */
 export async function runCliCommand(command: string, rawArgs: string[]) {
   const { options, positionals } = parseArgs(rawArgs);
   const jsonMode = Boolean(options.json);
   const actionName = operationForCliCommand(command, positionals);
   const projectDirForPolicy = asString(options["project-dir"]);
   const approvalOpt = asBoolean(options.approve);
+  const preassignedTaskId = asString(options["__task-id"]);
+  const shouldDetach =
+    asBoolean(options.background) === true &&
+    BACKGROUND_REEXEC_COMMANDS.has(command) &&
+    !preassignedTaskId;
+  let workerApprovalId: string | undefined;
   let policyArgs: Record<string, unknown> = {
     ...options,
     projectDir: projectDirForPolicy,
   };
+  // These identify worker transport, not operation arguments. Both processes
+  // must authorize the same operation scope so the grant is consumed once.
+  delete policyArgs["__task-id"];
+  delete policyArgs["__approval-id"];
+  if (preassignedTaskId && asString(options["__approval-id"])) {
+    policyArgs.approvalId = asString(options["__approval-id"]);
+  }
 
   try {
+    if (
+      (options["__task-id"] !== undefined &&
+        (!preassignedTaskId || !/^[a-f0-9-]{36}$/i.test(preassignedTaskId))) ||
+      (options["__approval-id"] !== undefined && !preassignedTaskId)
+    ) {
+      throw new PlatformIOError(
+        "Invalid background worker transport.",
+        "BACKGROUND_WORKER_INVALID",
+      );
+    }
     if (SELF_AUTHORIZING_COMMANDS.has(command)) {
       await runSelfAuthorizingCommand(command, {
         options,
@@ -371,7 +463,7 @@ export async function runCliCommand(command: string, rawArgs: string[]) {
     }
 
     if (decision.status === "requires_approval") {
-      if (jsonMode && approvalOpt !== true) {
+      if (preassignedTaskId || (jsonMode && approvalOpt !== true)) {
         const policyError = new PlatformIOError(
           decision.reason,
           "APPROVAL_REQUIRED",
@@ -402,35 +494,43 @@ export async function runCliCommand(command: string, rawArgs: string[]) {
         ...policyArgs,
         approvalId: decision.approvalId,
       };
-      decision = await authorizeAction(actionName, policyArgs, {
-        workspaceDir: projectDirForPolicy,
-        actor: "user",
-        operationName: actionName,
-      });
-      if (decision.status !== "allow") {
-        const policyError = new PlatformIOError(
-          decision.reason,
-          "POLICY_DENIED",
-          { policyDecision: decision },
-        );
-        throw policyError;
+      if (shouldDetach) {
+        // The worker consumes the approved grant against the unchanged policy
+        // and operation arguments. A changed policy fails closed there.
+        workerApprovalId = decision.approvalId;
+      } else {
+        decision = await authorizeAction(actionName, policyArgs, {
+          workspaceDir: projectDirForPolicy,
+          actor: "user",
+          operationName: actionName,
+        });
+        if (decision.status !== "allow") {
+          const policyError = new PlatformIOError(
+            decision.reason,
+            "POLICY_DENIED",
+            { policyDecision: decision },
+          );
+          throw policyError;
+        }
       }
     }
 
     const handler = COMMANDS[command];
     if (handler) {
-      if (
-        asBoolean(options.background) &&
-        BACKGROUND_REEXEC_COMMANDS.has(command)
-      ) {
-        dispatchDetached(command, rawArgs, jsonMode);
+      if (shouldDetach) {
+        await dispatchDetached(
+          command,
+          rawArgs,
+          jsonMode,
+          projectDirForPolicy,
+          workerApprovalId,
+        );
         return;
       }
 
       // A detached child carries the task id its parent already reported.
       // The spooler reads it from this context as the command id, so
       // `task-status <id>` finds the run without every handler threading it.
-      const preassignedTaskId = asString(options["__task-id"]);
       const run = () => handler({ options, positionals, jsonMode, rawArgs });
       const result = preassignedTaskId
         ? await mcpContext.run(
@@ -441,6 +541,24 @@ export async function runCliCommand(command: string, rawArgs: string[]) {
             run,
           )
         : await run();
+      if (
+        preassignedTaskId &&
+        !(
+          result &&
+          typeof result === "object" &&
+          (result as { status?: unknown }).status === "running"
+        )
+      ) {
+        const failed =
+          result &&
+          typeof result === "object" &&
+          (result as { success?: unknown }).success === false;
+        await finishDetachedTask(
+          preassignedTaskId,
+          projectDirForPolicy,
+          failed ? "Background operation failed." : undefined,
+        );
+      }
       if (result !== undefined) {
         printOutput(result, jsonMode);
         // `success: false` is overloaded: for a command that DOES work it
@@ -531,6 +649,13 @@ export async function runCliCommand(command: string, rawArgs: string[]) {
     const structured = toCliStructuredError(error, {
       stage: stageMap[command] ?? "unknown",
     });
+    if (preassignedTaskId) {
+      await finishDetachedTask(
+        preassignedTaskId,
+        projectDirForPolicy,
+        structured.summary,
+      ).catch(() => {});
+    }
 
     if (jsonMode) {
       console.error(JSON.stringify(structured, null, 2));

@@ -5,7 +5,24 @@ import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterAll, afterEach, expect, it, vi } from "vitest";
+
+// Configure isolated claim/registry storage before importing the monitor.
+const previousDataDir = process.env.PIO_MCP_DATA_DIR;
+const testDataDir = fs.mkdtempSync(
+  path.join(os.tmpdir(), "pio-monitor-launch-data-"),
+);
+process.env.PIO_MCP_DATA_DIR = testDataDir;
+process.once("exit", () => {
+  try {
+    fs.rmSync(testDataDir, { recursive: true, force: true });
+  } catch {}
+});
+afterAll(() => {
+  if (previousDataDir === undefined) delete process.env.PIO_MCP_DATA_DIR;
+  else process.env.PIO_MCP_DATA_DIR = previousDataDir;
+});
+
 const state = vi.hoisted(() => ({
   spawn: vi.fn(),
   pids: {} as Record<string, number>,
@@ -29,11 +46,33 @@ vi.mock("../src/utils/process-manager.js", () => ({
   isPidAlive: () => state.alive,
   isBuildActive: () => false,
 }));
-import {
-  startMonitor,
-  stopMonitor,
-  getMonitorStatus,
-} from "../src/tools/monitor.js";
+vi.mock("../src/core/devices/serial-endpoint.js", async (original) => ({
+  ...(await original<
+    typeof import("../src/core/devices/serial-endpoint.js")
+  >()),
+  resolveSerialEndpoint: (port: string) => ({
+    requestedPort: port,
+    canonicalPort: port,
+    resource: { kind: "serial", identity: `fixture:${port}` },
+    revalidate: vi.fn(),
+  }),
+}));
+vi.mock("../src/core/devices/device-lease.js", async (original) => {
+  const actual =
+    await original<typeof import("../src/core/devices/device-lease.js")>();
+  return {
+    ...actual,
+    DeviceLeaseStore: class extends actual.DeviceLeaseStore {
+      status(
+        resource: import("../src/core/devices/device-lease.js").DeviceResource,
+      ) {
+        return { status: "unclaimed" as const, resource };
+      }
+    },
+  };
+});
+const { startMonitor, stopMonitor, getMonitorStatus } =
+  await import("../src/tools/monitor.js");
 const roots: string[] = [];
 afterEach(async () => {
   await stopMonitor("COM42", roots[0]);

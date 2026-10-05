@@ -9,6 +9,7 @@ vi.mock("../src/utils/paths.js", () => ({
     return state.root;
   },
   ensureGlobalDirs: () => {},
+  canonicalPortName: (port: string) => port,
 }));
 vi.mock("../src/core/devices/process-identity.js", async (original) => ({
   ...(await original<

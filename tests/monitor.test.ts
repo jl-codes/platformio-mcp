@@ -140,7 +140,9 @@ describe("Monitor API", () => {
         timestamp: Date.now(),
       });
 
-      await stopMonitor(PORT, testProjectDir);
+      await expect(stopMonitor(PORT, testProjectDir)).rejects.toMatchObject({
+        code: "PROCESS_CLEANUP_PENDING",
+      });
 
       const claim = portSemaphoreManager.getClaim(PORT);
       expect(claim).not.toBeNull();
@@ -150,8 +152,7 @@ describe("Monitor API", () => {
     it("leaves a live monitor claim intact when the kill throws (identity unverified)", async () => {
       // killPioMonitorByPort refuses a PID-only kill when the recorded
       // process identity no longer matches, and throws rather than
-      // returning false. stopMonitor must treat that exactly like "not
-      // proven": no force release, and the claim survives.
+      // returning false. The failed stop must propagate; the claim survives.
       vi.mocked(processManager.killPioMonitorByPort).mockRejectedValueOnce(
         new PlatformIOError(
           "Monitor process identity is unavailable or changed; refusing PID-only termination.",
@@ -166,7 +167,9 @@ describe("Monitor API", () => {
         timestamp: Date.now(),
       });
 
-      await expect(stopMonitor(PORT, testProjectDir)).resolves.not.toThrow();
+      await expect(stopMonitor(PORT, testProjectDir)).rejects.toMatchObject({
+        code: "PROCESS_IDENTITY_UNVERIFIED",
+      });
 
       const claim = portSemaphoreManager.getClaim(PORT);
       expect(claim).not.toBeNull();
@@ -188,7 +191,9 @@ describe("Monitor API", () => {
         timestamp: Date.now(),
       });
 
-      await stopMonitor(PORT, testProjectDir);
+      await expect(stopMonitor(PORT, testProjectDir)).rejects.toMatchObject({
+        code: "PROCESS_CLEANUP_PENDING",
+      });
 
       const claim = portSemaphoreManager.getClaim(PORT);
       expect(claim).not.toBeNull();
@@ -228,7 +233,9 @@ describe("Monitor API", () => {
         timestamp: Date.now(),
       });
 
-      await stopMonitor(PORT, testProjectDir);
+      await expect(stopMonitor(PORT, testProjectDir)).rejects.toMatchObject({
+        code: "PROCESS_CLEANUP_PENDING",
+      });
 
       const claim = portSemaphoreManager.getClaim(PORT);
       expect(claim).not.toBeNull();

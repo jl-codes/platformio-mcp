@@ -1,12 +1,24 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import request from "supertest";
 import { io as Client } from "socket.io-client";
-import { startPortalServer } from "../src/api/server.js";
-import { portalEvents } from "../src/api/events.js";
 import { Server as HttpServer } from "http";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+
+// Mocked monitor/approval requests must never touch the operator's real store.
+const previousDataDir = process.env.PIO_MCP_DATA_DIR;
+const testDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "pio-api-data-"));
+process.env.PIO_MCP_DATA_DIR = testDataDir;
+process.once("exit", () => {
+  try {
+    fs.rmSync(testDataDir, { recursive: true, force: true });
+  } catch {}
+});
+afterAll(() => {
+  if (previousDataDir === undefined) delete process.env.PIO_MCP_DATA_DIR;
+  else process.env.PIO_MCP_DATA_DIR = previousDataDir;
+});
 
 // Mock platformio hardware runner to avoid hanging threads
 vi.mock("../src/platformio.js", async () => {
@@ -23,6 +35,35 @@ vi.mock("../src/platformio.js", async () => {
     checkPlatformIOInstalled: vi.fn(() => Promise.resolve(true)),
   };
 });
+
+vi.mock("../src/core/devices/serial-endpoint.js", async (original) => ({
+  ...(await original<
+    typeof import("../src/core/devices/serial-endpoint.js")
+  >()),
+  resolveSerialEndpoint: (port: string) => ({
+    requestedPort: port,
+    canonicalPort: port,
+    resource: { kind: "serial", identity: `fixture:${port}` },
+    revalidate: vi.fn(),
+  }),
+}));
+vi.mock("../src/core/devices/device-lease.js", async (original) => {
+  const actual =
+    await original<typeof import("../src/core/devices/device-lease.js")>();
+  return {
+    ...actual,
+    DeviceLeaseStore: class extends actual.DeviceLeaseStore {
+      status(
+        resource: import("../src/core/devices/device-lease.js").DeviceResource,
+      ) {
+        return { status: "unclaimed" as const, resource };
+      }
+    },
+  };
+});
+
+const { startPortalServer } = await import("../src/api/server.js");
+const { portalEvents } = await import("../src/api/events.js");
 
 describe("Portal API Security & Telemetry Tailing", () => {
   let app: any;

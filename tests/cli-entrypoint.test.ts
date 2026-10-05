@@ -263,6 +263,7 @@ describe("--background returns immediately", () => {
             "--project-dir",
             projectDir,
             "--background",
+            "--jobs=0",
             "--json",
           ],
           { stdio: ["ignore", "pipe", "pipe"] },
@@ -286,7 +287,148 @@ describe("--background returns immediately", () => {
     expect(parsed.taskId).toMatch(/^[0-9a-f-]{36}$/);
     expect(result.code).toBe(0);
     expect(elapsed).toBeLessThan(5000);
+    // Wait for this deliberately invalid worker to stop before deleting its
+    // workspace; otherwise the detached child can recreate files after cleanup.
+    const deadline = Date.now() + 15000;
+    const registryFile = path.join(
+      projectDir,
+      ".pio-mcp-workspace",
+      "registry",
+      "command_history.json",
+    );
+    let terminal = false;
+    while (Date.now() < deadline) {
+      try {
+        const records = JSON.parse(
+          fs.readFileSync(registryFile, "utf8"),
+        ) as Array<{ id: string; status: string }>;
+        terminal = records.some(
+          (item) => item.id === parsed.taskId && item.status === "error",
+        );
+        if (terminal) break;
+      } catch {
+        /* Registry writes can briefly be in progress. */
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    expect(terminal).toBe(true);
     fs.rmSync(projectDir, { recursive: true, force: true });
+  }, 30000);
+
+  it("keeps the selected policy, consumes approval once, and records worker startup failure", async () => {
+    // Invalid jobs fail before PlatformIO or hardware execution. Requiring a
+    // one-use approval also bounds any accidental recursive dispatch in this
+    // real-process regression test: a second worker cannot replay the grant.
+    const testDir = fs.mkdtempSync(path.join(os.tmpdir(), "pio-bg-policy-"));
+    const projectDir = path.join(testDir, "project");
+    const dataDir = path.join(testDir, "operator");
+    const policyFile = path.join(testDir, "selected-policy.json");
+    fs.mkdirSync(projectDir);
+    fs.mkdirSync(dataDir);
+    fs.writeFileSync(
+      path.join(projectDir, "platformio.ini"),
+      "[env:native]\nplatform = native\n",
+    );
+    fs.writeFileSync(
+      policyFile,
+      JSON.stringify({
+        approval_required: ["build_project"],
+        allow: [],
+        deny: [],
+      }),
+    );
+    let workerPid: number | undefined;
+    let workerFinished = false;
+    try {
+      const result = await new Promise<{
+        code: number | null;
+        out: string;
+        err: string;
+      }>((resolve, reject) => {
+        const child = spawn(
+          process.execPath,
+          [
+            "build/cli.js",
+            "--policy-file",
+            policyFile,
+            "build",
+            "--project-dir",
+            projectDir,
+            "--jobs=0",
+            "--background",
+            "--json=true",
+            "--approve",
+          ],
+          {
+            stdio: ["ignore", "pipe", "pipe"],
+            env: {
+              ...process.env,
+              PIO_MCP_DATA_DIR: dataDir,
+              PIO_MCP_POLICY_FILE: undefined,
+            },
+          },
+        );
+        let out = "";
+        let err = "";
+        child.stdout.on("data", (value) => {
+          out += String(value);
+        });
+        child.stderr.on("data", (value) => {
+          err += String(value);
+        });
+        child.once("error", reject);
+        child.once("exit", (code) => resolve({ code, out, err }));
+      });
+      expect(result.code, result.err).toBe(0);
+      const launched = JSON.parse(result.out) as {
+        taskId: string;
+        status: string;
+        pid?: number;
+      };
+      workerPid = launched.pid;
+      expect(launched.status).toBe("running");
+      const registryFile = path.join(
+        projectDir,
+        ".pio-mcp-workspace",
+        "registry",
+        "command_history.json",
+      );
+      const deadline = Date.now() + 15000;
+      let record: { id: string; status: string; error?: string } | undefined;
+      while (Date.now() < deadline) {
+        try {
+          const records = JSON.parse(
+            fs.readFileSync(registryFile, "utf8"),
+          ) as (typeof record)[];
+          record = records.find((item) => item?.id === launched.taskId);
+          if (record?.status === "error") {
+            workerFinished = true;
+            break;
+          }
+        } catch {
+          /* Registry writes can briefly be in progress. */
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(
+        record?.status,
+        "worker must reach a recorded terminal outcome",
+      ).toBe("error");
+      const approvals = JSON.parse(
+        fs.readFileSync(path.join(dataDir, "approvals.json"), "utf8"),
+      ) as Array<{ status: string }>;
+      expect(approvals).toHaveLength(1);
+      expect(approvals[0].status).toBe("consumed");
+    } finally {
+      if (!workerFinished && workerPid) {
+        try {
+          process.kill(workerPid);
+        } catch {
+          /* Worker already exited. */
+        }
+      }
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
   }, 30000);
 });
 

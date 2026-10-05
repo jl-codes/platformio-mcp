@@ -260,10 +260,33 @@ describe("SemaphoreManager claimPort", () => {
     expect(claim.owner_pid).toBe(process.pid);
   });
 
-  it("is re-entrant for the same process", () => {
-    portSemaphoreManager.claimPort(PORT, "Firmware Upload");
-    const second = portSemaphoreManager.claimPort(PORT, "Firmware Upload");
+  it("is re-entrant only for the same operation and claim type", () => {
+    const first = portSemaphoreManager.claimPort(PORT, "Firmware Upload");
+    const second = portSemaphoreManager.claimPort(PORT, "Firmware Upload", {
+      operationId: first.operation_id,
+    });
     expect(second.owner_pid).toBe(process.pid);
+  });
+
+  it.each(["Firmware Upload", "Monitor Daemon"])(
+    "rejects a distinct %s operation from the same process",
+    (reason) => {
+      const first = portSemaphoreManager.claimPort(PORT, reason);
+      expect(() => portSemaphoreManager.claimPort(PORT, reason)).toThrow(
+        PortBusyError,
+      );
+      expect(portSemaphoreManager.getClaim(PORT)).toEqual(first);
+    },
+  );
+
+  it("does not let monitor startup replace an upload, even with its operation id", () => {
+    const upload = portSemaphoreManager.claimPort(PORT, "Firmware Upload");
+    expect(() =>
+      portSemaphoreManager.claimPort(PORT, "Monitor Daemon", {
+        operationId: upload.operation_id,
+      }),
+    ).toThrow(PortBusyError);
+    expect(portSemaphoreManager.getClaim(PORT)).toEqual(upload);
   });
 
   it("reclaims a corrupt claim file", () => {
@@ -347,11 +370,7 @@ describe("SemaphoreManager claim file classification", () => {
     expect(strays).toEqual([]);
   });
 
-  it("keeps a live monitor claim for hours, but not forever (PID reuse cap)", () => {
-    // Two real concerns pull opposite ways: a monitor is legitimately held for
-    // hours and must not be reclaimed under the user by a flash-sized timer;
-    // yet a recycled PID (routine on Windows) must not wedge the port forever.
-    // Resolution: monitors get a day-sized TTL, uploads keep the 30-minute one.
+  it("keeps a live local monitor protected during multi-day captures", () => {
     const live = (type: "monitor" | "upload", ageMs: number) => {
       writeRawClaim(PORT, {
         type,
@@ -365,8 +384,8 @@ describe("SemaphoreManager claim file classification", () => {
       );
     };
     expect(live("monitor", 12 * 60 * 60 * 1000)).toBe(false); // half a day: still held
-    expect(live("monitor", 25 * 60 * 60 * 1000)).toBe(true); // past the cap: reclaimable
-    expect(live("upload", 31 * 60 * 1000)).toBe(true); // a flash never takes 31 minutes
+    expect(live("monitor", 25 * 60 * 60 * 1000)).toBe(false);
+    expect(live("upload", 31 * 60 * 1000)).toBe(false);
     expect(live("upload", 5 * 60 * 1000)).toBe(false);
   });
 });
@@ -449,6 +468,28 @@ describe("SemaphoreManager releasePort", () => {
     portSemaphoreManager.claimPort(PORT, "Firmware Upload");
     expect(portSemaphoreManager.releasePort(PORT)).toBe(true);
     expect(fs.existsSync(claimFile(PORT))).toBe(false);
+  });
+
+  it("does not release an owned live monitor when stale-only cleanup is required", () => {
+    portSemaphoreManager.claimPort(PORT, "Monitor Daemon");
+    portSemaphoreManager.attachMonitorPid(PORT, process.pid);
+    expect(portSemaphoreManager.releasePort(PORT, { requireStale: true })).toBe(
+      false,
+    );
+    expect(portSemaphoreManager.getClaim(PORT)?.monitor_pid).toBe(process.pid);
+  });
+
+  it("does not release a replacement claim under an earlier operation's authority", () => {
+    const previous = portSemaphoreManager.claimPort(PORT, "Monitor Daemon");
+    portSemaphoreManager.releasePort(PORT);
+    const replacement = portSemaphoreManager.claimPort(PORT, "Monitor Daemon");
+    expect(
+      portSemaphoreManager.releasePort(PORT, {
+        force: true,
+        expectedClaim: previous,
+      }),
+    ).toBe(false);
+    expect(portSemaphoreManager.getClaim(PORT)).toEqual(replacement);
   });
 
   it("refuses to release a live foreign claim", () => {
@@ -815,9 +856,11 @@ describe("re-entrant refresh keeps monitor_pid", () => {
     // The fresh claim never carries monitor_pid (it is attached only after the
     // child spawns). Writing it verbatim on the re-entrant path silently
     // dropped the field, so the next staleness check probed the launcher.
-    portSemaphoreManager.claimPort(PORT, "Monitor Daemon");
+    const claim = portSemaphoreManager.claimPort(PORT, "Monitor Daemon");
     expect(portSemaphoreManager.attachMonitorPid(PORT, 4242)).toBe(true);
-    portSemaphoreManager.claimPort(PORT, "Monitor Daemon"); // re-entrant
+    portSemaphoreManager.claimPort(PORT, "Monitor Daemon", {
+      operationId: claim.operation_id,
+    });
     expect(portSemaphoreManager.getClaim(PORT)!.monitor_pid).toBe(4242);
   });
 });
@@ -853,14 +896,11 @@ describe("attachMonitorPid ownership guard (mutation survivor M3)", () => {
   });
 });
 
-describe("monitor TTL still caps a live monitor_pid (mutation survivor M4)", () => {
+describe("live local monitors remain protected past the monitor TTL", () => {
   beforeEach(() => fs.rmSync(claimFile(PORT), { force: true }));
   afterEach(() => fs.rmSync(claimFile(PORT), { force: true }));
 
-  it("expires a monitor claim past the monitor TTL even though monitor_pid is live", () => {
-    // A recycled monitor_pid would otherwise report "held" forever with no way
-    // out but a manual `port release`. The monitor TTL is day-sized, not the
-    // flash-sized 30 minutes, so use a fixture older than that.
+  it("does not reclaim a live overnight monitor after 24 hours", () => {
     writeRawClaim(PORT, {
       type: "monitor",
       owner_workspace: "/tmp",
@@ -871,6 +911,107 @@ describe("monitor TTL still caps a live monitor_pid (mutation survivor M4)", () 
     });
     expect(
       portSemaphoreManager.isClaimStale(portSemaphoreManager.getClaim(PORT)!),
-    ).toBe(true);
+    ).toBe(false);
+    expect(() =>
+      portSemaphoreManager.claimPort(PORT, "Firmware Upload"),
+    ).toThrow(PortBusyError);
   });
+
+  it("does not amend a replacement operation's monitor claim", () => {
+    const previous = portSemaphoreManager.claimPort(PORT, "Monitor Daemon");
+    portSemaphoreManager.releasePort(PORT);
+    const replacement = portSemaphoreManager.claimPort(PORT, "Monitor Daemon");
+    expect(
+      portSemaphoreManager.attachMonitorPid(PORT, 4242, previous.operation_id),
+    ).toBe(false);
+    expect(portSemaphoreManager.getClaim(PORT)).toEqual(replacement);
+  });
+
+  it("retains uncertain detached startup custody after the launcher exits", () => {
+    writeRawClaim(PORT, {
+      type: "monitor",
+      owner_workspace: "/tmp",
+      owner_pid: 999999,
+      hostname: os.hostname(),
+      timestamp: Date.now() - 25 * 60 * 60 * 1000,
+      startup_pending: true,
+    });
+    expect(
+      portSemaphoreManager.isClaimStale(portSemaphoreManager.getClaim(PORT)!),
+    ).toBe(false);
+    expect(() =>
+      portSemaphoreManager.claimPort(PORT, "Firmware Upload"),
+    ).toThrow(PortBusyError);
+  });
+});
+
+describe("pre-upgrade alias claim ownership", () => {
+  const alias = "/dev/serial/by-id/usb-legacy-claim";
+  const nativePort = "/dev/ttyUSB42";
+  beforeEach(() => {
+    const originalRealpath = fs.realpathSync.native;
+    vi.spyOn(fs.realpathSync, "native").mockImplementation(
+      (target, options) => {
+        if (target === alias || target === nativePort) return nativePort;
+        return originalRealpath(target, options as never);
+      },
+    );
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(claimFile(alias), { force: true });
+    fs.rmSync(claimFile(nativePort), { force: true });
+  });
+  it("retains an old raw-alias monitor claim while its detached child lives", () => {
+    writeRawClaim(alias, {
+      type: "monitor",
+      port: alias,
+      owner_workspace: "/tmp/legacy",
+      owner_pid: 999999,
+      monitor_pid: process.pid,
+      hostname: os.hostname(),
+      timestamp: Date.now() - 25 * 60 * 60 * 1000,
+    });
+    expect(portSemaphoreManager.getClaim(nativePort)?.monitor_pid).toBe(
+      process.pid,
+    );
+    expect(() =>
+      portSemaphoreManager.claimPort(nativePort, "Firmware Upload"),
+    ).toThrow(PortBusyError);
+    expect(fs.existsSync(claimFile(alias))).toBe(false);
+    expect(portSemaphoreManager.getClaim(alias)?.monitor_pid).toBe(process.pid);
+    expect(
+      portSemaphoreManager.releasePort(nativePort, { requireStale: true }),
+    ).toBe(false);
+  });
+
+  it.skipIf(process.platform !== "win32")(
+    "does not unlink a canonical COM claim with legacy filename casing",
+    () => {
+      const rawFile = claimFile("com42");
+      fs.writeFileSync(
+        rawFile,
+        JSON.stringify({
+          type: "monitor",
+          port: "com42",
+          owner_workspace: "/tmp/legacy",
+          owner_pid: 999999,
+          monitor_pid: process.pid,
+          hostname: os.hostname(),
+          timestamp: Date.now(),
+        }),
+      );
+      try {
+        expect(() =>
+          portSemaphoreManager.claimPort("COM42", "Firmware Upload"),
+        ).toThrow(PortBusyError);
+        expect(fs.existsSync(rawFile)).toBe(true);
+        expect(portSemaphoreManager.getClaim("COM42")?.monitor_pid).toBe(
+          process.pid,
+        );
+      } finally {
+        fs.rmSync(rawFile, { force: true });
+      }
+    },
+  );
 });
