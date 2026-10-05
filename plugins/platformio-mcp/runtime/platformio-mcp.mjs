@@ -38035,6 +38035,19 @@ async function withMonitorTransition(port, action) {
     monitorTransitions.delete(port);
   }
 }
+function assertMonitorCustodyAvailable(endpoint) {
+  const custody = new DeviceLeaseStore().status(endpoint.resource);
+  if (custody.status === "unclaimed" || custody.status === "stale") return;
+  throw new PlatformIOError(
+    custody.status === "owned" ? "Physical serial endpoint is already owned by another operation." : "Physical serial endpoint custody is unresolved; refusing monitor startup.",
+    custody.status === "owned" ? "DEVICE_BUSY" : "DEVICE_OWNER_UNKNOWN",
+    {
+      resource: custody.resource,
+      ownerPid: custody.ownerPid,
+      custodyStatus: custody.status
+    }
+  );
+}
 function emitNewLogBytes(port, daemon) {
   let fd;
   try {
@@ -38167,7 +38180,7 @@ async function cleanupSpawnedMonitor(proc, observation) {
       throw error40;
   }
 }
-async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
+async function spawnPioMonitor(targetPort, endpoint, projectDir, rootCommandId) {
   const daemon = activeDaemons[targetPort];
   if (!daemon) return;
   const monitorArgs = ["--port", targetPort];
@@ -38183,6 +38196,8 @@ async function spawnPioMonitor(targetPort, projectDir, rootCommandId) {
   const outFd = fs83.openSync(daemon.logFile, "a");
   let proc;
   try {
+    endpoint.revalidate();
+    assertMonitorCustodyAvailable(endpoint);
     proc = await platformioExecutor.spawn(
       "device",
       ["monitor", ...monitorArgs],
@@ -38370,8 +38385,11 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
     );
   if (baud && !validateBaudRate(baud))
     throw new PlatformIOError(`Invalid baud rate: ${baud}`, "INVALID_BAUD");
-  const targetPort = canonicalPortName(activePort);
+  const requestedPort = activePort;
+  const targetPort = canonicalPortName(requestedPort);
   return withMonitorTransition(targetPort, async () => {
+    const endpoint = resolveSerialEndpoint(requestedPort);
+    assertMonitorCustodyAvailable(endpoint);
     await stopMonitorPort(targetPort, projectDir);
     const targetDir = getLogDir("monitor", projectDir);
     if (!fs83.existsSync(targetDir)) {
@@ -38393,7 +38411,12 @@ async function startMonitor(port, baud = 115200, projectDir, environment, rootCo
     };
     activeDaemons[targetPort] = daemon;
     try {
-      await spawnPioMonitor(targetPort, projectDir, effectiveCommandId);
+      await spawnPioMonitor(
+        targetPort,
+        endpoint,
+        projectDir,
+        effectiveCommandId
+      );
     } catch (error40) {
       const cleanupPending = error40 instanceof PlatformIOError && error40.context?.cleanupPending === true;
       if (!cleanupPending) {
@@ -38709,6 +38732,8 @@ var init_monitor = __esm({
     init_paths();
     init_owned_process_wait();
     init_process_identity();
+    init_device_lease();
+    init_serial_endpoint();
     init_devices();
     init_process_manager();
     init_platformio();

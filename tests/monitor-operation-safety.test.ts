@@ -24,6 +24,7 @@ const dependencies = vi.hoisted(() => ({
   kill: vi.fn(),
   register: vi.fn(),
   treeKill: vi.fn(),
+  custodyStatus: vi.fn(),
 }));
 vi.mock("../src/platformio.js", () => ({
   platformioExecutor: { spawn: dependencies.spawn },
@@ -40,6 +41,30 @@ vi.mock("../src/utils/process-manager.js", () => ({
   isBuildActive: vi.fn(() => false),
 }));
 vi.mock("tree-kill", () => ({ default: dependencies.treeKill }));
+vi.mock("../src/core/devices/device-lease.js", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../src/core/devices/device-lease.js")
+  >()),
+  DeviceLeaseStore: class {
+    status(resource: unknown) {
+      return dependencies.custodyStatus(resource);
+    }
+  },
+}));
+vi.mock("../src/core/devices/serial-endpoint.js", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../src/core/devices/serial-endpoint.js")
+  >()),
+  resolveSerialEndpoint: vi.fn((requestedPort: string) => ({
+    requestedPort,
+    canonicalPort: requestedPort,
+    resource: { kind: "serial", identity: `monitor-test:${requestedPort}` },
+    revalidate: vi.fn(),
+    identityBasis: "windows-port-name",
+    presence: "unverified",
+    survivesReenumeration: false,
+  })),
+}));
 vi.mock("../src/core/devices/process-identity.js", () => ({
   inspectProcessIdentity: vi.fn((pid: number) => ({
     status: "running",
@@ -87,6 +112,10 @@ describe("monitor operation safety", () => {
     dependencies.kill.mockResolvedValue(false);
     dependencies.register.mockResolvedValue(undefined);
     dependencies.spawn.mockResolvedValue(fakeChild());
+    dependencies.custodyStatus.mockImplementation((resource) => ({
+      status: "unclaimed",
+      resource,
+    }));
     dependencies.treeKill.mockImplementation((_pid, _signal, callback) =>
       callback(),
     );
@@ -115,6 +144,102 @@ describe("monitor operation safety", () => {
     ).rejects.toBeInstanceOf(PortBusyError);
     expect(dependencies.spawn).not.toHaveBeenCalled();
     expect(portSemaphoreManager.getClaim(port)).toEqual(upload);
+  });
+
+  it("refuses orphan upload custody before reclaiming its stale upload claim", async () => {
+    const { DeviceLeaseStore: ActualStore } = await vi.importActual<
+      typeof import("../src/core/devices/device-lease.js")
+    >("../src/core/devices/device-lease.js");
+    let ownerRunning = true;
+    const store = new ActualStore({
+      root: path.join(testDataDir, "orphan-upload-lease"),
+      inspect: (pid) =>
+        ownerRunning
+          ? {
+              status: "running",
+              identity: {
+                pid,
+                platform: process.platform,
+                startToken: "fixture-owner",
+              },
+            }
+          : { status: "absent" },
+    });
+    const uploadClaim = portSemaphoreManager.claimPort(port, "Firmware Upload");
+    vi.spyOn(portSemaphoreManager, "isClaimStale").mockReturnValue(true);
+    const resource = {
+      kind: "serial" as const,
+      identity: `monitor-test:${port}`,
+    };
+    const lease = store.acquire(resource);
+    store.beginHandoff(lease);
+    ownerRunning = false;
+    dependencies.custodyStatus.mockImplementation((selected) =>
+      store.status(selected),
+    );
+    try {
+      await expect(
+        startMonitor(port, 115200, testDataDir),
+      ).rejects.toMatchObject({ code: "DEVICE_OWNER_UNKNOWN" });
+      expect(dependencies.kill).not.toHaveBeenCalled();
+      expect(dependencies.spawn).not.toHaveBeenCalled();
+      expect(store.status(resource).status).toBe("unknown");
+      expect(portSemaphoreManager.getClaim(port)).toEqual(uploadClaim);
+    } finally {
+      // No fixture child was started, so this test owns the cleanup capability.
+      store.cancelHandoff(lease);
+      store.release(lease);
+    }
+  });
+
+  it.each(["owned", "unknown"] as const)(
+    "rejects %s physical custody before monitor preemption",
+    async (status) => {
+      dependencies.custodyStatus.mockImplementation((resource) => ({
+        status,
+        resource,
+        ownerPid: 999999,
+      }));
+      await expect(
+        startMonitor(port, 115200, testDataDir),
+      ).rejects.toMatchObject({
+        code: status === "owned" ? "DEVICE_BUSY" : "DEVICE_OWNER_UNKNOWN",
+      });
+      expect(dependencies.kill).not.toHaveBeenCalled();
+      expect(dependencies.spawn).not.toHaveBeenCalled();
+      expect(portSemaphoreManager.getClaim(port)).toBeNull();
+    },
+  );
+
+  it.each(["unclaimed", "stale"] as const)(
+    "accepts %s physical custody for monitor startup",
+    async (status) => {
+      dependencies.custodyStatus.mockImplementation((resource) => ({
+        status,
+        resource,
+      }));
+      await expect(
+        startMonitor(port, 115200, testDataDir),
+      ).resolves.toMatchObject({ success: true });
+      expect(dependencies.spawn).toHaveBeenCalledTimes(1);
+      expect(dependencies.custodyStatus).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("rechecks physical custody after its claim and before spawning", async () => {
+    dependencies.custodyStatus
+      .mockImplementationOnce((resource) => ({ status: "unclaimed", resource }))
+      .mockImplementationOnce((resource) => ({
+        status: "owned",
+        resource,
+        ownerPid: 999999,
+      }));
+    await expect(startMonitor(port, 115200, testDataDir)).rejects.toMatchObject(
+      { code: "DEVICE_BUSY" },
+    );
+    expect(dependencies.spawn).not.toHaveBeenCalled();
+    expect(portSemaphoreManager.getClaim(port)).toBeNull();
+    expect(getSpoolerStates()[port]).toBeUndefined();
   });
 
   it("rejects concurrent monitor starts before a second child can spawn", async () => {

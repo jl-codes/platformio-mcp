@@ -25,6 +25,11 @@ import {
   inspectProcessIdentity,
   type ProcessObservation,
 } from "../core/devices/process-identity.js";
+import { DeviceLeaseStore } from "../core/devices/device-lease.js";
+import {
+  resolveSerialEndpoint,
+  type ResolvedSerialEndpoint,
+} from "../core/devices/serial-endpoint.js";
 import { getFirstDevice } from "./devices.js";
 import {
   registerPioMonitorPid,
@@ -100,6 +105,23 @@ async function withMonitorTransition<T>(
   } finally {
     monitorTransitions.delete(port);
   }
+}
+
+/** Refuse existing physical custody, including children left by a dead upload coordinator. */
+function assertMonitorCustodyAvailable(endpoint: ResolvedSerialEndpoint): void {
+  const custody = new DeviceLeaseStore().status(endpoint.resource);
+  if (custody.status === "unclaimed" || custody.status === "stale") return;
+  throw new PlatformIOError(
+    custody.status === "owned"
+      ? "Physical serial endpoint is already owned by another operation."
+      : "Physical serial endpoint custody is unresolved; refusing monitor startup.",
+    custody.status === "owned" ? "DEVICE_BUSY" : "DEVICE_OWNER_UNKNOWN",
+    {
+      resource: custody.resource,
+      ownerPid: custody.ownerPid,
+      custodyStatus: custody.status,
+    },
+  );
 }
 
 function emitNewLogBytes(port: string, daemon: DaemonContext): void {
@@ -301,6 +323,7 @@ async function cleanupSpawnedMonitor(
 
 async function spawnPioMonitor(
   targetPort: string,
+  endpoint: ResolvedSerialEndpoint,
   projectDir?: string,
   rootCommandId?: string,
 ) {
@@ -325,6 +348,11 @@ async function spawnPioMonitor(
   const outFd = fs.openSync(daemon.logFile, "a");
   let proc;
   try {
+    // The canonical monitor claim now excludes ordinary upload launchers.
+    // Recheck the physical lease after claiming: a dead coordinator's native
+    // child may still own the UART even though its PID-only claim is stale.
+    endpoint.revalidate();
+    assertMonitorCustodyAvailable(endpoint);
     proc = await platformioExecutor.spawn(
       "device",
       ["monitor", ...monitorArgs],
@@ -561,8 +589,11 @@ export async function startMonitor(
   if (baud && !validateBaudRate(baud))
     throw new PlatformIOError(`Invalid baud rate: ${baud}`, "INVALID_BAUD");
 
-  const targetPort = canonicalPortName(activePort);
+  const requestedPort = activePort;
+  const targetPort = canonicalPortName(requestedPort);
   return withMonitorTransition(targetPort, async () => {
+    const endpoint = resolveSerialEndpoint(requestedPort);
+    assertMonitorCustodyAvailable(endpoint);
     // Relinquish previous bindings safely if re-invoked
     await stopMonitorPort(targetPort, projectDir);
 
@@ -591,7 +622,12 @@ export async function startMonitor(
     activeDaemons[targetPort] = daemon;
 
     try {
-      await spawnPioMonitor(targetPort, projectDir, effectiveCommandId);
+      await spawnPioMonitor(
+        targetPort,
+        endpoint,
+        projectDir,
+        effectiveCommandId,
+      );
     } catch (error) {
       const cleanupPending =
         error instanceof PlatformIOError &&
