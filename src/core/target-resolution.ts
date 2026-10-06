@@ -79,6 +79,7 @@ export function parseTargetEnvironments(iniText: string): {
 } {
   const environments: TargetEnvironment[] = [];
   const defaults: string[] = [];
+  const extendsMap = new Map<string, string>();
   let active: TargetEnvironment | undefined;
 
   for (const rawLine of iniText.split(/\r?\n/u)) {
@@ -92,7 +93,7 @@ export function parseTargetEnvironments(iniText: string): {
       continue;
     }
 
-    const pair = /^([a-zA-Z0-9_]+)\s*=\s*(.+)$/u.exec(line);
+    const pair = /^([a-zA-Z0-9_.]+)\s*=\s*(.+)$/u.exec(line);
     if (!pair) continue;
     const key = pair[1].toLowerCase();
     const value = pair[2].trim();
@@ -107,6 +108,33 @@ export function parseTargetEnvironments(iniText: string): {
       active.board = value;
     } else if (active && key === "framework") {
       active.framework = value;
+    } else if (active && key === "extends") {
+      // Capture extends for post-parse inheritance resolution.
+      // Value may be comma-separated; take the first env: reference.
+      const envParent = value
+        .split(",")
+        .map((v) => v.trim())
+        .find((p) => p.startsWith("env:"));
+      if (envParent) {
+        extendsMap.set(active.name, envParent.replace(/^env:/u, ""));
+      }
+    }
+  }
+
+  // Resolve inherited board/framework from parent environments.
+  // Follows extends chains (depth-limited to prevent cycles).
+  for (const env of environments) {
+    if (env.board && env.framework) continue;
+    let parentName = extendsMap.get(env.name);
+    let depth = 0;
+    while (parentName && depth < 10) {
+      const parent = environments.find((e) => e.name === parentName);
+      if (!parent) break;
+      if (!env.board && parent.board) env.board = parent.board;
+      if (!env.framework && parent.framework) env.framework = parent.framework;
+      if (env.board && env.framework) break;
+      parentName = extendsMap.get(parentName);
+      depth++;
     }
   }
 
