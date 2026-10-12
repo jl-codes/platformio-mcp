@@ -6,6 +6,8 @@
  * - verifyTargetBinding: Rejects expired or substituted target bindings.
  */
 
+import { NOISE_PORT_HINT, normalizeSerialPort } from "../utils/serial-port.js";
+import { mapVidPidToPlatform } from "../utils/hardware-maps.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -23,6 +25,7 @@ export interface TargetEnvironment {
   name: string;
   board?: string;
   framework?: string;
+  platform?: string;
 }
 
 /** Short-lived proof binding a workflow to one physical target. */
@@ -105,6 +108,8 @@ export function parseTargetEnvironments(iniText: string): {
       );
     } else if (active && key === "board") {
       active.board = value;
+    } else if (active && key === "platform") {
+      active.platform = value;
     } else if (active && key === "framework") {
       active.framework = value;
     }
@@ -201,6 +206,7 @@ export async function resolveTarget(
         return {
           name: env.name,
           ...(env.board ? { board: env.board } : {}),
+          ...(typeof env.platform === "string" ? { platform: env.platform } : {}),
           ...(typeof env.framework === "string" ? { framework: env.framework } : {}),
         };
       }),
@@ -262,11 +268,13 @@ export async function resolveTarget(
   }
 
   const devices = (discoveredDevices ?? (await listDevicesCore())).filter((device) => {
-    const normalizedPort = device.port.toLowerCase();
-    return !normalizedPort.includes("bluetooth") && !normalizedPort.includes("blth");
+    return !NOISE_PORT_HINT.test(`${device.port} ${device.description}`);
   });
   let candidates = input.port
-    ? devices.filter((device) => device.port === input.port)
+    ? devices.filter(
+        (device) =>
+          normalizeSerialPort(device.port) === normalizeSerialPort(input.port!),
+      )
     : devices.filter(
         (device) =>
           device.detectedBoard?.toLowerCase() ===
@@ -274,11 +282,25 @@ export async function resolveTarget(
       );
   let confidence: TargetResolutionResult["confidence"] = "exact";
 
-  if (!input.port && candidates.length === 0 && devices.length === 1) {
-    candidates = devices;
+  // A shared USB ID is only a platform hint. Unknown peers remain candidates,
+  // and an explicitly incompatible platform never gets the single-device fallback.
+  const compatibleDevices = devices.filter((device) => {
+    const platform = mapVidPidToPlatform(device.hwid);
+    // Registry names may carry an owner/version; custom URLs remain unknown.
+    const configuredPlatform = /^(?:platformio\/)?([a-z][a-z0-9_]*)(?:@[^\s]+)?$/iu.exec(
+      selectedEnvironment.platform ?? "",
+    )?.[1].toLowerCase();
+    return !platform || !configuredPlatform || configuredPlatform === platform;
+  });
+  if (!input.port && candidates.length === 0 && compatibleDevices.length === 1) {
+    candidates = compatibleDevices;
     confidence = "medium";
   } else if (!input.port && candidates.length === 1) {
     confidence = "high";
+  }
+
+  if (!input.port && candidates.length === 0 && compatibleDevices.length > 1) {
+    candidates = compatibleDevices;
   }
 
   if (candidates.length === 0) {

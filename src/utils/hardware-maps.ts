@@ -5,6 +5,7 @@
  *
  * Provides:
  * - mapVidPidToBoard: Resolves hardware names for the device list tool based on VID/PID or description
+ * - mapVidPidToPlatform: Returns a platform hint for shared USB hardware IDs
  * - vidPidDatabase: Dictionary mapping USB raw strings to development boards
  * - boardPatterns: Regex patterns for matching hardware descriptions
  */
@@ -14,8 +15,10 @@
  */
 export const vidPidDatabase: Record<
   string,
-  { boards: string[]; confidence: string }
+  { boards: string[]; confidence: string; platform?: string }
 > = {
+  // Shared by multiple ESP32 chips/boards: never invent an exact board ID.
+  "303a:1001": { boards: [], confidence: "medium", platform: "espressif32" },
   "2341:0043": { boards: ["uno"], confidence: "high" },
   "2341:0042": { boards: ["megaatmega2560"], confidence: "high" },
   "2341:8036": { boards: ["leonardo"], confidence: "high" },
@@ -108,4 +111,14 @@ export function mapVidPidToBoard(
   }
 
   return undefined;
+}
+
+/** Return a platform hint for shared USB IDs, never a physical-device identity. */
+export function mapVidPidToPlatform(hwid: string): string | undefined {
+  const match =
+    hwid.match(/VID:PID=([0-9a-f]{4}):([0-9a-f]{4})/iu) ??
+    hwid.match(/VID_([0-9a-f]{4})&PID_([0-9a-f]{4})/iu);
+  return match
+    ? vidPidDatabase[`${match[1]}:${match[2]}`.toLowerCase()]?.platform
+    : undefined;
 }
