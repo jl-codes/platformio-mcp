@@ -17660,11 +17660,24 @@ var init_esp_partition_artifacts = __esm({
   }
 });
 
+// src/utils/serial-port.ts
+function normalizeSerialPort(port) {
+  return port.replace(/^\/dev\/tty\.(?=.+)/u, "/dev/cu.");
+}
+var NOISE_PORT_HINT;
+var init_serial_port = __esm({
+  "src/utils/serial-port.ts"() {
+    "use strict";
+    NOISE_PORT_HINT = /Bluetooth|blth|debug-console|Jabra|AirPods|iPhone/i;
+  }
+});
+
 // src/types.ts
 var BoardInfoSchema, BoardsArraySchema, SerialDeviceSchema, DevicesArraySchema, ProjectConfigSchema, UploadConfigSchema, LibraryInfoSchema, LibrariesArraySchema, LibrariesObjectSchema, LibrarySearchResponseSchema, LibrarySearchConfigSchema, LibraryInstallConfigSchema, ListBoardsParamsSchema, AcquireLockParamsSchema, ReleaseLockParamsSchema, GetBoardInfoParamsSchema, InitProjectParamsSchema, GetProjectConfigParamsSchema, SystemInfoParamsSchema, BuildProjectParamsSchema, CleanProjectParamsSchema, CheckProjectParamsSchema, RunTestsParamsSchema, UploadFirmwareParamsSchema, UploadFilesystemParamsSchema, SearchLibrariesParamsSchema, InstallLibraryParamsSchema, UninstallLibraryParamsSchema, UpdateLibraryParamsSchema, ListInstalledLibrariesParamsSchema, StartMonitorParamsSchema, StopMonitorParamsSchema, QueryLogsParamsSchema, CheckTaskStatusParamsSchema, TargetBindingSchema, AgentResolveTargetParamsSchema, GetMonitorStatusParamsSchema, CaptureSerialWindowParamsSchema, AgentMonitorHealthParamsSchema, CancelTaskParamsSchema, ListTaskHistoryParamsSchema, GetApprovalRequestParamsSchema, ListPendingApprovalsParamsSchema, GetDashboardUrlParamsSchema, GetProjectContextParamsSchema, AgentValidateProjectParamsSchema, AgentBuildDiagnoseParamsSchema, AgentSafePinAuditParamsSchema, AgentFlashMonitorVerifyParamsSchema, AgentGetLastReportParamsSchema, AgentGenerateBoardReportParamsSchema, GetPolicyStatusParamsSchema;
 var init_types2 = __esm({
   "src/types.ts"() {
     "use strict";
+    init_serial_port();
     init_zod();
     BoardInfoSchema = external_exports.object({
       id: external_exports.string(),
@@ -17676,7 +17689,8 @@ var init_types2 = __esm({
       ram: external_exports.number().optional(),
       fcpu: external_exports.number().optional(),
       rom: external_exports.number().optional(),
-      frameworks: external_exports.array(external_exports.string()).optional(),
+      // PlatformIO emits null for boards without declared framework support.
+      frameworks: external_exports.array(external_exports.string()).nullish().transform((value2) => value2 ?? void 0),
       vendor: external_exports.string().optional(),
       url: external_exports.string().optional(),
       connectivity: external_exports.array(external_exports.string()).optional(),
@@ -17824,7 +17838,9 @@ var init_types2 = __esm({
     });
     UploadFirmwareParamsSchema = external_exports.object({
       projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
-      port: external_exports.string().optional().describe("Upload port (auto-detected if not specified)"),
+      port: external_exports.string().min(1).optional().describe("Upload port (auto-detected if not specified)"),
+      uploadPort: external_exports.string().min(1).optional().describe("Alias for port"),
+      upload_port: external_exports.string().min(1).optional().describe("Alias for port"),
       environment: external_exports.string().optional().describe("Specific environment to upload (from platformio.ini)"),
       sessionId: external_exports.string().optional().describe("Agent session ID for pipeline lock validation"),
       verbose: external_exports.boolean().optional().describe(
@@ -17839,7 +17855,21 @@ var init_types2 = __esm({
       targetBinding: external_exports.lazy(() => TargetBindingSchema).optional().describe("Optional short-lived binding returned by agent_resolve_target."),
       automationKey: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u).optional(),
       maxRunDurationSeconds: external_exports.number().int().min(1).max(900).optional()
-    });
+    }).superRefine((params, context) => {
+      const ports = [params.port, params.uploadPort, params.upload_port].filter(
+        (port) => port !== void 0
+      );
+      if (new Set(ports.map(normalizeSerialPort)).size > 1) {
+        context.addIssue({
+          code: external_exports.ZodIssueCode.custom,
+          path: ["port"],
+          message: "Conflicting port, uploadPort, or upload_port selectors"
+        });
+      }
+    }).transform(({ uploadPort, upload_port, ...params }) => ({
+      ...params,
+      port: params.port ?? uploadPort ?? upload_port
+    }));
     UploadFilesystemParamsSchema = external_exports.object({
       projectDir: external_exports.string().min(1).describe("Path to the PlatformIO project directory"),
       port: external_exports.string().optional().describe("Upload port (auto-detected if not specified)"),
@@ -18050,11 +18080,17 @@ function mapVidPidToBoard(hwid, description = "") {
   }
   return void 0;
 }
+function mapVidPidToPlatform(hwid) {
+  const match = hwid.match(/VID:PID=([0-9a-f]{4}):([0-9a-f]{4})/iu) ?? hwid.match(/VID_([0-9a-f]{4})&PID_([0-9a-f]{4})/iu);
+  return match ? vidPidDatabase[`${match[1]}:${match[2]}`.toLowerCase()]?.platform : void 0;
+}
 var vidPidDatabase, boardPatterns;
 var init_hardware_maps = __esm({
   "src/utils/hardware-maps.ts"() {
     "use strict";
     vidPidDatabase = {
+      // Shared by multiple ESP32 chips/boards: never invent an exact board ID.
+      "303a:1001": { boards: [], confidence: "medium", platform: "espressif32" },
       "2341:0043": { boards: ["uno"], confidence: "high" },
       "2341:0042": { boards: ["megaatmega2560"], confidence: "high" },
       "2341:8036": { boards: ["leonardo"], confidence: "high" },
@@ -37902,6 +37938,8 @@ function parseTargetEnvironments(iniText) {
       );
     } else if (active && key === "board") {
       active.board = value2;
+    } else if (active && key === "platform") {
+      active.platform = value2;
     } else if (active && key === "framework") {
       active.framework = value2;
     }
@@ -37956,6 +37994,7 @@ async function resolveTarget(input, discoveredDevices) {
         return {
           name: env.name,
           ...env.board ? { board: env.board } : {},
+          ...typeof env.platform === "string" ? { platform: env.platform } : {},
           ...typeof env.framework === "string" ? { framework: env.framework } : {}
         };
       })
@@ -38014,18 +38053,29 @@ async function resolveTarget(input, discoveredDevices) {
     };
   }
   const devices = (discoveredDevices ?? await listDevicesCore()).filter((device2) => {
-    const normalizedPort = device2.port.toLowerCase();
-    return !normalizedPort.includes("bluetooth") && !normalizedPort.includes("blth");
+    return !NOISE_PORT_HINT.test(`${device2.port} ${device2.description}`);
   });
-  let candidates = input.port ? devices.filter((device2) => device2.port === input.port) : devices.filter(
+  let candidates = input.port ? devices.filter(
+    (device2) => normalizeSerialPort(device2.port) === normalizeSerialPort(input.port)
+  ) : devices.filter(
     (device2) => device2.detectedBoard?.toLowerCase() === selectedEnvironment?.board?.toLowerCase()
   );
   let confidence = "exact";
-  if (!input.port && candidates.length === 0 && devices.length === 1) {
-    candidates = devices;
+  const compatibleDevices = devices.filter((device2) => {
+    const platform2 = mapVidPidToPlatform(device2.hwid);
+    const configuredPlatform = /^(?:platformio\/)?([a-z][a-z0-9_]*)(?:@[^\s]+)?$/iu.exec(
+      selectedEnvironment.platform ?? ""
+    )?.[1].toLowerCase();
+    return !platform2 || !configuredPlatform || configuredPlatform === platform2;
+  });
+  if (!input.port && candidates.length === 0 && compatibleDevices.length === 1) {
+    candidates = compatibleDevices;
     confidence = "medium";
   } else if (!input.port && candidates.length === 1) {
     confidence = "high";
+  }
+  if (!input.port && candidates.length === 0 && compatibleDevices.length > 1) {
+    candidates = compatibleDevices;
   }
   if (candidates.length === 0) {
     return {
@@ -38174,6 +38224,8 @@ var MAX_BINDING_TTL_SECONDS;
 var init_target_resolution = __esm({
   "src/core/target-resolution.ts"() {
     "use strict";
+    init_serial_port();
+    init_hardware_maps();
     init_errors2();
     init_validation();
     init_devices2();
@@ -68489,6 +68541,9 @@ var require_proxy_addr = __commonJS({
       return function trust(addr) {
         if (!isip(addr)) return false;
         var ip = parseip(addr);
+        if (ip.kind() === "ipv6" && ip.isIPv4MappedAddress()) {
+          ip = ip.toIPv4Address();
+        }
         var ipconv;
         var kind3 = ip.kind();
         for (var i = 0; i < subnets.length; i++) {
@@ -68501,10 +68556,15 @@ var require_proxy_addr = __commonJS({
             if (subnetkind === "ipv4" && !ip.isIPv4MappedAddress()) {
               continue;
             }
+            if (subnetkind !== "ipv4" && !(subnetrange >= 96 && subnetip.isIPv4MappedAddress())) {
+              continue;
+            }
             if (!ipconv) {
               ipconv = subnetkind === "ipv4" ? ip.toIPv4Address() : ip.toIPv4MappedAddress();
             }
             trusted = ipconv;
+          } else if (kind3 === "ipv6" && subnetip.isIPv4MappedAddress()) {
+            continue;
           }
           if (trusted.match(subnetip, subnetrange)) {
             return true;
@@ -68521,12 +68581,20 @@ var require_proxy_addr = __commonJS({
       return function trust(addr) {
         if (!isip(addr)) return false;
         var ip = parseip(addr);
+        if (ip.kind() === "ipv6" && ip.isIPv4MappedAddress()) {
+          ip = ip.toIPv4Address();
+        }
         var kind3 = ip.kind();
         if (kind3 !== subnetkind) {
           if (subnetisipv4 && !ip.isIPv4MappedAddress()) {
             return false;
           }
+          if (!subnetisipv4 && !(subnetrange >= 96 && subnetip.isIPv4MappedAddress())) {
+            return false;
+          }
           ip = subnetisipv4 ? ip.toIPv4Address() : ip.toIPv4MappedAddress();
+        } else if (kind3 === "ipv6" && subnetip.isIPv4MappedAddress()) {
+          return false;
         }
         return ip.match(subnetip, subnetrange);
       };
@@ -111891,6 +111959,9 @@ async function executeProjectInspection(action, input, caller = {}, onAuthorized
 // src/tools/run-target.ts
 init_devices2();
 
+// src/adapters/device-compat.ts
+init_serial_port();
+
 // src/adapters/size-compat.ts
 init_zod();
 
@@ -117243,7 +117314,6 @@ import path57 from "node:path";
 init_devices2();
 init_errors2();
 var DEVELOPMENT_BOARD_HINT = /CP210|CH34|CH9102|FTDI|FT23|Silicon Labs|SLAB|usbserial|usbmodem|wchusbserial|ttyUSB|ttyACM|ESP|Arduino|STLink|ST-Link|JLink|J-Link|CMSIS|DAPLink|Espressif|USB/i;
-var NOISE_PORT_HINT = /Bluetooth|debug-console|Jabra|AirPods|iPhone/i;
 function projectCompatibilityDevices(devices) {
   const rows = devices.map((device) => {
     const description = `${device.description} ${device.hwid} ${device.port}`;
@@ -132953,6 +133023,9 @@ var Protocol = class {
       this.setRequestHandler(GetTaskPayloadRequestSchema, async (request, extra) => {
         const handleTaskResult = async () => {
           const taskId = request.params.taskId;
+          if (!await this._taskStore.getTask(taskId, extra.sessionId)) {
+            throw new McpError(ErrorCode.InvalidParams, `Task not found: ${taskId}`);
+          }
           if (this._taskMessageQueue) {
             let queuedMessage;
             while (queuedMessage = await this._taskMessageQueue.dequeue(taskId, extra.sessionId)) {
@@ -132983,12 +133056,12 @@ var Protocol = class {
             throw new McpError(ErrorCode.InvalidParams, `Task not found: ${taskId}`);
           }
           if (!isTerminal(task.status)) {
-            await this._waitForTaskUpdate(taskId, extra.signal);
+            await this._waitForTaskUpdate(taskId, extra.signal, extra.sessionId);
             return await handleTaskResult();
           }
           if (isTerminal(task.status)) {
             const result = await this._taskStore.getTaskResult(taskId, extra.sessionId);
-            this._clearTaskQueue(taskId);
+            this._clearTaskQueue(taskId, extra.sessionId);
             return {
               ...result,
               _meta: {
@@ -133025,7 +133098,7 @@ var Protocol = class {
             throw new McpError(ErrorCode.InvalidParams, `Cannot cancel task in terminal status: ${task.status}`);
           }
           await this._taskStore.updateTaskStatus(request.params.taskId, "cancelled", "Client cancelled task execution.", extra.sessionId);
-          this._clearTaskQueue(request.params.taskId);
+          this._clearTaskQueue(request.params.taskId, extra.sessionId);
           const cancelledTask = await this._taskStore.getTask(request.params.taskId, extra.sessionId);
           if (!cancelledTask) {
             throw new McpError(ErrorCode.InvalidParams, `Task not found after cancellation: ${request.params.taskId}`);
@@ -133153,6 +133226,19 @@ var Protocol = class {
     const handler = this._requestHandlers.get(request.method) ?? this.fallbackRequestHandler;
     const capturedTransport = this._transport;
     const relatedTaskId = request.params?._meta?.[RELATED_TASK_META_KEY]?.taskId;
+    const sessionId2 = capturedTransport?.sessionId;
+    const store = this._taskStore;
+    let relatedTaskFound = true;
+    let relatedTaskLookup;
+    if (relatedTaskId && store && this._taskMessageQueue && sessionId2 !== void 0) {
+      relatedTaskFound = false;
+      relatedTaskLookup = (async () => {
+        if (!await store.getTask(relatedTaskId, sessionId2)) {
+          throw new McpError(ErrorCode.InvalidParams, `Task not found: ${relatedTaskId}`);
+        }
+        relatedTaskFound = true;
+      })();
+    }
     if (handler === void 0) {
       const errorResponse = {
         jsonrpc: "2.0",
@@ -133162,7 +133248,10 @@ var Protocol = class {
           message: "Method not found"
         }
       };
-      if (relatedTaskId && this._taskMessageQueue) {
+      if (relatedTaskId && relatedTaskLookup) {
+        const queuedError = { type: "error", message: errorResponse, timestamp: Date.now() };
+        relatedTaskLookup.then(() => this._enqueueTaskMessage(relatedTaskId, queuedError, sessionId2), () => capturedTransport?.send(errorResponse)).catch((error40) => this._onerror(new Error(`Failed to send an error response: ${error40}`)));
+      } else if (relatedTaskId && this._taskMessageQueue) {
         this._enqueueTaskMessage(relatedTaskId, {
           type: "error",
           message: errorResponse,
@@ -133213,7 +133302,10 @@ var Protocol = class {
       closeSSEStream: extra?.closeSSEStream,
       closeStandaloneSSEStream: extra?.closeStandaloneSSEStream
     };
-    Promise.resolve().then(() => {
+    (relatedTaskLookup ?? Promise.resolve()).then(() => {
+      if (relatedTaskLookup && abortController.signal.aborted) {
+        throw new McpError(ErrorCode.ConnectionClosed, "Request was cancelled");
+      }
       if (taskCreationParams) {
         this.assertTaskHandlerCapability(request.method);
       }
@@ -133248,7 +133340,7 @@ var Protocol = class {
           ...error40["data"] !== void 0 && { data: error40["data"] }
         }
       };
-      if (relatedTaskId && this._taskMessageQueue) {
+      if (relatedTaskId && this._taskMessageQueue && relatedTaskFound) {
         await this._enqueueTaskMessage(relatedTaskId, {
           type: "error",
           message: errorResponse,
@@ -133728,7 +133820,7 @@ var Protocol = class {
       throw new Error("Cannot enqueue task message: taskStore and taskMessageQueue are not configured");
     }
     const maxQueueSize = this._options?.maxTaskQueueSize;
-    await this._taskMessageQueue.enqueue(taskId, message, sessionId2, maxQueueSize);
+    await this._taskMessageQueue.enqueue(taskId, message, sessionId2 ?? this._transport?.sessionId, maxQueueSize);
   }
   /**
    * Clears the message queue for a task and rejects any pending request resolvers.
@@ -133757,12 +133849,13 @@ var Protocol = class {
    * Uses polling to check for updates at the task's configured poll interval.
    * @param taskId The task ID to wait for
    * @param signal Abort signal to cancel the wait
+   * @param sessionId Session of the request that waits, passed to the task store
    * @returns Promise that resolves when an update occurs or rejects if aborted
    */
-  async _waitForTaskUpdate(taskId, signal) {
+  async _waitForTaskUpdate(taskId, signal, sessionId2) {
     let interval = this._options?.defaultTaskPollInterval ?? 1e3;
     try {
-      const task = await this._taskStore?.getTask(taskId);
+      const task = await this._taskStore?.getTask(taskId, sessionId2);
       if (task?.pollInterval) {
         interval = task.pollInterval;
       }
@@ -134248,16 +134341,7 @@ var Server = class extends Protocol {
     if (!methodSchema) {
       throw new Error("Schema is missing a method literal");
     }
-    let methodValue;
-    if (isZ4Schema(methodSchema)) {
-      const v4Schema = methodSchema;
-      const v4Def = v4Schema._zod?.def;
-      methodValue = v4Def?.value ?? v4Schema.value;
-    } else {
-      const v3Schema = methodSchema;
-      const legacyDef = v3Schema._def;
-      methodValue = legacyDef?.value ?? v3Schema.value;
-    }
+    const methodValue = getLiteralValue(methodSchema);
     if (typeof methodValue !== "string") {
       throw new Error("Schema method literal must be a string");
     }
@@ -134566,8 +134650,17 @@ var Server = class extends Protocol {
 import process2 from "node:process";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
+var STDIO_DEFAULT_MAX_BUFFER_SIZE = 10 * 1024 * 1024;
 var ReadBuffer = class {
+  constructor(options) {
+    this._maxBufferSize = options?.maxBufferSize ?? STDIO_DEFAULT_MAX_BUFFER_SIZE;
+  }
   append(chunk) {
+    const newSize = (this._buffer?.length ?? 0) + chunk.length;
+    if (newSize > this._maxBufferSize) {
+      this.clear();
+      throw new Error(`ReadBuffer exceeded maximum size of ${this._maxBufferSize} bytes`);
+    }
     this._buffer = this._buffer ? Buffer.concat([this._buffer, chunk]) : chunk;
   }
   readMessage() {
@@ -134595,18 +134688,24 @@ function serializeMessage(message) {
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 var StdioServerTransport = class {
-  constructor(_stdin = process2.stdin, _stdout = process2.stdout) {
+  constructor(_stdin = process2.stdin, _stdout = process2.stdout, options) {
     this._stdin = _stdin;
     this._stdout = _stdout;
-    this._readBuffer = new ReadBuffer();
     this._started = false;
     this._ondata = (chunk) => {
-      this._readBuffer.append(chunk);
-      this.processReadBuffer();
+      try {
+        this._readBuffer.append(chunk);
+        this.processReadBuffer();
+      } catch (error40) {
+        this.onerror?.(error40);
+        this.close().catch(() => {
+        });
+      }
     };
     this._onerror = (error40) => {
       this.onerror?.(error40);
     };
+    this._readBuffer = new ReadBuffer({ maxBufferSize: options?.maxBufferSize });
   }
   /**
    * Starts listening for messages on stdin.
@@ -139974,6 +140073,16 @@ var toolDefinitions = [
         port: {
           type: "string",
           description: "Optional upload port (auto-detected if not specified)"
+        },
+        uploadPort: {
+          type: "string",
+          minLength: 1,
+          description: "Alias for port; conflicting selectors are rejected"
+        },
+        upload_port: {
+          type: "string",
+          minLength: 1,
+          description: "Alias for port; conflicting selectors are rejected"
         },
         environment: {
           type: "string",
