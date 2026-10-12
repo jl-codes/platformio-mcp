@@ -70,7 +70,11 @@ export const BoardInfoSchema = z.object({
   ram: z.number().optional(),
   fcpu: z.number().optional(),
   rom: z.number().optional(),
-  frameworks: z.array(z.string()).optional(),
+  // PlatformIO emits null for boards without declared framework support.
+  frameworks: z
+    .array(z.string())
+    .nullish()
+    .transform((value) => value ?? undefined),
   vendor: z.string().optional(),
   url: z.string().optional(),
   connectivity: z.array(z.string()).optional(),

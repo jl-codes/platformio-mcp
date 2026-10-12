@@ -149,7 +149,7 @@ export async function execPioCommand(
  */
 export function parsePioJsonOutput<T>(
   output: string,
-  schema: z.ZodSchema<T>,
+  schema: z.ZodSchema<T, z.ZodTypeDef, unknown>,
 ): T {
   if (!output || output.trim().length === 0) {
     throw new PlatformIOError("Empty output from PlatformIO command");
@@ -320,7 +320,7 @@ export class PlatformIOExecutor {
   async executeWithJsonOutput<T>(
     command: string,
     args: string[],
-    schema: z.ZodSchema<T>,
+    schema: z.ZodSchema<T, z.ZodTypeDef, unknown>,
     options?: {
       cwd?: string;
       timeout?: number;
