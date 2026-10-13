@@ -13,6 +13,7 @@
  * - LibraryInfo: PlatformIO registry library metadata.
  */
 
+import { normalizeSerialPort } from "./utils/serial-port.js";
 import { z } from "zod";
 import type { DiagnosticResult } from "./core/diagnostics/types.js";
 
@@ -69,7 +70,11 @@ export const BoardInfoSchema = z.object({
   ram: z.number().optional(),
   fcpu: z.number().optional(),
   rom: z.number().optional(),
-  frameworks: z.array(z.string()).optional(),
+  // PlatformIO emits null for boards without declared framework support.
+  frameworks: z
+    .array(z.string())
+    .nullish()
+    .transform((value) => value ?? undefined),
   vendor: z.string().optional(),
   url: z.string().optional(),
   connectivity: z.array(z.string()).optional(),
@@ -553,7 +558,7 @@ export const RunTestsParamsSchema = z.object({
     ),
 });
 
-// Upload firmware parameters
+/** Firmware upload arguments; compatible port aliases must select the same endpoint. */
 export const UploadFirmwareParamsSchema = z.object({
   projectDir: z
     .string()
@@ -561,8 +566,11 @@ export const UploadFirmwareParamsSchema = z.object({
     .describe("Path to the PlatformIO project directory"),
   port: z
     .string()
+    .min(1)
     .optional()
     .describe("Upload port (auto-detected if not specified)"),
+  uploadPort: z.string().min(1).optional().describe("Alias for port"),
+  upload_port: z.string().min(1).optional().describe("Alias for port"),
   environment: z
     .string()
     .optional()
@@ -598,7 +606,21 @@ export const UploadFirmwareParamsSchema = z.object({
     .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
     .optional(),
   maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
-});
+}).superRefine((params, context) => {
+  const ports = [params.port, params.uploadPort, params.upload_port].filter(
+    (port): port is string => port !== undefined,
+  );
+  if (new Set(ports.map(normalizeSerialPort)).size > 1) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["port"],
+      message: "Conflicting port, uploadPort, or upload_port selectors",
+    });
+  }
+}).transform(({ uploadPort, upload_port, ...params }) => ({
+  ...params,
+  port: params.port ?? uploadPort ?? upload_port,
+}));
 
 // Upload filesystem parameters
 export const UploadFilesystemParamsSchema = z.object({

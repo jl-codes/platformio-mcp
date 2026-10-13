@@ -109,6 +109,7 @@ describe("one-shot commands terminate", () => {
       code: number | null;
       ms: number;
       stdout: string;
+      stderr: string;
       hung: boolean;
     }>((resolve) => {
       const t0 = Date.now();
@@ -116,19 +117,21 @@ describe("one-shot commands terminate", () => {
         stdio: ["ignore", "pipe", "pipe"],
       });
       let stdout = "";
+      let stderr = "";
       let settled = false;
       child.stdout.on("data", (c) => (stdout += String(c)));
-      child.stderr.resume();
-      child.on("exit", (code) => {
+      child.stderr.on("data", (c) => (stderr += String(c)));
+      child.on("close", (code) => {
         if (settled) return;
         settled = true;
-        resolve({ code, ms: Date.now() - t0, stdout, hung: false });
+        clearTimeout(timer);
+        resolve({ code, ms: Date.now() - t0, stdout, stderr, hung: false });
       });
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
         child.kill("SIGKILL");
-        resolve({ code: null, ms: Date.now() - t0, stdout, hung: true });
+        resolve({ code: null, ms: Date.now() - t0, stdout, stderr, hung: true });
       }, budgetMs);
     });
   }
@@ -147,7 +150,7 @@ describe("one-shot commands terminate", () => {
     // drained. `boards` emits ~500KB, well past the pipe buffer.
     const result = await runCommand(["boards", "--json"]);
     expect(result.hung).toBe(false);
-    expect(result.code).toBe(0);
+    expect(result.code, result.stderr).toBe(0);
     expect(result.stdout.length).toBeGreaterThan(100_000);
     expect(() => JSON.parse(result.stdout)).not.toThrow();
   }, 60000);
