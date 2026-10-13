@@ -49,6 +49,23 @@ describe("target resolution", () => {
     ]);
   });
 
+  it("does not let custom or global sections rewrite the preceding environment", () => {
+    expect(parseTargetEnvironments(
+      "[env:native]\nplatform = espressif32\nboard = um_nanos3\nframework = arduino\n" +
+        "[common]\nplatform = atmelavr\nboard = uno\nframework = baremetal\n" +
+        "[env]\nplatform = ststm32\nboard = nucleo_f401re\n",
+    ).environments).toEqual([
+      { name: "native", platform: "espressif32", board: "um_nanos3", framework: "arduino" },
+    ]);
+  });
+
+  it.each(["[common]", "[common] ; custom settings", "[common] # custom settings"])("reads default environments only from platformio, not %s", (section) => {
+    expect(parseTargetEnvironments(
+      "[platformio]\ndefault_envs = release\n[env:release]\nboard = esp32dev\n" +
+        `default_envs = debug\n${section}\ndefault_envs = debug\n[env:debug]\nboard = esp32dev\n`,
+    ).defaults).toEqual(["release"]);
+  });
+
   it("returns ambiguity instead of choosing among multiple environments", async () => {
     const projectDir = createProject(
       "[env:first]\nboard = esp32dev\n[env:second]\nboard = esp32dev\n",
@@ -121,4 +138,18 @@ it("does not fall back to raw target metadata when computed configuration fails"
   const projectDir = createProject("[env:base]\nboard = esp32dev\n[env:native]\nextends = env:base\nboard = esp32dev\n");
   vi.mocked(getProjectConfig).mockRejectedValueOnce(new Error("invalid inheritance"));
   await expect(resolveTarget({ projectDir, environment: "native" }, [device("COM7")])).rejects.toThrow("invalid inheritance");
+});
+
+it("preserves Core's computed global environment defaults despite a trailing custom section", async () => {
+  const projectDir = createProject(
+    "[env]\nplatform = espressif32\nboard = um_nanos3\n" +
+      "[env:native]\nframework = arduino\n[common]\nplatform = atmelavr\n",
+  );
+  vi.mocked(getProjectConfig).mockResolvedValueOnce([
+    ["platformio", [["default_envs", ["native"]]]],
+    ["env:native", [["platform", "espressif32"], ["board", "um_nanos3"], ["framework", ["arduino"]]]],
+  ]);
+  const result = await resolveTarget({ projectDir }, [device("COM7", "um_nanos3")]);
+  expect(result).toMatchObject({ success: true, environment: "native", board: "um_nanos3" });
+  expect(getProjectConfig).toHaveBeenCalledWith(projectDir);
 });

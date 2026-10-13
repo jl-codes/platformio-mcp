@@ -190,6 +190,21 @@ it("does not infer a native ESP32 USB device for an incompatible configured plat
   });
 });
 
+it.each(["[common]", "[common] ; custom settings", "[common] # custom settings"])("keeps native USB target metadata scoped before %s", async (section) => {
+  fs.writeFileSync(
+    path.join(root, "platformio.ini"),
+    "[env:native]\nplatform = espressif32\nboard = um_nanos3\nframework = arduino\n" +
+      `${section}\nplatform = atmelavr\n`,
+  );
+  expect(await resolveTarget({ projectDir: root })).toMatchObject({
+    success: true,
+    status: "resolved",
+    environment: "native",
+    board: "um_nanos3",
+    port: native.port,
+  });
+});
+
 it("preserves serial identity revalidation after path normalization", async () => {
   const result = await resolveTarget({
     projectDir: root,

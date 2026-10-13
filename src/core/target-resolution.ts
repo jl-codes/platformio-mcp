@@ -83,15 +83,23 @@ export function parseTargetEnvironments(iniText: string): {
   const environments: TargetEnvironment[] = [];
   const defaults: string[] = [];
   let active: TargetEnvironment | undefined;
+  let inPlatformioSection = false;
 
   for (const rawLine of iniText.split(/\r?\n/u)) {
     const line = rawLine.trim();
     if (!line || line.startsWith(";") || line.startsWith("#")) continue;
 
-    const section = /^\[env:([^\]]+)\]$/iu.exec(line);
+    const section = /^\[([^\]]+)\]\s*(?:[;#].*)?$/u.exec(line);
     if (section) {
-      active = { name: section[1].trim() };
-      environments.push(active);
+      // Options belong only to their current section, never the previous environment.
+      active = undefined;
+      const sectionName = section[1].trim();
+      inPlatformioSection = sectionName.toLowerCase() === "platformio";
+      const environment = /^env:(.+)$/iu.exec(sectionName);
+      if (environment) {
+        active = { name: environment[1].trim() };
+        environments.push(active);
+      }
       continue;
     }
 
@@ -99,7 +107,7 @@ export function parseTargetEnvironments(iniText: string): {
     if (!pair) continue;
     const key = pair[1].toLowerCase();
     const value = pair[2].trim();
-    if (key === "default_envs") {
+    if (inPlatformioSection && key === "default_envs") {
       defaults.push(
         ...value
           .split(",")

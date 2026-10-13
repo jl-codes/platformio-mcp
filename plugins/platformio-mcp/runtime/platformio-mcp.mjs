@@ -37919,20 +37919,27 @@ function parseTargetEnvironments(iniText) {
   const environments = [];
   const defaults = [];
   let active;
+  let inPlatformioSection = false;
   for (const rawLine of iniText.split(/\r?\n/u)) {
     const line = rawLine.trim();
     if (!line || line.startsWith(";") || line.startsWith("#")) continue;
-    const section = /^\[env:([^\]]+)\]$/iu.exec(line);
+    const section = /^\[([^\]]+)\]\s*(?:[;#].*)?$/u.exec(line);
     if (section) {
-      active = { name: section[1].trim() };
-      environments.push(active);
+      active = void 0;
+      const sectionName = section[1].trim();
+      inPlatformioSection = sectionName.toLowerCase() === "platformio";
+      const environment = /^env:(.+)$/iu.exec(sectionName);
+      if (environment) {
+        active = { name: environment[1].trim() };
+        environments.push(active);
+      }
       continue;
     }
     const pair = /^([a-zA-Z0-9_]+)\s*=\s*(.+)$/u.exec(line);
     if (!pair) continue;
     const key = pair[1].toLowerCase();
     const value2 = pair[2].trim();
-    if (key === "default_envs") {
+    if (inPlatformioSection && key === "default_envs") {
       defaults.push(
         ...value2.split(",").map((item) => item.trim()).filter(Boolean)
       );
@@ -108157,6 +108164,10 @@ function isPathBoundaryUnsafe(projectDir) {
   const root = path14.parse(resolved).root;
   return resolved === root;
 }
+function uploadPortForDisplay(args) {
+  const port = args.port ?? args.uploadPort ?? args.upload_port;
+  return typeof port === "string" ? port : void 0;
+}
 function decision(status, reason, action, riskLevel, approvalId2) {
   return {
     status,
@@ -108197,9 +108208,12 @@ async function evaluatePolicyInternal(actionName, args, context, planning, inter
     );
   }
   const policy = effectivePolicy.policy;
+  const uploadPort = (context.operationName ?? action) === "upload_firmware" ? uploadPortForDisplay(args) : void 0;
   const auditContext = {
     workspaceDir: context.workspaceDir,
-    devicePort: context.devicePort,
+    // This hint belongs only to persisted diagnostics. The original context
+    // and arguments remain the inputs to approvalScopeDigest below.
+    devicePort: context.devicePort ?? uploadPort,
     taskId: context.taskId,
     automationKey: context.automationKey,
     targetBindingDigest: context.targetBindingDigest,
@@ -108324,7 +108338,7 @@ async function evaluatePolicyInternal(actionName, args, context, planning, inter
       args: {
         projectDir: args.projectDir,
         environment: args.environment,
-        port: args.port
+        port: (context.operationName ?? action) === "upload_firmware" ? uploadPort : args.port
       },
       policyDigest: effectivePolicy.digest,
       scopeVersion: 1,

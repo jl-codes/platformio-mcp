@@ -51,6 +51,14 @@ function isPathBoundaryUnsafe(projectDir: string): boolean {
   return resolved === root;
 }
 
+/** Select only a display hint using upload-schema precedence; never normalize authorization arguments. */
+function uploadPortForDisplay(
+  args: Record<string, unknown>,
+): string | undefined {
+  const port = args.port ?? args.uploadPort ?? args.upload_port;
+  return typeof port === "string" ? port : undefined;
+}
+
 function decision(
   status: PolicyDecision["status"],
   reason: string,
@@ -124,9 +132,15 @@ async function evaluatePolicyInternal(
     );
   }
   const policy = effectivePolicy.policy;
+  const uploadPort =
+    (context.operationName ?? action) === "upload_firmware"
+      ? uploadPortForDisplay(args)
+      : undefined;
   const auditContext = {
     workspaceDir: context.workspaceDir,
-    devicePort: context.devicePort,
+    // This hint belongs only to persisted diagnostics. The original context
+    // and arguments remain the inputs to approvalScopeDigest below.
+    devicePort: context.devicePort ?? uploadPort,
     taskId: context.taskId,
     automationKey: context.automationKey,
     targetBindingDigest: context.targetBindingDigest,
@@ -300,7 +314,10 @@ async function evaluatePolicyInternal(
       args: {
         projectDir: args.projectDir,
         environment: args.environment,
-        port: args.port,
+        port:
+          (context.operationName ?? action) === "upload_firmware"
+            ? uploadPort
+            : args.port,
       },
       policyDigest: effectivePolicy.digest,
       scopeVersion: 1,
