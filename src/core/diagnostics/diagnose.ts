@@ -42,7 +42,7 @@ export function diagnoseFromLog(
       severity: "info",
       summary: `${stage} completed successfully.`,
       evidence: [],
-      recommendedAction: "Proceed to the next workflow step.",
+      recommendedAction: "Release the pipeline lock, then proceed to the next workflow step.",
       safeToAutoRetry: true,
       rawLogPath: opts?.rawLogPath,
       taskId: opts?.taskId,

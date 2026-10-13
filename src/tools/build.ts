@@ -782,24 +782,26 @@ export async function checkTaskStatus(taskId?: string, logPath?: string, project
     normalizedStatus === "failed" ||
     normalizedStatus === "terminated";
 
-  if (taskType === "upload") {
-    diagnostic = diagnoseUploadLog(safeOutput, {
-      taskId: resolvedTaskId,
-      rawLogPath: effectiveLogPath,
-      success: successByStatus && !failedByStatus,
-    });
-  } else if (taskType === "monitor") {
-    diagnostic = diagnoseSerialLog(safeOutput, {
-      taskId: resolvedTaskId,
-      rawLogPath: effectiveLogPath,
-      success: successByStatus && !failedByStatus,
-    });
-  } else {
-    diagnostic = diagnoseBuildLog(safeOutput, {
-      taskId: resolvedTaskId,
-      rawLogPath: effectiveLogPath,
-      success: successByStatus && !failedByStatus,
-    });
+  if (normalizedStatus !== "running") {
+    if (taskType === "upload") {
+      diagnostic = diagnoseUploadLog(safeOutput, {
+        taskId: resolvedTaskId,
+        rawLogPath: effectiveLogPath,
+        success: successByStatus && !failedByStatus,
+      });
+    } else if (taskType === "monitor") {
+      diagnostic = diagnoseSerialLog(safeOutput, {
+        taskId: resolvedTaskId,
+        rawLogPath: effectiveLogPath,
+        success: successByStatus && !failedByStatus,
+      });
+    } else {
+      diagnostic = diagnoseBuildLog(safeOutput, {
+        taskId: resolvedTaskId,
+        rawLogPath: effectiveLogPath,
+        success: successByStatus && !failedByStatus,
+      });
+    }
   }
 
   return {
