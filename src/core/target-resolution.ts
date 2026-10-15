@@ -4,6 +4,7 @@
  * Provides:
  * - resolveTarget: Resolves one environment, board, and physical device.
  * - verifyTargetBinding: Rejects expired or substituted target bindings.
+ * - normalizePort: Normalizes macOS /dev/tty.* device paths to /dev/cu.*.
  */
 
 import crypto from "node:crypto";
@@ -11,6 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { SerialDevice } from "../types.js";
 import { PlatformIOError } from "../utils/errors.js";
+import { logDiagnostic } from "../utils/logger.js";
 import { validateProjectPath } from "../utils/validation.js";
 import { listDevicesCore } from "./devices.js";
 import { getProjectConfig } from "../tools/projects.js";
@@ -18,11 +20,21 @@ import { parseProjectEnvironments } from "./project-inspection.js";
 
 const MAX_BINDING_TTL_SECONDS = 900;
 
+// Pattern matching noise ports (macOS debug console, bluetooth, audio/phone devices)
+export const NOISE_PORT_PATTERN =
+  /bluetooth|blth|debug-console|jabra|airpods|iphone/i;
+
+/** Normalizes macOS /dev/tty.* serial device paths to /dev/cu.* */
+// TODO: Consider normalizing Windows COM port casing (COM3 vs com3)
+export const normalizePort = (p: string): string =>
+  p.trim().replace(/^\/dev\/tty\./, "/dev/cu.");
+
 /** Resolved environment metadata from platformio.ini. */
 export interface TargetEnvironment {
   name: string;
   board?: string;
   framework?: string;
+  extends?: string[];
 }
 
 /** Short-lived proof binding a workflow to one physical target. */
@@ -79,16 +91,41 @@ export function parseTargetEnvironments(iniText: string): {
 } {
   const environments: TargetEnvironment[] = [];
   const defaults: string[] = [];
-  let active: TargetEnvironment | undefined;
+  let activeEnv: TargetEnvironment | undefined;
+  let activeBaseSection:
+    | { board?: string; framework?: string; extends?: string[] }
+    | undefined;
+  const baseSections = new Map<
+    string,
+    { board?: string; framework?: string; extends?: string[] }
+  >();
 
   for (const rawLine of iniText.split(/\r?\n/u)) {
     const line = rawLine.trim();
     if (!line || line.startsWith(";") || line.startsWith("#")) continue;
 
-    const section = /^\[env:([^\]]+)\]$/iu.exec(line);
-    if (section) {
-      active = { name: section[1].trim() };
-      environments.push(active);
+    const envSection = /^\[env:([^\]]+)\]$/iu.exec(line);
+    if (envSection) {
+      activeEnv = { name: envSection[1].trim() };
+      environments.push(activeEnv);
+      activeBaseSection = undefined;
+      continue;
+    }
+
+    const baseSection = /^\[([^\]]+)\]$/u.exec(line);
+    if (baseSection) {
+      activeEnv = undefined;
+      const sectionName = baseSection[1].trim();
+      if (sectionName.toLowerCase() !== "platformio") {
+        let entry = baseSections.get(sectionName.toLowerCase());
+        if (!entry) {
+          entry = {};
+          baseSections.set(sectionName.toLowerCase(), entry);
+        }
+        activeBaseSection = entry;
+      } else {
+        activeBaseSection = undefined;
+      }
       continue;
     }
 
@@ -103,10 +140,71 @@ export function parseTargetEnvironments(iniText: string): {
           .map((item) => item.trim())
           .filter(Boolean),
       );
-    } else if (active && key === "board") {
-      active.board = value;
-    } else if (active && key === "framework") {
-      active.framework = value;
+    } else if (key === "board") {
+      if (activeEnv) {
+        activeEnv.board = value;
+      } else if (activeBaseSection) {
+        activeBaseSection.board = value;
+      }
+    } else if (key === "framework") {
+      if (activeEnv) {
+        activeEnv.framework = value;
+      } else if (activeBaseSection) {
+        activeBaseSection.framework = value;
+      }
+    } else if (key === "extends") {
+      const extendsList = value
+        .split(",")
+        .map((v) => v.trim().replace(/^env:\s*/iu, "").trim())
+        .filter(Boolean);
+      if (activeEnv) {
+        activeEnv.extends = extendsList;
+      } else if (activeBaseSection) {
+        activeBaseSection.extends = extendsList;
+      }
+    }
+  }
+
+  function findSection(
+    targetName: string,
+  ): { board?: string; framework?: string; extends?: string[] } | undefined {
+    const lower = targetName.toLowerCase();
+    const env = environments.find((e) => e.name.toLowerCase() === lower);
+    if (env) return env;
+    return baseSections.get(lower);
+  }
+
+  for (const env of environments) {
+    if (!env.extends || env.extends.length === 0) continue;
+
+    const visited = new Set<string>([env.name.toLowerCase()]);
+    const queue = [...env.extends];
+
+    while (queue.length > 0 && (!env.board || !env.framework)) {
+      const parentName = queue.shift()!;
+      const parentKey = parentName.toLowerCase();
+
+      if (visited.has(parentKey)) {
+        void logDiagnostic(
+          `Circular extends detected in environment '${env.name}' involving '${parentName}'`,
+        );
+        continue;
+      }
+      visited.add(parentKey);
+
+      const parent = findSection(parentName);
+      if (!parent) continue;
+
+      if (!env.board && parent.board) {
+        env.board = parent.board;
+      }
+      if (!env.framework && parent.framework) {
+        env.framework = parent.framework;
+      }
+
+      if (parent.extends && parent.extends.length > 0) {
+        queue.push(...parent.extends);
+      }
     }
   }
 
@@ -261,15 +359,20 @@ export async function resolveTarget(
     };
   }
 
-  const devices = (discoveredDevices ?? (await listDevicesCore())).filter((device) => {
-    const normalizedPort = device.port.toLowerCase();
-    return !normalizedPort.includes("bluetooth") && !normalizedPort.includes("blth");
-  });
+  const devices = (discoveredDevices ?? (await listDevicesCore())).filter(
+    (device) => {
+      if (NOISE_PORT_PATTERN.test(device.port)) return false;
+      if (device.hwid === "n/a" && device.description === "n/a") return false;
+      return true;
+    },
+  );
   let candidates = input.port
-    ? devices.filter((device) => device.port === input.port)
+    ? devices.filter(
+        (d) => normalizePort(d.port) === normalizePort(input.port!),
+      )
     : devices.filter(
-        (device) =>
-          device.detectedBoard?.toLowerCase() ===
+        (d) =>
+          d.detectedBoard?.toLowerCase() ===
           selectedEnvironment?.board?.toLowerCase(),
       );
   let confidence: TargetResolutionResult["confidence"] = "exact";

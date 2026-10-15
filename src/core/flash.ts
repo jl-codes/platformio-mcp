@@ -1,7 +1,19 @@
+/**
+ * Core firmware flashing orchestrator.
+ *
+ * Provides:
+ * - uploadFirmwareCore: Coordinates write-target resolution, hardware locking, and flashing.
+ */
+
 import { uploadFirmware } from "../tools/upload.js";
 import type { UploadResult } from "../types.js";
 import { hardwareLockManager } from "../utils/lock-manager.js";
-import { resolveWriteTarget, type TargetBinding } from "./target-resolution.js";
+import { loadEffectivePolicyState } from "./policy/load-policy.js";
+import {
+  normalizePort,
+  resolveWriteTarget,
+  type TargetBinding,
+} from "./target-resolution.js";
 
 export type UploadFirmwareCoreInput = {
   projectDir: string;
@@ -15,10 +27,31 @@ export type UploadFirmwareCoreInput = {
   maxRunDurationSeconds?: number;
 };
 
+/**
+ * Resolves the write target, manages lock custody, and executes firmware upload.
+ *
+ * @param input - Upload configuration including project directory, optional port, and environment.
+ * @returns Upload result.
+ */
 export async function uploadFirmwareCore(
   input: UploadFirmwareCoreInput,
 ): Promise<UploadResult> {
-  const target = await resolveWriteTarget(input);
+  let target: { port: string; environment: string };
+  const policyState = await loadEffectivePolicyState(input.projectDir);
+  if (
+    policyState.profile === "standalone" &&
+    input.environment?.trim() &&
+    input.port?.trim()
+  ) {
+    // Standalone mode: trust explicit env+port, skip target resolution ceremony.
+    // Still normalise the port so macOS /dev/tty.* paths resolve correctly.
+    target = {
+      port: normalizePort(input.port.trim()),
+      environment: input.environment.trim(),
+    };
+  } else {
+    target = await resolveWriteTarget(input);
+  }
 
   const executeTask = () =>
     uploadFirmware(

@@ -27,7 +27,8 @@ export type PolicyProfileName =
   | "monitor_only"
   | "flash_requires_approval"
   | "lab_runner"
-  | "lab_admin";
+  | "lab_admin"
+  | "standalone";
 
 export interface PolicyProfileConfig {
   profile: PolicyProfileName;
