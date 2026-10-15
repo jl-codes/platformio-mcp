@@ -21,6 +21,7 @@ export const PolicyProfileNameSchema = z.enum([
   "flash_requires_approval",
   "lab_runner",
   "lab_admin",
+  "standalone",
 ]);
 
 /** Known actions include explicit hard-deny names and the legacy status action. */
