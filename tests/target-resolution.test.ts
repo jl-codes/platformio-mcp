@@ -12,7 +12,9 @@ import {
 import type { SerialDevice } from "../src/types.js";
 
 vi.mock("../src/tools/projects.js", () => ({ getProjectConfig: vi.fn() }));
+vi.mock("../src/utils/logger.js", () => ({ logDiagnostic: vi.fn() }));
 import { getProjectConfig } from "../src/tools/projects.js";
+import { logDiagnostic } from "../src/utils/logger.js";
 
 const createdDirectories: string[] = [];
 
@@ -121,4 +123,125 @@ it("does not fall back to raw target metadata when computed configuration fails"
   const projectDir = createProject("[env:base]\nboard = esp32dev\n[env:native]\nextends = env:base\nboard = esp32dev\n");
   vi.mocked(getProjectConfig).mockRejectedValueOnce(new Error("invalid inheritance"));
   await expect(resolveTarget({ projectDir, environment: "native" }, [device("COM7")])).rejects.toThrow("invalid inheritance");
+});
+
+describe("extends inheritance parsing", () => {
+  it("inherits board from [env:base] via extends = env:base", () => {
+    const parsed = parseTargetEnvironments(`
+[env:base]
+board = esp32dev
+
+[env:child]
+extends = env:base
+`);
+    const child = parsed.environments.find((e) => e.name === "child");
+    expect(child).toBeDefined();
+    expect(child?.board).toBe("esp32dev");
+  });
+
+  it("inherits board from [common] section via extends = common", () => {
+    const parsed = parseTargetEnvironments(`
+[common]
+board = esp32dev
+
+[env:child]
+extends = common
+`);
+    const child = parsed.environments.find((e) => e.name === "child");
+    expect(child).toBeDefined();
+    expect(child?.board).toBe("esp32dev");
+  });
+
+  it("resolves multi-level extends inheritance (a -> b -> c)", () => {
+    const parsed = parseTargetEnvironments(`
+[env:a]
+extends = env:b
+
+[env:b]
+extends = env:c
+
+[env:c]
+board = esp32dev
+`);
+    const envA = parsed.environments.find((e) => e.name === "a");
+    expect(envA).toBeDefined();
+    expect(envA?.board).toBe("esp32dev");
+  });
+
+  it("handles circular extends without infinite looping, logs a warning, and leaves board undefined", () => {
+    const parsed = parseTargetEnvironments(`
+[env:a]
+extends = env:b
+
+[env:b]
+extends = env:a
+`);
+    const envA = parsed.environments.find((e) => e.name === "a");
+    const envB = parsed.environments.find((e) => e.name === "b");
+    expect(envA?.board).toBeUndefined();
+    expect(envB?.board).toBeUndefined();
+    expect(logDiagnostic).toHaveBeenCalledWith(expect.stringContaining("Circular extends detected"));
+  });
+
+  it("allows child to override parent's board value", () => {
+    const parsed = parseTargetEnvironments(`
+[env:base]
+board = esp32dev
+
+[env:child]
+extends = env:base
+board = esp32-s3-devkitc-1
+`);
+    const child = parsed.environments.find((e) => e.name === "child");
+    expect(child).toBeDefined();
+    expect(child?.board).toBe("esp32-s3-devkitc-1");
+  });
+});
+
+
+describe("extends edge cases", () => {
+  it("gracefully handles nonexistent extends parent", () => {
+    const ini = `
+[env:child]
+extends = does_not_exist
+framework = arduino
+`;
+    const { environments } = parseTargetEnvironments(ini);
+    const child = environments.find((e) => e.name === "child");
+    expect(child).toBeDefined();
+    expect(child!.board).toBeUndefined();
+    expect(child!.framework).toBe("arduino");
+  });
+
+  it("resolves multi-parent extends from different sources", () => {
+    const ini = `
+[common]
+board = esp32dev
+
+[env:networking]
+framework = arduino
+
+[env:app]
+extends = common, env:networking
+`;
+    const { environments } = parseTargetEnvironments(ini);
+    const app = environments.find((e) => e.name === "app");
+    expect(app).toBeDefined();
+    expect(app!.board).toBe("esp32dev");
+    expect(app!.framework).toBe("arduino");
+  });
+
+  it("handles mixed-case extends with spaces after env:", () => {
+    const ini = `
+[env:base]
+board = esp32-s3-devkitc-1
+
+[env:app]
+extends = ENV: base
+`;
+    const { environments } = parseTargetEnvironments(ini);
+    const app = environments.find((e) => e.name === "app");
+    expect(app).toBeDefined();
+    expect(app!.board).toBe("esp32-s3-devkitc-1");
+  });
 });
