@@ -4,12 +4,18 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fingerprintDevice,
+  normalizePort,
+  NOISE_PORT_PATTERN,
   parseTargetEnvironments,
   resolveWriteTarget,
   resolveTarget,
   verifyTargetBinding,
 } from "../src/core/target-resolution.js";
-import type { SerialDevice } from "../src/types.js";
+import {
+  UploadFirmwareParamsSchema,
+  UploadFilesystemParamsSchema,
+  type SerialDevice,
+} from "../src/types.js";
 
 vi.mock("../src/tools/projects.js", () => ({ getProjectConfig: vi.fn() }));
 vi.mock("../src/utils/logger.js", () => ({ logDiagnostic: vi.fn() }));
@@ -198,6 +204,193 @@ board = esp32-s3-devkitc-1
   });
 });
 
+describe("target resolution - noise port filtering", () => {
+  it("filters out macOS debug-console noise so single-device fallback succeeds", async () => {
+    const projectDir = createProject("[env:s3]\nboard = esp32-s3-devkitc-1\n");
+    const s3Device: SerialDevice = {
+      port: "/dev/cu.usbmodem101",
+      description: "USB JTAG/serial debug unit",
+      hwid: "USB VID:PID=303A:1001 SER=123 LOCATION=1-1",
+      detectedBoard: "esp32-s3-devkitc-1",
+    };
+    const debugConsole: SerialDevice = {
+      port: "/dev/cu.debug-console",
+      description: "debug-console",
+      hwid: "n/a",
+    };
+
+    const result = await resolveTarget(
+      { projectDir, environment: "s3" },
+      [s3Device, debugConsole],
+    );
+    expect(result.success).toBe(true);
+    expect(result.port).toBe("/dev/cu.usbmodem101");
+    expect(result.binding?.port).toBe("/dev/cu.usbmodem101");
+  });
+
+  it("filters out macOS debug-console noise so single-device fallback succeeds when board is unmapped", async () => {
+    const projectDir = createProject("[env:s3]\nboard = esp32-s3-devkitc-1\n");
+    const s3Device: SerialDevice = {
+      port: "/dev/cu.usbmodem101",
+      description: "USB JTAG/serial debug unit",
+      hwid: "USB VID:PID=303A:1001 SER=123 LOCATION=1-1",
+    };
+    const debugConsole: SerialDevice = {
+      port: "/dev/cu.debug-console",
+      description: "debug-console",
+      hwid: "n/a",
+    };
+
+    const result = await resolveTarget(
+      { projectDir, environment: "s3" },
+      [s3Device, debugConsole],
+    );
+    expect(result.success).toBe(true);
+    expect(result.confidence).toBe("medium");
+    expect(result.port).toBe("/dev/cu.usbmodem101");
+    expect(result.binding?.port).toBe("/dev/cu.usbmodem101");
+  });
+
+  it("filters out bluetooth, airpods, jabra, iphone, and n/a hwid+description devices", async () => {
+    const projectDir = createProject("[env:s3]\nboard = esp32-s3-devkitc-1\n");
+    const s3Device: SerialDevice = {
+      port: "/dev/cu.usbmodem101",
+      description: "USB JTAG/serial debug unit",
+      hwid: "USB VID:PID=303A:1001 SER=123 LOCATION=1-1",
+      detectedBoard: "esp32-s3-devkitc-1",
+    };
+    const bluetooth: SerialDevice = {
+      port: "/dev/cu.Bluetooth-Incoming-Port",
+      description: "Bluetooth port",
+      hwid: "USB VID:PID=0000:0000",
+    };
+    const airpods: SerialDevice = {
+      port: "/dev/cu.AirPods-Wireless-Port",
+      description: "AirPods",
+      hwid: "BT",
+    };
+    const jabra: SerialDevice = {
+      port: "/dev/cu.Jabra-Evolve-Port",
+      description: "Jabra Headset",
+      hwid: "BT",
+    };
+    const iphone: SerialDevice = {
+      port: "/dev/cu.iPhone-Wireless",
+      description: "iPhone",
+      hwid: "BT",
+    };
+    const naDevice: SerialDevice = {
+      port: "/dev/cu.unknown",
+      description: "n/a",
+      hwid: "n/a",
+    };
+
+    const result = await resolveTarget(
+      { projectDir, environment: "s3" },
+      [s3Device, bluetooth, airpods, jabra, iphone, naDevice],
+    );
+    expect(result.success).toBe(true);
+    expect(result.port).toBe("/dev/cu.usbmodem101");
+    expect(result.binding?.port).toBe("/dev/cu.usbmodem101");
+  });
+
+  it("NOISE_PORT_PATTERN matches expected noise port identifiers", () => {
+    expect(NOISE_PORT_PATTERN.test("/dev/cu.debug-console")).toBe(true);
+    expect(NOISE_PORT_PATTERN.test("/dev/cu.Bluetooth-Incoming-Port")).toBe(true);
+    expect(NOISE_PORT_PATTERN.test("/dev/cu.blth-port")).toBe(true);
+    expect(NOISE_PORT_PATTERN.test("/dev/cu.Jabra-Headset")).toBe(true);
+    expect(NOISE_PORT_PATTERN.test("/dev/cu.AirPods-Max")).toBe(true);
+    expect(NOISE_PORT_PATTERN.test("/dev/cu.iPhone-Sync")).toBe(true);
+    expect(NOISE_PORT_PATTERN.test("/dev/cu.usbmodem101")).toBe(false);
+    expect(NOISE_PORT_PATTERN.test("/dev/cu.usbserial-0001")).toBe(false);
+  });
+});
+
+describe("target resolution - port normalization", () => {
+  it("normalizes /dev/tty.* to /dev/cu.* when matching target port on macOS", async () => {
+    const projectDir = createProject("[env:s3]\nboard = esp32-s3-devkitc-1\n");
+    const s3Device: SerialDevice = {
+      port: "/dev/cu.usbmodem101",
+      description: "USB JTAG/serial debug unit",
+      hwid: "USB VID:PID=303A:1001 SER=123 LOCATION=1-1",
+      detectedBoard: "esp32-s3-devkitc-1",
+    };
+
+    const result = await resolveTarget(
+      { projectDir, environment: "s3", port: "/dev/tty.usbmodem101" },
+      [s3Device],
+    );
+    expect(result.success).toBe(true);
+    expect(result.confidence).toBe("exact");
+    expect(result.binding?.port).toBe("/dev/cu.usbmodem101");
+  });
+
+  it("normalizePort replaces /dev/tty. prefix with /dev/cu.", () => {
+    expect(normalizePort("/dev/tty.usbmodem101")).toBe("/dev/cu.usbmodem101");
+    expect(normalizePort("/dev/cu.usbmodem101")).toBe("/dev/cu.usbmodem101");
+    expect(normalizePort("COM3")).toBe("COM3");
+  });
+});
+
+describe("upload parameter schemas - port aliases", () => {
+  it("maps uploadPort alias to port in UploadFirmwareParamsSchema", () => {
+    const parsed = UploadFirmwareParamsSchema.parse({
+      projectDir: "/tmp",
+      uploadPort: "/dev/cu.usbmodem101",
+    });
+    expect(parsed.port).toBe("/dev/cu.usbmodem101");
+  });
+
+  it("maps upload_port alias to port in UploadFirmwareParamsSchema", () => {
+    const parsed = UploadFirmwareParamsSchema.parse({
+      projectDir: "/tmp",
+      upload_port: "/dev/cu.usbmodem101",
+    });
+    expect(parsed.port).toBe("/dev/cu.usbmodem101");
+  });
+
+  it("preserves explicit port when aliases are also passed in UploadFirmwareParamsSchema", () => {
+    const parsed = UploadFirmwareParamsSchema.parse({
+      projectDir: "/tmp",
+      port: "/dev/cu.explicit",
+      uploadPort: "/dev/cu.alias",
+    });
+    expect(parsed.port).toBe("/dev/cu.explicit");
+  });
+
+  it("maps uploadPort and upload_port aliases to port in UploadFilesystemParamsSchema", () => {
+    const parsedCamel = UploadFilesystemParamsSchema.parse({
+      projectDir: "/tmp",
+      uploadPort: "/dev/cu.usbmodem101",
+    });
+    expect(parsedCamel.port).toBe("/dev/cu.usbmodem101");
+
+    const parsedSnake = UploadFilesystemParamsSchema.parse({
+      projectDir: "/tmp",
+      upload_port: "/dev/cu.usbmodem101",
+    });
+    expect(parsedSnake.port).toBe("/dev/cu.usbmodem101");
+  });
+
+  it("falls back to uploadPort when port is empty string", () => {
+    const parsed = UploadFirmwareParamsSchema.parse({
+      projectDir: "/tmp",
+      port: "",
+      uploadPort: "/dev/cu.usbmodem101",
+    });
+    expect(parsed.port).toBe("/dev/cu.usbmodem101");
+  });
+
+  it("falls back to upload_port when port and uploadPort are whitespace", () => {
+    const parsed = UploadFirmwareParamsSchema.parse({
+      projectDir: "/tmp",
+      port: "  ",
+      uploadPort: " ",
+      upload_port: "/dev/cu.real",
+    });
+    expect(parsed.port).toBe("/dev/cu.real");
+  });
+});
 
 describe("extends edge cases", () => {
   it("gracefully handles nonexistent extends parent", () => {
@@ -243,5 +436,16 @@ extends = ENV: base
     const app = environments.find((e) => e.name === "app");
     expect(app).toBeDefined();
     expect(app!.board).toBe("esp32-s3-devkitc-1");
+  });
+});
+
+describe("normalizePort edge cases", () => {
+  it("leaves Linux ports untouched", () => {
+    expect(normalizePort("/dev/ttyUSB0")).toBe("/dev/ttyUSB0");
+    expect(normalizePort("/dev/ttyACM0")).toBe("/dev/ttyACM0");
+  });
+
+  it("handles leading/trailing whitespace", () => {
+    expect(normalizePort("  /dev/tty.usbmodem101  ")).toBe("/dev/cu.usbmodem101");
   });
 });

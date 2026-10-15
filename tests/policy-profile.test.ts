@@ -220,4 +220,31 @@ describe("Policy Profiles", () => {
     expect(result.success).toBe(true);
     expect(resolveSpy).toHaveBeenCalled();
   });
+
+  it("normalizes /dev/tty.* port in standalone bypass", async () => {
+    const workspace = makeTempWorkspace({ profile: "standalone" });
+    enrollProjectPolicy(workspace);
+
+    const uploadSpy = vi.spyOn(uploadModule, "uploadFirmware").mockResolvedValue({
+      success: true,
+      message: "Uploaded",
+    });
+
+    await uploadFirmwareCore({
+      projectDir: workspace,
+      environment: "esp32dev",
+      port: "/dev/tty.usbmodem101",
+    });
+
+    // Should be normalised to /dev/cu.usbmodem101
+    expect(uploadSpy).toHaveBeenCalledWith(
+      workspace,
+      "/dev/cu.usbmodem101",
+      "esp32dev",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
+  });
 });

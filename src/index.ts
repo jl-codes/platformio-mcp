@@ -794,6 +794,14 @@ const toolDefinitions: ToolDefinition[] = [
           type: "string",
           description: "Optional upload port (auto-detected if not specified)",
         },
+        uploadPort: {
+          type: "string",
+          description: "Upload port alias (mapped to port)",
+        },
+        upload_port: {
+          type: "string",
+          description: "Upload port alias (mapped to port)",
+        },
         environment: {
           type: "string",
           description: "Optional specific environment from platformio.ini",
@@ -845,6 +853,14 @@ const toolDefinitions: ToolDefinition[] = [
         port: {
           type: "string",
           description: "Optional upload port (auto-detected if not specified)",
+        },
+        uploadPort: {
+          type: "string",
+          description: "Upload port alias (mapped to port)",
+        },
+        upload_port: {
+          type: "string",
+          description: "Upload port alias (mapped to port)",
         },
         environment: {
           type: "string",

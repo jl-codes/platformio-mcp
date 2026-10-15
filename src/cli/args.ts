@@ -125,15 +125,15 @@ const NUMERIC_COMMAND_OPTIONS: Readonly<
   },
   "target-resolve": {
     "binding-ttl": {
-      schema: AgentResolveTargetParamsSchema.shape.bindingTtlSeconds,
+      schema: AgentResolveTargetParamsSchema.sourceType().shape.bindingTtlSeconds,
     },
   },
   "agent-flash-monitor-verify": {
     timeout: {
-      schema: AgentFlashMonitorVerifyParamsSchema.shape.timeoutSeconds,
+      schema: AgentFlashMonitorVerifyParamsSchema.sourceType().shape.timeoutSeconds,
     },
     "stability-window": {
-      schema: AgentFlashMonitorVerifyParamsSchema.shape.stabilityWindowSeconds,
+      schema: AgentFlashMonitorVerifyParamsSchema.sourceType().shape.stabilityWindowSeconds,
     },
   },
   "pending-approvals": {

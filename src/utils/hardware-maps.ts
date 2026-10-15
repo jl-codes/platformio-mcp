@@ -27,12 +27,31 @@ export const vidPidDatabase: Record<
   "0403:6001": { boards: ["uno", "pro16MHzatmega328"], confidence: "low" },
   "2e8a:0005": { boards: ["pico"], confidence: "high" },
   "0483:374b": { boards: ["nucleo_f103rb"], confidence: "high" },
+  "303a:1001": {
+    boards: ["esp32-s3-devkitc-1", "esp32s3box", "esp32-s3-devkitm-1"],
+    confidence: "high",
+  },
+  "303a:1002": {
+    boards: ["esp32-s2-saola-1"],
+    confidence: "high",
+  },
+  "303a:0002": {
+    boards: ["esp32-s2-saola-1"],
+    confidence: "medium",
+  },
 };
 
 /**
  * Regex patterns for deriving board types from strings like manufacturer or description
  */
 export const boardPatterns = [
+  {
+    // /Espressif/i is a broad fallback when VID:PID is unavailable;
+    // may match ESP32-C6 or other Espressif variants.
+    patterns: [/USB JTAG\/serial debug unit/i, /Espressif/i],
+    boardType: "ESP32-S3/C3",
+    boards: ["esp32-s3-devkitc-1", "esp32-c3-devkitm-1"],
+  },
   {
     patterns: [/CP210[0-9]/i, /Silicon Labs/i],
     boardType: "ESP32",
