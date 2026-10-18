@@ -996,6 +996,14 @@ const toolDefinitions: ToolDefinition[] = [
           type: "string",
           description: "Optional COM path. Falls back to default.",
         },
+        uploadPort: {
+          type: "string",
+          description: "Serial port alias (mapped to port).",
+        },
+        upload_port: {
+          type: "string",
+          description: "Serial port alias (mapped to port).",
+        },
         baudRate: {
           type: "number",
           description: "Optional baud rate. Defaults to 115200.",

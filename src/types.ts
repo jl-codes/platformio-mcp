@@ -710,26 +710,42 @@ export const ListInstalledLibrariesParamsSchema = z.object({
 });
 
 // Monitor parameters
-export const StartMonitorParamsSchema = z.object({
-  port: z
-    .string()
-    .optional()
-    .describe(
-      "Optional serial port to monitor (auto-detected if not specified)",
-    ),
-  baudRate: z
-    .number()
-    .optional()
-    .describe("Baud rate for serial connection (defaults to 115200)"),
-  projectDir: z
-    .string()
-    .optional()
-    .describe("Optional project directory for workspace log storage"),
-  environment: z
-    .string()
-    .optional()
-    .describe("Optional PlatformIO environment context"),
-});
+export const StartMonitorParamsSchema = z
+  .object({
+    port: z
+      .string()
+      .optional()
+      .describe(
+        "Optional serial port to monitor (auto-detected if not specified)",
+      ),
+    uploadPort: z
+      .string()
+      .optional()
+      .describe("Serial port alias (mapped to port)"),
+    upload_port: z
+      .string()
+      .optional()
+      .describe("Serial port alias (mapped to port)"),
+    baudRate: z
+      .number()
+      .optional()
+      .describe("Baud rate for serial connection (defaults to 115200)"),
+    projectDir: z
+      .string()
+      .optional()
+      .describe("Optional project directory for workspace log storage"),
+    environment: z
+      .string()
+      .optional()
+      .describe("Optional PlatformIO environment context"),
+  })
+  .transform((data) => ({
+    ...data,
+    port:
+      (data.port?.trim() ? data.port : undefined) ??
+      (data.uploadPort?.trim() ? data.uploadPort : undefined) ??
+      (data.upload_port?.trim() ? data.upload_port : undefined),
+  }));
 
 export const StopMonitorParamsSchema = z.object({
   port: z.string().describe("Serial port to stop monitoring"),
