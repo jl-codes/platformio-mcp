@@ -19,6 +19,11 @@ import { PlatformIOError } from "../utils/errors.js";
 import { mapVidPidToBoard } from "../utils/hardware-maps.js";
 import { portSemaphoreManager } from "../utils/semaphore.js";
 
+// Pattern matching noise ports (macOS debug console, bluetooth, audio/phone peripherals).
+// Mirrors NOISE_PORT_HINT in device-compat.ts and NOISE_PORT_PATTERN in target-resolution.ts.
+const NOISE_PORT_PATTERN =
+  /bluetooth|blth|debug-console|jabra|airpods|iphone/i;
+
 /**
  * Lists all connected serial devices.
  *
@@ -89,12 +94,12 @@ export async function getFirstDevice(): Promise<SerialDevice | null> {
   const devices = await listDevices();
   if (devices.length === 0) return null;
 
-  // Exclude native and secondary Bluetooth bridging drivers
+  // Exclude noise ports (Bluetooth, macOS debug-console, audio/phone peripherals)
+  // and virtual ports with no hardware identity, matching resolveTarget() filtering.
   const validDevices = devices.filter((d) => {
-    const p = d.port.toLowerCase();
-    return (
-      !p.includes("bluetooth") && !p.includes("blth") && !p.includes("bose")
-    );
+    if (NOISE_PORT_PATTERN.test(d.port)) return false;
+    if (d.hwid === "n/a" && d.description === "n/a") return false;
+    return true;
   });
 
   return validDevices.length > 0 ? validDevices[0] : devices[0];
