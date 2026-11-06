@@ -36,6 +36,11 @@ describe("strict policy configuration", () => {
     expect(() => parsePolicyDocument(text, source)).toThrow(PolicyConfigError);
   });
 
+  it("parses standalone profile document successfully", () => {
+    const document = parsePolicyDocument('{"profile":"standalone"}', "policy.json");
+    expect(document).toEqual({ profile: "standalone" });
+  });
+
   it("distinguishes server authority from unknown external host grants", () => {
     const status = getPolicyStatus(root);
     expect(status.serverPolicy).toEqual({
