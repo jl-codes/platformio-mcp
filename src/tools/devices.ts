@@ -102,7 +102,7 @@ export async function getFirstDevice(): Promise<SerialDevice | null> {
     return true;
   });
 
-  return validDevices.length > 0 ? validDevices[0] : devices[0];
+  return validDevices[0] ?? null;
 }
 
 /**

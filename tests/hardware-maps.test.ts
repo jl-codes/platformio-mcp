@@ -9,42 +9,30 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  boardPatterns,
   mapVidPidToBoard,
+  mapVidPidToPlatform,
   vidPidDatabase,
 } from "../src/utils/hardware-maps.js";
 
 describe("hardware maps - vidPidDatabase", () => {
-  it("contains Espressif native USB CDC entries with expected boards and confidence", () => {
+  it("records shared Espressif USB IDs as platform hints, not exact boards", () => {
     expect(vidPidDatabase["303a:1001"]).toEqual({
-      boards: ["esp32-s3-devkitc-1", "esp32s3box", "esp32-s3-devkitm-1"],
-      confidence: "high",
-    });
-
-    expect(vidPidDatabase["303a:1002"]).toEqual({
-      boards: ["esp32-s2-saola-1"],
-      confidence: "high",
-    });
-
-    expect(vidPidDatabase["303a:0002"]).toEqual({
-      boards: ["esp32-s2-saola-1"],
+      boards: [],
       confidence: "medium",
+      platform: "espressif32",
     });
   });
 
-  it("resolves ESP32-S3 boards from USB VID:PID=303A:1001", () => {
-    const board = mapVidPidToBoard(
-      "USB VID:PID=303A:1001",
-      "USB JTAG/serial debug unit",
-    );
-    expect(board).toBe("esp32-s3-devkitc-1");
+  it("does not infer an exact board from shared Espressif USB IDs", () => {
+    expect(mapVidPidToBoard("USB VID:PID=303A:1001", "USB JTAG/serial debug unit")).toBeUndefined();
+    expect(mapVidPidToPlatform("USB VID:PID=303A:1001")).toBe("espressif32");
   });
 
   it("handles case-insensitive hex VID:PID formats", () => {
-    expect(mapVidPidToBoard("USB VID:PID=303a:1001")).toBe("esp32-s3-devkitc-1");
-    expect(mapVidPidToBoard("USB VID_303A&PID_1001")).toBe("esp32-s3-devkitc-1");
-    expect(mapVidPidToBoard("USB VID:PID=303A:1002")).toBe("esp32-s2-saola-1");
-    expect(mapVidPidToBoard("USB VID:PID=303a:0002")).toBe("esp32-s2-saola-1");
+    expect(mapVidPidToPlatform("USB VID:PID=303a:1001")).toBe("espressif32");
+    expect(mapVidPidToPlatform("USB VID_303A&PID_1001")).toBe("espressif32");
+    expect(mapVidPidToBoard("USB VID:PID=303A:1002")).toBeUndefined();
+    expect(mapVidPidToBoard("USB VID:PID=303a:0002")).toBeUndefined();
   });
 
   it("preserves standard legacy board mappings", () => {
@@ -55,28 +43,18 @@ describe("hardware maps - vidPidDatabase", () => {
 });
 
 describe("hardware maps - boardPatterns", () => {
-  it("includes an Espressif USB JTAG / serial debug unit pattern", () => {
-    const jtagPattern = boardPatterns.find((entry) =>
-      entry.patterns.some((p) => p.test("USB JTAG/serial debug unit")),
-    );
-    expect(jtagPattern).toBeDefined();
-    expect(jtagPattern?.boardType).toBe("ESP32-S3/C3");
-    expect(jtagPattern?.boards).toContain("esp32-s3-devkitc-1");
-    expect(jtagPattern?.boards).toContain("esp32-c3-devkitm-1");
-  });
-
-  it("falls back to pattern matching when VID:PID is absent or unknown", () => {
+  it("does not infer exact boards from broad Espressif descriptions", () => {
     const resolvedFromDescription = mapVidPidToBoard(
       "UNKNOWN_HWID",
       "USB JTAG/serial debug unit",
     );
-    expect(resolvedFromDescription).toBe("esp32-s3-devkitc-1");
+    expect(resolvedFromDescription).toBeUndefined();
 
     const resolvedFromEspressif = mapVidPidToBoard(
       "n/a",
       "Espressif Device",
     );
-    expect(resolvedFromEspressif).toBe("esp32-s3-devkitc-1");
+    expect(resolvedFromEspressif).toBeUndefined();
   });
 
   it("returns undefined when no pattern matches", () => {

@@ -424,6 +424,26 @@ extends = common, env:networking
     expect(app!.framework).toBe("arduino");
   });
 
+  it("lets later extends parents override earlier inherited values", () => {
+    const ini = `
+[env:first]
+board = esp32dev
+framework = arduino
+
+[env:second]
+board = esp32-s3-devkitc-1
+framework = espidf
+
+[env:app]
+extends = env:first, env:second
+`;
+    const { environments } = parseTargetEnvironments(ini);
+    const app = environments.find((e) => e.name === "app");
+    expect(app).toBeDefined();
+    expect(app!.board).toBe("esp32-s3-devkitc-1");
+    expect(app!.framework).toBe("espidf");
+  });
+
   it("handles mixed-case extends with spaces after env:", () => {
     const ini = `
 [env:base]

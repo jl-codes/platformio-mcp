@@ -40,11 +40,12 @@ export async function uploadFirmwareCore(
   const policyState = await loadEffectivePolicyState(input.projectDir);
   if (
     policyState.profile === "standalone" &&
+    !input.targetBinding &&
     input.environment?.trim() &&
     input.port?.trim()
   ) {
-    // Standalone mode: trust explicit env+port, skip target resolution ceremony.
-    // Still normalise the port so macOS /dev/tty.* paths resolve correctly.
+    // Standalone mode may skip resolution only when no target binding needs
+    // revalidation. Normalize explicit ports for macOS /dev/tty.* paths.
     target = {
       port: normalizePort(input.port.trim()),
       environment: input.environment.trim(),

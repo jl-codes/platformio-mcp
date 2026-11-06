@@ -196,6 +196,34 @@ describe("Policy Profiles", () => {
     expect(resolveSpy).toHaveBeenCalled();
   });
 
+  it("revalidates a supplied target binding in standalone mode", async () => {
+    const workspace = makeTempWorkspace({
+      profile: "standalone",
+      overrides: { audit_all_agent_actions: false },
+    });
+    enrollProjectPolicy(workspace);
+
+    const uploadSpy = vi.spyOn(uploadModule, "uploadFirmware").mockResolvedValue({
+      success: true,
+      message: "Uploaded",
+    });
+    const resolveSpy = vi
+      .spyOn(targetModule, "resolveWriteTarget")
+      .mockRejectedValue(new Error("STALE_TARGET_BINDING"));
+
+    await expect(
+      uploadFirmwareCore({
+        projectDir: workspace,
+        environment: "esp32dev",
+        port: "/dev/ttyUSB0",
+        targetBinding: {} as targetModule.TargetBinding,
+      }),
+    ).rejects.toThrow("STALE_TARGET_BINDING");
+
+    expect(resolveSpy).toHaveBeenCalled();
+    expect(uploadSpy).not.toHaveBeenCalled();
+  });
+
   it("falls back to resolveWriteTarget in standalone when port is missing", async () => {
     const workspace = makeTempWorkspace({ profile: "standalone" });
     enrollProjectPolicy(workspace);

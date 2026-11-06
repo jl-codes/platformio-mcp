@@ -5,6 +5,7 @@
  *
  * Provides:
  * - mapVidPidToBoard: Resolves hardware names for the device list tool based on VID/PID or description
+ * - mapVidPidToPlatform: Returns a platform hint for shared USB hardware IDs
  * - vidPidDatabase: Dictionary mapping USB raw strings to development boards
  * - boardPatterns: Regex patterns for matching hardware descriptions
  */
@@ -14,8 +15,10 @@
  */
 export const vidPidDatabase: Record<
   string,
-  { boards: string[]; confidence: string }
+  { boards: string[]; confidence: string; platform?: string }
 > = {
+  // Shared by multiple ESP32 chips and boards: provide no exact board guess.
+  "303a:1001": { boards: [], confidence: "medium", platform: "espressif32" },
   "2341:0043": { boards: ["uno"], confidence: "high" },
   "2341:0042": { boards: ["megaatmega2560"], confidence: "high" },
   "2341:8036": { boards: ["leonardo"], confidence: "high" },
@@ -27,31 +30,12 @@ export const vidPidDatabase: Record<
   "0403:6001": { boards: ["uno", "pro16MHzatmega328"], confidence: "low" },
   "2e8a:0005": { boards: ["pico"], confidence: "high" },
   "0483:374b": { boards: ["nucleo_f103rb"], confidence: "high" },
-  "303a:1001": {
-    boards: ["esp32-s3-devkitc-1", "esp32s3box", "esp32-s3-devkitm-1"],
-    confidence: "high",
-  },
-  "303a:1002": {
-    boards: ["esp32-s2-saola-1"],
-    confidence: "high",
-  },
-  "303a:0002": {
-    boards: ["esp32-s2-saola-1"],
-    confidence: "medium",
-  },
 };
 
 /**
  * Regex patterns for deriving board types from strings like manufacturer or description
  */
 export const boardPatterns = [
-  {
-    // /Espressif/i is a broad fallback when VID:PID is unavailable;
-    // may match ESP32-C6 or other Espressif variants.
-    patterns: [/USB JTAG\/serial debug unit/i, /Espressif/i],
-    boardType: "ESP32-S3/C3",
-    boards: ["esp32-s3-devkitc-1", "esp32-c3-devkitm-1"],
-  },
   {
     patterns: [/CP210[0-9]/i, /Silicon Labs/i],
     boardType: "ESP32",
@@ -127,4 +111,14 @@ export function mapVidPidToBoard(
   }
 
   return undefined;
+}
+
+/** Return a platform hint for shared USB IDs without guessing a board model. */
+export function mapVidPidToPlatform(hwid: string): string | undefined {
+  const match =
+    hwid.match(/VID:PID=([0-9a-f]{4}):([0-9a-f]{4})/iu) ??
+    hwid.match(/VID_([0-9a-f]{4})&PID_([0-9a-f]{4})/iu);
+  return match
+    ? vidPidDatabase[`${match[1]}:${match[2]}`.toLowerCase()]?.platform
+    : undefined;
 }
