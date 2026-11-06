@@ -6,13 +6,14 @@
  * - verifyTargetBinding: Rejects expired or substituted target bindings.
  */
 
-import { NOISE_PORT_HINT, normalizeSerialPort } from "../utils/serial-port.js";
-import { mapVidPidToPlatform } from "../utils/hardware-maps.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { SerialDevice } from "../types.js";
+import { NOISE_PORT_HINT, normalizeSerialPort } from "../utils/serial-port.js";
+import { mapVidPidToPlatform } from "../utils/hardware-maps.js";
 import { PlatformIOError } from "../utils/errors.js";
+import { logDiagnostic } from "../utils/logger.js";
 import { validateProjectPath } from "../utils/validation.js";
 import { listDevicesCore } from "./devices.js";
 import { getProjectConfig } from "../tools/projects.js";
@@ -26,6 +27,7 @@ export interface TargetEnvironment {
   board?: string;
   framework?: string;
   platform?: string;
+  extends?: string[];
 }
 
 /** Short-lived proof binding a workflow to one physical target. */
@@ -82,7 +84,14 @@ export function parseTargetEnvironments(iniText: string): {
 } {
   const environments: TargetEnvironment[] = [];
   const defaults: string[] = [];
-  let active: TargetEnvironment | undefined;
+  let activeEnv: TargetEnvironment | undefined;
+  let activeBaseSection:
+    | { board?: string; framework?: string; platform?: string; extends?: string[] }
+    | undefined;
+  const baseSections = new Map<
+    string,
+    { board?: string; framework?: string; platform?: string; extends?: string[] }
+  >();
   let inPlatformioSection = false;
 
   for (const rawLine of iniText.split(/\r?\n/u)) {
@@ -91,14 +100,21 @@ export function parseTargetEnvironments(iniText: string): {
 
     const section = /^\[([^\]]+)\]\s*(?:[;#].*)?$/u.exec(line);
     if (section) {
-      // Options belong only to their current section, never the previous environment.
-      active = undefined;
+      activeEnv = undefined;
+      activeBaseSection = undefined;
       const sectionName = section[1].trim();
       inPlatformioSection = sectionName.toLowerCase() === "platformio";
-      const environment = /^env:(.+)$/iu.exec(sectionName);
-      if (environment) {
-        active = { name: environment[1].trim() };
-        environments.push(active);
+      const envSection = /^env:(.+)$/iu.exec(sectionName);
+      if (envSection) {
+        activeEnv = { name: envSection[1].trim() };
+        environments.push(activeEnv);
+      } else if (!inPlatformioSection) {
+        let entry = baseSections.get(sectionName.toLowerCase());
+        if (!entry) {
+          entry = {};
+          baseSections.set(sectionName.toLowerCase(), entry);
+        }
+        activeBaseSection = entry;
       }
       continue;
     }
@@ -114,12 +130,86 @@ export function parseTargetEnvironments(iniText: string): {
           .map((item) => item.trim())
           .filter(Boolean),
       );
-    } else if (active && key === "board") {
-      active.board = value;
-    } else if (active && key === "platform") {
-      active.platform = value;
-    } else if (active && key === "framework") {
-      active.framework = value;
+    } else if (key === "board") {
+      if (activeEnv) {
+        activeEnv.board = value;
+      } else if (activeBaseSection) {
+        activeBaseSection.board = value;
+      }
+    } else if (key === "platform") {
+      if (activeEnv) {
+        activeEnv.platform = value;
+      } else if (activeBaseSection) {
+        activeBaseSection.platform = value;
+      }
+    } else if (key === "framework") {
+      if (activeEnv) {
+        activeEnv.framework = value;
+      } else if (activeBaseSection) {
+        activeBaseSection.framework = value;
+      }
+    } else if (key === "extends") {
+      const extendsList = value
+        .split(",")
+        .map((v) => v.trim().replace(/^env:\s*/iu, "").trim())
+        .filter(Boolean);
+      if (activeEnv) {
+        activeEnv.extends = extendsList;
+      } else if (activeBaseSection) {
+        activeBaseSection.extends = extendsList;
+      }
+    }
+  }
+
+  function findSection(
+    targetName: string,
+  ): { board?: string; framework?: string; platform?: string; extends?: string[] } | undefined {
+    const lower = targetName.toLowerCase();
+    const env = environments.find((e) => e.name.toLowerCase() === lower);
+    if (env) return env;
+    return baseSections.get(lower);
+  }
+
+  for (const env of environments) {
+    if (!env.extends || env.extends.length === 0) continue;
+
+    // Values declared by the child remain authoritative. Among inherited
+    // values, PlatformIO applies parents from left to right, so later parents
+    // replace earlier ones when both define the same option.
+    const childBoard = env.board;
+    const childFramework = env.framework;
+    const childPlatform = env.platform;
+    const visited = new Set<string>([env.name.toLowerCase()]);
+    const queue = [...env.extends];
+
+    while (queue.length > 0) {
+      const parentName = queue.shift()!;
+      const parentKey = parentName.toLowerCase();
+
+      if (visited.has(parentKey)) {
+        void logDiagnostic(
+          `Circular extends detected in environment '${env.name}' involving '${parentName}'`,
+        );
+        continue;
+      }
+      visited.add(parentKey);
+
+      const parent = findSection(parentName);
+      if (!parent) continue;
+
+      if (!childBoard && parent.board) {
+        env.board = parent.board;
+      }
+      if (!childFramework && parent.framework) {
+        env.framework = parent.framework;
+      }
+      if (!childPlatform && parent.platform) {
+        env.platform = parent.platform;
+      }
+
+      if (parent.extends && parent.extends.length > 0) {
+        queue.push(...parent.extends);
+      }
     }
   }
 
@@ -275,9 +365,9 @@ export async function resolveTarget(
     };
   }
 
-  const devices = (discoveredDevices ?? (await listDevicesCore())).filter((device) => {
-    return !NOISE_PORT_HINT.test(`${device.port} ${device.description}`);
-  });
+  const devices = (discoveredDevices ?? (await listDevicesCore())).filter((device) =>
+    !NOISE_PORT_HINT.test(`${device.port} ${device.description}`),
+  );
   let candidates = input.port
     ? devices.filter(
         (device) =>
@@ -295,9 +385,10 @@ export async function resolveTarget(
   const compatibleDevices = devices.filter((device) => {
     const platform = mapVidPidToPlatform(device.hwid);
     // Registry names may carry an owner/version; custom URLs remain unknown.
-    const configuredPlatform = /^(?:platformio\/)?([a-z][a-z0-9_]*)(?:@[^\s]+)?$/iu.exec(
-      selectedEnvironment.platform ?? "",
-    )?.[1].toLowerCase();
+    const configuredPlatform =
+      /^(?:platformio\/)?([a-z][a-z0-9_]*)(?:@[^\s]+)?$/iu.exec(
+        selectedEnvironment.platform ?? "",
+      )?.[1].toLowerCase();
     return !platform || !configuredPlatform || configuredPlatform === platform;
   });
   if (!input.port && candidates.length === 0 && compatibleDevices.length === 1) {

@@ -35,9 +35,11 @@ import {
   writeAutomationState,
 } from "../core/automation-state.js";
 import {
+  parseTargetEnvironments,
   resolveTarget,
   resolveWriteTarget,
   type TargetBinding,
+  type TargetEnvironment,
   type TargetResolutionResult,
 } from "../core/target-resolution.js";
 import { validateAutomationScope } from "../core/policy/automation-policy.js";
@@ -63,11 +65,6 @@ import type {
   PinAuditSeverity,
 } from "../types.js";
 
-type ParsedEnvironment = {
-  name: string;
-  board?: string;
-  framework?: string;
-};
 
 const SOURCE_EXTENSIONS = new Set([
   ".c",
@@ -89,43 +86,6 @@ function severityRank(severity: PinAuditSeverity): number {
   return 1;
 }
 
-function parseDefaultEnvironments(iniText: string): string[] {
-  const defaultMatch = iniText.match(/^\s*default_envs\s*=\s*(.+)$/im);
-  if (!defaultMatch) return [];
-  return defaultMatch[1]
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-}
-
-function parseEnvironmentsFromIni(iniText: string): ParsedEnvironment[] {
-  const lines = iniText.split(/\r?\n/);
-  const environments: ParsedEnvironment[] = [];
-  let activeEnv: ParsedEnvironment | undefined;
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith(";") || line.startsWith("#")) continue;
-
-    const sectionMatch = line.match(/^\[env:([^\]]+)\]$/i);
-    if (sectionMatch) {
-      activeEnv = { name: sectionMatch[1].trim() };
-      environments.push(activeEnv);
-      continue;
-    }
-
-    if (!activeEnv) continue;
-    const kvMatch = line.match(/^([a-zA-Z0-9_]+)\s*=\s*(.+)$/);
-    if (!kvMatch) continue;
-    const key = kvMatch[1].toLowerCase();
-    const value = kvMatch[2].trim();
-
-    if (key === "board") activeEnv.board = value;
-    if (key === "framework") activeEnv.framework = value;
-  }
-
-  return environments;
-}
 
 function readProjectIniText(projectDir: string): string {
   const iniPath = path.join(projectDir, "platformio.ini");
@@ -170,13 +130,13 @@ function listSourceFiles(projectDir: string): string[] {
   return out.sort((a, b) => a.localeCompare(b));
 }
 
-function resolveEnvironment(boardEnvs: ParsedEnvironment[]): string | undefined {
+function resolveEnvironment(boardEnvs: TargetEnvironment[]): string | undefined {
   return boardEnvs[0]?.name;
 }
 
 function buildValidationNextSteps(
   hasPlatformioIni: boolean,
-  environments: ParsedEnvironment[],
+  environments: TargetEnvironment[],
   sourceFiles: string[],
   missingConfigEntries: string[],
   hasDevices: boolean,
@@ -257,8 +217,8 @@ export async function agentValidateProject(
     }
   }
 
-  const parsedEnvironments = parseEnvironmentsFromIni(iniText);
-  const defaultFromIni = parseDefaultEnvironments(iniText);
+  const { environments: parsedEnvironments, defaults: defaultFromIni } =
+    parseTargetEnvironments(iniText);
   const defaultEnvironment =
     defaultFromIni[0] ?? resolveEnvironment(parsedEnvironments);
   const boardIds = Array.from(
@@ -703,7 +663,7 @@ function inferBoardIdForProject(
 ): string | undefined {
   const iniText = readProjectIniText(projectDir);
   if (!iniText) return undefined;
-  const envs = parseEnvironmentsFromIni(iniText);
+  const { environments: envs, defaults } = parseTargetEnvironments(iniText);
 
   if (requestedEnvironment?.trim()) {
     const targeted = envs.find(
@@ -711,8 +671,6 @@ function inferBoardIdForProject(
     );
     if (targeted?.board) return targeted.board;
   }
-
-  const defaults = parseDefaultEnvironments(iniText);
 
   if (defaults.length > 0) {
     for (const defaultEnv of defaults) {
@@ -735,8 +693,7 @@ function inferArtifactTargetEnvironments(
   const iniText = readProjectIniText(projectDir);
   if (!iniText) return [];
 
-  const envs = parseEnvironmentsFromIni(iniText);
-  const defaults = parseDefaultEnvironments(iniText);
+  const { environments: envs, defaults } = parseTargetEnvironments(iniText);
   if (defaults.length > 0) {
     return Array.from(new Set(defaults));
   }

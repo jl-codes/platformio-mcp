@@ -12,7 +12,9 @@ import {
 import type { SerialDevice } from "../src/types.js";
 
 vi.mock("../src/tools/projects.js", () => ({ getProjectConfig: vi.fn() }));
+vi.mock("../src/utils/logger.js", () => ({ logDiagnostic: vi.fn() }));
 import { getProjectConfig } from "../src/tools/projects.js";
+import { logDiagnostic } from "../src/utils/logger.js";
 
 const createdDirectories: string[] = [];
 
@@ -49,22 +51,32 @@ describe("target resolution", () => {
     ]);
   });
 
-  it("does not let custom or global sections rewrite the preceding environment", () => {
-    expect(parseTargetEnvironments(
+  it("keeps custom and global sections from rewriting the preceding environment", () => {
+    const parsed = parseTargetEnvironments(
       "[env:native]\nplatform = espressif32\nboard = um_nanos3\nframework = arduino\n" +
         "[common]\nplatform = atmelavr\nboard = uno\nframework = baremetal\n" +
         "[env]\nplatform = ststm32\nboard = nucleo_f401re\n",
-    ).environments).toEqual([
-      { name: "native", platform: "espressif32", board: "um_nanos3", framework: "arduino" },
+    );
+    expect(parsed.environments).toEqual([
+      {
+        name: "native",
+        platform: "espressif32",
+        board: "um_nanos3",
+        framework: "arduino",
+      },
     ]);
   });
 
-  it.each(["[common]", "[common] ; custom settings", "[common] # custom settings"])("reads default environments only from platformio, not %s", (section) => {
-    expect(parseTargetEnvironments(
-      "[platformio]\ndefault_envs = release\n[env:release]\nboard = esp32dev\n" +
-        `default_envs = debug\n${section}\ndefault_envs = debug\n[env:debug]\nboard = esp32dev\n`,
-    ).defaults).toEqual(["release"]);
-  });
+  it.each(["[common]", "[common] ; custom settings", "[common] # custom settings"])(
+    "reads default_envs only from platformio when followed by %s",
+    (section) => {
+      const parsed = parseTargetEnvironments(
+        "[platformio]\ndefault_envs = release\n[env:release]\nboard = esp32dev\n" +
+          `default_envs = debug\n${section}\ndefault_envs = debug\n[env:debug]\nboard = esp32dev\n`,
+      );
+      expect(parsed.defaults).toEqual(["release"]);
+    },
+  );
 
   it("returns ambiguity instead of choosing among multiple environments", async () => {
     const projectDir = createProject(
@@ -140,7 +152,7 @@ it("does not fall back to raw target metadata when computed configuration fails"
   await expect(resolveTarget({ projectDir, environment: "native" }, [device("COM7")])).rejects.toThrow("invalid inheritance");
 });
 
-it("preserves Core's computed global environment defaults despite a trailing custom section", async () => {
+it("preserves Core's computed global environment defaults after a custom section", async () => {
   const projectDir = createProject(
     "[env]\nplatform = espressif32\nboard = um_nanos3\n" +
       "[env:native]\nframework = arduino\n[common]\nplatform = atmelavr\n",
@@ -152,4 +164,145 @@ it("preserves Core's computed global environment defaults despite a trailing cus
   const result = await resolveTarget({ projectDir }, [device("COM7", "um_nanos3")]);
   expect(result).toMatchObject({ success: true, environment: "native", board: "um_nanos3" });
   expect(getProjectConfig).toHaveBeenCalledWith(projectDir);
+});
+
+describe("extends inheritance parsing", () => {
+  it("inherits board from [env:base] via extends = env:base", () => {
+    const parsed = parseTargetEnvironments(`
+[env:base]
+board = esp32dev
+
+[env:child]
+extends = env:base
+`);
+    const child = parsed.environments.find((e) => e.name === "child");
+    expect(child).toBeDefined();
+    expect(child?.board).toBe("esp32dev");
+  });
+
+  it("inherits board from [common] section via extends = common", () => {
+    const parsed = parseTargetEnvironments(`
+[common]
+board = esp32dev
+
+[env:child]
+extends = common
+`);
+    const child = parsed.environments.find((e) => e.name === "child");
+    expect(child).toBeDefined();
+    expect(child?.board).toBe("esp32dev");
+  });
+
+  it("resolves multi-level extends inheritance (a -> b -> c)", () => {
+    const parsed = parseTargetEnvironments(`
+[env:a]
+extends = env:b
+
+[env:b]
+extends = env:c
+
+[env:c]
+board = esp32dev
+`);
+    const envA = parsed.environments.find((e) => e.name === "a");
+    expect(envA).toBeDefined();
+    expect(envA?.board).toBe("esp32dev");
+  });
+
+  it("handles circular extends without infinite looping, logs a warning, and leaves board undefined", () => {
+    const parsed = parseTargetEnvironments(`
+[env:a]
+extends = env:b
+
+[env:b]
+extends = env:a
+`);
+    const envA = parsed.environments.find((e) => e.name === "a");
+    const envB = parsed.environments.find((e) => e.name === "b");
+    expect(envA?.board).toBeUndefined();
+    expect(envB?.board).toBeUndefined();
+    expect(logDiagnostic).toHaveBeenCalledWith(expect.stringContaining("Circular extends detected"));
+  });
+
+  it("allows child to override parent's board value", () => {
+    const parsed = parseTargetEnvironments(`
+[env:base]
+board = esp32dev
+
+[env:child]
+extends = env:base
+board = esp32-s3-devkitc-1
+`);
+    const child = parsed.environments.find((e) => e.name === "child");
+    expect(child).toBeDefined();
+    expect(child?.board).toBe("esp32-s3-devkitc-1");
+  });
+});
+
+
+describe("extends edge cases", () => {
+  it("gracefully handles nonexistent extends parent", () => {
+    const ini = `
+[env:child]
+extends = does_not_exist
+framework = arduino
+`;
+    const { environments } = parseTargetEnvironments(ini);
+    const child = environments.find((e) => e.name === "child");
+    expect(child).toBeDefined();
+    expect(child!.board).toBeUndefined();
+    expect(child!.framework).toBe("arduino");
+  });
+
+  it("resolves multi-parent extends from different sources", () => {
+    const ini = `
+[common]
+board = esp32dev
+
+[env:networking]
+framework = arduino
+
+[env:app]
+extends = common, env:networking
+`;
+    const { environments } = parseTargetEnvironments(ini);
+    const app = environments.find((e) => e.name === "app");
+    expect(app).toBeDefined();
+    expect(app!.board).toBe("esp32dev");
+    expect(app!.framework).toBe("arduino");
+  });
+
+  it("lets later extends parents override earlier inherited values", () => {
+    const ini = `
+[env:first]
+board = esp32dev
+framework = arduino
+
+[env:second]
+board = esp32-s3-devkitc-1
+framework = espidf
+
+[env:app]
+extends = env:first, env:second
+`;
+    const { environments } = parseTargetEnvironments(ini);
+    const app = environments.find((e) => e.name === "app");
+    expect(app).toBeDefined();
+    expect(app!.board).toBe("esp32-s3-devkitc-1");
+    expect(app!.framework).toBe("espidf");
+  });
+
+  it("handles mixed-case extends with spaces after env:", () => {
+    const ini = `
+[env:base]
+board = esp32-s3-devkitc-1
+
+[env:app]
+extends = ENV: base
+`;
+    const { environments } = parseTargetEnvironments(ini);
+    const app = environments.find((e) => e.name === "app");
+    expect(app).toBeDefined();
+    expect(app!.board).toBe("esp32-s3-devkitc-1");
+  });
 });

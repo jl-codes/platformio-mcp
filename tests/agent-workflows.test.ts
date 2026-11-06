@@ -167,6 +167,36 @@ describe("agent workflow integration", () => {
     ).toBe(true);
   });
 
+  it("resolves board and framework inheritance through extends in validation", async () => {
+    const projectDir = createTempProject();
+    writeProjectFiles(
+      projectDir,
+      [
+        "[env:base]",
+        "board = esp32dev",
+        "framework = arduino",
+        "[env:child]",
+        "extends = env:base",
+      ].join("\n"),
+      "void setup() {}\nvoid loop() {}\n",
+    );
+
+    mockedListDevicesCore.mockResolvedValue([
+      {
+        port: "COM7",
+        description: "USB UART",
+        hwid: "USB VID:PID=303A:1001",
+      },
+    ]);
+
+    const result = await agentValidateProject(projectDir);
+
+    expect(result.success).toBe(true);
+    expect(result.missingConfigEntries).toHaveLength(0);
+    expect(result.environments).toEqual(["base", "child"]);
+    expect(result.boardIds).toEqual(["esp32dev"]);
+  });
+
   it("returns diagnostic-rich build success details", async () => {
     const projectDir = createTempProject();
     mockedBuildProjectCore.mockResolvedValue({
