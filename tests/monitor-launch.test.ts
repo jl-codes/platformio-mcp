@@ -201,4 +201,5 @@ sys.argv = ["bridge", "pio", "device", "monitor", "--port", "COM42"]
     { encoding: "utf8", timeout: 10000, windowsHide: true },
   );
   expect(output.trim()).toBe("headless reconnect lifecycle passed");
-});
+  // Leave a bounded test margin above the subprocess's 10-second deadline.
+}, 15000);

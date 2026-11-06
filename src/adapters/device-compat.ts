@@ -2,6 +2,7 @@
  * Reference serial-device presentation without opening ports or asserting hardware identity.
  * Provides projectCompatibilityDevices for authorized discovery adapters.
  */
+import { NOISE_PORT_HINT } from "../utils/serial-port.js";
 import { executeSizeCompatibility } from "./size-compat.js";
 import { executeDecodeCompatibility } from "./decode-compat.js";
 import { inspectPortDiagnostics } from "../core/devices/port-diagnostics.js";
@@ -28,7 +29,6 @@ import type { SerialDevice } from "../types.js";
 // Hint patterns adapted from the pinned reference devices.py; these are not identity checks.
 const DEVELOPMENT_BOARD_HINT =
   /CP210|CH34|CH9102|FTDI|FT23|Silicon Labs|SLAB|usbserial|usbmodem|wchusbserial|ttyUSB|ttyACM|ESP|Arduino|STLink|ST-Link|JLink|J-Link|CMSIS|DAPLink|Espressif|USB/i;
-const NOISE_PORT_HINT = /Bluetooth|debug-console|Jabra|AirPods|iPhone/i;
 
 /**
  * Preserve the reference row shape and stable likely-first ordering.

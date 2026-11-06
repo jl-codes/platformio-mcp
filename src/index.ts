@@ -846,6 +846,16 @@ const toolDefinitions: ToolDefinition[] = [
           type: "string",
           description: "Optional upload port (auto-detected if not specified)",
         },
+        uploadPort: {
+          type: "string",
+          minLength: 1,
+          description: "Alias for port; conflicting selectors are rejected",
+        },
+        upload_port: {
+          type: "string",
+          minLength: 1,
+          description: "Alias for port; conflicting selectors are rejected",
+        },
         environment: {
           type: "string",
           description: "Optional specific environment from platformio.ini",
