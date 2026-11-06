@@ -167,10 +167,15 @@ export function parseTargetEnvironments(iniText: string): {
   for (const env of environments) {
     if (!env.extends || env.extends.length === 0) continue;
 
+    // Values declared by the child remain authoritative. Among inherited
+    // values, PlatformIO applies parents from left to right, so later parents
+    // replace earlier ones when both define the same option.
+    const childBoard = env.board;
+    const childFramework = env.framework;
     const visited = new Set<string>([env.name.toLowerCase()]);
     const queue = [...env.extends];
 
-    while (queue.length > 0 && (!env.board || !env.framework)) {
+    while (queue.length > 0) {
       const parentName = queue.shift()!;
       const parentKey = parentName.toLowerCase();
 
@@ -185,10 +190,10 @@ export function parseTargetEnvironments(iniText: string): {
       const parent = findSection(parentName);
       if (!parent) continue;
 
-      if (!env.board && parent.board) {
+      if (!childBoard && parent.board) {
         env.board = parent.board;
       }
-      if (!env.framework && parent.framework) {
+      if (!childFramework && parent.framework) {
         env.framework = parent.framework;
       }
 
