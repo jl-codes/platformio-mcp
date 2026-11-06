@@ -147,10 +147,7 @@ export async function execPioCommand(
  * @param schema - Zod schema to validate against for type safety.
  * @returns The strongly typed validated object payload.
  */
-export function parsePioJsonOutput<T>(
-  output: string,
-  schema: z.ZodSchema<T, z.ZodTypeDef, unknown>,
-): T {
+export function parsePioJsonOutput<T>(output: string, schema: z.ZodType<T>): T {
   if (!output || output.trim().length === 0) {
     throw new PlatformIOError("Empty output from PlatformIO command");
   }
@@ -241,28 +238,33 @@ export class PlatformIOExecutor {
     },
   ): Promise<CommandResult> {
     const fullArgs = [command, ...args];
-    
+
     // Attempt telemetry tracking for observability of inline executions
     const ctx = mcpContext.getStore();
     const commandId = ctx?.activityId;
     const targetProjectDir = ctx?.targetProjectDir || options?.cwd;
     let taskId: string | undefined = undefined;
-    
+
     if (commandId) {
       taskId = crypto.randomUUID();
       try {
-        await registerCommand({
-          id: commandId,
-          commandDesc: `PIO Task: pio ${fullArgs.join(" ")}`,
-          timestamp: Date.now(),
-          status: "running",
-          tasks: [{
-            taskId,
-            type: command as any,
+        await registerCommand(
+          {
+            id: commandId,
+            commandDesc: `PIO Task: pio ${fullArgs.join(" ")}`,
+            timestamp: Date.now(),
             status: "running",
-            commandDesc: `pio ${fullArgs.join(" ")}`
-          }]
-        }, targetProjectDir);
+            tasks: [
+              {
+                taskId,
+                type: command as any,
+                status: "running",
+                commandDesc: `pio ${fullArgs.join(" ")}`,
+              },
+            ],
+          },
+          targetProjectDir,
+        );
       } catch (e: any) {
         console.error(`[PlatformIO] Inline telemetry failure: ${e.message}`);
       }
@@ -270,21 +272,31 @@ export class PlatformIOExecutor {
 
     try {
       const result = await execPioCommand(fullArgs, options);
-      
+
       if (commandId && taskId) {
-        await updateTaskStatus(commandId, taskId, {
-          status: result.exitCode === 0 ? "success" : "error",
-          exitCode: result.exitCode
-        }, targetProjectDir).catch(() => {});
+        await updateTaskStatus(
+          commandId,
+          taskId,
+          {
+            status: result.exitCode === 0 ? "success" : "error",
+            exitCode: result.exitCode,
+          },
+          targetProjectDir,
+        ).catch(() => {});
       }
-      
+
       return result;
     } catch (error: any) {
       if (commandId && taskId) {
-        await updateTaskStatus(commandId, taskId, {
-          status: "error",
-          exitCode: error.code || 1
-        }, targetProjectDir).catch(() => {});
+        await updateTaskStatus(
+          commandId,
+          taskId,
+          {
+            status: "error",
+            exitCode: error.code || 1,
+          },
+          targetProjectDir,
+        ).catch(() => {});
       }
       throw error;
     }
@@ -320,7 +332,7 @@ export class PlatformIOExecutor {
   async executeWithJsonOutput<T>(
     command: string,
     args: string[],
-    schema: z.ZodSchema<T, z.ZodTypeDef, unknown>,
+    schema: z.ZodType<T>,
     options?: {
       cwd?: string;
       timeout?: number;
@@ -380,11 +392,21 @@ export class PlatformIOExecutor {
       pioBinary = "python3";
       if (process.platform === "win32") {
         const info = await this.execute("system", ["info", "--json-output"], {
-          cwd: options.cwd, env, timeout: 15000,
+          cwd: options.cwd,
+          env,
+          timeout: 15000,
         });
         const python = JSON.parse(info.stdout)?.python_exe?.value;
-        if (typeof python !== "string" || !path.isAbsolute(python) || /[\x00-\x1f\x7f]/.test(python) || /\.(?:cmd|bat|ps1|sh)$/i.test(python)) {
-          throw new PlatformIOError("PlatformIO did not report a native Python interpreter.", "MONITOR_PYTHON_UNAVAILABLE");
+        if (
+          typeof python !== "string" ||
+          !path.isAbsolute(python) ||
+          /[\x00-\x1f\x7f]/.test(python) ||
+          /\.(?:cmd|bat|ps1|sh)$/i.test(python)
+        ) {
+          throw new PlatformIOError(
+            "PlatformIO did not report a native Python interpreter.",
+            "MONITOR_PYTHON_UNAVAILABLE",
+          );
         }
         pioBinary = python;
       }
@@ -438,7 +460,10 @@ function resolvePioPath(): string {
     const out = execSync(whichCmd, { stdio: "pipe" }).toString().trim();
     if (out) {
       // Windows 'where' can return multiple paths, take the first valid one
-      const paths = out.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+      const paths = out
+        .split("\n")
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
       for (const p of paths) {
         if (fs.existsSync(p)) return p;
       }
@@ -449,7 +474,13 @@ function resolvePioPath(): string {
 
   // Native check failed, fallback to extensive hardcoded probes
   if (os.platform() === "win32") {
-    const winCandidate = path.join(os.homedir(), ".platformio", "penv", "Scripts", "pio.exe");
+    const winCandidate = path.join(
+      os.homedir(),
+      ".platformio",
+      "penv",
+      "Scripts",
+      "pio.exe",
+    );
     if (fs.existsSync(winCandidate)) return winCandidate;
     return "pio"; // Fallback to PATH blindly
   }
@@ -464,6 +495,6 @@ function resolvePioPath(): string {
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
   }
-  
+
   return "pio"; // Ultimate fallback
 }

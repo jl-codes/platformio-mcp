@@ -28,7 +28,7 @@ export async function executePowerCompatibility(
   caller: PolicyEvaluationContext,
   operationName: "power_profile" | "pio_power_profile" = "pio_power_profile",
 ) {
-  const raw = z.record(z.unknown()).parse(input);
+  const raw = z.record(z.string(), z.unknown()).parse(input);
   if (raw.operation === "cleanup") {
     const args = z
       .object({

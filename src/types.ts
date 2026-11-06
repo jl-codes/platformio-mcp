@@ -81,7 +81,10 @@ export const BoardInfoSchema = z.object({
   debug: z
     .object({
       tools: z
-        .record(z.object({ default: z.boolean().optional() }).passthrough())
+        .record(
+          z.string(),
+          z.object({ default: z.boolean().optional() }).passthrough(),
+        )
         .optional(),
     })
     .passthrough()
@@ -191,9 +194,13 @@ export interface BuildResult {
   taskId?: string; // UUID mapping to the background invocation
   logPaths?: string[]; // Array of associated trailing paths
   rawLogPath?: string; // Full path to the captured raw log when available
-  testReport?: ReturnType<typeof import("./core/analysis/test-report.js").summarizeTestOutput>; // Validated foreground test case report.
+  testReport?: ReturnType<
+    typeof import("./core/analysis/test-report.js").summarizeTestOutput
+  >; // Validated foreground test case report.
   testReportError?: string; // Explicit missing/invalid report instead of a false passing result.
-  analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
+  analysisReport?: ReturnType<
+    typeof import("./core/analysis/check-report.js").summarizeCheckOutput
+  >; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Structured diagnostic summary for agent-safe recovery flows
 }
 
@@ -242,9 +249,13 @@ export interface UploadResult {
   taskId?: string; // UUID mapping to the background invocation
   logPaths?: string[]; // Array of associated trailing paths
   rawLogPath?: string; // Full path to the captured raw log when available
-  testReport?: ReturnType<typeof import("./core/analysis/test-report.js").summarizeTestOutput>; // Validated foreground test case report.
+  testReport?: ReturnType<
+    typeof import("./core/analysis/test-report.js").summarizeTestOutput
+  >; // Validated foreground test case report.
   testReportError?: string; // Explicit missing/invalid report instead of a false passing result.
-  analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
+  analysisReport?: ReturnType<
+    typeof import("./core/analysis/check-report.js").summarizeCheckOutput
+  >; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Structured diagnostic summary for agent-safe recovery flows
 }
 
@@ -452,8 +463,17 @@ export const SystemInfoParamsSchema = z.object({});
 
 // Build project parameters
 export const BuildProjectParamsSchema = z.object({
-  jobs: z.number().int().min(1).max(1024).optional().describe("Parallel build jobs"),
-  forceExecution: z.boolean().optional().describe("Run the build even when cached inputs match"),
+  jobs: z
+    .number()
+    .int()
+    .min(1)
+    .max(1024)
+    .optional()
+    .describe("Parallel build jobs"),
+  forceExecution: z
+    .boolean()
+    .optional()
+    .describe("Run the build even when cached inputs match"),
   projectDir: z
     .string()
     .min(1)
@@ -482,8 +502,15 @@ export const BuildProjectParamsSchema = z.object({
 
 // Clean project parameters
 export const CleanProjectParamsSchema = z.object({
-  environment: z.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).optional().describe("Environment to clean"),
-  full: z.boolean().optional().describe("Also remove downloaded build dependencies with fullclean"),
+  environment: z
+    .string()
+    .regex(/^[a-zA-Z0-9_-]{1,50}$/)
+    .optional()
+    .describe("Environment to clean"),
+  full: z
+    .boolean()
+    .optional()
+    .describe("Also remove downloaded build dependencies with fullclean"),
   projectDir: z
     .string()
     .min(1)
@@ -503,9 +530,19 @@ export const CleanProjectParamsSchema = z.object({
 // Check project parameters
 export const CheckProjectParamsSchema = z.object({
   severity: z.enum(["low", "medium", "high"]).optional(),
-  pattern: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  pattern: z
+    .string()
+    .min(1)
+    .max(4096)
+    .regex(/^[^\x00-\x1f\x7f]+$/)
+    .optional(),
   skipPackages: z.boolean().optional(),
-  tool: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  tool: z
+    .string()
+    .min(1)
+    .max(4096)
+    .regex(/^[^\x00-\x1f\x7f]+$/)
+    .optional(),
   structuredReport: z.boolean().optional(),
   projectDir: z
     .string()
@@ -525,13 +562,31 @@ export const CheckProjectParamsSchema = z.object({
 
 // Run tests parameters
 export const RunTestsParamsSchema = z.object({
-  filter: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
-  ignore: z.string().min(1).max(4096).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  filter: z
+    .string()
+    .min(1)
+    .max(4096)
+    .regex(/^[^\x00-\x1f\x7f]+$/)
+    .optional(),
+  ignore: z
+    .string()
+    .min(1)
+    .max(4096)
+    .regex(/^[^\x00-\x1f\x7f]+$/)
+    .optional(),
   withoutUploading: z.boolean().optional(),
   withoutBuilding: z.boolean().optional(),
-  uploadPort: z.string().min(1).max(512).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
+  uploadPort: z
+    .string()
+    .min(1)
+    .max(512)
+    .regex(/^[^\x00-\x1f\x7f]+$/)
+    .optional(),
   verbose: z.boolean().optional(),
-  structuredReport: z.boolean().optional().describe("Collect per-case results for a foreground test run"),
+  structuredReport: z
+    .boolean()
+    .optional()
+    .describe("Collect per-case results for a foreground test run"),
   projectDir: z
     .string()
     .min(1)
@@ -559,79 +614,84 @@ export const RunTestsParamsSchema = z.object({
 });
 
 /** Firmware upload arguments; compatible port aliases must select the same endpoint. */
-export const UploadFirmwareParamsSchema = z.object({
-  projectDir: z
-    .string()
-    .min(1)
-    .describe("Path to the PlatformIO project directory"),
-  port: z
-    .string()
-    .optional()
-    .describe("Upload port (auto-detected if not specified)"),
-  uploadPort: z.string().optional().describe("Alias for port"),
-  upload_port: z.string().optional().describe("Alias for port"),
-  environment: z
-    .string()
-    .optional()
-    .describe("Specific environment to upload (from platformio.ini)"),
-  sessionId: z
-    .string()
-    .optional()
-    .describe("Agent session ID for pipeline lock validation"),
-  verbose: z
-    .boolean()
-    .optional()
-    .describe(
-      "If true, returns the complete verbose upload log in the result instead of truncating it",
-    ),
-  background: z
-    .boolean()
-    .optional()
-    .describe(
-      "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
-    ),
-  startMonitorAfter: z
-    .boolean()
-    .optional()
-    .describe(
-      "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration.",
-    ),
-  targetBinding: z
-    .lazy(() => TargetBindingSchema)
-    .optional()
-    .describe("Optional short-lived binding returned by agent_resolve_target."),
-  automationKey: z
-    .string()
-    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
-    .optional(),
-  maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
-}).superRefine((params, context) => {
-  const selectors = [params.port, params.uploadPort, params.upload_port];
-  const suppliedSelectors = selectors.filter((port) => port !== undefined);
-  const ports = selectors
-    .filter((port): port is string => Boolean(port?.trim()))
-    .map((port) => normalizeSerialPort(port.trim()));
-  if (suppliedSelectors.length > 0 && ports.length === 0) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["port"],
-      message: "A port selector cannot be empty",
-    });
-  }
-  if (new Set(ports).size > 1) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["port"],
-      message: "Conflicting port, uploadPort, or upload_port selectors",
-    });
-  }
-}).transform(({ uploadPort, upload_port, ...params }) => ({
-  ...params,
-  port:
-    (params.port?.trim() ? params.port.trim() : undefined) ??
-    (uploadPort?.trim() ? uploadPort.trim() : undefined) ??
-    (upload_port?.trim() ? upload_port.trim() : undefined),
-}));
+export const UploadFirmwareParamsSchema = z
+  .object({
+    projectDir: z
+      .string()
+      .min(1)
+      .describe("Path to the PlatformIO project directory"),
+    port: z
+      .string()
+      .optional()
+      .describe("Upload port (auto-detected if not specified)"),
+    uploadPort: z.string().optional().describe("Alias for port"),
+    upload_port: z.string().optional().describe("Alias for port"),
+    environment: z
+      .string()
+      .optional()
+      .describe("Specific environment to upload (from platformio.ini)"),
+    sessionId: z
+      .string()
+      .optional()
+      .describe("Agent session ID for pipeline lock validation"),
+    verbose: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, returns the complete verbose upload log in the result instead of truncating it",
+      ),
+    background: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
+      ),
+    startMonitorAfter: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration.",
+      ),
+    targetBinding: z
+      .lazy(() => TargetBindingSchema)
+      .optional()
+      .describe(
+        "Optional short-lived binding returned by agent_resolve_target.",
+      ),
+    automationKey: z
+      .string()
+      .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
+      .optional(),
+    maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
+  })
+  .superRefine((params, context) => {
+    const selectors = [params.port, params.uploadPort, params.upload_port];
+    const suppliedSelectors = selectors.filter((port) => port !== undefined);
+    const ports = selectors
+      .filter((port): port is string => Boolean(port?.trim()))
+      .map((port) => normalizeSerialPort(port.trim()));
+    if (suppliedSelectors.length > 0 && ports.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["port"],
+        message: "A port selector cannot be empty",
+      });
+    }
+    if (new Set(ports).size > 1) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["port"],
+        message: "Conflicting port, uploadPort, or upload_port selectors",
+      });
+    }
+  })
+  .transform(({ uploadPort, upload_port, ...params }) => ({
+    ...params,
+    port:
+      (params.port?.trim() ? params.port.trim() : undefined) ??
+      (uploadPort?.trim() ? uploadPort.trim() : undefined) ??
+      (upload_port?.trim() ? upload_port.trim() : undefined),
+  }));
 
 // Upload filesystem parameters
 export const UploadFilesystemParamsSchema = z
@@ -681,7 +741,9 @@ export const UploadFilesystemParamsSchema = z
     targetBinding: z
       .lazy(() => TargetBindingSchema)
       .optional()
-      .describe("Optional short-lived binding returned by agent_resolve_target."),
+      .describe(
+        "Optional short-lived binding returned by agent_resolve_target.",
+      ),
     automationKey: z
       .string()
       .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
@@ -863,16 +925,22 @@ export const TargetBindingSchema = z.object({
 });
 
 /** Zod schema for deterministic project/environment/device resolution. */
-export const AgentResolveTargetParamsSchema = z
-  .object({
-    projectDir: z.string().min(1).max(4096),
-    environment: z.string().min(1).max(80).optional(),
-    port: z.string().min(1).max(512).optional(),
-    uploadPort: z.string().optional().describe("Upload port alias (mapped to port)"),
-    upload_port: z.string().optional().describe("Upload port alias (mapped to port)"),
-    bindingTtlSeconds: z.number().int().min(30).max(900).optional(),
-  })
-  .transform((data) => ({
+export const AgentResolveTargetParamsInputSchema = z.object({
+  projectDir: z.string().min(1).max(4096),
+  environment: z.string().min(1).max(80).optional(),
+  port: z.string().min(1).max(512).optional(),
+  uploadPort: z
+    .string()
+    .optional()
+    .describe("Upload port alias (mapped to port)"),
+  upload_port: z
+    .string()
+    .optional()
+    .describe("Upload port alias (mapped to port)"),
+  bindingTtlSeconds: z.number().int().min(30).max(900).optional(),
+});
+export const AgentResolveTargetParamsSchema =
+  AgentResolveTargetParamsInputSchema.transform((data) => ({
     ...data,
     port:
       (data.port?.trim() ? data.port : undefined) ??
@@ -1093,9 +1161,13 @@ export interface AgentFlashMonitorVerifyResult {
   unmatchedExpectations: string[]; // Expected runtime markers not observed
   rejectedPatterns: string[]; // Rejected runtime patterns that appeared
   detectedRuntimeErrors: string[]; // Built-in runtime failures detected
-  testReport?: ReturnType<typeof import("./core/analysis/test-report.js").summarizeTestOutput>; // Validated foreground test case report.
+  testReport?: ReturnType<
+    typeof import("./core/analysis/test-report.js").summarizeTestOutput
+  >; // Validated foreground test case report.
   testReportError?: string; // Explicit missing/invalid report instead of a false passing result.
-  analysisReport?: ReturnType<typeof import("./core/analysis/check-report.js").summarizeCheckOutput>; // Structured foreground static-analysis report when requested.
+  analysisReport?: ReturnType<
+    typeof import("./core/analysis/check-report.js").summarizeCheckOutput
+  >; // Structured foreground static-analysis report when requested.
   diagnostic?: DiagnosticResult; // Upload-stage diagnostic payload when relevant
   recommendedNextAction: string; // Single recommended next step
   rawMonitorLogPath?: string; // Path to monitor log consumed for verification
@@ -1229,59 +1301,65 @@ export const AgentSafePinAuditParamsSchema = z.object({
 /**
  * Zod schema for `agent_flash_monitor_verify` tool parameters.
  */
-export const AgentFlashMonitorVerifyParamsSchema = z
-  .object({
-    projectDir: z
-      .string()
-      .min(1)
-      .describe("Path to the PlatformIO project directory"),
-    environment: z
-      .string()
-      .optional()
-      .describe("Optional specific environment from platformio.ini"),
-    port: z.string().optional().describe("Optional serial upload port"),
-    uploadPort: z.string().optional().describe("Upload port alias (mapped to port)"),
-    upload_port: z.string().optional().describe("Upload port alias (mapped to port)"),
-    targetBinding: TargetBindingSchema.optional().describe(
-      "Short-lived exact target binding returned by agent_resolve_target.",
+export const AgentFlashMonitorVerifyParamsInputSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+  environment: z
+    .string()
+    .optional()
+    .describe("Optional specific environment from platformio.ini"),
+  port: z.string().optional().describe("Optional serial upload port"),
+  uploadPort: z
+    .string()
+    .optional()
+    .describe("Upload port alias (mapped to port)"),
+  upload_port: z
+    .string()
+    .optional()
+    .describe("Upload port alias (mapped to port)"),
+  targetBinding: TargetBindingSchema.optional().describe(
+    "Short-lived exact target binding returned by agent_resolve_target.",
+  ),
+  expect_all: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "All expected runtime markers that should appear in serial output.",
     ),
-    expect_all: z
-      .array(z.string())
-      .optional()
-      .describe(
-        "All expected runtime markers that should appear in serial output.",
-      ),
-    reject_patterns: z
-      .array(z.string())
-      .optional()
-      .describe("Runtime patterns that must not appear in serial output."),
-    timeoutSeconds: z
-      .number()
-      .int()
-      .positive()
-      .max(300)
-      .optional()
-      .describe("Total verification timeout window in seconds."),
-    stabilityWindowSeconds: z
-      .number()
-      .int()
-      .positive()
-      .max(120)
-      .optional()
-      .describe("Required quiet serial window at the tail of capture."),
-    autoBuild: z
-      .boolean()
-      .optional()
-      .describe(
-        "If true, build before flashing when no firmware artifact is detected.",
-      ),
-    automationKey: z
-      .string()
-      .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
-      .optional(),
-    maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
-  })
-  .transform((data) => ({
+  reject_patterns: z
+    .array(z.string())
+    .optional()
+    .describe("Runtime patterns that must not appear in serial output."),
+  timeoutSeconds: z
+    .number()
+    .int()
+    .positive()
+    .max(300)
+    .optional()
+    .describe("Total verification timeout window in seconds."),
+  stabilityWindowSeconds: z
+    .number()
+    .int()
+    .positive()
+    .max(120)
+    .optional()
+    .describe("Required quiet serial window at the tail of capture."),
+  autoBuild: z
+    .boolean()
+    .optional()
+    .describe(
+      "If true, build before flashing when no firmware artifact is detected.",
+    ),
+  automationKey: z
+    .string()
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
+    .optional(),
+  maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
+});
+export const AgentFlashMonitorVerifyParamsSchema =
+  AgentFlashMonitorVerifyParamsInputSchema.transform((data) => ({
     ...data,
     port:
       (data.port?.trim() ? data.port : undefined) ??

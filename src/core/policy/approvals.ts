@@ -26,7 +26,7 @@ const ApprovalRecordSchema = z
       .regex(/^[a-f0-9]{64}$/)
       .optional(),
     consumedAt: z.string().datetime().optional(),
-    metadata: z.record(z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 

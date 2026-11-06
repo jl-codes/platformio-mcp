@@ -263,7 +263,7 @@ export async function registerPioMonitorPid(
       const identities = readMonitorIdentities(pidsFile);
       const metadata = readMonitorRegistry(
         pidsFile + ".metadata.json",
-        z.record(MonitorMetadataSchema),
+        z.record(z.string(), MonitorMetadataSchema),
       );
       const matchingKeys = monitorRegistryKeys(pids, canonicalPort);
       for (const key of matchingKeys) {
@@ -370,7 +370,7 @@ export async function unregisterPioMonitorPid(
           const identities = readMonitorIdentities(pidsFile);
           const metadata = readMonitorRegistry(
             pidsFile + ".metadata.json",
-            z.record(MonitorMetadataSchema),
+            z.record(z.string(), MonitorMetadataSchema),
           );
           for (const key of matchingKeys) {
             delete pids[key];
@@ -504,7 +504,7 @@ export async function killPioMonitorByPort(
     const identities = readMonitorIdentities(pidsFile);
     const metadata = readMonitorRegistry(
       pidsFile + ".metadata.json",
-      z.record(MonitorMetadataSchema),
+      z.record(z.string(), MonitorMetadataSchema),
     );
     for (const key of matchingKeys) {
       delete pids[key];
@@ -630,15 +630,15 @@ export function getPersistedMonitorStatuses(
   );
   const pids = readMonitorRegistry(
     pidsFile,
-    z.record(z.number().int().min(1).max(2147483647)),
+    z.record(z.string(), z.number().int().min(1).max(2147483647)),
   );
   const identities = readMonitorRegistry(
     pidsFile + ".identities.json",
-    z.record(ProcessIdentitySchema),
+    z.record(z.string(), ProcessIdentitySchema),
   );
   const metadata = readMonitorRegistry(
     pidsFile + ".metadata.json",
-    z.record(MonitorMetadataSchema),
+    z.record(z.string(), MonitorMetadataSchema),
   );
   const records = new Map<
     string,
@@ -719,7 +719,9 @@ export function isBuildActive(projectDir?: string): boolean {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
   if (!fs.existsSync(pidsFile)) return false;
   try {
-    const pids: Record<string, any> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+    const pids: Record<string, any> = JSON.parse(
+      fs.readFileSync(pidsFile, "utf8"),
+    );
     for (const key of Object.keys(pids)) {
       if (pids[key]?.type === "build" || key === "build") {
         const targetPid = key === "build" ? pids[key] : Number(key);
@@ -730,14 +732,19 @@ export function isBuildActive(projectDir?: string): boolean {
   return false;
 }
 
-export async function registerBuildPid(pid: number, projectDir?: string): Promise<void> {
+export async function registerBuildPid(
+  pid: number,
+  projectDir?: string,
+): Promise<void> {
   const pidsFile = getPidsFilePath(projectDir, BUILD_PIDS_FILE);
   const dir = path.dirname(pidsFile);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   if (!fs.existsSync(pidsFile)) fs.writeFileSync(pidsFile, "{}");
 
   try {
-    const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    const release = await lockfile.lock(pidsFile, {
+      retries: { retries: 5, minTimeout: 50, maxTimeout: 200 },
+    });
     try {
       let pids: Record<string, any> = {};
       try {
@@ -758,9 +765,13 @@ export async function unregisterBuildPid(projectDir?: string): Promise<void> {
   if (!fs.existsSync(pidsFile)) return;
 
   try {
-    const release = await lockfile.lock(pidsFile, { retries: { retries: 5, minTimeout: 50, maxTimeout: 200 } });
+    const release = await lockfile.lock(pidsFile, {
+      retries: { retries: 5, minTimeout: 50, maxTimeout: 200 },
+    });
     try {
-      const pids: Record<string, any> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+      const pids: Record<string, any> = JSON.parse(
+        fs.readFileSync(pidsFile, "utf8"),
+      );
       let changed = false;
       for (const key of Object.keys(pids)) {
         if (pids[key]?.type === "build" || key === "build") {
@@ -868,14 +879,18 @@ export async function killTrackedTaskProcess(
  * Wipes out all stray tracked processes across serial instances and builds.
  * Specifically used by emergency reset routines to return the system to a clean state.
  */
-export async function killAllTrackedProcesses(projectDir?: string): Promise<void> {
+export async function killAllTrackedProcesses(
+  projectDir?: string,
+): Promise<void> {
   const tasks: Promise<void>[] = [];
-  
+
   for (const file of [SERIAL_PIDS_FILE, BUILD_PIDS_FILE]) {
     const pidsFile = getPidsFilePath(projectDir, file);
     if (fs.existsSync(pidsFile)) {
       try {
-        const pids: Record<string, any> = JSON.parse(fs.readFileSync(pidsFile, "utf8"));
+        const pids: Record<string, any> = JSON.parse(
+          fs.readFileSync(pidsFile, "utf8"),
+        );
         for (const key of Object.keys(pids)) {
           let targetPid: number | undefined;
           if (file === BUILD_PIDS_FILE) {
@@ -886,7 +901,10 @@ export async function killAllTrackedProcesses(projectDir?: string): Promise<void
             targetPid = pids[key];
           }
           if (targetPid) {
-            logDiag(`[ProcessManager Diagnostic] Emergency killing tracked PID ${targetPid} via ${file}.`, projectDir);
+            logDiag(
+              `[ProcessManager Diagnostic] Emergency killing tracked PID ${targetPid} via ${file}.`,
+              projectDir,
+            );
             const p = new Promise<void>((res) => {
               treeKill(targetPid!, "SIGKILL", () => res());
             });
@@ -897,9 +915,9 @@ export async function killAllTrackedProcesses(projectDir?: string): Promise<void
       } catch {}
     }
   }
-  
+
   await Promise.all(tasks);
-  
+
   // Ensure the command registry is immediately synchronized with reality
   await sweepGhostTasks(projectDir);
 }
@@ -925,17 +943,28 @@ export async function sweepGhostTasks(projectDir?: string): Promise<void> {
 
             if (!isAlive) {
               // Task is dead! Force transition to terminated
-              await updateTaskStatus(cmd.id, task.taskId, { status: "terminated" }, projectDir);
-              logDiag(`[Ghost Sweeper] Cleaned up orphaned ghost task ${task.taskId} (PID: ${pid || 'Unknown'})`, projectDir);
+              await updateTaskStatus(
+                cmd.id,
+                task.taskId,
+                { status: "terminated" },
+                projectDir,
+              );
+              logDiag(
+                `[Ghost Sweeper] Cleaned up orphaned ghost task ${task.taskId} (PID: ${pid || "Unknown"})`,
+                projectDir,
+              );
               changed = true;
             }
           }
         }
       }
     }
-    
+
     if (changed) {
-      logDiag(`[Ghost Sweeper] Successfully scrubbed stale background tasks from registry.`, projectDir);
+      logDiag(
+        `[Ghost Sweeper] Successfully scrubbed stale background tasks from registry.`,
+        projectDir,
+      );
     }
   } catch (e: any) {
     logDiag(`[Ghost Sweeper] Failed to sweep tasks: ${e.message}`, projectDir);
