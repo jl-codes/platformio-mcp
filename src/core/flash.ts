@@ -36,10 +36,12 @@ export async function uploadFirmwareCore(
   const policyState = await loadEffectivePolicyState(input.projectDir);
   if (
     policyState.profile === "standalone" &&
+    !input.targetBinding &&
     input.environment?.trim() &&
     input.port?.trim()
   ) {
-    // Standalone mode: trust explicit env+port, skip target resolution ceremony
+    // Standalone mode may skip resolution only when no prior target binding
+    // needs revalidation before this write.
     target = { port: input.port.trim(), environment: input.environment.trim() };
   } else {
     target = await resolveWriteTarget(input);
