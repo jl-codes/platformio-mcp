@@ -9,7 +9,11 @@ import { uploadFirmware } from "../tools/upload.js";
 import type { UploadResult } from "../types.js";
 import { hardwareLockManager } from "../utils/lock-manager.js";
 import { loadEffectivePolicyState } from "./policy/load-policy.js";
-import { resolveWriteTarget, type TargetBinding } from "./target-resolution.js";
+import {
+  normalizePort,
+  resolveWriteTarget,
+  type TargetBinding,
+} from "./target-resolution.js";
 
 export type UploadFirmwareCoreInput = {
   projectDir: string;
@@ -40,9 +44,12 @@ export async function uploadFirmwareCore(
     input.environment?.trim() &&
     input.port?.trim()
   ) {
-    // Standalone mode may skip resolution only when no prior target binding
-    // needs revalidation before this write.
-    target = { port: input.port.trim(), environment: input.environment.trim() };
+    // Standalone mode may skip resolution only when no target binding needs
+    // revalidation. Normalize explicit ports for macOS /dev/tty.* paths.
+    target = {
+      port: normalizePort(input.port.trim()),
+      environment: input.environment.trim(),
+    };
   } else {
     target = await resolveWriteTarget(input);
   }

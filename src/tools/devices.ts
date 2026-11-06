@@ -20,7 +20,7 @@ import { mapVidPidToBoard } from "../utils/hardware-maps.js";
 import { portSemaphoreManager } from "../utils/semaphore.js";
 
 // Pattern matching noise ports (macOS debug console, bluetooth, audio/phone peripherals).
-// Mirrors NOISE_PORT_HINT in device-compat.ts and NOISE_PORT_PATTERN in target-resolution.ts.
+// Mirrors NOISE_PORT_HINT in device-compat.ts and target-resolution.ts.
 const NOISE_PORT_PATTERN =
   /bluetooth|blth|debug-console|jabra|airpods|iphone/i;
 
@@ -102,7 +102,7 @@ export async function getFirstDevice(): Promise<SerialDevice | null> {
     return true;
   });
 
-  return validDevices.length > 0 ? validDevices[0] : devices[0];
+  return validDevices[0] ?? null;
 }
 
 /**

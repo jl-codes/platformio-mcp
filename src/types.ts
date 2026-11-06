@@ -566,11 +566,10 @@ export const UploadFirmwareParamsSchema = z.object({
     .describe("Path to the PlatformIO project directory"),
   port: z
     .string()
-    .min(1)
     .optional()
     .describe("Upload port (auto-detected if not specified)"),
-  uploadPort: z.string().min(1).optional().describe("Alias for port"),
-  upload_port: z.string().min(1).optional().describe("Alias for port"),
+  uploadPort: z.string().optional().describe("Alias for port"),
+  upload_port: z.string().optional().describe("Alias for port"),
   environment: z
     .string()
     .optional()
@@ -607,10 +606,19 @@ export const UploadFirmwareParamsSchema = z.object({
     .optional(),
   maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
 }).superRefine((params, context) => {
-  const ports = [params.port, params.uploadPort, params.upload_port].filter(
-    (port): port is string => port !== undefined,
-  );
-  if (new Set(ports.map(normalizeSerialPort)).size > 1) {
+  const selectors = [params.port, params.uploadPort, params.upload_port];
+  const suppliedSelectors = selectors.filter((port) => port !== undefined);
+  const ports = selectors
+    .filter((port): port is string => Boolean(port?.trim()))
+    .map((port) => normalizeSerialPort(port.trim()));
+  if (suppliedSelectors.length > 0 && ports.length === 0) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["port"],
+      message: "A port selector cannot be empty",
+    });
+  }
+  if (new Set(ports).size > 1) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["port"],
@@ -619,55 +627,74 @@ export const UploadFirmwareParamsSchema = z.object({
   }
 }).transform(({ uploadPort, upload_port, ...params }) => ({
   ...params,
-  port: params.port ?? uploadPort ?? upload_port,
+  port:
+    (params.port?.trim() ? params.port.trim() : undefined) ??
+    (uploadPort?.trim() ? uploadPort.trim() : undefined) ??
+    (upload_port?.trim() ? upload_port.trim() : undefined),
 }));
 
 // Upload filesystem parameters
-export const UploadFilesystemParamsSchema = z.object({
-  projectDir: z
-    .string()
-    .min(1)
-    .describe("Path to the PlatformIO project directory"),
-  port: z
-    .string()
-    .optional()
-    .describe("Upload port (auto-detected if not specified)"),
-  environment: z
-    .string()
-    .optional()
-    .describe("Specific environment to upload (from platformio.ini)"),
-  sessionId: z
-    .string()
-    .optional()
-    .describe("Agent session ID for pipeline lock validation"),
-  verbose: z
-    .boolean()
-    .optional()
-    .describe(
-      "If true, returns the complete verbose upload log in the result instead of truncating it",
-    ),
-  background: z
-    .boolean()
-    .optional()
-    .describe(
-      "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
-    ),
-  startMonitorAfter: z
-    .boolean()
-    .optional()
-    .describe(
-      "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration.",
-    ),
-  targetBinding: z
-    .lazy(() => TargetBindingSchema)
-    .optional()
-    .describe("Optional short-lived binding returned by agent_resolve_target."),
-  automationKey: z
-    .string()
-    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
-    .optional(),
-  maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
-});
+export const UploadFilesystemParamsSchema = z
+  .object({
+    projectDir: z
+      .string()
+      .min(1)
+      .describe("Path to the PlatformIO project directory"),
+    port: z
+      .string()
+      .optional()
+      .describe("Upload port (auto-detected if not specified)"),
+    uploadPort: z
+      .string()
+      .optional()
+      .describe("Upload port alias (mapped to port)"),
+    upload_port: z
+      .string()
+      .optional()
+      .describe("Upload port alias (mapped to port)"),
+    environment: z
+      .string()
+      .optional()
+      .describe("Specific environment to upload (from platformio.ini)"),
+    sessionId: z
+      .string()
+      .optional()
+      .describe("Agent session ID for pipeline lock validation"),
+    verbose: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, returns the complete verbose upload log in the result instead of truncating it",
+      ),
+    background: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
+      ),
+    startMonitorAfter: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration.",
+      ),
+    targetBinding: z
+      .lazy(() => TargetBindingSchema)
+      .optional()
+      .describe("Optional short-lived binding returned by agent_resolve_target."),
+    automationKey: z
+      .string()
+      .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
+      .optional(),
+    maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
+  })
+  .transform((data) => ({
+    ...data,
+    port:
+      (data.port?.trim() ? data.port : undefined) ??
+      (data.uploadPort?.trim() ? data.uploadPort : undefined) ??
+      (data.upload_port?.trim() ? data.upload_port : undefined),
+  }));
 
 // Search libraries parameters
 export const SearchLibrariesParamsSchema = z.object({
@@ -836,12 +863,22 @@ export const TargetBindingSchema = z.object({
 });
 
 /** Zod schema for deterministic project/environment/device resolution. */
-export const AgentResolveTargetParamsSchema = z.object({
-  projectDir: z.string().min(1).max(4096),
-  environment: z.string().min(1).max(80).optional(),
-  port: z.string().min(1).max(512).optional(),
-  bindingTtlSeconds: z.number().int().min(30).max(900).optional(),
-});
+export const AgentResolveTargetParamsSchema = z
+  .object({
+    projectDir: z.string().min(1).max(4096),
+    environment: z.string().min(1).max(80).optional(),
+    port: z.string().min(1).max(512).optional(),
+    uploadPort: z.string().optional().describe("Upload port alias (mapped to port)"),
+    upload_port: z.string().optional().describe("Upload port alias (mapped to port)"),
+    bindingTtlSeconds: z.number().int().min(30).max(900).optional(),
+  })
+  .transform((data) => ({
+    ...data,
+    port:
+      (data.port?.trim() ? data.port : undefined) ??
+      (data.uploadPort?.trim() ? data.uploadPort : undefined) ??
+      (data.upload_port?.trim() ? data.upload_port : undefined),
+  }));
 
 /** Zod schema for active serial monitor status inspection. */
 export const GetMonitorStatusParamsSchema = z.object({
@@ -1192,55 +1229,65 @@ export const AgentSafePinAuditParamsSchema = z.object({
 /**
  * Zod schema for `agent_flash_monitor_verify` tool parameters.
  */
-export const AgentFlashMonitorVerifyParamsSchema = z.object({
-  projectDir: z
-    .string()
-    .min(1)
-    .describe("Path to the PlatformIO project directory"),
-  environment: z
-    .string()
-    .optional()
-    .describe("Optional specific environment from platformio.ini"),
-  port: z.string().optional().describe("Optional serial upload port"),
-  targetBinding: TargetBindingSchema.optional().describe(
-    "Short-lived exact target binding returned by agent_resolve_target.",
-  ),
-  expect_all: z
-    .array(z.string())
-    .optional()
-    .describe(
-      "All expected runtime markers that should appear in serial output.",
+export const AgentFlashMonitorVerifyParamsSchema = z
+  .object({
+    projectDir: z
+      .string()
+      .min(1)
+      .describe("Path to the PlatformIO project directory"),
+    environment: z
+      .string()
+      .optional()
+      .describe("Optional specific environment from platformio.ini"),
+    port: z.string().optional().describe("Optional serial upload port"),
+    uploadPort: z.string().optional().describe("Upload port alias (mapped to port)"),
+    upload_port: z.string().optional().describe("Upload port alias (mapped to port)"),
+    targetBinding: TargetBindingSchema.optional().describe(
+      "Short-lived exact target binding returned by agent_resolve_target.",
     ),
-  reject_patterns: z
-    .array(z.string())
-    .optional()
-    .describe("Runtime patterns that must not appear in serial output."),
-  timeoutSeconds: z
-    .number()
-    .int()
-    .positive()
-    .max(300)
-    .optional()
-    .describe("Total verification timeout window in seconds."),
-  stabilityWindowSeconds: z
-    .number()
-    .int()
-    .positive()
-    .max(120)
-    .optional()
-    .describe("Required quiet serial window at the tail of capture."),
-  autoBuild: z
-    .boolean()
-    .optional()
-    .describe(
-      "If true, build before flashing when no firmware artifact is detected.",
-    ),
-  automationKey: z
-    .string()
-    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
-    .optional(),
-  maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
-});
+    expect_all: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "All expected runtime markers that should appear in serial output.",
+      ),
+    reject_patterns: z
+      .array(z.string())
+      .optional()
+      .describe("Runtime patterns that must not appear in serial output."),
+    timeoutSeconds: z
+      .number()
+      .int()
+      .positive()
+      .max(300)
+      .optional()
+      .describe("Total verification timeout window in seconds."),
+    stabilityWindowSeconds: z
+      .number()
+      .int()
+      .positive()
+      .max(120)
+      .optional()
+      .describe("Required quiet serial window at the tail of capture."),
+    autoBuild: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, build before flashing when no firmware artifact is detected.",
+      ),
+    automationKey: z
+      .string()
+      .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
+      .optional(),
+    maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
+  })
+  .transform((data) => ({
+    ...data,
+    port:
+      (data.port?.trim() ? data.port : undefined) ??
+      (data.uploadPort?.trim() ? data.uploadPort : undefined) ??
+      (data.upload_port?.trim() ? data.upload_port : undefined),
+  }));
 
 /**
  * Zod schema for `agent_get_last_report` tool parameters.

@@ -17,7 +17,7 @@ export const vidPidDatabase: Record<
   string,
   { boards: string[]; confidence: string; platform?: string }
 > = {
-  // Shared by multiple ESP32 chips/boards: never invent an exact board ID.
+  // Shared by multiple ESP32 chips and boards: provide no exact board guess.
   "303a:1001": { boards: [], confidence: "medium", platform: "espressif32" },
   "2341:0043": { boards: ["uno"], confidence: "high" },
   "2341:0042": { boards: ["megaatmega2560"], confidence: "high" },
@@ -113,7 +113,7 @@ export function mapVidPidToBoard(
   return undefined;
 }
 
-/** Return a platform hint for shared USB IDs, never a physical-device identity. */
+/** Return a platform hint for shared USB IDs without guessing a board model. */
 export function mapVidPidToPlatform(hwid: string): string | undefined {
   const match =
     hwid.match(/VID:PID=([0-9a-f]{4}):([0-9a-f]{4})/iu) ??

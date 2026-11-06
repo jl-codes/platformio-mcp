@@ -85,7 +85,7 @@ describe("getFirstDevice noise port filtering", () => {
     expect(device!.port).toBe("/dev/cu.usbmodem101");
   });
 
-  it("falls back to first raw device when ALL devices are noise", async () => {
+  it("returns null when ALL devices are noise", async () => {
     mockExecutor.mockResolvedValue([
       { port: "/dev/cu.debug-console", description: "n/a", hwid: "n/a" },
       {
@@ -95,9 +95,7 @@ describe("getFirstDevice noise port filtering", () => {
       },
     ]);
     const device = await getFirstDevice();
-    // Should fall back rather than returning null
-    expect(device).not.toBeNull();
-    expect(device!.port).toBe("/dev/cu.debug-console");
+    expect(device).toBeNull();
   });
 
   it("returns null when no devices are present", async () => {

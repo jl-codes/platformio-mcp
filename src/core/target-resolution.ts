@@ -4,6 +4,7 @@
  * Provides:
  * - resolveTarget: Resolves one environment, board, and physical device.
  * - verifyTargetBinding: Rejects expired or substituted target bindings.
+ * - normalizePort: Normalizes macOS /dev/tty.* device paths to /dev/cu.*.
  */
 
 import crypto from "node:crypto";
@@ -20,6 +21,11 @@ import { getProjectConfig } from "../tools/projects.js";
 import { parseProjectEnvironments } from "./project-inspection.js";
 
 const MAX_BINDING_TTL_SECONDS = 900;
+
+/** Normalizes macOS /dev/tty.* serial device paths to /dev/cu.* */
+// TODO: Consider normalizing Windows COM port casing (COM3 vs com3)
+export const normalizePort = (p: string): string =>
+  normalizeSerialPort(p.trim());
 
 /** Resolved environment metadata from platformio.ini. */
 export interface TargetEnvironment {
@@ -374,8 +380,8 @@ export async function resolveTarget(
           normalizeSerialPort(device.port) === normalizeSerialPort(input.port!),
       )
     : devices.filter(
-        (device) =>
-          device.detectedBoard?.toLowerCase() ===
+        (d) =>
+          d.detectedBoard?.toLowerCase() ===
           selectedEnvironment?.board?.toLowerCase(),
       );
   let confidence: TargetResolutionResult["confidence"] = "exact";
