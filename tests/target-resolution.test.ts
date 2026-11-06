@@ -5,12 +5,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fingerprintDevice,
   normalizePort,
-  NOISE_PORT_PATTERN,
   parseTargetEnvironments,
   resolveWriteTarget,
   resolveTarget,
   verifyTargetBinding,
 } from "../src/core/target-resolution.js";
+import { NOISE_PORT_HINT } from "../src/utils/serial-port.js";
 import {
   UploadFirmwareParamsSchema,
   UploadFilesystemParamsSchema,
@@ -56,6 +56,33 @@ describe("target resolution", () => {
       { name: "release", board: "esp32dev", framework: "arduino" },
     ]);
   });
+
+  it("keeps custom and global sections from rewriting the preceding environment", () => {
+    const parsed = parseTargetEnvironments(
+      "[env:native]\nplatform = espressif32\nboard = um_nanos3\nframework = arduino\n" +
+        "[common]\nplatform = atmelavr\nboard = uno\nframework = baremetal\n" +
+        "[env]\nplatform = ststm32\nboard = nucleo_f401re\n",
+    );
+    expect(parsed.environments).toEqual([
+      {
+        name: "native",
+        platform: "espressif32",
+        board: "um_nanos3",
+        framework: "arduino",
+      },
+    ]);
+  });
+
+  it.each(["[common]", "[common] ; custom settings", "[common] # custom settings"])(
+    "reads default_envs only from platformio when followed by %s",
+    (section) => {
+      const parsed = parseTargetEnvironments(
+        "[platformio]\ndefault_envs = release\n[env:release]\nboard = esp32dev\n" +
+          `default_envs = debug\n${section}\ndefault_envs = debug\n[env:debug]\nboard = esp32dev\n`,
+      );
+      expect(parsed.defaults).toEqual(["release"]);
+    },
+  );
 
   it("returns ambiguity instead of choosing among multiple environments", async () => {
     const projectDir = createProject(
@@ -129,6 +156,20 @@ it("does not fall back to raw target metadata when computed configuration fails"
   const projectDir = createProject("[env:base]\nboard = esp32dev\n[env:native]\nextends = env:base\nboard = esp32dev\n");
   vi.mocked(getProjectConfig).mockRejectedValueOnce(new Error("invalid inheritance"));
   await expect(resolveTarget({ projectDir, environment: "native" }, [device("COM7")])).rejects.toThrow("invalid inheritance");
+});
+
+it("preserves Core's computed global environment defaults after a custom section", async () => {
+  const projectDir = createProject(
+    "[env]\nplatform = espressif32\nboard = um_nanos3\n" +
+      "[env:native]\nframework = arduino\n[common]\nplatform = atmelavr\n",
+  );
+  vi.mocked(getProjectConfig).mockResolvedValueOnce([
+    ["platformio", [["default_envs", ["native"]]]],
+    ["env:native", [["platform", "espressif32"], ["board", "um_nanos3"], ["framework", ["arduino"]]]],
+  ]);
+  const result = await resolveTarget({ projectDir }, [device("COM7", "um_nanos3")]);
+  expect(result).toMatchObject({ success: true, environment: "native", board: "um_nanos3" });
+  expect(getProjectConfig).toHaveBeenCalledWith(projectDir);
 });
 
 describe("extends inheritance parsing", () => {
@@ -294,15 +335,15 @@ describe("target resolution - noise port filtering", () => {
     expect(result.binding?.port).toBe("/dev/cu.usbmodem101");
   });
 
-  it("NOISE_PORT_PATTERN matches expected noise port identifiers", () => {
-    expect(NOISE_PORT_PATTERN.test("/dev/cu.debug-console")).toBe(true);
-    expect(NOISE_PORT_PATTERN.test("/dev/cu.Bluetooth-Incoming-Port")).toBe(true);
-    expect(NOISE_PORT_PATTERN.test("/dev/cu.blth-port")).toBe(true);
-    expect(NOISE_PORT_PATTERN.test("/dev/cu.Jabra-Headset")).toBe(true);
-    expect(NOISE_PORT_PATTERN.test("/dev/cu.AirPods-Max")).toBe(true);
-    expect(NOISE_PORT_PATTERN.test("/dev/cu.iPhone-Sync")).toBe(true);
-    expect(NOISE_PORT_PATTERN.test("/dev/cu.usbmodem101")).toBe(false);
-    expect(NOISE_PORT_PATTERN.test("/dev/cu.usbserial-0001")).toBe(false);
+  it("NOISE_PORT_HINT matches expected noise port identifiers", () => {
+    expect(NOISE_PORT_HINT.test("/dev/cu.debug-console")).toBe(true);
+    expect(NOISE_PORT_HINT.test("/dev/cu.Bluetooth-Incoming-Port")).toBe(true);
+    expect(NOISE_PORT_HINT.test("/dev/cu.blth-port")).toBe(true);
+    expect(NOISE_PORT_HINT.test("/dev/cu.Jabra-Headset")).toBe(true);
+    expect(NOISE_PORT_HINT.test("/dev/cu.AirPods-Max")).toBe(true);
+    expect(NOISE_PORT_HINT.test("/dev/cu.iPhone-Sync")).toBe(true);
+    expect(NOISE_PORT_HINT.test("/dev/cu.usbmodem101")).toBe(false);
+    expect(NOISE_PORT_HINT.test("/dev/cu.usbserial-0001")).toBe(false);
   });
 });
 
@@ -349,13 +390,12 @@ describe("upload parameter schemas - port aliases", () => {
     expect(parsed.port).toBe("/dev/cu.usbmodem101");
   });
 
-  it("preserves explicit port when aliases are also passed in UploadFirmwareParamsSchema", () => {
-    const parsed = UploadFirmwareParamsSchema.parse({
+  it("rejects conflicting port selectors in UploadFirmwareParamsSchema", () => {
+    expect(() => UploadFirmwareParamsSchema.parse({
       projectDir: "/tmp",
       port: "/dev/cu.explicit",
       uploadPort: "/dev/cu.alias",
-    });
-    expect(parsed.port).toBe("/dev/cu.explicit");
+    })).toThrow("Conflicting port");
   });
 
   it("maps uploadPort and upload_port aliases to port in UploadFilesystemParamsSchema", () => {

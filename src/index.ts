@@ -856,11 +856,13 @@ const toolDefinitions: ToolDefinition[] = [
         },
         uploadPort: {
           type: "string",
-          description: "Upload port alias (mapped to port)",
+          minLength: 1,
+          description: "Alias for port; conflicting selectors are rejected",
         },
         upload_port: {
           type: "string",
-          description: "Upload port alias (mapped to port)",
+          minLength: 1,
+          description: "Alias for port; conflicting selectors are rejected",
         },
         environment: {
           type: "string",

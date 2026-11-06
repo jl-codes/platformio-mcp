@@ -13,6 +13,7 @@
  * - LibraryInfo: PlatformIO registry library metadata.
  */
 
+import { normalizeSerialPort } from "./utils/serial-port.js";
 import { z } from "zod";
 import type { DiagnosticResult } from "./core/diagnostics/types.js";
 
@@ -69,7 +70,11 @@ export const BoardInfoSchema = z.object({
   ram: z.number().optional(),
   fcpu: z.number().optional(),
   rom: z.number().optional(),
-  frameworks: z.array(z.string()).optional(),
+  // PlatformIO emits null for boards without declared framework support.
+  frameworks: z
+    .array(z.string())
+    .nullish()
+    .transform((value) => value ?? undefined),
   vendor: z.string().optional(),
   url: z.string().optional(),
   connectivity: z.array(z.string()).optional(),
@@ -553,68 +558,80 @@ export const RunTestsParamsSchema = z.object({
     ),
 });
 
-// Upload firmware parameters
-export const UploadFirmwareParamsSchema = z
-  .object({
-    projectDir: z
-      .string()
-      .min(1)
-      .describe("Path to the PlatformIO project directory"),
-    port: z
-      .string()
-      .optional()
-      .describe("Upload port (auto-detected if not specified)"),
-    uploadPort: z
-      .string()
-      .optional()
-      .describe("Upload port alias (mapped to port)"),
-    upload_port: z
-      .string()
-      .optional()
-      .describe("Upload port alias (mapped to port)"),
-    environment: z
-      .string()
-      .optional()
-      .describe("Specific environment to upload (from platformio.ini)"),
-    sessionId: z
-      .string()
-      .optional()
-      .describe("Agent session ID for pipeline lock validation"),
-    verbose: z
-      .boolean()
-      .optional()
-      .describe(
-        "If true, returns the complete verbose upload log in the result instead of truncating it",
-      ),
-    background: z
-      .boolean()
-      .optional()
-      .describe(
-        "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
-      ),
-    startMonitorAfter: z
-      .boolean()
-      .optional()
-      .describe(
-        "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration.",
-      ),
-    targetBinding: z
-      .lazy(() => TargetBindingSchema)
-      .optional()
-      .describe("Optional short-lived binding returned by agent_resolve_target."),
-    automationKey: z
-      .string()
-      .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
-      .optional(),
-    maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
-  })
-  .transform((data) => ({
-    ...data,
-    port:
-      (data.port?.trim() ? data.port : undefined) ??
-      (data.uploadPort?.trim() ? data.uploadPort : undefined) ??
-      (data.upload_port?.trim() ? data.upload_port : undefined),
-  }));
+/** Firmware upload arguments; compatible port aliases must select the same endpoint. */
+export const UploadFirmwareParamsSchema = z.object({
+  projectDir: z
+    .string()
+    .min(1)
+    .describe("Path to the PlatformIO project directory"),
+  port: z
+    .string()
+    .optional()
+    .describe("Upload port (auto-detected if not specified)"),
+  uploadPort: z.string().optional().describe("Alias for port"),
+  upload_port: z.string().optional().describe("Alias for port"),
+  environment: z
+    .string()
+    .optional()
+    .describe("Specific environment to upload (from platformio.ini)"),
+  sessionId: z
+    .string()
+    .optional()
+    .describe("Agent session ID for pipeline lock validation"),
+  verbose: z
+    .boolean()
+    .optional()
+    .describe(
+      "If true, returns the complete verbose upload log in the result instead of truncating it",
+    ),
+  background: z
+    .boolean()
+    .optional()
+    .describe(
+      "If true, dispatches the long-running compilation to the background and returns immediately to prevent MCP timeouts. You must poll status subsequently.",
+    ),
+  startMonitorAfter: z
+    .boolean()
+    .optional()
+    .describe(
+      "If true, automatically starts the background serial monitor after a successful upload, handling OS-level port re-enumeration.",
+    ),
+  targetBinding: z
+    .lazy(() => TargetBindingSchema)
+    .optional()
+    .describe("Optional short-lived binding returned by agent_resolve_target."),
+  automationKey: z
+    .string()
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/u)
+    .optional(),
+  maxRunDurationSeconds: z.number().int().min(1).max(900).optional(),
+}).superRefine((params, context) => {
+  const selectors = [params.port, params.uploadPort, params.upload_port];
+  const suppliedSelectors = selectors.filter((port) => port !== undefined);
+  const ports = selectors
+    .filter((port): port is string => Boolean(port?.trim()))
+    .map((port) => normalizeSerialPort(port.trim()));
+  if (suppliedSelectors.length > 0 && ports.length === 0) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["port"],
+      message: "A port selector cannot be empty",
+    });
+  }
+  if (new Set(ports).size > 1) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["port"],
+      message: "Conflicting port, uploadPort, or upload_port selectors",
+    });
+  }
+}).transform(({ uploadPort, upload_port, ...params }) => ({
+  ...params,
+  port:
+    (params.port?.trim() ? params.port.trim() : undefined) ??
+    (uploadPort?.trim() ? uploadPort.trim() : undefined) ??
+    (upload_port?.trim() ? upload_port.trim() : undefined),
+}));
 
 // Upload filesystem parameters
 export const UploadFilesystemParamsSchema = z
