@@ -16,9 +16,9 @@
 import type { OptionValue } from "./commands/types.js";
 import type { ZodTypeAny } from "zod";
 import {
-  AgentFlashMonitorVerifyParamsSchema,
+  AgentFlashMonitorVerifyParamsInputSchema,
   AgentMonitorHealthParamsSchema,
-  AgentResolveTargetParamsSchema,
+  AgentResolveTargetParamsInputSchema,
   BuildProjectParamsSchema,
   CaptureSerialWindowParamsSchema,
   ListPendingApprovalsParamsSchema,
@@ -125,15 +125,16 @@ const NUMERIC_COMMAND_OPTIONS: Readonly<
   },
   "target-resolve": {
     "binding-ttl": {
-      schema: AgentResolveTargetParamsSchema.sourceType().shape.bindingTtlSeconds,
+      schema: AgentResolveTargetParamsInputSchema.shape.bindingTtlSeconds,
     },
   },
   "agent-flash-monitor-verify": {
     timeout: {
-      schema: AgentFlashMonitorVerifyParamsSchema.sourceType().shape.timeoutSeconds,
+      schema: AgentFlashMonitorVerifyParamsInputSchema.shape.timeoutSeconds,
     },
     "stability-window": {
-      schema: AgentFlashMonitorVerifyParamsSchema.sourceType().shape.stabilityWindowSeconds,
+      schema:
+        AgentFlashMonitorVerifyParamsInputSchema.shape.stabilityWindowSeconds,
     },
   },
   "pending-approvals": {
