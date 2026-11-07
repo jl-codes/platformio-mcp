@@ -36,7 +36,9 @@ function parseRequest(
   input: unknown,
 ) {
   try {
-    const { request_approval_id, ...raw } = z.record(z.unknown()).parse(input);
+    const { request_approval_id, ...raw } = z
+      .record(z.string(), z.unknown())
+      .parse(input);
     const approvalId = z
       .string()
       .min(1)

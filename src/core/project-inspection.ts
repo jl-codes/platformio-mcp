@@ -30,6 +30,7 @@ const targetSchema = z.object({
   group: text.nullish(),
 });
 const metadataSchema = z.record(
+  z.string(),
   z
     .object({
       env_name: z.string().optional(),
@@ -145,7 +146,8 @@ export function parseProjectEnvironments(output: string) {
       uploadProtocol: options.upload_protocol ?? null,
       partitionTable: options["board_build.partitions"] ?? null,
       sdkconfigPath: options["board_build.esp-idf.sdkconfig_path"] ?? null,
-      partitionTableUploadOffset: options["board_upload.partition_table_offset"] ?? null,
+      partitionTableUploadOffset:
+        options["board_upload.partition_table_offset"] ?? null,
       flashSize: options["board_upload.flash_size"] ?? null,
       mcu: options["board_build.mcu"] ?? null,
       libraryDependencies: options.lib_deps ?? [],
@@ -221,7 +223,9 @@ export function parseProjectMetadata(output: string, environment?: string) {
           buildType: item.build_type ?? null,
           defines: item.defines ?? [],
           includeDirs: item.includes?.build?.slice(0, 40) ?? [],
-          partitionFrameworkCandidates: partitionFrameworkCandidates(item.includes?.build ?? []),
+          partitionFrameworkCandidates: partitionFrameworkCandidates(
+            item.includes?.build ?? [],
+          ),
           includeDirCount: item.includes?.build?.length ?? 0,
           toolchainIncludeDirCount: item.includes?.toolchain?.length ?? 0,
           librarySourceDirs: item.libsource_dirs ?? [],

@@ -27,7 +27,7 @@ export const FlashVerificationSchema = z
     monitorPort: z.string().min(1).max(512),
     baudRate: z.number().int().min(1).max(4000000),
     stopOpenSessions: z.boolean().default(false),
-    verification: VerificationCaptureSchema.default({}),
+    verification: VerificationCaptureSchema.prefault({}),
     retainFirmware: z.boolean().default(false),
     resumeId: z.string().uuid().optional(),
     manifestApprovalId: z.string().max(256).optional(),
