@@ -89,5 +89,5 @@ user's authorized scope, then read status again.
 
 `serverPolicy` describes this server's gates. `hostPolicy` reports external host
 enforcement with unknown effective runtime permissions. Do not interpret a server
-allow as approval from Codex or another MCP host, or edit host `config.toml` to
+allow as approval from the host or another MCP client, or edit host `config.toml` to
 bypass a denial. Preserve customized host tool settings during installation.

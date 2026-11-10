@@ -332,7 +332,12 @@ async function spawnPioMonitor(
   if (!daemon) return;
 
   // Preserve project filters: --raw bypasses PlatformIO transformations.
-  const monitorArgs = ["--port", targetPort];
+  const monitorArgs = [
+    "--port",
+    targetPort,
+    "--rts",
+    "0", // Non-invasive: prevent device reset via auto-reset circuit (RTS→EN)
+  ];
 
   if (daemon.environment) {
     monitorArgs.push("--environment", daemon.environment);

@@ -158,6 +158,8 @@ it("retains configured filtering and exposes a dead or missing tracked process a
     "monitor",
     "--port",
     "COM42",
+    "--rts",
+    "0",
     "--environment",
     "fixture",
   ]);
